@@ -13,7 +13,6 @@ function make(overrides: Partial<CoalescableAssignment> = {}): CoalescableAssign
     oreLines: [{ typeId: 100, quantity: 10 }],
     estimatedValue: 1000,
     taxOwed: 50,
-    hasPayment: false,
     ...overrides,
   };
 }
@@ -128,12 +127,6 @@ describe('planEntryMerges', () => {
     for (const status of ['paid', 'dismissed', 'needs-review']) {
       expect(planEntryMerges([make({ id: 'a', status }), make({ id: 'b', status })])).toEqual([]);
     }
-  });
-
-  it('never fuses a record carrying a recorded payment', () => {
-    expect(
-      planEntryMerges([make({ id: 'a', hasPayment: true }), make({ id: 'b', hasPayment: true })])
-    ).toEqual([]);
   });
 
   it('leaves different dates, systems and characters alone', () => {

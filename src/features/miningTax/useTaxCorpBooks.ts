@@ -5,7 +5,7 @@ import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClai
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
-import { owedWhereUncovered, paymentCoverage } from './paymentLinks';
+import { withPaidStatus } from './payeeAccounts';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
@@ -21,26 +21,18 @@ export function useTaxCorpBooks(
     characters.map((c) => c.characterId).join(',')
   );
 
-  // Every Assignment the ledger stores, the ones a book row stands in for included: whether a
-  // transaction is already linked is decided over all of them, or a donation two book days used
-  // up is offered again to link to a third.
-  const storedAssignments = useMemo(
-    () => (data?.entries ?? []).flatMap((row) => row.assignments),
-    [data?.entries]
-  );
-  // A paid day the ISK linked to it does not reach is still owed (`paymentCoverage`).
-  const ledger = useMemo((): TaxSnapshot | null => {
-    if (!data) return null;
-    const amounts = new Map(madePayments.map((m) => [m.key, m.amount]));
-    const { uncovered } = paymentCoverage(storedAssignments, (key) => amounts.get(key));
-    const entries = owedWhereUncovered(data.entries, uncovered);
-    return entries === data.entries ? data : { ...data, entries };
-  }, [data, madePayments, storedAssignments]);
-
   const payees = useMemo(
     () => [...(data?.payeesByCharacter.values() ?? [])].flat(),
     [data?.payeesByCharacter]
   );
+  // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
+  // day, oldest first (decision 20261120-235011), whatever mark it stores.
+  const ledger = useMemo(
+    (): TaxSnapshot | null =>
+      data ? { ...data, entries: withPaidStatus(data.entries, payees, data.paymentLinks) } : null,
+    [data, payees]
+  );
+
   // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
   // the tab is exactly what it was).
   const leftAck = useHiddenLeftCorps();
@@ -73,7 +65,6 @@ export function useTaxCorpBooks(
   });
   return {
     ledger,
-    storedAssignments,
     madePayments,
     paymentSources,
     corpView,

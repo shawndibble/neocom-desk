@@ -11,6 +11,7 @@
  * the calendar Statement they replaced; `lateNoticeFromStatementDoc` reads one into a `LateNotice`.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
+import { DAY_MS } from './timeConstants.js';
 
 /** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
 export type LateNoticeKind = 'late' | 'final';
@@ -282,6 +283,64 @@ export function legacyStatementDocOf(notice: LateNotice): Record<string, unknown
     remindersStopped: notice.mail.remindersStopped,
     ...notice.names,
   };
+}
+
+/**
+ * Why a new notice is not sent, or null: a line another notice already listed (a notice lists only
+ * new days), or the cooldown since the Miner's last late notice (`cooldownDays`) has not passed. So
+ * two tabs never mail the same days. A final notice starts no cooldown.
+ */
+export function lateNoticeRefusal(
+  notice: { lines: readonly Pick<LateNoticeLine, 'key'>[] },
+  earlier: readonly {
+    issuedAt: string;
+    kind?: LateNoticeKind;
+    lines: readonly Pick<LateNoticeLine, 'key'>[];
+  }[],
+  cooldownDays: number,
+  now: string
+): 'already-listed' | 'notice-cooldown' | null {
+  const listed = listedKeys(earlier);
+  if (notice.lines.some((l) => listed.has(l.key))) return 'already-listed';
+  const last = earlier
+    .filter((n) => n.kind !== 'final')
+    .map((n) => Date.parse(n.issuedAt))
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => b - a)[0];
+  if (last !== undefined && Date.parse(now) - last < cooldownDays * DAY_MS)
+    return 'notice-cooldown';
+  return null;
+}
+
+/**
+ * The Late notices stored in both collections, one per id (decision 20261120-235011): a
+ * `lateNotices` doc (`current`, its server stamp dropped) wins, with its mail state read from its
+ * legacy copy too (`mergeNoticeMail`); a legacy doc with no copy is read as its notice; anything
+ * that is no notice (a malformed doc, a calendar Statement) is left out.
+ */
+export function mergeNoticeDocs(
+  current: readonly Record<string, unknown>[],
+  legacy: readonly Record<string, unknown>[]
+): LateNotice[] {
+  const old = new Map<string, LateNotice>();
+  for (const raw of legacy) {
+    const notice = lateNoticeFromStatementDoc(raw);
+    if (notice?.id && notice.minerId) old.set(notice.id, notice);
+  }
+  const out = new Map(old);
+  for (const raw of current) {
+    if (typeof raw.id !== 'string' || typeof raw.minerId !== 'string') continue;
+    if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) continue;
+    const { updatedAt: _stamp, ...rest } = raw;
+    void _stamp;
+    const notice = rest as unknown as LateNotice;
+    const copy = old.get(notice.id);
+    out.set(
+      notice.id,
+      copy ? { ...notice, mail: mergeNoticeMail(notice.mail, copy.mail) } : notice
+    );
+  }
+  return [...out.values()];
 }
 
 /** Every line key any of these notices listed. */

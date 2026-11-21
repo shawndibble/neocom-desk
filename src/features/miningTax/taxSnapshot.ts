@@ -1,6 +1,7 @@
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { TradeHub } from '@/market/hubs';
 import type { PayeeRecord } from '@/db';
+import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
 import {
   loadMoonMiningTaxSnapshot,
   type MoonMiningTaxRow,
@@ -14,6 +15,8 @@ export interface TaxSnapshot {
   entries: MoonMiningTaxRow[];
   characters: TrackedCharacter[];
   payeesByCharacter: Map<number, PayeeRecord[]>;
+  paymentLinks: PayeePaymentLink[];
+  payeeCheckpoints: ReadonlyMap<string, StoredPayeeCheckpoint>;
   unclassified: { characterId: number; characterName: string; typeIds: number[] }[];
   reauthCharacters: TrackedCharacter[];
   fetchedAt: Date | null;

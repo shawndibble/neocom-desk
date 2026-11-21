@@ -5,7 +5,7 @@ import {
   type RunningDay,
 } from './minerRunningAccount';
 import {
-  checkpointProblem,
+  checkpointProblems,
   type RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { TaxPayment } from './payments';
@@ -492,12 +492,12 @@ function harderBook(seed: number): { input: MinerRunningAccountInput; through: s
   };
 }
 
-describe('a checkpoint always passes the shared checkpointProblem (M5)', () => {
+describe('a checkpoint always passes the shared checkpointProblems (M5)', () => {
   it('on 500 random books with held days, officer charges and recorded-paid days', () => {
     for (let seed = 1; seed <= 500; seed += 1) {
       const { input, through } = harderBook(seed);
       const cp = MinerRunningAccount.checkpoint(input, 'm1', through, { at: 'x' });
-      expect(checkpointProblem(cp), `seed ${seed}: ${JSON.stringify(cp)}`).toBeNull();
+      expect(checkpointProblems(cp), `seed ${seed}: ${JSON.stringify(cp)}`).toEqual([]);
     }
   });
 });

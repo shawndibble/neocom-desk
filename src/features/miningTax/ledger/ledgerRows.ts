@@ -22,16 +22,20 @@ export const DEFAULT_LEDGER_FILTER: LedgerFilter = {
   kinds: LEDGER_KINDS,
 };
 
-/** The rows the filter keeps. Each keeps the account's running balance: filtering hides rows, it never re-adds them. */
+/**
+ * The rows the filter keeps. Each keeps the account's running balance: filtering hides rows, it
+ * never re-adds them. The opening balance is what every later balance starts from: always kept.
+ */
 export function filterLedgerRows(
   rows: readonly PayeeLedgerRow[],
   filter: LedgerFilter
 ): PayeeLedgerRow[] {
   return rows.filter(
     (r) =>
-      filter.kinds.includes(r.kind) &&
-      (filter.startDate === null || r.date >= filter.startDate) &&
-      (filter.endDate === null || r.date <= filter.endDate)
+      r.kind === 'opening' ||
+      (filter.kinds.includes(r.kind) &&
+        (filter.startDate === null || r.date >= filter.startDate) &&
+        (filter.endDate === null || r.date <= filter.endDate))
   );
 }
 
@@ -71,6 +75,8 @@ export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
       return t(`miningTax.ledger.what.${row.cause}`);
     case 'notice':
       return t(`miningTax.ledger.what.${row.notice.kind}`);
+    case 'opening':
+      return t('miningTax.ledger.what.opening', { date: row.date });
   }
 }
 
@@ -79,7 +85,7 @@ export function ledgerCsvColumns(t: Translate): CsvColumn<PayeeLedgerRow>[] {
     { header: t('miningTax.ledger.column.date'), value: (r) => r.date },
     { header: t('miningTax.ledger.column.what'), value: (r) => ledgerWhat(r, t) },
     { header: t('miningTax.ledger.column.charged'), value: (r) => r.charged || null },
-    { header: t('miningTax.ledger.column.paid'), value: (r) => r.paid || null },
+    { header: t('miningTax.ledger.column.credited'), value: (r) => r.paid || null },
     { header: t('miningTax.ledger.column.balance'), value: (r) => r.balance },
   ];
 }

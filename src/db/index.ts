@@ -22,6 +22,7 @@ import type {
   MailDraftRecord,
   MiningLedgerHistoryRecord,
   MiningTaxAssignmentRecord,
+  MiningTaxPaymentLinkRecord,
   NetWorthSnapshotRecord,
   CharacterAcceleratorRecord,
   NotificationFeedRecord,
@@ -64,6 +65,7 @@ export const db = new Dexie('neocom') as Dexie & {
   payees: EntityTable<PayeeRecord, 'id'>;
   fittings: EntityTable<FittingRecord, 'id'>;
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
+  miningTaxPaymentLinks: EntityTable<MiningTaxPaymentLinkRecord, 'id'>;
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
@@ -340,4 +342,11 @@ db.version(32).stores({
 db.version(33).stores({
   corpMailQueue: 'id, corporationId, batchId, senderCharacterId, order, statementId',
   netWorthSnapshots: 'id, characterId, [characterId+day]',
+});
+
+// Adds `miningTaxPaymentLinks`: each Made Payment linked to one Payee, which pays its oldest unpaid
+// days (decision 20261120-235011). Synced as Editable Data; replaces the paid marks Assignments
+// carried, which stay readable and are read into links once (`legacyPaidMarks.ts`).
+db.version(34).stores({
+  miningTaxPaymentLinks: 'id, characterId, payeeId',
 });

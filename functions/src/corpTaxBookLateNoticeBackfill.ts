@@ -2,12 +2,21 @@
 // `lateNotices` collection existed lives only as a `statements` doc (`kind: 'notice'`), its link
 // only in `statementLinks`. This copies each into `lateNotices` / `lateNoticeLinks` once, brings
 // the mail state of a copy that already exists level with its legacy doc (`mergeNoticeMail`), and
-// marks the book (`BACKFILLED_DOC`), after which no read looks at the legacy docs. A re-run copies
-// nothing new. Run by functions/scripts/backfill-late-notices.mjs.
+// marks the book (`BACKFILLED_DOC`), after which no read looks at the legacy docs. It also gives
+// each payment stored before `uids` its readers (`planPaymentReaders`). A re-run copies nothing
+// new. Run by functions/scripts/backfill-late-notices.mjs.
 
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore, type Timestamp } from 'firebase-admin/firestore';
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
-import { LATE_NOTICES, LATE_NOTICE_LINKS, STATEMENTS, STATEMENT_LINKS } from './corpTaxBook.js';
+import {
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  MINERS,
+  PAYMENTS,
+  STATEMENTS,
+  STATEMENT_LINKS,
+} from './corpTaxBook.js';
+import { minerUidsOf, paymentUids } from './corpTaxBookClaims.js';
 import {
   lateNoticeFromStatementDoc,
   mergeNoticeMail,
@@ -113,4 +122,74 @@ export async function applyLateNoticeBackfill(
   ];
   await commitInBatches(db, ops);
   await book.collection(META).doc(BACKFILLED_DOC).set({ at: Date.now() });
+}
+
+/**
+ * The payments stored before `uids`, each with its readers: its Miner's (`minerUidsOf`) and its
+ * sender's, as every write now stores them (`paymentUids`). One that has `uids` is left alone, so
+ * a re-run plans nothing and a grouping's later narrowing is never undone.
+ */
+export function planPaymentReaders(
+  payments: readonly Doc[],
+  miners: readonly Doc[]
+): { id: string; uids: string[] }[] {
+  const byId = new Map(miners.map((m) => [m.id, m.data]));
+  return payments.flatMap(({ id, data }) => {
+    if ('uids' in data) return [];
+    const minerId = typeof data.minerId === 'string' ? data.minerId : undefined;
+    const miner = minerId === undefined ? undefined : byId.get(minerId);
+    const readers =
+      minerId === undefined
+        ? []
+        : minerUidsOf(
+            minerId,
+            miner && {
+              characterIds: (miner.characterIds as number[] | undefined) ?? [],
+              officerClaimed: miner.officerClaimed as number[] | undefined,
+              pendingConfirmation: miner.pendingConfirmation as number[] | undefined,
+            }
+          );
+    return [{ id, uids: paymentUids(readers, data.uid) }];
+  });
+}
+
+/** A payment's planned readers, with the version read, so a write meanwhile is never overwritten. */
+export type PaymentReaders = { id: string; uids: string[]; updateTime: Timestamp };
+
+/** Reads one book's payments and groupings and plans the payments' readers. */
+export async function planPaymentReadersBackfill(
+  db: Firestore,
+  corporationId: number
+): Promise<PaymentReaders[]> {
+  const book = db.collection('corps').doc(String(corporationId));
+  const [payments, miners] = await Promise.all([
+    book.collection(PAYMENTS).select('minerId', 'uid', 'uids').get(),
+    book.collection(MINERS).select('characterIds', 'officerClaimed', 'pendingConfirmation').get(),
+  ]);
+  const read = new Map(payments.docs.map((d) => [d.id, d.updateTime]));
+  const docs = (snap: typeof payments) => snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+  return planPaymentReaders(docs(payments), docs(miners)).map((p) => ({
+    ...p,
+    updateTime: read.get(p.id)!,
+  }));
+}
+
+/**
+ * Writes the readers to each payment as it was read: one written meanwhile (a sync, an officer's
+ * placement) fails its batch, and a re-run plans what is left.
+ */
+export async function applyPaymentReadersBackfill(
+  db: Firestore,
+  corporationId: number,
+  plan: readonly PaymentReaders[]
+): Promise<void> {
+  const payments = db.collection('corps').doc(String(corporationId)).collection(PAYMENTS);
+  await commitInBatches(
+    db,
+    plan.map(
+      ({ id, uids, updateTime }): BatchOp =>
+        (b) =>
+          void b.update(payments.doc(id), { uids }, { lastUpdateTime: updateTime })
+    )
+  );
 }

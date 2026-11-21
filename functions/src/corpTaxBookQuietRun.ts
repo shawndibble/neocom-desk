@@ -22,7 +22,8 @@
 
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { DISMISSALS, MINERS, PAYMENTS, STATEMENTS, WRITE_OFFS } from './corpTaxBook.js';
+import { MINERS, PAYMENTS, STATEMENTS } from './corpTaxBook.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { COLLECTION_VERSIONS_FIELD } from './corpTaxBookVersionKeys.js';
 
 /**
@@ -39,7 +40,7 @@ export const QUIET_DOC = 'scheduledQuiet';
  * the stored ones) never reaches a chunk older than that. The old ones are the
  * book's growth, and re-reading them every run bought nothing.
  */
-export const QUIET_EXTRACTION_WINDOW_MS = 60 * 24 * 3_600_000;
+export const QUIET_EXTRACTION_WINDOW_MS = 60 * DAY_MS;
 
 /** The cut-off a marker written by a run starting at `at` fixes for as long as it vouches (< QUIET_MAX_AGE_MS). */
 export const extractionsSinceOf = (at: number): string =>
@@ -50,17 +51,16 @@ export const inExtractionWindow = (x: { chunkArrivalTime?: unknown }, since: str
   typeof x.chunkArrivalTime === 'string' && x.chunkArrivalTime >= since;
 
 /** A marker older than this is ignored: at least one full run a day, whatever the stamps say. */
-export const QUIET_MAX_AGE_MS = 24 * 3_600_000;
+export const QUIET_MAX_AGE_MS = 24 * HOUR_MS;
 
 /**
  * What `readBookStateAdmin` reads that a quiet run does not. Not `meta`: every
- * run writes its status there, so its stamp always moves; a quiet run reads the
- * one meta doc that counts (`paid`) and compares it instead, as it does the
- * extractions. `lateNotices` is not listed: every notice written there is mirrored to
+ * run writes its status there, so its stamp always moves, and a run reads none of it. A quiet run
+ * compares the extractions it reads instead. `lateNotices` is not listed: every notice written there is mirrored to
  * `statements` (corpTaxBookLegacyMirror.ts), whose stamp moves with it, and a book that never
  * wrote one has no stamp for it. Swap it in when the mirror goes.
  */
-export const QUIET_COLLECTIONS = [MINERS, STATEMENTS, PAYMENTS, DISMISSALS, WRITE_OFFS] as const;
+export const QUIET_COLLECTIONS = [MINERS, STATEMENTS, PAYMENTS] as const;
 
 export interface QuietMarker {
   /** When the quiet run started. */
@@ -80,8 +80,6 @@ export interface QuietMarker {
   extractions: string;
   /** The `chunkArrivalTime` cut-off its extractions fingerprint, and later quiet reads, use (`extractionsSinceOf`). */
   extractionsSince: string;
-  /** The Statements it held as paid (`fingerprintOf`), which settling rests on. */
-  paid: string;
 }
 
 /** The quiet collections' stamps on a book doc, or null when any is missing (a book not versioned yet). */
@@ -112,8 +110,7 @@ export function readQuietMarker(raw: unknown): QuietMarker | null {
     m.journalThrough === null ||
     !numbers(m.known) ||
     typeof m.extractions !== 'string' ||
-    typeof m.extractionsSince !== 'string' ||
-    typeof m.paid !== 'string'
+    typeof m.extractionsSince !== 'string'
   ) {
     return null;
   }
@@ -195,7 +192,7 @@ function canonical(value: unknown): unknown {
   return value;
 }
 
-/** A fingerprint of a set of stored values (the extractions, the paid ids), whatever order they were read in. */
+/** A fingerprint of a set of stored values (the extractions), whatever order they were read in. */
 export function fingerprintOf(values: Iterable<unknown>): string {
   const docs = [...values].map((x) => JSON.stringify(canonical(x))).sort();
   return createHash('sha256').update(JSON.stringify(docs)).digest('hex');

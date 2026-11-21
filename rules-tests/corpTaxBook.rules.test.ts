@@ -58,6 +58,13 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/observed/a`), { uid: 'char:2', characterId: 2, quantity: 5 });
     await setDoc(doc(db, `${CORP}/observed/b`), { uid: 'char:3', characterId: 3, quantity: 7 });
     await setDoc(doc(db, `${CORP}/payments/p1`), { uid: 'char:2', amount: 1 });
+    // An alt's donation, read by its whole Miner (`uids`): main 2, alt 8.
+    await setDoc(doc(db, `${CORP}/payments/p2`), {
+      uid: 'char:8',
+      minerId: 'm1',
+      uids: ['char:2', 'char:8'],
+      amount: 1,
+    });
     await setDoc(doc(db, `${CORP}/statements/s1`), {
       uids: ['char:2', 'char:9'],
       verifyToken: 't',
@@ -168,6 +175,36 @@ describe('corps (Tax Book) rules', () => {
       getDocs(query(collection(db, `${CORP}/observed`), where('uid', '==', 'char:3')))
     );
     for (const path of OFFICER_ONLY) await assertFails(getDoc(doc(db, `${CORP}/${path}`)));
+  });
+
+  it("lets a Miner's main read an alt's payment, and no one outside the Miner", async () => {
+    const main = characterAuth(env, 2, 'h2').firestore();
+    await assertSucceeds(getDoc(doc(main, `${CORP}/payments/p2`)));
+    await assertSucceeds(
+      getDocs(
+        query(collection(main, `${CORP}/payments`), where('uids', 'array-contains', 'char:2'))
+      )
+    );
+    const outsider = characterAuth(env, 3, 'h3').firestore();
+    await assertFails(getDoc(doc(outsider, `${CORP}/payments/p2`)));
+    await assertFails(getDoc(doc(outsider, `${CORP}/payments/p1`)));
+    await assertFails(
+      getDocs(
+        query(collection(outsider, `${CORP}/payments`), where('uids', 'array-contains', 'char:2'))
+      )
+    );
+    await assertFails(getDocs(collection(outsider, `${CORP}/payments`)));
+  });
+
+  it('still lets the sender read an older payment stored without `uids`', async () => {
+    const sender = characterAuth(env, 2, 'h2').firestore();
+    await assertSucceeds(getDoc(doc(sender, `${CORP}/payments/p1`)));
+    await assertSucceeds(
+      getDocs(query(collection(sender, `${CORP}/payments`), where('uid', '==', 'char:2')))
+    );
+    const alt = characterAuth(env, 8, 'h8').firestore();
+    await assertSucceeds(getDoc(doc(alt, `${CORP}/payments/p2`)));
+    await assertFails(getDoc(doc(alt, `${CORP}/payments/p1`)));
   });
 
   it.each(['statementLinks/s1', 'lateNoticeLinks/n1'])(

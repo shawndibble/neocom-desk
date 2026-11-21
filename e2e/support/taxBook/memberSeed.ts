@@ -1,7 +1,7 @@
 /**
- * Phase-2 fixtures: the pilot's own Moon Mining Tax tab against a Corp Tax Book (decision
- * 20261120-235011, "every Payee is paid oldest first"). Not used by a spec yet: the member side is
- * being rebuilt, so these hold only what will not change with its UI.
+ * The pilot's own Moon Mining Tax tab against a Corp Tax Book (decision 20261120-235011, "every
+ * Payee is paid oldest first"), for `miningTaxCorpBook.book.spec.ts`. The personal side's Dexie
+ * rows are `personalSeed.ts`'s.
  *
  * - The corp book (Firestore, the server's layout) the pilot's corp-book Payee reads.
  * - What ESI tells the pilot's tab: their mining ledger and wallet journal, served on the network
@@ -16,6 +16,7 @@ import { BookSeed, DAY_QTY, DAY_TAX, ORE_TYPE, REFINERY, day, noonOf } from './b
 import type { SeedDoc } from './emulator';
 import type { EsiOverride } from './bookTest';
 import { CORP, MINER, OFFICER } from './identities';
+import { PERSONAL_SYSTEM_ID } from './personalSeed';
 
 export const PILOT = { id: OFFICER.id, name: OFFICER.name };
 /** The pilot's alt: grouped with the pilot in the book, so its donations pay the pilot's days. */
@@ -23,7 +24,7 @@ export const PILOT_ALT = MINER.pilotAlt;
 /** The pilot's Miner in the book: a group, since the alt is in it. */
 export const PILOT_MINER_ID = 'm-pilot';
 /** A system with no book's refinery: mining there is owed to a personal Payee. */
-export const PERSONAL_SYSTEM = 30000144;
+export const PERSONAL_SYSTEM = PERSONAL_SYSTEM_ID;
 /** The personal Payee: a real character in EVE, as every Payee is. */
 export const PERSONAL_PAYEE = { ...MINER.rook, taxPct: 10 };
 

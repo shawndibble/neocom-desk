@@ -114,6 +114,15 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // A Made Payment's link to one Payee (decision 20261120-235011): the pilot's own, like Assignments.
+      match /miningTaxPaymentLinks/{linkId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
       // Communities membership index (issue #3596): one doc per Community
       // this Character belongs to, written only by the Community callables
       // (admin SDK). The Character may read its own; it backs the
@@ -524,8 +533,10 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A payment is its sender's (`uid`) and its Miner's readers' (`uids`), so a main reads an
+      // alt's donation. One stored before `uids` reads by its sender alone.
       match /payments/{paymentId} {
-        allow get, list: if isOfficer() || isOwnLine();
+        allow get, list: if isOfficer() || isOwnLine() || isOnOwnLine();
         allow write: if false;
       }
 

@@ -15,37 +15,34 @@ import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailM
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
-import { payStatementCodes } from '@/features/miningTax/corpBook/payStatementCodes';
+import { minerPayCodes } from '@/features/miningTax/corpBook/minerPayCodes';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
-import { findRowForEntry } from '@/features/miningTax/paymentDeepLink';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import {
   acceptNewTotal,
   dismiss,
-  linkTransaction,
-  settle,
+  linkPayment,
   unassign,
   uncombine,
-  unlinkTransaction,
-  unsettle,
-  unsettleByIds,
+  unlinkPayments,
   type LedgerActionResult,
 } from '@/features/miningTax/ledgerActions';
 import { buildPriceBreakdown } from '@/features/miningTax/usePriceBreakdown';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import type { RowMenuAction } from '@/features/miningTax/rowMenu';
-import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
-import { paidOnFromIso } from '@/features/miningTax/madePayments';
-import type { LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
+import type { PaidByLink } from '@/features/miningTax/PaymentLinksCard';
 import {
-  assignmentsForLinkTarget,
-  coPaidAssignments,
-  coPaidOutsideGroup,
-  linkedTransactionsFor,
-  linkTargetsWithin,
-  unlinkedPayments,
+  linkablePayments,
+  paymentOfLink,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
+import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeeAccounts } from '@/features/miningTax/payeeAccounts';
+import { buildSettleUpReason } from '@/features/miningTax/groupRows';
+import { systemLabel } from '@/features/miningTax/names';
+import { bookLedgerSource, personalLedgerSource } from '@/features/miningTax/ledger/ledgerSources';
+import { minerIdFor } from '@/engine/corpTaxBook/charges';
+import { formatIsk } from '@/lib/isk';
 import { pricesAtHubOnDate, type DatedUnitPrices } from '@/features/miningTax/pricing';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
@@ -92,6 +89,11 @@ const EntryEditDialog = lazy(() =>
     default: m.EntryEditDialog,
   }))
 );
+const PayeeLedgerPanel = lazy(() =>
+  guarded(() => import('@/features/miningTax/ledger/PayeeLedgerPanel')).then((m) => ({
+    default: m.PayeeLedgerPanel,
+  }))
+);
 const LinkWalletPaymentDialog = lazy(() =>
   guarded(() => import('@/features/miningTax/LinkWalletPaymentDialog')).then((m) => ({
     default: m.LinkWalletPaymentDialog,
@@ -111,15 +113,17 @@ export interface TaxDialogsHostProps {
   loading: boolean;
   /** A `useContinuations` write is running; with a dialog's own action it makes the dialogs `busy`. */
   continuing: boolean;
-  characterCount: number;
   allDisplayRows: readonly DisplayRow[];
   characterFiltered: readonly DisplayRow[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
-  /**
-   * Every stored Assignment, the ones a book row stands in for included: a transaction any of
-   * them links is used, and never offered to link again. Defaults to `everyAssignment`.
-   */
-  storedAssignments?: readonly MiningTaxAssignmentRecord[];
+  /** Every personal Payee's Running account: what Settle up, the ledger and Paid read. */
+  accounts: PayeeAccounts;
+  /** Every Made Payment linked to a Payee. */
+  links: readonly PayeePaymentLink[];
+  /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
+  bookCorporations: ReadonlySet<number>;
+  /** The active Character: whose Miner a book's ledger opens on. */
+  activeCharacterId: number | null;
   /** Every stored Payee record; the pickers list one per recipient (`duplicateAliases`). */
   allPayees: PayeeRecord[];
   /** Duplicate records of one Payee mapped to its primary (`payeeDuplicateAliases`). */
@@ -169,11 +173,13 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     refresh,
     loading,
     continuing,
-    characterCount,
     allDisplayRows,
     characterFiltered,
     everyAssignment,
-    storedAssignments = everyAssignment,
+    accounts,
+    links,
+    bookCorporations,
+    activeCharacterId,
     allPayees,
     duplicateAliases,
     payeeById,
@@ -198,12 +204,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     onAddPayee,
     onToast,
   } = props;
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const {
     detailTarget,
     detailConfirmUnassign,
     editTarget,
-    linkTransactionTarget,
     joinTarget,
     splitTarget,
     joinCandidateOverride,
@@ -212,6 +217,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     linkWalletTarget,
     corpPayTarget,
     corpPayFocus,
+    ledgerTarget,
     bulkDismissOpen,
     linkPaymentOpen,
   } = useTaxDialogState(store);
@@ -232,15 +238,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   // Reset whenever the target changes, not keyed on it: after a failure
   // nothing reloads, so reopening the same row hands back the very same object.
-  const [errorTargets, setErrorTargets] = useState({ detailTarget, linkTransactionTarget });
+  const [errorTarget, setErrorTarget] = useState(detailTarget);
   // A row-menu action that failed opens its row's detail to say so; that open
   // is a target change too, and must not wipe the message it opened for.
   const [failedMenuRow, setFailedMenuRow] = useState<DisplayRow | null>(null);
-  if (
-    errorTargets.detailTarget !== detailTarget ||
-    errorTargets.linkTransactionTarget !== linkTransactionTarget
-  ) {
-    setErrorTargets({ detailTarget, linkTransactionTarget });
+  if (errorTarget !== detailTarget) {
+    setErrorTarget(detailTarget);
     if (detailTarget !== failedMenuRow) {
       setActionError(null);
       setFailedMenuRow(null);
@@ -294,19 +297,15 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
-  /**
-   * Settle up from a row: that entry, paid by the Character who mined it. The
-   * rest of its Payee balance comes along unticked, to add in if wanted.
-   */
+  /** Settle up from a row: its Payee's balance, paid by the Character who mined it. */
   function settleUpPayeeOf(dr: DisplayRow) {
     const payeeId = dr.assignment?.payeeId;
-    const balance = balances.find((b) => b.payee.id === payeeId);
+    if (!payeeId) return;
+    const primary = accounts.primaryIdOf(payeeId);
+    const balance = balances.find((b) => b.payee.id === primary);
     actions.openDetail(null);
     if (balance && balance.members.length > 0)
-      actions.openSettleUp(settleUpRowsFor(balance.members), {
-        payerId: dr.row.characterId,
-        focusIds: new Set(allMembers(dr).map((m) => m.assignment.id)),
-      });
+      actions.openSettleUp(settleUpRowsFor(balance.members), { payerId: dr.row.characterId });
   }
 
   /** "I don't pay tax on this entry" — dismisses the whole unassigned residual in one action, no Payee needed. */
@@ -389,15 +388,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     }
   }
 
-  // Each takes the row and whether the row menu (not the detail) is asking.
-  function markGroupPaid(dr: DisplayRow, fromMenu = false) {
-    const outstanding = allMembers(dr)
-      .filter((m) => m.assignment.status === 'outstanding')
-      .map((m) => m.assignment);
-    if (outstanding.length === 0) return;
-    void runAndClose(() => settle(outstanding), fromMenu ? dr : undefined);
-  }
-
   /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
   function handleAssignedFromDetail() {
     actions.openDetail(null);
@@ -408,118 +398,45 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => dismissRow(dr.row), fromMenu ? dr : undefined);
   }
 
-  const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
-    if (!detailTarget?.assignment?.payment) return undefined;
-    return linkedTransactionsFor([detailTarget.assignment], madePayments, t);
-  }, [detailTarget, madePayments, t]);
-
-  const detailAlsoCovers = useMemo(
-    () =>
-      detailTarget?.assignment ? coPaidAssignments(detailTarget.assignment, everyAssignment) : [],
-    [detailTarget, everyAssignment]
-  );
-
-  const groupAlsoCovers = useMemo(
-    () =>
-      detailTarget?.groupMembers
-        ? coPaidOutsideGroup(
-            allMembers(detailTarget).map((m) => m.assignment),
-            everyAssignment
-          )
-        : [],
-    [detailTarget, everyAssignment]
-  );
-
-  // A listed sibling opens in place of the entry showing: the row holding it, found in every row, not the filtered ones.
-  function openCoveredEntry(id: string) {
-    const target = findRowForEntry(allDisplayRows, id);
-    if (target) actions.openDetail(target);
-  }
-
-  const groupLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
-    if (!detailTarget?.groupMembers) return undefined;
-    return linkedTransactionsFor(
-      allMembers(detailTarget).map((m) => m.assignment),
-      madePayments,
-      t
-    );
-  }, [detailTarget, madePayments, t]);
-
-  function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
-    if (!detailTarget) return;
-    const targets = assignmentsForLinkTarget(detailTarget, everyAssignment);
-    void runAndClose(() =>
-      unlinkTransaction(
-        targets,
-        transaction.kind === 'journal'
-          ? { journalRefId: transaction.refId }
-          : { contractId: transaction.refId }
-      )
-    );
-  }
-
-  const linkTransactionCandidates = useMemo(() => {
-    if (!linkTransactionTarget) return [];
-    return unlinkedPayments(
-      madePayments.filter((p) => p.characterId === linkTransactionTarget.row.characterId),
-      storedAssignments
-    );
-  }, [linkTransactionTarget, madePayments, storedAssignments]);
-
-  const linkTransactionTargetAmount = useMemo(() => {
-    if (!linkTransactionTarget) return 0;
-    const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
-    const existing = targets.map((a) => a.payment?.amount).find((amount) => amount !== undefined);
-    return existing ?? targets.reduce((sum, a) => sum + a.taxOwed, 0);
-  }, [linkTransactionTarget, everyAssignment]);
-
-  async function handleConfirmLinkTransaction(payment: MadePayment, source: 'auto' | 'manual') {
-    if (!linkTransactionTarget) return;
-    // Linked only to the days its ISK reaches: a smaller transaction is not proof of the rest.
-    const targets = linkTargetsWithin(
-      assignmentsForLinkTarget(linkTransactionTarget, everyAssignment),
-      payment.amount
-    );
-    if (targets.length === 0) return;
-    await runRowAction(
-      () =>
-        linkTransaction(
-          targets,
-          payment.kind === 'journal'
-            ? { journalRefId: payment.refId }
-            : { contractId: payment.refId },
-          source,
-          {
-            paidOn: paidOnFromIso(payment.date),
-            method: payment.method,
-            amount: payment.amount === null ? 0 : Math.round(payment.amount),
-          }
-        ),
-      () => {
-        actions.openLinkTransaction(null);
-        actions.openDetail(null);
-        refresh();
+  const linkByKey = useMemo(() => new Map(links.map((l) => [paymentLinkKey(l), l])), [links]);
+  /**
+   * The linked payments whose money reached any of these Assignments' days, off their Payee's
+   * account, each with what it put on the day and a line naming its transaction.
+   */
+  function paidByOf(assignments: readonly MiningTaxAssignmentRecord[]): PaidByLink[] {
+    const out = new Map<string, PaidByLink>();
+    for (const a of assignments) {
+      if (!a.payeeId) continue;
+      const account = accounts.of(a.payeeId);
+      for (const { key, amount } of account?.paidBy(a.date) ?? []) {
+        const link = linkByKey.get(key);
+        if (!link) continue;
+        const held = out.get(key);
+        if (held) {
+          held.amount += amount;
+          continue;
+        }
+        const made = paymentOfLink(link, madePayments);
+        out.set(key, { key, link, amount, label: made ? paymentLabel(made) : null });
       }
-    );
+    }
+    return [...out.values()];
   }
-
-  function markPaid(dr: DisplayRow, fromMenu = false) {
-    const assignment = dr.assignment;
-    if (!assignment) return;
-    void runAndClose(() => settle([assignment]), fromMenu ? dr : undefined);
+  function paymentLabel(made: MadePayment): string {
+    const amount =
+      made.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(made.amount)} ISK`;
+    const label = made.label || t('miningTax.linkPaymentUntitledContract');
+    return `${amount} · ${made.date.slice(0, 10)} — ${label}`;
   }
+  const detailPaidBy = useMemo(
+    () =>
+      detailTarget?.assignment ? paidByOf(allMembers(detailTarget).map((m) => m.assignment)) : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- paidByOf reads only these
+    [detailTarget, accounts, linkByKey, madePayments]
+  );
 
-  function unmarkPaid(dr: DisplayRow, fromMenu = false) {
-    const assignment = dr.assignment;
-    if (!assignment) return;
-    void runAndClose(() => unsettle([assignment]), fromMenu ? dr : undefined);
-  }
-
-  /** Undoes the member's own "paid" on Assignments a Corp Tax Book row stands in for. */
-  function unmarkCorpPayment(ids: readonly string[] | undefined) {
-    if (!ids || ids.length === 0) return;
-    // By id, not from `everyAssignment`: that list leaves out the rows the book decided.
-    void runAndClose(() => unsettleByIds(ids));
+  function unlinkPayment(key: string) {
+    void runAndClose(() => unlinkPayments([key]));
   }
 
   function resolveEntry(dr: DisplayRow, fromMenu = false) {
@@ -559,18 +476,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => uncombine(members), fromMenu ? dr : undefined);
   }
 
-  /** "Link a wallet payment" for a row: a combined entry's owed days, or its Payee's balance. */
+  /** "Link a wallet payment" for a row: a payment to its Payee, which pays the oldest days. */
   function linkWalletFor(dr: DisplayRow) {
     const payeeId = dr.assignment?.payeeId;
     if (!payeeId) return;
-    actions.linkWalletFromDetail(
-      dr.groupMembers
-        ? {
-            payeeId,
-            members: allMembers(dr).filter((m) => m.assignment.status === 'outstanding'),
-          }
-        : { payeeId }
-    );
+    actions.linkWalletFromDetail({ payeeId: accounts.primaryIdOf(payeeId) });
   }
 
   function copyBreakdown(dr: DisplayRow) {
@@ -609,16 +519,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       case 'reviewSplit':
       case 'split':
         return actions.splitFromDetail(dr);
-      case 'markPaid':
-        return markPaid(dr, true);
-      case 'markGroupPaid':
-        return markGroupPaid(dr, true);
-      case 'unmarkPaid':
-        return unmarkPaid(dr, true);
       case 'linkWallet':
         return linkWalletFor(dr);
-      case 'linkTransaction':
-        return actions.openLinkTransaction(dr);
       case 'join':
         return actions.joinFromDetail(dr);
       case 'copyBreakdown':
@@ -645,22 +547,87 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   useEffect(() => actions.registerRowMenuRunner(runMenuAction));
 
   const linkWalletPayee = payeeById.get(linkWalletTarget?.payeeId ?? '') ?? null;
-  const linkWalletOwed = useMemo(
+  // Every payment no link holds and no Corp Tax Book counts: whichever Character sent it, since a
+  // merged Payee's money can come from any alt.
+  const linkCandidates = useMemo(
     () =>
-      linkWalletTarget?.members ??
-      balances.find((b) => b.payee.id === linkWalletTarget?.payeeId)?.members ??
-      [],
-    [linkWalletTarget, balances]
+      linkablePayments(madePayments, {
+        linked: new Set(links.map(paymentLinkKey)),
+        bookCorporations,
+      }),
+    [madePayments, links, bookCorporations]
   );
-  // Only payments from a pilot who mined one of the owed entries — the ISK
-  // has to have left a wallet that owes this bill.
-  const linkWalletCandidates = useMemo(() => {
-    const miners = new Set(linkWalletOwed.map((m) => m.row.characterId));
-    return unlinkedPayments(
-      madePayments.filter((p) => miners.has(p.characterId)),
-      storedAssignments
+  const trackedCharacters = useMemo(
+    () => [
+      ...new Map(
+        allDisplayRows.map((dr) => [
+          dr.row.characterId,
+          { characterId: dr.row.characterId, characterName: dr.row.characterName },
+        ])
+      ).values(),
+    ],
+    [allDisplayRows]
+  );
+  const characterNameOf = (id: number) =>
+    trackedCharacters.find((c) => c.characterId === id)?.characterName;
+
+  // Settle up's Payee: one per dialog, its account what it pays.
+  const settleUpPayeeId = settleUpRows?.[0]?.assignment.payeeId;
+  const settleUpAccount = settleUpPayeeId ? accounts.of(settleUpPayeeId) : undefined;
+  const settleUpPayee = settleUpPayeeId
+    ? payeeById.get(accounts.primaryIdOf(settleUpPayeeId))
+    : undefined;
+
+  // The Payee ledger: a personal Payee's account, or the book Miner of the active Character.
+  const ledgerSource = useMemo(() => {
+    if (!ledgerTarget) return null;
+    if (ledgerTarget.kind === 'personal') {
+      const account = accounts.of(ledgerTarget.payeeId);
+      if (!account) return null;
+      const byId = new Map(everyAssignment.map((a) => [a.id, a]));
+      return personalLedgerSource(
+        account,
+        (id) => byId.get(id),
+        (a) => systemLabel(systemNames, a.solarSystemId),
+        (l) =>
+          l.kind === 'recorded'
+            ? undefined
+            : characterNameOf(
+                madePayments.find((m) => m.key === `${l.kind}:${l.refId}`)?.characterId ?? 0
+              )
+      );
+    }
+    const book = corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId);
+    if (!book) return null;
+    const own =
+      activeCharacterId === null ? undefined : minerIdFor(activeCharacterId, book.loaded.miners);
+    const miner = book.summary.miners.find((m) => m.minerId === own) ?? book.summary.miners[0];
+    if (!miner) return null;
+    return bookLedgerSource(
+      miner,
+      book.loaded.writeOffs ?? [],
+      (structureId) =>
+        structureId === undefined ? undefined : book.loaded.structureNames?.[structureId],
+      characterNameOf
     );
-  }, [linkWalletOwed, madePayments, storedAssignments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- characterNameOf reads trackedCharacters
+  }, [
+    ledgerTarget,
+    accounts,
+    everyAssignment,
+    systemNames,
+    madePayments,
+    corpView,
+    activeCharacterId,
+    trackedCharacters,
+  ]);
+  const ledgerTitle =
+    ledgerTarget?.kind === 'personal'
+      ? (payeeById.get(ledgerTarget.payeeId)?.name ?? '')
+      : ledgerTarget?.kind === 'book'
+        ? (corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId)?.payee
+            .name ?? '')
+        : '';
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
   // The member's own entry for a book day, when one lines up: "Fix my records" opens it to edit.
@@ -686,28 +653,19 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           typeNames={typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
-          // A failed link shows in its own dialog, open on top of this one.
-          saveError={linkTransactionTarget ? null : actionError}
+          saveError={actionError}
           onEdit={() => actions.editFromDetail(detailTarget)}
           onSettleUp={
             detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
           }
           startWithUnassignConfirm={detailConfirmUnassign}
-          onMarkAllPaid={() => markGroupPaid(detailTarget)}
           onTakeOut={(member) => takeOut(member)}
           onUncombine={() => uncombineAll(detailTarget)}
           onResolve={() => resolveGroup(detailTarget)}
           onUnassignAll={() => unassignGroup(detailTarget)}
           onLinkWalletPayment={() => linkWalletFor(detailTarget)}
-          linkedTransactions={groupLinkedTransactions}
-          alsoCovers={groupAlsoCovers}
-          onOpenCovered={openCoveredEntry}
-          onLinkTransaction={
-            allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
-              ? () => actions.openLinkTransaction(detailTarget)
-              : undefined
-          }
-          onUnlinkTransaction={handleUnlinkTransactionFromDetail}
+          paidBy={detailPaidBy}
+          onUnlinkPayment={unlinkPayment}
         />
       )}
 
@@ -750,7 +708,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               characterId: corpDetail.view.characterId,
             })
           }
-          onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
           onResolve={(target) => {
             // The detail is closed first: Resolve is its own dialog, and may send the member back here.
             actions.openDetail(null);
@@ -800,21 +757,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               dr.corp.view.corporationId === corpPayTarget &&
               dr.status === 'outstanding'
           );
-          // Every open Statement, oldest first: one a local mark or donation reads Paid is still
-          // open in the book, and payments settle the oldest first (#6204).
-          const names = new Map(
-            allDisplayRows.map((dr) => [dr.row.characterId, dr.row.characterName])
-          );
-          const codes = payStatementCodes(book, (id) => names.get(id), i18n.language);
-          // The book's days still owing for the Characters in view, held ones included.
-          const inView = new Set(characterFiltered.map((dr) => dr.row.characterId));
-          const openDays = (corpView?.overlay.rows ?? []).filter(
-            (r) =>
-              r.corporationId === corpPayTarget &&
-              r.state === 'billed' &&
-              (r.taxOwed ?? 0) > 0 &&
-              inView.has(r.characterId)
-          );
+          // Each of the member's Miners' own code: money pays the Miner's oldest day whatever it
+          // carries; the code only says whose money it is.
+          const codes = minerPayCodes(book, characterNameOf);
           return (
             <Suspense fallback={null}>
               <CorpPayDialog
@@ -822,9 +767,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 onPaid={refresh}
                 book={book}
                 rows={owedRows}
-                systemNames={systemNames}
-                statementCodes={codes}
-                openDays={openDays}
+                codes={codes}
                 focus={corpPayFocus ?? undefined}
               />
             </Suspense>
@@ -851,12 +794,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             unreachableHubs={unreachableHubs}
             busy={busy}
             // A failed link shows in its own dialog, open on top of this one.
-            saveError={linkTransactionTarget ? null : actionError}
+            saveError={actionError}
             startWithUnassignConfirm={detailConfirmUnassign}
             onAssigned={handleAssignedFromDetail}
             onDismiss={() => dismissEntry(detailTarget)}
-            onMarkPaid={() => markPaid(detailTarget)}
-            onUnmarkPaid={() => unmarkPaid(detailTarget)}
             onResolve={() => resolveEntry(detailTarget)}
             onUndo={() => unassignEntry(detailTarget)}
             onEdit={() => actions.editFromDetail(detailTarget)}
@@ -866,9 +807,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 : undefined
             }
             onLinkWalletPayment={
-              detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
-                ? () => linkWalletFor(detailTarget)
-                : undefined
+              detailTarget.assignment?.payeeId ? () => linkWalletFor(detailTarget) : undefined
             }
             onAddPayee={onAddPayee}
             onJoin={() => actions.joinFromDetail(detailTarget)}
@@ -877,31 +816,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 ? () => actions.splitFromDetail(detailTarget)
                 : undefined
             }
-            linkedTransactions={detailLinkedTransactions}
-            alsoCovers={detailAlsoCovers}
-            onOpenCovered={openCoveredEntry}
-            onLinkTransaction={
-              detailTarget.status === 'paid'
-                ? () => actions.openLinkTransaction(detailTarget)
-                : undefined
-            }
-            onUnlinkTransaction={handleUnlinkTransactionFromDetail}
+            paidBy={detailPaidBy}
+            onUnlinkPayment={unlinkPayment}
             corpNote={
               detailTarget.corp?.kind === 'label' ? corpStateHint(detailTarget.corp) : undefined
             }
-          />
-        )}
-
-      {linkTransactionTarget &&
-        assignmentsForLinkTarget(linkTransactionTarget, everyAssignment).length > 0 && (
-          <LinkTransactionDialog
-            open
-            onClose={() => actions.openLinkTransaction(null)}
-            candidates={linkTransactionCandidates}
-            targetAmount={linkTransactionTargetAmount}
-            busy={busy}
-            saveError={actionError}
-            onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
           />
         )}
 
@@ -965,33 +884,49 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         </Suspense>
       )}
 
-      {settleUpRows && hasData && (
+      {settleUpRows && hasData && settleUpAccount && settleUpPayee && (
         <Suspense fallback={null}>
           <SettleUpDialog
             open
             onClose={() => actions.openSettleUp(null)}
             rows={liveSettleUpRows ?? settleUpRows}
-            payerId={settleUpStart.payerId}
-            focusIds={settleUpStart.focusIds}
-            systemNames={systemNames}
+            {...(settleUpStart.payerId !== undefined ? { payerId: settleUpStart.payerId } : {})}
             arrivalCheck={settleUpRecheck}
+            owedFor={() => settleUpAccount.owes?.amount ?? 0}
+            preview={(amount, paidOn) => settleUpAccount.preview(amount, paidOn)}
+            reason={buildSettleUpReason(
+              t('miningTax.settleUpReasonPrefix'),
+              [
+                ...new Set(
+                  settleUpRows.map((r) => systemLabel(systemNames, r.assignment.solarSystemId))
+                ),
+              ],
+              settleUpRows.map((r) => r.assignment.date).sort()
+            )}
+            // A recorded payment, or a contract paid in kind: linked to the Payee, swapped for its
+            // wallet transaction once one shows up.
+            record={(payment) =>
+              linkPayment(
+                {
+                  payeeId: settleUpPayee.id,
+                  ...(payment.contractId !== undefined
+                    ? { kind: 'contract' as const, refId: payment.contractId }
+                    : { kind: 'recorded' as const, refId: crypto.randomUUID() }),
+                  amount: payment.amount,
+                  paidOn: payment.paidOn,
+                  source: 'manual',
+                },
+                settleUpPayee.characterId
+              )
+            }
             onPaid={() => {
               onClearSelection();
               refresh();
             }}
-            onPickFromWallet={(() => {
-              const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
-              const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
-              if (!only) return undefined;
-              return (tickedIds: ReadonlySet<string>) => {
-                // The entries ticked to settle, not the Payee's whole balance.
-                const members = allDisplayRows
-                  .flatMap(allMembers)
-                  .filter((m) => tickedIds.has(m.assignment.id));
-                actions.openSettleUp(null);
-                actions.openLinkWallet({ payeeId: only, members });
-              };
-            })()}
+            onPickFromWallet={() => {
+              actions.openSettleUp(null);
+              actions.openLinkWallet({ payeeId: settleUpPayee.id });
+            }}
           />
         </Suspense>
       )}
@@ -1003,10 +938,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             open
             onClose={() => actions.openLinkWallet(null)}
             payee={linkWalletPayee}
-            owed={linkWalletOwed}
-            candidates={linkWalletCandidates}
+            {...(accounts.of(linkWalletPayee.id)
+              ? { account: accounts.of(linkWalletPayee.id) }
+              : {})}
+            candidates={linkCandidates}
+            characters={trackedCharacters}
             paymentSources={paymentSources}
-            systemNames={systemNames}
             onLinked={() => {
               onClearSelection();
               refresh();
@@ -1021,9 +958,20 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             open
             onClose={() => actions.openLinkPayment(false)}
             suggestions={linkSuggestions}
-            systemNames={systemNames}
-            showCharacter={characterCount > 1}
+            accountOf={(id) => accounts.of(id)}
             onLinked={refresh}
+          />
+        </Suspense>
+      )}
+
+      {ledgerTarget && (
+        <Suspense fallback={null}>
+          <PayeeLedgerPanel
+            open
+            onClose={() => actions.openLedger(null)}
+            payeeName={ledgerTitle}
+            source={ledgerSource}
+            typeNames={typeNames}
           />
         </Suspense>
       )}

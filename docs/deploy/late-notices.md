@@ -1,4 +1,4 @@
-# Deploying Late notices (decision 20261120-235011, step 2)
+# Deploying the Running account and Late notices (decision 20261120-235011)
 
 Dev and production share one Firebase project and its data, and neither the rules nor the
 Cloud Functions are deployed by CI. Every step is additive: older open tabs and the functions
@@ -10,9 +10,16 @@ deployed now keep working at each point, so the steps can run before the PR merg
   - `lateNotices/{noticeId}`: officers read every one; a Miner reads their own (`uids`).
   - `lateNoticeLinks/{noticeId}`: `{ token }`, editors only (as `statementLinks`).
   - `accountCheckpoints/{minerId}`: officers read every one; a Miner reads their own (`uids`).
-- **Indexes:** none. Every new query is on a single field (`minerId`, `characterIds`,
-  `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and `books.<corporationId>` on
-  `corpTaxBookBilledBy`, which Firestore indexes as a map field by default).
+  - `payments/{paymentId}`: also readable by its Miner's readers (`uids`), so a main reads an
+    alt's donation. A payment without `uids` still reads by its sender (`uid`) alone.
+  - Under `users/{uid}`, a pilot's own `miningTaxPaymentLinks/{linkId}` (a Made Payment's link
+    to one Payee), with the same owner and hash rules as `miningTaxAssignments`. Older clients
+    never read or write it.
+- **Indexes:** for the synced `miningTaxPaymentLinks` collection only (`ownerHash` + `updatedAt`,
+  and its single-field `ownerHash` override), the same pair every synced collection has. Corp Tax
+  Book queries need none: each is on a single field (`minerId`, `characterIds`, `uids` on
+  `payments`, `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and
+  `books.<corporationId>` on `corpTaxBookBilledBy`, indexed as a map field by default).
 - **Functions:**
   - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`,
     `recordCheckpoints` and `resetCheckpoint` edits; Late notices written beside their
@@ -26,6 +33,8 @@ deployed now keep working at each point, so the steps can run before the PR merg
     payments named; one that could be two Miners' is stored for review (`reviewReason:
 'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
     unread division is linked to it and never counted again. `reassignPayment` moves a payment.
+    Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
+    and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
     frozen tax) and the tab read models (schema 2, from recorded accounts), and deletes the
     retired `minerTotals` docs.
@@ -34,10 +43,17 @@ deployed now keep working at each point, so the steps can run before the PR merg
 
 ## Order
 
-1. **Rules first**, so a client can read the new collections the moment anything writes them:
+Merging the PR to `develop` ships the new client to `https://dev.neocomdesk.com` straight away,
+before anything below. That is safe: against the functions deployed now it falls back to the old
+actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs beside
+`lateNotices`. A pilot's payment links stay on their device until the rules allow syncing them
+(step 1), and sync once they do.
+
+1. **Rules and indexes**, so a client can read and sync the new collections the moment anything
+   writes them. Indexes build in the background; the client works while they do.
 
    ```sh
-   firebase deploy --only firestore:rules
+   firebase deploy --only firestore:rules,firestore:indexes
    ```
 
 2. **Functions**, which start writing `lateNotices` (and still mirror every notice to
@@ -51,9 +67,11 @@ deployed now keep working at each point, so the steps can run before the PR merg
    `statements`). Count first, then copy. It creates missing copies, brings each existing copy's
    mail state level with its legacy doc, and then marks the book (`meta/lateNoticesBackfilled`):
    from then on reads look at `lateNotices` alone. Until a book is marked, every read also reads
-   the ids of its legacy docs and fetches those with no copy. It can run again safely; a book
-   that fails (a notice issued during its run) is reported, the run goes on, and the script exits
-   non-zero: re-run it with those corporation ids.
+   the ids of its legacy docs and fetches those with no copy. It also gives each payment stored
+   without `uids` its Miner's readers and its sender (`payment readers` in its output); until it
+   has, a main does not see an alt's older donations. It can run again safely; a book that fails
+   (a notice issued, or a payment written, during its run) is reported, the run goes on, and the
+   script exits non-zero: re-run it with those corporation ids.
 
    ```sh
    cd functions && npm run build
@@ -63,14 +81,9 @@ deployed now keep working at each point, so the steps can run before the PR merg
 
    Add corporation ids after the project id to run only those books.
 
-4. **The client** that reads `lateNotices` ships after step 3. Until then a verify link, a mail
-   or a declaration on a notice the backfill has not reached still works: the functions fall
-   back to its `statements` doc.
-
-5. **Promote `develop` to `main` soon after step 2.** The production client on `main` is built
-   for the old schemas (moon docs and read models schema 1): from step 2 it ignores the rebuilt
-   docs and reads the whole book instead. Its figures stay correct, only slower, until it is
-   promoted.
+4. **Promote `develop` to `main` straight after.** The production client on `main` is built for
+   the old schemas (moon docs and read models schema 1): from step 2 it ignores the rebuilt docs
+   and reads the whole book instead. Its figures stay correct, only slower, until it is promoted.
 
 ## After deploy
 
@@ -84,7 +97,8 @@ deployed now keep working at each point, so the steps can run before the PR merg
   - delete every `corps/{id}/meta/lateNoticesBackfilled` doc, or a marked book's list reads
     (the Miners list, codes, guards) miss the notices issued meanwhile;
   - re-run the backfill (step 3): it copies those notices and brings their mail state across
-    (until then the verify page and mail already read both docs and merge their mail state);
+    (until then the verify page and mail already read both docs and merge their mail state), and
+    gives the payments written meanwhile their `uids`;
   - the next nightly pass rewrites the moon docs and read models and deletes `minerTotals`.
-- An older tab that still issues a calendar Statement on a book that never switched removes the
-  book's backfilled marker, so reads look at the legacy docs again until the next backfill.
+- An older tab that still issues a calendar Statement is refused on every book (the backfill
+  lists the books with no `runningAccountFrom`, whose older tabs see that refusal).

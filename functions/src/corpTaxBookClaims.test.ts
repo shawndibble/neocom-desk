@@ -3,6 +3,8 @@ import {
   classifyGroup,
   groupConflicts,
   minerReaderIds,
+  minerUidsOf,
+  paymentUids,
   promoteClaims,
   type ClaimMiner,
 } from './corpTaxBookClaims.js';
@@ -73,6 +75,32 @@ describe('minerReaderIds', () => {
     expect(
       minerReaderIds({ characterIds: [1, 2, 3], officerClaimed: [2], pendingConfirmation: [3] })
     ).toEqual([1]);
+  });
+});
+
+describe('minerUidsOf', () => {
+  it("is a grouping's reader Characters' sign-ins", () => {
+    expect(minerUidsOf('g1', { characterIds: [1, 2, 3], officerClaimed: [3] })).toEqual([
+      'char:1',
+      'char:2',
+    ]);
+  });
+
+  it("is a solo Miner's own Character, and nobody for an unknown id", () => {
+    expect(minerUidsOf('solo:7', undefined)).toEqual(['char:7']);
+    expect(minerUidsOf('g-gone', undefined)).toEqual([]);
+  });
+});
+
+describe('paymentUids', () => {
+  it("is the Miner's readers and its sender, once each", () => {
+    expect(paymentUids(['char:1', 'char:2'], 'char:2')).toEqual(['char:1', 'char:2']);
+    expect(paymentUids(['char:1'], 'char:9')).toEqual(['char:1', 'char:9']);
+  });
+
+  it('is the sender alone for an Unmatched payment, and nobody without a sender', () => {
+    expect(paymentUids([], 'char:9')).toEqual(['char:9']);
+    expect(paymentUids(['char:1'], undefined)).toEqual(['char:1']);
   });
 });
 

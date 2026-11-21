@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MadePayment } from '../../paymentLinks';
-import { recipientOf, transferChoices } from './paidTransfers';
+import { claimablePayments, recipientOf, transferChoices } from './paidTransfers';
 
 const pay = (over: Partial<MadePayment>): MadePayment => ({
   key: `journal:${over.refId ?? 1}`,
@@ -59,5 +59,38 @@ describe('paid-to-a-person picker', () => {
   it('treats a recipient it cannot place as a person', () => {
     expect(recipientOf(77, 1000, undefined)).toBe('character');
     expect(recipientOf(undefined, 1000, undefined)).toBe('character');
+  });
+
+  it('never offers a payment a link holds, nor a donation the book already holds (audit bug 9)', () => {
+    const out = claimablePayments(
+      [
+        pay({ refId: 1, counterpartyId: 1000, date: '2026-11-04T10:00:00Z' }),
+        pay({ refId: 2, counterpartyId: 1000, date: '2026-11-05T10:00:00Z' }),
+        pay({ refId: 3, counterpartyId: 90 }),
+        pay({ refId: 4, counterpartyId: 91 }),
+      ],
+      {
+        bookCorporationId: 1000,
+        linked: new Set(['journal:3']),
+        // The corp's journal entry for donation 1, a minute later: the book holds it.
+        held: [{ characterId: 7, amount: 5_000_000, at: '2026-11-04T10:01:00Z' }],
+      }
+    );
+    expect(out.map((p) => p.refId)).toEqual([2, 4]);
+  });
+
+  it('two equal donations: the book holding one still offers the other', () => {
+    const out = claimablePayments(
+      [
+        pay({ refId: 1, counterpartyId: 1000, date: '2026-11-04T10:00:00Z' }),
+        pay({ refId: 2, counterpartyId: 1000, date: '2026-11-04T10:02:00Z' }),
+      ],
+      {
+        bookCorporationId: 1000,
+        linked: new Set(),
+        held: [{ characterId: 7, amount: 5_000_000, at: '2026-11-04T10:00:30Z' }],
+      }
+    );
+    expect(out.map((p) => p.refId)).toEqual([2]);
   });
 });

@@ -83,6 +83,7 @@ const HISTORY: [number, Record<string, string | null>][] = [
       netWorthSnapshots: 'id, characterId, [characterId+day]',
     },
   ],
+  [34, { miningTaxPaymentLinks: 'id, characterId, payeeId' }],
 ];
 
 /** The complete schema at `version`: every delta up to it, drops removed. */

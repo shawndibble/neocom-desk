@@ -1,7 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
-import { formatList } from '@/lib/listFormat';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
@@ -43,8 +42,6 @@ interface Props {
   systemName: string;
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  /** Unmarks the member's own payment this day stands on; absent when there is none. */
-  onUnmarkPaid?: () => void;
   /** Opens the corp pay dialog; absent when nothing is owed. */
   onPay?: () => void;
   /** The notice for a day the miner's own list shares with the corporation's bill: the overlap notice, or a Conflict's. */
@@ -74,7 +71,6 @@ export function CorpRowDetailModal({
   systemSecurity,
   typeNames,
   onPay,
-  onUnmarkPaid,
   notice,
   onResolve,
   onFixRecords,
@@ -109,10 +105,10 @@ export function CorpRowDetailModal({
   const payeeName = book?.payee.name ?? t('miningTax.corpBook.payeeName', { corp: corp.corpName });
   // The book's side of the day as a few labelled facts, not one run-on sentence.
   const facts: [string, string][] = [];
-  if (view.statementId && (view.state === 'billed' || view.state === 'paid')) {
+  if (view.noticeId && (view.state === 'billed' || view.state === 'paid')) {
     facts.push([
-      t('miningTax.corpBook.detail.factStatement'),
-      t('miningTax.corpBook.detail.factStatementFinal'),
+      t('miningTax.corpBook.detail.factNotice'),
+      t('miningTax.corpBook.detail.factNoticeSent'),
     ]);
   } else if (view.state === 'billed') {
     facts.push([
@@ -135,19 +131,18 @@ export function CorpRowDetailModal({
   }
   // A conflict is the first thing to read and act on, so its notice leads.
   const conflict = view.state === 'conflict';
-  // Ore listed beyond what the book recorded: no Statement ever bills it.
+  // Ore listed beyond what the book recorded: the book never bills it.
   const excess = conflict && view.conflictCause === 'overListed';
-  // #6206: "I paid this another way" on a day its Statement still bills (owed, or marked paid by
-  // the member while the book still shows it owed), and what came of it. A day with an overlap
-  // says it in its notice instead.
+  // #6206: "I paid this another way" on a day a Late notice asked for while it is still owed, and
+  // what came of it. A day with an overlap says it in its notice instead.
   // What Resolve opens on for this day: an officer's kept bill, a Conflict, a figure that differs.
   const resolvable = rowTarget(view);
   const unlinked = unlinkedTarget(view);
   const declaring =
     onResolve !== undefined &&
-    view.statementId !== undefined &&
+    view.noticeId !== undefined &&
     !view.overlap &&
-    (owing || view.bookOwed !== undefined || view.declaration !== undefined);
+    (owing || view.declaration !== undefined);
 
   return (
     <>
@@ -253,22 +248,6 @@ export function CorpRowDetailModal({
                   ))}
                 </ValueList>
               )}
-              {view.state === 'paid' && view.settledBy === 'yourMark' && (
-                <p>
-                  {view.bookOwed !== undefined
-                    ? t(
-                        view.bookSpentOn
-                          ? 'miningTax.corpBook.detail.markedPaidSpentNote'
-                          : 'miningTax.corpBook.detail.markedPaidNote',
-                        {
-                          corp: corp.corpName,
-                          owed: formatIsk(view.bookOwed, 0),
-                          days: formatList(view.bookSpentOn ?? []),
-                        }
-                      )
-                    : t('miningTax.corpBook.detail.yourMarkNote')}
-                </p>
-              )}
               {view.state === 'paid' && view.settledBy === 'credit' && (
                 <p>
                   {t('miningTax.corpBook.detail.creditAppliedNote', {
@@ -314,11 +293,6 @@ export function CorpRowDetailModal({
               {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
                 <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
               )}
-              {view.settledBy !== 'yourMark' &&
-                view.markedPaidIds &&
-                view.markedPaidIds.length > 0 && (
-                  <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
-                )}
               <p className="text-text-dim">
                 {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
               </p>
@@ -407,9 +381,6 @@ export function CorpRowDetailModal({
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {onUnmarkPaid && view.markedPaidIds && view.markedPaidIds.length > 0 && (
-              <Button onClick={onUnmarkPaid}>{t('miningTax.unmarkPaidAction')}</Button>
-            )}
             {owing && owed > 0 && onPay && (
               <Button variant="primary" onClick={onPay}>
                 {t('miningTax.settleUpAction')}

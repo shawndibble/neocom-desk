@@ -1,136 +1,92 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, IskInput, Checkbox, Radio } from '@/components/ui';
-import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import type { PayeeRecord } from '@/db';
+import { Button, Modal, IskInput, Radio } from '@/components/ui';
+import { selectedRowClassName } from '@/components/ui/controlStyles';
+import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { formatDateRange } from './groupRows';
-import { settle } from './ledgerActions';
-import { paidOnFromIso } from './madePayments';
-import { systemLabel } from './names';
+import { linkPayment } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
-import { linkTargetsWithin, type LinkSuggestion } from './paymentLinks';
+import { linkFor, type LinkSuggestion } from './paymentLinks';
+import { PaymentPreview } from './SettleUpDialog';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
-import { toggleInSet } from '@/lib/sets';
 import { DividedList } from '@/components/ui/DividedList';
 
 interface LinkPaymentDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Unlinked payments with a plausible target, most confident first. */
+  /** Unlinked payments with a Payee named, the surest first. */
   suggestions: readonly LinkSuggestion[];
-  systemNames: ReadonlyMap<number, string>;
-  showCharacter: boolean;
+  /** Each personal Payee's account, by any of its record ids: what a payment would pay. */
+  accountOf: (payeeId: string) => PayeeAccount | undefined;
   onLinked: () => void;
 }
 
 /**
- * "I already paid this — what did it cover?" (issue #540), the mirror of
- * Settle up.
- *
- * Pick a payment the app found unaccounted for; it arrives with a Payee already
- * identified and that Payee's matching entries pre-ticked. The list is itemized
- * and untickable for the same reason settle-up's is: a suggestion is a starting
- * point, never a blind mark-all. Confirming records the payment against every
- * ticked Assignment under one shared `paymentId`, and teaches the Payee who the
- * recipient was, so the next payment to them matches on identity.
+ * "I already paid this" (issue #540): a payment the app found unaccounted for, with the Payee it
+ * most likely went to. Confirming links it to that Payee, where it pays the oldest unpaid days
+ * (shown off the account) and what is over is credit; nothing is ticked. It also teaches the Payee
+ * who the recipient was, so the next payment to them is known by its entity.
  */
 export function LinkPaymentDialog({
   open,
   onClose,
   suggestions,
-  systemNames,
-  showCharacter,
+  accountOf,
   onLinked,
 }: LinkPaymentDialogProps) {
   const { t } = useTranslation();
   const [selectedKey, setSelectedKey] = useState<string | null>(
     suggestions[0]?.payment.key ?? null
   );
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   // Only meaningful for a payment in kind, whose cargo is never priced.
   const [amountInKind, setAmountInKind] = useState('');
-  // False while the field shows text `amountInKind` doesn't reflect ("1bx"):
-  // saving then would record a figure the pilot can't see.
   const [amountInKindParses, setAmountInKindParses] = useState(true);
   const { pending: saving, error: saveError, setError: setSaveError, run } = useLedgerAction();
-  // Set once the entries are marked paid, so a retry after a later failure can't record it twice.
-  const [recorded, setRecorded] = useState(false);
+  // Set once the link is saved, so a retry after a later failure can't save it twice.
+  const [linked, setLinked] = useState(false);
 
   const selected = suggestions.find((s) => s.payment.key === selectedKey) ?? null;
-
-  const included = useMemo(
-    () => selected?.members.filter((m) => !excluded.has(m.assignment.id)) ?? [],
-    [selected, excluded]
-  );
-  const includedTotal = included.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+  const account = selected ? accountOf(selected.payee.id) : undefined;
+  const owed = account?.owes?.amount ?? 0;
+  const amount =
+    selected?.payment.amount ??
+    (amountInKind.trim() === '' ? Math.round(owed) : Number(amountInKind));
+  const amountValid =
+    Number.isFinite(amount) &&
+    amount > 0 &&
+    (selected?.payment.amount != null || amountInKindParses);
+  const outcome =
+    selected && amountValid && account
+      ? account.preview(amount, selected.payment.date.slice(0, 10))
+      : null;
 
   function pick(key: string) {
     setSelectedKey(key);
-    setExcluded(new Set());
     setAmountInKind('');
     setAmountInKindParses(true);
   }
 
-  function toggle(id: string) {
-    setExcluded((previous) => toggleInSet(previous, id));
-  }
-
-  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
-
-  /** What goes on the record: the ISK that actually moved, or the pilot's figure for ore handed over. */
-  const recordedAmount =
-    selected?.payment.amount ??
-    (amountInKind.trim() === '' ? Math.round(includedTotal) : Number(amountInKind));
-  const amountValid =
-    Number.isFinite(recordedAmount) &&
-    recordedAmount >= 0 &&
-    (selected?.payment.amount != null || amountInKindParses);
-
-  // Only shown for a real ISK payment, where a gap between what was sent and
-  // what the ticked entries owe is worth noticing before committing.
-  const difference =
-    selected && selected.payment.amount !== null ? selected.payment.amount - includedTotal : null;
-
   async function commit() {
-    if (!selected || included.length === 0 || !amountValid) return;
-    const { payment, balance } = selected;
+    if (!selected || !amountValid) return;
+    const { payment, payee } = selected;
+    const record = payee.members[0];
+    if (!record) return;
     const result = await run(() =>
-      settle(
-        // A day the ISK sent cannot reach stays outstanding, as the "short" line says.
-        linkTargetsWithin(
-          included.map((m) => m.assignment),
-          payment.amount
-        ),
-        {
-          paidOn: paidOnFromIso(payment.date),
-          method: payment.method,
-          amount: Math.round(recordedAmount),
-          ...(payment.kind === 'journal'
-            ? { journalLinks: [{ refId: payment.refId, source: 'manual' as const }] }
-            : { contractLinks: [{ refId: payment.refId, source: 'manual' as const }] }),
-        }
-      )
+      linkPayment(linkFor(payment, payee.id, 'manual', Math.round(amount)), record.characterId)
     );
     if (!result.ok) return;
-    setRecorded(true);
+    setLinked(true);
     try {
-      // Learned only on confirmation — the pilot agreeing this payment settled
-      // this Payee is what makes the recipient identification trustworthy.
-      if (payment.counterpartyId !== undefined) {
-        await rememberPayeeEntity(balance.payee, payment.counterpartyId);
-      }
+      // Learned only on confirmation: the pilot agreeing who was paid is what makes it trustworthy.
+      if (payment.counterpartyId !== undefined)
+        await rememberPayeeEntity(record, payment.counterpartyId);
     } catch {
-      // The payment is recorded; only learning who the Payee is paid failed.
-      // Say so and keep the dialog open, rather than closing as if all went.
-      // `onLinked` waits for the close: TaxTab mounts this dialog only while
-      // `linkSuggestions` is non-empty, and the reload drops this payment from
-      // them, which would unmount the message unread. (LinkWalletPaymentDialog
-      // is mounted per Payee, so it can reload straight away.)
-      setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: balance.payee.name }));
+      // The link is saved; only learning who the Payee is failed. Say so and stay open: the
+      // reload drops this payment from the suggestions, which would unmount the message unread.
+      setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: payee.name }));
       return;
     }
     onLinked();
@@ -138,12 +94,9 @@ export function LinkPaymentDialog({
   }
 
   function close() {
-    if (recorded) onLinked();
+    if (linked) onLinked();
     onClose();
   }
-
-  const confidenceLabel = (suggestion: LinkSuggestion, payee: PayeeRecord) =>
-    t(`miningTax.linkConfidence.${suggestion.confidence}`, { payee: payee.name });
 
   return (
     <Modal
@@ -185,7 +138,9 @@ export function LinkPaymentDialog({
                       {payment.counterpartyName ? ` → ${payment.counterpartyName}` : ''}
                     </span>
                     <span className="truncate text-[0.6875rem] text-text-dim">
-                      {confidenceLabel(suggestion, suggestion.balance.payee)}
+                      {t(`miningTax.linkConfidence.${suggestion.confidence}`, {
+                        payee: suggestion.payee.name,
+                      })}
                     </span>
                   </span>
                 </label>
@@ -194,103 +149,34 @@ export function LinkPaymentDialog({
           })}
         </DividedList>
 
-        {selected && (
-          <>
-            <div className="space-y-1">
-              <p className={eyebrowClassName}>
-                {t('miningTax.linkPaymentCoversLabel', { payee: selected.balance.payee.name })}
-              </p>
-              <DividedList as="ul">
-                {selected.members.map((m) => {
-                  const on = !excluded.has(m.assignment.id);
-                  return (
-                    <li key={m.assignment.id}>
-                      <label
-                        className={cx(
-                          'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
-                          tappableRowClassName
-                        )}
-                      >
-                        <Checkbox
-                          checked={on}
-                          onChange={() => toggle(m.assignment.id)}
-
-                          aria-label={t('miningTax.linkPaymentIncludeLabel', {
-                            date: m.assignment.date,
-                          })}
-                        />
-                        <span className="w-20 shrink-0 tabular-nums">{m.assignment.date}</span>
-                        <span className="min-w-0 flex-1 truncate text-text-dim">
-                          {systemName(m.assignment.solarSystemId)}
-                          {showCharacter && ` · ${m.row.characterName}`}
-                        </span>
-                        <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
-                          {formatIsk(m.assignment.taxOwed)} ISK
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </DividedList>
-            </div>
-
-            {selected.payment.amount === null && (
-              <div className="space-y-1">
-                <p className={eyebrowClassName}>{t('miningTax.linkPaymentAmountLabel')}</p>
-                <IskInput
-                  value={amountInKind}
-                  onChange={setAmountInKind}
-                  onParseableChange={setAmountInKindParses}
-                  defaultAmount={Math.round(includedTotal)}
-                  aria-label={t('miningTax.linkPaymentAmountLabel')}
-                  className="w-full"
-                />
-                <p className="text-[0.6875rem] text-text-dim">
-                  {t('miningTax.linkPaymentInKindHint')}
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[0.6875rem] text-text-dim">
-                {t('miningTax.linkPaymentIncluded', {
-                  count: included.length,
-                  range: formatDateRange(included.map((m) => m.assignment.date).sort()),
-                })}
-              </span>
-              <span className="text-sm font-semibold tabular-nums">
-                {formatIsk(includedTotal)} ISK
-              </span>
-            </div>
-
-            {difference !== null && Math.round(difference) !== 0 && (
-              <p
-                className={cx(
-                  'text-[0.6875rem]',
-                  difference > 0 ? 'text-text-dim' : 'text-warning'
-                )}
-              >
-                {difference > 0
-                  ? t('miningTax.linkPaymentOverpaid', {
-                      amount: `${formatIsk(difference)} ISK`,
-                    })
-                  : t('miningTax.linkPaymentShort', {
-                      amount: `${formatIsk(-difference)} ISK`,
-                    })}
-              </p>
-            )}
-          </>
+        {selected && selected.payment.amount === null && (
+          <div className="space-y-1">
+            <p className={eyebrowClassName}>{t('miningTax.linkPaymentAmountLabel')}</p>
+            <IskInput
+              value={amountInKind}
+              onChange={setAmountInKind}
+              onParseableChange={setAmountInKindParses}
+              defaultAmount={Math.round(owed)}
+              aria-label={t('miningTax.linkPaymentAmountLabel')}
+              className="w-full"
+            />
+            <p className="text-[0.6875rem] text-text-dim">{t('miningTax.linkPaymentInKindHint')}</p>
+          </div>
         )}
+
+        {outcome && <PaymentPreview outcome={outcome} />}
 
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
             size="sm"
-            disabled={!selected || included.length === 0 || !amountValid || saving || recorded}
+            disabled={!selected || !amountValid || saving || linked}
             onClick={() => void commit()}
           >
-            {t('miningTax.linkPaymentConfirmAction', { count: included.length })}
+            {selected
+              ? t('miningTax.linkPaymentConfirmAction', { payee: selected.payee.name })
+              : t('miningTax.linkPaymentTitle')}
           </Button>
           <Button size="sm" onClick={close}>
             {t('filters.cancel')}

@@ -84,6 +84,7 @@ export function LedgerRowDetail({
           )}
         </>
       )}
+      {row.kind === 'opening' && <p className="text-text-dim">{k('opening')}</p>}
       {row.kind === 'notice' && (
         <>
           <Days title={k('listedDays')} days={byDate(row.notice.lines)} />
