@@ -12,7 +12,16 @@
  * `REFINERY.alpha.systemId`; mining in `PERSONAL_SYSTEM` is no book's, so it is owed to the
  * pilot's personal Payee.
  */
-import { BookSeed, DAY_QTY, DAY_TAX, ORE_TYPE, REFINERY, day, noonOf } from './bookSeed';
+import {
+  BookSeed,
+  DAY_QTY,
+  DAY_TAX,
+  ORE_TYPE,
+  REFINERY,
+  day,
+  noonOf,
+  verifyToken,
+} from './bookSeed';
 import type { SeedDoc } from './emulator';
 import type { EsiOverride } from './bookTest';
 import { CORP, MINER, OFFICER } from './identities';
@@ -130,5 +139,31 @@ export function creditedDonation(p: {
       division: 1,
       minerId: p.minerId ?? PILOT_MINER_ID,
     },
+  };
+}
+
+/**
+ * A book the pilot and the officers write to each other in (`corpTaxBookNotes.book.spec.ts`): the
+ * pilot's group mined two days a month ago, listed on a late notice that is now overdue, and
+ * three days this week, still billed.
+ */
+export function notesBook() {
+  const oldDays = [30, 29];
+  const newDays = [6, 5, 4];
+  const seed = new BookSeed({ startBack: 60 })
+    .group(PILOT_MINER_ID, [PILOT.id])
+    .mine(PILOT.id, [...oldDays, ...newDays])
+    .lateNotice({
+      id: 'ln-pilot',
+      characterId: PILOT.id,
+      minerId: PILOT_MINER_ID,
+      days: oldDays,
+      issuedBack: 25,
+      token: verifyToken('pilot-notes'),
+    });
+  return {
+    seed,
+    owed: (oldDays.length + newDays.length) * DAY_TAX,
+    esi: pilotEsi({ mining: miningLedger([...oldDays, ...newDays]) }),
   };
 }
