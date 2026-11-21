@@ -10,9 +10,7 @@
 import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
-import type { FeederReadClock } from './feederHealth';
-import type { DayCharge, Miner } from './charges';
-import type { FeederCoverage } from './coverage';
+import type { DayCharge } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import { disputeHold, isMinersDispute, type OreDispute } from './disputes';
 import {
@@ -26,24 +24,18 @@ import {
   type LearnedChunkRate,
 } from './extraction';
 import { overdueStatus, type Declaration, type OverdueState } from './overdue';
-import { isBeforeBook, paymentNet, type RecordedWriteOff, type TaxPayment } from './payments';
+import { isBeforeBook, paymentNet, type TaxPayment } from './payments';
 import { toEngineExtraction, type SettlePayment, type SyncExtraction } from './sync';
-import type { TaxRate } from './rates';
 import { latestRecordedCorp } from './bookDocs';
 import type { ObservedMiningEntry, OreLine } from './types';
-import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
 import { utcDayOf } from '../localDay';
 import type { MinerRunningAccount } from './minerRunningAccount';
-import type { ToleranceExemption } from './toleranceExemptions';
 import { settleOpenSet, type MinerSettlement, type OpenSet, type OpenSetInput } from './openSet';
 
-export interface BookViewInput {
-  corporationId: number;
-  /** ISO instant the view is read at. */
-  now: string;
-  startDate: string;
+/** What a view is built from: the open set's input, placed by the book's Extractions. */
+export interface BookViewInput extends Omit<OpenSetInput, 'placement'> {
   graceHours: number;
   overdueDays: number;
   hubId: string;
@@ -51,38 +43,9 @@ export interface BookViewInput {
   structureExpiryHours: Readonly<Record<string, number>>;
   /** The book's manual chunk rate (m³/h); the fallback behind a refinery's measured one. */
   chunkM3PerHour?: number;
-  /** ISO instant of the book's last sync by anyone. */
-  lastSyncedAt?: string;
-  rates: readonly TaxRate[];
-  entries: readonly ObservedMiningEntry[];
-  miners: readonly Miner[];
-  /** The book's late notices: what was asked of a Miner, never money owed of its own. */
-  notices: readonly LateNotice[];
-  payments: readonly SettlePayment[];
-  dismissals: readonly Dismissal[];
   declarations: readonly Declaration[];
-  /** Members' disputes: an open one holds its day out of what is due (resolving in the app). */
-  disputes?: readonly OreDispute[];
   adjustments: readonly Adjustment[];
-  /** Officer write-offs (#4637): each forgives the Miner's oldest unpaid days. */
-  writeOffs?: readonly RecordedWriteOff[];
-  /** Officers' per-day limits on what a shortfall may forgive (`toleranceExemptions`). */
-  toleranceExemptions?: readonly ToleranceExemption[];
-  /**
-   * Feeders' last good ledger reads. A feeder's refinery days are withheld until
-   * one lands after the day's grace (#4509), and a day outside its coverage owes
-   * nothing (#4618); absent means no feeders.
-   */
-  feeders?: readonly (FeederReadClock & FeederCoverage)[];
   extractions: readonly SyncExtraction[];
-  /** A Running account's per-day tolerance, in percent. */
-  dayTolerancePct?: number;
-  /** Each Miner's stored paid-through day (`meta/paid`): it and every day before it stay paid for good (D22). */
-  minerPaidThrough?: ReadonlyMap<string, string>;
-  /** Each Miner's closed-through checkpoint (`accountCheckpoints`), by Miner id. */
-  checkpoints?: ReadonlyMap<string, RunningAccountCheckpoint>;
-  /** The day's prices at the book's hub and Ore Form, by raw type id. */
-  pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
    * A moon owner's prices by raw type id (#4621): the server's rule for the moon owner's own
    * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay and that page owe one figure.
@@ -265,26 +228,7 @@ export function pendingTax(
 /** What the open set of a whole book is settled from, as an officer reads it. */
 export function openSetInputOf(input: BookViewInput): OpenSetInput {
   return {
-    corporationId: input.corporationId,
-    now: input.now,
-    startDate: input.startDate,
-    graceHours: input.graceHours,
-    lastSyncedAt: input.lastSyncedAt,
-    rates: input.rates,
-    entries: input.entries,
-    miners: input.miners,
-    notices: input.notices,
-    payments: input.payments,
-    dismissals: input.dismissals,
-    adjustments: input.adjustments,
-    writeOffs: input.writeOffs,
-    ...(input.disputes ? { disputes: input.disputes } : {}),
-    ...(input.toleranceExemptions ? { toleranceExemptions: input.toleranceExemptions } : {}),
-    ...(input.dayTolerancePct !== undefined ? { dayTolerancePct: input.dayTolerancePct } : {}),
-    ...(input.minerPaidThrough ? { minerPaidThrough: input.minerPaidThrough } : {}),
-    ...(input.checkpoints ? { checkpoints: input.checkpoints } : {}),
-    feeders: input.feeders,
-    pricesOn: input.pricesOn,
+    ...input,
     placement: {
       kind: 'extractions',
       extractions: input.extractions,
@@ -353,7 +297,6 @@ export function buildBookView(input: BookViewInput): BookView {
         ? hold.ownerCorporationId
         : undefined;
     const billed = new Set(billable.lines.map((l) => l.key));
-    const dismissedKeys = new Map(billable.dismissed.map((d) => [d.charge.key, d.dismissal.id]));
     /** The newest late notice that listed each day. */
     const noticeBy = new Map<string, string>();
     for (const n of notices) for (const line of n.lines) noticeBy.set(line.key, n.id);
@@ -373,7 +316,7 @@ export function buildBookView(input: BookViewInput): BookView {
         const dismissal = activeDismissalFor(c, input.dismissals);
         const day = account.day(c.date);
         let status: DayStatus;
-        if (dismissal || dismissedKeys.has(c.key)) status = 'dismissed';
+        if (dismissal) status = 'dismissed';
         else if (!billed.has(c.key)) status = 'not-billable';
         // A day the account closed through and no longer owes is paid.
         else if (day ? day.settled : through !== undefined && c.date <= through) status = 'paid';
