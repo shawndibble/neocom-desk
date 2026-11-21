@@ -142,3 +142,24 @@ and flipped paid days back for older clients.
   by reading their rows, and Firestore cannot query "characters not in this set". Bounding that
   read needs a server-kept list of every character the book bills, or a checkpoint for every Miner
   who has mined; left for a later change.
+
+## Added 2026-11-21: a lock date, and no copied reader lists (owner's decision)
+
+Replaces "the checkpoint is a strict cache" and the copied `uids` on rows and payments.
+
+- **History before the lock date is read-only.** The lock date is the 1st of the month two months
+  back: on Dec 1 and on Dec 15 alike it is Oct 1. Nothing dated before it can be added, changed or
+  removed (payments recorded or moved, adjustments, dismissals, rates, write-offs, disputes on
+  those days): the server refuses the edit. Everything from the lock date up to today stays freely
+  editable.
+- **A snapshot is taken once per lock date.** When an officer opens the book and a Miner has no
+  snapshot for the current lock date, the officer's tab records one: what that Miner's Running
+  account stood at through the day before the lock date. A load reads the snapshot and the days
+  after it. Since locked history cannot change, a snapshot never goes stale: there is no
+  invalidation, no epoch and no Director gate. The one exception is a change to a Miner's
+  characters (a grouping, an unlink): that deletes the affected Miners' snapshots, and the next
+  officer load records them again. A pilot's personal Payees follow the same lock date on their
+  device.
+- **No copied reader lists.** Rows and payments are not given `uids`, and no queue maintains them.
+  A pilot sees an alt's lines through the Mining Tax page's character selector ("All characters"),
+  as before.
