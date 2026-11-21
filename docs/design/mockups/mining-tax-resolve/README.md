@@ -51,11 +51,10 @@ The pilot's own journal entry already gives the amount, EVE time, journal ref an
 
 ## Paying a Corp Tax Book: an amount, not days
 
-The book pays a Miner's oldest days first and can't target a moon or a day, so the pilot pays an amount and the dialog shows where it lands. A day held by an open dispute or "Not paying" is skipped until an officer answers; the officer's card says where the money went.
+The book pays a Miner's oldest days first and can't target a moon or a day, so the pilot pays an amount. The pay side shipped as Settle up's preview off the Miner's Running account (`SettleUpDialog`), so its mockup is gone; the officer's card says where the money went.
 
 | | 1440 | 390 |
 |---|---|---|
-| Pay dialog: oldest first, the held day skipped | ![](pay-oldest-first-1440.png) | ![](pay-oldest-first-phone-390.png) |
 | Officer: where the member's payment landed, and what is held | ![](officer-held-1440.png) | |
 
 ## After the pilot answers
