@@ -13,6 +13,7 @@
  * officer's tab through a callable: the server has no prices) and on the pilot's device for a
  * personal Payee.
  */
+import { DAY_MS, utcDay } from './timeConstants.js';
 
 /** How old the end of a month must be before it closes: past ESI's ~30-day ledger window. */
 export const CLOSE_AFTER_DAYS = 31;
@@ -73,11 +74,6 @@ export function checkpointFits(
   return held.every((c) => now.has(c)) && now.size === held.length;
 }
 
-const DAY_MS = 86_400_000;
-
-/** `YYYY-MM-DD` of a UTC instant in ms. */
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-
 /**
  * The newest date an account may be closed through on `today` (`YYYY-MM-DD`, UTC): the end of the
  * last month that ended at least `CLOSE_AFTER_DAYS` days before today.
@@ -87,7 +83,7 @@ export function closedThroughFor(today: string): string {
   const c = new Date(cutoff);
   // The last day of the month before the cutoff's, unless the cutoff is itself a month's last day.
   const endOfCutoffMonth = Date.UTC(c.getUTCFullYear(), c.getUTCMonth() + 1, 0);
-  return isoDay(
+  return utcDay(
     endOfCutoffMonth === cutoff ? cutoff : Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), 0)
   );
 }

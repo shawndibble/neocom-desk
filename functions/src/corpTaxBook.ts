@@ -30,7 +30,7 @@ import {
   shiftDate,
   type ForfeitBasis,
 } from './corpTaxBookEngine.js';
-import { DAY_MS } from './timeConstants.js';
+import { DAY_MS, HOUR_MS, MINUTE_MS, utcDay } from './timeConstants.js';
 import { payOldestFirst, type OwedDay } from './corpTaxBookAccounts.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
@@ -148,9 +148,9 @@ export const FEEDER_VIEWS = 'feederViews';
 export const BILLED_BY_COLLECTION = 'corpTaxBookBilledBy';
 
 /** Roles are trusted for at most this long without a live check (D7). */
-export const ROLE_CACHE_MS = 10 * 60_000;
+export const ROLE_CACHE_MS = 10 * MINUTE_MS;
 /** Read access lapses this long after the last check (D7). */
-export const ACCESS_TTL_MS = 24 * 3_600_000;
+export const ACCESS_TTL_MS = DAY_MS;
 
 export const MAX_SYNC_OBSERVED = 2000;
 export const MAX_SYNC_EXTRACTIONS = 200;
@@ -210,14 +210,13 @@ export function satisfies(roles: OfficerRoles, need: Need): boolean {
 }
 
 export function isCacheFresh(checkedAt: number, now: number): boolean {
-  return now - checkedAt <= ROLE_CACHE_MS && checkedAt <= now + 60_000;
+  return now - checkedAt <= ROLE_CACHE_MS && checkedAt <= now + MINUTE_MS;
 }
 
 // --- Input parsing --------------------------------------------------------
 
-export function utcDate(nowMs: number): string {
-  return new Date(nowMs).toISOString().slice(0, 10);
-}
+/** `YYYY-MM-DD` of a UTC instant in ms: `utcDay`, under the name the callables use. */
+export const utcDate = utcDay;
 
 export function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
@@ -1593,7 +1592,7 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
     const row = record(r);
     const date = dateString(row.date, 'date');
     const cachedAt = instant(row.cachedAt, 'cachedAt');
-    if (date > today || Date.parse(cachedAt) > nowMs + 3_600_000) {
+    if (date > today || Date.parse(cachedAt) > nowMs + HOUR_MS) {
       throw new HttpsError('invalid-argument', 'observed rows cannot be from the future');
     }
     return {
