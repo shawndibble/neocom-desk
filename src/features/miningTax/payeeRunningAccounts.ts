@@ -61,6 +61,8 @@ export class PayeeRunningAccounts {
     const charges = new Map<string, { id: string; date: string; tax: number }[]>();
     for (const a of input.assignments) {
       if (!isBilled(a)) continue;
+      // A day a book bills whole is the book's, not this Payee's: no charge, not a zero line.
+      if ((input.billedElsewhere?.get(a.id) ?? 0) >= 1) continue;
       const key = keyOf(a.payeeId!);
       charges.set(key, [...(charges.get(key) ?? []), { id: a.id, date: a.date, tax: taxOf(a) }]);
     }
