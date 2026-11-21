@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dueCheckpoints } from './accountRecords';
+import { dueCheckpoints } from './runningAccountRecords';
 import { buildBookView, type BookViewInput } from './bookView';
 import type { ObservedMiningEntry } from './types';
 

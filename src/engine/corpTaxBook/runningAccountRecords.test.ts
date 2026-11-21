@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountRecords } from './accountRecords';
+import { runningAccountRecords } from './runningAccountRecords';
 import type { BookView } from './bookView';
 
 const view = () =>
@@ -50,9 +50,9 @@ const view = () =>
     ],
   }) as unknown as BookView;
 
-describe('accountRecords', () => {
+describe('runningAccountRecords', () => {
   it('records each Miner’s account in whole ISK, with the net payments counted and the days still owed (oldest first, none held or settled)', () => {
-    expect(accountRecords(view())).toEqual([
+    expect(runningAccountRecords(view())).toEqual([
       {
         minerId: 'm1',
         owed: 301,
@@ -72,6 +72,6 @@ describe('accountRecords', () => {
   });
 
   it('keeps only the Miner a scoped page read', () => {
-    expect(accountRecords(view(), 'm2').map((a) => a.minerId)).toEqual(['m2']);
+    expect(runningAccountRecords(view(), 'm2').map((a) => a.minerId)).toEqual(['m2']);
   });
 });

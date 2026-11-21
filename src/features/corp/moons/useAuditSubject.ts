@@ -1,4 +1,5 @@
 import type { AuditEntry } from '../taxBook/bookClient';
+import { LEGACY_ISSUE_ACTION } from '../taxBook/bookClient';
 import { useMemo } from 'react';
 import { NOTICE_ID_FIELD } from '../../../../functions/src/corpTaxBookLateNotice';
 import { minerPath } from './moonsPaths';
@@ -15,12 +16,12 @@ export type AuditSubject = (
 /** Entries about one late notice; the `issueStatement` and `recordMail` names are older servers'. */
 const NOTICE_ACTIONS = new Set([
   'issueLateNotice',
-  'issueStatement',
+  LEGACY_ISSUE_ACTION,
   'recordLateNoticeMail',
   'recordMail',
   'recordReminder',
 ]);
-const ISSUE_ACTIONS = new Set(['issueLateNotice', 'issueStatement']);
+const ISSUE_ACTIONS = new Set(['issueLateNotice', LEGACY_ISSUE_ACTION]);
 
 /**
  * Resolves an entry's Miner, from its own `minerId` or its late notice's, so old entries (which

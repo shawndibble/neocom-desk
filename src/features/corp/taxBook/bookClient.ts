@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { callableErrorReason } from '@/lib/callableError';
 import { LATE_NOTICES, LEGACY_NOTICES } from '@/engine/corpTaxBook/noticeCollections';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
@@ -630,6 +631,12 @@ export type BookDeclaration = Declaration & {
   resolution?: NonNullable<Declaration['resolution']> & { by?: number };
 };
 
+/** A stored declaration with the notice it answers read off its legacy field (`NOTICE_ID_FIELD`). */
+export function bookDeclarationOf(raw: Record<string, unknown>): BookDeclaration {
+  const { [NOTICE_ID_FIELD]: legacy, ...rest } = raw;
+  return { ...rest, noticeId: (raw.noticeId ?? legacy) as string } as unknown as BookDeclaration;
+}
+
 /** An officer's "rebill from date" (D22), server-written. */
 export interface Rebill {
   id: string;
@@ -726,6 +733,8 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
 /** Where the book keeps its late notices (`noticeCollections.ts`), and their verify links. */
 export { LATE_NOTICES, LEGACY_NOTICES };
 const LATE_NOTICE_LINKS = 'lateNoticeLinks';
+/** The action servers older than `issueLateNotice` take a late notice through (and audit it as). */
+export const LEGACY_ISSUE_ACTION = 'issueStatement';
 /** The mail kind the legacy `recordMail` action takes for a late notice's first mail. */
 const LEGACY_NOTICE_MAIL_KIND = 'statement';
 /** Where servers older than the `lateNotices` collection keep a late notice's verify link. */
@@ -809,12 +818,24 @@ export async function readVerifyTokens(
 }
 
 /** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
-// TODO(M7): fall back only on the router's exact unknown-action answer, not on any
-// `invalid-argument` or `not-found` (a real refusal of a known action falls back today). The
-// server agent is naming the exact old and new answers; match them here once known.
-const unknownAction = (error: unknown) => {
-  const code = errorCode(error);
-  return code.endsWith('invalid-argument') || code.endsWith('not-found');
+/**
+ * The `reason` a server gives an action or edit it does not know (`UNKNOWN_ACTION`,
+ * functions/src/inputParse.ts, which the client cannot import: it pulls in firebase-functions).
+ */
+const UNKNOWN_ACTION_REASON = 'unknown-action';
+
+/**
+ * Whether the server does not know this edit action yet, so the legacy one is the way (M7): its
+ * `unknown-action` reason, or, from a server before that reason, the router's "Unknown action"
+ * or the edit parser's "action must be one of ..." refusal. Any other refusal of a known action
+ * is the action's own answer, never a reason to fall back.
+ */
+export const unknownAction = (error: unknown): boolean => {
+  const reason = callableErrorReason(error);
+  if (reason !== null) return reason === UNKNOWN_ACTION_REASON;
+  if (!errorCode(error).endsWith('invalid-argument')) return false;
+  const message = error instanceof Error ? error.message : '';
+  return /^(Unknown action|action must be one of )/.test(message);
 };
 
 /**
@@ -831,7 +852,7 @@ export async function issueLateNotice(
   } catch (error) {
     if (!unknownAction(error)) throw error;
     await editBook(characterId, corporationId, {
-      action: 'issueStatement',
+      action: LEGACY_ISSUE_ACTION,
       statement: legacyStatementDocOf(notice),
     });
   }

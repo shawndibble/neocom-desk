@@ -10,7 +10,7 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 const token = vi.hoisted(() => vi.fn());
 vi.mock('@/auth/session', () => ({ getValidAccessToken: token }));
 
-import { bookFeederFrom, editBook, reclaimBook } from './bookClient';
+import { bookFeederFrom, editBook, reclaimBook, unknownAction } from './bookClient';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,6 +45,24 @@ describe('editBook', () => {
     fns.callable.mockResolvedValue({ data: {} });
     await editBook(7, 98000001, { action: 'assignPayment' });
     expect(token).not.toHaveBeenCalled();
+  });
+});
+
+describe('unknownAction (M7)', () => {
+  const err = (code: string, message: string, reason?: string) =>
+    Object.assign(new Error(message), { code, ...(reason ? { details: { reason } } : {}) });
+  it("falls back on the server's unknown-action answer, old or new", () => {
+    expect(unknownAction(err('functions/invalid-argument', 'x', 'unknown-action'))).toBe(true);
+    expect(unknownAction(err('functions/invalid-argument', 'Unknown action'))).toBe(true);
+    expect(
+      unknownAction(err('functions/invalid-argument', 'action must be one of addRate, dismiss'))
+    ).toBe(true);
+  });
+
+  it("never on a known action's own refusal", () => {
+    expect(unknownAction(err('functions/invalid-argument', 'notice.code must be MT1'))).toBe(false);
+    expect(unknownAction(err('functions/invalid-argument', 'x', 'notice-exists'))).toBe(false);
+    expect(unknownAction(err('functions/not-found', 'Payment not found'))).toBe(false);
   });
 });
 

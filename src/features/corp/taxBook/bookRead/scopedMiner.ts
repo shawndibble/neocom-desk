@@ -25,6 +25,7 @@ import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import {
   LATE_NOTICES,
   LEGACY_NOTICES,
+  bookDeclarationOf,
   readsLegacyNotices,
   settingsFrom,
   type BookDeclaration,
@@ -106,7 +107,7 @@ export async function readMinerScope(
       out.push(
         ...(
           await getDocs(query(under('declarations'), where(NOTICE_ID_FIELD, 'in', batch)))
-        ).docs.map((d) => d.data() as BookDeclaration)
+        ).docs.map((d) => bookDeclarationOf(d.data()))
       );
     return out;
   };

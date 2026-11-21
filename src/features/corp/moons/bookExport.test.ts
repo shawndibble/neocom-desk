@@ -97,7 +97,7 @@ const input: BookExportInput = {
   declarations: [
     {
       id: 'd1',
-      statementId: 'n1',
+      noticeId: 'n1',
       kind: 'contract',
       at: '2026-04-02T00:00:00Z',
       note: 'sent by contract',

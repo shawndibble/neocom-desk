@@ -387,9 +387,9 @@ export function bookExportSheets(
       ),
       [
         ['declarationId', (d) => d.id],
-        ['noticeId', (d) => d.statementId],
-        ['miner', (d) => minerName(noticeMiner.get(d.statementId))],
-        ['minerId', (d) => noticeMiner.get(d.statementId)],
+        ['noticeId', (d) => d.noticeId],
+        ['miner', (d) => minerName(noticeMiner.get(d.noticeId))],
+        ['minerId', (d) => noticeMiner.get(d.noticeId)],
         ['kind', (d) => t(`corpTaxBook.export.declarationKind.${d.kind}`)],
         ['time', (d) => d.at],
         ['note', (d) => d.note],

@@ -252,7 +252,7 @@ export function NeedsYouQueue() {
 
   const creditedAutomatically = autoCredited(view.input.declarations, now).flatMap((d) => {
     const miner = miners.find((m) =>
-      view.input.notices.some((n) => n.id === d.statementId && n.minerId === m.id)
+      view.input.notices.some((n) => n.id === d.noticeId && n.minerId === m.id)
     );
     if (!miner) return [];
     const transfers = d.transfers ?? [];

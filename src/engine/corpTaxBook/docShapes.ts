@@ -6,6 +6,7 @@
  * server wrote under the officer rules) and shares the settings parser, `parseBookSettings`
  * (`bookDocs.ts`), with this one.
  */
+import { NOTICE_ID_FIELD } from '../../../functions/src/corpTaxBookLateNotice';
 import {
   checkpointProblems,
   type RunningAccountCheckpoint,
@@ -181,12 +182,12 @@ const DECLARATION_KINDS: readonly Declaration['kind'][] = [
   'another-way',
 ];
 
-/** A declaration on one of the member's own Statements (#6206). */
+/** A declaration on one of the member's own late notices (#6206). */
 export function readMemberDeclaration(id: string, d: Data): Declaration | null {
-  const statementId = str(d.statementId);
+  const noticeId = str(d[NOTICE_ID_FIELD]);
   const kind = str(d.kind) as Declaration['kind'] | undefined;
   const at = str(d.at);
-  if (!statementId || !at || !kind || !DECLARATION_KINDS.includes(kind)) return null;
+  if (!noticeId || !at || !kind || !DECLARATION_KINDS.includes(kind)) return null;
   const amount = num(d.amount);
   const note = str(d.note);
   const r = d.resolution as Data | undefined | null;
@@ -197,7 +198,7 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   const by = num(r?.by);
   return {
     id,
-    statementId,
+    noticeId,
     kind,
     at,
     ...(amount !== undefined ? { amount } : {}),
