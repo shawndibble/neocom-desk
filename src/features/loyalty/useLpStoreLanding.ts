@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { useCurrentSystem, useJumpRangeFilter } from '@/features/route/currentSystem';
@@ -93,8 +93,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   const [warmed, setWarmed] = useState(active);
   if (active && !warmed) setWarmed(true);
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
-  const hubId = useMarketHub((s) => s.value);
-  const hubHydrated = useMarketHub((s) => s.hydrated);
+  const { hubId, hydrated: hubHydrated } = useHubFor('lpStore');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceBasis = usePriceBasis((s) => s.value);
   const standing = tradeHubStanding(useTradeHubStandings(activeCharacterId), hub.id);

@@ -16,6 +16,7 @@
 import type { CharacterBoardItem, CharacterBoardItemKind } from './board';
 import { CHARACTER_BOARD_ITEM_KINDS } from './board';
 import { dayStart, localMidnight, nextDay, type DayZone } from '../localDay';
+import { DAY_MS } from '@/lib/age';
 
 export { localMidnight };
 
@@ -91,6 +92,13 @@ export function groupByDay(items: readonly CharacterBoardItem[], zone?: DayZone)
   }
   return groups;
 }
+
+/**
+ * Overdue for longer than this, an item folds into the rail's one summary row (and the Overview's
+ * Calendar widget leaves it out): a month of extractors nobody restarted must not open the agenda
+ * above everything current.
+ */
+export const LONG_OVERDUE_MS = 2 * DAY_MS;
 
 /**
  * The rail's long-overdue items apart from the rest: past their deadline by more than

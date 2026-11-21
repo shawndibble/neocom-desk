@@ -73,7 +73,7 @@ import {
 import { flagDetail } from '@/features/contractSearch/contractFlagText';
 import * as Icon from '@/components/ui/icons';
 import { SIMILAR_COPY_WINDOW, type BpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
@@ -171,7 +171,7 @@ export function PublicContractDetailModal({
 }: PublicContractDetailModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const hubId = useMarketHub((s) => s.value);
+  const { hubId } = useHubFor('contracts');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<string | null | undefined>(undefined);
@@ -275,6 +275,7 @@ export function PublicContractDetailModal({
     asking: askingIsk ?? 0,
     basis: LIVE,
     hub,
+    hubArea: 'contracts',
     defaultSide: defaultPriceSide,
     sellOverrides,
     otherValue,

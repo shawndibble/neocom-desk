@@ -89,6 +89,7 @@ export function useOwnContractPriceCheck({
     asking,
     basis,
     hub,
+    hubArea: 'contracts',
     defaultSide: 'buy',
     sellOverrides,
   });

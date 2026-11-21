@@ -234,7 +234,6 @@
   "src/engine/blueprintKind.test.ts": 1,
   "src/engine/boosterImpact.test.ts": 1,
   "src/engine/character/board.test.ts": 1,
-  "src/engine/character/calendarDeadline.test.ts": 1,
   "src/engine/character/calendarPrefetch.test.ts": 1,
   "src/engine/character/calendarRetention.test.ts": 1,
   "src/engine/character/deadlines.test.ts": 1,

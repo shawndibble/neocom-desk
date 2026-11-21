@@ -19,18 +19,20 @@ import {
   type PriceCheckLine,
 } from '@/engine/contracts/contractPriceCheck';
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
+import type { PageHubArea } from '@/features/market/pageHubs';
 import type { TradeHub } from '@/market/hubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
 import { formatContractIsk } from '@/lib/isk';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import type { PriceCheckFlip, PriceCheckRowModel } from './ContractPriceCheck';
+import type { PriceCheckFlip, PriceCheckHubMenu, PriceCheckRowModel } from './ContractPriceCheck';
 import { loadContractPrices, type PriceBasisChoice } from './contractPrices';
 
 export interface ContractPriceCheckView {
   heading: string;
   rows: PriceCheckRowModel[];
   flip: PriceCheckFlip;
+  hubMenu?: PriceCheckHubMenu;
   message?: string;
   busy: boolean;
   /**
@@ -52,6 +54,8 @@ export interface ContractPriceCheckArgs {
   /** An Open Price of a past UTC day, or the live book. */
   basis: PriceBasisChoice;
   hub: TradeHub;
+  /** The page area `hub` was resolved for: the heading's hub opens its `HubMenu`. Absent, it is plain text. */
+  hubArea?: PageHubArea;
   defaultSide: PriceSide;
   /** Live sell prices for what the hub never lists (PLEX). Keep the map stable between renders: a new one reloads the prices. */
   sellOverrides?: ReadonlyMap<number, number>;
@@ -91,6 +95,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     asking,
     basis,
     hub,
+    hubArea,
     defaultSide,
     sellOverrides,
     searchedTypeIds = null,
@@ -134,6 +139,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       showOther: t('contractDetail.priceCheckShowSide', { side: wordOf(other).toLowerCase() }),
       onFlip: () => setSide(other),
     },
+    hubMenu: hubArea && { hub, area: hubArea },
   };
 
   if (load.status !== 'ready') {

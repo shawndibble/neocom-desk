@@ -310,13 +310,14 @@ export interface HubBooks extends PriceBooks {
 export function priceBooks(
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
   accountingLevel: number | null,
-  buybackPct: number | null = null
+  buybackPct: number | null = null,
+  feeDiscountFactor = 1
 ): HubBooks {
   return {
     ask: prices.prices,
     bid: sellPrices(prices, buybackPct),
     // A corp buyback pays out of its own pocket: no market sale, no sales tax.
-    salesTaxPct: buybackPct === null ? salesTaxPct(accountingLevel ?? 0) : 0,
+    salesTaxPct: buybackPct === null ? salesTaxPct(accountingLevel ?? 0, feeDiscountFactor) : 0,
     valuedAtAsk: new Set(
       Object.keys(prices.prices)
         .filter((id) => !Object.hasOwn(prices.buyPrices, id))

@@ -8,7 +8,12 @@
  * formula a set of characters owns" into the inputs those already-tested
  * pieces need.
  */
-import { mostRecentlyUpdatedPlan, newBuildPlan, startingLocation } from './newBuildPlan';
+import {
+  mostRecentlyUpdatedPlan,
+  newBuildPlan,
+  newPlanHub,
+  startingLocation,
+} from './newBuildPlan';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { computeBuildPlan } from './computeBuildPlan';
 import type { BuildPlanRecord } from '@/db';
@@ -47,7 +52,7 @@ import {
   type OrderDepthThresholds,
 } from '@/engine/industry/opportunities';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 
 /** One owned blueprint (original or copy) matched to what it builds — the unit of an Opportunities row. */
@@ -94,7 +99,7 @@ export function buildOpportunityCandidates(
 
 /**
  * The Trade Hub a fresh Build Plan for this Character would default to —
- * `newBuildPlan`'s own `defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id` rule,
+ * `newBuildPlan`'s own rule (`newPlanHubId`: the Industry page hub, else the latest plan's),
  * reused here so a candidate's row prices at the same hub "Add to Compare"
  * would seed the plan at (issue #2055), not a hard-coded default.
  */
@@ -103,7 +108,7 @@ export function hubForCharacter(
   plansByCharacter: ReadonlyMap<number, readonly BuildPlanRecord[]>
 ): TradeHub {
   const plan = mostRecentlyUpdatedPlan(plansByCharacter.get(characterId));
-  return (plan && getTradeHub(plan.hubId)) ?? DEFAULT_TRADE_HUB;
+  return newPlanHub(plan);
 }
 
 export interface OpportunityHubGroup {

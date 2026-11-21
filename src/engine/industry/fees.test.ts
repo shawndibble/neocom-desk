@@ -207,3 +207,46 @@ describe('relistBreakEvenPrice', () => {
     expect(relistBreakEvenPrice(1_000, 0, 0, 0, 0)).toBeNull();
   });
 });
+
+describe('a hub fee discount factor (Amarr Deaconry, measured in game: 1.69% sales tax at Accounting V)', () => {
+  it('halves the post-skill sales tax rate', () => {
+    expect(salesTaxPct(5, 0.5)).toBeCloseTo(1.6875, 12);
+    expect(salesTax(1_000_000, 5, 0.5)).toBeCloseTo(16_875, 8);
+  });
+
+  it('halves the post-skill, post-standing broker fee rate but not the hub surcharge', () => {
+    expect(brokerFeePct(3, 0, 0, 0, 0.5)).toBeCloseTo(1.05, 12);
+    expect(brokerFeePct(3, 5, 0, 0, 0.5)).toBeCloseTo((2.1 - 0.15) / 2, 12);
+    expect(brokerFeePct(3, 0, 0, 5, 0.5)).toBeCloseTo(1.05 + 5, 12);
+    expect(brokerFeePct(5, 10, 10, 0, 0.5)).toBeCloseTo(0.5, 12);
+    expect(brokerFeePct(5, 10, 10, 0, 0.5)).toBeCloseTo(brokerFeePct(5, 10, 10) * 0.5, 12);
+  });
+
+  it('leaves the 100 ISK minimum broker fee unchanged', () => {
+    // 1% x 5,000 ISK = 50 ISK, under the minimum either way.
+    expect(brokerFee(5_000, 3, 0, 0, 0, 0.5)).toBe(100);
+    // 1.05% x 100M = 1.05M, well above it.
+    expect(brokerFee(100_000_000, 3, 0, 0, 0, 0.5)).toBeCloseTo(1_050_000, 6);
+  });
+
+  it('defaults to no discount', () => {
+    expect(salesTaxPct(5, 1)).toBeCloseTo(salesTaxPct(5), 12);
+    expect(brokerFee(1_000_000, 3, 0, 0, 0, 1)).toBeCloseTo(brokerFee(1_000_000, 3), 8);
+  });
+
+  it('lowers the break-even price', () => {
+    const full = breakEvenPrice(1_000_000, 1, 5, 3) as number;
+    const halved = breakEvenPrice(1_000_000, 1, 5, 3, 0, 0, 0, 0.5) as number;
+    expect(halved).toBeLessThan(full);
+    expect(halved).toBeCloseTo(1_000_000 / (1 - (1.6875 + 1.05) / 100), 6);
+  });
+
+  it('applies the Relist Discount on the already-halved broker rate', () => {
+    expect(relistBrokerFeePct(3, 5, 0, 0, 0.5)).toBeCloseTo(2.1 * 0.5 * 0.2, 12);
+    const fee = relistFee(100_000_000, 100_000_000, 1, 3, 5, 0, 0, 0.5);
+    expect(fee).toBeCloseTo(100_000_000 * 0.0021, 6);
+    expect(relistBreakEvenPrice(1_000_000, 1, 5, 3, 5, 0, 0, 0.5) as number).toBeLessThan(
+      relistBreakEvenPrice(1_000_000, 1, 5, 3, 5) as number
+    );
+  });
+});

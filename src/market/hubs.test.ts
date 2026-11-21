@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { COMPARED_HUBS, DAILY_JOB_HUBS, TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub } from './hubs';
+import {
+  COMPARED_HUBS,
+  DAILY_JOB_HUBS,
+  TRADE_HUBS,
+  DEFAULT_TRADE_HUB,
+  getTradeHub,
+  hubFeeDiscountFactor,
+  AMARR_FEE_DISCOUNT_UNTIL_MS,
+} from './hubs';
 
 describe('TRADE_HUBS', () => {
   it('lists the five empire trade hubs and Manifest with verified station/system/region IDs', () => {
@@ -92,5 +100,33 @@ describe('compared and daily-job hubs', () => {
   it('charges Exordium a Safety Tax and no empire hub one', () => {
     expect(getTradeHub('manifest')?.safetyTaxPct).toBeGreaterThan(0);
     expect(COMPARED_HUBS.every((hub) => hub.safetyTaxPct === 0)).toBe(true);
+  });
+});
+
+describe('hubFeeDiscountFactor', () => {
+  const amarr = getTradeHub('amarr')!;
+  const jita = getTradeHub('jita')!;
+  const start = Date.UTC(2026, 10, 10, 11);
+
+  it('halves Amarr fees while the Deaconry discount runs', () => {
+    expect(hubFeeDiscountFactor(amarr, start)).toBe(0.5);
+    expect(hubFeeDiscountFactor(amarr, AMARR_FEE_DISCOUNT_UNTIL_MS - 1)).toBe(0.5);
+  });
+
+  it('stops applying at the end date, with no change needed', () => {
+    expect(hubFeeDiscountFactor(amarr, AMARR_FEE_DISCOUNT_UNTIL_MS)).toBe(1);
+    expect(hubFeeDiscountFactor(amarr, AMARR_FEE_DISCOUNT_UNTIL_MS + 86_400_000)).toBe(1);
+  });
+
+  it('does not apply before the Fractured Skies expansion', () => {
+    expect(hubFeeDiscountFactor(amarr, start - 1)).toBe(1);
+  });
+
+  it('is 1 at every other hub, and for an unknown hub', () => {
+    for (const hub of TRADE_HUBS.filter((h) => h.id !== 'amarr')) {
+      expect(hubFeeDiscountFactor(hub, start)).toBe(1);
+    }
+    expect(hubFeeDiscountFactor(undefined, start)).toBe(1);
+    expect(jita.feeDiscount).toBeUndefined();
   });
 });

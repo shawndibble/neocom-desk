@@ -4,13 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Disclosure, IskAmount, IskFigureGroup, LiveStatus } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskCompact } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, getRegionSellPrices } from '@/market/prices';
 import { buildSkillsToBuy, skillsToBuyTypeIds } from './skillsToBuy';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface SkillsToBuyPanelProps {
   entries: readonly { skillTypeID: number }[];
@@ -39,8 +38,7 @@ export function SkillsToBuyPanel({
 }: SkillsToBuyPanelProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const typeIds = useMemo(

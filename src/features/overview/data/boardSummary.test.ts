@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  comingUpSummary,
   industrySummary,
   mailSummary,
   miningTaxSummary,
@@ -11,7 +10,6 @@ import {
 } from './boardSummary';
 import type {
   BoardColony,
-  CalendarEventsBoardData,
   IndustryBoardData,
   MailBoardData,
   MiningTaxBoardData,
@@ -258,41 +256,6 @@ describe('industrySummary', () => {
 
   it('says the line is idle when there are no jobs', () => {
     expect(industrySummary(t, industryData(), NOW)).toBe('overview.board.industryIdle');
-  });
-});
-
-describe('comingUpSummary', () => {
-  const NOW = Date.parse('2026-01-01T00:00:00Z');
-  const data = (events: CalendarEventsBoardData['events'], needsReauth = false) => ({
-    events,
-    needsReauth,
-    fetchedAt: null,
-  });
-
-  it('names the next committed event and how far off it is', () => {
-    const summary = comingUpSummary(
-      t,
-      data([
-        {
-          event_id: 1,
-          event_date: new Date(NOW + 2 * 3_600_000).toISOString(),
-          title: 'Moon pop',
-          importance: 0,
-          event_response: 'tentative',
-        },
-      ]),
-      NOW
-    );
-    expect(summary).toBe('overview.board.comingUpNext(title=Moon pop,when=2h 0m)');
-  });
-
-  it('says so when nothing is scheduled', () => {
-    expect(comingUpSummary(t, data([]), NOW)).toBe('overview.board.comingUpNone');
-  });
-
-  it('reports loading and a lapsed grant rather than an empty calendar', () => {
-    expect(comingUpSummary(t, null, NOW)).toBe('overview.board.checking');
-    expect(comingUpSummary(t, data([], true), NOW)).toBe('overview.board.reauth');
   });
 });
 

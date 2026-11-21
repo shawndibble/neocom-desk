@@ -21,6 +21,7 @@ import {
   setRaidsWhere,
   setProfitSource,
   setHiddenLayers,
+  setHiddenKinds,
   setTrendHubs,
   setTrendItems,
   setPlexPer30Days,
@@ -363,6 +364,27 @@ describe('newWidget and addWidget with a Show', () => {
     expect('show' in newWidget('orders', 'a', 'flow')!).toBe(false);
     const added = addWidget(layoutOf(), 'corpWallet', counter(), { show: 'sources' });
     expect(added.widgets[0]).toMatchObject({ kind: 'corpWallet', show: 'sources', range: 30 });
+  });
+});
+
+describe('setHiddenKinds', () => {
+  const l = layoutOf(w('a', 'comingUp'), w('b', 'orders'));
+
+  it('stores known kinds once in board order, and clears on an empty list', () => {
+    const next = setHiddenKinds(l, 'a', [
+      'planetExtraction',
+      'nope',
+      'skillTraining',
+      'skillTraining',
+    ]);
+    expect(next.widgets[0].hiddenKinds).toEqual(['skillTraining', 'planetExtraction']);
+    expect(setHiddenKinds(next, 'a', []).widgets[0]).not.toHaveProperty('hiddenKinds');
+  });
+
+  it('changes nothing for the same list or a kind without the filter', () => {
+    const next = setHiddenKinds(l, 'a', ['industryJob']);
+    expect(setHiddenKinds(next, 'a', ['industryJob'])).toBe(next);
+    expect(setHiddenKinds(l, 'b', ['industryJob'])).toBe(l);
   });
 });
 

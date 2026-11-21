@@ -12,10 +12,14 @@ export interface HubPrices {
  * the ask for a type with no buy order (the Advisor's `revenuePrices` rule), and
  * unknown Accounting prices at level 0, the highest tax.
  */
-export function hubBooks(prices: HubPrices, accountingLevel: number | null): SellBooks {
+export function hubBooks(
+  prices: HubPrices,
+  accountingLevel: number | null,
+  feeDiscountFactor = 1
+): SellBooks {
   return {
     prices: prices.prices,
     revenuePrices: { ...prices.prices, ...prices.buyPrices },
-    salesTaxPct: salesTaxPct(accountingLevel ?? 0),
+    salesTaxPct: salesTaxPct(accountingLevel ?? 0, feeDiscountFactor),
   };
 }

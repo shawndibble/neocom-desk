@@ -130,3 +130,5 @@ and flipped paid days back for older clients.
 - **Rules ship before the client.** The rules and indexes for the new collection are deployed
   before the merge (they are additive). A refused pull of a collection the rules do not know yet is
   treated as "not ready", not as a sync error.
+- **An older client's unmark and re-record counts twice until the pilot unlinks one.** Confirmed
+  by the owner: few users, and they upgrade almost at once, so no extra handling is built for it.

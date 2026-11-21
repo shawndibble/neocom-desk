@@ -4,7 +4,9 @@ import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 
 /**
  * The LP store's trade hub select: one markup for the filter row and the
- * header gear, both writing the app-wide hub (`useMarketHub`).
+ * header gear's `HubField`: an Applied pick writes the LP Store page hub
+ * (`pickHubFor('lpStore', …)`), its own entry or else the Global hub. It stays
+ * a `Select` because the filter box applies its drafts together on Apply.
  */
 export function TradeHubSelect({
   value,

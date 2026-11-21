@@ -1,9 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { doctrineCoverage, doctrineParts, type HubCoverage } from '@/engine/doctrineCoverage';
 import { loadBooks } from '@/features/industry/depthPriceLoader';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import type { DoctrineFit } from '../srpTypes';
 
@@ -20,8 +19,7 @@ export interface DoctrineCoverageState {
  * set of parts, not per fit. An outage leaves `coverageOf` null for the fits it touched.
  */
 export function useDoctrineCoverage(fits: readonly DoctrineFit[]): DoctrineCoverageState {
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('corpSrp');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const typeKey = [...new Set(fits.flatMap((f) => [...doctrineParts(f.snapshot).keys()]))]
     .sort((a, b) => a - b)

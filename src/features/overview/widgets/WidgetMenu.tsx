@@ -14,7 +14,7 @@
  * `inert` is the signed-out landing page's demo: the same menu over a layout
  * whose actions do nothing, where Rename must not open its dialog either.
  */
-import { useId, useRef, useState, type ReactElement } from 'react';
+import { useId, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -25,6 +25,9 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
   Modal,
   OpenInNewTabMenuItem,
   RowActionsMenu,
@@ -37,6 +40,11 @@ import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
 import { LAYER_IDS, toggleHidden } from '@/engine/netWorth/series';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
+import { CHARACTER_BOARD_ITEM_KINDS } from '@/engine/character/board';
+import { kindHasFilterRow, toggleHiddenKind } from '@/features/character/calendarKindFilter';
+import { KindGlyph } from '@/features/character/CalendarKindFilterMenu';
+import { KIND_LABEL } from '@/features/character/calendarKindLabels';
+import { useFeedStore } from './data/feedStoreContext';
 import { TrendHubsMenuGroup, TrendItemsDialog } from './TrendPicks';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import {
@@ -188,6 +196,58 @@ function PlexPlanDialog({
   );
 }
 
+/**
+ * The Calendar widget's own kind filter: the Calendar page's types, each a checkbox, stored on the
+ * widget (never the page's filter). Which kinds get a row follows the page (`kindHasFilterRow`),
+ * read off the widget's feed; without counts, a readable kind keeps its row even with nothing due.
+ */
+function CalendarTypesSub({ widget }: { widget: Widget }) {
+  const { t } = useTranslation();
+  const edit = useOverviewEdit();
+  const store = useFeedStore();
+  // Live: a calendar read landing while the menu is open adds the kinds it made readable.
+  const data = useSyncExternalStore(store.subscribe, () => store.get().calendar)?.data;
+  const hidden = widget.hiddenKinds ?? [];
+  const state = {
+    hidden: new Set(hidden),
+    readable: new Set(data?.readableKinds ?? []),
+    reauth: new Set(data?.reauthKinds ?? []),
+  };
+  return (
+    <MenuSub>
+      <MenuSubTrigger>
+        {hidden.length === 0
+          ? t('overview.menu.types')
+          : t('overview.menu.typesHidden', { count: hidden.length })}
+      </MenuSubTrigger>
+      <MenuSubContent className="min-w-56">
+        {CHARACTER_BOARD_ITEM_KINDS.filter((kind) => kindHasFilterRow(kind, state)).map((kind) => (
+          <MenuCheckboxItem
+            key={kind}
+            checked={!state.hidden.has(kind)}
+            // The menu stays open, so several types are one visit.
+            onSelect={(event) => event.preventDefault()}
+            onCheckedChange={() => edit.setHiddenKinds(widget.id, toggleHiddenKind(hidden, kind))}
+          >
+            <KindGlyph kind={kind} />
+            <span className="flex-1">{t(KIND_LABEL[kind])}</span>
+          </MenuCheckboxItem>
+        ))}
+        <MenuSeparator />
+        <MenuItem
+          disabled={hidden.length === 0}
+          onSelect={(event) => {
+            event.preventDefault();
+            edit.setHiddenKinds(widget.id, []);
+          }}
+        >
+          {t('calendar.filter.showAll')}
+        </MenuItem>
+      </MenuSubContent>
+    </MenuSub>
+  );
+}
+
 export function WidgetMenu({
   widget,
   to = null,
@@ -314,6 +374,7 @@ export function WidgetMenu({
       {kind.hasCalendarEvents && (
         <>
           <MenuSeparator />
+          <CalendarTypesSub widget={widget} />
           <MenuLabel>{t('overview.menu.events')}</MenuLabel>
           <MenuRadioGroup
             value={widget.calendarEvents ?? 'committed'}

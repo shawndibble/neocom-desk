@@ -145,7 +145,7 @@ export function relistFees(
   skills: CharacterSkills | undefined
 ): RelistFees | null {
   if (!skills || !row.floor || !row.costBasis) return null;
-  const tax = salesTax(row.floor.relist, skills.accountingLevel);
+  const tax = salesTax(row.floor.relist, skills.accountingLevel, row.floor.feeDiscountFactor);
   return { salesTax: tax, brokerFee: row.floor.relist - row.costBasis.unitCost - tax };
 }
 
