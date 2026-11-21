@@ -10,7 +10,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MenuItem, RowActionsMenu } from '@/components/ui';
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
-import { isLocked } from '@/engine/corpTaxBook/lockDate';
+import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { useBook } from './useBook';
 
 /** What a ledger row can open; each is bound by the Miner page, which owns the dialogs. */

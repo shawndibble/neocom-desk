@@ -55,7 +55,7 @@ export async function readLateNotice(
   id: string
 ): Promise<LoadedNotice | undefined> {
   const [doc] = await reader.getAll(noticeRef(book, id));
-  const [notice] = doc.exists ? mergeNoticeDocs([withId(doc)], []) : [];
+  const [notice] = doc.exists ? mergeNoticeDocs([withId(doc)]) : [];
   return notice && { notice };
 }
 
@@ -83,7 +83,7 @@ export async function readNotices(
   where: NoticeFilter = everything
 ): Promise<LateNotice[]> {
   const snap = await reader.get(where(book.collection(LATE_NOTICES)));
-  return mergeNoticeDocs(snap.docs.map(withId), []);
+  return mergeNoticeDocs(snap.docs.map(withId));
 }
 
 /** A fresh verify-link token: `VERIFY_TOKEN_BYTES` random bytes, url-safe. */

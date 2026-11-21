@@ -83,3 +83,14 @@ describe('dueCheckpoints (a snapshot once per lock date)', () => {
     expect(dueCheckpoints(view, at)).toEqual([]);
   });
 });
+
+describe('a stored checkpoint that is no snapshot', () => {
+  it('is not used, and a snapshot is recorded over it', () => {
+    const [snapshot] = dueCheckpoints(buildBookView(input()), at);
+    // Through 30 Sep but recorded on 5 Nov, while Sep was still open: the old strict cache.
+    const stale = { ...snapshot!, at: '2026-11-05T14:00:00Z' };
+    const view = buildBookView(input({ checkpoints: new Map([['solo:1', stale]]) }));
+    expect(view.internals.byMiner.get('solo:1')?.account.input.checkpoint).toBeUndefined();
+    expect(dueCheckpoints(view, at).map((c) => c.through)).toEqual(['2026-09-30']);
+  });
+});

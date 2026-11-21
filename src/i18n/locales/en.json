@@ -19289,7 +19289,11 @@
           "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
           "unknown-moon": "This book has no Extraction at that moon.",
-          "locked": "That date is locked: nothing before the 1st of the month two months back can be changed. Add a correction dated today instead."
+          "locked": "That date is locked: nothing before the 1st of the month two months back can be changed. Add a correction dated today instead.",
+          "unknown-miner": "That Miner isn't in the book any more. Reload and pick another.",
+          "account-closed": "That Miner's account is closed: it takes no more payments.",
+          "wrong-miner": "The final notice is for another Miner. Reload and try again.",
+          "notice-exists": "This account's final notice was already sent. Reload to see it."
         }
       },
       "consent": {

@@ -3,7 +3,7 @@
  * scenario and reads its facts (who owes what, from which day), never builds data inline.
  * Every figure follows from `bookSeed.ts`'s flat pricing: one ordinary mined day owes `DAY_TAX`.
  */
-import { closedThroughFor } from '../../../functions/src/corpTaxBookCheckpoint';
+import { snapshotThroughFor } from '../../../functions/src/corpTaxBookCheckpoint';
 import { BookSeed, DAY_TAX, day, verifyToken } from './bookSeed';
 import { MINER, OFFICER, solo } from './identities';
 
@@ -210,7 +210,7 @@ export function officerBook() {
  * - Cora mined eleven days, the oldest twenty days ago, and has had no notice: she is behind by
  *   the default rules (oldest unpaid 14+ days, 10,000,000+ owed), so the run plans one for her.
  * - Ada has a notice in `lateNotices` (its verify link in `lateNoticeLinks`).
- * - Bram has only a legacy notice, its link only in `statementLinks`: an old mailed link.
+ * - Bram has a notice for two days.
  * - Gale is a guest whose notice listed his first two days; two more days were never listed, so
  *   closing his account leaves a final notice to send.
  */
@@ -232,7 +232,7 @@ export function lateNoticeBook() {
       token: tokens.ada,
     })
     .mine(MINER.bram.id, [12, 11])
-    .legacyNotice({
+    .lateNotice({
       id: 'st-bram',
       characterId: MINER.bram.id,
       days: [12, 11],
@@ -258,11 +258,10 @@ export function lateNoticeBook() {
 }
 
 /**
- * A Miner whose history passes a closed month (GLOSSARY "Closed-through checkpoint"). Ada mined
+ * A Miner whose history passes the lock date (decision 20261120-235011, "a lock date"). Ada mined
  * three days about three months ago and two this month, and paid two days' tax then: she still
- * owes the third old day, inside the closed month, and both new ones. The closed-through date
- * is the end of the last month at least 31 days old, so her old days are always inside it and
- * her new ones always after it.
+ * owes the third old day, before the lock date, and both new ones. The lock date is between 59
+ * and 91 days back, so her old days and payment are always before it and her new days after it.
  */
 export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
   const minerId = solo(MINER.ada.id);
@@ -270,13 +269,13 @@ export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
     id: 'j1_940001',
     characterId: MINER.ada.id,
     amount: 2 * DAY_TAX,
-    back: 90,
+    back: 95,
     minerId,
   });
-  /** What an officer's tab records for her (`RunningAccountCheckpoint`): the old day still owed. */
+  /** The snapshot an officer's tab records for her (`RunningAccountCheckpoint`): the old day owed. */
   const checkpoint = {
     minerId,
-    through: closedThroughFor(day(0, seed.now)),
+    through: snapshotThroughFor(day(0, seed.now)),
     owed: [{ date: day(98, seed.now), remaining: DAY_TAX, tax: DAY_TAX, credited: 0 }],
     credit: 0,
     balance: DAY_TAX,

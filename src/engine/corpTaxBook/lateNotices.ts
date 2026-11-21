@@ -171,5 +171,5 @@ export function planNotices(
 
 /** The book's late notices from their `lateNotices` docs, read as the server reads them. */
 export function readLateNotices(noticeDocs: readonly unknown[]): LateNotice[] {
-  return mergeNoticeDocs(noticeDocs.filter(isRecord), []);
+  return mergeNoticeDocs(noticeDocs.filter(isRecord));
 }

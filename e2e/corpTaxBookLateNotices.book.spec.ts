@@ -114,12 +114,6 @@ test('the pay section gives the Miner the same code the mail did', async ({ page
   );
 });
 
-test('an old-style verify link from before the move still opens', async ({ page }) => {
-  await page.goto(`./corp-tax-book/verify/${book.tokens.bram}`);
-  await expect(page.getByRole('main')).toContainText(MINER.bram.name);
-  await expect(page.getByRole('main')).not.toContainText('This link is not valid');
-});
-
 test('a Miner stops reminders from the verify page', async ({ page }) => {
   await page.goto(`./corp-tax-book/verify/${book.tokens.ada}`);
   const stop = page

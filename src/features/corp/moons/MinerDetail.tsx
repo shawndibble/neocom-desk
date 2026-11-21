@@ -49,7 +49,7 @@ import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
-import { isLocked } from '@/engine/corpTaxBook/lockDate';
+import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
 import { MinerLedger } from './MinerLedger';
@@ -928,10 +928,10 @@ export function MinerDetail({ id }: { id: string }) {
                   aside={
                     canEdit &&
                     !d.reversed &&
-                    !locked(
-                      d.scope === 'record'
-                        ? (detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
-                        : d.at
+                    // A record's dismissal is locked with its day; a wider one never is.
+                    !(
+                      d.scope === 'record' &&
+                      locked(detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
                     ) ? (
                       <button
                         type="button"

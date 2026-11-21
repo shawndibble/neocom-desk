@@ -12,10 +12,8 @@ import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
 import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
-import {
-  checkpointFits,
-  type RunningAccountCheckpoint,
-} from '../../../../../functions/src/corpTaxBookCheckpoint';
+import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
+import { usableCheckpoint } from '@/engine/corpTaxBook/openSet/miners';
 import { NOTICE_ID_FIELD } from '../../../../../functions/src/corpTaxBookLateNotice';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -70,9 +68,9 @@ export async function readMinerScope(
   const characterIds = grouping.then((g) =>
     characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
   );
-  // A checkpoint summed for other characters than the Miner has now is none: read from the start.
+  // One that is no snapshot, or summed for other characters, is none: read from the start.
   const fitting = Promise.all([checkpoint, characterIds]).then(([c, ids]) =>
-    c && checkpointFits(c, ids) ? c : undefined
+    usableCheckpoint(c, ids)
   );
   const from = fitting.then((c) => accountWindowStart(c, settingsFrom(book.data).startDate));
 

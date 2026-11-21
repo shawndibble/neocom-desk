@@ -3,10 +3,30 @@ import { minerBillableLines, savedPrice } from '../billableLines';
 import { disputeHold, disputesToShow, isMinersDispute } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
 import { MinerRunningAccount } from '../minerRunningAccount';
-import { checkpointFits } from '../../../../functions/src/corpTaxBookCheckpoint';
+import {
+  checkpointFits,
+  isSnapshot,
+  type RunningAccountCheckpoint,
+} from '../../../../functions/src/corpTaxBookCheckpoint';
 import { isBeforeBook, type TaxPayment } from '../payments';
 import { exemptionsOf } from '../toleranceExemptions';
 import type { MinerSettlement, OpenSetInput } from './types';
+
+/**
+ * A stored checkpoint an account may start from: a snapshot (`isSnapshot`: an older strict cache
+ * is not one, and is recorded again) summed for the characters the Miner has now.
+ */
+export function usableCheckpoint(
+  stored: RunningAccountCheckpoint | undefined,
+  characterIds: readonly number[]
+): RunningAccountCheckpoint | undefined {
+  return stored &&
+    typeof stored.at === 'string' &&
+    isSnapshot(stored) &&
+    checkpointFits(stored, characterIds)
+    ? stored
+    : undefined;
+}
 
 /** The Miner ids a book lists, in order: groupings, then the ids days, notices and payments name. */
 export function minerIdsOf(input: OpenSetInput, charges: readonly DayCharge[]): string[] {
@@ -54,9 +74,7 @@ export function settleMiner(
       .filter((d) => isMinersDispute(d, minerId, characterIds) && disputeHold(d, input.now))
       .map((d) => d.date)
   );
-  // One summed for other characters than the Miner has now is no history of this account (B3).
-  const stored = input.checkpoints?.get(minerId);
-  const checkpoint = stored && checkpointFits(stored, characterIds) ? stored : undefined;
+  const checkpoint = usableCheckpoint(input.checkpoints?.get(minerId), characterIds);
   const storedPaidThrough = input.minerPaidThrough?.get(minerId);
   const account = MinerRunningAccount.build({
     // Whether each line was priced at a saved close-of-day price: only such days close for good.

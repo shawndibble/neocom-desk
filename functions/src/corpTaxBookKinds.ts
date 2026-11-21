@@ -169,8 +169,5 @@ export const LIVE_CHECK_ACTION_NAMES = [
   'reassignPayment',
 ] as const;
 
-/** The mail kind a late notice's first mail was queued and logged under before the rename. */
-export const LEGACY_NOTICE_MAIL_KIND = 'statement';
-
 /** The longest note an officer may put on a payment they record or a write-off. */
 export const PAYMENT_NOTE_MAX = 500;

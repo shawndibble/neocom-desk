@@ -1,5 +1,5 @@
 import type { DayRow } from '@/engine/corpTaxBook/bookView';
-import { isLocked } from '@/engine/corpTaxBook/lockDate';
+import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 
 /**
  * A day's rate can be overridden until a late notice lists it (D31; the server refuses a record
