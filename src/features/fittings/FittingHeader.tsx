@@ -53,7 +53,7 @@ interface FittingHeaderProps {
   unflyable?: boolean;
   /** Renames the open Fitting, independent of Save. */
   onRename: (name: string) => void;
-  /** The Fitting's Jita price, for Export; null while it loads. */
+  /** The Fitting's price at the Fittings hub, for Export; null while it loads. */
   price: Appraisal | null;
   /** The pilot's active clone, left off Export's multibuy list. */
   cloneImplants?: readonly number[];

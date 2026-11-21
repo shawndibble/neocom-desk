@@ -39,3 +39,14 @@ _Recorded 2026-11-20. Issue #6523._
   onto `useHubFor` and `HubMenu`, and adds the area to `PAGE_HUB_AREAS`. Only
   listed areas are offered in Settings or kept on parse, so no entry is ever
   offered that does nothing.
+- **Ship Fit Costs (`fittings`) and Skills (`skills`) join (slice 2).** Ship
+  Fit Costs covers every Fittings price: the Price section, fit Appraisal,
+  Implant Finder, Improve, Make it fit, charges, hull rows, the Abyssal
+  planner, module variations, and the `/ships` compare. The last two always
+  priced at Jita; they now follow the area. Skills covers skill book prices,
+  Skills to Buy, the injector facts and the Characters page's SP extraction
+  value, which is an injector price. A field-chrome `HubField` (the
+  `HubMenu` behind a select-shaped trigger) replaces the hub `Select` on
+  both pages. The Fittings export's "minus owned" station still falls back
+  to the Global hub on purpose: it is the station the Appraisal tab's Minus
+  owned uses, so it moves with the Appraisal area, not with Ship Fit Costs.

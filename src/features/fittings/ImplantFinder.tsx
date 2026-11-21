@@ -38,7 +38,7 @@ import type {
   FittingStats,
   PilotProfile,
 } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { getTradeHub } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -80,7 +80,7 @@ export function ImplantFinder({
   onChange,
 }: ImplantFinderProps) {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
   const [goalParam, setGoalParam] = useUrlParam(IMPLANT_GOAL_PARAM, GOAL_PARAM);

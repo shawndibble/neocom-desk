@@ -1,12 +1,11 @@
 import { useCallback } from 'react';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import {
   extractionNet,
   LARGE_SKILL_INJECTOR_TYPE_ID,
   SKILL_EXTRACTOR_TYPE_ID,
 } from '@/engine/skills/spExtraction';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 
@@ -20,8 +19,7 @@ export interface ExtractionPrices {
 
 /** Net ISK per extraction at the saved market hub (sell injector − buy extractor). */
 export function useExtractionPrices(): ExtractionPrices {
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const load = useCallback(

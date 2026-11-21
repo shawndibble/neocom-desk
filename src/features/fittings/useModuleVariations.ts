@@ -26,7 +26,8 @@ import {
   getVariations,
   type VariationIndex,
 } from '@/engine/market/variations';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useHubFor } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
@@ -40,7 +41,7 @@ export interface VariationRow {
   /** Set only when the swap is over a CPU/PG/calibration budget; null otherwise (including a hull-rule miss). */
   overage: ResourceBudgetOverage | null;
   canFly: boolean | null;
-  /** Jita sell price; null if the hub has no sell orders for it. */
+  /** Sell price at the Fittings hub; null if the hub has no sell orders for it. */
   price: number | null;
 }
 
@@ -143,16 +144,20 @@ export function useModuleVariations({
 
   // Left null on failure: rows show "no sell orders", the same degrade a hub
   // with no orders at all produces, rather than a broken loading state.
+  // The Fittings hub, as the rest of the fit's prices.
+  const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const loadPrices = useCallback(async () => {
     const typeIds = members.map((member) => member.typeId);
     if (typeIds.length === 0) return new Map<number, number | null>();
-    const priceMap = await getHubPrices(DEFAULT_TRADE_HUB, typeIds);
+    const priceMap = await getHubPrices(hub, typeIds);
     return new Map<number, number | null>(
       typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
     );
-  }, [members]);
-  // Same key: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
-  const freshPrices = useKeyedLoad('prices', loadPrices).data;
+  }, [members, hub]);
+  // Same hub: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
+  // Keyed on the hub: another hub's prices never show under this one; null until the hub is read.
+  const freshPrices = useKeyedLoad(hubHydrated ? `prices:${hub.id}` : null, loadPrices).data;
 
   const fresh =
     computed &&

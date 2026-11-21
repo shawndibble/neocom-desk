@@ -17,7 +17,7 @@ import { placeAllInSet, type ImplantGoalId } from '@/engine/fittings/implantFind
 import { overageOf } from '@/engine/fittings/makeItFit';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import type { FittingImplantSet } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { cx } from '@/lib/cx';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { MakeItFitImplantsInput } from './MakeItFitImplants';
@@ -64,7 +64,7 @@ function Implants({
 }: Props & { goalId: ImplantGoalId }) {
   const { t } = useTranslation();
   const { profile, basis } = implants;
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
   const seed = useMemo(
