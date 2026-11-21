@@ -3,51 +3,64 @@
  * "A Payee ledger"): the officer's Miner page and a pilot's own ledger list the same rows from
  * the same Running account. Pure: names come from the caller.
  */
+import { adjustmentLineKey } from '../../../functions/src/corpTaxBookLateNotice';
 import type {
   LedgerCharge,
   LedgerPayment,
   LedgerWriteOff,
   PayeeLedgerSource,
 } from '../miningTax/payeeLedger';
-import { minerDetail, type BookView, type DayRow } from './bookView';
+import type { Adjustment } from './adjustments';
+import type { BillableLine } from './billableLines';
+import type { MinerAccountBooks } from './bookView';
+import type { RecordedWriteOff } from './payments';
 import { utcDayOf } from '../localDay';
 
 export interface MinerLedgerNames {
-  /** A Character's name. */
-  character: (characterId: number) => string;
-  /** Where a mined day was: its moon, else its refinery; absent when unknown. */
-  place?: (day: DayRow) => string | undefined;
+  /** A Character's name; absent when unknown. */
+  character: (characterId: number) => string | undefined;
+  /** Where a mined line was: its moon, else its refinery; absent when unknown. */
+  place?: (line: BillableLine) => string | undefined;
   /** Where a payment sits in the corp wallet, by its id; absent for one recorded by hand. */
   walletHref?: (paymentId: string) => string | undefined;
 }
 
-/** Undefined for a Miner the view does not hold. */
-export function minerLedgerSource(
-  view: BookView,
-  minerId: string,
-  names: MinerLedgerNames
-): PayeeLedgerSource | undefined {
-  const detail = minerDetail(view, minerId);
-  const inner = view.internals.byMiner.get(minerId);
-  if (!detail || !inner) return undefined;
-  const through = detail.checkpoint?.through;
-  const after = (date: string) => through === undefined || date > through;
+/** What the book records beside a Miner's account; both lists hold every Miner's. */
+export interface MinerLedgerBook {
+  adjustments?: readonly Adjustment[];
+  writeOffs?: readonly RecordedWriteOff[];
+}
 
-  const mined = detail.days
-    .filter((d) => d.status === 'paid' || d.status === 'owed')
-    .map((d): LedgerCharge => {
-      const place = names.place?.(d);
+export function minerLedgerSource(
+  miner: MinerAccountBooks,
+  book: MinerLedgerBook,
+  names: MinerLedgerNames
+): PayeeLedgerSource {
+  const { minerId, account } = miner;
+  const cp = account.input.checkpoint;
+  const billed = new Set(miner.lines.map((l) => l.key));
+
+  const mined = miner.lines
+    .filter((l) => l.kind !== 'correction')
+    .map((l): LedgerCharge => {
+      const place = names.place?.(l);
       return {
-        id: d.key,
-        date: d.date,
+        id: l.key,
+        date: l.date,
         kind: 'mined',
-        tax: d.tax,
+        tax: l.tax,
         ...(place ? { place } : {}),
-        ore: d.oreLines,
+        ore: l.oreLines,
       };
     });
-  const corrections = view.input.adjustments
-    .filter((a) => a.minerId === minerId && a.amount !== 0)
+  // The account bills the corrections in `lines`; one an officer undid stays, struck through.
+  const corrections = (book.adjustments ?? [])
+    .filter(
+      (a) =>
+        a.minerId === minerId &&
+        a.amount !== 0 &&
+        (a.reversed || billed.has(adjustmentLineKey(a.id)))
+    )
     .map((a): LedgerCharge => ({
       id: a.id,
       date: a.date,
@@ -57,19 +70,20 @@ export function minerLedgerSource(
       ...(a.kind === 'opening' ? { opening: true } : {}),
       ...(a.reversed ? { reversed: { at: a.reversed.at, reason: a.reversed.reason } } : {}),
     }));
-  const payments = detail.payments.map((p): LedgerPayment => {
+  const payments = miner.payments.map((p): LedgerPayment => {
+    const from = names.character(p.characterId);
     const href = names.walletHref?.(p.id);
     return {
       id: p.id,
       at: p.at,
-      from: names.character(p.characterId),
+      ...(from ? { from } : {}),
       ...(p.note ? { note: p.note } : {}),
       ...(href ? { href } : {}),
     };
   });
-  // A write-off on or before the checkpoint is in its balance already.
-  const writeOffs = (view.input.writeOffs ?? [])
-    .filter((w) => w.minerId === minerId && after(utcDayOf(w.at)))
+  // A write-off on or before the checkpoint is in its balance already: it forgives no later day.
+  const writeOffs = (book.writeOffs ?? [])
+    .filter((w) => w.minerId === minerId && (!cp || utcDayOf(w.at) > cp.through))
     .map((w): LedgerWriteOff => ({
       id: w.id,
       at: w.at,
@@ -77,19 +91,13 @@ export function minerLedgerSource(
       ...(w.reason ? { reason: w.reason } : {}),
       ...(w.reversed ? { reversed: { at: w.reversed.at, reason: w.reversed.reason } } : {}),
     }));
-  const pending = detail.days.filter((d) => d.status === 'not-billable');
   return {
-    account: inner.account,
-    ...(detail.checkpoint
-      ? { opening: { through: detail.checkpoint.through, balance: detail.checkpoint.balance } }
-      : {}),
+    account,
+    ...(cp ? { opening: { through: cp.through, balance: cp.balance } } : {}),
     charges: [...mined, ...corrections],
     payments,
     writeOffs,
-    notices: detail.notices,
-    notYetBilled: {
-      tax: pending.reduce((sum, d) => sum + d.tax, 0),
-      days: pending.length,
-    },
+    notices: miner.notices,
+    ...(miner.notYetBilled ? { notYetBilled: miner.notYetBilled } : {}),
   };
 }

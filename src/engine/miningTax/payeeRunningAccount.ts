@@ -13,7 +13,6 @@
 import { MinerRunningAccount, type RunningAccountOwes } from '../corpTaxBook/minerRunningAccount';
 import { previewPayment, type PaymentOutcome } from '../corpTaxBook/paymentPreview';
 import type { TaxPayment } from '../corpTaxBook/payments';
-import type { LedgerCharge, LedgerPayment, PayeeLedgerSource } from './payeeLedger';
 
 /**
  * Where a linked payment came from: a wallet journal entry, a contract paid in kind, a payment
@@ -87,7 +86,7 @@ export interface PayeeRunningAccountInput {
 }
 
 /** The instant a link's money arrived, for the account's oldest-first order. */
-const linkAt = (link: Pick<PayeePaymentLink, 'paidOn'>) => `${link.paidOn}T00:00:00.000Z`;
+export const linkAt = (link: Pick<PayeePaymentLink, 'paidOn'>) => `${link.paidOn}T00:00:00.000Z`;
 
 function taxPaymentOf(payeeId: string, link: PayeePaymentLink): TaxPayment {
   // Recorded by the pilot, so the book's start-date rule for donations never drops it.
@@ -170,22 +169,5 @@ export class PayeeRunningAccount {
         source: 'manual',
       })
     );
-  }
-
-  /** The Payee ledger's source: the account, each charge and payment described by the caller. */
-  ledgerSource(describe: {
-    charge: (charge: PayeeCharge) => Omit<LedgerCharge, 'id' | 'date' | 'tax'>;
-    payment: (link: PayeePaymentLink) => Omit<LedgerPayment, 'id'>;
-  }): PayeeLedgerSource {
-    return {
-      account: this.account,
-      charges: this.charges.map((c) => ({
-        ...describe.charge(c),
-        id: c.id,
-        date: c.date,
-        tax: c.tax,
-      })),
-      payments: this.links.map((l) => ({ ...describe.payment(l), id: paymentLinkKey(l) })),
-    };
   }
 }

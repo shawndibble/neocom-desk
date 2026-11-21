@@ -203,7 +203,7 @@ Offered when a wholly unassigned entry has the same Character + system on the EV
 
 ### Payee ledger (`ledger/`)
 
-A Payee's balance figure opens its ledger (`PayeeLedgerPanel`): the owed figure, or the credit of a Payee paid ahead, on its card (`OwedBalances`), and the Owed / credit / Settled readout of its Manage Payees row, the way in for a settled Payee. Owed reads positive and money ahead as credit. The ledger is every charge, payment and correction in date order with the running balance. Its source is `personalLedgerSource` (the `PayeeRunningAccount`) or `bookLedgerSource` (the active Character's Miner's account, else the first Miner). It starts at an opening row when a checkpoint is in use. The name still toggles the table's Payee filter. Columns: Date, What, Charged, Credited, Balance.
+A Payee's balance figure opens its ledger (`PayeeLedgerPanel`): the owed figure, or the credit of a Payee paid ahead, on its card (`OwedBalances`), and the Owed / credit / Settled readout of its Manage Payees row, the way in for a settled Payee. Owed reads positive and money ahead as credit. The ledger is every charge, payment and correction in date order with the running balance. Its source is the `PayeeRunningAccount`, or `minerLedgerSource` (the active Character's Miner's account, else the first Miner; the officer's Miner page reads the same). It starts at an opening row when a checkpoint is in use. The name still toggles the table's Payee filter. Columns: Date, What, Charged, Credited, Balance.
 
 ### Ledger table, filters, selection
 

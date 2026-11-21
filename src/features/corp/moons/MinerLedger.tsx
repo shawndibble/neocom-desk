@@ -2,7 +2,7 @@ import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOpenAfterMenu } from '@/components/ui';
 import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
-import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
+import { minerAccountOf, type MinerDetail } from '@/engine/corpTaxBook/bookView';
 import { payeeLedger, type PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
 import { PayeeLedgerTable } from '@/features/miningTax/ledger/PayeeLedgerPanel';
 import { canOverrideDay } from './dayEligibility';
@@ -33,13 +33,21 @@ export function MinerLedger({
   const { view, names } = useBook();
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const ledger = useMemo(() => {
-    const source = minerLedgerSource(view, minerId, {
-      character: names.character,
-      place: (d) => (d.moonId !== undefined ? names.moon(d.moonId) : names.refinery(d.structureId)),
-      walletHref: (id) => paymentWalletHref(id) ?? undefined,
-    });
-    return source ? payeeLedger(source) : null;
-  }, [view, minerId, names]);
+    const miner = minerAccountOf(view, minerId);
+    if (!miner) return null;
+    const dayOfLine = new Map(detail.days.map((d) => [d.key, d]));
+    return payeeLedger(
+      minerLedgerSource(miner, view.input, {
+        character: names.character,
+        place: (l) => {
+          const d = dayOfLine.get(l.key);
+          if (d?.moonId !== undefined) return names.moon(d.moonId);
+          return l.structureId === undefined ? undefined : names.refinery(l.structureId);
+        },
+        walletHref: (id) => paymentWalletHref(id) ?? undefined,
+      })
+    );
+  }, [view, minerId, detail.days, names]);
   const rows = useMemo(() => [...(ledger?.rows ?? [])].reverse(), [ledger]);
   const typeNames = useMemo(() => {
     const out = new Map<number, string>();

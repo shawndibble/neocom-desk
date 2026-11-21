@@ -357,21 +357,57 @@ export class MinerRunningAccount {
 
   /**
    * What the tolerance (or a day recorded paid) wrote off, by day, dated by the last of `payments`
-   * that reached the day, else the day itself.
+   * that reached the day (`paymentId`), else the day itself.
    */
   writtenOffDays(
     payments: readonly { id: string; at: string }[]
-  ): { date: string; amount: number; at: string }[] {
+  ): { date: string; amount: number; at: string; paymentId?: string }[] {
     const paidAt = new Map(payments.map((p) => [p.id, p.at]));
-    const closedAt = new Map<string, string>();
+    const closedBy = new Map<string, { id: string; at: string }>();
     for (const p of this.applications.payments) {
       const at = paidAt.get(p.paymentId);
-      if (at) for (const d of p.days) closedAt.set(d.date, at);
+      if (at) for (const d of p.days) closedBy.set(d.date, { id: p.paymentId, at });
     }
     return [...this.byDay]
       .filter(([, d]) => d.writtenOff >= 1)
-      .map(([date, d]) => ({ date, amount: d.writtenOff, at: closedAt.get(date) ?? date }))
+      .map(([date, d]) => {
+        const closed = closedBy.get(date);
+        return {
+          date,
+          amount: d.writtenOff,
+          at: closed?.at ?? date,
+          ...(closed ? { paymentId: closed.id } : {}),
+        };
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * What each officer write-off forgave, poured in the order they were recorded into the days the
+   * account forgave: a write-off the checkpoint already holds forgives nothing after it.
+   */
+  writeOffDays(): Map<string, DayAmount[]> {
+    const cp = this.input.checkpoint;
+    const forgiven = this.applications.writeOffs.map((d) => ({ ...d }));
+    const out = new Map<string, DayAmount[]>();
+    let head = 0;
+    const counted = (this.input.writeOffs ?? [])
+      .filter((w) => cp === undefined || dayOf(w.at) > cp.through)
+      .sort((a, b) => a.at.localeCompare(b.at));
+    for (const w of counted) {
+      const days: DayAmount[] = [];
+      let left = Math.max(0, w.amount);
+      while (left > 0 && head < forgiven.length) {
+        const day = forgiven[head]!;
+        const take = Math.min(left, day.amount);
+        days.push({ date: day.date, amount: take });
+        day.amount -= take;
+        left -= take;
+        if (day.amount <= 0) head += 1;
+      }
+      out.set(w.id, days);
+    }
+    return out;
   }
 
   /** The dates still owed, oldest first: neither settled nor held by an open dispute. */

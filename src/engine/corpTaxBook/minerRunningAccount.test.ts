@@ -302,6 +302,42 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
     expect(owing.closableThrough('2026-11-21')).toBe('2026-10-05');
   });
 
+  it('pours each write-off, in the order recorded, into the days it forgave', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1e6), day('2026-11-02', 1e6)],
+      payments: [],
+      writeOffs: [
+        { id: 'w2', amount: 1_000_000, at: '2026-11-05T00:00:00Z' },
+        { id: 'w1', amount: 400_000, at: '2026-11-03T00:00:00Z' },
+      ],
+    });
+    expect([...account.writeOffDays()]).toEqual([
+      ['w1', [{ date: '2026-11-01', amount: 400_000 }]],
+      [
+        'w2',
+        [
+          { date: '2026-11-01', amount: 600_000 },
+          { date: '2026-11-02', amount: 400_000 },
+        ],
+      ],
+    ]);
+  });
+
+  it('pours no write-off the checkpoint already holds into a day after it', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [],
+      writeOffs: [
+        { id: 'w-old', amount: 1e6, at: '2026-10-26T00:00:00Z' },
+        { id: 'w-new', amount: 100_000, at: '2026-11-10T00:00:00Z' },
+      ],
+      checkpoint: checkpoint(),
+    });
+    expect([...account.writeOffDays()]).toEqual([
+      ['w-new', [{ date: '2026-11-02', amount: 100_000 }]],
+    ]);
+  });
+
   it('forgives the checkpoint’s owed days first with a later write-off', () => {
     const account = MinerRunningAccount.build({
       days: [day('2026-11-02', 1e6)],
@@ -625,7 +661,11 @@ describe('MinerRunningAccount: what screens read off it (D1)', () => {
 
   it('lists what the tolerance wrote off, by day, dated by the payment that closed it', () => {
     expect(account.writtenOffDays([{ id: 'p1', at: '2026-11-05T10:00:00Z' }])).toEqual([
-      { date: '2026-11-02', amount: 5_000, at: '2026-11-05T10:00:00Z' },
+      { date: '2026-11-02', amount: 5_000, at: '2026-11-05T10:00:00Z', paymentId: 'p1' },
+    ]);
+    // A day no payment reached is dated by itself.
+    expect(account.writtenOffDays([])).toEqual([
+      { date: '2026-11-02', amount: 5_000, at: '2026-11-02' },
     ]);
   });
 

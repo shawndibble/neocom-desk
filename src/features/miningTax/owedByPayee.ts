@@ -1,12 +1,12 @@
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { assignmentsMovedWithPayee } from '@/features/miningTax/ledgerActions';
 import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
-import type { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { isBilled, type PayeeRunningAccounts } from './payeeRunningAccounts';
 
 /**
  * Every Payee record's owed total, entry count and how many entries would move with it, for the
- * Payee manager's rows: each Outstanding Assignment owes its share of what its Payee's account
- * still owes of its day, as on the balance cards.
+ * Payee manager's rows. What is owed is its account's (`owes`), as on the balance cards; the count
+ * is the entries that bill it and still owe something of their day.
  */
 export function computeOwedByPayee(
   everyAssignment: readonly MiningTaxAssignmentRecord[],
@@ -14,14 +14,11 @@ export function computeOwedByPayee(
 ): Map<string, PayeeOwed> {
   const out = new Map<string, PayeeOwed>();
   for (const a of everyAssignment) {
-    // Owed means Outstanding, as on the balance cards: a needs-review entry waits on the pilot.
-    if (!a.payeeId || a.status !== 'outstanding') continue;
+    if (!a.payeeId || !isBilled(a)) continue;
     const account = accounts.of(a.payeeId);
     const charge = account?.charges.find((c) => c.id === a.id);
-    const owed = account && charge ? account.owedOf(charge) : 0;
-    if (owed < 0.01) continue;
-    const entry = out.get(a.payeeId) ?? { amount: 0, count: 0, moving: 0 };
-    entry.amount += owed;
+    if (!account?.owes || !charge || account.owedOf(charge) < 0.01) continue;
+    const entry = out.get(a.payeeId) ?? { amount: account.owes.amount, count: 0, moving: 0 };
     entry.count += 1;
     out.set(a.payeeId, entry);
   }
