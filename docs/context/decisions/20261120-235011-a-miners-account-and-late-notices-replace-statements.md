@@ -83,7 +83,8 @@ running account).
   runs it on every donation it stores, whichever sync sent it (a client's Miner is ignored).
   "Known" means grouped or seen mining, not "has paid before". An ambiguous donation is stored for
   review, shown in Needs you, and never claimed automatically. An officer can move a payment to
-  another Miner. A hand-recorded payment is checked against uncounted and in-flight transfers so
+  another Miner. A donation from an alt pays the group the alt is in, as the alt is billed with
+  it. A hand-recorded payment is checked against uncounted and in-flight transfers so
   the same ISK is not counted twice.
 - **One rule per question.** Whether two records are the same transfer, which Miner a Character
   is in (earliest grouping wins), and when money pays a day (the Running account, a date at a

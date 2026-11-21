@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PayeeLedgerSource } from '@/engine/miningTax/payeeLedger';
 import { PayeeLedgerPanel } from './PayeeLedgerPanel';
@@ -13,13 +14,16 @@ import {
 
 const renderPanel = (source: PayeeLedgerSource | null) =>
   render(
-    <PayeeLedgerPanel
-      open
-      onClose={() => {}}
-      payeeName="Bureau of Unified Harvesting"
-      source={source}
-      typeNames={LEDGER_TYPE_NAMES}
-    />
+    // An ore name links to its Market listing, so the panel needs a router.
+    <MemoryRouter>
+      <PayeeLedgerPanel
+        open
+        onClose={() => {}}
+        payeeName="Bureau of Unified Harvesting"
+        source={source}
+        typeNames={LEDGER_TYPE_NAMES}
+      />
+    </MemoryRouter>
   );
 
 const table = () => screen.getByRole('table', { name: 'Ledger' });

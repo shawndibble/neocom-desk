@@ -18,7 +18,6 @@
     // Book engine, and the import-free rules that live once here.
     "functions/src/callableManifest.ts",
     "functions/src/corpTaxBookEngine.ts",
-    "functions/src/corpTaxBookMinerTotals.ts",
     "functions/src/corpTaxBookMoonDocs.ts",
     "functions/src/corpTaxBookLateNotice.ts",
     "functions/src/corpTaxBookCheckpoint.ts",

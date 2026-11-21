@@ -4,6 +4,7 @@ import type { DayAmount } from '@/engine/corpTaxBook/minerRunningAccount';
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
+import { OreLink } from '../OreIcon';
 
 const isk = (value: number) => `${formatIsk(value)} ISK`;
 
@@ -51,7 +52,11 @@ export function LedgerRowDetail({
               {row.charge.ore.map((o) => (
                 <ValueRow
                   key={o.typeId}
-                  label={typeNames?.get(o.typeId) ?? `#${o.typeId}`}
+                  label={
+                    <OreLink typeId={o.typeId}>
+                      {typeNames?.get(o.typeId) ?? `#${o.typeId}`}
+                    </OreLink>
+                  }
                   value={formatCount(o.quantity)}
                 />
               ))}
