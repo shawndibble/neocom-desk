@@ -8777,7 +8777,7 @@
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
     "saveFailed": "Couldn’t save — nothing was changed. Try again.",
     "ledger": {
-      "subtitle": "Ledger, oldest first",
+      "subtitle": "Ledger, newest first",
       "loading": "Loading the ledger",
       "tableLabel": "Ledger",
       "lockDivider": "Locked before {{date}} · fix with a correction dated {{date}} or later",

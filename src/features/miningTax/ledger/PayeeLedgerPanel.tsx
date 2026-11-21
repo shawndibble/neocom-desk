@@ -146,7 +146,7 @@ export interface PayeeLedgerPanelProps {
 
 /**
  * A Payee ledger (decision 20261120-235011): every charge, payment, write-off and late notice
- * of one Payee's Running account, oldest first with a running balance, under its "Owes" or
+ * of one Payee's Running account, newest first with a running balance, under its "Owes" or
  * "Paid through" status. One panel for a Corp Tax Book's Payee and a personal one: the caller
  * fills `source`. A row opens in place to say what it was.
  */
@@ -237,12 +237,18 @@ function LedgerBody({
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>(DEFAULT_LEDGER_FILTER);
+  // In date order: each row's balance is the account's balance after it, computed there.
   const rows = useMemo(() => filterLedgerRows(ledger.rows, filter), [ledger.rows, filter]);
+  // Shown newest first, like a bank statement: the latest payment is the top row, not the bottom
+  // of a long list. Only the order is reversed; no balance is recomputed.
+  const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
   const csvColumns = useMemo(() => ledgerCsvColumns(t), [t]);
+  // The file stays in date order (oldest first), whichever way the table reads.
   const tableExport = useTableExport({
     surface: 'mining-tax-payee-ledger',
     rows,
     columns: csvColumns,
+    source: 'rows',
   });
   if (ledger.rows.length === 0)
     return (
@@ -313,7 +319,7 @@ function LedgerBody({
           <PayeeLedgerTable
             {...tableExport.tableProps}
             label={t('miningTax.ledger.tableLabel')}
-            rows={rows}
+            rows={newestFirst}
             typeNames={typeNames}
             {...(onUnlinkPayment ? { onUnlinkPayment } : {})}
             {...(lockDate ? { lockDate } : {})}
@@ -326,7 +332,8 @@ function LedgerBody({
 
 /**
  * The ledger's table, for a page that holds its own frame: the Payee panel's, and an officer's
- * Miner page, which adds a row menu. `rows` in the order to show them.
+ * Miner page, which adds a row menu. `rows` in the order to show them: newest first in both, each
+ * row's balance still the account's balance after it.
  */
 export function PayeeLedgerTable({
   rows,

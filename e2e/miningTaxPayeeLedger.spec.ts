@@ -48,12 +48,15 @@ test('the ledger lists every charge and payment with a running balance', async (
   const ledger = await openLedger(page);
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*2`));
   await expect(ledger).toContainText(/Oldest unpaid/);
+  // Newest first, like a bank statement: the payment on top, the first day's charge last. Each
+  // row's balance is still the one after it in date order.
   const rows = bodyRows(ledger);
   await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText(`${day(6)}Mined at Jita${isk(DAY_TAX)}${isk(DAY_TAX)}`);
-  await expect(rows.nth(3)).toContainText(
+  await expect(rows.nth(0)).toContainText(
     `${day(PAID_BACK)}Payment${isk(DAY_TAX)}${isk(2 * DAY_TAX)}`
   );
+  await expect(rows.nth(3)).toContainText(`${day(6)}Mined at Jita${isk(DAY_TAX)}${isk(DAY_TAX)}`);
+  await expect(ledger).toContainText('Ledger, newest first');
 });
 
 test('the kind filter shows only payments, and clearing it brings every row back', async ({
@@ -77,8 +80,8 @@ test('the date range keeps only the days inside it', async ({ page }) => {
   await ledger.getByRole('textbox', { name: 'From' }).fill(day(5));
   await ledger.getByRole('textbox', { name: 'To' }).fill(day(4));
   await expect(bodyRows(ledger)).toHaveCount(2);
-  await expect(bodyRows(ledger).nth(0)).toContainText(day(5));
-  await expect(bodyRows(ledger).nth(1)).toContainText(day(4));
+  await expect(bodyRows(ledger).nth(0)).toContainText(day(4));
+  await expect(bodyRows(ledger).nth(1)).toContainText(day(5));
 });
 
 test('the ledger downloads as CSV, a line per row', async ({ page }) => {

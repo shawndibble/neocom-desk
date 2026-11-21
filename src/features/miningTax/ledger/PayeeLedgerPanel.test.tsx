@@ -3,7 +3,8 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { PayeeLedgerSource } from '@/engine/miningTax/payeeLedger';
+import { payeeLedger, type PayeeLedgerSource } from '@/engine/miningTax/payeeLedger';
+import { formatIsk } from '@/lib/isk';
 import { PayeeLedgerPanel } from './PayeeLedgerPanel';
 import {
   CORP_BOOK_LEDGER,
@@ -31,18 +32,28 @@ const table = () => screen.getByRole('table', { name: 'Ledger' });
 const bodyRows = () => within(table()).getAllByRole('row').slice(1);
 
 describe('PayeeLedgerPanel', () => {
-  it('shows what is owed and every entry oldest first, ending at the balance', () => {
+  it('shows what is owed and every entry newest first, the top row at the balance', () => {
     renderPanel(CORP_BOOK_LEDGER);
+    expect(screen.getByText('Ledger, newest first')).toBeInTheDocument();
     expect(screen.getByText('Owes')).toBeInTheDocument();
     expect(screen.getByText('10,595,000 ISK')).toBeInTheDocument();
     const rows = bodyRows();
-    expect(rows[0]).toHaveTextContent('2026-10-03');
-    expect(rows[0]).toHaveTextContent('Mined at Hakonen - Moon 4 Athanor');
-    expect(rows.at(-1)).toHaveTextContent('10,595,000');
+    expect(rows[0]).toHaveTextContent('10,595,000');
+    expect(rows.at(-1)).toHaveTextContent('2026-10-03');
+    expect(rows.at(-1)).toHaveTextContent('Mined at Hakonen - Moon 4 Athanor');
     expect(screen.getByText('Late notice sent')).toBeInTheDocument();
     expect(screen.getByText('Written off by an officer')).toBeInTheDocument();
     expect(screen.getByText('Shortfall forgiven')).toBeInTheDocument();
     expect(within(table()).getByRole('columnheader', { name: 'Credited' })).toBeInTheDocument();
+  });
+
+  it("keeps each row's balance the one after it in date order, only displayed in reverse", () => {
+    renderPanel(CORP_BOOK_LEDGER);
+    const shown = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
+    const inDateOrder = payeeLedger(CORP_BOOK_LEDGER).rows.map((r) =>
+      formatIsk(Math.max(0, r.balance))
+    );
+    expect(shown.reverse()).toEqual(inDateOrder);
   });
 
   it('writes every date, the status line included, the way its rows do', () => {
@@ -112,8 +123,9 @@ describe('PayeeLedgerPanel', () => {
       );
       const rows = bodyRows();
       const at = rows.findIndex((r) => r.textContent?.includes('Locked before'));
-      expect(rows[at - 1]).toHaveTextContent('2026-10-0');
-      expect(rows[at + 1]).toHaveTextContent('2026-10-1');
+      // Newest first: the open rows above the divider, the locked ones below.
+      expect(rows[at - 1]).toHaveTextContent('2026-10-1');
+      expect(rows[at + 1]).toHaveTextContent('2026-10-0');
     });
 
     it('explains itself in a hint', () => {
@@ -151,7 +163,8 @@ describe('PayeeLedgerPanel', () => {
     renderPanel(CREDIT_LEDGER);
     const balances = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
     expect(balances.some((b) => b?.startsWith('-'))).toBe(false);
-    expect(balances.at(-1)).toMatch(/credit$/);
+    // The latest row, now on top, is the one that left the Payee paid ahead.
+    expect(balances[0]).toMatch(/credit$/);
   });
 
   it("shows an officer's note on a payment, on its row", () => {
@@ -172,7 +185,8 @@ describe('PayeeLedgerPanel', () => {
         i === 0 ? { ...p, href: '/wallet/journal?highlight=42' } : p
       ),
     });
-    await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
+    // The first payment in date order is the last one shown.
+    await user.click(screen.getAllByText('Payment from Varro Kestane').at(-1)!);
     expect(screen.getByRole('link', { name: 'View the payment' })).toHaveAttribute(
       'href',
       '/wallet/journal?highlight=42'
