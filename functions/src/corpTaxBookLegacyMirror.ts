@@ -18,12 +18,28 @@ export type NoticeMailChange =
 export const legacyNoticeRef = (book: DocumentReference, id: string) =>
   book.collection(STATEMENTS).doc(id);
 
-/** A Miner's legacy notice docs, for reads that list notices from both collections. */
-export const legacyNoticesOf = (book: DocumentReference, minerId: string) =>
-  book.collection(STATEMENTS).where('minerId', '==', minerId);
-
-/** Every legacy notice doc of a book: what a whole-book read merges with `lateNotices`. */
+/** The legacy notice collection, which reads of both collections filter (corpTaxBookLateNoticeStore.ts). */
 export const legacyNotices = (book: DocumentReference) => book.collection(STATEMENTS);
+
+/**
+ * The legacy collections a regroup moves onto the surviving Miner (corpTaxBookRekey.ts), beside
+ * the collections that outlive the mirror.
+ */
+export const LEGACY_MINER_KEYED = [STATEMENTS];
+
+/**
+ * An older tab's `issueStatement` (a notice, or a calendar Statement on a book that never
+ * switched), stored as it sent it, with its link. Reads nothing: the caller checked the id is free.
+ */
+export function writeLegacyStatement(
+  tx: Transaction,
+  book: DocumentReference,
+  stored: Record<string, unknown> & { id: string },
+  token: string
+): void {
+  tx.create(legacyNoticeRef(book, stored.id), stored);
+  tx.create(book.collection(STATEMENT_LINKS).doc(stored.id), { verifyToken: token });
+}
 
 /** Mirrors a new notice and its verify link. Reads nothing: the caller checked neither exists. */
 export function mirrorIssue(

@@ -43,8 +43,16 @@ export interface MinerListEntry {
   minerId: string;
   /** What the account an officer's tab last recorded still owes, less what the Miner paid since. */
   owed: number;
-  /** What the Miner paid since that record beyond what it said they owed. */
+  /** The credit the record counted, and what the Miner paid since beyond what it said they owed. */
   credit: number;
+  /** When an officer's tab recorded the account these figures rest on; null when none did. */
+  asOf: string | null;
+  /**
+   * The figures may be behind: no account was recorded, the record is more than a day old, or a
+   * notice was issued or an officer's edit moved the account after it. A tab recomputes such a
+   * Miner rather than trusting the entry.
+   */
+  stale: boolean;
   /** ISO instant of the latest payment that was tax; null when none. */
   lastPaidAt: string | null;
   /** Late notices not yet settled, oldest first, each with its declarations. */
@@ -93,6 +101,12 @@ export interface ReadModelInputs {
   accounts?: readonly Data[];
   /** Late notices from both collections; absent reads as none issued. */
   notices?: readonly ListedNotice[];
+  /**
+   * Officers' edits that move what an account owes (write-offs, corrections, dismissals, dispute
+   * answers), each with its Miner, or none when it may touch any Miner: a record made before one
+   * is behind it.
+   */
+  edits?: readonly { minerId?: string; at: string }[];
 }
 
 /** Whether an Extraction is still worth listing at `now` (ms): not cancelled, expiry no more than a day gone. */
@@ -111,22 +125,37 @@ function inWindow(
   return fractured + hours * 3_600_000 >= now - DAY_MS;
 }
 
-/** The days an account still owes, as `lateNoticeStanding` reads them. */
-function owedDays(days: readonly OwedDay[]) {
-  return new Map<string, LateNoticeDayState>(
-    days.map((d) => [
-      d.date,
-      {
-        tax: d.tax,
-        held: false,
-        credited: d.tax - d.owed,
-        forgiven: 0,
-        writtenOff: 0,
-        remaining: d.owed,
-        settled: false,
-      },
-    ])
-  );
+/** A record older than this is stale: officers' tabs record their Miners' accounts on every load. */
+export const RECORD_STALE_MS = DAY_MS;
+
+/**
+ * How each day a notice listed stands on the recorded account, as `lateNoticeStanding` reads it:
+ * a day the record still lists as owed is owed; a day up to the record's own date that it does
+ * not list is paid; a day after it is unknown, so it reads as still owed, never as paid.
+ */
+function listedDays(
+  notice: ListedNotice,
+  unpaid: readonly OwedDay[],
+  recordDay: string
+): Map<string, LateNoticeDayState> {
+  const owed = new Map(unpaid.map((d) => [d.date, d]));
+  const out = new Map<string, LateNoticeDayState>();
+  for (const { date, tax } of notice.lines) {
+    const day = owed.get(date);
+    const known = day !== undefined || date <= recordDay;
+    const remaining = day ? day.owed : known ? 0 : tax;
+    const dayTax = day ? day.tax : tax;
+    out.set(date, {
+      tax: dayTax,
+      held: false,
+      credited: dayTax - remaining,
+      forgiven: 0,
+      writtenOff: 0,
+      remaining,
+      settled: remaining <= 0,
+    });
+  }
+  return out;
 }
 
 /** Builds both docs. `now` is epoch ms. */
@@ -150,13 +179,19 @@ export function buildReadModels(inputs: ReadModelInputs, now: number): ReadModel
     }
     const account = accounts.get(minerId);
     const live = account && liveAccount(account, payments);
-    const days = live?.unpaidDays && owedDays(live.unpaidDays);
+    const asOf = typeof account?.at === 'string' ? account.at : null;
     const mine = notices
       .filter((n) => n.minerId === minerId)
       .sort((x, y) => x.issuedAt.localeCompare(y.issuedAt) || x.id.localeCompare(y.id));
     // Without the days recorded, a notice cannot be read as settled.
+    const unpaid = live?.unpaidDays;
     const unsettled = mine
-      .filter((n) => !days || !lateNoticeStanding(n, days).settled)
+      .filter(
+        (n) =>
+          !unpaid ||
+          !asOf ||
+          !lateNoticeStanding(n, listedDays(n, unpaid, asOf.slice(0, 10))).settled
+      )
       .map((n) => ({
         id: n.id,
         issuedAt: n.issuedAt,
@@ -167,8 +202,17 @@ export function buildReadModels(inputs: ReadModelInputs, now: number): ReadModel
       minerId,
       owed: live?.owed ?? 0,
       credit: account
-        ? Math.max(0, paidSinceRecord(account, payments) - (Number(account.owed) || 0))
+        ? (Number(account.credit) || 0) +
+          Math.max(0, paidSinceRecord(account, payments) - (Number(account.owed) || 0))
         : 0,
+      asOf,
+      stale:
+        asOf === null ||
+        now - Date.parse(asOf) > RECORD_STALE_MS ||
+        mine.some((n) => n.issuedAt > asOf) ||
+        (inputs.edits ?? []).some(
+          (e) => (e.minerId === undefined || e.minerId === minerId) && e.at > asOf
+        ),
       lastPaidAt,
       unsettled,
       unresolvedDeclarations: inputs.declarations.filter(
@@ -207,6 +251,16 @@ export function buildReadModels(inputs: ReadModelInputs, now: number): ReadModel
 /** Edits that change what either doc is built from, whatever they name. */
 const READ_MODEL_EDITS: ReadonlySet<string> = new Set([
   'recordAccounts',
+  'writeOff',
+  'reverseWriteOff',
+  'dismiss',
+  'dismissRecords',
+  'reverseDismissal',
+  'addAdjustment',
+  'reverseAdjustment',
+  'editAdjustment',
+  'rejectDispute',
+  'dismissDispute',
   'issueLateNotice',
   'issueStatement',
   'closeAccount',
@@ -223,8 +277,10 @@ const READ_MODEL_EDITS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Whether an edit moves the Overview or Miners doc: a Miner's recorded account, their notices,
- * payments, declarations or grouping, an Extraction, or the book's start date or expiry.
+ * Whether an edit moves the Overview or Miners doc: a Miner's recorded account, notices,
+ * payments, declarations, grouping, write-offs, dismissals, corrections or dispute answers (each
+ * moves what the record is judged against, so the entry turns stale), an Extraction, or the book's
+ * start date or expiry.
  */
 export function movesReadModels(action: { action: string; patch?: object }): boolean {
   if (READ_MODEL_EDITS.has(action.action)) return true;

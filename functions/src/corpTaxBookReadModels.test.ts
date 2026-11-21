@@ -56,7 +56,12 @@ describe('buildReadModels on Running accounts', () => {
     expect(READ_MODELS_SCHEMA).toBe(2);
     const g1 = minerList.miners.find((m) => m.minerId === 'g1')!;
     // 150 paid since the record: the oldest day (100) and half of the next.
-    expect(g1).toMatchObject({ owed: 150, credit: 0, lastPaidAt: '2026-11-16T00:00:00Z' });
+    expect(g1).toMatchObject({
+      owed: 150,
+      credit: 0,
+      lastPaidAt: '2026-11-16T00:00:00Z',
+      asOf: '2026-11-15T00:00:00Z',
+    });
     // Money paid beyond what the record said was owed is credit.
     expect(minerList.miners.find((m) => m.minerId === 'solo:5')).toMatchObject({
       owed: 0,
@@ -76,6 +81,48 @@ describe('buildReadModels on Running accounts', () => {
       },
     ]);
     expect(g1.unresolvedDeclarations).toEqual([inputs.declarations[0]]);
+  });
+
+  it('adds the credit the tab recorded to what was paid beyond the record', () => {
+    const { minerList } = buildReadModels(
+      { ...inputs, accounts: [{ ...inputs.accounts[1], credit: 10 }] },
+      NOW
+    );
+    expect(minerList.miners.find((m) => m.minerId === 'solo:5')?.credit).toBe(50);
+  });
+
+  it('flags an entry whose record is old, missing, or older than a notice it judges', () => {
+    const fresh = Date.parse('2026-11-15T12:00:00Z');
+    const of = (id: string, at = fresh) =>
+      buildReadModels(inputs, at).minerList.miners.find((m) => m.minerId === id)!;
+    expect(of('g1').stale).toBe(false);
+    expect(of('g1', NOW).stale).toBe(true);
+    const late = buildReadModels(
+      {
+        ...inputs,
+        notices: [...inputs.notices, notice('n-new', 'g1', ['2026-11-02'], '2026-11-16T00:00:00Z')],
+      },
+      fresh
+    ).minerList.miners.find((m) => m.minerId === 'g1')!;
+    expect(late.stale).toBe(true);
+    const edited = (edits: { minerId?: string; at: string }[]) =>
+      buildReadModels({ ...inputs, edits }, fresh).minerList.miners.find((m) => m.minerId === 'g1')!
+        .stale;
+    expect(edited([{ minerId: 'g1', at: '2026-11-15T06:00:00Z' }])).toBe(true);
+    expect(edited([{ at: '2026-11-15T06:00:00Z' }])).toBe(true);
+    expect(edited([{ minerId: 'solo:5', at: '2026-11-15T06:00:00Z' }])).toBe(false);
+    expect(edited([{ minerId: 'g1', at: '2026-11-14T00:00:00Z' }])).toBe(false);
+    const none = buildReadModels({ ...inputs, accounts: [] }, fresh).minerList.miners;
+    expect(none.find((m) => m.minerId === 'g1')).toMatchObject({ asOf: null, stale: true });
+  });
+
+  it('counts a listed day the record does not cover as unknown, never as paid', () => {
+    // Recorded on 15 Nov: a notice day after it is not the record's to call paid.
+    const g1 = buildReadModels(
+      { ...inputs, notices: [notice('n-after', 'g1', ['2026-11-17'])] },
+      NOW
+    ).minerList.miners.find((m) => m.minerId === 'g1')!;
+    expect(g1.unsettled.map((u) => u.id)).toEqual(['n-after']);
   });
 
   it('counts a notice of a Miner with no recorded account as unsettled', () => {
@@ -107,7 +154,7 @@ describe('movesReadModels', () => {
       true
     );
     expect(movesReadModels({ action: 'updateSettings', patch: { hubId: 'jita' } })).toBe(false);
-    for (const action of ['recordLateNoticeMail', 'recordCheckpoints', 'addRate', 'writeOff'])
+    for (const action of ['recordLateNoticeMail', 'recordCheckpoints', 'addRate'])
       expect(movesReadModels({ action })).toBe(false);
   });
 });

@@ -34,12 +34,17 @@ import {
 import { DAY_MS } from './timeConstants.js';
 import {
   NOTICE_ID_FIELD,
-  finalNoticeId,
+  isFinalNoticeId,
+  paymentCode,
   type LateNotice,
-  type LateNoticeKind,
   type LateNoticeLine,
 } from './corpTaxBookLateNotice.js';
-import type { RunningAccountCheckpoint } from './corpTaxBookCheckpoint.js';
+import {
+  canAdvanceCheckpoint,
+  checkpointProblem,
+  type CheckpointProblem,
+  type RunningAccountCheckpoint,
+} from './corpTaxBookCheckpoint.js';
 import { UNCOUNTED_LIMIT, type UncountedDonation } from './corpTaxBookSyncEngine.js';
 import {
   MAX_POP_AUDIENCES,
@@ -779,7 +784,9 @@ export type EditAction =
   /** A running account's figures per Miner, as the officer's client works them out (#6294). */
   | { action: 'recordAccounts'; accounts: RecordedAccount[] }
   /** Each Miner's closed-through checkpoint; the server sets who recorded it, when, and its readers. */
-  | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] };
+  | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] }
+  /** A Director drops a Miner's checkpoint: the next load works it out again from the history. */
+  | { action: 'resetCheckpoint'; minerId: string };
 
 /** A Late notice's first mail, or a reminder of it. */
 export type LateNoticeMailKind = 'notice' | 'reminder';
@@ -804,6 +811,8 @@ export interface RecordedAccount {
    * close-of-day price; it trusts the client for that and checks only what it can see.
    */
   settledThrough?: string;
+  /** Money ahead of every billed day, as the client counted it; absent from an older client. */
+  credit?: number;
 }
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
@@ -821,6 +830,7 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'writeOff',
   'rebill',
   'markNotTax',
+  'resetCheckpoint',
 ]);
 
 /** A close that forfeits credit writes value off, so it re-checks the role live too (#4184). */
@@ -912,6 +922,7 @@ export function parseEditAction(data: unknown): EditAction {
     'recordLateNoticeMail',
     'recordAccounts',
     'recordCheckpoints',
+    'resetCheckpoint',
     'setPopSharing',
     'setPopSharingMoon',
   ] as const);
@@ -1072,7 +1083,12 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
       };
     case 'writeOff':
-      // An older client may still name a Statement: it pins nothing now, so it is dropped.
+      // A write-off forgives the oldest days: an older tab that names a Statement meant something
+      // else, so it is refused rather than read another way.
+      if (d.statementId !== undefined)
+        throw new HttpsError('failed-precondition', 'This page is out of date: reload it', {
+          reason: 'reload',
+        });
       return {
         action,
         minerId: docId(d.minerId, 'minerId'),
@@ -1204,6 +1220,8 @@ export function parseEditAction(data: unknown): EditAction {
             ? 'notice'
             : oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
       };
+    case 'resetCheckpoint':
+      return { action, minerId: docId(d.minerId, 'minerId') };
     case 'recordCheckpoints':
       return {
         action,
@@ -1238,6 +1256,7 @@ export function parseEditAction(data: unknown): EditAction {
             ...(a.settledThrough !== undefined
               ? { settledThrough: dateString(a.settledThrough, 'settledThrough') }
               : {}),
+            ...(a.credit !== undefined ? { credit: num(a.credit, 'credit', 0, 1e15) } : {}),
           };
         }),
       };
@@ -1430,20 +1449,20 @@ function parseNoticeLine(raw: unknown): LateNoticeLine {
 
 /**
  * A Late notice from an officer's tab (decision 20261120-235011). What it listed is summed here
- * from its lines; who may read it, who issued it and its mail state are the server's to set, so
- * they start empty. A final notice is stored only under the id closing the account gives it.
+ * from its lines, and its Reason code is the one its id hashes to; who may read it, who issued it
+ * and its mail state are the server's to set, so they start empty. A final notice is never issued
+ * here: only closing the account sends one.
  */
 export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
   const id = docId(raw.id, 'notice.id');
   const minerId = docId(raw.minerId, 'notice.minerId');
-  const kind: LateNoticeKind = oneOf(raw.kind, 'notice.kind', ['late', 'final'] as const);
-  if ((kind === 'final') !== (id === finalNoticeId(minerId)))
-    throw new HttpsError('invalid-argument', 'only an account closing sends a final notice');
+  oneOf(raw.kind, 'notice.kind', ['late'] as const);
+  if (isFinalNoticeId(id))
+    throw new HttpsError('invalid-argument', 'only closing an account sends a final notice');
+  const code = paymentCode(id);
+  if (raw.code !== undefined && raw.code !== code)
+    throw new HttpsError('invalid-argument', `notice.code must be ${code}`);
   const lines = list(raw.lines, 'notice.lines', 5000).map(parseNoticeLine);
-  const code =
-    raw.code === undefined || raw.code === ''
-      ? undefined
-      : boundedString(raw.code, 'notice.code', 64);
   const pricing =
     raw.pricing === undefined
       ? undefined
@@ -1461,9 +1480,9 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
     characterIds: list(raw.characterIds, 'notice.characterIds', 50).map((x) =>
       int(x, 'characterId')
     ),
-    kind,
+    kind: 'late',
     issuedAt: instant(raw.issuedAt, 'notice.issuedAt'),
-    ...(code !== undefined ? { code } : {}),
+    code,
     ...(pricing !== undefined ? { pricing } : {}),
     uids: [],
     lines,
@@ -1473,7 +1492,40 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
   };
 }
 
-/** A checkpoint from an officer's tab; `canAdvanceCheckpoint` decides whether it is stored. */
+/** Why a checkpoint from a tab is not stored. */
+export type CheckpointRefusal =
+  CheckpointProblem | 'not-forward' | 'unknown-miner' | 'director-approval';
+
+/**
+ * Whether a checkpoint is stored (B1): a checkpoint is a cache of history the book keeps for good,
+ * so one that cannot be trusted is skipped and the next load works the account out again. It must
+ * move forward (`canAdvanceCheckpoint`), add up (`checkpointProblem`) and name a Miner the book
+ * knows; one that owes less through its date than the Miner's recorded account (`live`, after the
+ * payments since) would forgive days, so it needs a Director.
+ */
+export function checkpointRefusal(
+  k: RecordedCheckpoint,
+  ctx: {
+    stored?: Pick<RunningAccountCheckpoint, 'through'>;
+    today: string;
+    known: boolean;
+    live?: { unpaidDays?: readonly { date: string; owed: number }[] };
+    isDirector: boolean;
+  }
+): CheckpointRefusal | null {
+  if (!canAdvanceCheckpoint(ctx.stored, k, ctx.today)) return 'not-forward';
+  const problem = checkpointProblem(k);
+  if (problem) return problem;
+  if (!ctx.known) return 'unknown-miner';
+  const recorded = (ctx.live?.unpaidDays ?? [])
+    .filter((d) => d.date <= k.through)
+    .reduce((sum, d) => sum + d.owed, 0);
+  const owes = k.owed.reduce((sum, d) => sum + d.remaining, 0);
+  if (owes < recorded - 1 && !ctx.isDirector) return 'director-approval';
+  return null;
+}
+
+/** A checkpoint from an officer's tab; `checkpointRefusal` decides whether it is stored. */
 export function parseCheckpoint(raw: unknown): RecordedCheckpoint {
   const c = record(raw);
   return {
@@ -2073,29 +2125,25 @@ export function billedDisputeTax(
 
 /**
  * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off forgives
- * the oldest unpaid days first (decision 20261120-235011), read off the account an officer's tab
- * last recorded (`accounts/{minerId}`): the open disputes of the days it forgives in full close,
- * a day only partly forgiven keeps its dispute. A write-off of the whole balance, or one for a
- * Miner with no recorded days, is the leaver's: it closes every open dispute.
+ * the oldest unpaid days first (decision 20261120-235011), read off the Miner's account as it
+ * stands now (`liveAccount`): the open disputes of the days it forgives in full close, a held day
+ * included, while a day only partly forgiven keeps its dispute; a write-off of the whole balance
+ * closes every one. With the account's days unknown, none closes.
  */
 export function disputesClosedByWriteOff(
   disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
   writeOff: { amount: number },
-  account?: { owed?: unknown; unpaidDays?: unknown }
+  live?: { owed: number; unpaidDays?: readonly { date: string; owed: number }[] }
 ): string[] {
+  if (!live?.unpaidDays) return [];
   const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
-  const days = Array.isArray(account?.unpaidDays)
-    ? (account.unpaidDays as { date?: unknown; owed?: unknown }[])
-    : undefined;
-  const owed = typeof account?.owed === 'number' ? account.owed : Infinity;
-  if (!days || writeOff.amount >= owed - 0.01) return open.map((d) => d.id as string);
+  if (writeOff.amount >= live.owed - 0.01) return open.map((d) => d.id as string);
   const forgiven = new Set<string>();
   let left = writeOff.amount;
-  for (const day of days) {
-    const due = typeof day.owed === 'number' ? day.owed : 0;
-    if (left < due - 0.01) break;
-    left -= due;
-    if (typeof day.date === 'string') forgiven.add(day.date);
+  for (const day of live.unpaidDays) {
+    if (left < day.owed - 0.01) break;
+    left -= day.owed;
+    forgiven.add(day.date);
   }
   return open
     .filter((d) => typeof d.date === 'string' && forgiven.has(d.date))

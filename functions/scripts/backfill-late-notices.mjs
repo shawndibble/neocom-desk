@@ -1,8 +1,9 @@
 /**
  * One-off (decision 20261120-235011, step 2): copies every Late notice stored as a `statements`
  * doc (`kind: 'notice'`) into `lateNotices`, and every `statementLinks` doc into
- * `lateNoticeLinks`. Idempotent: a doc already copied is left alone, so a re-run copies nothing.
- * `--dry-run` only counts what it would copy. Run it once the functions that write
+ * `lateNoticeLinks`; brings an existing copy's mail state level with its legacy doc; then marks
+ * the book backfilled, after which no read looks at the legacy docs. Idempotent: a re-run copies
+ * nothing new. A book that fails is reported and the run goes on. `--dry-run` only counts. Run it once the functions that write
  * `lateNotices` are deployed (docs/deploy/late-notices.md).
  *
  *   cd functions && npm run build
@@ -28,16 +29,37 @@ const corps = only.length
   : (await db.collection('corps').listDocuments()).map((d) => Number(d.id));
 let notices = 0;
 let links = 0;
+let mail = 0;
+const failed = [];
 for (const corporationId of corps) {
-  const plan = await planLateNoticeBackfill(db, corporationId);
-  if (plan.notices.length + plan.links.length === 0) continue;
-  console.log(corporationId, `notices: ${plan.notices.length}`, `links: ${plan.links.length}`);
-  notices += plan.notices.length;
-  links += plan.links.length;
-  if (!dryRun) await applyLateNoticeBackfill(db, corporationId, plan);
+  try {
+    const plan = await planLateNoticeBackfill(db, corporationId);
+    const counts = [plan.notices.length, plan.links.length, plan.mail.length];
+    if (counts.some((n) => n > 0))
+      console.log(
+        corporationId,
+        `notices: ${counts[0]}`,
+        `links: ${counts[1]}`,
+        `mail: ${counts[2]}`
+      );
+    notices += counts[0];
+    links += counts[1];
+    mail += counts[2];
+    // Marks the book even with nothing to copy, so its reads stop looking at the legacy docs.
+    if (!dryRun) await applyLateNoticeBackfill(db, corporationId, plan);
+  } catch (e) {
+    // One book's failure (a notice issued mid-run, a timeout) leaves the rest to go on; re-run it.
+    failed.push(corporationId);
+    console.error(corporationId, 'failed:', e instanceof Error ? e.message : e);
+  }
 }
 console.log(
   dryRun ? 'dry run: nothing written' : 'copied',
   `notices: ${notices}`,
-  `links: ${links}`
+  `links: ${links}`,
+  `mail synced: ${mail}`
 );
+if (failed.length > 0) {
+  console.error(`failed: ${failed.join(' ')} (re-run with these ids)`);
+  process.exitCode = 1;
+}

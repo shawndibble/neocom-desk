@@ -61,8 +61,6 @@ import {
   UNCOUNTED_IGNORED_MAX,
   PAYMENTS,
   REBILLS,
-  STATEMENTS,
-  STATEMENT_LINKS,
   TOKENS_COLLECTION,
   LATE_NOTICES,
   ACCOUNT_CHECKPOINTS,
@@ -75,6 +73,8 @@ import {
   parseRecordKey,
   billedDisputeTax,
   disputesClosedByWriteOff,
+  checkpointRefusal,
+  type RecordedCheckpoint,
   mergeDisputeLines,
   type RecordedOre,
   parseStatement,
@@ -173,21 +173,24 @@ import {
   legacyStatementDocOf,
   lineKey,
 } from './corpTaxBookLateNotice.js';
-import { canAdvanceCheckpoint } from './corpTaxBookCheckpoint.js';
 import {
+  BACKFILLED_DOC,
+  dbReader,
+  type DocReader,
   issueLateNoticeDocs,
-  mergeNotices,
   newVerifyToken,
+  readNoticeDocById,
+  readNoticeDocs,
+  readNotices,
+  ofCharacterFilter,
+  ofMinerFilter,
+  writeVerifyToken,
   readLateNotice,
   writeLateNoticeDocs,
   writeNoticeMail,
   type LoadedNotice,
 } from './corpTaxBookLateNoticeStore.js';
-import {
-  legacyNoticeRef,
-  legacyNotices as legacyNoticesRoot,
-  legacyNoticesOf,
-} from './corpTaxBookLegacyMirror.js';
+import { legacyNoticeRef, writeLegacyStatement } from './corpTaxBookLegacyMirror.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
 export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
@@ -951,6 +954,7 @@ interface EditOutcome {
 const hasLines = (d: Data) => Array.isArray(d.lines) && d.lines.length > 0;
 
 const col = (c: EditCtx, name: string) => sub(c.deps.db, c.corporationId, name);
+const bookOf = (c: EditCtx) => bookRef(c.deps.db, c.corporationId);
 
 /**
  * The ids, among `statements`, that open disputes hold something of at `now`
@@ -963,12 +967,11 @@ async function heldStatementIds(c: EditCtx, statements: readonly Data[], now: st
       (await c.tx.get(col(c, DISPUTES).where('minerId', '==', minerId))).docs.map((d) => d.data())
     ).filter((d) => disputeHolds(d, now));
     if (disputes.length === 0) continue;
-    const [all, dismissals, extractions] = await Promise.all([
-      c.tx.get(col(c, STATEMENTS).where('minerId', '==', minerId)),
+    const [ofMiner, dismissals, extractions] = await Promise.all([
+      readNoticeDocs(c.tx, bookOf(c), ofMinerFilter(minerId)),
       c.tx.get(col(c, DISMISSALS)),
       c.tx.get(col(c, EXTRACTIONS)),
     ]);
-    const ofMiner = all.docs.map((d) => d.data() as Data);
     const byId = new Map(ofMiner.map((s) => [s.id as string, s]));
     for (const s of statements) if (s.minerId === minerId) byId.set(s.id as string, s);
     const mine = [...byId.values()].map((x) => ({
@@ -1052,15 +1055,38 @@ async function assertAdjustmentReversible(
     );
 }
 
-/** A Miner's Late notices, from both collections, read in the transaction. */
-async function minerNotices(c: EditCtx, minerId: string) {
-  const book = bookRef(c.deps.db, c.corporationId);
-  const [current, legacy] = await Promise.all([
-    c.tx.get(col(c, LATE_NOTICES).where('minerId', '==', minerId)),
-    c.tx.get(legacyNoticesOf(book, minerId)),
+/** A Miner's account as it stands now: the officer's last record less what they paid since. */
+async function liveAccountOf(c: EditCtx, minerId: string) {
+  const [account, payments] = await Promise.all([
+    c.tx.get(col(c, ACCOUNTS).doc(minerId)),
+    c.tx.get(col(c, PAYMENTS).where('minerId', '==', minerId)),
   ]);
-  return mergeNotices(current, legacy);
+  return account.exists
+    ? liveAccount(
+        account.data() as Data,
+        payments.docs.map((d) => d.data())
+      )
+    : undefined;
 }
+
+/** Whether the book knows a Miner: its grouping, its recorded account, or a solo Character that mined here. */
+async function knownMiner(c: EditCtx, minerId: string): Promise<boolean> {
+  const [miner, account] = await c.tx.getAll(
+    col(c, MINERS).doc(minerId),
+    col(c, ACCOUNTS).doc(minerId)
+  );
+  if (miner.exists || account.exists) return true;
+  const solo = /^solo:(\d+)$/.exec(minerId);
+  if (!solo) return false;
+  const rows = await c.tx.get(
+    col(c, OBSERVED).where('characterId', '==', Number(solo[1])).select().limit(1)
+  );
+  return !rows.empty;
+}
+
+/** A Miner's Late notices, from both collections, read in the transaction. */
+const minerNotices = (c: EditCtx, minerId: string) =>
+  readNotices(c.tx, bookOf(c), ofMinerFilter(minerId));
 
 /** A Late notice by id, read in the transaction; not-found when neither collection holds it. */
 async function mustGetNotice(c: EditCtx, id: string): Promise<LoadedNotice> {
@@ -1305,8 +1331,10 @@ async function rekeyAbsorbed(
     absorbed
   );
   const writes = planRekey({ target, targetUids, records, existingDisputeIds });
-  // A transaction holds 500 writes; a move is two. Refuse, rather than fail half-way.
-  if (writes.length > 450)
+  // A transaction holds 500 writes: a move is two, and the target's checkpoint goes too. Refuse,
+  // rather than fail half-way.
+  const ops = writes.reduce((n, w) => n + (w.kind === 'move' ? 2 : 1), writes.length > 0 ? 1 : 0);
+  if (ops > 450)
     fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
   return () => {
     // The target's closed-through checkpoint summed only its own history: its next load rolls a
@@ -1350,7 +1378,8 @@ function groupResult(plan: GroupPlan) {
 function writeMiner(
   c: EditCtx,
   action: { minerId: string; characterIds: number[]; mainCharacterId: number },
-  plan: GroupPlan
+  plan: GroupPlan,
+  aliases: readonly string[] = []
 ): void {
   // An officer asking again starts a fresh question: the old answer no longer stands.
   clearAnswers(c, plan.officerClaimed);
@@ -1366,7 +1395,22 @@ function writeMiner(
     createdAt: plan.createdAt,
     // An Officer claim stays out of the readable grouping until its owner signs in as it.
     uids: plan.readers.map((x) => `char:${x}`),
+    // The Miner ids folded into it: a Reason code printed for one still names it.
+    ...(aliases.length > 0 ? { aliases: [...aliases] } : {}),
   });
+}
+
+/** The ids a grouping answers to: its own aliases, and each absorbed Miner's id and aliases. */
+function aliasesAfter(
+  miners: readonly QueryDocumentSnapshot[],
+  target: string,
+  absorbed: readonly string[]
+): string[] {
+  const of = (id: string) =>
+    (miners.find((d) => d.id === id)?.get('aliases') as string[] | undefined) ?? [];
+  return [...new Set([...of(target), ...absorbed.flatMap((id) => [id, ...of(id)])])].filter(
+    (id) => id !== target
+  );
 }
 
 /**
@@ -1454,7 +1498,7 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
   );
 }
 
-const ACCOUNT_FIGURES = ['owed', 'paid', 'days', 'oldest', 'paidThrough'] as const;
+const ACCOUNT_FIGURES = ['owed', 'paid', 'days', 'oldest', 'paidThrough', 'credit'] as const;
 
 /** Whether a stored account already holds these figures (its `at` and `by` aside). */
 function sameAccount(
@@ -1520,8 +1564,7 @@ async function storableSettledThrough(
 async function checkRateStarts(c: EditCtx, newRates: readonly { effectiveFrom: string }[]) {
   const today = utcDate(c.now);
   if (!newRates.some((r) => r.effectiveFrom < today)) return;
-  const statements = await c.tx.get(col(c, STATEMENTS));
-  const last = lastStatementDay(statements.docs.map((d) => d.data() as never));
+  const last = lastStatementDay((await readNoticeDocs(c.tx, bookOf(c))) as never[]);
   for (const r of newRates) {
     const why = rateStartRefusal(r.effectiveFrom, today, last);
     if (why === 'too-old')
@@ -1561,15 +1604,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'setRecordRate': {
       const { characterId, date } = parseRecordKey(action.recordKey);
-      const onChar = await tx.get(
-        col(c, STATEMENTS).where('characterIds', 'array-contains', characterId)
-      );
-      if (
-        !canOverrideRecordRate(
-          date,
-          onChar.docs.map((d) => d.data() as never)
-        )
-      ) {
+      const onChar = await readNoticeDocs(tx, bookOf(c), ofCharacterFilter(characterId));
+      if (!canOverrideRecordRate(date, onChar as never[])) {
         fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
       }
       const rate: StoredRate = { scope: 'record', recordKey: action.recordKey, pct: action.pct };
@@ -1641,13 +1677,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
-        const statements = await tx.get(col(c, STATEMENTS));
+        const statements = await readNoticeDocs(tx, bookOf(c));
         const reason = startDateMoveReason(
           oldStart ?? startDate,
           startDate,
           utcDate(now),
           await ownBookFloor((r) => tx.get(r), c.deps.db, c.corporationId),
-          statements.docs.map((d) => d.data() as never)
+          statements as never[]
         );
         if (reason) fail('failed-precondition', 'The start date cannot move there', reason);
         update.startDate = startDate;
@@ -1911,7 +1947,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         scope.uids,
         scope.absorbed
       );
-      writeMiner(c, action, out);
+      writeMiner(c, action, out, aliasesAfter(miners.docs, action.minerId, []));
       rekey();
       keepInGroup(c, action.characterIds);
       return {
@@ -1949,7 +1985,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         scope.absorbed
       );
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
-      writeMiner(c, action, out);
+      writeMiner(c, action, out, aliasesAfter(miners.docs, action.minerId, action.absorbMinerIds));
       rekey();
       // A confirmation still stands for a character the Miner already held.
       clearAnswers(
@@ -2099,14 +2135,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // A write-off forgives the Miner's oldest unpaid days (decision 20261120-235011), and closes
       // the Miner's disputes of the days it forgives (#6307): answered, so they leave the
       // officer's Needs you and no longer hold those days.
-      const [disputes, account] = await Promise.all([
+      const [disputes, live] = await Promise.all([
         c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId)),
-        c.tx.get(col(c, ACCOUNTS).doc(action.minerId)),
+        liveAccountOf(c, action.minerId),
       ]);
       const mineOpen = disputes.docs.map((d) => d.data()).filter(hasLines); // a withdrawn dispute is a tombstone
       // Every read stays above the first write: a Firestore transaction refuses a read after one.
       const uids = await minerUids(c, action.minerId);
-      const closing = disputesClosedByWriteOff(mineOpen, { amount: action.amount }, account.data());
+      const closing = disputesClosedByWriteOff(mineOpen, { amount: action.amount }, live);
       const id = `w${now}_${rand(4)}`;
       for (const disputeId of closing)
         tx.update(col(c, DISPUTES).doc(disputeId), {
@@ -2141,18 +2177,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'rebill': {
       const [statements, paidDoc, minerDoc] = await Promise.all([
-        tx.get(col(c, STATEMENTS).where('minerId', '==', action.minerId)),
+        readNoticeDocs(tx, bookOf(c), ofMinerFilter(action.minerId)),
         tx.get(col(c, META).doc(PAID_DOC)),
         tx.get(col(c, MINERS).doc(action.minerId)),
       ]);
       const paid = new Set<string>((paidDoc.data()?.ids as string[] | undefined) ?? []);
-      if (
-        !canRebillFrom(
-          action.fromDate,
-          statements.docs.map((d) => d.data() as never),
-          paid
-        )
-      ) {
+      if (!canRebillFrom(action.fromDate, statements as never[], paid)) {
         fail('failed-precondition', 'A paid Statement covers that day', 'paid-days-closed');
       }
       // A rebill that touches a corp member's days needs a Director (D22).
@@ -2215,7 +2245,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (current.exists || legacy.exists)
         fail('already-exists', 'A Late notice never changes', 'notice-exists');
       // Who may read it and who issued it are the server's to say, never the tab's.
-      const readers = miner.exists ? minerReaders(sent.minerId, miner.data()) : sent.characterIds;
+      const readers = minerReaders(sent.minerId, miner.data());
       const notice = {
         ...sent,
         uids: readers.map((x) => `char:${x}`),
@@ -2236,7 +2266,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       );
       const wanted = [...new Set(action.statementIds)].filter((id) => !paid.has(id));
       const docs: Data[] = [];
-      for (const id of wanted) docs.push(await mustGet(c, col(c, STATEMENTS).doc(id), 'Statement'));
+      for (const id of wanted) {
+        const doc = await readNoticeDocById(tx, bookOf(c), id);
+        if (!doc) fail('not-found', 'Statement not found', 'not-found');
+        docs.push(doc);
+      }
       // A Statement settles for good (D22), so the server never trusts the caller's plan: an
       // older client plans without disputes. One an open dispute holds right now is dropped.
       const held = await heldStatementIds(c, docs, iso);
@@ -2310,19 +2344,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
       const lines = (dispute.lines as DisputeConflictInput['lines'] | undefined) ?? [];
       const billing = [];
-      const book = bookRef(c.deps.db, c.corporationId);
-      for (const characterId of new Set(
-        lines.map((l) => parseRecordKey(l.recordKey).characterId)
-      )) {
-        const listing = (q: FirebaseFirestore.CollectionReference) =>
-          tx.get(q.where('characterIds', 'array-contains', characterId));
-        billing.push(
-          ...mergeNotices(
-            await listing(col(c, LATE_NOTICES)),
-            await listing(legacyNoticesRoot(book))
-          )
-        );
-      }
+      for (const characterId of new Set(lines.map((l) => parseRecordKey(l.recordKey).characterId)))
+        billing.push(...(await readNotices(tx, bookOf(c), ofCharacterFilter(characterId))));
       const priced = billedDisputeTax(
         {
           lines,
@@ -2434,36 +2457,49 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { noticeId, mailId: action.mailId, kind: action.kind } };
     }
     case 'recordCheckpoints': {
-      // Only ever forward, and never past what may close today: one that fails is skipped, as a
-      // paid-through day is (`recordAccounts`). Reads first: a transaction refuses one after a write.
+      // A checkpoint is a cache of history the book keeps for good (B1): one that cannot be
+      // trusted is skipped and reported, and the next load works the account out again. Reads
+      // first: a transaction refuses one after a write.
       const today = utcDate(now);
       const refs = action.checkpoints.map((k) => col(c, ACCOUNT_CHECKPOINTS).doc(k.minerId));
       const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
-      const moving = action.checkpoints.flatMap((k, i) =>
-        canAdvanceCheckpoint(stored[i].data() as { through: string } | undefined, k, today)
-          ? [{ checkpoint: k, ref: refs[i] }]
-          : []
-      );
-      const uids = await Promise.all(moving.map((m) => minerUids(c, m.checkpoint.minerId)));
-      moving.forEach(({ checkpoint, ref }, i) =>
-        tx.set(ref, {
-          ...checkpoint,
-          at: iso,
-          by,
-          uids: uids[i],
-          updatedAt: FieldValue.serverTimestamp(),
-        })
-      );
+      const recorded: { checkpoint: RecordedCheckpoint; ref: DocumentReference; uids: string[] }[] =
+        [];
+      const skipped: { minerId: string; through: string; reason: string }[] = [];
+      for (const [i, k] of action.checkpoints.entries()) {
+        const known = await knownMiner(c, k.minerId);
+        const reason = checkpointRefusal(k, {
+          stored: stored[i].data() as { through: string } | undefined,
+          today,
+          known,
+          live: known ? await liveAccountOf(c, k.minerId) : undefined,
+          isDirector: c.access.isDirector,
+        });
+        if (reason) skipped.push({ minerId: k.minerId, through: k.through, reason });
+        else recorded.push({ checkpoint: k, ref: refs[i], uids: await minerUids(c, k.minerId) });
+      }
+      for (const { checkpoint, ref, uids } of recorded)
+        tx.set(ref, { ...checkpoint, at: iso, by, uids, updatedAt: FieldValue.serverTimestamp() });
+      // The full figures, so the audit says what each account was closed through.
       return {
-        detail: {
-          recorded: moving.map((m) => ({
-            minerId: m.checkpoint.minerId,
-            through: m.checkpoint.through,
-          })),
-          skipped: action.checkpoints.length - moving.length,
+        detail: { recorded: recorded.map((r) => r.checkpoint), skipped },
+        result: {
+          recorded: recorded.map((r) => r.checkpoint.minerId),
+          skipped: skipped.map(({ minerId, reason }) => ({ minerId, reason })),
         },
-        result: { recorded: moving.map((m) => m.checkpoint.minerId) },
       };
+    }
+    case 'resetCheckpoint': {
+      // The correction path: the next load works the account out again from its history.
+      if (!c.access.isDirector)
+        throw new HttpsError('permission-denied', 'A Director must reset a checkpoint', {
+          reason: 'director-approval',
+        });
+      const ref = col(c, ACCOUNT_CHECKPOINTS).doc(action.minerId);
+      const held = (await tx.get(ref)).data();
+      if (!held) fail('not-found', 'No checkpoint to reset', 'not-found');
+      tx.delete(ref);
+      return { detail: { minerId: action.minerId, checkpoint: held } };
     }
     case 'setPopSharing':
     case 'setPopSharingMoon':
@@ -2539,8 +2575,11 @@ async function issueStatementDoc(
   readers: readonly number[] = statement.characterIds
 ): Promise<string> {
   const { tx, now } = c;
-  const ref = col(c, STATEMENTS).doc(statement.id);
-  const [held, heldNotice] = await tx.getAll(ref, col(c, LATE_NOTICES).doc(statement.id));
+  const book = bookOf(c);
+  const [held, heldNotice] = await tx.getAll(
+    legacyNoticeRef(book, statement.id),
+    col(c, LATE_NOTICES).doc(statement.id)
+  );
   if (held.exists || heldNotice.exists)
     fail('already-exists', 'An issued Statement never changes', 'statement-exists');
   const token = newVerifyToken();
@@ -2551,20 +2590,13 @@ async function issueStatementDoc(
     manualRemindersSent: 0,
     issuedBy: c.access.characterId,
   };
-  tx.create(ref, stored);
   // An older tab still issues a Late notice this way: it is stored as one too, under the same token.
+  writeLegacyStatement(tx, book, stored, token);
   const notice = lateNoticeFromStatementDoc(stored);
-  if (notice) writeLateNoticeDocs(tx, bookRef(c.deps.db, c.corporationId), notice, token);
-  // The link lives beside the Statement, readable by editors only (rules): the
-  // miner and view-only officers never see it.
-  tx.create(col(c, STATEMENT_LINKS).doc(statement.id), { verifyToken: token });
-  tx.create(c.deps.db.collection(TOKENS_COLLECTION).doc(token), {
-    corporationId: c.corporationId,
-    statementId: statement.id,
-    minerId: statement.minerId,
-    remindersStopped: false,
-    createdAt: now,
-  });
+  if (notice) writeLateNoticeDocs(tx, book, notice, token);
+  // A calendar Statement has no `lateNotices` copy: reads look at the legacy docs again.
+  else tx.delete(book.collection(META).doc(BACKFILLED_DOC));
+  writeVerifyToken(tx, c.deps.db, c.corporationId, statement, token, now);
   return token;
 }
 
@@ -2619,14 +2651,14 @@ async function closeAccount(
 
   // The credit the guest is left with once the final Statement is counted.
   const [statements, payments, dismissals, extractions, writeOffs] = await Promise.all([
-    tx.get(col(c, STATEMENTS).where('minerId', '==', action.minerId)),
+    readNoticeDocs(tx, bookOf(c), ofMinerFilter(action.minerId)),
     tx.get(col(c, PAYMENTS).where('minerId', '==', action.minerId)),
     tx.get(col(c, DISMISSALS)),
     tx.get(col(c, EXTRACTIONS)),
     tx.get(col(c, WRITE_OFFS).where('minerId', '==', action.minerId)),
   ]);
   // A running account's notices bill no days of their own (#6294): legacy Statements only.
-  const held = statements.docs.map((d) => d.data() as Data).filter(billsDays);
+  const held = statements.filter(billsDays);
   const allocation = allocatePayments({
     statements: [...held, ...(statement && billsDays(statement) ? [statement] : [])].map((x) => ({
       id: x.id as string,
@@ -2969,7 +3001,8 @@ export async function promoteProvenClaims(
     for (const p of plans) {
       const uids = p.characterIds.map((x) => `char:${x}`);
       const refs: { ref: DocumentReference; uids: string[] }[] = [];
-      for (const name of [...MINER_KEYED, DISPUTES]) {
+      // A checkpoint carries the Miner's readers too, as notices do.
+      for (const name of [...MINER_KEYED, DISPUTES, ACCOUNT_CHECKPOINTS]) {
         const snap = await tx.get(
           sub(deps.db, corporationId, name).where('minerId', '==', p.minerId)
         );
@@ -3439,6 +3472,16 @@ export async function withdrawDispute(deps: BookDeps, caller: Caller, input: Wit
 
 // --- Verify link -----------------------------------------------------------
 
+/** The notice a verify token names; undefined for a token that names none. */
+async function noticeOfToken(
+  reader: Pick<DocReader, 'getAll'>,
+  book: DocumentReference,
+  token: Data
+): Promise<LoadedNotice | undefined> {
+  const id = token[NOTICE_ID_FIELD];
+  return typeof id === 'string' && id !== '' ? readLateNotice(reader, book, id) : undefined;
+}
+
 /**
  * The verify page (#4066): the Late notice a mailed link names, read from `lateNotices` and else
  * from its legacy `statements` doc, so every link already mailed keeps working. The notice goes
@@ -3450,14 +3493,13 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
   if (!tokenSnap.exists) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const { corporationId, ...held } = tokenSnap.data() as { corporationId: number } & Data;
   const book = bookRef(deps.db, corporationId);
-  const loaded = await readLateNotice(deps.db, book, held[NOTICE_ID_FIELD] as string);
+  const loaded = await noticeOfToken(deps.db, book, held);
   if (!loaded) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const { notice } = loaded;
   const minerId = notice.minerId;
-  const [bookSnap, current, legacy, payments, declarations, miner, account] = await Promise.all([
+  const [bookSnap, notices, payments, declarations, miner, account] = await Promise.all([
     book.get(),
-    sub(deps.db, corporationId, LATE_NOTICES).where('minerId', '==', minerId).get(),
-    legacyNoticesOf(book, minerId).get(),
+    readNotices(dbReader(deps.db), book, ofMinerFilter(minerId)),
     sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
     sub(deps.db, corporationId, DECLARATIONS).where(NOTICE_ID_FIELD, '==', notice.id).get(),
     sub(deps.db, corporationId, MINERS).doc(minerId).get(),
@@ -3522,7 +3564,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       : null,
     // The Miner's whole history for the ledger: every day a notice listed once, and every payment.
     ledger: {
-      days: ledgerDays(mergeNotices(current, legacy)),
+      days: ledgerDays(notices),
       payments: ledgerPayments(
         payments.docs.map((d) => ({ id: d.id, data: d.data() })),
         b.startDate as string | undefined
@@ -3549,7 +3591,7 @@ export async function setRemindersByToken(deps: BookDeps, token: string, stopped
       minerId: string;
     } & Data;
     const book = bookRef(deps.db, corporationId);
-    const loaded = await readLateNotice(tx, book, held[NOTICE_ID_FIELD] as string);
+    const loaded = await noticeOfToken(tx, book, held);
     if (!loaded) fail('not-found', 'Verify link is not valid', 'invalid-token');
     tx.update(tokenRef, { remindersStopped: stopped });
     writeNoticeMail(tx, book, loaded, { kind: 'remindersStopped', stopped });
