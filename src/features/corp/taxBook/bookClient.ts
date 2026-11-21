@@ -789,6 +789,9 @@ export async function readVerifyTokens(
 }
 
 /** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
+// TODO(M7): fall back only on the router's exact unknown-action answer, not on any
+// `invalid-argument` or `not-found` (a real refusal of a known action falls back today). The
+// server agent is naming the exact old and new answers; match them here once known.
 const unknownAction = (error: unknown) => {
   const code = errorCode(error);
   return code.endsWith('invalid-argument') || code.endsWith('not-found');
