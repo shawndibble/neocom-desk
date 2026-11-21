@@ -139,6 +139,7 @@ function renderPanel(
           onPricePercentChange={onPricePercentChange}
           hub={TRADE_HUBS[0]}
           onHubChange={vi.fn()}
+          onHubPicked={vi.fn()}
           standing={ZERO_STANDINGS}
           characterId={1}
           {...props}
@@ -202,6 +203,7 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
             onPricePercentChange={vi.fn()}
             hub={TRADE_HUBS[0]}
             onHubChange={vi.fn()}
+            onHubPicked={vi.fn()}
             standing={ZERO_STANDINGS}
             characterId={1}
           />

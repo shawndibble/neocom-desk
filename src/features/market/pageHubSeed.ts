@@ -17,12 +17,19 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { FIRST_PULL_WAIT_MS } from '@/features/overview/widgets/firstRun';
+import { FIRST_PULL_WAIT_MS, syncSettled } from '@/features/overview/widgets/firstRun';
 import type { TradeHub } from '@/market/hubs';
 import { subscribeSyncStatus } from '@/sync/status';
-import { ownChoice, setPageHub, usePageHubs, type PageHubArea } from './pageHubs';
+import {
+  ownChoice,
+  PAGE_HUBS_SETTING_KEY,
+  parsePageHubs,
+  setPageHub,
+  usePageHubs,
+  type PageHubArea,
+} from './pageHubs';
 
-/** Resolves once a sync pass has run (or failed), or after the first-pull wait, whichever is first. */
+/** Resolves once the first pull has settled (`syncSettled`: landed, failed or offline), or after the first-pull wait. */
 function afterFirstPull(): Promise<void> {
   if (!isSyncConfigured()) return Promise.resolve();
   return new Promise((resolve) => {
@@ -30,7 +37,14 @@ function afterFirstPull(): Promise<void> {
     let subscribed = false;
     // The listener runs once at once, inside `subscribeSyncStatus`: it only notes readiness then.
     const unsubscribe = subscribeSyncStatus((status) => {
-      if (status.lastSyncedAt === null && status.state !== 'error') return;
+      const settled = syncSettled({
+        syncConfigured: true,
+        state: status.state,
+        lastSyncedAt: status.lastSyncedAt,
+        online: navigator.onLine,
+        waitedOut: false,
+      });
+      if (!settled) return;
       ready = true;
       if (subscribed) finish();
     });
@@ -50,7 +64,22 @@ function afterFirstPull(): Promise<void> {
  * local `db.settings` key). `readOldHub` resolves `null` when this device has
  * nothing to fold in; the marker is set either way.
  */
-export async function seedPageHubsOnce(
+const running = new Map<string, Promise<void>>();
+
+export function seedPageHubsOnce(
+  markerKey: string,
+  areas: readonly PageHubArea[],
+  readOldHub: () => Promise<TradeHub['id'] | null>
+): Promise<void> {
+  // Every reader on a page mounts the seed: one run per marker at a time.
+  const pending = running.get(markerKey);
+  if (pending) return pending;
+  const run = seed(markerKey, areas, readOldHub).finally(() => running.delete(markerKey));
+  running.set(markerKey, run);
+  return run;
+}
+
+async function seed(
   markerKey: string,
   areas: readonly PageHubArea[],
   readOldHub: () => Promise<TradeHub['id'] | null>
@@ -59,7 +88,10 @@ export async function seedPageHubsOnce(
   const hub = await readOldHub();
   if (hub !== null) {
     await Promise.all([afterFirstPull(), usePageHubs.getState().hydrate()]);
-    const before = usePageHubs.getState().value;
+    // The row, not the store: just after a pull the store can still hold the
+    // map from before it, and writing that back whole would drop what arrived.
+    const row = await db.settings.get(PAGE_HUBS_SETTING_KEY);
+    const before = (row && parsePageHubs(row.value)) ?? usePageHubs.getState().value;
     let next = before;
     for (const area of areas) if (!ownChoice(next, area)) next = setPageHub(next, area, hub);
     if (next !== before) await usePageHubs.getState().setValue(next);

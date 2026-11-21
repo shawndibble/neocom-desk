@@ -342,8 +342,8 @@ export function Market() {
   const appraisalHubOverride =
     tab === 'appraisal' ? getTradeHub(searchParams.get('hub') as TradeHub['id']) : undefined;
   const appraisalHub = appraisalHubOverride ?? getTradeHub(appraisalHubId) ?? DEFAULT_TRADE_HUB;
-  function handleAppraisalHubChange(id: TradeHub['id']) {
-    void pickHubFor('appraisal', id);
+  /** After the Appraisal's hub menu wrote its pick: a link's visit-only hub then gives way to it. */
+  function handleAppraisalHubPicked() {
     if (appraisalHubOverride === undefined) return;
     setSearchParams(
       (prev) => {
@@ -729,7 +729,11 @@ export function Market() {
                 pricePercent={pricePercent}
                 onPricePercentChange={handlePricePercentChange}
                 hub={appraisalHub}
-                onHubChange={handleAppraisalHubChange}
+                onHubChange={(id) => {
+                  void pickHubFor('appraisal', id);
+                  handleAppraisalHubPicked();
+                }}
+                onHubPicked={handleAppraisalHubPicked}
                 standing={tradeHubStanding(tradeHubStandings, appraisalHub.id)}
                 characterId={activeCharacterId}
                 defaultCompareExpanded={expandCompareOnAppraisal}

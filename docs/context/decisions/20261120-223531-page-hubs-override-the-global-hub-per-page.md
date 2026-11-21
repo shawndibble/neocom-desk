@@ -70,7 +70,7 @@ _Recorded 2026-11-20. Issue #6523._
     device still reads it, and a local marker records the fold. A device that never opened the
     Market starts on Global, which is what it seeded from before.
   - **The stored map keeps every entry, even one this build cannot read** (`parsePageHubs`,
-    `ownHub`). A newer build's area or value survives an older build's edit, which writes the map
+    `ownChoice`). A newer build's area or value survives an older build's edit, which writes the map
     back whole.
   - **Market** covers the Browser, an item's Market section (`useSavedOrderBookLocation`), the
     Stock tab, the Compare drawer's own-hub mark, and price alerts: the form, the poller and the
@@ -112,3 +112,11 @@ _Recorded 2026-11-20. Issue #6523._
   - A Build Plan stores the hub Closest found when the plan was made; plans keep their own hub.
   - Settings' Trade Hub select and each Page hub row offer Closest hub; the per-Character selects do
     not (the flag is account-wide).
+  - **Global's Closest is account-wide and wins over a Character's own hub** while it finds one;
+    the Character's hub is then the fallback with no location.
+  - **The LP Store filter box offers hubs only.** Its draft is applied with the other filters, so
+    Closest is picked from the gear's `HubField` instead.
+  - **Settings shows "Closest hub" without the hub it found:** Settings is not where the pilot
+    is priced; each page's own picker shows "Closest (Amarr)".
+- **Two Jita prices stay Jita, outside the areas:** Pilot Lookup's loss values (another pilot's
+  losses, valued as killboards value them) and the hauling fee estimates.

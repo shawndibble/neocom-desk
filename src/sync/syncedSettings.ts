@@ -66,7 +66,7 @@
 // own boolean rather than a 'closest' value in sync.marketHub, so an older
 // build always reads a real hub there; that hub is also Closest's fallback.
 //
-// sync.pageHubs (issue #6523): one map of page area -> Trade Hub, the pages a
+// sync.pageHubs (issue #6523): one map of page area -> Trade Hub or 'closest', the pages a
 // pilot prices somewhere other than their Global hub (features/market/
 // pageHubs.ts). Account-wide. A blob over a fixed key set, against the
 // one-key-each rule above, for the reason sync.marketHubByCharacter is one:

@@ -138,6 +138,21 @@ export interface MarketBrowserController {
   setCompareRegionIds: (next: readonly number[]) => void;
 }
 
+/**
+ * The last hub the Market put in the URL or adopted from it, for the session
+ * (not per mount: Back to a URL the page wrote must not adopt it either). A
+ * link's hub is adopted once, when it is new: the adopt check re-runs whenever
+ * the stored hub differs from the linked one, so without this a "back to
+ * Global" or a Global change under a URL the page wrote would create a Market
+ * entry the pilot never asked for.
+ */
+const knownLinkedHubRef: { current: string | null } = { current: null };
+
+/** Forgets the hub the Market last linked (tests). */
+export function resetKnownLinkedHub(): void {
+  knownLinkedHubRef.current = null;
+}
+
 export function useMarketBrowser({
   groups,
   types,
@@ -150,11 +165,6 @@ export function useMarketBrowser({
   const migrated = useDeviceMarketHubMigrated();
   const { hubId, hydrated: marketHubHydrated } = useHubFor('market');
   const hubHydrated = marketHubHydrated && migrated;
-  // The last hub this page put in the URL or adopted from it. A link's hub is
-  // adopted once, when it is new: the adopt check re-runs whenever the stored
-  // hub differs from the linked one, so without this a "back to Global" or a
-  // Global change under a linked URL would re-create the Market's entry.
-  const knownLinkedHub = useRef<string | null>(null);
   // The Appraisal's `?hub=` (a Shared Appraisal's "Open Neocom Desk") is that
   // tab's override for the visit, never the Market's hub.
   const onAppraisal = useLocation().pathname.startsWith(tabPath(MARKET_TABS, 'appraisal'));
@@ -300,8 +310,8 @@ export function useMarketBrowser({
         return isMarketRegionChoice(value as RegionChoice, marketRegions);
       },
       remember: (patch: Partial<LocationParams>) => {
-        if (patch.hub && patch.hub !== knownLinkedHub.current) {
-          knownLinkedHub.current = patch.hub;
+        if (patch.hub && patch.hub !== knownLinkedHubRef.current) {
+          knownLinkedHubRef.current = patch.hub;
           void setPageHubEntry('market', patch.hub as TradeHub['id']);
         }
         if (patch.region !== undefined && patch.region !== null) {
@@ -449,7 +459,7 @@ export function useMarketBrowser({
   /** After the header's `HubField` writes the hub: points the URL at it, since a linked hub outranks the stored one. */
   function handleHubChange(id: TradeHub['id']) {
     // The page's own write: never adopted back as a link.
-    knownLinkedHub.current = id;
+    knownLinkedHubRef.current = id;
     navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
   }
 

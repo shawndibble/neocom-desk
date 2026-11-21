@@ -79,7 +79,10 @@ interface AppraisalPanelProps {
   onPricePercentChange: (value: number) => void;
   /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share Link is stored against. */
   hub: TradeHub;
+  /** A hub picked outside the hub menu (the Compare Hubs cards): the caller writes it. */
   onHubChange: (id: TradeHub['id']) => void;
+  /** After the hub menu itself wrote a pick (it writes the page hub, so the caller must not again). */
+  onHubPicked: () => void;
   /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
   standing: ResolvedStandings;
   /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
@@ -96,6 +99,7 @@ export function AppraisalPanel({
   onPricePercentChange,
   hub,
   onHubChange,
+  onHubPicked,
   standing,
   characterId,
   defaultCompareExpanded = false,
@@ -385,7 +389,7 @@ export function AppraisalPanel({
         <AppraisalPasteCard
           controller={controller}
           shownHubId={hub.id}
-          onHubPicked={onHubChange}
+          onHubPicked={onHubPicked}
           characterId={characterId}
           percentText={percentText}
           onPercentChange={handlePercentChange}

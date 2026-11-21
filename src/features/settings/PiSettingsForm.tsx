@@ -75,7 +75,9 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
               area="pi"
               className="w-44"
               label={t('piPlan.strip.sellAt')}
-              onPicked={(id, kind) => kind === 'hub' && sellHub.hubPicked(id)}
+              onPicked={(id, kind) =>
+                kind === 'hub' ? sellHub.hubPicked(id) : sellHub.hubSwitched(id)
+              }
               extraOptions={[
                 {
                   value: BUYBACK,

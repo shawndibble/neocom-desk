@@ -17,6 +17,8 @@ export interface SellHub {
   sellAtNearest: (id: TradeHub['id']) => void;
   /** After the shared hub menu wrote a hub pick: sell on that hub's market, and stop the nudge. */
   hubPicked: (id: TradeHub['id']) => void;
+  /** After a Global / PI switch: the hub now in use, for older builds' `piSettings.hub` only. */
+  hubSwitched: (id: TradeHub['id']) => void;
   /** The pilot already picked (or dismissed a suggestion for) a hub. */
   hubChosen: boolean;
   /** Keep the current hub and stop suggesting another. */
@@ -70,15 +72,16 @@ export function useSellHub(): SellHub {
     buybackPct: settings.buybackPct,
     buyTiers: settings.buyTiers,
     hubChosen: settings.hubChosen === true,
-    keepHub: () => void setSettings({ ...settings, hubChosen: true }),
+    keepHub: () => void setSettings({ ...usePiSettings.getState().value, hubChosen: true }),
     sellAtNearest: (id) => {
       void setPageHubEntry('pi', id);
       picked(id);
     },
     hubPicked: picked,
+    hubSwitched: (id) => void setSettings({ ...usePiSettings.getState().value, hub: id }),
     setBuyback: (pct) =>
       void setSettings({
-        ...settings,
+        ...usePiSettings.getState().value,
         buybackPct: pct === null ? null : pct,
         ...(pct === null ? {} : { hubChosen: true as const }),
       }),

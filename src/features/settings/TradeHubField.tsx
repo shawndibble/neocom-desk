@@ -106,14 +106,14 @@ export function TradeHubField() {
           closest
           value={globalClosest ? CLOSEST : shown}
           label={label}
-          onChange={(choice) =>
-            void (choice === CLOSEST
-              ? pickGlobalHub(CLOSEST)
-              : useGlobalClosest
-                  .getState()
-                  .setValue(false)
-                  .then(() => changeDefaultHub(choice, ids)))
-          }
+          onChange={(choice) => {
+            if (choice === CLOSEST) return void pickGlobalHub(CLOSEST);
+            // A hub ends Closest; `changeDefaultHub` also moves the Characters still on the old default.
+            const ended = globalClosest
+              ? useGlobalClosest.getState().setValue(false)
+              : Promise.resolve();
+            void ended.then(() => changeDefaultHub(choice, ids));
+          }}
         />
         {!single && (
           <div>

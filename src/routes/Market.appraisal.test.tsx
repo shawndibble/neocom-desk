@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
-import { useDefaultMarketHub, useMarketHub } from '@/features/market/hub';
+import { useGlobalClosest, useMarketHub } from '@/features/market/hub';
+import { resetHubStores } from '@/test/hubStores';
 import { usePageHubs } from '@/features/market/pageHubs';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { appraisePaste } from '@/features/market/appraisalData';
@@ -87,9 +88,7 @@ beforeEach(async () => {
   // the previous test picked, which makes picking that hub again a no-op
   // firing no `onValueChange` at all.
   await db.settings.clear();
-  useDefaultMarketHub.setState({ value: 'jita', hydrated: false });
-  useMarketHub.setState({ value: 'jita', hydrated: false });
-  usePageHubs.setState({ value: {}, hydrated: false });
+  resetHubStores();
   useMarketPricePercent.setState({ value: 100, hydrated: false });
 });
 
@@ -128,6 +127,18 @@ describe('Market Appraisal tab navigation', () => {
     await waitFor(() => expect(usePageHubs.getState().hydrated).toBe(true));
     expect(usePageHubs.getState().value).toEqual({});
     expect(useMarketHub.getState().value).toBe('jita');
+  });
+
+  it('Closest picked on the Appraisal sticks, written once', async () => {
+    renderAt('/market/appraisal');
+    await screen.findByRole('button', { name: /Trade Hub/i });
+
+    await pickHub('Closest hub');
+
+    await waitFor(() => expect(useGlobalClosest.getState().value).toBe(true));
+    // No location here, so Closest falls back to Global; the stored hub is untouched.
+    expect(useMarketHub.getState().value).toBe('jita');
+    expect(usePageHubs.getState().value).toEqual({});
   });
 
   it('with its own entry, an Appraisal pick moves only the Appraisal hub', async () => {

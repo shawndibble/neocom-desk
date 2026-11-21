@@ -75,7 +75,7 @@ export function PiHeaderStrip({
   eveTime = false,
 }: Props) {
   const { t } = useTranslation();
-  const { hub, buybackPct, hubChosen, hubPicked, sellAtNearest, setBuyback, keepHub } =
+  const { hub, buybackPct, hubChosen, hubPicked, hubSwitched, sellAtNearest, setBuyback, keepHub } =
     useSellHub();
   const basis = useSharedJumpBasis();
   const colonyHome = homeSystemId(colonySystemIds);
@@ -198,7 +198,7 @@ export function PiHeaderStrip({
           size="sm"
           className="w-auto min-w-40"
           label={t('piPlan.strip.sellAt')}
-          onPicked={(id, kind) => kind === 'hub' && hubPicked(id)}
+          onPicked={(id, kind) => (kind === 'hub' ? hubPicked(id) : hubSwitched(id))}
           extraOptions={[
             {
               value: BUYBACK,

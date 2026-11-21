@@ -26,10 +26,7 @@ async function workOutClosestHub(characterId: number): Promise<HubId | null> {
     import('@/features/route/jumpBasis'),
     import('@/features/route/localRoute'),
   ]);
-  const [origin, basis] = await Promise.all([
-    loadCurrentSystemId(characterId).catch(() => null),
-    loadJumpBasis(),
-  ]);
+  const [origin, basis] = await Promise.all([loadCurrentSystemId(characterId), loadJumpBasis()]);
   if (origin === null) return null;
   const distances = await localJumpDistances(origin, basis.rules, basis.network);
   return distances.kind === 'known' ? (nearestHub(TRADE_HUBS, distances.jumps)?.id ?? null) : null;
@@ -48,20 +45,31 @@ export const useClosestHubs = create<ClosestHubState>(() => ({ byCharacter: {} }
 
 const inFlight = new Map<number, Promise<HubId | null>>();
 
+/** Forgets every answer and read in flight (tests). */
+export function resetClosestHubs(): void {
+  inFlight.clear();
+  useClosestHubs.setState({ byCharacter: {} });
+}
+
 /** `characterId`'s Closest hub, read again when the last answer is a few minutes old. */
 export function loadClosestHub(characterId: number): Promise<HubId | null> {
   const known = useClosestHubs.getState().byCharacter[String(characterId)];
   if (known && Date.now() - known.at < CLOSEST_FRESH_MS) return Promise.resolve(known.hubId);
   const running = inFlight.get(characterId);
   if (running) return running;
+  const remember = (hubId: HubId | null, at: number) => {
+    useClosestHubs.setState((state) => ({
+      byCharacter: { ...state.byCharacter, [String(characterId)]: { hubId, at } },
+    }));
+    return hubId;
+  };
   const load = workOutClosestHub(characterId)
-    .catch(() => null)
-    .then((hubId) => {
-      useClosestHubs.setState((state) => ({
-        byCharacter: { ...state.byCharacter, [String(characterId)]: { hubId, at: Date.now() } },
-      }));
-      return hubId;
-    })
+    .then(
+      (hubId) => remember(hubId, Date.now()),
+      // A failed read (offline, no stargate data) falls back to Global now and
+      // is stamped stale, so the next reader tries again.
+      () => remember(known?.hubId ?? null, 0)
+    )
     .finally(() => inFlight.delete(characterId));
   inFlight.set(characterId, load);
   return load;
@@ -85,7 +93,11 @@ export function useClosestHub(
     characterId === null ? undefined : state.byCharacter[String(characterId)]
   );
   useEffect(() => {
-    if (wanted && characterId !== null) void loadClosestHub(characterId);
+    if (!wanted || characterId === null) return;
+    void loadClosestHub(characterId);
+    // A page left open follows the pilot: the answer is read again once it is stale.
+    const timer = setInterval(() => void loadClosestHub(characterId), CLOSEST_FRESH_MS);
+    return () => clearInterval(timer);
   }, [wanted, characterId]);
   if (!wanted || characterId === null) return { hubId: null, loaded: true };
   return { hubId: answer?.hubId ?? null, loaded: answer !== undefined };

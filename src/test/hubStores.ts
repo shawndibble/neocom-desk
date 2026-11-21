@@ -1,5 +1,5 @@
 import { useDefaultMarketHub, useGlobalClosest, useMarketHub } from '@/features/market/hub';
-import { useClosestHubs } from '@/features/market/closestHub';
+import { resetClosestHubs } from '@/features/market/closestHub';
 import { useHubByCharacter } from '@/features/market/characterHubs';
 import { usePageHubs } from '@/features/market/pageHubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -17,5 +17,5 @@ export function resetHubStores(): void {
   useMarketHub.setState({ value: 'jita', hydrated: false });
   usePageHubs.setState({ value: {}, hydrated: false });
   useGlobalClosest.setState({ value: false, hydrated: false });
-  useClosestHubs.setState({ byCharacter: {} });
+  resetClosestHubs();
 }

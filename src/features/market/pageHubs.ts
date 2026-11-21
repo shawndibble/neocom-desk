@@ -19,7 +19,7 @@ import type { HubId } from './characterHubs';
  * The page areas a pilot can give a hub of their own, in the order Settings
  * lists them. An area joins once its pages read `useHubFor` (issue #6523 moves
  * them one slice at a time), so Settings never offers an entry that does
- * nothing; an entry for an area this build does not list is dropped on parse.
+ * nothing; an entry for an area this build does not list is kept, unread.
  */
 export const PAGE_HUB_AREAS = [
   'fittings',
@@ -58,7 +58,7 @@ export function pageHubAreaName(t: TFunction, area: PageHubArea): string {
   return t(AREA_NAME_KEYS[area]);
 }
 /**
- * The stored map, as stored: `area -> value`. Read an area through `ownHub`,
+ * The stored map, as stored: `area -> value`. Read an area through `ownChoice`,
  * never by indexing, since a key or value this build does not know (a newer
  * build's area, a future value such as Closest) is kept as it came.
  */
@@ -70,7 +70,7 @@ export const PAGE_HUBS_SETTING_KEY = 'sync.pageHubs';
  * A stored map. Pulled from other devices, maybe newer builds, so an entry
  * this build cannot use is **kept**, not dropped: the map is written back
  * whole on the next edit, and dropping it would erase a newer build's entry
- * on every device. Only a non-string value is discarded. `ownHub` decides what
+ * on every device. Only a non-string value is discarded. `ownChoice` decides what
  * an entry means here; one it cannot read leaves that page on Global.
  */
 export function parsePageHubs(raw: unknown): PageHubMap | null {
