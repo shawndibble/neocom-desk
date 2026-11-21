@@ -26,15 +26,10 @@ import {
   refineryLabeler,
   type RefineryLabelSources,
 } from '@/engine/corpTaxBook/refinery';
-import {
-  surveyFractions,
-  estimateChunk,
-  learnChunkRates,
-  scanVolume,
-} from '@/engine/corpTaxBook/extraction';
+import { surveyFractions, estimateChunk, learnChunkRates } from '@/engine/corpTaxBook/extraction';
 import { measurable } from '@/engine/corpTaxBook/bookView';
 import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
-import { countedScans } from '@/engine/survey/series';
+import { firstCountedScan, scanVolume } from '@/engine/survey/series';
 import { loadCurrentMemberIds } from '../currentMembers';
 import { loadMoonNames } from '@/features/character/moonNames';
 import { loadSurvey } from '@/features/survey/surveyStore';
@@ -338,10 +333,7 @@ export function useCorpBook(
           wanted.map(async (x) => {
             const survey = await loadSurvey(x.surveyId!);
             if (!survey.ok) return;
-            // The first counted scan is the best picture of the whole chunk.
-            const first = countedScans(survey.scans, survey.ignored).reduce<
-              (typeof survey.scans)[number] | undefined
-            >((a, b) => (a === undefined || b.at < a.at ? b : a), undefined);
+            const first = firstCountedScan(survey.scans, survey.ignored);
             if (!first) return;
             const ex = toEngineExtraction(x);
             const estimate = estimateChunk(ex, {

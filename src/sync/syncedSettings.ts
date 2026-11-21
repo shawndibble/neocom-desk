@@ -83,6 +83,11 @@
 // sync.marketPricePercent and PI its device-local buyback rate, so neither
 // page ever has two. Entries are set, never removed (100 is a value).
 //
+// sync.pageHubsParked (issue #6531): the page hubs a hub popover set aside when
+// the page switched to App setting, so switching back restores them (pageHubs.ts).
+// Its own map so older builds, which read sync.pageHubs alone, see the page on
+// the Global hub too. Same blob and rewrite-never-delete shape as sync.pageHubs.
+//
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from
 // (no `legacyKey`). Which Character a cross-character view (Wallet Balance,
@@ -390,6 +395,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketHub',
   'sync.marketHubByCharacter',
   'sync.pageHubs',
+  'sync.pageHubsParked',
   'sync.marketHubClosest',
   'sync.marketPricePercent',
   'sync.pagePricePercents',

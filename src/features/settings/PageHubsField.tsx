@@ -30,6 +30,7 @@ import {
   PAGE_HUB_AREAS,
   setPageHub,
   usePageHubs,
+  useParkedPageHubs,
   type HubChoice,
   type PageHubArea,
   type PageHubMap,
@@ -37,17 +38,24 @@ import {
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { HubSelect } from './TradeHubField';
 
-type Removed = { area: PageHubArea; hub: HubChoice };
+/** A removed page hub, and whether it was in use or set aside, so Undo puts it back where it was. */
+type Removed = { area: PageHubArea; hub: HubChoice; parked: boolean };
 
-function write(edit: (map: PageHubMap) => PageHubMap) {
-  const store = usePageHubs.getState();
+function write(edit: (map: PageHubMap) => PageHubMap, parked = false) {
+  const store = (parked ? useParkedPageHubs : usePageHubs).getState();
   return store.setValue(edit(store.value));
 }
 
-/** Reads settled stores; the caller waits for `usePageHubs`, `useMarketHub` and `useGlobalClosest` to hydrate. */
+/**
+ * Reads settled stores; the caller waits for `usePageHubs`, `useParkedPageHubs`,
+ * `useMarketHub` and `useGlobalClosest` to hydrate. Lists every page with a hub
+ * of its own, in use or set aside by its popover's App setting (noted so); only
+ * Remove here forgets one.
+ */
 export function PageHubsField() {
   const { t } = useTranslation();
   const map = usePageHubs((state) => state.value);
+  const parkedMap = useParkedPageHubs((state) => state.value);
   const globalHub = useMarketHub((state) => state.value);
   // A new entry starts at what Global is set to, so adding re-prices nothing.
   const globalChoice: HubChoice = useGlobalClosest((state) => state.value) ? CLOSEST : globalHub;
@@ -55,10 +63,12 @@ export function PageHubsField() {
   const removeRefs = useRef(new Map<PageHubArea, HTMLButtonElement>());
   const addRef = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  // Only areas with an entry this build reads are listed, so `own(area)` is set for each.
-  const own = (area: PageHubArea) => ownChoice(map, area)!;
-  const set = PAGE_HUB_AREAS.filter((area) => ownChoice(map, area));
-  const unset = PAGE_HUB_AREAS.filter((area) => !ownChoice(map, area));
+  // A hub in use wins over one set aside; only areas with either are listed, so `own(area)` is set for each.
+  const parked = (area: PageHubArea) => !ownChoice(map, area);
+  const own = (area: PageHubArea) => (ownChoice(map, area) ?? ownChoice(parkedMap, area))!;
+  const hasOwn = (area: PageHubArea) => Boolean(ownChoice(map, area) ?? ownChoice(parkedMap, area));
+  const set = PAGE_HUB_AREAS.filter(hasOwn);
+  const unset = PAGE_HUB_AREAS.filter((area) => !hasOwn(area));
   const name = (area: PageHubArea) => pageHubAreaName(t, area);
   const add = (area: PageHubArea) => void write((m) => setPageHub(m, area, globalChoice));
 
@@ -67,8 +77,9 @@ export function PageHubsField() {
       (key) => () => (key === undefined ? null : (removeRefs.current.get(key) ?? null))
     );
     focusAfterCommit(...near, () => addRef.current);
-    setRemoved({ area, hub: own(area) });
+    setRemoved({ area, hub: own(area), parked: parked(area) });
     void write((m) => dropPageHub(m, area));
+    void write((m) => dropPageHub(m, area), true);
   }
 
   return (
@@ -81,7 +92,14 @@ export function PageHubsField() {
                 key={area}
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 sm:flex-nowrap"
               >
-                <span className="min-w-0 flex-1 truncate text-sm">{name(area)}</span>
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {name(area)}
+                  {parked(area) && (
+                    <span className="block text-xs text-text-dim">
+                      {t('settings.pageHubParked')}
+                    </span>
+                  )}
+                </span>
                 <div className="flex w-full items-center gap-2 sm:w-80">
                   <div className="min-w-0 flex-1 [&_button]:w-full">
                     <HubSelect<HubChoice>
@@ -89,7 +107,7 @@ export function PageHubsField() {
                       closest
                       value={own(area)}
                       label={t('settings.pageHubFor', { page: name(area) })}
-                      onChange={(hub) => void write((m) => setPageHub(m, area, hub))}
+                      onChange={(hub) => void write((m) => setPageHub(m, area, hub), parked(area))}
                     />
                   </div>
                   <Button
@@ -134,12 +152,14 @@ export function PageHubsField() {
       </div>
       {removed !== null && (
         <Toast
-          message={t('settings.pageHubRemoved', { page: name(removed.area) })}
+          message={t(removed.parked ? 'settings.pageHubRemovedParked' : 'settings.pageHubRemoved', {
+            page: name(removed.area),
+          })}
           undo={{
             label: t('settings.pageHubUndo'),
             onUndo: () => {
               setRemoved(null);
-              void write((m) => setPageHub(m, removed.area, removed.hub));
+              void write((m) => setPageHub(m, removed.area, removed.hub), removed.parked);
             },
           }}
           onClose={() => setRemoved(null)}

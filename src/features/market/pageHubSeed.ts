@@ -23,9 +23,11 @@ import { subscribeSyncStatus } from '@/sync/status';
 import {
   ownChoice,
   PAGE_HUBS_SETTING_KEY,
+  PARKED_PAGE_HUBS_SETTING_KEY,
   parsePageHubs,
   setPageHub,
   usePageHubs,
+  useParkedPageHubs,
   type PageHubArea,
 } from './pageHubs';
 
@@ -87,13 +89,24 @@ async function seed(
   if ((await db.settings.get(markerKey)) !== undefined) return;
   const hub = await readOldHub();
   if (hub !== null) {
-    await Promise.all([afterFirstPull(), usePageHubs.getState().hydrate()]);
-    // The row, not the store: just after a pull the store can still hold the
+    await Promise.all([
+      afterFirstPull(),
+      usePageHubs.getState().hydrate(),
+      useParkedPageHubs.getState().hydrate(),
+    ]);
+    // The rows, not the stores: just after a pull a store can still hold the
     // map from before it, and writing that back whole would drop what arrived.
-    const row = await db.settings.get(PAGE_HUBS_SETTING_KEY);
+    const [row, parkedRow] = await Promise.all([
+      db.settings.get(PAGE_HUBS_SETTING_KEY),
+      db.settings.get(PARKED_PAGE_HUBS_SETTING_KEY),
+    ]);
     const before = (row && parsePageHubs(row.value)) ?? usePageHubs.getState().value;
+    const parked =
+      (parkedRow && parsePageHubs(parkedRow.value)) ?? useParkedPageHubs.getState().value;
     let next = before;
-    for (const area of areas) if (!ownChoice(next, area)) next = setPageHub(next, area, hub);
+    // A page with a hub set aside chose App setting: never turn it back on.
+    for (const area of areas)
+      if (!ownChoice(next, area) && !ownChoice(parked, area)) next = setPageHub(next, area, hub);
     if (next !== before) await usePageHubs.getState().setValue(next);
   }
   await db.settings.put({ key: markerKey, value: true });
