@@ -8858,7 +8858,66 @@
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
-    "saveFailed": "Couldn’t save — nothing was changed. Try again."
+    "saveFailed": "Couldn’t save — nothing was changed. Try again.",
+    "ledger": {
+      "subtitle": "Ledger, oldest first",
+      "loading": "Loading the ledger",
+      "tableLabel": "Ledger",
+      "status": {
+        "owes": "Owes",
+        "days": "Days owed",
+        "oldest": "Oldest unpaid",
+        "paidThrough": "Paid through",
+        "credit": "Credit"
+      },
+      "column": {
+        "date": "Date",
+        "dateTooltip": "The EVE (UTC) day.",
+        "what": "What",
+        "charged": "Charged",
+        "paid": "Paid",
+        "balance": "Balance"
+      },
+      "kind": {
+        "charge": "Charges",
+        "payment": "Payments",
+        "writeOff": "Write-offs",
+        "notice": "Late notices"
+      },
+      "filter": {
+        "show": "Show",
+        "from": "From",
+        "to": "To"
+      },
+      "what": {
+        "mined": "Mined",
+        "minedAt": "Mined at {{place}}",
+        "correction": "Adjustment",
+        "payment": "Payment",
+        "paymentFrom": "Payment from {{name}}",
+        "officer": "Written off by an officer",
+        "tolerance": "Shortfall forgiven",
+        "late": "Late notice sent",
+        "final": "Final notice sent"
+      },
+      "held": "On hold while a dispute is open",
+      "detail": {
+        "reason": "Reason: {{reason}}",
+        "noDetail": "No ore or place recorded for this charge.",
+        "paidDays": "Days it paid",
+        "leftAsCredit": "{{amount}} left as credit.",
+        "officer": "An officer forgave this much of the oldest unpaid days.",
+        "tolerance": "A payment fell short of the day by no more than the tolerance, so the gap was forgiven.",
+        "forgaveDays": "Days it forgave",
+        "nothingToForgive": "Nothing was left to forgive.",
+        "listedDays": "Days it listed",
+        "noticeSettled": "Every day it listed is paid.",
+        "noticeRemaining": "{{amount}} still owed on its days."
+      },
+      "emptyTitle": "Nothing on this ledger yet",
+      "emptyHint": "A day shows here once it is billed.",
+      "filteredTitle": "No entries match these filters"
+    }
   },
   "assets": {
     "tabs": {
