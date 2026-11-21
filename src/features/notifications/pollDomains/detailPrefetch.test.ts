@@ -16,6 +16,8 @@ vi.mock('@/features/character/calendar', () => ({
   prefetchCalendarEventDetails: mocks.prefetchCalendarEventDetails,
 }));
 
+vi.mock('./sharedMoonPops', () => ({ alertedSharedPops: async () => [] }));
+
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { calendarDomain } from './calendar';
 import { mailDomain } from './mail';

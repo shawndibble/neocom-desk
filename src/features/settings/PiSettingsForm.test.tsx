@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
+import { resetHubStores } from '@/test/hubStores';
 import { useCadence, DEFAULT_PI_CADENCE } from '@/features/pi/cadencePref';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from '@/features/pi/piSettings';
@@ -10,6 +11,7 @@ import { PiSettingsForm } from './PiSettingsForm';
 
 beforeEach(async () => {
   await db.settings.clear();
+  resetHubStores();
   usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: false });
   useCadence.setState({ value: DEFAULT_PI_CADENCE, hydrated: false });
 });
@@ -33,7 +35,9 @@ describe('PiSettingsForm', () => {
         'false'
       );
     }
-    expect(screen.queryByRole('combobox', { name: 'Where do you sell?' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /, Where do you sell\?$/ })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Restart extractors every' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Haul every' })).toBeInTheDocument();
   });
@@ -56,7 +60,7 @@ describe('PiSettingsForm', () => {
 
   it('offers the sell market only where asked, under the strip label', async () => {
     render(<PiSettingsForm showSellAt />);
-    expect(await screen.findByRole('combobox', { name: 'Where do you sell?' })).toHaveTextContent(
+    expect(await screen.findByRole('button', { name: /, Where do you sell\?$/ })).toHaveTextContent(
       'Jita'
     );
   });
@@ -64,17 +68,17 @@ describe('PiSettingsForm', () => {
   it('leaves one sell control with the strip and the form side by side', async () => {
     both();
     await screen.findByRole('group', { name: 'Buy now at the hub when short' });
-    expect(screen.getAllByRole('combobox', { name: 'Where do you sell?' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /, Where do you sell\?$/ })).toHaveLength(1);
   });
 
   it('keeps the form and the header strip on one setting', async () => {
     const user = userEvent.setup();
     both();
     const strip = await screen.findByTestId('pi-header-strip');
-    const stripSellAt = within(strip).getByRole('combobox', { name: 'Where do you sell?' });
-    await act(() => usePiSettings.getState().setValue({ ...DEFAULT_PI_SETTINGS, hub: 'amarr' }));
-    expect(stripSellAt).toHaveTextContent('Amarr');
+    const stripSellAt = within(strip).getByRole('button', { name: /, Where do you sell\?$/ });
+    await act(() => usePiSettings.getState().setValue({ ...DEFAULT_PI_SETTINGS, buybackPct: 85 }));
+    expect(stripSellAt).toHaveTextContent('Jita · 85%');
     await user.click(screen.getByRole('button', { name: 'P2' }));
-    expect(usePiSettings.getState().value).toMatchObject({ hub: 'amarr', buyTiers: [2] });
+    expect(usePiSettings.getState().value).toMatchObject({ buybackPct: 85, buyTiers: [2] });
   });
 });

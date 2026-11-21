@@ -34,8 +34,9 @@ import {
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
 import type { FittingCargoItem, FittingStats } from '@/engine/fittings/types';
 import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { getTradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
 import { formatIsk } from '@/lib/isk';
 import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { abyssalVerdict } from './abyssalVerdict';
@@ -85,13 +86,17 @@ function useRunDelta(
  */
 function useFilamentPrice(typeId: number | null, hubId: string): number | null {
   const hub = getTradeHub(hubId);
+  const percent = usePricePercentFor('fittings');
   const load = useCallback(async () => {
     if (!hub || typeId === null) return null;
-    const prices = await getHubPrices(hub, [typeId]);
+    const prices = await getHubPricesAt(hub, [typeId], percent);
     return prices.get(typeId)?.sellMin ?? null;
-  }, [hub, typeId]);
+  }, [hub, typeId, percent]);
   // A failed lookup reads as no price.
-  return useKeyedLoad(typeId === null || !hub ? null : `${hubId}:${typeId}`, load).data ?? null;
+  return (
+    useKeyedLoad(typeId === null || !hub ? null : `${hubId}:${percent}:${typeId}`, load).data ??
+    null
+  );
 }
 
 /** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */

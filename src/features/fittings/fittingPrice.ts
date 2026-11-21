@@ -13,7 +13,7 @@
  */
 import { buildAppraisal, type Appraisal } from '@/engine/market/appraisal';
 import { FULL_PRICE_PERCENT, fitAppraisalItems } from '@/engine/fittings/fitSellPrice';
-import { getHubPrices } from '@/market/prices';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import type { TradeHub } from '@/market/hubs';
 import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { Fitting } from '@/engine/fittings/types';
@@ -27,14 +27,18 @@ export function unpricedSellRows<T extends { sellTotal: number | null }>(rows: r
   return rows.filter((row) => row.sellTotal === null);
 }
 
-/** `cloneImplants`: the pilot's active clone, whose implants are already bought (`fittingItemCounts`). */
+/**
+ * `cloneImplants`: the pilot's active clone, whose implants are already bought (`fittingItemCounts`).
+ * `percent`: the Fittings page's price percent (`pagePricePercents.ts`), 100 for the hub's own prices.
+ */
 export async function loadFittingPrice(
   fitting: Fitting,
   hub: TradeHub,
-  cloneImplants: readonly number[] = []
+  cloneImplants: readonly number[] = [],
+  percent = 100
 ): Promise<Appraisal> {
   const counts = fittingItemCounts(fitting, cloneImplants);
-  const prices = await getHubPrices(hub, [...counts.keys()]);
+  const prices = await getHubPricesAt(hub, [...counts.keys()], percent);
   // The same items an EVE Workbench row is priced from (`fitSellPrice.ts`).
   return buildAppraisal(fitAppraisalItems(counts, prices), FULL_PRICE_PERCENT);
 }

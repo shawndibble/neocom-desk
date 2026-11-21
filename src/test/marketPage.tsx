@@ -7,8 +7,8 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { useMarketHub } from '@/features/market/hub';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { resetHubStores } from '@/test/hubStores';
+import { resetKnownLinkedHub } from '@/features/market/useMarketBrowser';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import {
   useBrowserFilterSetting,
@@ -246,8 +246,8 @@ async function resetMarketSession(): Promise<void> {
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
-  useMarketHub.setState({ value: 'jita', hydrated: false });
-  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
+  resetHubStores();
+  resetKnownLinkedHub();
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   useCompareSet.setState({ items: [] });

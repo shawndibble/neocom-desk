@@ -30,9 +30,9 @@ an open tab older than it must be reloaded.
     `settleStatements`, `recordMail` and `resetCheckpoint` are gone.
   - **The lock date.** Anything dated before the 1st of the month two months back is read-only:
     a payment recorded or moved, "not tax", an adjustment, a dismissal of a day, a rate or record
-    rate, a tolerance exemption, a rebill, a write-off's reversal, and a dispute filed, withdrawn
-    or answered are refused with reason `locked`. A correction or a write-off dated today is how
-    an old mistake is put right. An officer's tab records one snapshot per Miner per lock date;
+    rate, a tolerance exemption, a rebill, a write-off's reversal, and a dispute filed or
+    withdrawn are refused with reason `locked`. A correction or a write-off dated today is how
+    an old mistake is put right, and an officer still answers an open dispute on a locked day. An officer's tab records one snapshot per Miner per lock date;
     only a change to a Miner's characters deletes it.
   - `syncCorpTaxBooks` (scheduled sync) and every officer sync: the server decides whose money
     each stored donation is (`corpTaxBookDonationMatch.ts`). A donation that matches an unlinked

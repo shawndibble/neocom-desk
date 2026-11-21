@@ -256,7 +256,7 @@ describe('one event through its entry', () => {
     const names = { corporation: 'Moon Collectors', when: '14:00' };
     const expected = {
       title: 'Moon pop · Efa - Moon Drill',
-      body: 'Auto-fracture at 14:00 · taxed by Moon Collectors · 7.5%',
+      body: 'Auto-fracture at 14:00 · Efa - Moon Drill · taxed by Moon Collectors · 7.5%',
     };
     expect(entry.copy.poll(fires[0], PILOT, names)).toEqual(expected);
     expect(entry.projection.push(fires[0], PILOT, names)).toEqual(expected);

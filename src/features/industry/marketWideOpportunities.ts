@@ -83,6 +83,8 @@ export interface MarketWideScanOptions {
    * data loads alongside the product-price fetch.
    */
   include?: Promise<MarketWideInclude>;
+  /** The Industry percent (issue #6531) rows price at; the liquidity cut reads the market as it stands. Absent is 100. */
+  pricePercent?: number;
 }
 
 export interface MarketWideResultRow extends MarketWideRow {
@@ -201,6 +203,7 @@ export async function runMarketWideScan(
       standing,
       characterId: options.characterId ?? null,
       research: options.research,
+      pricePercent: options.pricePercent,
     })
   );
   return rows.map((row) => ({

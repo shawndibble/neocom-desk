@@ -2057,6 +2057,14 @@ export function disputeIdFor(minerId: string, date: string): string {
   return `${minerId.replace(/[^A-Za-z0-9_-]/g, '_')}_${date}`;
 }
 
+/** An officer dismisses a Character's answer to a grouping from Needs you. */
+export function parseGroupingAnswerInput(data: unknown): BookCall & { characterId: number } {
+  return {
+    ...parseBookCall(data),
+    characterId: int(record(data).characterId, 'characterId', 1, Number.MAX_SAFE_INTEGER),
+  };
+}
+
 /** A player claims one of their own Unmatched donations (D5). */
 export function parseClaimPaymentInput(data: unknown): {
   corporationId: number;

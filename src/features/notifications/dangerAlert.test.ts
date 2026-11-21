@@ -103,6 +103,7 @@ describe('chips', () => {
       'market',
       'industry',
       'mail',
+      'calendar',
       'structures',
       'skills',
     ]);
@@ -113,6 +114,8 @@ describe('chips', () => {
     expect(typeChipOfGroupKey('event:priceAlertTriggered')).toBe('market');
     expect(typeChipOfGroupKey('event:industryJobComplete')).toBe('industry');
     expect(typeChipOfGroupKey('event:newMail')).toBe('mail');
+    expect(typeChipOfGroupKey('event:calendarEventStarting')).toBe('calendar');
+    expect(typeChipOfGroupKey('event:newCalendarEvent')).toBe('calendar');
     expect(typeChipOfGroupKey('event:skillQueueEnding')).toBe('skills');
     expect(typeChipOfGroupKey('event:structureFuelLow')).toBe('structures');
     expect(typeChipOfGroupKey('eveType:StructureUnderAttack')).toBe('structures');

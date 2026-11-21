@@ -9,8 +9,9 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { findFitSwaps, type FitSwap, type FitSwapsResult } from '@/engine/fittings/makeItFit';
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 import { yieldToEventLoop } from './yieldToEventLoop';
@@ -30,6 +31,7 @@ export function useMakeItFit(
   enabled: boolean
 ): MakeItFitState {
   const { hubId } = useHubFor('fittings');
+  const percent = usePricePercentFor('fittings');
   const [failed, setFailed] = useState<VariantEvaluator | null>(null);
   const [computed, setComputed] = useState<{
     variants: VariantEvaluator;
@@ -62,7 +64,7 @@ export function useMakeItFit(
     void (async () => {
       const typeIds = [...new Set(candidates.flatMap((c) => [c.fromTypeId, c.toTypeId]))];
       const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-      const priceMap = await getHubPrices(hub, typeIds).catch(() => null);
+      const priceMap = await getHubPricesAt(hub, typeIds, percent).catch(() => null);
       if (cancelled) return;
       try {
         const { before } = await variants.compare(variants.fitting);
@@ -83,7 +85,7 @@ export function useMakeItFit(
     return () => {
       cancelled = true;
     };
-  }, [enabled, variants, candidates, hubId]);
+  }, [enabled, variants, candidates, hubId, percent]);
 
   const fresh = computed && computed.variants === variants ? computed : null;
   return {

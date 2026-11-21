@@ -4,6 +4,7 @@ import type { TradeHub } from '@/market/hubs';
 import { applyCostIndexOverride } from './costIndexOverride';
 import { applyProductSalePrice } from './productPriceCap';
 import { useMarketSnapshot } from './useMarketSnapshot';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 
 /**
  * The plan's two market snapshots: the primary one at its build system, and
@@ -20,6 +21,8 @@ export function usePlanMarketSnapshots(
   productSalePrice: number | undefined,
   refreshTick: number
 ) {
+  // A plan keeps its own hub but prices at the Industry percent (issue #6531).
+  const pricePercent = usePricePercentFor('industry');
   // Distinct from `pricesReady`: that one collapses "still fetching"
   // and "the live ESI call failed" into the same false, which used to flash
   // the "prices unavailable" warning on every fresh load before the first
@@ -28,7 +31,7 @@ export function usePlanMarketSnapshots(
     snapshot: esiSnapshot,
     fetchedAt,
     loading: pricesLoading,
-  } = useMarketSnapshot(hub, typeIds, buildSystemId, activity, refreshTick);
+  } = useMarketSnapshot(hub, typeIds, buildSystemId, activity, refreshTick, pricePercent);
   // The pilot's own cost index outranks ESI's — the only one there is in
   // J-Space. Everything reads this; `esiSnapshot` is for asking what ESI
   // itself could not supply.
@@ -54,7 +57,8 @@ export function usePlanMarketSnapshots(
     typeIds,
     reactionBuildSystemId,
     'reaction',
-    refreshTick
+    refreshTick,
+    pricePercent
   );
 
   return { snapshot, costIndexMissing, fetchedAt, pricesLoading, reactionSnapshot };

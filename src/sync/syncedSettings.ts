@@ -61,7 +61,12 @@
 // key it used before it synced; `lib/useSyncedSetting.ts` explains why that
 // seed is written unstamped.
 //
-// sync.pageHubs (issue #6523): one map of page area -> Trade Hub, the pages a
+// sync.marketHubClosest (issue #6523): the Global hub set to Closest hub, the
+// Trade Hub nearest the active Character (features/market/closestHub.ts). Its
+// own boolean rather than a 'closest' value in sync.marketHub, so an older
+// build always reads a real hub there; that hub is also Closest's fallback.
+//
+// sync.pageHubs (issue #6523): one map of page area -> Trade Hub or 'closest', the pages a
 // pilot prices somewhere other than their Global hub (features/market/
 // pageHubs.ts). Account-wide. A blob over a fixed key set, against the
 // one-key-each rule above, for the reason sync.marketHubByCharacter is one:
@@ -71,6 +76,12 @@
 // setting edited this rarely is accepted. An entry is removed by rewriting the
 // map without it, never by deleting the key, so the tombstone edge does not
 // bite it.
+//
+// sync.pagePricePercents (issue #6531): one map of page area -> percent of
+// market that page prices at (features/market/pagePricePercents.ts), beside
+// sync.pageHubs and a blob for the same reason. Appraisal keeps
+// sync.marketPricePercent and PI its device-local buyback rate, so neither
+// page ever has two. Entries are set, never removed (100 is a value).
 //
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from
@@ -379,7 +390,9 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketHub',
   'sync.marketHubByCharacter',
   'sync.pageHubs',
+  'sync.marketHubClosest',
   'sync.marketPricePercent',
+  'sync.pagePricePercents',
   'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxCompressedOre',

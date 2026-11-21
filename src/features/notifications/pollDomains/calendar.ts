@@ -2,6 +2,7 @@ import {
   loadCalendarEvents as loadCharacterCalendarEvents,
   prefetchCalendarEventDetails,
 } from '@/features/character/calendar';
+import { sharedPopEventMatcher } from '@/features/character/calendarSharedPops';
 import { projectCalendar } from '@/engine/projection';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
@@ -17,6 +18,7 @@ import type { CalendarNames } from '../domainCopy';
 import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
+import { alertedSharedPops } from './sharedMoonPops';
 
 /* Calendar ------------------------------------------------------------------- */
 
@@ -51,6 +53,22 @@ const isCalendarEventEntrySnapshot = shapeGuard<CalendarEventEntrySnapshot>({
   response: is.optional(is.oneOf(CALENDAR_EVENT_RESPONSES)),
 });
 
+/**
+ * The events with those a Shared Pop already alerts about taken out: the corp put the same fleet
+ * in the in-game calendar, and the pop's own alert is the one the pilot gets (the Calendar page
+ * likewise shows the pop, not the event, though it keeps the event for a refinery the pilot reads
+ * as a corp moon chunk; the alerts have no such exception). Out of the snapshot, so neither the diff nor the Projection announce it.
+ */
+async function withoutSharedPopEvents(
+  characterId: number,
+  events: CalendarEventSummary[]
+): Promise<CalendarEventSummary[]> {
+  const pops = await alertedSharedPops(characterId);
+  if (pops.length === 0) return events;
+  const isPop = sharedPopEventMatcher(pops, new Set(), Date.now(), 'asShared');
+  return events.filter((event) => !isPop(event.title, Date.parse(event.event_date)));
+}
+
 export const calendarDomain = defineDomain<
   CalendarEventSummary,
   CalendarSnapshot,
@@ -68,7 +86,7 @@ export const calendarDomain = defineDomain<
     // proves nothing landed); see `detailPrefetch.ts` for the triggers.
     if (!result.cached.fromCache)
       void prefetchCalendarEventDetails(characterId, result.cached.data);
-    return result.cached.data;
+    return withoutSharedPopEvents(characterId, result.cached.data);
   },
   toSnapshot: (events, nowMs) => ({
     entries: events.map((event) => ({

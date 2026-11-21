@@ -4,6 +4,8 @@ import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import type { ProfitBasis } from '@/engine/industry/profitBasis';
 import type { HubPrices } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import { hubPricesAtPercent } from '@/features/market/hubPricesAtPercent';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import { planDepthNeeds } from '../depthPriceLoader';
 import { resolveBuildPlan, type BuildPlanPrices, type BuildPlanSources } from '../resolveBuildPlan';
 import { planVerdictOf, type PlanVerdict } from './planVerdict';
@@ -27,6 +29,8 @@ export interface PricePlanOptions {
   saleBasis?: LiquidationBasis;
   /** Also resolve with owned-stock deduction off (`ResolveBuildPlanOptions`). */
   withGroupResult?: boolean;
+  /** The Industry percent (#6531) for the walked Depth Prices, as the snapshot's prices already are. */
+  pricePercent?: number;
 }
 
 /**
@@ -58,7 +62,9 @@ export async function pricePlan(
       const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
       const walked = await options.depth(hub, needs).catch(() => null);
       if (walked && walked.size > 0) {
-        resolved = resolveAt(depthPriceMap(walked));
+        resolved = resolveAt(
+          hubPricesAtPercent(depthPriceMap(walked), options.pricePercent ?? DEFAULT_PRICE_PERCENT)
+        );
         depth = walked;
       }
     }

@@ -18,11 +18,6 @@ import {
   Panel,
   SearchInput,
   RegionSelect,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   LiveStatus,
   DropdownMenuItem,
   DropdownMenu,
@@ -40,7 +35,9 @@ import { industryTabHref } from '@/features/industry/industryTabs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { orderBookFailedOffline } from '@/features/market/orderBookView';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import { pickHubFor, useHubFor } from '@/features/market/hub';
+import { HubField } from '@/features/market/HubMenu';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { JumpRangeNote } from '@/features/route/JumpRangeControls';
 import {
@@ -338,8 +335,27 @@ export function Market() {
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const { setup: refiningSetup, hydrated: refiningHydrated } = useRefiningSetup();
+  // Appraisal prices at its own page hub, apart from the hub the Browser is on.
+  // On its tab `?hub=` overrides it for the visit, as `?percent=` does the Price
+  // Percent (a Shared Appraisal's "Open Neocom Desk"); a pick drops the override.
+  const { hubId: appraisalHubId } = useHubFor('appraisal');
+  const appraisalHubOverride =
+    tab === 'appraisal' ? getTradeHub(searchParams.get('hub') as TradeHub['id']) : undefined;
+  const appraisalHub = appraisalHubOverride ?? getTradeHub(appraisalHubId) ?? DEFAULT_TRADE_HUB;
+  /** After the Appraisal's hub menu wrote its pick: a link's visit-only hub then gives way to it. */
+  function handleAppraisalHubPicked() {
+    if (appraisalHubOverride === undefined) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('hub');
+        return next;
+      },
+      { replace: true }
+    );
+  }
   const appraisal = useAppraisal(
-    effectiveHub,
+    appraisalHub,
     pricePercent,
     activeCharacterId,
     refiningSetup,
@@ -635,21 +651,13 @@ export function Market() {
                   </div>
                 )}
                 {tab === 'appraisal' ? null : effectiveLocation.mode === 'hub' ? (
-                  <Select
-                    value={effectiveHub.id}
-                    onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
-                  >
-                    <SelectTrigger aria-label={t('market.tradeHub')} className="w-32 sm:w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRADE_HUBS.map((h) => (
-                        <SelectItem key={h.id} value={h.id}>
-                          {h.systemName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <HubField
+                    area="market"
+                    label={t('market.tradeHub')}
+                    shownHubId={effectiveHub.id}
+                    onPicked={handleHubChange}
+                    className="w-32 sm:w-44"
+                  />
                 ) : (
                   // "All regions" (`null` to the picker) fans the selected item's
                   // book out over every region; see `allRegionsFetchKey`.
@@ -720,9 +728,13 @@ export function Market() {
                 controller={appraisal}
                 pricePercent={pricePercent}
                 onPricePercentChange={handlePricePercentChange}
-                hub={effectiveHub}
-                onHubChange={handleHubChange}
-                standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+                hub={appraisalHub}
+                onHubChange={(id) => {
+                  void pickHubFor('appraisal', id);
+                  handleAppraisalHubPicked();
+                }}
+                onHubPicked={handleAppraisalHubPicked}
+                standing={tradeHubStanding(tradeHubStandings, appraisalHub.id)}
                 characterId={activeCharacterId}
                 defaultCompareExpanded={expandCompareOnAppraisal}
               />

@@ -21,7 +21,7 @@ import { loadOwnedStockSnapshot } from '@/features/industry/ownedStockDetection'
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
 
 const storeOffers = new Map<number, Promise<LoyaltyStoreOffer[]>>();
@@ -115,9 +115,12 @@ function ownedItems(
   return new Map([...detected].map(([id, stock]) => [id, stock.quantity]));
 }
 
-async function pricesAtEveryHub(typeIds: readonly number[]): Promise<Map<number, HubPrice[]>> {
+async function pricesAtEveryHub(
+  typeIds: readonly number[],
+  percent: number
+): Promise<Map<number, HubPrice[]>> {
   const perHub = await Promise.all(
-    TRADE_HUBS.map(async (hub) => ({ hub, prices: await getHubPrices(hub, [...typeIds]) }))
+    TRADE_HUBS.map(async (hub) => ({ hub, prices: await getHubPricesAt(hub, typeIds, percent) }))
   );
   return new Map(
     typeIds.map((typeId) => [
@@ -131,17 +134,22 @@ async function pricesAtEveryHub(typeIds: readonly number[]): Promise<Map<number,
   );
 }
 
-/** Where each of `typeIds` can be had, and what it costs this pilot, buying at `hub`. */
+/**
+ * Where each of `typeIds` can be had, and what it costs this pilot, buying at `hub`.
+ * `percent`, the Fittings page's price percent, scales every hub's market prices
+ * (the implants and the LP turn-in items); the LP rate is the Loyalty valuation, left as it is.
+ */
 export async function loadImplantPurchase(
   typeIds: readonly number[],
   hub: TradeHub,
   characterId: number | null,
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  percent = 100
 ): Promise<ImplantPurchase> {
   // The owned-stock snapshot doesn't depend on the offers, so it loads alongside them.
   const [lpOffers, hubPrices, balances, snapshot] = await Promise.all([
     loadLpOffersFor(typeIds, onProgress),
-    pricesAtEveryHub(typeIds),
+    pricesAtEveryHub(typeIds, percent),
     lpBalances(characterId),
     loadOwnedStockSnapshot().catch(() => null),
   ]);
@@ -150,7 +158,7 @@ export async function loadImplantPurchase(
   const turnInIds = [...new Set(offers.flatMap((o) => o.requiredItems.map((r) => r.typeId)))];
   const [rateFor, turnInPrices, turnInNames] = await Promise.all([
     loadLpRates(corporations, hub),
-    turnInIds.length > 0 ? getHubPrices(hub, turnInIds) : Promise.resolve(new Map()),
+    turnInIds.length > 0 ? getHubPricesAt(hub, turnInIds, percent) : Promise.resolve(new Map()),
     turnInIds.length > 0
       ? loadTypeNames(turnInIds).catch(() => new Map<number, string>())
       : Promise.resolve(new Map<number, string>()),

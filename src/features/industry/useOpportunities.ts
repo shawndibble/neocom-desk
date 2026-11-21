@@ -86,6 +86,8 @@ export interface UseOpportunitiesArgs {
   assumedMe: number;
   /** The pilot's Profit Basis setting: held stock is charged at its sell value only on `'sellValue'`, as on the plan page. */
   profitBasis: ProfitBasis;
+  /** The Industry percent (issue #6531): every row prices its materials and product at it. Absent is 100. */
+  pricePercent?: number;
 }
 
 export interface UseOpportunitiesResult {
@@ -126,6 +128,7 @@ export function useOpportunities({
   ownedByCharacter,
   assumedMe,
   profitBasis,
+  pricePercent,
 }: UseOpportunitiesArgs): UseOpportunitiesResult {
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -148,9 +151,13 @@ export function useOpportunities({
   const settledRef = useRef<{ batchKey: string; rows: OpportunityRow[] } | null>(null);
 
   const manualRefreshOnly = !autoRecalculates(candidates.length);
+  // The percent re-keys the batch the way a hub change does: rows priced at another percent are another batch.
   const batchKey = useMemo(
-    () => opportunitiesBatchKey(candidates, hubForCharacter),
-    [candidates, hubForCharacter]
+    () =>
+      pricePercent === undefined
+        ? opportunitiesBatchKey(candidates, hubForCharacter)
+        : `${opportunitiesBatchKey(candidates, hubForCharacter)}|${pricePercent}%`,
+    [candidates, hubForCharacter, pricePercent]
   );
   const inputsKey = useMemo(
     () =>
@@ -236,8 +243,8 @@ export function useOpportunities({
           startingLocation(activity, facilityDefaults, defaultsRef.current(characterId))
             .buildSystemId
       );
-      const requests = hubGroups.map((group) =>
-        opportunitySnapshotRequest(
+      const requests = hubGroups.map((group) => ({
+        ...opportunitySnapshotRequest(
           group.candidates,
           group.hub,
           catalog,
@@ -246,8 +253,9 @@ export function useOpportunities({
           // One build system per group, so any member's latest plan names it.
           defaultsRef.current(group.candidates[0]!.characterId),
           group.activity
-        )
-      );
+        ),
+        pricePercent,
+      }));
       const snapshots = await Promise.all(loadMarketSnapshots(requests));
       if (cancelled) return;
       // By candidate, not hub: one hub can hold several groups (build
@@ -339,6 +347,7 @@ export function useOpportunities({
     ownedByCharacter,
     assumedMe,
     profitBasis,
+    pricePercent,
     refreshToken,
     manualRefreshOnly,
   ]);

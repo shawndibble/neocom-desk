@@ -9,11 +9,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   StatChip,
   Tooltip,
 } from '@/components/ui';
@@ -25,14 +20,12 @@ import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useSharedJumpBasis } from '@/features/route/jumpBasis';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useNow } from '@/lib/useNow';
-import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { eveClock } from './colonies/coloniesFormat';
 import { EstimateBadge } from './DirectiveRow';
 import { homeSystemId, nearestHub, routeFigures, type RouteFigures } from './sellRoute';
-import { DEFAULT_BUYBACK_PCT, PI_BUYBACK_PCT_OPTIONS } from './piSettings';
 import { useSellHub } from './sellHub';
-
-const BUYBACK = 'buyback';
+import { HubField } from '@/features/market/HubMenu';
 
 interface Props {
   /** The solar system of each of the active Character's colonies. */
@@ -74,7 +67,8 @@ export function PiHeaderStrip({
   eveTime = false,
 }: Props) {
   const { t } = useTranslation();
-  const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
+  const { hub, buybackPct, hubChosen, hubPicked, hubSwitched, sellAtNearest, keepHub } =
+    useSellHub();
   const basis = useSharedJumpBasis();
   const colonyHome = homeSystemId(colonySystemIds);
   const locateLoader = useCallback(
@@ -191,48 +185,14 @@ export function PiHeaderStrip({
         <span className={cx(eyebrowClassName, 'max-md:sr-only')}>
           {t('piPlan.strip.sellAtShort')}
         </span>
-        <Select
-          value={buybackPct === null ? hub.id : BUYBACK}
-          onValueChange={(value) =>
-            value === BUYBACK ? setBuyback(DEFAULT_BUYBACK_PCT) : setHub(value as TradeHub['id'])
-          }
-        >
-          <SelectTrigger
-            size="sm"
-            className="w-auto min-w-40"
-            aria-label={t('piPlan.strip.sellAt')}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TRADE_HUBS.map((option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.systemName}
-              </SelectItem>
-            ))}
-            <SelectItem value={BUYBACK}>{t('piPlan.strip.corpBuyback')}</SelectItem>
-          </SelectContent>
-        </Select>
-        {buybackPct !== null && (
-          <Select value={String(buybackPct)} onValueChange={(pct) => setBuyback(Number(pct))}>
-            <SelectTrigger
-              size="sm"
-              className="w-auto min-w-40"
-              aria-label={t('piPlan.strip.buybackRate')}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[...new Set([...PI_BUYBACK_PCT_OPTIONS, buybackPct])]
-                .sort((x, y) => x - y)
-                .map((pct) => (
-                  <SelectItem key={pct} value={String(pct)}>
-                    {t('piPlan.strip.buybackPct', { pct, hub: hub.systemName })}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        )}
+        <HubField
+          area="pi"
+          size="sm"
+          className="w-auto min-w-40"
+          label={t('piPlan.strip.sellAt')}
+          side="sell"
+          onPicked={(id, kind) => (kind === 'hub' ? hubPicked(id) : hubSwitched(id))}
+        />
       </div>
       {nearest && nearestOption && buybackPct === null && (
         <div
@@ -246,7 +206,7 @@ export function PiHeaderStrip({
               hub: nearestOption.systemName,
             })}
           </span>
-          <Button size="sm" onClick={() => setHub(nearestOption.id)}>
+          <Button size="sm" onClick={() => sellAtNearest(nearestOption.id)}>
             {t('piPlan.strip.useHub', { hub: nearestOption.systemName })}
           </Button>
           <Button size="sm" variant="ghost" onClick={keepHub}>

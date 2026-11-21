@@ -5,8 +5,9 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
-import { useMarketHub } from '@/features/market/hub';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { useGlobalClosest, useMarketHub } from '@/features/market/hub';
+import { resetHubStores } from '@/test/hubStores';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { appraisePaste } from '@/features/market/appraisalData';
 import { Market } from './Market';
@@ -73,22 +74,21 @@ function renderAt(entry: string) {
 
 async function pickHub(name: string) {
   const user = userEvent.setup({ delay: null });
-  await user.click(screen.getByRole('combobox', { name: /Trade Hub/i }));
-  await user.click(await screen.findByRole('option', { name }));
+  await user.click(screen.getByRole('button', { name: /Trade Hub/i }));
+  await user.click(await screen.findByRole('button', { name }));
 }
 
 beforeEach(async () => {
   probe.pathname = '';
   probe.search = '';
-  // The page reads its hub from `useMarketBrowserHub`, a Dexie-backed store
-  // like `useMarketHub`, so picking one writes it to Dexie as well as to the
+  // The page reads its hub from the page hubs, a Dexie-backed store like
+  // `useMarketHub`, so picking one writes it to Dexie as well as to the
   // store. Resetting only the store leaves the row behind, and the next
   // test's `hydrateHub()` reads it back asynchronously — landing on the hub
   // the previous test picked, which makes picking that hub again a no-op
   // firing no `onValueChange` at all.
   await db.settings.clear();
-  useMarketHub.setState({ value: 'jita', hydrated: false });
-  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
+  resetHubStores();
   useMarketPricePercent.setState({ value: 100, hydrated: false });
 });
 
@@ -96,36 +96,60 @@ describe('Market Appraisal tab navigation', () => {
   it('offers the trade hub picker but not the Location Mode chips', async () => {
     renderAt('/market/appraisal');
 
-    expect(await screen.findByRole('combobox', { name: /Trade Hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Trade Hub/i })).toBeInTheDocument();
     // Region has no meaning here: prices come from one station's aggregates.
     expect(screen.queryByRole('button', { name: /Region/i })).not.toBeInTheDocument();
   });
 
   /**
-   * `navigateTo` replaces only `type`/`hub`/`region`/`group` — the tab is a
-   * path segment now (ADR 0015), not a query param riding along, so there is
-   * nothing left for it to carry across a hub change.
+   * Appraisal prices at its own page hub (issue #6523), apart from the hub the
+   * Browser's URL names: a pick writes the hub, never the URL, and the tab
+   * stays put.
    */
-  it('stays on the appraisal path when the hub changes', async () => {
-    renderAt('/market/appraisal');
-    await screen.findByRole('combobox', { name: /Trade Hub/i });
+  it('a hub pick prices the Appraisal there and stays on the tab, leaving the URL alone', async () => {
+    renderAt('/market/appraisal?type=34');
+    await screen.findByRole('button', { name: /Trade Hub/i });
+    expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
 
-    await pickHub('Amarr');
+    await pickHub('Amarr VIII');
 
-    await waitFor(() => expect(probe.search).toContain('hub=amarr'));
+    // Appraisal is on Global here, so the pick moves the Global hub.
+    await waitFor(() => expect(useMarketHub.getState().value).toBe('amarr'));
+    expect(probe.search).not.toContain('hub=');
     expect(probe.pathname).toBe('/market/appraisal');
+    expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
   });
 
-  it('stays on the tab when the hub changes with an item still in the URL', async () => {
-    renderAt('/market/appraisal?type=34');
-    await screen.findByRole('combobox', { name: /Trade Hub/i });
-    expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
+  it("a link's ?hub= prices this visit's Appraisal there, never writing a hub", async () => {
+    renderAt('/market/appraisal?hub=amarr');
+    expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
+    // Once page hubs are read (adoption runs after that), nothing was written.
+    await waitFor(() => expect(usePageHubs.getState().hydrated).toBe(true));
+    expect(usePageHubs.getState().value).toEqual({});
+    expect(useMarketHub.getState().value).toBe('jita');
+  });
 
-    await pickHub('Amarr');
+  it('Closest picked on the Appraisal sticks, written once', async () => {
+    renderAt('/market/appraisal');
+    await screen.findByRole('button', { name: /Trade Hub/i });
 
-    await waitFor(() => expect(probe.search).toContain('hub=amarr'));
-    expect(probe.pathname).toBe('/market/appraisal');
-    expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
+    await pickHub('Closest hub');
+
+    await waitFor(() => expect(useGlobalClosest.getState().value).toBe(true));
+    // No location here, so Closest falls back to Global; the stored hub is untouched.
+    expect(useMarketHub.getState().value).toBe('jita');
+    expect(usePageHubs.getState().value).toEqual({});
+  });
+
+  it('with its own entry, an Appraisal pick moves only the Appraisal hub', async () => {
+    await usePageHubs.getState().setValue({ appraisal: 'jita' });
+    renderAt('/market/appraisal');
+    await screen.findByRole('button', { name: /Trade Hub/i });
+
+    await pickHub('Amarr VIII');
+
+    await waitFor(() => expect(usePageHubs.getState().value.appraisal).toBe('amarr'));
+    expect(useMarketHub.getState().value).toBe('jita');
   });
 
   /**
