@@ -32,6 +32,11 @@ export interface ResolvedStandings {
    * for its hub; absent means none.
    */
   safetyTaxPct?: number;
+  /**
+   * A temporary multiplier on sales tax and broker fee rates at this hub (`hubFeeDiscountFactor`:
+   * 0.5 at Amarr while the Deaconry discount runs); absent means standard rates.
+   */
+  feeDiscountFactor?: number;
 }
 
 export const ZERO_STANDINGS: ResolvedStandings = { factionStanding: 0, corpStanding: 0 };

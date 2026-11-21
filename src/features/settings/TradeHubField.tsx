@@ -18,7 +18,8 @@ import {
   useHubByCharacter,
   type HubId,
 } from '@/features/market/characterHubs';
-import { useDefaultMarketHub } from '@/features/market/hub';
+import { pickGlobalHub, useDefaultMarketHub, useGlobalClosest } from '@/features/market/hub';
+import { CLOSEST, type HubChoice } from '@/features/market/pageHubs';
 import {
   applyDefaultHubToAll,
   changeDefaultHub,
@@ -26,25 +27,33 @@ import {
 } from '@/features/market/tradeHubActions';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 
-function HubSelect({
+/**
+ * A field select over every Trade Hub, by name; shared by the Settings hub
+ * controls. With `closest`, Closest hub is offered first (issue #6523).
+ */
+export function HubSelect<T extends HubChoice = HubId>({
   value,
   onChange,
   label,
   id,
   size,
+  closest = false,
 }: {
-  value: HubId;
-  onChange: (next: HubId) => void;
+  value: T;
+  onChange: (next: T) => void;
   label: string;
   id?: string;
   size?: 'md' | 'sm';
+  closest?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
-    <Select value={value} onValueChange={(next) => onChange(next as HubId)}>
+    <Select value={value} onValueChange={(next) => onChange(next as T)}>
       <SelectTrigger id={id} aria-label={label} size={size} className="max-w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
+        {closest && <SelectItem value={CLOSEST}>{t('pageHubs.closest')}</SelectItem>}
         {TRADE_HUBS.map((hub) => (
           <SelectItem key={hub.id} value={hub.id}>
             {hub.name}
@@ -67,6 +76,7 @@ export function TradeHubField() {
   const loaded = useCharactersOrLoading();
   const defaultHub = useDefaultMarketHub((state) => state.value);
   const map = useHubByCharacter((state) => state.value);
+  const globalClosest = useGlobalClosest((state) => state.value);
   const [open, setOpen] = useState(false);
   const panelId = useId();
   // Nothing until the roster has loaded: an empty one reads as "single" and would pin nobody.
@@ -91,11 +101,19 @@ export function TradeHubField() {
       note={single ? t('settings.tradeHubHint') : t('settings.tradeHubMultiNote', { summary })}
     >
       <div className="min-w-0 space-y-2">
-        <HubSelect
+        <HubSelect<HubChoice>
           id="settings-hub"
-          value={shown}
+          closest
+          value={globalClosest ? CLOSEST : shown}
           label={label}
-          onChange={(hub) => void changeDefaultHub(hub, ids)}
+          onChange={(choice) => {
+            if (choice === CLOSEST) return void pickGlobalHub(CLOSEST);
+            // A hub ends Closest; `changeDefaultHub` also moves the Characters still on the old default.
+            const ended = globalClosest
+              ? useGlobalClosest.getState().setValue(false)
+              : Promise.resolve();
+            void ended.then(() => changeDefaultHub(choice, ids));
+          }}
         />
         {!single && (
           <div>

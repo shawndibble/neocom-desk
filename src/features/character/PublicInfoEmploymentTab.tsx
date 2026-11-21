@@ -29,13 +29,7 @@ export default function PublicInfoEmploymentTab({ characterId }: { characterId: 
   }
   const { rows, summary, names } = data;
   if (rows.length === 0) {
-    return (
-      <EmptyState
-        title={t('publicInfo.employmentEmptyTitle')}
-        hint={t('publicInfo.employmentEmptyHint')}
-        className="py-8"
-      />
-    );
+    return <EmptyState title={t('publicInfo.employmentEmptyTitle')} className="py-8" />;
   }
   return (
     <div className="space-y-3">

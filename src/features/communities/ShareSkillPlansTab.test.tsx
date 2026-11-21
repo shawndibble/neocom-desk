@@ -67,7 +67,7 @@ describe('ShareSkillPlansTab', () => {
     renderTab();
     expect(await screen.findByText(p.noneShared)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(screen.getByText(/never all at once/)).toBeInTheDocument();
+    expect(screen.getByText(/shared one at a time/)).toBeInTheDocument();
   });
 
   it('refreshes the shared copies of edited plans when it opens', async () => {

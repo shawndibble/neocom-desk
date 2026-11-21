@@ -20,7 +20,7 @@ describe('UnpricedOreDetail', () => {
       <UnpricedOreDetail unpricedByHub={UNPRICED} unreachableHubs={new Set()} typeNames={NAMES} />
     );
     expect(screen.getByText(/Jita has no buy orders for Zeolites/)).toBeInTheDocument();
-    expect(screen.getByText(/Move that payee to a busier hub/)).toBeInTheDocument();
+    expect(screen.getByText(/Move that Payee to a busier hub/)).toBeInTheDocument();
     expect(screen.queryByText(/No price could be loaded/)).not.toBeInTheDocument();
   });
 
@@ -48,7 +48,7 @@ describe('UnpricedOreDetail', () => {
     );
     expect(screen.getByText(/Jita has no buy orders for Zeolites/)).toBeInTheDocument();
     expect(screen.getByText(/No price could be loaded at Hek for Veldspar/)).toBeInTheDocument();
-    expect(screen.getByText(/Move that payee to a busier hub/)).toBeInTheDocument();
+    expect(screen.getByText(/Move that Payee to a busier hub/)).toBeInTheDocument();
   });
 
   it('renders its children after the explanation', () => {

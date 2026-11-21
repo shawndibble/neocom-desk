@@ -660,10 +660,8 @@ describe('PlanetaryIndustry', () => {
     );
     await renderIndustryRoutes();
     const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('No pin data cached for this colony')).toBeInTheDocument();
-    expect(
-      within(panel).getByText("Refresh to fetch this colony's deployed pins.")
-    ).toBeInTheDocument();
+    expect(within(panel).getByText('No buildings loaded for this colony')).toBeInTheDocument();
+    expect(within(panel).getByText("Refresh to load this colony's buildings.")).toBeInTheDocument();
   });
 
   it("lists an alt's cached programs beside the active character's, without fetching for it", async () => {
@@ -897,7 +895,7 @@ describe('PlanetaryIndustry', () => {
       .setup({ delay: null })
       .click(await screen.findByRole('button', { name: 'Show colonies' }));
     expect(
-      await screen.findByText(/Left out: no link on any of your colonies/)
+      await screen.findByText(/Left out: we couldn't measure the building links/)
     ).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /^Jita IV/ })).toBeDisabled();
   });
@@ -1235,7 +1233,9 @@ describe('PlanetaryIndustry', () => {
     await renderIndustryRoutes();
     await colonyPanelFor(/Jita IV/);
     const strip = screen.getByTestId('pi-header-strip');
-    expect(within(strip).getByRole('combobox', { name: 'Where do you sell?' })).toBeInTheDocument();
+    expect(
+      within(strip).getByRole('button', { name: /, Where do you sell\?$/ })
+    ).toBeInTheDocument();
     // Home, the colony count and the route wait behind the strip's "i".
     await userEvent.click(within(strip).getByRole('button', { name: 'Home, colonies and route' }));
     expect(
@@ -1243,11 +1243,11 @@ describe('PlanetaryIndustry', () => {
     ).toBeInTheDocument();
   });
 
-  it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {
+  it('lets the Sell at picker grow past its minimum, so a hub with its percent is not cut off', async () => {
     await renderIndustryRoutes();
     await colonyPanelFor(/Jita IV/);
-    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('combobox', {
-      name: 'Where do you sell?',
+    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('button', {
+      name: /, Where do you sell\?$/,
     });
     expect(picker).toHaveClass('min-w-40', 'w-auto');
     expect(picker).not.toHaveClass('w-40');

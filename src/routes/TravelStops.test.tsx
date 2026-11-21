@@ -258,9 +258,7 @@ describe('Travel › Route Safety › Stops', () => {
       name: /^Leg 2 · Uedama → Thera · no stargate route/,
     });
     expect(screen.getByRole('switch', { name: 'Optimize stop order' })).toBeDisabled();
-    expect(
-      screen.getByText(/A stop no stargate route reaches can't be put in order/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No stargate route reaches one of your stops/)).toBeInTheDocument();
     // The reachable leg still draws.
     expect(screen.getByRole('table', { name: 'Systems on leg 1' })).toBeInTheDocument();
 

@@ -124,7 +124,7 @@ describe('MoonOwnerPanel', () => {
     });
     mount();
     expect(
-      await screen.findByText('Removal pending, takes effect 18 Oct 2026 14:22 EVE time')
+      await screen.findByText(/^Removal pending, takes effect 18 Oct( 2026)? 14:22$/)
     ).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'End it now' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('End the removal now?');

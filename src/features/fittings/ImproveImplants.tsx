@@ -12,7 +12,7 @@ import type { ImproveGoal } from '@/engine/fittings/improve';
 import { IMPLANT_GOAL } from '@/engine/fittings/improve';
 import { cloneSeedSet } from '@/engine/fittings/implantBasis';
 import { goalById, goalGain, type ImplantGoalId } from '@/engine/fittings/implantFinder';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { fmt } from './implantFinderFormat';
 import type { MakeItFitImplantsInput } from './MakeItFitImplants';
@@ -37,7 +37,7 @@ export function ImproveImplants({ goal, ...rest }: Props) {
 function Implants({ goalId, open, implants }: Omit<Props, 'goal'> & { goalId: ImplantGoalId }) {
   const { t } = useTranslation();
   const { fitting, profile, basis, onChange } = implants;
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
   const seed = useMemo(

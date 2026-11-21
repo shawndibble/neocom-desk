@@ -1,49 +1,38 @@
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
-import { useMarketHub } from '@/features/market/hub';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { HubField } from '@/features/market/HubMenu';
+import type { PageHubArea } from '@/features/market/pageHubs';
 import { STAT_FIELD_WIDTH } from './statKit';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
- * The Trade Hub the Price section quotes — the same synced "Default Trade Hub"
- * as Settings, so picking one here changes it there too.
+ * The Trade Hub a Fittings or Skills price section quotes: its page area's
+ * hub (`HubField`), Global unless the pilot gave the area a hub of its own.
+ * Both pages price what the pilot buys, so the popover's percent is a Buy percent.
  */
 export function PriceHubSelect({
+  area = 'fittings',
   size = 'md',
   bare = false,
 }: {
+  area?: PageHubArea;
   size?: 'sm' | 'md';
-  /** Just the select, for a caller that labels it itself (the stats column's `StatField`). */
+  /** Just the field, for a caller that labels it itself (the stats column's `StatField`). */
   bare?: boolean;
 } = {}) {
   const { t } = useTranslation();
-  const hub = useMarketHub((state) => state.value);
-  const setHub = useMarketHub((state) => state.setValue);
-  useHydratedStore(useMarketHub);
-  const select = (
-    <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-      <SelectTrigger
-        aria-label={t('fittings.stats.priceHub')}
-        size={size}
-        className={bare ? STAT_FIELD_WIDTH : 'min-w-0'}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {TRADE_HUBS.map((tradeHub) => (
-          <SelectItem key={tradeHub.id} value={tradeHub.id}>
-            {tradeHub.systemName}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+  const field = (
+    <HubField
+      area={area}
+      size={size}
+      side="buy"
+      label={t('fittings.stats.priceHub')}
+      className={bare ? STAT_FIELD_WIDTH : 'min-w-0'}
+    />
   );
-  if (bare) return select;
+  if (bare) return field;
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="text-text-dim">{t('fittings.stats.priceHub')}</span>
-      {select}
+      {field}
     </div>
   );
 }

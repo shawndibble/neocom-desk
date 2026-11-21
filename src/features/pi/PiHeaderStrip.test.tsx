@@ -4,6 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
+import { resetHubStores } from '@/test/hubStores';
+import { useMarketHub } from '@/features/market/hub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { PiHeaderStrip } from './PiHeaderStrip';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
 import { routeExposure } from '@/features/route/routeExposure';
@@ -44,6 +47,7 @@ beforeEach(async () => {
   located.systemId = null;
   located.calls = [];
   await db.settings.clear();
+  resetHubStores();
   usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: false });
 });
 
@@ -91,7 +95,7 @@ describe('PiHeaderStrip', () => {
     renderStrip({ colonySystemIds: [30000142], estimate: true });
     const strip = await screen.findByTestId('pi-header-strip');
     expect(screen.queryByRole('button', { name: /PI settings/i })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('combobox', { name: 'Where do you sell?' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /, Where do you sell\?$/ })).toHaveLength(1);
     // Home and the colony count are not at a glance: they wait behind the "i".
     expect(within(strip).queryByText('Colonies')).not.toBeInTheDocument();
     const facts = await openFacts();
@@ -105,7 +109,7 @@ describe('PiHeaderStrip', () => {
     const chip = within(strip).getByRole('button', { name: 'Estimated prices' });
     expect(chip).toHaveTextContent(/est\./i);
     await userEvent.hover(chip);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/projection from current market/i);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/estimate from current prices/i);
   });
 
   it('shows EVE time where asked (Colonies), and only there', async () => {
@@ -147,6 +151,9 @@ describe('PiHeaderStrip', () => {
       expect(hint).toHaveTextContent('Nearest hub: Hek, 9 jumps');
       await userEvent.click(within(hint).getByRole('button', { name: 'Sell at Hek' }));
       expect(usePiSettings.getState().value).toMatchObject({ hub: 'hek', hubChosen: true });
+      // The nudge is about the colonies, so it gives PI its own hub and leaves Global alone.
+      await waitFor(() => expect(usePageHubs.getState().value).toEqual({ pi: 'hek' }));
+      expect(useMarketHub.getState().value).toBe('jita');
       await waitFor(() => expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument());
     });
 

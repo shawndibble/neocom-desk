@@ -33,10 +33,10 @@ import {
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
 import type { FittingCargoItem, FittingStats } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { getTradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { formatIsk } from '@/lib/isk';
 import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { abyssalVerdict } from './abyssalVerdict';
@@ -86,13 +86,17 @@ function useRunDelta(
  */
 function useFilamentPrice(typeId: number | null, hubId: string): number | null {
   const hub = getTradeHub(hubId);
+  const percent = usePricePercentFor('fittings');
   const load = useCallback(async () => {
     if (!hub || typeId === null) return null;
-    const prices = await getHubPrices(hub, [typeId]);
+    const prices = await getHubPricesAt(hub, [typeId], percent);
     return prices.get(typeId)?.sellMin ?? null;
-  }, [hub, typeId]);
+  }, [hub, typeId, percent]);
   // A failed lookup reads as no price.
-  return useKeyedLoad(typeId === null || !hub ? null : `${hubId}:${typeId}`, load).data ?? null;
+  return (
+    useKeyedLoad(typeId === null || !hub ? null : `${hubId}:${percent}:${typeId}`, load).data ??
+    null
+  );
 }
 
 /** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */
@@ -122,8 +126,7 @@ export function AbyssalRunPlanner({
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const { tier, security, setTier, setSecurity } = useAbyssalRunPlan();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);

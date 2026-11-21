@@ -139,7 +139,7 @@ describe('AlertsWhenClosedSection', () => {
     expect(screen.queryByText(/needs? a login/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Alerts when closed/ }));
     expect(
-      await screen.findByText(/Every Character that is on has what its ticked Device alerts need/)
+      await screen.findByText(/Every Character that is on has the logins its Device alerts need/)
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Log in \d+ characters?/ })).toBeNull();
     // Beta's own row still offers the login.
@@ -227,7 +227,7 @@ describe('AlertsWhenClosedSection', () => {
     await turnOn(1);
     await renderSection();
     expect(
-      await screen.findByText(/Every Character that is on has what its ticked Device alerts need/)
+      await screen.findByText(/Every Character that is on has the logins its Device alerts need/)
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Log in/ })).toBeNull();
   });

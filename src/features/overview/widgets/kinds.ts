@@ -380,13 +380,23 @@ const SPECS = {
   },
   // The game clock (UTC); reads no feed, so it needs no permission and is always ready.
   eveTime: { category: 'travel', views: N, view: 'number', size: 'S', endpoints: [] },
+  // The Calendar widget: the Calendar page's agenda, with its own Types and Events settings.
   comingUp: {
     category: 'messages',
     views: NT,
     view: 'table',
     size: 'M',
     calendarEvents: true,
-    endpoints: ['getCharacterCalendar'],
+    // The Character reads behind the board; corp sources are gated by role and never ask here.
+    endpoints: [
+      'getCharacterCalendar',
+      'getCharacterSkillQueue',
+      'getCharacterIndustryJobs',
+      'getCharacterPlanets',
+      'getCharacterContracts',
+      'getCharacterOrders',
+      'getCharacterMercenaryDens',
+    ],
   },
   contracts: {
     category: 'messages',

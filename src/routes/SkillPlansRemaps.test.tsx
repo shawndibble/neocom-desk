@@ -89,7 +89,7 @@ describe('SkillPlans editor: optimize remaps', () => {
 
     expect(
       await screen.findByText(
-        'No remap improves this plan in its current order \u2014 keeping current attributes. Try "Reorder only" to group similar skills first, then optimize again.'
+        'No remap speeds up this plan in its current order, so your attributes stay as they are. Try "Reorder only" to group similar skills first, then optimize again.'
       )
     ).toBeInTheDocument();
     expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
@@ -132,12 +132,12 @@ describe('SkillPlans editor: optimize remaps', () => {
     await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
-      await screen.findByText('This plan has 0 remaps to spend, so nothing was placed.')
+      await screen.findByText('This plan has no remaps to spend, so none were placed.')
     ).toBeInTheDocument();
     expect(await within(toolbar).findByRole('status')).toHaveTextContent('No remaps to spend');
     // Not the order-blaming verdict, and not the generic inline confirmation.
     expect(screen.queryByText(/^No remap improves this plan/)).not.toBeInTheDocument();
-    expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
+    expect(screen.queryByText('No time saved')).not.toBeInTheDocument();
   });
 
   it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {
@@ -310,12 +310,12 @@ describe('SkillPlans editor: remap markers', () => {
 
     expect(
       await screen.findByText(
-        'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
+        'Every remap marker is at the end of the plan, so it speeds up nothing. Drag a marker above the skills it should speed up.'
       )
     ).toBeInTheDocument();
     expect(await within(toolbar).findByText('No marker splits the plan')).toBeInTheDocument();
     expect(screen.queryByText(/^Remapping at these markers/)).not.toBeInTheDocument();
-    expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
+    expect(screen.queryByText('No time saved')).not.toBeInTheDocument();
     // No segment list under the message: the only segment is the whole plan
     // on current attributes, which reads as a contradiction of it.
     expect(screen.queryByText(/^Segment 1/)).not.toBeInTheDocument();
@@ -391,7 +391,7 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     // An answer for one remap, shown for a plan that asks for three, is the
     // silent-degradation failure this planner keeps running into.
     await optimize(3);
-    expect(screen.getByText(/Evaluated with 2 remaps/i)).toBeInTheDocument();
+    expect(screen.getByText(/Worked out with 2 remaps/i)).toBeInTheDocument();
   });
 
   it.each([1, 2])('says nothing when the plan asks for %i remap(s)', async (available) => {

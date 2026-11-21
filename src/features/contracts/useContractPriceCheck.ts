@@ -19,18 +19,22 @@ import {
   type PriceCheckLine,
 } from '@/engine/contracts/contractPriceCheck';
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
+import type { PageHubArea } from '@/features/market/pageHubs';
+import { atPercent, usePricePercentFor } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import type { TradeHub } from '@/market/hubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
 import { formatContractIsk } from '@/lib/isk';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import type { PriceCheckFlip, PriceCheckRowModel } from './ContractPriceCheck';
+import type { PriceCheckFlip, PriceCheckHubMenu, PriceCheckRowModel } from './ContractPriceCheck';
 import { loadContractPrices, type PriceBasisChoice } from './contractPrices';
 
 export interface ContractPriceCheckView {
   heading: string;
   rows: PriceCheckRowModel[];
   flip: PriceCheckFlip;
+  hubMenu?: PriceCheckHubMenu;
   message?: string;
   busy: boolean;
   /**
@@ -52,6 +56,8 @@ export interface ContractPriceCheckArgs {
   /** An Open Price of a past UTC day, or the live book. */
   basis: PriceBasisChoice;
   hub: TradeHub;
+  /** The page area `hub` was resolved for: the heading's hub opens its `HubMenu`. Absent, it is plain text. */
+  hubArea?: PageHubArea;
   defaultSide: PriceSide;
   /** Live sell prices for what the hub never lists (PLEX). Keep the map stable between renders: a new one reloads the prices. */
   sellOverrides?: ReadonlyMap<number, number>;
@@ -91,6 +97,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     asking,
     basis,
     hub,
+    hubArea,
     defaultSide,
     sellOverrides,
     searchedTypeIds = null,
@@ -100,6 +107,9 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
   const { t } = useTranslation();
   const unavailableLabel = usePricesUnavailableLabel();
   const [side, setSide] = useState<PriceSide>(defaultSide);
+  // The page's Buy/Sell percent (#6531) scales the hub's prices; without a hub menu there is no percent to set.
+  const pagePercent = usePricePercentFor(hubArea ?? 'contracts');
+  const percent = hubArea ? pagePercent : DEFAULT_PRICE_PERCENT;
 
   const swap = requested.length > 0;
   const typeIds = [...new Set([...included, ...requested].map((line) => line.typeId))].sort(
@@ -134,6 +144,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       showOther: t('contractDetail.priceCheckShowSide', { side: wordOf(other).toLowerCase() }),
       onFlip: () => setSide(other),
     },
+    hubMenu: hubArea && { hub, area: hubArea, side },
   };
 
   if (load.status !== 'ready') {
@@ -142,7 +153,19 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       : { ...view, rows: [], busy: true };
   }
 
-  const { prices, unreachable } = load.data;
+  const { unreachable } = load.data;
+  const prices =
+    percent === DEFAULT_PRICE_PERCENT
+      ? load.data.prices
+      : new Map(
+          [...load.data.prices].map(([typeId, p]) => [
+            typeId,
+            {
+              buy: p.buy === null ? null : atPercent(p.buy, percent),
+              sell: p.sell === null ? null : atPercent(p.sell, percent),
+            },
+          ])
+        );
   const check = swap
     ? itemSwapPriceCheck({ included, requested, prices, side })
     : iskPriceCheck({ asking, included, prices, side });

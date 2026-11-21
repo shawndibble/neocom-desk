@@ -189,11 +189,7 @@ export function SrpSettingsEditor({
               </label>
               <span className="text-sm">{t('srp.settings.onValue')}</span>
             </Field>
-            <Field
-              label={t('srp.settings.linkLabel')}
-              htmlFor={`${uid}-link`}
-              note={t('srp.settings.linkNote')}
-            >
+            <Field label={t('srp.settings.linkLabel')} htmlFor={`${uid}-link`}>
               {phone ? (
                 <p id={`${uid}-link`} className="w-full truncate text-sm text-text-dim">
                   {link}
@@ -303,12 +299,7 @@ export function SrpSettingsEditor({
               </FieldError>
             )}
           </Field>
-          <Field
-            label={t('srp.settings.fleetLabel')}
-            htmlFor={`${uid}-fc`}
-            inline
-            note={t('srp.settings.fleetNote')}
-          >
+          <Field label={t('srp.settings.fleetLabel')} htmlFor={`${uid}-fc`} inline>
             <label className={touchCheckboxLabelClassName}>
               <Checkbox
                 id={`${uid}-fc`}

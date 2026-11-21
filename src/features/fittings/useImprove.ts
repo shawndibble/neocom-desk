@@ -11,7 +11,8 @@ import type { HullRef } from '@/engine/fittings/improve';
 import type { ChargeLoadStep } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { createWorkerPool, searchPoolSize, type WorkerPool } from './fittingWorker';
 import { fitCheckOf, modulePool } from './improveModulePool';
 import {
@@ -93,7 +94,8 @@ export function useImprove(
   config: ImproveConfig,
   chargePlan: readonly ChargeLoadStep[] = NO_CHARGES
 ): ImproveSearch {
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
+  const percent = usePricePercentFor('fittings');
   // The plan and config are new objects each render; the search reruns only when their content changes.
   const chargePlanKey = JSON.stringify(chargePlan);
   const configKey = JSON.stringify(config);
@@ -152,6 +154,7 @@ export function useImprove(
       variants,
       catalogue,
       hubId,
+      percent,
       workers: () => (poolRef.current ??= createWorkerPool(searchPoolSize())),
     });
     runImproveSearch(request, ports, {
@@ -179,7 +182,19 @@ export function useImprove(
       setCompletion(null);
       clearTimeout(slowTimer);
     };
-  }, [enabled, variants, catalogue, goal, hull, target, hubId, attempt, configKey, chargePlanKey]);
+  }, [
+    enabled,
+    variants,
+    catalogue,
+    goal,
+    hull,
+    target,
+    hubId,
+    percent,
+    attempt,
+    configKey,
+    chargePlanKey,
+  ]);
 
   const cancel = useCallback(() => cancelRef.current(), []);
   const showBestSoFar = useCallback(() => {

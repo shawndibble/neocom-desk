@@ -1,5 +1,10 @@
-import { figureOpenerClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import {
+  figureOpenerClassName,
+  popoverValueClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { Pill } from '@/components/ui/Pill';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { useNeedsLogin } from '@/stores/authFailure';
@@ -55,6 +60,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
 import { MyOrderMark } from '@/features/market/marketOrderCells';
+import { HubMenu } from '@/features/market/HubMenu';
 import { cx } from '@/lib/cx';
 import { OfflineStrip } from '@/app/OfflineBanner';
 import { MissingGrantBadge } from '@/features/notifications/ScheduledPushBadge';
@@ -250,6 +256,19 @@ export function InteractionGrammar() {
             {k('samples.figureBreakdown')}
           </button>
         </Cue>
+        <Cue rule={k('rules.hubMenu')}>
+          <span className="text-[0.6875rem] text-text-dim">
+            <span className={eyebrowClassName}>{k('samples.hubMenuTitle')}</span>
+            {' · '}
+            <HubMenu
+              area="contracts"
+              triggerClassName={popoverValueClassName}
+              triggerLabel={k('samples.hubMenu')}
+            >
+              {k('samples.hubMenu')}
+            </HubMenu>
+          </span>
+        </Cue>
         <Cue rule={k('rules.infoTooltip')}>
           <span>{k('samples.term')}</span>
           <InfoTooltip label={k('samples.infoLabel')} content={k('samples.infoContent')} />
@@ -301,6 +320,13 @@ export function InteractionGrammar() {
           <span className="inline-flex items-center gap-1">
             {k('samples.editableValue')}
             <Icon.Rename size={Icon.ICON_SIZE.sm} className="text-text-faint" aria-hidden="true" />
+          </span>
+        </Cue>
+        <Cue rule={k('rules.editGenerated')}>
+          <span className="flex flex-wrap items-center gap-2">
+            <Pill tone="accent">{k('samples.edited')}</Pill>
+            <Button size="sm">{k('samples.editMail')}</Button>
+            <Button size="sm">{k('samples.standardMail')}</Button>
           </span>
         </Cue>
         <Cue rule={k('rules.assumed')}>

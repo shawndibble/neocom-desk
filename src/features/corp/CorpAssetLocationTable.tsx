@@ -1,7 +1,8 @@
 /**
  * Corp assets, grouped by location (issue #4671): a group per office with a
  * row per division (and its Corp deliveries), and on All a group for every
- * other place. A row opens the by-item view filtered to it.
+ * other place. A row opens the by-item view filtered to it; its caret unfolds
+ * what it holds, nested by container (`CorpAssetContents`).
  */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,8 @@ import { Pill } from '@/components/ui/Pill';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { buildContentsTree } from '@/engine/corp/assetLedger';
+import type { AssetNameMap } from '@/engine/assetNames';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
@@ -22,6 +25,7 @@ import {
 } from './corpAssetsColumns';
 import type { LedgerLabels, LocationRow } from './assetLedgerView';
 import { corpAssetLocationCsvColumns } from './corpAssetsCsv';
+import { CorpAssetContents } from './CorpAssetContents';
 
 /** `undefined` sinks a row to the end of its group in either sort direction: Corp deliveries always lists after the divisions. */
 function sinkDeliveries<V extends string | number | undefined>(
@@ -36,6 +40,7 @@ const SORTABLE_IDS = ['place', ...CORP_ASSET_LOCATION_COLUMN_IDS];
 export function CorpAssetLocationTable({
   rows,
   labels,
+  assetNames,
   onOpenRow,
   renderToolbar,
   truncated,
@@ -43,6 +48,8 @@ export function CorpAssetLocationTable({
 }: {
   rows: readonly LocationRow[];
   labels: LedgerLabels;
+  /** In-game names of containers and ships, for the unfolded contents. */
+  assetNames: AssetNameMap;
   /** Opens the by-item view filtered to this row. */
   onOpenRow: (row: LocationRow) => void;
   renderToolbar: (columnPicker: ReactNode, exportMenu: ReactNode) => ReactNode;
@@ -171,6 +178,23 @@ export function CorpAssetLocationTable({
             mobileSort
             onRowClick={onOpenRow}
             rowClickable={(r) => r.cell.itemCount > 0}
+            expandableRow={{
+              leadingIcon: true,
+              trigger: 'button',
+              toggleLabel: (r) => t('corp.assets.contentsOf', { place: r.label }),
+              renderDetail: (r) =>
+                r.cell.itemCount === 0 ? (
+                  <p className="px-3 py-1 text-sm text-text-dim">
+                    {t('corp.assets.nothingStored')}
+                  </p>
+                ) : (
+                  <CorpAssetContents
+                    nodes={buildContentsTree(r.cell.stacks)}
+                    labels={labels}
+                    assetNames={assetNames}
+                  />
+                ),
+            }}
             groupBy={{
               key: (r) => r.groupKey,
               allWidths: true,

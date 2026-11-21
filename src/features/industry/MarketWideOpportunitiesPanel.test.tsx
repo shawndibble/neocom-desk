@@ -611,7 +611,7 @@ describe('MarketWideOpportunitiesPanel data age and failure (#2845)', () => {
       const user = userEvent.setup();
       renderPanel();
       expect(screen.getByText('The scan failed')).toBeInTheDocument();
-      expect(screen.queryByText(/cleared the liquidity floor/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/sells often enough at this hub/)).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Try again' }));
       expect(hookState.run).toHaveBeenCalledTimes(1);
     } finally {

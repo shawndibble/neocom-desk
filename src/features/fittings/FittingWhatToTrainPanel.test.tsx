@@ -470,12 +470,12 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
       </MemoryRouter>
     );
     await screen.findByRole('region', { name: 'Tech II upgrades' });
-    expect(screen.queryByText(/no single skill level/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no skill level would change/i)).not.toBeInTheDocument();
     unmount();
 
     upgradeState.rows = [];
     renderPanel();
-    expect(await screen.findByText(/no single skill level/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no skill level would change/i)).toBeInTheDocument();
   });
 });
 

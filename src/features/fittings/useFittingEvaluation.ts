@@ -20,7 +20,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { applyImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useStatsConditions } from './statsConditions';
 import { useChargeBasis } from './useChargeBasis';
@@ -31,7 +32,6 @@ import { loadFittingPrice } from './fittingPrice';
 import { useDogmaEngine } from './fittingContext';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
   offThreadStatsUnder,
   sharedBaseline,
@@ -169,16 +169,16 @@ export function useFittingEvaluation({
   }, [fitting, pilot, damageProfile, conditions, attempt]);
 
   // Priced at the pilot's Trade Hub (Settings, or the Price section's select).
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
+  const percent = usePricePercentFor('fittings');
 
   // The clone's implants are already bought: priced like the multibuy list, without them.
   const cloneImplants = profile?.implantTypeIds;
   // Keyed by hull: a different hull drops the old price, an edit refreshes behind it.
   const loadPrice = useCallback(async () => {
     const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-    return loadFittingPrice(fitting!, hub, cloneImplants);
-  }, [fitting, hubId, cloneImplants]);
+    return loadFittingPrice(fitting!, hub, cloneImplants, percent);
+  }, [fitting, hubId, cloneImplants, percent]);
   const price: Appraisal | null =
     useKeyedLoad(fitting === null ? null : String(fitting.shipTypeId), loadPrice, !hubHydrated)
       .data ?? null;

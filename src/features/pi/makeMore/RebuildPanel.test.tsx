@@ -36,7 +36,7 @@ function renderRebuilds(reason: string) {
 describe('RebuildPanel, a colony with no rebuild advice', () => {
   it('says a missing planet size is why, and still shows what it earns today', () => {
     renderRebuilds('needs-link-cost');
-    expect(screen.getByText(/we don't have this planet's size/)).toBeInTheDocument();
+    expect(screen.getByText(/we don't know this planet's size/)).toBeInTheDocument();
     expect(screen.queryByText(/we can't measure this colony/)).toBeNull();
     expect(screen.getByText('1.2M')).toBeInTheDocument();
   });
@@ -74,7 +74,7 @@ describe('RebuildPanel, colonies that keep their setup', () => {
       'aria-expanded',
       'false'
     );
-    expect(screen.queryByText(/we don't have this planet's size/)).toBeNull();
+    expect(screen.queryByText(/we don't know this planet's size/)).toBeNull();
   });
 
   it('opens the fold when a link points at a folded colony', () => {

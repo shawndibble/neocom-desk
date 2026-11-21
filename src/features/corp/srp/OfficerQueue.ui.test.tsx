@@ -223,7 +223,9 @@ describe('OfficerQueue pending', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
     expect(data.approve).toHaveBeenCalled();
     expect(
-      await findLine(/Approved Pilot1.*No mail sent: mail permission missing\./)
+      await findLine(
+        /Approved Pilot1.*No mail sent: your character has not allowed sending EVE mail\./
+      )
     ).toBeInTheDocument();
   });
 

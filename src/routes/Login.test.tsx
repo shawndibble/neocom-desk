@@ -326,7 +326,7 @@ describe('Login', () => {
       'Contracts',
       'Mail',
       'Location and ship',
-      'Coming up',
+      'Calendar',
       'Wallet',
       'Mining survey',
       'Wallet flow',

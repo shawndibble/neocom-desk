@@ -48,6 +48,9 @@ const FIXTURE_SKILLS: SkillType[] = [
   },
 ];
 
+// The Calendar widget's board reads Shared Pops through a callable: no Firebase here.
+vi.mock('@/sync/sharedPops', () => ({ fetchSharedPops: async () => [] }));
+
 vi.mock('@/sde/loadMarketSde', () => ({
   loadNpcStations: vi.fn(async () => []),
   loadMarketGroups: vi.fn(async () => []),
@@ -266,7 +269,7 @@ describe('Overview widget grid', () => {
 
     await user.click(screen.getByRole('button', { name: /just the basics/i }));
 
-    for (const name of ['Wallet', 'Training', 'Coming up', 'Mail']) {
+    for (const name of ['Wallet', 'Training', 'Calendar', 'Mail']) {
       expect(await widgetCard(name)).toBeInTheDocument();
     }
     await waitFor(async () =>
@@ -402,25 +405,39 @@ describe('Overview widget grid', () => {
     expect(within(orders).getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
   });
 
-  it('says what is missing and what the widget is for, and its ⋮ menu removes and saves it', async () => {
+  it("lists the Calendar's clocks, not only its events, and its ⋮ menu removes and saves it", async () => {
     const user = userEvent.setup();
     await grantScopes([CALENDAR_SCOPE]);
     await seedLayout(widget('w', 'wallet', { size: 'S' }), widget('c', 'comingUp'));
     renderOverviewRoute();
 
-    const coming = await widgetCard('Coming up');
-    expect(
-      await within(coming).findByText('No accepted or tentative events ahead.')
-    ).toBeInTheDocument();
-    expect(
-      within(coming).getByText('Calendar events you accepted or may attend')
-    ).toBeInTheDocument();
+    const coming = await widgetCard('Calendar');
+    // No events on the calendar, but the skill queue is a Calendar clock too.
+    expect(await within(coming).findByText('Type #3300 V')).toBeInTheDocument();
+
+    // Its own Types filter: switching the skill queue off hides the row, on this widget only.
+    await user.click(within(coming).getByRole('button', { name: 'Settings for Calendar' }));
+    const types = await screen.findByRole('menuitem', { name: 'Types' });
+    types.focus();
+    await user.keyboard('{ArrowRight}');
+    const skills = await screen.findByRole('menuitemcheckbox', { name: 'Skill queue' });
+    skills.focus();
+    await user.keyboard(' ');
+    expect(skills).toHaveAttribute('aria-checked', 'false');
+    await user.keyboard('{Escape}{Escape}');
+    await waitFor(async () => {
+      const row = await db.settings.get(OVERVIEW_LAYOUT_KEY);
+      const stored = (row?.value as OverviewLayout).widgets.find((w) => w.kind === 'comingUp');
+      expect(stored?.hiddenKinds).toEqual(['skillTraining']);
+    });
+    await waitFor(() => expect(within(coming).queryByText('Type #3300 V')).toBeNull());
+
     expect(within(coming).queryByRole('button', { name: /remove/i })).toBeNull();
-    await user.click(within(coming).getByRole('button', { name: 'Settings for Coming up' }));
+    await user.click(within(coming).getByRole('button', { name: 'Settings for Calendar' }));
     await user.click(screen.getByRole('menuitem', { name: 'Remove from Overview' }));
 
     await waitFor(() =>
-      expect(screen.queryByRole('region', { name: 'Coming up' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Calendar' })).not.toBeInTheDocument()
     );
     expect(await widgetCard('Wallet')).toBeInTheDocument();
     await waitFor(async () => expect(await storedKinds()).toEqual(['wallet']));

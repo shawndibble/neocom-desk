@@ -19,7 +19,9 @@ import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { hubNowFor, loadHubFor } from '@/features/market/hub';
+import { pageHubEntry } from '@/features/market/pageHubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import {
   DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
   type ActivityFacilityDefaults,
@@ -100,6 +102,30 @@ export function mostRecentlyUpdatedPlan(
 ): BuildPlanRecord | null {
   if (!plans || plans.length === 0) return null;
   return plans.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));
+}
+
+/**
+ * The Trade Hub a new plan starts at: the Industry page hub when the pilot set
+ * one (issue #6523), else the plan it was started from (the pilot's latest),
+ * else the Global hub. Without an Industry entry a pilot's next plan still
+ * follows their last one, as before page hubs.
+ *
+ * Reads the settled stores: a caller outside the Industry page (which waits
+ * for them) awaits `loadNewPlanHubInputs()` first.
+ */
+export function newPlanHubId(defaultsFrom?: BuildPlanRecord | null): TradeHub['id'] {
+  if (pageHubEntry('industry') === undefined && defaultsFrom) return defaultsFrom.hubId;
+  return hubNowFor('industry');
+}
+
+/** `newPlanHubId` as the hub itself. */
+export function newPlanHub(defaultsFrom?: BuildPlanRecord | null): TradeHub {
+  return getTradeHub(newPlanHubId(defaultsFrom)) ?? DEFAULT_TRADE_HUB;
+}
+
+/** Reads what `newPlanHubId` depends on, for a caller that can run before any Industry page mounts. */
+export async function loadNewPlanHubInputs(): Promise<void> {
+  await loadHubFor('industry');
 }
 
 /** Fields a caller may set on the new plan beyond what the defaults decide. */
@@ -196,7 +222,7 @@ export function newBuildPlan(
     // Highsec when the record names no band: a record from before locations
     // were remembered, which is what every plan started at then.
     security: location.security ?? 'highsec',
-    hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
+    hubId: newPlanHubId(defaultsFrom),
     // A pilot who builds in one system builds their next thing there too, and
     // re-typing it every plan is the annoyance issue #456 removed. The pair is
     // one fact — a plan holding half of it builds at its hub.

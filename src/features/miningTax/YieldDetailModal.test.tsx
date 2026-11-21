@@ -239,10 +239,10 @@ describe('YieldDetailModal', () => {
     expect(screen.getByText(/Jita sell on 2026-09-08/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Reprocessing and Reprocessing Efficiency skills at your 50% facility base yield \(50.0% yield\), less 0% reprocessing tax/
+        /Reprocessing and Reprocessing Efficiency skills and your 50% facility base yield, giving 50.0% yield\. Then 0% reprocessing tax is taken off/
       )
     ).toBeInTheDocument();
-    expect(screen.getByText(/no Jita price on this basis/)).toBeInTheDocument();
+    expect(screen.getByText(/no Jita price for this setting/)).toBeInTheDocument();
   });
 
   describe('refining hidden (issue #1281)', () => {

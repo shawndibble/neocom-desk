@@ -72,7 +72,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     // and the "no remaps" state was reached deliberately, so the header has
     // had its chance to render a badge and chose not to.
     await screen.findByText(
-      "Remaps: 0 (from this plan's saved value — ESI attributes unavailable)"
+      "Remaps: 0 (saved with this plan, because your attributes didn't load)"
     );
 
     expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
@@ -143,7 +143,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await openPlanTools();
 
     expect(
-      await screen.findByText('Remaps: 2 bonus now · yearly from 2027-01-15')
+      await screen.findByText('Remaps: 2 bonus · yearly remap from 2027-01-15')
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
@@ -153,7 +153,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
     // cooldown, so only the 2 bonus remaps count.
     expect(
-      await screen.findByText('Remaps: 2 bonus now · yearly from 2027-01-15')
+      await screen.findByText('Remaps: 2 bonus · yearly remap from 2027-01-15')
     ).toBeInTheDocument();
     const created = (await db.skillPlans.where('characterId').equals(CHAR_ID).toArray()).find(
       (p) => p.name === 'Untitled plan'
@@ -177,14 +177,14 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     renderSkillsRoutes();
     await openPlanTools();
 
-    expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+    expect(await screen.findByText('Remaps: 1 bonus · yearly remap ready')).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
     // The cooldown date is already past, so the new plan's derived display
     // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
-    expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+    expect(await screen.findByText('Remaps: 1 bonus · yearly remap ready')).toBeInTheDocument();
   });
 });
 

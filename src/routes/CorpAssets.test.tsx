@@ -502,6 +502,40 @@ describe('group by location', () => {
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
+  it("unfolds a division's caret into its containers and their contents", async () => {
+    const user = userEvent.setup();
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([
+        ...ledgerFixture(),
+        asset({
+          item_id: 6,
+          type_id: 587,
+          location_id: 100,
+          location_type: 'item',
+          location_flag: 'CorpSAG1',
+          is_singleton: true,
+        }),
+        asset({
+          item_id: 7,
+          type_id: 35,
+          quantity: 40,
+          location_id: 6,
+          location_type: 'item',
+          location_flag: 'Cargo',
+        }),
+      ])
+    );
+    await ledger('/corp/assets?group=location');
+    await user.click(await screen.findByRole('button', { name: 'Contents of Ships' }));
+    const container = await screen.findByRole('button', { name: /Rifter/, expanded: false });
+    expect(screen.queryByText('×40')).not.toBeInTheDocument();
+    await user.click(container);
+    expect(container).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('×40')).toBeInTheDocument();
+    // The caret only unfolds: the row's own click still opens the by-item view.
+    expect(currentLocation()).toBe('/corp/assets?group=location');
+  });
+
   it('lists only the divisions in use, with a count, and folds an empty office', async () => {
     await ledger('/corp/assets?group=location');
     expect(await screen.findByText('Empty office')).toBeInTheDocument();
@@ -554,7 +588,7 @@ describe('truncation', () => {
   it('surfaces truncation with the count fetched', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(cached(ledgerFixture(), { truncated: true }));
     await ledger();
-    expect(await screen.findByText(/Only the first 7 assets were fetched/)).toBeInTheDocument();
+    expect(await screen.findByText(/Showing the first 7 assets/)).toBeInTheDocument();
   });
 });
 

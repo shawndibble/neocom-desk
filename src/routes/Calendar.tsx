@@ -21,9 +21,8 @@ import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
 import { sharedPopDetail } from '@/features/character/sharedPopDetail';
 import { useSharedPopParam } from '@/features/character/sharedPopLink';
 import {
-  dropEventsOfSharedPops,
+  boardSourcesWithSharedPops,
   sharedPopDeadlineMs,
-  toSharedPopSources,
 } from '@/features/character/calendarSharedPops';
 import { useSharedPopTime } from '@/features/character/calendarSharedPopTime';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
@@ -272,30 +271,24 @@ export function Calendar() {
    * already-converted array from the raw `events` above — so the override
    * has to be applied here too, not just to `events`.
    */
-  const boardSources = useMemo(() => {
-    if (!data) return undefined;
-    const readable = new Set(data.readableRefineries);
-    // A pop the corp also put in the in-game calendar is one row: the pop, at the Pop Time the
-    // viewer picked, and not the event (calendarSharedPops.ts).
-    const calendarEvents = data.calendarEvents
-      ? dropEventsOfSharedPops(
+  const boardSources = useMemo(
+    () =>
+      data &&
+      // A pop the corp also put in the in-game calendar is one row: the pop, at the Pop Time the
+      // viewer picked, and not the event (calendarSharedPops.ts).
+      boardSourcesWithSharedPops(
+        data,
+        sharedPopTime,
+        data.calendarEvents &&
           applyResponseOverrides(
             data.calendarEvents,
             activeOverrides,
             (source) => Number(source.id),
             (source, response) => ({ ...source, response })
-          ),
-          data.sharedPops,
-          readable,
-          data.loadedAtMs,
-          sharedPopTime
-        )
-      : undefined;
-    const sharedMoonPops =
-      data.sharedMoonPops &&
-      toSharedPopSources(data.sharedPops, readable, data.loadedAtMs, sharedPopTime);
-    return { ...data, calendarEvents, sharedMoonPops };
-  }, [data, activeOverrides, sharedPopTime]);
+          )
+      ),
+    [data, activeOverrides, sharedPopTime]
+  );
 
   const board = useMemo(
     () => (boardSources ? buildCharacterBoard({ nowMs, ...boardSources }) : []),

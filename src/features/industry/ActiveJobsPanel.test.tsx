@@ -289,7 +289,7 @@ describe('ActiveJobsPanel: rendering', () => {
     // The whole point: an idle panel is its own header line, not a card that
     // stands taller than the same panel with jobs running in it.
     expect(await screen.findByText('None')).toBeInTheDocument();
-    expect(screen.queryByText('No active jobs cached')).toBeNull();
+    expect(screen.queryByText('Job data not loaded yet')).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
     // Still a working title line: the age badge and the refresh button stay.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
@@ -304,7 +304,7 @@ describe('ActiveJobsPanel: rendering', () => {
         </FakeItemActions>
       </MemoryRouter>
     );
-    expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
+    expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
   });
 });
 
@@ -337,7 +337,7 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
 
     expect(await screen.findByText('Pilot One: grant Industry')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).toBeNull();
-    expect(screen.queryByText('No active jobs cached')).toBeNull();
+    expect(screen.queryByText('Job data not loaded yet')).toBeNull();
   });
 
   it('offers a real login action wired to beginEveLogin (UX-REVIEW #3)', async () => {
@@ -1369,7 +1369,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     // "No data cached", not "None" — a failed read must not read as an answer
     // of zero running jobs.
-    expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
+    expect(await screen.findByText('Job data not loaded yet')).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
     expect(screen.queryByText('None')).not.toBeInTheDocument();
   });

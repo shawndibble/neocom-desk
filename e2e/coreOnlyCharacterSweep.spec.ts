@@ -53,7 +53,7 @@ const TAB_PATHS = Object.values(PAGE_TABS).flatMap((page) =>
 );
 
 /** reauth.refusedHint — said only where EVE refused a saved login, never for a Permission not granted. */
-const STALE_GRANT_TITLE = 'EVE refused the saved login.';
+const STALE_GRANT_TITLE = 'EVE no longer accepts the saved login.';
 /** error.title — the ErrorBoundary fallback for an uncaught render throw. */
 const ERROR_TITLE = 'Something went wrong';
 

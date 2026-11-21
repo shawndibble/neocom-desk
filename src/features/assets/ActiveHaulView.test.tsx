@@ -139,7 +139,7 @@ describe('ActiveHaulView', () => {
       },
     });
     expect(
-      screen.getByText(/Rens VI \(Alice\): 4 m³ has units worth more than your ISK limit/)
+      screen.getByText(/Rens VI \(Alice\): 4 m³ has single units worth more than your ISK limit/)
     ).toBeTruthy();
   });
 
@@ -392,7 +392,7 @@ describe('ActiveHaulView', () => {
 
   it('warns that stock may look stale once every leg is done', () => {
     renderView(undefined, {}, [0, 1, 2]);
-    expect(screen.getByText(/may show the old stock until ESI refreshes/)).toBeTruthy();
+    expect(screen.getByText(/may show the old stock for a while/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Replan from here' })).toBeNull();
   });
 

@@ -199,7 +199,7 @@ describe('CourierContractDetailModal route path', () => {
     routeExposure.mockResolvedValue({ kind: 'unknown' });
     renderModal();
 
-    expect(await screen.findByText(/Route not worked out/)).toBeInTheDocument();
+    expect(await screen.findByText(/Couldn't work out the route/)).toBeInTheDocument();
     expect(screen.getByText('2 jumps').tagName).not.toBe('BUTTON');
   });
 });

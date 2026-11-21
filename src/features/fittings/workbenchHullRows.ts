@@ -50,7 +50,9 @@ import {
   matchWorkbenchSightings,
   type WorkbenchSighting,
 } from '@/engine/fittings/workbenchSightings';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
+import { scaleHubPrices } from '@/features/market/hubPricesAtPercent';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -59,7 +61,6 @@ import { loadFittingFromText } from './loadFittingFromText';
 import { loadPopularFits, type PopularFitsResult } from './popularFits';
 import { yieldToEventLoop } from './yieldToEventLoop';
 import { loadWorkbenchFits, type WorkbenchFit, type WorkbenchFitsResult } from './workbenchFits';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** What the Workbench rows read from outside. */
 export interface WorkbenchHullSources {
@@ -293,9 +294,9 @@ export function useWorkbenchHullRows(
     [checks, popular, shipTypeId]
   );
 
-  const hubId = useMarketHub((state) => state.value);
-  useHydratedStore(useMarketHub);
+  const { hubId } = useHubFor('fittings');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const percent = usePricePercentFor('fittings');
   const { current, outOfDate } = useMemo(
     () =>
       partitionByCurrency(
@@ -327,12 +328,14 @@ export function useWorkbenchHullRows(
   const priceById = useMemo(() => {
     const priced = new Map<string, FitSellPrice>();
     if (listedChecks === null || prices === null) return priced;
+    // The Fittings page's price percent, on this page's copy of the hub's prices.
+    const atPercent = scaleHubPrices(prices, percent);
     for (const [id, check] of listedChecks) {
-      const price = fitSellPrice(check.items, prices);
+      const price = fitSellPrice(check.items, atPercent);
       if (price !== null) priced.set(id, price);
     }
     return priced;
-  }, [listedChecks, prices]);
+  }, [listedChecks, prices, percent]);
 
   const moduleTypeIds = useMemo(() => {
     if (listedChecks === null) return null;

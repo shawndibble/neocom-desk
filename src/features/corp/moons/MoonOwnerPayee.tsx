@@ -1,11 +1,12 @@
 import { useId, useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { PayeeNameField } from '@/features/miningTax/PayeeNameField';
 import type { PayeeEntityMatch } from '@/features/miningTax/payeeEntitySearch';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { DialogShell } from './BookDialogs';
-import { shortDate } from './moonsFormat';
+import { atDate } from './moonsFormat';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 
@@ -25,8 +26,9 @@ export function PayeeLine({
   setBy?: { name: string | null; at: number };
   onChange?: () => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
-  const date = setBy ? shortDate(new Date(setBy.at).toISOString()) : '';
+  const date = setBy ? atDate(setBy.at, zone) : '';
   return (
     <div className="space-y-1 text-sm">
       <p>
@@ -133,6 +135,7 @@ export function PayeeChangeStrip({
   /** The corporation whose officer changed it. */
   byName: string;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   // Read every render: the same strip may be handed another page's key.
   const [dismissedNow, setDismissedNow] = useState<string | null>(null);
@@ -150,7 +153,7 @@ export function PayeeChangeStrip({
       body={t('corpTaxBook.moons.payeeNotice.body', {
         payee: payeeName,
         by: byName,
-        date: shortDate(new Date(at).toISOString()),
+        date: atDate(at, zone),
       })}
       actions={
         <Button size="sm" variant="ghost" onClick={dismiss}>

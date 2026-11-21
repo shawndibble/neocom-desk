@@ -145,7 +145,7 @@ describe('ImprovePanel', () => {
     });
     expect(
       screen.getByText(
-        '2 launchers have no missiles loaded, so swaps are scored as if they held the best one.'
+        '2 launchers have no missiles loaded. Swaps are scored as if the best missile were loaded.'
       )
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Load best charge' }));
@@ -359,7 +359,7 @@ describe('ImprovePanel', () => {
     const [a, b] = screen.getAllByRole('checkbox');
     await userEvent.click(a);
     await userEvent.click(b);
-    expect(await screen.findByText(/over-run the CPU/)).toBeInTheDocument();
+    expect(await screen.findByText(/use more CPU than the ship has/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled();
     expect(
       await screen.findByText('Add one of these so the set fits:', {}, { timeout: 3000 })
@@ -612,7 +612,7 @@ describe('ImprovePanel', () => {
     const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
     renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });
     expect(
-      screen.getByText('Nothing could be added to this fit within the guardrails.')
+      screen.getByText('Nothing could be added to this fit within the limits.')
     ).toBeInTheDocument();
     expect(screen.queryByText(/No variation of a fitted/)).not.toBeInTheDocument();
   });
@@ -837,7 +837,7 @@ describe('ImprovePanel', () => {
       />
     );
     expect(screen.getByRole('status')).toHaveTextContent(
-      '2 miners have no crystal for Simple Asteroid ore, so they mine 24.7 m³/s; with Type B II, 55.6.'
+      '2 miners have no crystal for Simple Asteroid ore, so they mine 24.7 m³/s. With Type B II they would mine 55.6 m³/s.'
     );
     expect(screen.getByTestId('improve-best-found')).toHaveTextContent(
       'Now → best found Mines 24.7 → 57.1 m³/s'
@@ -1055,7 +1055,7 @@ describe('ImprovePanel', () => {
       const s = checked({ ...before, cpuUsed: before.cpuTotal + 10 }, done({ noDownside: [a] }));
       renderPanel(s, onApply, vi.fn(), settings(), { fitting });
       await userEvent.click(screen.getByRole('checkbox'));
-      expect(await screen.findByRole('alert')).toHaveTextContent('over-run the CPU');
+      expect(await screen.findByRole('alert')).toHaveTextContent('use more CPU than the ship has');
       expect(screen.getByRole('button', { name: 'Apply 1 change' })).toBeDisabled();
     });
 

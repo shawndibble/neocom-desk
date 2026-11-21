@@ -298,11 +298,12 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     { id: 'owed', label: t('srp.officer.tabs.owed'), count: counts.owed },
     { id: 'history', label: t('srp.officer.tabs.history') },
   ];
-  const empty = {
-    pending: [t('srp.officer.empty.pendingTitle'), t('srp.officer.empty.pendingHint')],
+  const emptyByTab: Record<QueueTab, [title: string, hint?: string]> = {
+    pending: [t('srp.officer.empty.pendingTitle')],
     owed: [t('srp.officer.empty.owedTitle'), t('srp.officer.empty.owedHint')],
     history: [t('srp.officer.empty.historyTitle'), t('srp.officer.empty.historyHint')],
-  }[tab];
+  };
+  const empty = emptyByTab[tab];
   const tickedTotal = sumAmounts(selectable.filter((c) => ticked.includes(c.killmailId)));
 
   return (

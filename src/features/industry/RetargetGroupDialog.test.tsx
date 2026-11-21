@@ -24,10 +24,15 @@ function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => ['esi-search.search_structures.v1'],
 }));
-vi.mock('@/stores/activeCharacter', () => ({
-  useActiveCharacter: (select: (s: { activeCharacterId: number | null }) => unknown) =>
-    select({ activeCharacterId: 91 }),
-}));
+vi.mock('@/stores/activeCharacter', () => {
+  const state = { activeCharacterId: 91, hydrated: true, hydrate: async () => {} };
+  return {
+    useActiveCharacter: Object.assign(
+      (select: (s: { activeCharacterId: number | null }) => unknown) => select(state),
+      { getState: () => state, subscribe: () => () => {} }
+    ),
+  };
+});
 const searchBuildLocations = vi.hoisted(() => vi.fn());
 vi.mock('./searchBuildLocations', () => ({ searchBuildLocations, MIN_SEARCH_LENGTH: 3 }));
 

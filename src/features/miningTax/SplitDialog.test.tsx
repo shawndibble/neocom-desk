@@ -306,7 +306,7 @@ describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () =
     await userEvent.clear(keepsBox());
     await userEvent.type(keepsBox(), '130');
 
-    expect(screen.getByText(/30 more than ESI reports yet/)).toBeInTheDocument();
+    expect(screen.getByText(/30 more than the game reports so far/)).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Jita landlord \(keeps\)/ })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Split · keep 30 more units' }));
 
@@ -328,7 +328,7 @@ describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () =
     await userEvent.type(keepsBox(), '500');
 
     expect(keepsBox()).toHaveValue('200');
-    expect(screen.getByText(/100 more than ESI reports yet/)).toBeInTheDocument();
+    expect(screen.getByText(/100 more than the game reports so far/)).toBeInTheDocument();
     expect(screen.getByText(/this UTC day only/)).toBeInTheDocument();
   });
 

@@ -466,7 +466,7 @@ describe('Skills', () => {
 
     renderSkillsRoutes();
 
-    expect(await screen.findByText(/no skill data cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no skills loaded yet/i)).toBeInTheDocument();
   });
 
   it('shows a re-login banner (not a silent offline empty state) on a 401 (BUG #3)', async () => {
@@ -479,7 +479,7 @@ describe('Skills', () => {
     renderSkillsRoutes();
 
     expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
-    expect(screen.queryByText(/no skill data cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no skills loaded yet/i)).not.toBeInTheDocument();
     const { beginEveLogin } = await import('@/app/loginFlow');
     screen.getByRole('button', { name: 'Log in' }).click();
     expect(beginEveLogin).toHaveBeenCalledWith(expect.objectContaining({ characterId: CHAR_ID }));

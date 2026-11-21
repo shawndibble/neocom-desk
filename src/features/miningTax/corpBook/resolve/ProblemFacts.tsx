@@ -1,6 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
+import { useTimeZone } from '@/lib/timeFormat';
+import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { formatList } from '@/lib/listFormat';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { IskText } from '../../IskText';
@@ -11,6 +12,7 @@ const k = (key: string) => `miningTax.resolve.facts.${key}`;
 
 /** What the app knows about a problem, above its choices: the figures, never advice. */
 export function ProblemFacts({ target }: { target: ResolveTarget }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { problem } = target;
   const corp = problem.corpName;
@@ -42,7 +44,7 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
                   <span className="font-semibold">
                     <IskText value={d.amount} />
                   </span>{' '}
-                  · {eveTimeLabel(Date.parse(d.at))}
+                  · {dateTimeAt(d.at, zone)}
                   {d.refId !== undefined && ` · ${t(k('journalRef'), { ref: d.refId })}`}
                 </li>
               ))}
@@ -64,7 +66,7 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
                 <span className="font-semibold">
                   <IskText value={d.amount} />
                 </span>{' '}
-                · {eveTimeLabel(Date.parse(d.at))}
+                · {dateTimeAt(d.at, zone)}
                 {d.refId !== undefined && ` · ${t(k('journalRef'), { ref: d.refId })}`}
                 {d.covered.length > 0 && ` · ${t(k('paidDays'), { days: d.covered.join(', ') })}`}
               </li>

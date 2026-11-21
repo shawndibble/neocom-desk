@@ -13,6 +13,7 @@ import type { BlueprintSource } from '@/engine/industry/blueprintObtainability';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { HUB_PRICE_TTL_MS } from '@/market/prices';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 
 /** Everything a scan's rows depend on. Sort, share, page size and the build-cost cap only re-view the rows, so they are not here. */
@@ -35,6 +36,8 @@ export interface MarketWideScanInputs {
   lpValue: number;
   /** The latest plan's price basis and build location (`planSettings`), which a plan starts from. */
   planSettings: unknown;
+  /** The Industry percent rows price at (issue #6531). Absent is 100. */
+  pricePercent?: number;
 }
 
 export function marketWideScanKey(inputs: MarketWideScanInputs): string {
@@ -52,6 +55,7 @@ export function marketWideScanKey(inputs: MarketWideScanInputs): string {
     inputs.facilityDefaults,
     inputs.lpValue,
     inputs.planSettings,
+    inputs.pricePercent ?? DEFAULT_PRICE_PERCENT,
   ]);
 }
 

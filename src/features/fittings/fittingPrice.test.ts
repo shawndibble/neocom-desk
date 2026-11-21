@@ -40,6 +40,21 @@ describe('loadFittingPrice', () => {
     expect(appraisal.totals.unpricedRows).toBe(0);
   });
 
+  it('prices at the page percent: 90% scales both sides', async () => {
+    getHubPricesMock.mockResolvedValue(
+      new Map([
+        [587, { buyMax: 500000, sellMin: 600000 }],
+        [2456, { buyMax: 1000, sellMin: 1500 }],
+      ])
+    );
+
+    const appraisal = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB, [], 90);
+
+    // (hull 600000 + module 1500) at 90%; the charge and drones have no price here.
+    expect(appraisal.totals.sell).toBeCloseTo(541350);
+    expect(appraisal.totals.buy).toBeCloseTo(450900);
+  });
+
   it('leaves an unpriced type out of the totals and counts it', async () => {
     getHubPricesMock.mockResolvedValue(new Map());
 

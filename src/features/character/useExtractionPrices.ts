@@ -1,14 +1,14 @@
 import { useCallback } from 'react';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import {
   extractionNet,
   LARGE_SKILL_INJECTOR_TYPE_ID,
   SKILL_EXTRACTOR_TYPE_ID,
 } from '@/engine/skills/spExtraction';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 
 export interface ExtractionPrices {
   hubName: string;
@@ -20,13 +20,14 @@ export interface ExtractionPrices {
 
 /** Net ISK per extraction at the saved market hub (sell injector − buy extractor). */
 export function useExtractionPrices(): ExtractionPrices {
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  // The Skills page's price percent, on both the injector and the extractor.
+  const percent = usePricePercentFor('skills');
 
   const load = useCallback(
     () =>
-      getHubPrices(hub, [LARGE_SKILL_INJECTOR_TYPE_ID, SKILL_EXTRACTOR_TYPE_ID])
+      getHubPricesAt(hub, [LARGE_SKILL_INJECTOR_TYPE_ID, SKILL_EXTRACTOR_TYPE_ID], percent)
         .then((prices) =>
           extractionNet(
             prices.get(LARGE_SKILL_INJECTOR_TYPE_ID)?.sellMin ?? null,
@@ -34,9 +35,9 @@ export function useExtractionPrices(): ExtractionPrices {
           )
         )
         .catch(() => null),
-    [hub]
+    [hub, percent]
   );
-  const result = useKeyedLoad(hubHydrated ? hub.id : null, load);
+  const result = useKeyedLoad(hubHydrated ? `${hub.id}:${percent}` : null, load);
 
   return { hubName: hub.systemName, loaded: result.status === 'ready', net: result.data ?? null };
 }

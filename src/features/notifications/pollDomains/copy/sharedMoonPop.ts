@@ -19,8 +19,9 @@ const PUSH_POP_TIME: Record<SharedPopTime, string> = {
 };
 
 /**
- * Title "Moon pop · [Refinery]", body "[Pop Time] at [time] · taxed by [corporation] · [rate]%"
- * (the scope decision's words); a chunk fractured early reads "Fractured early at [time]". Opening it opens the pop on the Calendar, which
+ * Title "Moon pop · [Refinery]", body "[Pop Time] at [time] · [Refinery] · taxed by [corporation] · [rate]%"
+ * (the scope decisions' words: the body names the refinery too because the Alerts panel row
+ * shows the body without the title); a chunk fractured early reads "Fractured early at [time]". Opening it opens the pop on the Calendar, which
  * `notificationOptions.ts`'s `occurrencePath` reads off the Occurrence Key.
  */
 export const sharedMoonPopCopy: DomainCopy<SharedMoonPopFire, SharedMoonPopNames> & {
@@ -31,12 +32,13 @@ export const sharedMoonPopCopy: DomainCopy<SharedMoonPopFire, SharedMoonPopNames
       fire.refineryName === null
         ? fired('sharedMoonPop', 'titleUnnamed')
         : fired('sharedMoonPop', 'title', { refinery: fire.refineryName }),
-    body: fired('sharedMoonPop', 'body', {
+    body: fired('sharedMoonPop', fire.refineryName === null ? 'body' : 'bodyAtRefinery', {
       popTime: fired(
         'sharedMoonPop',
         fire.early ? 'fracturedEarly' : fire.popTime === 'ready' ? 'ready' : 'autoFracture'
       ),
       when: names.when ?? '',
+      refinery: fire.refineryName ?? '',
       corporation: corporationOf(fire, names),
       rate: fire.ratePct,
     }),
@@ -46,7 +48,7 @@ export const sharedMoonPopCopy: DomainCopy<SharedMoonPopFire, SharedMoonPopNames
     assertProjectionWording('sharedMoonPop', 'assert');
     return {
       title: fire.refineryName === null ? 'Moon pop' : `Moon pop · ${fire.refineryName}`,
-      body: `${fire.early ? 'Fractured early' : PUSH_POP_TIME[fire.popTime]} at ${names.when ?? ''} · taxed by ${corporationOf(fire, names)} · ${fire.ratePct}%`,
+      body: `${fire.early ? 'Fractured early' : PUSH_POP_TIME[fire.popTime]} at ${names.when ?? ''}${fire.refineryName === null ? '' : ` · ${fire.refineryName}`} · taxed by ${corporationOf(fire, names)} · ${fire.ratePct}%`,
     };
   },
 };

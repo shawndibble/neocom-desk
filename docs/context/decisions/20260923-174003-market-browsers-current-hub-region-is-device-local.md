@@ -1,5 +1,7 @@
 # Scope decisions — Market Browser's current hub/region is device-local, not the synced default
 
+> **Superseded (2026-11-20, issue #6523):** the Market Browser's hub is now the synced Market page hub; see `20261120-223531-page-hubs-override-the-global-hub-per-page.md`.
+
 _Recorded 2026-09-23._
 
 - **The Market Browser page's own current hub/region moves to a new

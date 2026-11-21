@@ -265,7 +265,8 @@ describe('BuildPlanDetail build system', () => {
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
       30003888,
-      'manufacturing'
+      'manufacturing',
+      100
     );
   });
 
@@ -343,7 +344,8 @@ describe('BuildPlanDetail build system', () => {
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
       undefined,
-      'manufacturing'
+      'manufacturing',
+      100
     );
   });
 
@@ -614,7 +616,9 @@ describe('BuildPlanDetail profit if sold now (issue #5007)', () => {
     expect(await screen.findByText('Profit if sold now')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Calculations?' })[0]!);
     expect(
-      await screen.findByText('Priced at the highest buy order; a large quantity may fill lower.')
+      await screen.findByText(
+        'Priced at the highest buy order. A large quantity may sell for less.'
+      )
     ).toBeInTheDocument();
   });
 

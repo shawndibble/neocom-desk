@@ -121,7 +121,7 @@ describe('EventDetailModal', () => {
       );
       render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
       expect(await screen.findByText('Could not load')).toBeInTheDocument();
-      expect(screen.getByText(/You may be offline or ESI may be busy/)).toBeInTheDocument();
+      expect(screen.getByText(/You may be offline or EVE may be busy/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     });
 

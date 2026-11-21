@@ -196,7 +196,7 @@ describe('Settings — Notifications (issue #170)', () => {
       expect(rowCheckbox('Planetary extractor expiring', 'Alerts')).toBeInTheDocument();
     });
     // On the row's face, whether or not the row is open.
-    expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/arrives up to 72 hours ahead/i).length).toBeGreaterThan(0);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -474,7 +474,9 @@ describe('Settings — Notifications (issue #170)', () => {
 
     await openTopic(user, 'Corp');
     const corp = (await panel.findByRole('heading', { name: 'Corp' })).parentElement!.textContent!;
-    expect(at(corp, 'Best effort')).toBeLessThan(at(corp, 'Structure fuel low'));
+    expect(at(corp, 'Only alerts while the app is open')).toBeLessThan(
+      at(corp, 'Structure fuel low')
+    );
     expect(at(corp, 'Structure fuel low')).toBeLessThan(at(corp, 'Member joined'));
   });
 

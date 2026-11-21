@@ -3,31 +3,34 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
+import { usePageHubs } from '@/features/market/pageHubs';
+import { resetHubStores } from '@/test/hubStores';
 import { SurveyHubSelect } from './SurveyHubSelect';
-import { useSurveyPriceHub } from './surveyPref';
 
 afterEach(async () => {
   cleanup();
   await db.settings.clear();
-  useSurveyPriceHub.setState({ value: 'jita', hydrated: false });
+  resetHubStores();
 });
 
 describe('SurveyHubSelect', () => {
-  it('shows Jita until the pilot picks a hub, whatever their default Trade Hub', async () => {
-    await db.settings.put({ key: 'sync.marketHub', value: 'amarr' });
+  it("shows Mining's own hub over the Global hub", async () => {
+    await db.settings.bulkPut([
+      { key: 'sync.marketHub', value: 'amarr' },
+      { key: 'sync.pageHubs', value: { mining: 'jita' } },
+    ]);
     render(<SurveyHubSelect />);
     expect(
-      await screen.findByRole('combobox', { name: 'Price ore at market hub' })
+      await screen.findByRole('button', { name: 'Jita, Price ore at market hub' })
     ).toHaveTextContent('Jita');
   });
 
-  it('remembers the pick in the browser', async () => {
+  it("writes a pick to Mining's own hub when it has one", async () => {
+    await db.settings.put({ key: 'sync.pageHubs', value: { mining: 'jita' } });
     const user = userEvent.setup();
     render(<SurveyHubSelect />);
-    await user.click(await screen.findByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: 'Amarr' }));
-    await waitFor(async () =>
-      expect((await db.settings.get('miningSurveyPriceHub'))?.value).toBe('amarr')
-    );
+    await user.click(await screen.findByRole('button', { name: /Price ore at market hub$/ }));
+    await user.click(await screen.findByRole('button', { name: /^Amarr/ }));
+    await waitFor(() => expect(usePageHubs.getState().value).toEqual({ mining: 'amarr' }));
   });
 });

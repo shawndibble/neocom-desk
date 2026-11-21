@@ -377,7 +377,7 @@ describe('HaulingPanel table', () => {
     const dialog = await screen.findByRole('dialog', { name: 'How these items were picked' });
     expect(dialog).toHaveTextContent('1. Price gap');
     expect(dialog).toHaveTextContent('3. Order books');
-    expect(dialog).toHaveTextContent('Order books: live from ESI');
+    expect(dialog).toHaveTextContent('Order books: live from EVE');
   });
 
   it('select all in the strip unticks and reticks every row', async () => {

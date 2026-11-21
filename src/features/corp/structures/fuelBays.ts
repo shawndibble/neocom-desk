@@ -7,13 +7,14 @@
 import { fuelBays } from '@/engine/corp/fuelPlan';
 import { loadCorporationAssets } from '@/features/corp/assets';
 import { accountCorpReaders } from '@/features/corp/corpReadAccess';
+import { eveReadAtMs } from '@/features/corp/corpRead';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export interface CorpFuelBays {
   /** Blocks by structure id; a structure with an empty bay has no entry. */
   bays: ReadonlyMap<number, number>;
-  /** When the assets were read, for pairing with the structures' expiry. */
-  readAt: Date;
+  /** When EVE read the assets (`eveReadAtMs`), for pairing with the structures' expiry. */
+  readAtMs: number | null;
 }
 
 /** Fuel bays by corporation id, for each corporation whose assets could be read. */
@@ -27,7 +28,10 @@ export async function loadStructureFuelBays(): Promise<Map<number, CorpFuelBays>
       const { cached } = await loadCorporationAssets(characterId, corporationId);
       // A truncated read may be missing a bay: no number beats a short one.
       return cached && !cached.truncated
-        ? ([corporationId, { bays: fuelBays(cached.data), readAt: cached.fetchedAt }] as const)
+        ? ([
+            corporationId,
+            { bays: fuelBays(cached.data), readAtMs: eveReadAtMs(cached.expiresAt) },
+          ] as const)
         : null;
     })
   );

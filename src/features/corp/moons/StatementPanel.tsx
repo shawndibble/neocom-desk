@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { DAY_MS } from '@/lib/age';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +9,16 @@ import { StatementLines, StatementPayments } from '@/features/corpTaxBook/Statem
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
 import { useBook } from './useBook';
-import { dateTimeUtc, dateWithYear, isk, iskOrDash, periodLabel, shortDate } from './moonsFormat';
+import {
+  type ClockZone,
+  atDateWithYear,
+  dateTimeAt,
+  isk,
+  iskOrDash,
+  periodLabel,
+  shortDate,
+  atDate,
+} from './moonsFormat';
 import { DueWord } from './moonsParts';
 import { minerPath } from './moonsPaths';
 
@@ -24,7 +34,11 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Mail state from what the book recorded; who a mail went to and whether it was read are not stored. */
-function mailText(d: StatementDetail, t: (key: string, opts?: Record<string, unknown>) => string) {
+function mailText(
+  d: StatementDetail,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  zone: ClockZone
+) {
   const { statement } = d;
   const sent = statement.mailsSent ?? 0;
   const parts = [
@@ -33,7 +47,7 @@ function mailText(d: StatementDetail, t: (key: string, opts?: Record<string, unk
       : statement.lastMailedAt
         ? t(k('mailedLast'), {
             what: t(k('mailed'), { count: sent }),
-            date: dateTimeUtc(statement.lastMailedAt),
+            date: dateTimeAt(statement.lastMailedAt, zone),
           })
         : t(k('mailed'), { count: sent }),
   ];
@@ -90,6 +104,7 @@ export function StatementPanel({
   /** False on the Miner's own page, where the link would lead back to it. */
   showMinerLink?: boolean;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
   const detail = statementDetail(view, statementId);
@@ -139,7 +154,7 @@ export function StatementPanel({
             <Fact label={t(k('writtenOff'))}>{isk(detail.writtenOff)}</Fact>
           )}
           <Fact label={t(k('issued'))}>
-            {dateWithYear(statement.issuedAt)}
+            {atDateWithYear(statement.issuedAt, zone)}
             {statement.issuedBy !== undefined && (
               <span className="block text-xs text-text-dim">
                 {t(k('issuedBy'), { name: names.character(statement.issuedBy) })}
@@ -159,12 +174,12 @@ export function StatementPanel({
             {detail.settled ? (
               t(k('paid'))
             ) : detail.state === 'paused' && detail.pausedUntil ? (
-              t(k('paused'), { date: shortDate(detail.pausedUntil) })
+              t(k('paused'), { date: atDate(detail.pausedUntil, zone) })
             ) : (
               <DueWord dueAt={detail.dueAt} now={view.input.now} />
             )}
           </Fact>
-          <Fact label={t(k('mail'))}>{mailText(detail, t)}</Fact>
+          <Fact label={t(k('mail'))}>{mailText(detail, t, zone)}</Fact>
           <Fact label={t(k('code'))}>
             <span className="font-mono">{statement.code}</span>
           </Fact>

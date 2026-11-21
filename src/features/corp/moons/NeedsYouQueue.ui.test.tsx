@@ -264,7 +264,9 @@ describe('NeedsYouQueue (#6207)', () => {
     // The next step is required: Confirm stays disabled until it is filled.
     const confirm = screen.getAllByRole('button', { name: 'Keep the bill' }).at(-1)!;
     expect(confirm).toBeDisabled();
-    expect(screen.getByText(/Required\. Pilot 7 sees this word for word/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Required\. Pilot 7 sees this exactly as written, beside the bill/)
+    ).toBeInTheDocument();
     await user.type(nextStep!, 'Send the journal line');
     await user.click(confirm);
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {

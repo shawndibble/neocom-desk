@@ -336,7 +336,7 @@ describe('Clones training verdict', () => {
   it('shows no verdict without the implants grant, and the list still works', async () => {
     scenario.implantsStatus = 403;
     renderClonesRoute();
-    expect(await screen.findByText(/worn implants could not be read/)).toBeInTheDocument();
+    expect(await screen.findByText(/couldn't read your implants/)).toBeInTheDocument();
     expect(screen.queryByText('Worth a jump')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
     expect((await screen.findAllByText('Jita IV - Moon 4')).length).toBeGreaterThan(0);

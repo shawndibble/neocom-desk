@@ -55,7 +55,7 @@ import { useCompareHubs } from './useCompareHubs';
 import { buildCompareHubRows } from './compareHubsRows';
 import { compareHubsCsvColumns } from './compareHubsCsv';
 import { TradeHubsTable } from './TradeHubsTable';
-import { useMarketHub } from './hub';
+import { useHubFor } from './hub';
 import { CompareAttributesMatrix } from './CompareAttributesMatrix';
 import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
@@ -220,7 +220,7 @@ export function CompareDrawer({
   );
   const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
   const attributesExport = useCompareAttributesExport(rows, attributes.data);
-  const ownHubId = useMarketHub((state) => state.value);
+  const { hubId: ownHubId } = useHubFor('market');
   const ownHubName = TRADE_HUBS.find((candidate) => candidate.id === ownHubId)?.systemName ?? '';
   const hubsData = useCompareHubs(items, mode !== 'closed' && view === 'hubs', refreshTick);
   const hubRows = useMemo(() => buildCompareHubRows(items, hubsData), [items, hubsData]);

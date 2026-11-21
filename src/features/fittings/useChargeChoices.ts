@@ -20,14 +20,14 @@ import type {
   FittingSlotKind,
   PilotProfile,
 } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { getTradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
 import type { ChargeBasis, ChargeEngineStats } from './dogmaFittingEngine';
 import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** The SDE meta groups (public/data/market/variations.json) a charge's tier reads off. */
 const META_GROUP_TECH2 = 2;
@@ -214,8 +214,8 @@ export function useChargeChoices({
   moduleResults,
   moduleTypeId,
 }: UseChargeChoicesParams): ChargeChoicesResult {
-  const hubId = useMarketHub((state) => state.value);
-  useHydratedStore(useMarketHub);
+  const { hubId } = useHubFor('fittings');
+  const percent = usePricePercentFor('fittings');
 
   const figuresByGroup = useMemo(() => {
     if (!fitting || !context || !moduleResults) return null;
@@ -236,15 +236,15 @@ export function useChargeChoices({
     const map = new Map<number, number | null>();
     if (!hub) return map;
     try {
-      const aggregates = await getHubPrices(hub, priceIds);
+      const aggregates = await getHubPricesAt(hub, priceIds, percent);
       for (const id of priceIds) map.set(id, aggregates.get(id)?.sellMin ?? null);
     } catch {
       map.clear();
     }
     return map;
-  }, [hub, priceIds]);
+  }, [hub, priceIds, percent]);
   const prices = useKeyedLoad(
-    hub && priceIds.length > 0 ? `${hubId}|${priceIds.join(',')}` : null,
+    hub && priceIds.length > 0 ? `${hubId}|${percent}|${priceIds.join(',')}` : null,
     loadPrices
   );
   const priceMap = prices.status === 'ready' ? prices.data : null;

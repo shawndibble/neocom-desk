@@ -75,7 +75,7 @@ describe('AutoBuildControl', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(
-      within(dialog).getByText('This will overwrite craft/buy choices on this plan — continue?')
+      within(dialog).getByText('This will overwrite build/buy choices on this plan. Continue?')
     ).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
   });

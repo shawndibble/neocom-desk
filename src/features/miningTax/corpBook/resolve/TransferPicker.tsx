@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
+import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import type { ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { resolveCategories } from '@/features/character/names';
 import { cx } from '@/lib/cx';
 import type { MadePayment } from '../../paymentLinks';
@@ -37,6 +38,7 @@ export function TransferPicker({
   chosen,
   onChange,
 }: Props) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const [categories, setCategories] = useState<ReadonlyMap<number, RecipientCategory>>(new Map());
   const ids = useMemo(
@@ -103,7 +105,7 @@ export function TransferPicker({
                 </Pill>
               </span>
               <span className="block text-xs text-text-dim tabular-nums">
-                {eveTimeLabel(Date.parse(c.transfer.at))} ·{' '}
+                {dateTimeAt(c.transfer.at, zone)} ·{' '}
                 {t('miningTax.resolve.facts.journalRef', { ref })}
               </span>
               {c.recipient !== 'corporation' && (

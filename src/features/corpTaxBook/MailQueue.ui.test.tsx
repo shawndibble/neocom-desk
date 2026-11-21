@@ -8,7 +8,21 @@ import { formatIsk } from '@/lib/isk';
 import { MailLimitNotice } from './MailLimitNotice';
 import { MailQueueChip } from './MailQueueChip';
 import { MailQueuePanel } from './MailQueuePanel';
-import { StatementMailPreview } from './StatementMailPreview';
+import { EditableMailPreview, StatementMailPreview } from './StatementMailPreview';
+
+// The rich editor is its own chunk (Tiptap); a plain field stands in for it here.
+vi.mock('@/features/character/MailBodyEditor', async () => {
+  const { TextArea } = await import('@/components/ui');
+  return {
+    MailBodyEditor: (props: { id: string; value: string; onChange: (v: string) => void }) => (
+      <TextArea
+        id={props.id}
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+      />
+    ),
+  };
+});
 
 function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
   return {
@@ -163,5 +177,25 @@ describe('StatementMailPreview', () => {
     expect(screen.getByText('Subject:').parentElement).toHaveTextContent(mail.subject);
     expect(screen.getByText(/Efa - Brass Anvil/)).toBeInTheDocument();
     expect(screen.getByText(/Total tax: 1,200,000 ISK/)).toBeInTheDocument();
+  });
+});
+
+describe('EditableMailPreview', () => {
+  const mail = { to: 'Varro', subject: 'Late notice', body: 'You owe 5 ISK.' };
+
+  it('saves the edit with the standard mail it started from, even if that changed meanwhile', async () => {
+    const onSave = vi.fn();
+    const props = { mail, edited: false, onSave, onReset: () => {} };
+    const { rerender } = render(<EditableMailPreview {...props} basis="owe 5" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit mail' }));
+    // A payment lands while the draft is open: the standard mail now says something else.
+    rerender(<EditableMailPreview {...props} basis="owe 2" />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Subject' }), '!');
+    await userEvent.click(screen.getByRole('button', { name: 'Save mail' }));
+    expect(onSave).toHaveBeenCalledWith({
+      subject: 'Late notice!',
+      body: 'You owe 5 ISK.',
+      basis: 'owe 5',
+    });
   });
 });

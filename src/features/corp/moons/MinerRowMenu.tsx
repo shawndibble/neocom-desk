@@ -5,13 +5,14 @@
  * Mark not tax acts on the latest payment with tax in it, and the item names it. Officers only:
  * without edit rights the row has no actions, so no menu.
  */
+import { useTimeZone } from '@/lib/timeFormat';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { EntityShowInfoMenuItem } from '../corpRowMenus';
 import { useBook } from './useBook';
-import { isk, shortDate } from './moonsFormat';
+import { atDate, isk } from './moonsFormat';
 
 export function MinerRowMenu({
   miner,
@@ -32,6 +33,7 @@ export function MinerRowMenu({
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
   if (!canEdit) return children;
@@ -61,7 +63,7 @@ export function MinerRowMenu({
                 {/* The item acts on the latest payment with tax in it: say which, in view. */}
                 <span className="block text-xs text-text-dim">
                   {t('corpTaxBook.moons.payment.markNotTaxTarget', {
-                    date: shortDate(payment.at),
+                    date: atDate(payment.at, zone),
                     amount: isk(payment.amount),
                   })}
                 </span>

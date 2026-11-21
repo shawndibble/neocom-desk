@@ -83,11 +83,13 @@ export function loadCorporationStructures(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationStructure[]>> {
-  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+  const { fetchLive, conditional, expiresCapture } = conditionalPagedFetch((options) =>
     getCorporationStructures(characterId, corporationId, options)
   );
+  // `expiresAt` dates EVE's read, which the Structures page pairs with the fuel bays.
   return loadCorpPaginatedWithCacheStatus(characterId, corporationId, 'structures', fetchLive, {
     conditional,
+    expiresCapture,
   });
 }
 

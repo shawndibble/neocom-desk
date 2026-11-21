@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { Button, IconButton, TextInput } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, stackedLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
@@ -312,10 +312,7 @@ export function MailComposeBox({
   // A long quote can push a short reply over the limit: unfold it so the pilot can trim it.
   if (quoteFolded && bodyOver) setQuoteFolded(false);
   const noRecipientsError = error !== null && recipients.length === 0;
-  // Plain stacked labels, not the `Fields`/`Field` label-column primitive: a
-  // side label column would take width from the 8-row message box in the
-  // narrow reading pane. Don't "fix" this to `Fields`.
-  const labelClass = 'block text-[0.6875rem] text-text-dim';
+  const labelClass = stackedLabelClassName;
 
   return (
     <div className="mt-3 space-y-3 border-t border-line pt-3">

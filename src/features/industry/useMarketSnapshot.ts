@@ -39,7 +39,9 @@ export function useMarketSnapshot(
   typeIds: readonly number[],
   costIndexSystemId?: number,
   activity: IndustryActivity = 'manufacturing',
-  refreshTick = 0
+  refreshTick = 0,
+  /** The Industry percent (`MarketSnapshotRequest.pricePercent`); absent is 100. Part of the key, so a change re-prices. */
+  pricePercent?: number
 ): UseMarketSnapshotResult {
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
@@ -47,7 +49,7 @@ export function useMarketSnapshot(
   const key =
     typeIds.length === 0
       ? null
-      : `${hub.id}:${costIndexSystemId ?? ''}:${activity}:${typeIds.join(',')}:${refreshTick}`;
+      : `${hub.id}:${costIndexSystemId ?? ''}:${activity}:${typeIds.join(',')}:${refreshTick}:${pricePercent ?? ''}`;
 
   const [lifecycle, setLifecycle] = useState<Lifecycle>({ key, loading: key !== null });
   // Adjusting state during render, React's documented way to reset on a
@@ -60,21 +62,23 @@ export function useMarketSnapshot(
   // Latest-ref so a caller passing freshly-computed `hub`/`typeIds` on every
   // render (neither is required to be memoized) can't restart the effect —
   // it re-fires on `key` alone, which is already value-stable.
-  const paramsRef = useRef({ hub, typeIds, costIndexSystemId, activity });
+  const paramsRef = useRef({ hub, typeIds, costIndexSystemId, activity, pricePercent });
   useEffect(() => {
-    paramsRef.current = { hub, typeIds, costIndexSystemId, activity };
+    paramsRef.current = { hub, typeIds, costIndexSystemId, activity, pricePercent };
   });
 
   useEffect(() => {
     if (key === null) return;
     let cancelled = false;
-    const { hub, typeIds, costIndexSystemId, activity } = paramsRef.current;
-    void loadMarketSnapshot(hub, [...typeIds], costIndexSystemId, activity).then((snap) => {
-      if (cancelled) return;
-      setSnapshot(snap);
-      setFetchedAt(new Date());
-      setLifecycle({ key, loading: false });
-    });
+    const { hub, typeIds, costIndexSystemId, activity, pricePercent } = paramsRef.current;
+    void loadMarketSnapshot(hub, [...typeIds], costIndexSystemId, activity, pricePercent).then(
+      (snap) => {
+        if (cancelled) return;
+        setSnapshot(snap);
+        setFetchedAt(new Date());
+        setLifecycle({ key, loading: false });
+      }
+    );
     return () => {
       cancelled = true;
     };

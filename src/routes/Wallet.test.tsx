@@ -116,7 +116,7 @@ describe('Wallet', () => {
     // Radix's first hover in a session goes through its own open delay
     // (zeroed, but still a real timer), so this waits rather than reads.
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      /Paragon \(the in-game cosmetics store\)/
+      /Paragon, the in-game cosmetics store/
     );
   });
 

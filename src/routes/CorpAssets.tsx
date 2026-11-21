@@ -707,7 +707,7 @@ function CorpAssetsView({
             hint={t('corp.assets.loadFailedHint')}
           />
         ) : !hasAnyAssets ? (
-          <EmptyState title={t('corp.assets.empty')} hint={t('corp.assets.emptyHint')} />
+          <EmptyState title={t('corp.assets.empty')} />
         ) : (
           <div className="space-y-2">
             {data.fromCache && (
@@ -803,6 +803,7 @@ function CorpAssetsView({
                       <CorpAssetLocationTable
                         rows={locationRows}
                         labels={labels}
+                        assetNames={assetNames}
                         onOpenRow={openLocationRow}
                         renderToolbar={(picker, exportMenu) => (
                           <div className="border-b border-line p-3">

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
 import { useMarketHub } from '@/features/market/hub';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { LOCATION_MODE_SETTING_KEY } from '@/features/market/locationMode';
 import { useBrowserFilterSetting } from '@/features/market/browserFilterSetting';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -255,7 +255,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rifetr');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
-    expect(screen.getByText(/close spellings/i)).toBeInTheDocument();
+    expect(screen.getByText(/similar names/i)).toBeInTheDocument();
   });
 
   it('selecting an item and changing location updates the query string', async () => {
@@ -344,9 +344,9 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
     await screen.findByRole('heading', { name: 'Rifter', level: 2 });
-    // The linked hub is copied into the device setting only once that setting
-    // has hydrated; toggling before then would find the old Jita default.
-    await waitFor(() => expect(useMarketBrowserHub.getState().value).toBe('amarr'));
+    // The linked hub is copied into the Market page hub only once page hubs
+    // have hydrated; toggling before then would find the old Jita default.
+    await waitFor(() => expect(usePageHubs.getState().value.market).toBe('amarr'));
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
     expect(window.location.search).toBe('?type=587&region=10000043'); // Domain, Amarr's region
@@ -355,41 +355,70 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     expect(window.location.search).toBe('?type=587&hub=amarr');
   });
 
-  it('remembers the last picked Trade Hub across a remount, per device, without touching the synced default', async () => {
+  it('on its own Market hub, remembers the pick across a remount without touching the Global hub', async () => {
+    await db.settings.put({ key: 'sync.pageHubs', value: { market: 'jita' } });
     const user = userEvent.setup({ delay: null });
     const { unmount } = renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
-    await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
-    await user.click(screen.getByRole('option', { name: 'Amarr' }));
-    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+    await user.click(screen.getByRole('button', { name: /, Trade Hub$/ }));
+    await user.click(screen.getByRole('button', { name: 'Amarr VIII' }));
+    expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
 
-    // The device-local pick must not touch the cross-device default other
-    // features (Settings, Contracts, LP Store) read — no row for it at all.
+    // The Market's own pick must not touch the Global hub other pages read.
     expect(await db.settings.get('sync.marketHub')).toBeUndefined();
+    await waitFor(() => expect(usePageHubs.getState().value.market).toBe('amarr'));
 
     unmount();
     window.history.pushState({}, '', '/market');
     renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
-    expect(await screen.findByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+    expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
   });
 
-  it('keeps its own Trade Hub when the synced Settings default changes underneath it', async () => {
+  it('keeps its own Trade Hub when the Global hub changes underneath it', async () => {
+    await db.settings.put({ key: 'sync.pageHubs', value: { market: 'amarr' } });
+    renderMarketRoute();
+    await screen.findByRole('button', SHIPS_GROUP);
+    expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
+
+    // Another device (or Settings' "Default trade hub") moves Global to
+    // Dodixie: it must not reach a Market with its own hub.
+    await useMarketHub.getState().setValue('dodixie');
+
+    expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
+  });
+
+  it('a linked hub is adopted once: back to Global then sticks under the same link', async () => {
+    window.history.pushState({}, '', '/market?hub=amarr');
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
+    await waitFor(() => expect(usePageHubs.getState().value.market).toBe('amarr'));
+    expect(useMarketHub.getState().value).toBe('jita');
 
-    await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
-    await user.click(screen.getByRole('option', { name: 'Amarr' }));
-    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+    await user.click(screen.getByRole('button', { name: /, Trade Hub$/ }));
+    await user.click(screen.getByRole('button', { name: 'App setting' }));
 
-    // Another device (or Settings' own "Default trade hub" control) changes
-    // the synced default to Dodixie — must not reach back into this page.
-    await useMarketHub.getState().setValue('dodixie');
+    await waitFor(() => expect(usePageHubs.getState().value.market).toBeUndefined());
+    // The page follows Global into its URL rather than re-adopting the old link.
+    await waitFor(() => expect(window.location.search).toContain('hub=jita'));
+    expect(usePageHubs.getState().value.market).toBeUndefined();
+  });
 
-    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+  it("folds this device's old Market Browser hub into the Market and Appraisal page hubs, once", async () => {
+    await db.settings.put({ key: 'marketBrowserHub', value: 'hek' });
+    renderMarketRoute();
+    await screen.findByRole('button', SHIPS_GROUP);
+
+    expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Hek');
+    await waitFor(() =>
+      expect(usePageHubs.getState().value).toEqual({ market: 'hek', appraisal: 'hek' })
+    );
+    // The device row stays for an older build on this device; a marker records the fold.
+    expect((await db.settings.get('marketBrowserHub'))?.value).toBe('hek');
+    expect(await db.settings.get('marketBrowserHubMigrated')).toBeDefined();
   });
 
   it('browser back and forward move through previous selections', async () => {

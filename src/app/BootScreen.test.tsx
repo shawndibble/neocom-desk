@@ -69,7 +69,7 @@ describe('BootScreen', () => {
     act(() => {
       vi.advanceTimersByTime(BOOT_STALL_MS);
     });
-    expect(region).toHaveTextContent(/another copy of the app/i);
+    expect(region).toHaveTextContent(/another tab or window/i);
     expect(screen.getByTestId('boot-stall-status')).toBe(region);
   });
 

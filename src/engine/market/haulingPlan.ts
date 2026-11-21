@@ -155,16 +155,18 @@ export function profitableDepth(
       originLadder: candidate.buyLadder,
       destBuyLadder: candidate.destBuyLadder,
       accountingLevel,
+      feeDiscountFactor: standing.feeDiscountFactor,
       minMarginPct,
     }).units;
   }
   const feeRate =
-    (salesTaxPct(accountingLevel) +
+    (salesTaxPct(accountingLevel, standing.feeDiscountFactor) +
       brokerFeePct(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.safetyTaxPct
+        standing.safetyTaxPct,
+        standing.feeDiscountFactor
       )) /
     100;
   const breakEven = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);
@@ -193,6 +195,7 @@ export function maxBuyPrice(
       originLadder: candidate.buyLadder,
       destBuyLadder: candidate.destBuyLadder,
       accountingLevel,
+      feeDiscountFactor: standing.feeDiscountFactor,
       minMarginPct,
     });
     if (units <= 0) return null;
@@ -202,7 +205,8 @@ export function maxBuyPrice(
     for (const level of candidate.destBuyLadder) {
       sold += level.units;
       if (sold >= units) {
-        const net = level.price - salesTax(level.price, accountingLevel);
+        const net =
+          level.price - salesTax(level.price, accountingLevel, standing.feeDiscountFactor);
         const limit = net / (1 + minMarginPct / 100);
         return roundPriceDown(limit) ?? limit;
       }
@@ -210,12 +214,13 @@ export function maxBuyPrice(
     return null;
   }
   const feeRate =
-    (salesTaxPct(accountingLevel) +
+    (salesTaxPct(accountingLevel, standing.feeDiscountFactor) +
       brokerFeePct(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.safetyTaxPct
+        standing.safetyTaxPct,
+        standing.feeDiscountFactor
       )) /
     100;
   const limit = (candidate.expectedPrice * (1 - feeRate)) / (1 + minMarginPct / 100);

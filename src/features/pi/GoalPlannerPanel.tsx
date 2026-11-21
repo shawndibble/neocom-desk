@@ -86,6 +86,7 @@ import {
   Shortfalls,
   type PlanNames,
 } from './GoalPlannerResults';
+import { hubFeeDiscountFactor } from '@/market/hubs';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const HOURS_PER_DAY = 24;
@@ -143,7 +144,7 @@ function GoalPlanner({
 
   // Where the plan sells, and what it may buy there, are the shared PI
   // settings: the page strip and the settings form edit the same record.
-  const { hub, buybackPct, buyTiers } = useSellHub();
+  const { hub, hydrated: hubHydrated, buybackPct, buyTiers } = useSellHub();
   const buysAnything = buyTiers.length > 0;
   const buysP1 = buyTiers.includes(1);
 
@@ -153,7 +154,8 @@ function GoalPlanner({
     () => (pi ? loadGoalPlannerPrices(hub, pi) : Promise.reject(new Error('no snapshot'))),
     [pi, hub]
   );
-  const prices: PlanPrices | null = useKeyedLoad(pi ? hub.id : null, loadPrices).data ?? null;
+  const prices: PlanPrices | null =
+    useKeyedLoad(pi && hubHydrated ? hub.id : null, loadPrices).data ?? null;
 
   // --- Customs: edits layered over the snapshot, written through to the synced setting ---
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
@@ -287,7 +289,12 @@ function GoalPlanner({
           goals: plannedGoals,
           colonies: goalPlannerInput(rows),
           policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyTiers }),
-          books: priceBooks(prices, snapshot.accountingLevel, buybackPct),
+          books: priceBooks(
+            prices,
+            snapshot.accountingLevel,
+            buybackPct,
+            hubFeeDiscountFactor(hub, snapshot.nowMs)
+          ),
           jumps: jumpsFn,
           salesCapPerDay: salesCaps,
         },
@@ -301,6 +308,7 @@ function GoalPlanner({
     pi,
     prices,
     snapshot,
+    hub,
     rows,
     plannedGoals,
     prefs.maxP0Types,
@@ -360,7 +368,12 @@ function GoalPlanner({
     const { best } = result;
     const planned = goalPlannerInput(rows);
     const hauling = planHauling(best.plan, best.baseline, pi, haulHours);
-    const books = priceBooks(prices, snapshot.accountingLevel, buybackPct);
+    const books = priceBooks(
+      prices,
+      snapshot.accountingLevel,
+      buybackPct,
+      hubFeeDiscountFactor(hub, snapshot.nowMs)
+    );
     const earnings = earningsNow(rows, pi, prices, books.salesTaxPct, buybackPct);
     const verdict =
       best.economics.status === 'costed'

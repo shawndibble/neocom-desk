@@ -2,9 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { StructureFeesList } from '@/features/market/StructureFeesList';
 import { Fields, Panel } from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useDefaultMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub, useGlobalClosest, useMarketHub } from '@/features/market/hub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { useHubByCharacter } from '@/features/market/characterHubs';
 import { TradeHubField } from '@/features/settings/TradeHubField';
+import { PageHubsField } from '@/features/settings/PageHubsField';
 import {
   COLLATERAL_RATIO_OPTIONS,
   useCourierCollateralRatio,
@@ -20,7 +22,13 @@ import { ChipRow, SettingsPanelLoading } from '@/features/settings/settingsField
 
 export function MarketDefaultsPanel() {
   const { t } = useTranslation();
-  const hubHydrated = useHydratedStore(useDefaultMarketHub, useHubByCharacter);
+  const hubHydrated = useHydratedStore(
+    useDefaultMarketHub,
+    useHubByCharacter,
+    useMarketHub,
+    usePageHubs,
+    useGlobalClosest
+  );
   const collateralRatio = useCourierCollateralRatio((state) => state.value);
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
@@ -37,6 +45,8 @@ export function MarketDefaultsPanel() {
       <div className="space-y-4">
         <Fields variant="form">
           <TradeHubField />
+
+          <PageHubsField />
 
           <RefiningSetupFields refining={refining} />
 

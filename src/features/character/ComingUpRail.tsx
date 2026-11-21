@@ -24,17 +24,12 @@ import { useTimeZone } from '@/lib/timeFormat';
 import {
   groupByDay,
   relativeDayFor,
+  LONG_OVERDUE_MS,
   splitLongOverdue,
   type DayGroup,
 } from '@/engine/character/deadlines';
 import { CalendarClocks } from './CalendarClocks';
 import { CharacterBoardRow } from './CharacterBoardRow';
-
-/**
- * Overdue for longer than this, an item folds into the rail's one summary row: a month of
- * extractors nobody restarted must not open the agenda above everything current.
- */
-export const LONG_OVERDUE_MS = 2 * DAY_MS;
 
 export interface ComingUpRailProps {
   items: readonly CharacterBoardItem[];
@@ -153,7 +148,7 @@ export function ComingUpRail({
       {groups.map(dayGroup)}
     </ul>
   ) : selectedDayMs === null ? (
-    <EmptyState title={t('calendar.rail.empty')} hint={t('calendar.rail.emptyHint')} />
+    <EmptyState title={t('calendar.rail.empty')} />
   ) : (
     <EmptyState title={t('calendar.rail.emptyForDay')} />
   );

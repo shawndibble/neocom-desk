@@ -851,7 +851,7 @@ describe('ItemDetailModal planetary production', () => {
     render(<ItemDetailModal typeId={2267} itemName="Base Metals" onClose={() => {}} />);
 
     expect(await screen.findByText('Planetary production')).toBeInTheDocument();
-    expect(screen.getByText(/Extracted straight off a planet/)).toBeInTheDocument();
+    expect(screen.getByText(/Taken straight from a planet/)).toBeInTheDocument();
   });
 
   it('shows no planetary section for an item planetary industry never touches', async () => {

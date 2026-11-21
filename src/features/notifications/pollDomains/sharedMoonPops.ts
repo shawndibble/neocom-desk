@@ -7,11 +7,15 @@ import { projectSharedMoonPops } from '@/engine/projection';
 import { MINUTE_MS } from '@/lib/age';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
+import { loadMoonNames } from '@/features/character/moonNames';
 import { resolveNames } from '@/features/character/names';
+import type { SharedPopMatchSource } from '@/features/character/calendarSharedPops';
 import type { SharedPopView } from '@/sync/sharedPops';
 import type { SharedMoonPopNames } from '../domainCopy';
 import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
+import { isEventEnabledFor, NOTIFICATION_CHANNELS } from '../eventSelection';
 import {
+  characterEventPrefs,
   hydrateNotificationPreferences,
   mutedSharedPopCorporations,
   useNotificationPreferences,
@@ -34,6 +38,11 @@ const isSharedMoonPopEntry = shapeGuard<SharedMoonPopEntrySnapshot>({
   muted: is.optional(is.boolean),
 });
 
+/** A server deployed before `viewerCharacterIds` existed sends none, and every Character then counts. */
+function inAudience(pop: SharedPopView, characterId: number): boolean {
+  return pop.viewerCharacterIds === undefined || pop.viewerCharacterIds.includes(characterId);
+}
+
 /**
  * The Shared Pops one Character is told about: those the server says that Character is in an
  * audience for (`viewerCharacterIds`; a server deployed before it existed sends none, and every
@@ -49,8 +58,7 @@ export function sharedMoonPopEntries(
   return pops.flatMap((pop) => {
     const popAtMs = Date.parse(pop.popAt);
     if (!Number.isFinite(popAtMs)) return [];
-    if (pop.viewerCharacterIds !== undefined && !pop.viewerCharacterIds.includes(characterId))
-      return [];
+    if (!inAudience(pop, characterId)) return [];
     return [
       {
         popId: pop.id,
@@ -69,6 +77,34 @@ export function sharedMoonPopEntries(
 async function currentMuted(): Promise<ReadonlySet<number>> {
   await hydrateNotificationPreferences();
   return mutedSharedPopCorporations(useNotificationPreferences.getState().value);
+}
+
+/**
+ * The Shared Pops that already alert this Character (Shared moon pop alerts on for some channel,
+ * in its audience, sharing corporation not muted), with their moon names, for the calendar alerts to recognise the same fleet by. Best
+ * effort: a failed read is none, and the calendar alerts then run as they always did.
+ */
+export async function alertedSharedPops(characterId: number): Promise<SharedPopMatchSource[]> {
+  await hydrateNotificationPreferences();
+  const prefs = useNotificationPreferences.getState().value;
+  // Alerts switched off for this Character: the calendar event is then the only alert there is.
+  const eventPrefs = characterEventPrefs(prefs, characterId);
+  if (
+    !NOTIFICATION_CHANNELS.some((channel) =>
+      isEventEnabledFor(eventPrefs, 'sharedMoonPop', channel)
+    )
+  )
+    return [];
+  const [pops, muted] = await Promise.all([
+    loadSharedPopsCached().catch(() => [] as SharedPopView[]),
+    currentMuted(),
+  ]);
+  const alerted = pops.filter(
+    (pop) => inAudience(pop, characterId) && !muted.has(pop.corporationId)
+  );
+  if (alerted.length === 0) return [];
+  const moonNames = await loadMoonNames(alerted.map((pop) => pop.moonId));
+  return alerted.map((pop) => ({ pop, moonName: moonNames.get(pop.moonId) ?? null }));
 }
 
 async function currentLeadMs(characterId: number): Promise<number> {

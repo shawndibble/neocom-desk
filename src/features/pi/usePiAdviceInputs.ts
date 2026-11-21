@@ -21,6 +21,7 @@ import { loadInterplanetaryConsolidation } from './planetSlots';
 import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
 import { usePiSnapshot } from './usePiSnapshot';
+import { hubFeeDiscountFactor } from '@/market/hubs';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
@@ -134,7 +135,7 @@ function useLiveAdviceInputs(
   preference: RebuildPreference,
   reloadKey: number
 ): PiAdviceInputsState {
-  const { hub, buybackPct } = useSellHub();
+  const { hub, hydrated: hubHydrated, buybackPct } = useSellHub();
   const cadence = useCadence((state) => state.value);
   const goalPrefs = useGoalPlannerPrefs((state) => state.value);
   useHydratedStore(useCadence, useGoalPlannerPrefs);
@@ -150,7 +151,7 @@ function useLiveAdviceInputs(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `reloadKey` is the caller's "read again" signal, not read by the loader.
     [pi, hub, reloadKey]
   );
-  const pricedLoad = useKeyedLoad(pi ? hub.id : null, loadPrices);
+  const pricedLoad = useKeyedLoad(pi && hubHydrated ? hub.id : null, loadPrices);
   const pricedNow =
     pricedLoad.status === 'idle' || pricedLoad.status === 'loading' ? null : pricedLoad;
   const prices = pricedLoad.data ?? null;
@@ -225,7 +226,11 @@ function useLiveAdviceInputs(
         customsOverrides: snapshot.customsOverrides,
         richness,
       },
-      books: hubBooks(usable ?? { prices: {}, buyPrices: {} }, snapshot.accountingLevel),
+      books: hubBooks(
+        usable ?? { prices: {}, buyPrices: {} },
+        snapshot.accountingLevel,
+        hubFeeDiscountFactor(hub, snapshot.nowMs)
+      ),
       market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
       cadence,
       preference,
@@ -248,6 +253,6 @@ function useLiveAdviceInputs(
     preference,
     routes,
     systemKey,
-    hub.systemName,
+    hub,
   ]);
 }

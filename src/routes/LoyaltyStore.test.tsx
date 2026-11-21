@@ -800,8 +800,8 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
 
     await user.click(screen.getByText('Scourge Fury Heavy Missile').closest('tr')!);
 
-    expect(screen.getByText(/Counted at recent trades/)).toHaveTextContent(
-      'Counted at recent trades, 17,300,000 ISK each: the cheapest listing asks 1,000,000,000 ISK, 57.8× that.'
+    expect(screen.getByText(/Valued at the recent trade price/)).toHaveTextContent(
+      'Valued at the recent trade price, 17,300,000 ISK each, because the cheapest sell order asks 1,000,000,000 ISK, 57.8× that.'
     );
   });
 
@@ -1170,9 +1170,10 @@ describe('LoyaltyStore switching stores through the search', () => {
       })
     );
     const settings = screen.getAllByRole('dialog').at(-1)!;
-    await user.click(within(settings).getByRole('combobox', { name: 'Market hub' }));
-    await user.click(await screen.findByRole('option', { name: OTHER_HUB.systemName }));
-    expect(useMarketHub.getState().value).toBe(OTHER_HUB.id);
+    await user.click(within(settings).getByRole('button', { name: /Market hub/ }));
+    await user.click(await screen.findByRole('button', { name: OTHER_HUB.stationLabel }));
+    // On Global, so the gear's pick moves the Global hub the filter row reads.
+    await waitFor(() => expect(useMarketHub.getState().value).toBe(OTHER_HUB.id));
     expect(screen.getByTestId('lp-basis-readout')).toHaveTextContent(OTHER_HUB.systemName);
   });
 

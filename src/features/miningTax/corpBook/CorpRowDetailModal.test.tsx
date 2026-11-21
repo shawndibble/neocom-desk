@@ -306,7 +306,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ corp: { ...corp, view: unlinked } });
     expect(
       screen.getByText(
-        /^Your 26,952,549 ISK donation sent 2 Nov 2026 22:38 EVE time paid this day, but Brass Meridian Logistics never credited it/
+        /^Your 26,952,549 ISK donation sent 2 Nov( 2026)? 22:38 paid this day, but Brass Meridian Logistics never credited it/
       )
     ).toBeInTheDocument();
   });
@@ -346,7 +346,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ onResolve, corp: { ...corp, view: marked } });
     expect(
       screen.getByText(
-        'Marked paid by you. Brass Meridian Logistics already holds that payment, but it pays your oldest open days first and spent it on 2026-11-01, so it still bills this day 10,242,021 ISK. Resolve says what you can do.'
+        'Marked paid by you. Brass Meridian Logistics already has that payment, but it pays your oldest open days first and used it on 2026-11-01. So it still bills this day 10,242,021 ISK. Resolve shows what you can do.'
       )
     ).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);
@@ -396,7 +396,7 @@ describe('CorpRowDetailModal', () => {
   it('says what a Market adjustment forgave', () => {
     renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });
     expect(
-      screen.getByText(/1,000 ISK forgiven by the corporation: a small shortfall/)
+      screen.getByText(/1,000 ISK forgiven by the corporation\. This is a small shortfall/)
     ).toBeInTheDocument();
   });
 

@@ -93,7 +93,7 @@ describe('PlanHeader', () => {
     );
 
     expect(screen.getByText('8m')).toBeInTheDocument();
-    expect(screen.queryByText(/evaluated with/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/worked out with/i)).not.toBeInTheDocument();
   });
 
   it('states the cap instead of implying the answer is complete when the plan asks for more', () => {
@@ -113,7 +113,7 @@ describe('PlanHeader', () => {
     );
 
     expect(screen.getByText('8m')).toBeInTheDocument();
-    expect(screen.getByText(/evaluated with 2 remaps/i)).toBeInTheDocument();
+    expect(screen.getByText(/worked out with 2 remaps/i)).toBeInTheDocument();
   });
 
   it('never shows a saving below the meaningful-savings threshold', () => {

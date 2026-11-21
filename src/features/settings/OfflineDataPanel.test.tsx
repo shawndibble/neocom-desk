@@ -74,7 +74,7 @@ describe('OfflineDataPanel status', () => {
 
   it('shows the storage estimate, and hides the row where it is unsupported', async () => {
     const { unmount } = render(<OfflineDataPanel />);
-    expect(await screen.findByText(/5 MB of 2 GB/)).toBeInTheDocument();
+    expect(await screen.findByText(/5 MB used of the 2 GB/)).toBeInTheDocument();
     unmount();
     mocks.readStorageEstimate.mockResolvedValue(null);
     render(<OfflineDataPanel />);

@@ -461,8 +461,10 @@ describe('BuildPlanDetail job cost index without an ESI figure (J-Space)', () =>
     render(<Harness plan={wormholeStructure} />);
     await openSetup(user);
 
-    expect(await screen.findByText(/ESI has no cost index for this system/)).toBeInTheDocument();
-    expect(costIndexInput()).toHaveAccessibleDescription(/ESI has no cost index/);
+    expect(
+      await screen.findByText(/No cost index is available for this system/)
+    ).toBeInTheDocument();
+    expect(costIndexInput()).toHaveAccessibleDescription(/No cost index is available/);
     await user.hover(screen.getByRole('button', { name: 'Where to find the job cost index' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/Facilities tab/);
   });
@@ -472,7 +474,7 @@ describe('BuildPlanDetail job cost index without an ESI figure (J-Space)', () =>
     const onUpdate = vi.fn();
     render(<Harness plan={wormholeStructure} onUpdate={onUpdate} />);
     await openSetup(user);
-    await screen.findByText(/ESI has no cost index for this system/);
+    await screen.findByText(/No cost index is available for this system/);
 
     await user.type(costIndexInput(), '3.5');
     await user.tab();

@@ -106,7 +106,7 @@ describe('BiggerChainsPanel', () => {
   it('says why a candidate has no figure, never that it lost', () => {
     state({ colonies: null, newPlanets: null });
     renderPanel();
-    expect(screen.getByText(/your colonies can't make it in full/)).toBeInTheDocument();
+    expect(screen.getByText(/Your colonies can't make all of it/)).toBeInTheDocument();
   });
 
   it('recommends nothing when no chain beats the one-planet picks, and keeps those chains one click away', async () => {

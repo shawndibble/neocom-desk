@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SharedMoonPopFire } from '@/engine/notificationDiffs';
 import type { SharedPopView } from '@/sync/sharedPops';
 import { sharedMoonPopCopy } from './copy/sharedMoonPop';
-import { sharedMoonPopEntries } from './sharedMoonPops';
+
+const mocks = vi.hoisted(() => ({ loadSharedPopsCached: vi.fn() }));
+vi.mock('../sharedPopsCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../sharedPopsCache')>()),
+  loadSharedPopsCached: mocks.loadSharedPopsCached,
+}));
+vi.mock('@/features/character/moonNames', () => ({
+  loadMoonNames: async () => new Map([[40001, 'Ainsan IV - Moon 2']]),
+}));
+
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '../preferencesStore';
+import { useNotificationPreferences } from '../preferences';
+import { alertedSharedPops, sharedMoonPopEntries } from './sharedMoonPops';
 
 const pop = (over: Partial<SharedPopView> = {}): SharedPopView => ({
   id: '98000001_1035_1762900000000',
@@ -74,10 +86,61 @@ describe('sharedMoonPopCopy', () => {
   it('reads a chunk fractured early as such, not as its Pop Time setting', () => {
     const names = { corporation: 'Ore Co', when: '14:00' };
     expect(sharedMoonPopCopy.poll(fire, 'Pilot', names).body).toBe(
-      'Auto-fracture at 14:00 · taxed by Ore Co · 10%'
+      'Auto-fracture at 14:00 · Efa - Moon Drill · taxed by Ore Co · 10%'
     );
     expect(sharedMoonPopCopy.poll({ ...fire, early: true }, 'Pilot', names).body).toBe(
-      'Fractured early at 14:00 · taxed by Ore Co · 10%'
+      'Fractured early at 14:00 · Efa - Moon Drill · taxed by Ore Co · 10%'
     );
+  });
+
+  it('names the refinery in the body, poll and push alike, and leaves it out when unnamed', () => {
+    const names = { corporation: 'Ore Co', when: '14:00' };
+    expect(sharedMoonPopCopy.push(fire, 'Pilot', names).body).toBe(
+      'Auto-fracture at 14:00 · Efa - Moon Drill · taxed by Ore Co · 10%'
+    );
+    const unnamed = { ...fire, refineryName: null };
+    expect(sharedMoonPopCopy.poll(unnamed, 'Pilot', names).body).toBe(
+      'Auto-fracture at 14:00 · taxed by Ore Co · 10%'
+    );
+    expect(sharedMoonPopCopy.push(unnamed, 'Pilot', names).body).toBe(
+      'Auto-fracture at 14:00 · taxed by Ore Co · 10%'
+    );
+  });
+});
+
+describe('alertedSharedPops', () => {
+  const setPrefs = (over: Partial<typeof DEFAULT_NOTIFICATION_PREFERENCES>) =>
+    useNotificationPreferences.setState({
+      value: { ...DEFAULT_NOTIFICATION_PREFERENCES, ...over },
+      hydrated: true,
+    });
+
+  beforeEach(() => {
+    mocks.loadSharedPopsCached.mockReset();
+    setPrefs({});
+  });
+
+  it('returns the pops that alert this Character, with the moon name', async () => {
+    mocks.loadSharedPopsCached.mockResolvedValue([pop()]);
+    expect(await alertedSharedPops(7)).toEqual([{ pop: pop(), moonName: 'Ainsan IV - Moon 2' }]);
+  });
+
+  it('leaves out a muted sharing corporation and a pop for another audience', async () => {
+    mocks.loadSharedPopsCached.mockResolvedValue([pop({ viewerCharacterIds: [8] })]);
+    expect(await alertedSharedPops(7)).toEqual([]);
+    mocks.loadSharedPopsCached.mockResolvedValue([pop()]);
+    setPrefs({ mutedSharedPopCorporations: [98000001] });
+    expect(await alertedSharedPops(7)).toEqual([]);
+  });
+
+  it('returns none when Shared moon pop alerts are off for the Character, so the event keeps alerting', async () => {
+    mocks.loadSharedPopsCached.mockResolvedValue([pop()]);
+    setPrefs({ perCharacter: { '7': { sharedMoonPop: false } } });
+    expect(await alertedSharedPops(7)).toEqual([]);
+  });
+
+  it('returns none when the read fails', async () => {
+    mocks.loadSharedPopsCached.mockRejectedValue(new Error('offline'));
+    expect(await alertedSharedPops(7)).toEqual([]);
   });
 });

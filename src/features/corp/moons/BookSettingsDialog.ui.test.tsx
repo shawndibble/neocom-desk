@@ -153,7 +153,7 @@ describe('BookSettingsDialog pending rates (#6323)', () => {
     await user.type(screen.getByLabelText('Rate (%)'), '2');
     expect(screen.getByRole('button', { name: 'Add rate' })).toBeDisabled();
     expect(
-      screen.getByText('Another pending rate has the same scope, target and day.')
+      screen.getByText('Another pending rate has the same type, target and day.')
     ).toBeInTheDocument();
   });
 

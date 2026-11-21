@@ -30,13 +30,12 @@ import {
   summarizeContractsBoard,
   type ContractsBoardSummary,
 } from '@/engine/contracts/contractsBoard';
-import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
-import { useMarketHub } from '@/features/market/hub';
+import { tradeHubIdFor } from '@/features/market/hub';
 import { loadPriceVsMedian } from '@/features/market/priceVsMedian';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { sum } from '@/engine/math';
@@ -48,7 +47,6 @@ import type {
 } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { PopShareMark } from '@/engine/corpTaxBook/popShareMarks';
-import type { CalendarEventSummary } from '@/esi/endpoints';
 import type { CorpLabel } from '@/features/corp/corpTicker';
 import { DAY_MS } from '@/lib/age';
 
@@ -372,26 +370,6 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   return { summary, route, routes, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }
 
-// --- Calendar ---------------------------------------------------------------
-
-export interface CalendarEventsBoardData {
-  events: CalendarEventSummary[];
-  needsReauth: boolean;
-  fetchedAt: Date | null;
-}
-
-/**
- * The pilot's calendar, for the "Next deadline" strip's calendar candidate
- * (`engine/calendarDeadline`) — not a card of its own, so this is the whole
- * event list rather than anything already summarised.
- */
-export async function loadCalendarEventsBoard(
-  characterId: number
-): Promise<CalendarEventsBoardData> {
-  const { cached, needsReauth } = await loadCalendarEvents(characterId);
-  return { events: cached?.data ?? [], needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
-}
-
 // --- SP extraction ----------------------------------------------------------
 
 /**
@@ -503,10 +481,10 @@ export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAl
   const [record, snapshot] = await Promise.all([
     db.quickbars.get(String(characterId)),
     lastPriceAlertSnapshot(characterId),
-    useMarketHub.getState().hydrate(),
   ]);
   const alerts = buildPriceAlertRows(record?.items ?? [], snapshot);
-  const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+  // The hub the poller prices alerts at: the Market page hub.
+  const hub = getTradeHub(await tradeHubIdFor(characterId, 'market')) ?? DEFAULT_TRADE_HUB;
   const typeIds = [...new Set(alerts.map((alert) => alert.typeId))];
   const vs90d = new Map<number, number | null>();
   await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
@@ -539,6 +517,10 @@ export interface StructuresBoardData {
   structureCount: number;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** ESI's `Expires` for this read, when stored: dates EVE's read (`eveReadAtMs`). */
+  expiresAt?: Date;
+  /** Read across several corporations (All scope): each one's `expiresAt`, by corporation id. */
+  expiresAtByCorp?: ReadonlyMap<number, Date>;
   /** Read across several corporations (All scope): each one's ticker and name, for its rows. */
   corporations?: ReadonlyMap<number, CorpLabel>;
   /** Read across several corporations, and one of them failed: the rest draws, flagged. */

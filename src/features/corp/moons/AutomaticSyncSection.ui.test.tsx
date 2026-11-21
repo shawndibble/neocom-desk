@@ -105,7 +105,7 @@ describe('AutomaticSyncSection', () => {
 
   it('lets the CEO revoke the holder with a live role check', async () => {
     renderSection(status({ characterId: 9, characterName: 'Pilot 9' }), { isCeo: true });
-    await userEvent.click(screen.getByRole('button', { name: "Revoke Pilot 9's grant" }));
+    await userEvent.click(screen.getByRole('button', { name: "Remove Pilot 9's access" }));
     expect(turnOffScheduledSync).toHaveBeenCalledWith({
       characterId: ME,
       corporationId: CORP,

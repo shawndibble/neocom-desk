@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { TRADE_HUBS } from '@/market/hubs';
 import { ContractPriceCheck } from './ContractPriceCheck';
 
 const ROWS = [
@@ -29,6 +30,25 @@ describe('ContractPriceCheck', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Buy orders' }));
     expect(onFlip).toHaveBeenCalledOnce();
+  });
+
+  it('opens the hub menu from the heading hub', async () => {
+    const jita = TRADE_HUBS.find((hub) => hub.id === 'jita')!;
+    render(
+      <ContractPriceCheck
+        heading="Is it fair? · Jita 4-4 right now"
+        rows={ROWS}
+        hubMenu={{ hub: jita, area: 'contracts' }}
+      />
+    );
+    // The heading still reads whole around the trigger.
+    expect(screen.getByRole('region', { name: 'Is it fair? · Jita 4-4 right now' })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /^Jita 4-4, choose another/ }));
+    expect(screen.getByRole('button', { name: 'Contracts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jita 4-4' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('indents a part of the line above, and keeps it in the same list', () => {

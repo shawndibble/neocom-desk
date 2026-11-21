@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, CollapsiblePanel, entityLinkClassName } from '@/components/ui';
@@ -7,7 +8,7 @@ import * as Icon from '@/components/ui/icons';
 import type { RefineryRow } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import { cx } from '@/lib/cx';
 import { callableErrorText } from './feederErrorText';
-import { shortDate } from './moonsFormat';
+import { atDate } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.refineryLabels.archived.${key}`;
 
@@ -26,6 +27,7 @@ function ArchivedRow({
   byName: string;
   onRestore?: () => Promise<void>;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(undefined);
@@ -39,7 +41,7 @@ function ArchivedRow({
         <p className="text-xs text-text-dim">
           {[
             t(k('row'), {
-              date: shortDate(new Date(archive.at).toISOString()),
+              date: atDate(archive.at, zone),
               name: byName,
               why: t(k(`why.${archive.reason}`)),
             }),

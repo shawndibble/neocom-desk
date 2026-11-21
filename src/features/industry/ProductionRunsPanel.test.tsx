@@ -426,7 +426,7 @@ describe('ProductionRunsPanel', () => {
     // Already linked to another run — the picker must not offer it again.
     await waitFor(() => {
       expect(
-        screen.getByText('No unlinked past sales of this item found in the cached wallet history.')
+        screen.getByText('No unlinked past sales of this item found in your saved wallet history.')
       ).toBeInTheDocument();
     });
   });

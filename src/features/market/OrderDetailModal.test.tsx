@@ -1044,7 +1044,7 @@ describe('OrderDetailModal', () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Refined at a 50% facility base yield with 0% reprocessing tax, valued against the buy orders here. Set both in Appraisal.'
+          'Assumes 50% base yield and 0% reprocessing tax, priced against the buy orders here. Change both in Appraisal.'
         )
       ).toBeInTheDocument();
       expect(screen.queryByText('Reprocess and sell the minerals')).not.toBeInTheDocument();
@@ -1098,7 +1098,9 @@ describe('OrderDetailModal', () => {
       expandAll();
 
       expect(
-        screen.getByText('At least one material has no buy order here, so this total is a floor.')
+        screen.getByText(
+          'At least one material has no buy order here, so the real value may be higher.'
+        )
       ).toBeInTheDocument();
     });
   });

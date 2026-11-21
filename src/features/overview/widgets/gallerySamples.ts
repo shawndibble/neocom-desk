@@ -954,7 +954,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
           t('overview.gallery.samples.comingUp.forms'),
           '1h 20m',
         ],
-        [t('overview.gallery.samples.comingUp.meeting'), '', '3h 10m'],
+        [
+          t('overview.gallery.samples.comingUp.timer'),
+          t('overview.gallery.samples.comingUp.timerKind'),
+          '3h 10m',
+        ],
+        [
+          t('overview.gallery.samples.comingUp.job'),
+          t('overview.gallery.samples.comingUp.jobKind'),
+          '5h 45m',
+        ],
       ],
     },
     contracts: {
