@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { noteCheckpointSkips } from './checkpointHolds';
-import { accountRecords, dueCheckpoints } from '@/engine/corpTaxBook/accountRecords';
+import { runningAccountRecords, dueCheckpoints } from '@/engine/corpTaxBook/runningAccountRecords';
 import { chunk } from '@/lib/chunk';
 import { editBook, recordCheckpoints } from '../taxBook/bookClient';
 import { invalidatePopSharing } from '../taxBook/popSharingCache';
@@ -102,8 +102,11 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
     // A context built by hand (a story, a test) may carry no parts: then it counts nothing.
     const whole = !!data?.parts?.has('observed') && !!data.parts.has('ledger');
     if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
-    sendChanged(corporationId, 'accounts', accountRecords(view, data.scopedMiner), (accounts) =>
-      editBook(characterId, corporationId, { action: 'recordAccounts', accounts })
+    sendChanged(
+      corporationId,
+      'accounts',
+      runningAccountRecords(view, data.scopedMiner),
+      (accounts) => editBook(characterId, corporationId, { action: 'recordAccounts', accounts })
     );
     // A checkpoint comes only from a read of the whole book: a Miner's own page cannot see the
     // groupings around them (B2).
