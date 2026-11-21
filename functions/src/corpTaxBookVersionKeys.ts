@@ -50,7 +50,7 @@ export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
  * `accountCheckpoints/{minerId}`: a `RunningAccountCheckpoint`, its Miner's readers (`uids`) and a
  * server `updatedAt`. Officers read every one; a Miner reads their own.
  */
-export const ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
+export const RUNNING_ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
 export const MINERS = 'miners';
 export const META = 'meta';
 
@@ -94,7 +94,7 @@ export const VERSIONED_COLLECTIONS = [
   // (decision 20261120-235011).
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNT_CHECKPOINTS,
   PAYMENTS,
   DISMISSALS,
   EXTRACTIONS,

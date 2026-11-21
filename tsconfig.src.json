@@ -22,7 +22,7 @@
     "functions/src/corpTaxBookLateNotice.ts",
     "functions/src/corpTaxBookCheckpoint.ts",
     "functions/src/corpTaxBookReadModels.ts",
-    "functions/src/corpTaxBookAccounts.ts",
+    "functions/src/corpTaxBookRunningAccounts.ts",
     "functions/src/corpTaxBookKinds.ts",
     "functions/src/corpTaxBookDonationMatch.ts",
     "functions/src/corpTaxBookTransferMatch.ts",

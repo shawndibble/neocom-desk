@@ -4,7 +4,7 @@
  * (`MinerRunningAccount`), whatever code it carries. Whose Miner a donation is, is the shared
  * rule (`functions/src/corpTaxBookDonationMatch.ts`, through `donationMatchBook` in `sync.ts`).
  */
-import { netPayment } from '../../../functions/src/corpTaxBookAccounts';
+import { netPayment } from '../../../functions/src/corpTaxBookRunningAccounts';
 
 /** One Tax Payment credited to a Miner. */
 export interface TaxPayment {

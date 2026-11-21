@@ -1,7 +1,7 @@
 /**
  * A running account's figures as the pay page reads them (#6294): the server cannot price days,
  * so an officer's client records each Miner's account (`recordAccounts`) and the verify link
- * shows it, less what the Miner paid since (`liveAccount`, functions).
+ * shows it, less what the Miner paid since (`liveRunningAccount`, functions).
  */
 import { utcDayOf } from '@/engine/localDay';
 import {
@@ -12,7 +12,7 @@ import {
 import type { BookView } from './bookView';
 import { MinerRunningAccount } from './minerRunningAccount';
 import { paymentNet } from './payments';
-import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
+import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { savedPrice } from './billableLines';
 
 /** One Miner's account as `recordAccounts` takes it. */

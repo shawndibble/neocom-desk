@@ -5,7 +5,7 @@
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import {
-  ACCOUNTS,
+  RUNNING_ACCOUNTS,
   BILLED_BY_COLLECTION,
   FEEDERS,
   MINERS,
@@ -44,7 +44,7 @@ export async function loadMatchBook(
   const [minerSnap, notices, accounts] = await Promise.all([
     book.collection(MINERS).get(),
     readNotices(dbReader(db), book),
-    book.collection(ACCOUNTS).select().get(),
+    book.collection(RUNNING_ACCOUNTS).select().get(),
   ]);
   const miners: MatchMiner[] = minerSnap.docs.map((d) => ({
     id: d.id,

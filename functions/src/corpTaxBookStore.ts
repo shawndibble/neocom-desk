@@ -53,7 +53,7 @@ import {
   META,
   SCHEDULED_SYNC_DOC,
   MINERS,
-  ACCOUNTS,
+  RUNNING_ACCOUNTS,
   OBSERVED,
   OFFICERS,
   PAID_DOC,
@@ -63,7 +63,7 @@ import {
   REBILLS,
   TOKENS_COLLECTION,
   LATE_NOTICES,
-  ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNT_CHECKPOINTS,
   WRITE_OFFS,
   TOLERANCE_EXEMPTIONS,
   MINER_PAID,
@@ -113,7 +113,7 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import { type FeederExtraction, type StoredExtractionKey } from './corpTaxBookSyncEngine.js';
-import { ledgerDays, ledgerPayments, liveAccount } from './corpTaxBookAccounts.js';
+import { ledgerDays, ledgerPayments, liveRunningAccount } from './corpTaxBookRunningAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
@@ -1194,7 +1194,7 @@ function dropCheckpoints(
 ): void {
   if (!editReachesCheckpoint(onOrBefore, utcDate(now))) return;
   for (const id of new Set(minerIds))
-    if (id) tx.delete(sub(db, corporationId, ACCOUNT_CHECKPOINTS).doc(id));
+    if (id) tx.delete(sub(db, corporationId, RUNNING_ACCOUNT_CHECKPOINTS).doc(id));
 }
 
 /** The earliest of some days or instants, as a day; null when any is unknown. */
@@ -1268,13 +1268,13 @@ async function assertAdjustmentReversible(
 }
 
 /** A Miner's account as it stands now: the officer's last record less what they paid since. */
-async function liveAccountOf(c: EditCtx, minerId: string) {
+async function liveRunningAccountOf(c: EditCtx, minerId: string) {
   const [account, payments] = await Promise.all([
-    c.tx.get(col(c, ACCOUNTS).doc(minerId)),
+    c.tx.get(col(c, RUNNING_ACCOUNTS).doc(minerId)),
     c.tx.get(col(c, PAYMENTS).where('minerId', '==', minerId)),
   ]);
   return account.exists
-    ? liveAccount(
+    ? liveRunningAccount(
         account.data() as Data,
         payments.docs.map((d) => d.data())
       )
@@ -1285,7 +1285,7 @@ async function liveAccountOf(c: EditCtx, minerId: string) {
 async function knownMiner(c: EditCtx, minerId: string): Promise<boolean> {
   const [miner, account] = await c.tx.getAll(
     col(c, MINERS).doc(minerId),
-    col(c, ACCOUNTS).doc(minerId)
+    col(c, RUNNING_ACCOUNTS).doc(minerId)
   );
   if (miner.exists || account.exists) return true;
   const solo = soloCharacterId(minerId);
@@ -1795,16 +1795,23 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
   );
 }
 
-const ACCOUNT_FIGURES = ['owed', 'paid', 'days', 'oldest', 'paidThrough', 'credit'] as const;
+const RUNNING_ACCOUNT_FIGURES = [
+  'owed',
+  'paid',
+  'days',
+  'oldest',
+  'paidThrough',
+  'credit',
+] as const;
 
 /** Whether a stored account already holds these figures (its `at` and `by` aside). */
-function sameAccount(
+function sameRunningAccount(
   stored: FirebaseFirestore.DocumentData | undefined,
   next: Record<string, unknown>
 ): boolean {
   return (
     !!stored &&
-    ACCOUNT_FIGURES.every((k) => stored[k] === next[k]) &&
+    RUNNING_ACCOUNT_FIGURES.every((k) => stored[k] === next[k]) &&
     JSON.stringify(stored.unpaidDays ?? null) === JSON.stringify(next.unpaidDays ?? null)
   );
 }
@@ -2539,7 +2546,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // officer's Needs you and no longer hold those days.
       const [disputes, live] = await Promise.all([
         c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId)),
-        liveAccountOf(c, action.minerId),
+        liveRunningAccountOf(c, action.minerId),
       ]);
       const mineOpen = disputes.docs.map((d) => d.data()).filter(hasLines); // a withdrawn dispute is a tombstone
       // Every read stays above the first write: a Firestore transaction refuses a read after one.
@@ -2813,7 +2820,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const settled = await storableSettledThrough(c, action.accounts, paidRef, iso);
       // Every editor's open tab records the same figures (#6313): one already stored is not
       // written again, so a second tab adds no write and no newer `at`/`by`.
-      const refs = action.accounts.map((a) => col(c, ACCOUNTS).doc(a.minerId));
+      const refs = action.accounts.map((a) => col(c, RUNNING_ACCOUNTS).doc(a.minerId));
       const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
       // The Miner's own copy of the paid-through day (the marker itself is officer-only), for each
       // Miner it advanced now. Reads first: a transaction refuses one after a write.
@@ -2822,7 +2829,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       action.accounts.forEach((account, i) => {
         const a = { ...account };
         delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
-        if (sameAccount(stored[i].data(), a)) return;
+        if (sameRunningAccount(stored[i].data(), a)) return;
         tx.set(refs[i], { ...a, at: iso, by });
       });
       // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
@@ -2847,7 +2854,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // trusted is skipped and reported, and the next load works the account out again. Reads
       // first: a transaction refuses one after a write.
       const today = utcDate(now);
-      const refs = action.checkpoints.map((k) => col(c, ACCOUNT_CHECKPOINTS).doc(k.minerId));
+      const refs = action.checkpoints.map((k) =>
+        col(c, RUNNING_ACCOUNT_CHECKPOINTS).doc(k.minerId)
+      );
       const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
       const recorded: { checkpoint: RecordedCheckpoint; ref: DocumentReference; uids: string[] }[] =
         [];
@@ -2864,7 +2873,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           today,
           known,
           characterIds,
-          live: known ? await liveAccountOf(c, k.minerId) : undefined,
+          live: known ? await liveRunningAccountOf(c, k.minerId) : undefined,
           isDirector: c.access.isDirector,
         });
         // `reason` is the first, for a tab that reads one; `reasons` names every one.
@@ -2889,7 +2898,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         throw new HttpsError('permission-denied', 'A Director must reset a checkpoint', {
           reason: 'director-approval',
         });
-      const ref = col(c, ACCOUNT_CHECKPOINTS).doc(action.minerId);
+      const ref = col(c, RUNNING_ACCOUNT_CHECKPOINTS).doc(action.minerId);
       const held = (await tx.get(ref)).data();
       if (!held) fail('not-found', 'No checkpoint to reset', 'not-found');
       tx.delete(ref);
@@ -3050,7 +3059,7 @@ async function closeAccount(
   // A Running account's figures are the officer's tab's to work out (the server holds no
   // prices): the credit it sends, and what the account recorded still owes, less payments since.
   const credit = Math.max(0, action.runningCredit ?? 0);
-  const owed = (await liveAccountOf(c, action.minerId))?.owed ?? 0;
+  const owed = (await liveRunningAccountOf(c, action.minerId))?.owed ?? 0;
 
   let token: string | undefined;
   if (statement)
@@ -3157,7 +3166,7 @@ export async function editBookAs(
     };
     if (BOOK_WIDE_EDITS.has(action.action))
       ctx.checkpointIds = (
-        await tx.get(sub(deps.db, call.corporationId, ACCOUNT_CHECKPOINTS).select())
+        await tx.get(sub(deps.db, call.corporationId, RUNNING_ACCOUNT_CHECKPOINTS).select())
       ).docs.map((d) => d.id);
     const outcome = await applyEdit(ctx, action);
     dropCheckpoints(
@@ -3418,7 +3427,7 @@ export async function promoteProvenClaims(
         ...uids,
       ];
       // A checkpoint carries the Miner's readers too, as notices do.
-      for (const name of [...MINER_KEYED, DISPUTES, ACCOUNT_CHECKPOINTS]) {
+      for (const name of [...MINER_KEYED, DISPUTES, RUNNING_ACCOUNT_CHECKPOINTS]) {
         const snap = await tx.get(
           sub(deps.db, corporationId, name).where('minerId', '==', p.minerId)
         );
@@ -3942,7 +3951,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
     sub(deps.db, corporationId, DECLARATIONS).where(NOTICE_ID_FIELD, '==', notice.id).get(),
     sub(deps.db, corporationId, MINERS).doc(minerId).get(),
-    sub(deps.db, corporationId, ACCOUNTS).doc(minerId).get(),
+    sub(deps.db, corporationId, RUNNING_ACCOUNTS).doc(minerId).get(),
   ]);
   const s = legacyStatementDocOf(notice);
   // A whitelist: the guest sees no character ids (bar `pendingCharacterIds` below, which they must answer), officer ids or other bookkeeping.
@@ -3996,7 +4005,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     // A running account's total now (#6294): what an officer's client last worked out, less the
     // payments credited to this Miner since. Days mined since then show once it recounts.
     account: account.exists
-      ? liveAccount(
+      ? liveRunningAccount(
           account.data() as Data,
           payments.docs.map((d) => d.data())
         )

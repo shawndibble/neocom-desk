@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ledgerDays,
   ledgerPayments,
-  liveAccount,
+  liveRunningAccount,
   netPayment,
   paidSinceRecord,
   payOldestFirst,
-} from './corpTaxBookAccounts.js';
+} from './corpTaxBookRunningAccounts.js';
 
-describe('liveAccount', () => {
+describe('liveRunningAccount', () => {
   const recorded = {
     owed: 10_000_000,
     paid: 1_000_000,
@@ -20,7 +20,7 @@ describe('liveAccount', () => {
 
   it('takes off what the Miner paid beyond what was counted, net of not tax', () => {
     const payments = [{ amount: 1_000_000 }, { amount: 3_000_000, notTaxAmount: 1_000_000 }];
-    expect(liveAccount(recorded, payments)).toEqual({
+    expect(liveRunningAccount(recorded, payments)).toEqual({
       owed: 8_000_000,
       days: 3,
       oldest: '2026-10-05',
@@ -31,14 +31,14 @@ describe('liveAccount', () => {
   });
 
   it("returns the record's credit and what was paid beyond what it owed", () => {
-    expect(liveAccount({ ...recorded, credit: 5 }, [{ amount: 1_000_000 }]).credit).toBe(5);
-    expect(liveAccount({ ...recorded, credit: 5 }, [{ amount: 12_000_000 }]).credit).toBe(
+    expect(liveRunningAccount({ ...recorded, credit: 5 }, [{ amount: 1_000_000 }]).credit).toBe(5);
+    expect(liveRunningAccount({ ...recorded, credit: 5 }, [{ amount: 12_000_000 }]).credit).toBe(
       1_000_005
     );
   });
 
   it('owes nothing, and lists no days, once the payments since cover it', () => {
-    expect(liveAccount(recorded, [{ amount: 20_000_000 }])).toMatchObject({
+    expect(liveRunningAccount(recorded, [{ amount: 20_000_000 }])).toMatchObject({
       owed: 0,
       days: 0,
       oldest: null,
@@ -54,7 +54,7 @@ describe('paidSinceRecord', () => {
   });
 });
 
-describe('liveAccount with the days still owed', () => {
+describe('liveRunningAccount with the days still owed', () => {
   const recorded = {
     owed: 7_000_000,
     paid: 0,
@@ -69,7 +69,7 @@ describe('liveAccount with the days still owed', () => {
   };
 
   it('is the recorded days when nothing was paid since', () => {
-    expect(liveAccount(recorded, [])).toMatchObject({
+    expect(liveRunningAccount(recorded, [])).toMatchObject({
       owed: 7_000_000,
       days: 3,
       unpaidDays: recorded.unpaidDays,
@@ -77,7 +77,7 @@ describe('liveAccount with the days still owed', () => {
   });
 
   it('pays the oldest day first, part of the next, and moves the oldest date on', () => {
-    expect(liveAccount(recorded, [{ amount: 1_500_000 }])).toMatchObject({
+    expect(liveRunningAccount(recorded, [{ amount: 1_500_000 }])).toMatchObject({
       owed: 5_500_000,
       days: 2,
       oldest: '2026-11-09',
@@ -90,7 +90,7 @@ describe('liveAccount with the days still owed', () => {
 
   it('pays the recorded days oldest first, whatever the record owes beyond them', () => {
     const more = { ...recorded, owed: 8_000_000, oldest: '2026-10-01' };
-    expect(liveAccount(more, [{ amount: 1_500_000 }])).toMatchObject({
+    expect(liveRunningAccount(more, [{ amount: 1_500_000 }])).toMatchObject({
       owed: 6_500_000,
       oldest: '2026-11-09',
       unpaidDays: [
@@ -101,7 +101,7 @@ describe('liveAccount with the days still owed', () => {
   });
 
   it('lists no days once the payments cover them all', () => {
-    expect(liveAccount(recorded, [{ amount: 9_000_000 }])).toMatchObject({
+    expect(liveRunningAccount(recorded, [{ amount: 9_000_000 }])).toMatchObject({
       owed: 0,
       days: 0,
       oldest: null,

@@ -24,7 +24,7 @@ import type {
   RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import { countedPayments, paymentNet, type TaxPayment } from './payments';
-import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
+import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { shiftUtcDate, utcDayOf } from '@/engine/localDay';
 
 /** What is left of a day below this is float residue: the day is done (whole ISK on every screen). */
