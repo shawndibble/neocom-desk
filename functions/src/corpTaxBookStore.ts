@@ -168,7 +168,6 @@ import {
   adjustmentLineKey,
   lastNoticedDay,
   lateNoticeRefusal,
-  legacyStatementDocOf,
   noticedDates,
   reminderAllowed,
 } from './corpTaxBookLateNotice.js';
@@ -3625,8 +3624,8 @@ async function noticeOfToken(
 }
 
 /**
- * The verify page (#4066): the Late notice a mailed link names. The notice goes out in the shape
- * the page has always read (`legacyStatementDocOf`); a notice takes no money, so no payment is
+ * The verify page (#4066): the Late notice a mailed link names, under the wire name `statement`
+ * the page has always read; a notice takes no money, so no payment is
  * credited to it and it never settles for good: what the Miner owes is `account`.
  */
 export async function readStatementByToken(deps: BookDeps, token: string) {
@@ -3645,46 +3644,38 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     sub(deps.db, corporationId, MINERS).doc(minerId).get(),
     sub(deps.db, corporationId, RUNNING_ACCOUNTS).doc(minerId).get(),
   ]);
-  const s = legacyStatementDocOf(notice);
-  // A whitelist: the guest sees no character ids (bar `pendingCharacterIds` below, which they must answer), officer ids or other bookkeeping.
-  const shown: Data = {};
-  for (const key of [
-    'id',
-    'code',
-    'periodStart',
-    'periodEnd',
-    'coversFrom',
-    'coversThrough',
-    'issuedAt',
-    'hubId',
-    'oreForm',
-    'amount',
-    'corporationName',
-    'minerName',
-    'refineryNames',
-    'kind',
-  ]) {
-    if (s[key] !== undefined) shown[key] = s[key];
-  }
-  shown.lines = ((s.lines as Data[] | undefined) ?? []).map((line) => {
-    const { characterId: _c, ...rest } = line;
-    void _c;
-    return rest;
-  });
+  // What the page prints, and no more: the guest sees no character ids (bar `pendingCharacterIds`
+  // below, which they must answer), officer ids or other bookkeeping.
+  const { hubId, oreForm } = notice.pricing ?? { hubId: 'jita', oreForm: 'compressed' };
+  const shown = {
+    id: notice.id,
+    ...(notice.code ? { code: notice.code } : {}),
+    issuedAt: notice.issuedAt,
+    hubId,
+    oreForm,
+    amount: notice.listed,
+    corporationName: notice.names?.corporationName,
+    minerName: notice.names?.minerName,
+    refineryNames: notice.names?.refineryNames,
+    lines: notice.lines.map(({ key: _key, characterId: _characterId, ...line }) => {
+      void _key;
+      void _characterId;
+      return line;
+    }),
+  };
   const b = bookSnap.data() ?? {};
   return {
     statement: shown,
     corporationId,
     terms: {
-      hubId: s.hubId,
-      oreForm: s.oreForm,
+      hubId,
+      oreForm,
       startDate: b.startDate,
       overdueDays: b.overdueDays,
-      minimumStatement: b.minimumStatement,
-      divisions: b.divisions,
+      // A book that never stored them reads the Master Wallet alone.
+      divisions: (b.divisions as number[] | undefined) ?? [1],
       // The corp's own names for them, so the verify page names the Account to pay into (#6204).
       divisionNames: b.divisionNames,
-      cadence: b.cadence,
     },
     // Money pays the Miner's oldest day, never a notice: none is credited to this one.
     payments: [],

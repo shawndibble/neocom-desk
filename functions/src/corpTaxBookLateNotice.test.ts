@@ -4,7 +4,6 @@ import {
   isFinalNoticeId,
   lateNoticeRefusal,
   noticesOfDocs,
-  legacyStatementDocOf,
   listedKeys,
   paymentCode,
   minerPaymentCode,
@@ -222,26 +221,6 @@ describe('finalNoticeId', () => {
     expect(lateNoticeFromStatementDoc({ ...storedNotice, id: finalNoticeId('g') })?.kind).toBe(
       'final'
     );
-  });
-});
-
-describe('legacyStatementDocOf', () => {
-  it('writes back a doc an older tab reads as the same notice', () => {
-    const notice = lateNoticeFromStatementDoc(storedNotice)!;
-    expect(lateNoticeFromStatementDoc(legacyStatementDocOf(notice))).toEqual(notice);
-  });
-
-  it('keeps the legacy fields an older tab requires', () => {
-    const doc = legacyStatementDocOf(lateNoticeFromStatementDoc(storedNotice)!);
-    expect(doc).toMatchObject({
-      kind: 'notice',
-      periodStart: '2026-11-01',
-      coversThrough: '2026-11-03',
-      hubId: 'jita',
-      oreForm: 'compressed',
-      amount: 3_000_000,
-    });
-    expect((doc.lines as { adjustmentId?: string }[])[1]?.adjustmentId).toBe('a1');
   });
 });
 

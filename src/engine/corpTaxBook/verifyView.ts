@@ -30,8 +30,8 @@ export interface VerifyPayload {
   terms: {
     startDate?: string;
     overdueDays?: number;
-    /** The wallet divisions the book reads donations from; absent from older servers. */
-    divisions?: number[];
+    /** The wallet divisions the book reads donations from. */
+    divisions: number[];
     /** The corp's own names for those divisions, when a Director's visit stored them. */
     divisionNames?: Record<string, string>;
   };
@@ -57,8 +57,8 @@ export interface VerifyPayload {
      */
     unpaidDays?: UnpaidDay[];
   } | null;
-  /** The Miner's whole history, for the ledger; absent from an older server. */
-  ledger?: VerifyLedgerData;
+  /** The Miner's whole history, for the ledger. */
+  ledger: VerifyLedgerData;
 }
 
 /** A running day still owed: what remains of it and its whole tax (the shared `OwedDay`). */

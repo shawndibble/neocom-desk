@@ -134,7 +134,6 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
     recordedDays && owing - unpaidSum <= recordedDays.length + 1 ? recordedDays : undefined;
   // Days mined since the last notice are on no notice: the recorded days add them to the ledger.
   const ledger = useMemo(() => {
-    if (!payload.ledger) return undefined;
     const known = new Set(payload.ledger.days.map((d) => d.date));
     const days = [
       ...payload.ledger.days,
@@ -146,12 +145,11 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
   }, [payload.ledger, unpaidDays]);
 
   const lastDeclaration = payload.declarations.at(-1);
-  // The wallet divisions the book reads (#6204); an older server sends none, and then the page
-  // names none rather than guess. Only a book that reads past the Master Wallet has a choice to
-  // name: a donation from outside the corporation has no division to pick.
+  // The wallet divisions the book reads (#6204). Only a book that reads past the Master Wallet has
+  // a choice to name: a donation from outside the corporation has no division to pick.
   const divisionNames = readDivisionNames(terms.divisionNames);
   const wallet =
-    terms.divisions?.length && !(terms.divisions.length === 1 && terms.divisions[0] === 1)
+    terms.divisions.length > 0 && !(terms.divisions.length === 1 && terms.divisions[0] === 1)
       ? corpPayAccounts(terms.divisions, divisionNames, t).join(', ')
       : null;
 
@@ -257,7 +255,7 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
               <OwedDayList days={unpaidDays} notice={notice} />
             </Panel>
           )}
-          {ledger && <VerifyLedger ledger={ledger} />}
+          <VerifyLedger ledger={ledger} />
         </>
       ) : (
         <>

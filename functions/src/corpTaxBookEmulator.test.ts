@@ -6,7 +6,12 @@ import {
   applyLateNoticeBackfill,
   planLateNoticeBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
-import { finalNoticeId, legacyStatementDocOf, minerPaymentCode } from './corpTaxBookLateNotice.js';
+import {
+  finalNoticeId,
+  minerPaymentCode,
+  noticeSpan,
+  type LateNotice,
+} from './corpTaxBookLateNotice.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -106,6 +111,39 @@ async function reason(promise: Promise<unknown>): Promise<string> {
 
 const edit = (id: number, data: Record<string, unknown>, token = false) =>
   editBook(deps(), who(id), token ? withToken(id) : { corporationId: CORP }, parseEditAction(data));
+
+/** A notice as the retired `statements` mirror stored it: what the one-time copy reads back. */
+function legacyStatementDoc(notice: LateNotice): Record<string, unknown> {
+  const { first, last } = noticeSpan(notice);
+  const pricing = notice.pricing ?? { hubId: 'jita', oreForm: 'compressed' };
+  return {
+    id: notice.id,
+    minerId: notice.minerId,
+    kind: 'notice',
+    ...(notice.code ? { code: notice.code } : {}),
+    periodStart: first,
+    periodEnd: last,
+    coversFrom: first,
+    coversThrough: last,
+    issuedAt: notice.issuedAt,
+    ...(notice.issuedBy !== undefined ? { issuedBy: notice.issuedBy } : {}),
+    hubId: pricing.hubId,
+    oreForm: pricing.oreForm,
+    lines: notice.lines.map(({ key, ...line }) =>
+      key.startsWith('adjustment:')
+        ? { ...line, adjustmentId: key.slice('adjustment:'.length) }
+        : { ...line, chargeKey: key }
+    ),
+    amount: notice.listed,
+    characterIds: notice.characterIds,
+    uids: notice.uids,
+    mailsSent: notice.mail.sent,
+    ...(notice.mail.lastAt ? { lastMailedAt: notice.mail.lastAt } : {}),
+    manualRemindersSent: notice.mail.manualSent,
+    remindersStopped: notice.mail.remindersStopped,
+    ...notice.names,
+  };
+}
 
 const book = () => db.collection('corps').doc(String(CORP));
 const auditCount = async () => (await book().collection('audit').get()).size;
@@ -2599,7 +2637,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         at: '2026-10-01T00:00:00Z',
       });
       const view = await readStatementByToken(deps(), String(verifyToken));
-      expect(view.statement.kind).toBe('notice');
+      expect(view.statement).toMatchObject({ code: minerPaymentCode('solo:50') });
       expect(view.account).toMatchObject({ owed: 10_000_000, days: 3, oldest: '2026-10-05' });
     });
 
@@ -2736,7 +2774,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(view.statement).toMatchObject({
         id: 's1',
         amount: 10_000,
-        kind: 'notice',
         code: minerPaymentCode('solo:50'),
       });
       expect(view.statement).not.toHaveProperty('verifyToken');
@@ -2833,7 +2870,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('statements').get()).empty).toBe(true);
       expect((await book().collection('statementLinks').get()).empty).toBe(true);
       const view = await readStatementByToken(deps(), String(out.verifyToken));
-      expect(view.statement).toMatchObject({ id: 'n1', kind: 'notice', minerName: 'Ore Pilot' });
+      expect(view.statement).toMatchObject({ id: 'n1', minerName: 'Ore Pilot' });
       expect(await reason(issue('n1'))).toBe('notice-exists');
     });
 
@@ -2884,7 +2921,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       await book()
         .collection('statements')
         .doc('n1')
-        .set(legacyStatementDocOf(copied as never));
+        .set(legacyStatementDoc(copied as unknown as LateNotice));
       await book().collection('statementLinks').doc('n1').set({ verifyToken });
       // Not read from there by anything but the copy.
       expect(await reason(readStatementByToken(deps(), String(verifyToken)))).toBe('invalid-token');
