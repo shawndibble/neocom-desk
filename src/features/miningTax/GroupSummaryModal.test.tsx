@@ -65,38 +65,16 @@ function renderGroup(overrides: Partial<Parameters<typeof GroupSummaryModal>[0]>
   );
 }
 
-describe('GroupSummaryModal payment', () => {
-  it('shows no payment card while no payment reached its days', () => {
+describe('GroupSummaryModal ledger link', () => {
+  it("opens its Payee's ledger from one link, with no paid-by card", async () => {
+    const onOpenLedger = vi.fn();
     renderGroup({
       members: [member('2026-09-08', { status: 'outstanding' }), member('2026-09-09')],
+      onOpenLedger,
     });
     expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
-  });
-
-  it('lists the payments that paid its days, each opening its wallet entry, and unlinks one', async () => {
-    const onUnlinkPayment = vi.fn();
-    renderGroup({
-      paidBy: [
-        {
-          key: 'journal:42',
-          link: {
-            payeeId: 'p1',
-            kind: 'journal',
-            refId: 42,
-            amount: 200,
-            paidOn: '2026-09-10',
-            source: 'manual',
-          },
-          amount: 200,
-          label: '200 ISK · 2026-09-10 — Player donation',
-        },
-      ],
-      onUnlinkPayment,
-    });
-    const link = screen.getByRole('link', { name: /Player donation/ });
-    expect(link.getAttribute('href')).toBe('/wallet/journal?highlight=42');
-    await userEvent.click(screen.getByRole('button', { name: 'Unlink transaction #42' }));
-    expect(onUnlinkPayment).toHaveBeenCalledWith('journal:42');
+    await userEvent.click(screen.getByRole('button', { name: /^Open .* ledger$/ }));
+    expect(onOpenLedger).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,4 +1,3 @@
-import { utcDayOf } from '../../../functions/src/timeConstants';
 import { soloCharacterId } from '../../../functions/src/corpTaxBookDonationMatch';
 import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -32,12 +31,7 @@ import {
 import { buildPriceBreakdown } from '@/features/miningTax/usePriceBreakdown';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import type { RowMenuAction } from '@/features/miningTax/rowMenu';
-import type { PaidByLink } from '@/features/miningTax/PaymentLinksCard';
-import {
-  linkablePayments,
-  paymentOfLink,
-  type MadePayment,
-} from '@/features/miningTax/paymentLinks';
+import { linkablePayments, type MadePayment } from '@/features/miningTax/paymentLinks';
 import {
   paymentLinkKey,
   linkAt,
@@ -51,7 +45,6 @@ import { systemLabel } from '@/features/miningTax/names';
 import { madePaymentHref } from '@/features/miningTax/madePaymentHref';
 import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
-import { formatIsk } from '@/lib/isk';
 import { pricesAtHubOnDate, type DatedUnitPrices } from '@/features/miningTax/pricing';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
@@ -408,42 +401,13 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => dismissRow(dr.row), fromMenu ? dr : undefined);
   }
 
-  const linkByKey = useMemo(() => new Map(links.map((l) => [paymentLinkKey(l), l])), [links]);
-  /**
-   * The linked payments whose money reached any of these Assignments' days, off their Payee's
-   * account, each with what it put on the day and a line naming its transaction.
-   */
-  function paidByOf(assignments: readonly MiningTaxAssignmentRecord[]): PaidByLink[] {
-    const out = new Map<string, PaidByLink>();
-    for (const a of assignments) {
-      if (!a.payeeId) continue;
-      const account = accounts.of(a.payeeId);
-      for (const { key, amount } of account?.paidBy(a.date) ?? []) {
-        const link = linkByKey.get(key);
-        if (!link) continue;
-        const held = out.get(key);
-        if (held) {
-          held.amount += amount;
-          continue;
-        }
-        const made = paymentOfLink(link, madePayments);
-        out.set(key, { key, link, amount, label: made ? paymentLabel(made) : null });
-      }
-    }
-    return [...out.values()];
+  /** The detail's "Open ledger": the detail closes and its Payee's ledger opens in its place. */
+  function openPayeeLedger() {
+    const payeeId = detailTarget?.assignment?.payeeId;
+    if (!payeeId) return;
+    actions.openDetail(null);
+    actions.openLedger({ kind: 'personal', payeeId });
   }
-  function paymentLabel(made: MadePayment): string {
-    const amount =
-      made.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(made.amount)} ISK`;
-    const label = made.label || t('miningTax.linkPaymentUntitledContract');
-    return `${amount} · ${utcDayOf(made.date)} — ${label}`;
-  }
-  const detailPaidBy = useMemo(
-    () =>
-      detailTarget?.assignment ? paidByOf(allMembers(detailTarget).map((m) => m.assignment)) : [],
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- paidByOf reads only these
-    [detailTarget, accounts, linkByKey, madePayments]
-  );
 
   function unlinkPayment(key: string) {
     void runAndClose(() => unlinkPayments([key]));
@@ -726,8 +690,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           onResolve={() => resolveGroup(detailTarget)}
           onUnassignAll={() => unassignGroup(detailTarget)}
           onLinkWalletPayment={() => linkWalletFor(detailTarget)}
-          paidBy={detailPaidBy}
-          onUnlinkPayment={unlinkPayment}
+          onOpenLedger={openPayeeLedger}
         />
       )}
 
@@ -757,7 +720,6 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           onClose={() => actions.openDetail(null)}
           dr={detailTarget}
           corp={corpDetail}
-          madePayments={madePayments}
           book={corpView?.books.find(
             (b) => b.loaded.corporationId === corpDetail.view.corporationId
           )}
@@ -776,6 +738,14 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             onResolve(target);
           }}
           {...(ownEntry ? { onFixRecords: () => actions.openDetail(ownEntry) } : {})}
+          onOpenLedger={() => {
+            actions.openDetail(null);
+            actions.openLedger({
+              kind: 'book',
+              corporationId: corpDetail.view.corporationId,
+              ...(corpDetail.view.minerId ? { minerId: corpDetail.view.minerId } : {}),
+            });
+          }}
           notice={
             (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
               <CorpOverlapNotice
@@ -878,8 +848,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 ? () => actions.splitFromDetail(detailTarget)
                 : undefined
             }
-            paidBy={detailPaidBy}
-            onUnlinkPayment={unlinkPayment}
+            onOpenLedger={openPayeeLedger}
             corpNote={
               detailTarget.corp?.kind === 'label' ? corpStateHint(detailTarget.corp) : undefined
             }
@@ -1035,6 +1004,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             source={ledgerSource}
             typeNames={typeNames}
             {...(ledgerPicker ? { picker: ledgerPicker } : {})}
+            {...(ledgerTarget.kind === 'personal' ? { onUnlinkPayment: unlinkPayment } : {})}
           />
         </Suspense>
       )}

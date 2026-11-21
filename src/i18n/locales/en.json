@@ -8245,30 +8245,12 @@
         "factSynced": "Synced",
         "factNotice": "Late notice",
         "factNoticeSent": "Sent. A payment pays your oldest unpaid days first, this one among them.",
-        "factSettledBy": "Settled by",
-        "creditAppliedNote": "{{corp}} already held credit from an earlier payment of yours, and applied {{amount}} ISK of it to this day.",
-        "settledBy": {
-          "donation": "Donation",
-          "credit": "Corp credit",
-          "closed": "Closed by the corporation"
-        },
-        "paidBy": {
-          "title": "Paid by",
-          "donation": "Donation, {{time}}",
-          "manual": "Recorded by an officer, {{time}}",
-          "payment": "Payment",
-          "openInWallet": "Open in wallet",
-          "inFlight": "Your donation, {{time}}, not credited by {{corp}} yet",
-          "corrections": "Credit from corrections (not a payment)",
-          "writtenOff": "Forgiven by an officer (not a payment)",
-          "withNote": "{{label}} · “{{note}}”"
-        },
+        "openLedger": "Open {{payee}} ledger",
         "factOriginal": "Originally billed",
         "settled": {},
         "disputeHint": "Your own record differs from the corp's records.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
         "reason": "Their reason: {{reasons}}",
-        "partPaid": "Billed {{billed}} ISK · paid {{paid}} ISK · owes {{owes}} ISK.",
         "forgiven": "{{amount}} ISK forgiven by the corporation. This is a small shortfall it closed out (a Market adjustment), or an amount still showing on a day it had recorded as paid.",
         "reversedTag": "Reversed by an officer"
       },
@@ -8442,8 +8424,7 @@
     "linkPaymentAmountLabel": "Value handed over",
     "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what it was worth: that is what it pays.",
     "linkPaymentConfirmAction": "Link to {{payee}}",
-    "paymentCardTitle": "Paid by",
-    "noLinkedTransactions": "No linked payment reached this day.",
+    "openLedger": "Open {{payee}} ledger",
     "unlinkTransactionAction": "Unlink",
     "characterColumn": "Character",
     "dateColumn": "Date",
@@ -8757,13 +8738,6 @@
       "history": "History",
       "monthSummary_one": "{{count}} entry · {{amount}} ISK tax",
       "monthSummary_other": "{{count}} entries · {{amount}} ISK tax"
-    },
-    "payment": {
-      "autoLinked": "auto-linked",
-      "unlinkNamed": "Unlink transaction #{{id}}",
-      "notCached": "Transaction #{{id}} · no longer in your saved wallet journal",
-      "recorded": "Recorded in Settle up on {{date}}, not seen in your wallet yet",
-      "legacy": "Paid on {{date}}, recorded by an older version of the app"
     },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",

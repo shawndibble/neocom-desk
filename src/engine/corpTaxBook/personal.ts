@@ -56,13 +56,6 @@ import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
 import { DAY_MS } from '@/lib/age';
 
-/**
- * What paid a day, read off the account: the book's own money (`credit`), a donation the member
- * sent that the book has not credited yet (`donation`), or none, the book closing it (`closed`: a
- * paid-through it recorded, a checkpoint, or a shortfall within the tolerance).
- */
-export type BookSettledBy = 'credit' | 'donation' | 'closed';
-
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /**
  * Why a Conflict clashes. `otherPayee`: the member gave the ore to a Payee that is not this
@@ -335,10 +328,6 @@ export interface BookRowView {
   taxOwed: number | null;
   /** The whole bill of the day, before payments. */
   billed: number;
-  /** How a Paid day was settled; absent while it is owed, dismissed or waived. */
-  settledBy?: BookSettledBy;
-  /** Whose money paid the day, read off the account's applications. Absent while no money reached it. */
-  paidBy?: PaidBy;
   /** The newest Late notice that asked for this day. */
   noticeId?: string;
   dismissalReason?: string;
@@ -374,8 +363,6 @@ export interface BookRowView {
   /** This line's share of the ore the miner's own entry also gives a Payee. */
   overlap?: BookOverlap;
   correction?: BookCorrection;
-  /** What the book's money paid of the day while it still owes the rest (a part-paid day). */
-  paidIsk?: number;
   /** What the book forgave of the day: an officer's write-off, or a shortfall within the tolerance. */
   forgivenIsk?: number;
   /** Corrections an officer reversed on the day: they no longer count, and stay visible. */
@@ -554,8 +541,6 @@ function inFlightPayment(d: InFlightDonation, miners: readonly Miner[]): TaxPaym
     source: 'donation',
   };
 }
-
-const isInFlight = (paymentId: string) => paymentId.startsWith('inFlight:');
 
 function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: string): Prepared {
   // A donation the book synced past without crediting no longer counts (`UNCREDITED_AFTER_DAYS`).
@@ -1368,12 +1353,6 @@ const byDateThenId = (a: BookRowView, b: BookRowView) =>
 const minerOfRow = (p: Prepared, row: Pick<BookRowView, 'minerId' | 'characterId'>) =>
   row.minerId ?? minerIdFor(row.characterId, p.book.miners);
 
-/** The journal id an in-flight payment carries (`inFlightPayment`), when it had one. */
-function inFlightRefId(paymentId: string): number | undefined {
-  const ref = /^inFlight:(\d+)$/.exec(paymentId)?.[1];
-  return ref === undefined ? undefined : Number(ref);
-}
-
 /**
  * Each Adjustment on its day's first billed line, the old figure kept beside the new; one with no
  * mined day of its own stands on the account alone (the Payee ledger lists it). A correction an
@@ -1403,49 +1382,6 @@ function showAdjustments(p: Prepared, rows: readonly BookRowView[]): void {
     row.billed += a.amount;
     row.taxOwed = row.billed;
   }
-}
-
-/**
- * Whose money paid a day, for the member's day detail: read off the Miner's Running account's
- * applications, so it never decides who is paid, only reports what the account did.
- */
-export interface PaidBy {
-  /** Book Tax Payments, with what each put on the day. */
-  payments: { paymentId: string; amount: number }[];
-  /** Donations the member sent that the book has not credited yet. `refId` is the member's own journal entry. */
-  inFlight: { amount: number; at: string; refId?: number }[];
-  /** Credit that came from no payment (a credit correction). */
-  corrections?: number;
-  /** What an officer forgave of the day: no payment's, and nothing was paid for it. */
-  writtenOff?: number;
-}
-
-/** Whose money reached a date, as the account applied it, at `share` of the day. */
-function paidByOf(account: MinerRunningAccount, date: string, share: number): PaidBy | undefined {
-  const at = new Map(account.input.payments.map((x) => [x.id, x.at]));
-  const out: PaidBy = { payments: [], inFlight: [] };
-  for (const applied of account.applications.payments) {
-    const amount = applied.days.filter((d) => d.date === date).reduce((s, d) => s + d.amount, 0);
-    if (amount * share < 0.01) continue;
-    if (!isInFlight(applied.paymentId)) {
-      out.payments.push({ paymentId: applied.paymentId, amount: amount * share });
-      continue;
-    }
-    const refId = inFlightRefId(applied.paymentId);
-    out.inFlight.push({
-      amount: amount * share,
-      at: at.get(applied.paymentId) ?? '',
-      ...(refId !== undefined ? { refId } : {}),
-    });
-  }
-  const onDate = (list: readonly { date: string; amount: number }[]) =>
-    list.filter((d) => d.date === date).reduce((s, d) => s + d.amount, 0) * share;
-  const corrections = onDate(account.applications.corrections);
-  const writtenOff = onDate(account.applications.writeOffs);
-  if (corrections >= 0.01) out.corrections = corrections;
-  if (writtenOff >= 0.01) out.writtenOff = writtenOff;
-  const any = out.payments.length + out.inFlight.length > 0 || corrections >= 0.01;
-  return any || writtenOff >= 0.01 ? out : undefined;
 }
 
 /** The reasons of the officer write-offs that forgave each date, poured in the order recorded. */
@@ -1483,7 +1419,6 @@ function settleRows(p: Prepared, rows: readonly BookRowView[]): UncreditedDonati
       const cp = account.input.checkpoint;
       if (cp && row.date <= cp.through && !cp.owed.some((d) => d.date === row.date)) {
         row.state = 'paid';
-        row.settledBy = 'closed';
         row.taxOwed = 0;
       }
       continue;
@@ -1491,8 +1426,6 @@ function settleRows(p: Prepared, rows: readonly BookRowView[]): UncreditedDonati
     // A day an open dispute holds is not due: it stays billed in full.
     if (day.held) continue;
     const share = day.tax > 0 ? Math.max(0, row.billed) / day.tax : 0;
-    const paidBy = paidByOf(account, row.date, share);
-    if (paidBy) row.paidBy = paidBy;
     const officer = day.forgiven * share;
     const forgiven = officer + day.writtenOff * share;
     if (forgiven >= 1) row.forgivenIsk = forgiven;
@@ -1517,7 +1450,6 @@ function settleRows(p: Prepared, rows: readonly BookRowView[]): UncreditedDonati
       // with an officer's raise (the row carries both).
       const charging = Math.max(row.billed, row.correction?.before ?? 0);
       row.taxOwed = Math.max(0, account.owedOf(row.date, charging));
-      if (money >= 1) row.paidIsk = money;
       continue;
     }
     row.taxOwed = 0;
@@ -1537,7 +1469,6 @@ function settleRows(p: Prepared, rows: readonly BookRowView[]): UncreditedDonati
       continue;
     }
     row.state = 'paid';
-    row.settledBy = paidBy?.inFlight.length ? 'donation' : money >= 0.01 ? 'credit' : 'closed';
   }
   return uncreditedOf(p, rows);
 }

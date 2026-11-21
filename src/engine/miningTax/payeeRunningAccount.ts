@@ -148,14 +148,6 @@ export class PayeeRunningAccount {
     return this.account.day(charge.date) ? this.account.owedOf(charge.date, charge.tax) : 0;
   }
 
-  /** The linked payments whose money reached a day, with what each put on it, oldest first. */
-  paidBy(date: string): { key: string; amount: number }[] {
-    return this.account.applications.payments.flatMap((p) => {
-      const amount = p.days.filter((d) => d.date === date).reduce((sum, d) => sum + d.amount, 0);
-      return amount > 0 ? [{ key: p.paymentId, amount }] : [];
-    });
-  }
-
   /** What one more payment of `amount` on `paidOn` (a UTC day) would do, before it is recorded. */
   preview(amount: number, paidOn: string): PaymentOutcome {
     return previewPayment(

@@ -11,7 +11,9 @@ import {
   FilterBar,
   FilterChip,
   FilterField,
+  MenuItem,
   Panel,
+  RowActionsMenu,
   SlideOver,
   Spinner,
   StatChip,
@@ -132,6 +134,11 @@ export interface PayeeLedgerPanelProps {
   typeNames?: ReadonlyMap<number, string>;
   /** Above the ledger: a pick between accounts, when the Payee has several (a book's Miners). */
   picker?: ReactNode;
+  /**
+   * Unlinks a payment (its id in `source.payments`) from a personal Payee: it pays nothing and
+   * is offered again. Absent for a Corp Tax Book's Payee, whose payments the corporation owns.
+   */
+  onUnlinkPayment?: (paymentId: string) => void;
 }
 
 /**
@@ -147,6 +154,7 @@ export function PayeeLedgerPanel({
   source,
   typeNames,
   picker,
+  onUnlinkPayment,
 }: PayeeLedgerPanelProps) {
   const { t } = useTranslation();
   const ledger = useMemo(() => (source ? payeeLedger(source) : null), [source]);
@@ -161,7 +169,7 @@ export function PayeeLedgerPanel({
     >
       {picker && <div className="mb-3">{picker}</div>}
       {ledger ? (
-        <LedgerBody ledger={ledger} typeNames={typeNames} />
+        <LedgerBody ledger={ledger} typeNames={typeNames} onUnlinkPayment={onUnlinkPayment} />
       ) : (
         <Spinner block="panel" label={t('miningTax.ledger.loading')} />
       )}
@@ -213,9 +221,11 @@ const amountCell = (value: number) => (value === 0 ? '' : formatIsk(value));
 function LedgerBody({
   ledger,
   typeNames,
+  onUnlinkPayment,
 }: {
   ledger: PayeeLedger;
   typeNames?: ReadonlyMap<number, string>;
+  onUnlinkPayment?: ((paymentId: string) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>(DEFAULT_LEDGER_FILTER);
@@ -297,10 +307,47 @@ function LedgerBody({
             label={t('miningTax.ledger.tableLabel')}
             rows={rows}
             typeNames={typeNames}
+            {...(onUnlinkPayment
+              ? {
+                  rowContextMenu: (r: PayeeLedgerRow, tr: ReactElement) =>
+                    r.kind === 'payment' ? (
+                      <PaymentRowMenu row={r} onUnlink={onUnlinkPayment}>
+                        {tr}
+                      </PaymentRowMenu>
+                    ) : (
+                      tr
+                    ),
+                }
+              : {})}
           />
         )}
       </Panel>
     </div>
+  );
+}
+
+/** A linked payment's row menu on a personal Payee's ledger: Unlink, for a legacy link too. */
+function PaymentRowMenu({
+  row,
+  onUnlink,
+  children,
+}: {
+  row: Extract<PayeeLedgerRow, { kind: 'payment' }>;
+  onUnlink: (paymentId: string) => void;
+  children: ReactElement;
+}) {
+  const { t } = useTranslation();
+  return (
+    <RowActionsMenu
+      name={`${row.date} ${ledgerWhat(row, t)}`}
+      items={
+        <MenuItem onSelect={() => onUnlink(row.payment.id)}>
+          {t('miningTax.unlinkTransactionAction')}
+        </MenuItem>
+      }
+    >
+      {children}
+    </RowActionsMenu>
   );
 }
 

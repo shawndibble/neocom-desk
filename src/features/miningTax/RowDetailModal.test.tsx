@@ -178,52 +178,12 @@ describe('RowDetailModal payment', () => {
     );
   }
 
-  it('lists the payments that paid the day, each opening its wallet entry', () => {
-    renderPaid({
-      paidBy: [
-        {
-          key: 'journal:42',
-          link: {
-            payeeId: 'p1',
-            kind: 'journal',
-            refId: 42,
-            amount: 100,
-            paidOn: '2026-09-10',
-            source: 'auto',
-          },
-          amount: 100,
-          label: '100 ISK · 2026-09-10 — Player donation',
-        },
-      ],
-    });
-    const link = screen.getByRole('link', { name: /Player donation/ });
-    expect(link.getAttribute('href')).toBe('/wallet/journal?highlight=42');
-    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
-  });
-
-  it('unlinks a payment by its key', async () => {
-    const onUnlinkPayment = vi.fn();
-    renderPaid({
-      paidBy: [
-        {
-          key: 'recorded:r1',
-          link: {
-            payeeId: 'p1',
-            kind: 'recorded',
-            refId: 'r1',
-            amount: 100,
-            paidOn: '2026-09-10',
-            source: 'manual',
-          },
-          amount: 100,
-          label: null,
-        },
-      ],
-      onUnlinkPayment,
-    });
-    expect(screen.getByText(/Recorded in Settle up on 2026-09-10/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Unlink transaction #r1' }));
-    expect(onUnlinkPayment).toHaveBeenCalledWith('recorded:r1');
+  it("opens the Payee's ledger from one link, with no paid-by card", async () => {
+    const onOpenLedger = vi.fn();
+    renderPaid({ onOpenLedger });
+    expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Open .* ledger$/ }));
+    expect(onOpenLedger).toHaveBeenCalledOnce();
   });
 
   it('shows no payment card while no payment reached the day', () => {

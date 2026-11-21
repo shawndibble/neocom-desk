@@ -30,7 +30,7 @@ import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { OrePricedCard } from './OrePricedCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
-import { PaymentLinksCard, type PaidByLink } from './PaymentLinksCard';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
@@ -81,13 +81,8 @@ interface RowDetailModalProps {
   onSplit?: () => void;
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
-  /**
-   * The linked payments whose money reached this entry's day, off its Payee's account. Absent
-   * while nothing reached it, so the section renders nothing.
-   */
-  paidBy?: readonly PaidByLink[];
-  /** Unlinks one of `paidBy`. */
-  onUnlinkPayment?: (key: string) => void;
+  /** Opens its Payee's ledger: every payment and the days it paid. Absent: no link. */
+  onOpenLedger?: () => void;
   /** The Payee to pre-select for an unassigned entry — see `AssignDialog.suggestion`. */
   suggestion?: PayeeSuggestion;
   /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
@@ -149,8 +144,7 @@ export function RowDetailModal({
   onJoin,
   onSplit,
   onAddPayee,
-  paidBy,
-  onUnlinkPayment,
+  onOpenLedger,
   suggestion,
   onSettleUp,
   onLinkWalletPayment,
@@ -346,12 +340,10 @@ export function RowDetailModal({
           />
         )}
 
-        {paidBy && paidBy.length > 0 && (
-          <PaymentLinksCard
-            paidBy={paidBy}
-            {...(onUnlinkPayment ? { onUnlink: onUnlinkPayment } : {})}
-            busy={busy}
-          />
+        {payee && onOpenLedger && (
+          <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
+            {t('miningTax.openLedger', { payee: payee.name })}
+          </button>
         )}
 
         {assignment && row.duplicateAssignmentIds?.includes(assignment.id) && (

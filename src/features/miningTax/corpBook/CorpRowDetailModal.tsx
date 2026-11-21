@@ -1,13 +1,14 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatAge, MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -17,11 +18,8 @@ import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
-import { madeDonationOf, type CorpBookViewBook } from './corpBookView';
-import { pairWithMadePayments } from '@/engine/corpTaxBook/transferMatch';
-import type { MadePayment } from '../paymentLinks';
+import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
-import { PaidByList } from './PaidByList';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import {
   figureTarget,
@@ -50,8 +48,8 @@ interface Props {
   onResolve?: (target: ResolveTarget) => void;
   /** Opens the member's own entry for this day, to fix their records. Absent: no entry lines up. */
   onFixRecords?: () => void;
-  /** The member's own outgoing payments, to find their wallet entry for each donation the book holds. */
-  madePayments?: readonly MadePayment[];
+  /** Opens this Payee's ledger, which lists every payment and the days it paid. Absent: no link. */
+  onOpenLedger?: () => void;
 }
 
 /**
@@ -74,7 +72,7 @@ export function CorpRowDetailModal({
   notice,
   onResolve,
   onFixRecords,
-  madePayments,
+  onOpenLedger,
 }: Props) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -82,15 +80,6 @@ export function CorpRowDetailModal({
   const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
-  const bookPayments = book?.loaded.payments;
-  // Best effort, on this device: a donation the member's own journal no longer holds has no link.
-  const walletRefs = useMemo(
-    () =>
-      bookPayments && madePayments && madePayments.length > 0
-        ? pairWithMadePayments(bookPayments, madePayments.map(madeDonationOf), view.corporationId)
-        : undefined,
-    [bookPayments, madePayments, view.corporationId]
-  );
   const hub = hubForPayee(view.hubId);
   const form = t(
     view.oreForm === 'compressed'
@@ -118,12 +107,6 @@ export function CorpRowDetailModal({
     facts.push([
       t('miningTax.corpBook.detail.factSynced'),
       synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : '—',
-    ]);
-  }
-  if (view.state === 'paid' && view.settledBy) {
-    facts.push([
-      t('miningTax.corpBook.detail.factSettledBy'),
-      t(`miningTax.corpBook.detail.settledBy.${view.settledBy}`),
     ]);
   }
   if ((view.state === 'dismissed' || view.state === 'waived') && view.billed > 0) {
@@ -248,14 +231,6 @@ export function CorpRowDetailModal({
                   ))}
                 </ValueList>
               )}
-              {view.state === 'paid' && view.settledBy === 'credit' && (
-                <p>
-                  {t('miningTax.corpBook.detail.creditAppliedNote', {
-                    corp: corp.corpName,
-                    amount: formatIsk(view.billed, 0),
-                  })}
-                </p>
-              )}
               {/* Why a day the member saw Paid is Billed again, and the transfer to dispute. */}
               {view.unlinkedDonation && (
                 <div className="space-y-1.5">
@@ -309,15 +284,6 @@ export function CorpRowDetailModal({
             </div>
           )}
 
-          {view.paidBy && (
-            <PaidByList
-              paidBy={view.paidBy}
-              payments={book?.loaded.payments ?? []}
-              corpName={corp.corpName}
-              {...(walletRefs ? { walletRefs } : {})}
-            />
-          )}
-
           {view.correction && (
             <p className="rounded-xs border border-line p-2 text-xs">
               {t('miningTax.corpBook.detail.corrected', {
@@ -328,16 +294,6 @@ export function CorpRowDetailModal({
                 ` ${t('miningTax.corpBook.detail.reason', {
                   reasons: view.correction.reasons.join(' · '),
                 })}`}
-            </p>
-          )}
-
-          {view.paidIsk !== undefined && view.paidIsk >= 1 && (view.taxOwed ?? 0) > 0 && (
-            <p className="text-xs text-text-dim tabular-nums">
-              {t('miningTax.corpBook.detail.partPaid', {
-                billed: formatIsk(view.billed),
-                paid: formatIsk(view.paidIsk),
-                owes: formatIsk(view.taxOwed ?? 0),
-              })}
             </p>
           )}
 
@@ -378,6 +334,12 @@ export function CorpRowDetailModal({
                 {t('miningTax.corpBook.diff.open')}
               </Button>
             </div>
+          )}
+
+          {onOpenLedger && (
+            <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
+              {t('miningTax.corpBook.detail.openLedger', { payee: payeeName })}
+            </button>
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">

@@ -59,19 +59,6 @@ describe('PayeeRunningAccount', () => {
     expect(account.isPaid('2026-10-01')).toBe(true);
   });
 
-  it('says which payment paid each day, from the account', () => {
-    const account = build([
-      link(1, 800_000, '2026-10-05'),
-      link(2, 700_000, '2026-10-06', { kind: 'contract' }),
-    ]);
-    expect(account.paidBy('2026-10-01')).toEqual([
-      { key: 'journal:1', amount: 800_000 },
-      { key: 'contract:2', amount: 200_000 },
-    ]);
-    expect(account.paidBy('2026-10-02')).toEqual([{ key: 'contract:2', amount: 500_000 }]);
-    expect(account.paidBy('2026-10-03')).toEqual([]);
-  });
-
   it('previews one more payment without recording it', () => {
     const account = build([link(1, 1_000_000, '2026-10-05')]);
     const preview = account.preview(2_600_000, '2026-10-07');

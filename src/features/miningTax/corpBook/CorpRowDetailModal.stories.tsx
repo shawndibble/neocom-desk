@@ -117,23 +117,10 @@ export const Dismissed: S = {
   },
 };
 
-/** @summary A paid day: two book payments, a donation not credited yet, and credit from a correction. */
-export const PaidByMoney: S = {
+/** @summary A paid day: its payments are in the Payee ledger, not on the day. */
+export const Paid: S = {
   args: {
-    view: {
-      ...base,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'credit',
-      paidBy: {
-        payments: [
-          { paymentId: 'p1', amount: 200_000 },
-          { paymentId: 'p2', amount: 60_000 },
-        ],
-        inFlight: [{ amount: 50_000, at: '2026-10-29T13:10:00Z', refId: 5150 }],
-        corrections: 9_000,
-      },
-    },
+    view: { ...base, state: 'paid', taxOwed: 0 },
   },
 };
 

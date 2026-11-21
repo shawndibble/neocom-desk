@@ -7,7 +7,6 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
 import { CorpRowDetailModal } from './CorpRowDetailModal';
 import type { CorpRowInfo } from './corpRows';
-import type { CorpBookViewBook } from './corpBookView';
 
 const ZEO = 45490;
 
@@ -77,69 +76,14 @@ function renderModal(over: Partial<Parameters<typeof CorpRowDetailModal>[0]> = {
 }
 
 describe('CorpRowDetailModal', () => {
-  it('lists what paid a day, and nothing for a day nothing has paid', () => {
-    renderModal();
+  it("opens the Payee's ledger from one link, and shows no paid-by list", async () => {
+    const onOpenLedger = vi.fn();
+    renderModal({ onOpenLedger });
     expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
-  });
-
-  it('links a paid day’s donation to the member’s own wallet entry for it', () => {
-    const paid = {
-      ...view,
-      state: 'paid' as const,
-      taxOwed: 0,
-      settledBy: 'credit' as const,
-      paidBy: { payments: [{ paymentId: 'j1_900', amount: 957_001 }], inFlight: [] },
-    };
-    const book = {
-      summary: {},
-      payee: { name: 'Brass Meridian Logistics' },
-      loaded: {
-        payments: [
-          {
-            id: 'j1_900',
-            minerId: 'solo:1',
-            characterId: 1,
-            amount: 957_001,
-            at: '2026-10-18T13:10:00Z',
-            source: 'donation',
-          },
-        ],
-      },
-    } as unknown as CorpBookViewBook;
-    const madePayments = [
-      {
-        key: 'journal:5150',
-        kind: 'journal',
-        refId: 5150,
-        characterId: 1,
-        date: '2026-10-18T13:09:00Z',
-        amount: 957_001,
-        method: 'donation',
-        counterpartyId: paid.corporationId,
-        label: '',
-      },
-    ] as const;
-    renderModal({ corp: { ...corp, view: paid }, book, madePayments });
-    expect(screen.getByRole('link', { name: 'Open in wallet' })).toHaveAttribute(
-      'href',
-      '/wallet/journal?highlight=5150'
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open Brass Meridian Logistics ledger' })
     );
-  });
-
-  it('lists the money that paid a paid day', () => {
-    const paid = {
-      ...view,
-      state: 'paid' as const,
-      taxOwed: 0,
-      settledBy: 'donation' as const,
-      paidBy: {
-        payments: [],
-        inFlight: [{ amount: 957_001, at: '2026-10-18T13:10:00Z', refId: 5150 }],
-      },
-    };
-    renderModal({ corp: { ...corp, view: paid } });
-    expect(screen.getByText('Paid by')).toBeInTheDocument();
-    expect(screen.getByText(/not credited by Brass Meridian Logistics yet/)).toBeInTheDocument();
+    expect(onOpenLedger).toHaveBeenCalledOnce();
   });
 
   it('shows what the book bills, with the book and your own quantity', () => {
@@ -240,7 +184,6 @@ describe('CorpRowDetailModal', () => {
       ...view,
       state: 'paid',
       taxOwed: 0,
-      settledBy: 'credit',
       noticeId: 's1',
       dispute: undefined,
     };
@@ -267,15 +210,6 @@ describe('CorpRowDetailModal', () => {
     expect(screen.getByText('Their reason: No tax on this moon')).toBeInTheDocument();
   });
 
-  it('says a day was paid from credit the book already held', () => {
-    const paid: BookRowView = { ...view, state: 'paid', taxOwed: 0, settledBy: 'credit' };
-    renderModal({ corp: { ...corp, view: paid } });
-    expect(screen.getByText('Corp credit')).toBeInTheDocument();
-    expect(
-      screen.getByText(/already held credit from an earlier payment of yours/)
-    ).toBeInTheDocument();
-  });
-
   it('names the donation that paid a day until the corporation never credited it', () => {
     const unlinked: BookRowView = {
       ...view,
@@ -290,18 +224,6 @@ describe('CorpRowDetailModal', () => {
   });
 
   // The Bureau report: the book holds the payment but spent it on an older day it still bills.
-
-  it('breaks a part-paid day into billed, paid and owes', () => {
-    renderModal({
-      corp: {
-        ...corp,
-        view: { ...view, billed: 222_000, paidIsk: 100_000, taxOwed: 122_000 },
-      },
-    });
-    expect(
-      screen.getByText('Billed 222,000 ISK · paid 100,000 ISK · owes 122,000 ISK.')
-    ).toBeInTheDocument();
-  });
 
   it('says what a Market adjustment forgave', () => {
     renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });

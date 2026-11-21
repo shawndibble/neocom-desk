@@ -20,7 +20,7 @@ import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
-import { PaymentLinksCard, type PaidByLink } from './PaymentLinksCard';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
@@ -57,10 +57,8 @@ interface GroupSummaryModalProps {
   onLinkWalletPayment?: () => void;
   /** Deletes every day's Assignment — asked first. */
   onUnassignAll: () => void;
-  /** The linked payments whose money reached any of its days, off its Payee's account. */
-  paidBy?: readonly PaidByLink[];
-  /** Unlinks one of `paidBy`. */
-  onUnlinkPayment?: (key: string) => void;
+  /** Opens its Payee's ledger: every payment and the days it paid. Absent: no link. */
+  onOpenLedger?: () => void;
   /** Opens with the "unassign all days?" question showing — the row menu's Unassign. */
   startWithUnassignConfirm?: boolean;
 }
@@ -91,8 +89,7 @@ export function GroupSummaryModal({
   onResolve,
   onLinkWalletPayment,
   onUnassignAll,
-  paidBy,
-  onUnlinkPayment,
+  onOpenLedger,
   startWithUnassignConfirm = false,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
@@ -171,12 +168,10 @@ export function GroupSummaryModal({
           </span>
         </div>
 
-        {paidBy && paidBy.length > 0 && (
-          <PaymentLinksCard
-            paidBy={paidBy}
-            {...(onUnlinkPayment ? { onUnlink: onUnlinkPayment } : {})}
-            busy={busy}
-          />
+        {onOpenLedger && (
+          <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
+            {t('miningTax.openLedger', { payee: payeeDisplayName })}
+          </button>
         )}
 
         <ul className="space-y-2">
