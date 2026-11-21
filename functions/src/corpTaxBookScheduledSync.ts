@@ -54,9 +54,6 @@ import {
   placeObservedRows,
   otherDivisions,
   reconcileExtractions,
-  billableStoredRows,
-  storedRowsWanted,
-  unbilledMinerIds,
   type JournalDonation,
   type MinerLike,
   type MoonNotification,
@@ -76,11 +73,11 @@ import { chunk } from './chunk.js';
 import { dbReader, readNoticeDocs } from './corpTaxBookLateNoticeStore.js';
 import {
   donationOwner,
-  resolveDonationOwners,
-  uncountedDonations,
+  noteUncountedDonations,
   type MatchBook,
 } from './corpTaxBookDonationMatch.js';
 import { loadMatchBook } from './corpTaxBookDonationMatchStore.js';
+import { billableStoredRows, minedSinceStart, storedRowsWanted } from './corpTaxBookMatchRows.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
@@ -400,15 +397,13 @@ export async function runBookSync(
     ...rows.map((r) => r.characterId),
     ...before.miners.flatMap((m) => m.characterIds),
   ]);
-  const resolved = book ? resolveDonationOwners(fresh, book) : [];
   const uncounted =
     elsewhere === null || !book
       ? undefined
-      : uncountedDonations(
+      : noteUncountedDonations(
           elsewhere,
-          // A Running account holds no open balance a sync can read: who mined, unlisted, owes.
-          { ...book, openBalance: new Map(), unbilled: unbilledOf(before, rows) },
-          resolved
+          book,
+          minedSinceStart(rows, before.miners, before.startDate)
         );
 
   const placed = placeObservedRows(
@@ -598,7 +593,6 @@ async function billedStoredRows(
     held,
     senders,
     miners: book.miners,
-    statements: book.statements,
     startDate: book.startDate,
   });
   if (wanted.size === 0) return [];
@@ -637,18 +631,6 @@ async function billedStoredRows(
     console.error('stored rows not read', e instanceof Error ? e.message : e);
     return [];
   }
-}
-
-/** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
-function unbilledOf(
-  book: AdminBookState,
-  rows: readonly { characterId: number; date: string; quantity: number }[]
-): Set<string> {
-  return unbilledMinerIds(rows, {
-    miners: book.miners,
-    statements: book.statements as { minerId: string; coversThrough?: string }[],
-    startDate: book.startDate,
-  });
 }
 
 async function reassignUnmatched(

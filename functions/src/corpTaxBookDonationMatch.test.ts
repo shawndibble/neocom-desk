@@ -7,7 +7,7 @@ import {
   donationOwner,
   minerIdFor,
   resolveDonationOwners,
-  uncountedDonations,
+  noteUncountedDonations,
 } from './corpTaxBookDonationMatch.js';
 
 const miners = [
@@ -170,9 +170,10 @@ describe('donationOwner', () => {
       at: `2026-11-0${refId % 9}T00:00:00.000Z`,
       ...(reason ? { reason } : {}),
     });
-    const noted = uncountedDonations(
+    const noted = noteUncountedDonations(
       [d(99, 'MTOLD001', 1), d(99, undefined, 2), d(10, undefined, 3), d(20, undefined, 4)],
-      { ...book, openBalance: new Map(), unbilled: new Set(['g1']) }
+      book,
+      new Set(['g1'])
     );
     expect(noted.map((u) => u.refId).sort()).toEqual([1, 3]);
   });

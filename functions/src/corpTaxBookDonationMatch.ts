@@ -172,40 +172,32 @@ export interface UncountedDonation {
   at: string;
 }
 
+/** A donation into a division the book does not read, as the journal gave it. */
+type ElsewhereDonation = {
+  refId: number;
+  division: number;
+  characterId: number;
+  amount: number;
+  at: string;
+  reason?: string;
+};
+
 /**
  * The donations into divisions the book does not read that look like tax (#6207): one carrying a
- * code the book knows, or one whose sender's Miner owes (an open balance less what was already
- * counted, or days not yet listed). Newest first, at most `UNCOUNTED_LIMIT`.
+ * code the book knows, one an officer has to place, or one whose sender's Miner mined what the book
+ * bills (`mined`, `minedSinceStart`). Newest first, at most `UNCOUNTED_LIMIT`.
  */
-export function uncountedDonations(
-  donations: readonly {
-    refId: number;
-    division: number;
-    characterId: number;
-    amount: number;
-    at: string;
-    reason?: string;
-  }[],
-  book: MatchBook & {
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  },
-  counted: readonly { minerId?: string; amount: number }[] = []
+export function noteUncountedDonations(
+  donations: readonly ElsewhereDonation[],
+  book: MatchBook,
+  mined: ReadonlySet<string>
 ): UncountedDonation[] {
-  const openBalance = new Map(book.openBalance);
-  for (const c of counted)
-    if (c.minerId !== undefined)
-      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
   return donations
     .filter((d) => {
       const owner = donationOwner(d, book);
-      // A code says it was tax; so does a donation an officer has to place.
       if (owner.kind === 'ambiguous' || (owner.kind === 'miner' && owner.by === 'code'))
         return true;
-      return (
-        owner.kind === 'miner' &&
-        ((openBalance.get(owner.minerId) ?? 0) > 0 || book.unbilled.has(owner.minerId))
-      );
+      return owner.kind === 'miner' && mined.has(owner.minerId);
     })
     .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
     .slice(0, UNCOUNTED_LIMIT)
@@ -217,4 +209,15 @@ export function uncountedDonations(
       amount: d.amount,
       at: d.at,
     }));
+}
+
+/**
+ * @deprecated `noteUncountedDonations`: a Running account has no open balance a sync reads, and
+ * nothing counted takes one down. Kept only until the client's sync calls the new one.
+ */
+export function uncountedDonations(
+  donations: readonly ElsewhereDonation[],
+  book: MatchBook & { openBalance?: ReadonlyMap<string, number>; unbilled: ReadonlySet<string> }
+): UncountedDonation[] {
+  return noteUncountedDonations(donations, book, book.unbilled);
 }
