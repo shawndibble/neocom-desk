@@ -37,7 +37,9 @@ order below.
     grouping); a stranger is named by a Miner's or a notice's code, else by the Miner their earlier
     payments named; one that could be two Miners' is stored for review (`reviewReason:
 'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
-    unread division is linked to it and never counted again. `reassignPayment` moves a payment.
+    unread division is linked to it and never counted again. `reassignPayment` moves a payment;
+    moving one off a Miner, or marking more of it not tax, drops that Miner's recorded paid-through
+    day (`meta/paid`, `minerPaid`) so the days it paid reopen (decision 20261121-093000).
     Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
     and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner. Every
     `observed` row a sync writes stores `uids` too: its Character's Miner's readers and itself.
@@ -45,8 +47,9 @@ order below.
     Character it touched are brought level a page at a time (best effort, with a fresh
     `updatedAt`), since one Character can hold more rows than a transaction writes.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
-    frozen tax) and the Overview read model (schema 2, its Extractions alone), and deletes the
-    retired `minerTotals` docs and `readModels/minerList` doc (nothing reads it).
+    frozen tax) and the tab read models (schema 2: the Overview's Extractions, and the Miners list
+    as the ids of recorded accounts, which a Miner page's Move dialog reads), and deletes the
+    retired `minerTotals` docs.
   - A rate refused on a day a Late notice listed still answers `day-on-statement`, which every
     client matches; a correction a notice listed answers `billed-on-notice` (was
     `billed-on-statement`, which no client matched). The date guards read the days a notice
@@ -109,9 +112,8 @@ firebase deploy --only functions
 
 ## After deploy
 
-- The first nightly pass rewrites every moon doc and the Overview read model (new schemas) and
-  deletes `minerTotals`, `meta/minerTotalsHealth` and `readModels/minerList`; its result is in
-  `meta/verifierHealth`.
+- The first nightly pass rewrites every moon doc and both read models (new schemas) and deletes
+  `minerTotals` and `meta/minerTotalsHealth`; its result is in `meta/verifierHealth`.
 - **Rolling the functions back is not free.** Verify links keep working (every notice is
   mirrored to `statements`, and tokens still name it under `statementId`), but the older
   functions write only the legacy docs: a notice issued or a mail recorded while rolled back
@@ -122,8 +124,7 @@ firebase deploy --only functions
   - re-run the backfill (step 3): it copies those notices and brings their mail state across
     (until then the verify page and mail already read both docs and merge their mail state), and
     gives the payments written meanwhile their `uids`;
-  - the next nightly pass rewrites the moon docs and the Overview read model and deletes
-    `minerTotals` and `readModels/minerList`.
+  - the next nightly pass rewrites the moon docs and both read models and deletes `minerTotals`.
 - An older tab that still issues a calendar Statement is refused on every book (the backfill
   lists the books with no `runningAccountFrom`, whose older tabs see that refusal).
 

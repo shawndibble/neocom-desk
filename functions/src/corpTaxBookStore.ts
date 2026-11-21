@@ -1096,6 +1096,8 @@ interface EditCtx {
   checkpointIds?: string[];
   /** Characters whose rows' readers the edit changed (`refreshObservedReaders`, after it commits). */
   rowReaders: Set<number>;
+  /** Miners whose recorded paid-through the edit drops, once its reads are done (`releasePaidThrough`). */
+  released: Set<string>;
 }
 
 /** Checkpoints an edit made stale: these Miners' (or every Miner's), if it reaches a closed day. */
@@ -1110,6 +1112,34 @@ interface EditOutcome {
   /** Several audit entries for one write (each with its own action); replaces `detail`'s entry. */
   audits?: { action: AuditAction; detail: Data }[];
   result?: Data;
+}
+
+/**
+ * Money taken off a Miner (a payment moved away, more of it marked not tax) reopens the days it
+ * paid: their recorded paid-through day (`meta/paid`, and their `minerPaid` copy) is dropped, and
+ * the next officer load records it again without that money (decision 20261121-093000). Read in
+ * the transaction before any write; a Miner with no day recorded writes nothing.
+ */
+async function releasePaidThrough(c: EditCtx, minerId: string | null | undefined): Promise<void> {
+  if (typeof minerId !== 'string') return;
+  const held = (await c.tx.get(col(c, META).doc(PAID_DOC))).get(
+    new FieldPath('minerPaidThrough', minerId)
+  ) as unknown;
+  const copy = await c.tx.get(col(c, MINER_PAID).doc(minerId));
+  if (held !== undefined || copy.exists) c.released.add(minerId);
+}
+
+/** Drops the paid-through days `releasePaidThrough` found: the edit's writes, after its reads. */
+function applyReleasedPaidThrough(c: EditCtx): void {
+  if (c.released.size === 0) return;
+  c.tx.set(
+    col(c, META).doc(PAID_DOC),
+    {
+      minerPaidThrough: Object.fromEntries([...c.released].map((id) => [id, FieldValue.delete()])),
+    },
+    { merge: true }
+  );
+  for (const id of c.released) c.tx.delete(col(c, MINER_PAID).doc(id));
 }
 
 /** The fields that end a payment's wait for review, once an officer places it. */
@@ -2051,6 +2081,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (action.notTaxAmount > (payment.amount as number)) {
         fail('invalid-argument', 'More than the payment', 'not-tax-too-large');
       }
+      // More of it not tax is money taken off its Miner.
+      if (action.notTaxAmount > ((payment.notTaxAmount as number | undefined) ?? 0))
+        await releasePaidThrough(c, payment.minerId as string | undefined);
       staleCheckpoints(c, [payment.minerId as string | undefined], earliestDay(payment.at));
       tx.update(ref, {
         notTaxAmount: action.notTaxAmount,
@@ -2108,6 +2141,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (from === action.minerId)
         return { detail: { paymentId: action.paymentId, from, to: from } };
       const readers = action.minerId === null ? [] : await minerUids(c, action.minerId);
+      await releasePaidThrough(c, from);
       staleCheckpoints(c, [from, action.minerId], earliestDay(payment.at));
       tx.update(ref, {
         minerId: action.minerId ?? FieldValue.delete(),
@@ -3119,6 +3153,7 @@ export async function editBookAs(
       now: deps.now(),
       stale: [],
       rowReaders: new Set(),
+      released: new Set(),
     };
     if (BOOK_WIDE_EDITS.has(action.action))
       ctx.checkpointIds = (
@@ -3139,6 +3174,7 @@ export async function editBookAs(
       null,
       ctx.now
     );
+    applyReleasedPaidThrough(ctx);
     const actor = actorOf(access, via);
     // `addRates` is never an audit action itself: it always returns its own per-rate `audits`.
     for (const a of outcome.audits ?? [

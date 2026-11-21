@@ -112,7 +112,7 @@ export const VERSIONED_COLLECTIONS = [
   'minerTotals',
   // Server-built per-pull moon docs (#5256, ADR 0032); the moon page reads them (#5716).
   'moonDocs',
-  // The server-built Overview doc (#5259, ADR 0032): its Extractions.
+  // The server-built Overview and Miners list docs (#5259, ADR 0032).
   'readModels',
   // The member side (issue #5050) caches it too.
   'feederCoverage',
@@ -123,7 +123,7 @@ export type VersionedCollection = (typeof VERSIONED_COLLECTIONS)[number];
 /**
  * Bump when a field of a `readModels` doc changes meaning (#5259): the verifier then rewrites it
  * and a client ignores the old one. 2: built for Running accounts (decision 20261120-235011); the
- * Overview now holds only its Extractions, and the Miners list doc is retired.
+ * Overview holds only its Extractions, and the Miners list only the ids of recorded accounts.
  */
 export const READ_MODELS_SCHEMA = 2;
 
