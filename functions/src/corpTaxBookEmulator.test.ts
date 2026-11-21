@@ -2323,7 +2323,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       await book()
         .collection('lateNotices')
         .doc('n9')
-        .set({ id: 'n9', minerId: 'solo:50', lines: [{ ...listed, key: `adjustment:${id}` }] });
+        .set({
+          id: 'n9',
+          minerId: 'solo:50',
+          lines: [{ ...listed, key: `adjustment:${id}` }],
+          mail: { sent: 0, manualSent: 0, remindersStopped: false },
+        });
       expect(
         await reason(
           edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)

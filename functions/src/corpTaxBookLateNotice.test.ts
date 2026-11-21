@@ -4,6 +4,7 @@ import {
   isFinalNoticeId,
   lateNoticeRefusal,
   mergeNoticeMail,
+  mergeNoticeDocs,
   legacyStatementDocOf,
   listedKeys,
   paymentCode,
@@ -293,5 +294,26 @@ describe('lateNoticeRefusal: two tabs never mail the same days', () => {
     expect(
       lateNoticeRefusal({ lines: [line('b')] }, [{ ...earlier[0], kind: 'final' }], 14, now)
     ).toBeNull();
+  });
+});
+
+describe('mergeNoticeDocs: one notice per id from both collections', () => {
+  const current = {
+    ...lateNoticeFromStatementDoc(storedNotice)!,
+    mail: { sent: 1, manualSent: 0, remindersStopped: false },
+    updatedAt: { seconds: 1 },
+  };
+
+  it('keeps the lateNotices doc, without its stamp, and reads its mail from both docs', () => {
+    const [notice] = mergeNoticeDocs([current], [storedNotice]);
+    expect(notice).not.toHaveProperty('updatedAt');
+    expect(notice.mail).toMatchObject({ sent: 2, manualSent: 1, remindersStopped: true });
+    expect(notice.lines).toEqual(current.lines);
+  });
+
+  it('reads a legacy doc with no copy as its notice, and drops anything that is no notice', () => {
+    expect(mergeNoticeDocs([], [storedNotice]).map((n) => n.id)).toEqual([storedNotice.id]);
+    expect(mergeNoticeDocs([], [{ ...storedNotice, kind: undefined }])).toEqual([]);
+    expect(mergeNoticeDocs([{ id: 'x' }], [])).toEqual([]);
   });
 });

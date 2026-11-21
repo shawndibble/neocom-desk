@@ -18,9 +18,8 @@ import {
 import { LATE_NOTICES, LATE_NOTICE_LINKS, META, TOKENS_COLLECTION } from './corpTaxBook.js';
 import {
   NOTICE_ID_FIELD,
-  lateNoticeFromStatementDoc,
   legacyStatementDocOf,
-  mergeNoticeMail,
+  mergeNoticeDocs,
   type LateNotice,
 } from './corpTaxBookLateNotice.js';
 import {
@@ -63,24 +62,12 @@ export interface LoadedNotice {
 
 const noticeRef = (book: DocumentReference, id: string) => book.collection(LATE_NOTICES).doc(id);
 
-/** A stored `lateNotices` doc as a `LateNotice`: the server's `updatedAt` stamp is not part of it. */
-function noticeOf(snap: DocumentSnapshot): LateNotice {
-  const { updatedAt: _stamp, ...notice } = snap.data() as LateNotice & { updatedAt?: unknown };
-  void _stamp;
-  return notice;
-}
+/** A doc with its id, as `mergeNoticeDocs` reads it. */
+const withId = (d: DocumentSnapshot): Data => ({ ...d.data(), id: d.id });
 
 /**
- * A legacy `statements` doc as the notice it asked as. Production holds only notices there, but an
- * older tab on a book that never switched may still issue a calendar Statement: it is read as a
- * notice too (what it listed, its readers and mail state), so its link and mail keep working.
- */
-const fromLegacy = (raw: Data) => lateNoticeFromStatementDoc({ ...raw, kind: 'notice' });
-
-/**
- * A Late notice by id: its `lateNotices` doc, else its legacy doc; undefined when neither holds
- * one. While both do, the mail state is read from both (`mergeNoticeMail`): a change an older tab
- * or a rolled-back function wrote to only one of them still counts.
+ * A Late notice by id: its `lateNotices` doc, else its legacy doc (`mergeNoticeDocs`, which reads
+ * the mail state from both while both exist); undefined when neither holds one.
  */
 export async function readLateNotice(
   reader: Pick<DocReader, 'getAll'>,
@@ -88,14 +75,11 @@ export async function readLateNotice(
   id: string
 ): Promise<LoadedNotice | undefined> {
   const [current, legacy] = await reader.getAll(noticeRef(book, id), legacyNoticeRef(book, id));
-  const old = legacy.exists ? fromLegacy(legacy.data() ?? {}) : undefined;
-  if (!current.exists) return old && { notice: old, current: false, legacy: true };
-  const notice = noticeOf(current);
-  return {
-    notice: old ? { ...notice, mail: mergeNoticeMail(notice.mail, old.mail) } : notice,
-    current: true,
-    legacy: legacy.exists,
-  };
+  const [notice] = mergeNoticeDocs(
+    current.exists ? [withId(current)] : [],
+    legacy.exists ? [withId(legacy)] : []
+  );
+  return notice && { notice, current: current.exists, legacy: legacy.exists };
 }
 
 /** Narrows a notice read: the same filter on both collections, or one each (`legacy` says which). */
@@ -132,14 +116,14 @@ async function readBoth(reader: DocReader, book: DocumentReference, where: Notic
   return { current: current.docs, legacy: legacy.filter((d) => d.exists) };
 }
 
-/** The Late notices a filter finds in both collections, once each. */
+/** The Late notices a filter finds in both collections, once each (`mergeNoticeDocs`). */
 export async function readNotices(
   reader: DocReader,
   book: DocumentReference,
   where: NoticeFilter = everything
 ): Promise<LateNotice[]> {
   const { current, legacy } = await readBoth(reader, book, where);
-  return [...current.map(noticeOf), ...legacy.flatMap((d) => fromLegacy(d.data() ?? {}) ?? [])];
+  return mergeNoticeDocs(current.map(withId), legacy.map(withId));
 }
 
 /**
@@ -153,7 +137,7 @@ export async function readNoticeDocs(
 ): Promise<Data[]> {
   const { current, legacy } = await readBoth(reader, book, where);
   return [
-    ...current.map((d) => legacyStatementDocOf(noticeOf(d))),
+    ...mergeNoticeDocs(current.map(withId), []).map(legacyStatementDocOf),
     ...legacy.map((d) => d.data() ?? {}),
   ];
 }
@@ -165,7 +149,7 @@ export async function readNoticeDocById(
   id: string
 ): Promise<Data | undefined> {
   const [current, legacy] = await reader.getAll(noticeRef(book, id), legacyNoticeRef(book, id));
-  if (current.exists) return legacyStatementDocOf(noticeOf(current));
+  if (current.exists) return mergeNoticeDocs([withId(current)], []).map(legacyStatementDocOf)[0];
   return legacy.exists ? legacy.data() : undefined;
 }
 

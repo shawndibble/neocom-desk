@@ -312,6 +312,37 @@ export function lateNoticeRefusal(
   return null;
 }
 
+/**
+ * The Late notices stored in both collections, one per id (decision 20261120-235011): a
+ * `lateNotices` doc (`current`, its server stamp dropped) wins, with its mail state read from its
+ * legacy copy too (`mergeNoticeMail`); a legacy doc with no copy is read as its notice; anything
+ * that is no notice (a malformed doc, a calendar Statement) is left out.
+ */
+export function mergeNoticeDocs(
+  current: readonly Record<string, unknown>[],
+  legacy: readonly Record<string, unknown>[]
+): LateNotice[] {
+  const old = new Map<string, LateNotice>();
+  for (const raw of legacy) {
+    const notice = lateNoticeFromStatementDoc(raw);
+    if (notice?.id && notice.minerId) old.set(notice.id, notice);
+  }
+  const out = new Map(old);
+  for (const raw of current) {
+    if (typeof raw.id !== 'string' || typeof raw.minerId !== 'string') continue;
+    if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) continue;
+    const { updatedAt: _stamp, ...rest } = raw;
+    void _stamp;
+    const notice = rest as unknown as LateNotice;
+    const copy = old.get(notice.id);
+    out.set(
+      notice.id,
+      copy ? { ...notice, mail: mergeNoticeMail(notice.mail, copy.mail) } : notice
+    );
+  }
+  return [...out.values()];
+}
+
 /** Every line key any of these notices listed. */
 export function listedKeys(
   notices: readonly { lines: readonly Pick<LateNoticeLine, 'key'>[] }[]
