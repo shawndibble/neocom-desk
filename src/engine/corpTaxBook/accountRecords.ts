@@ -96,6 +96,11 @@ export function dueCheckpoints(
     if (!canAdvanceCheckpoint(stored, { through }, today)) return [];
     // Nothing billed and no money: nothing to close.
     if (inner.billable.lines.length === 0 && inner.payments.length === 0 && !stored) return [];
-    return [MinerRunningAccount.checkpoint(inner.account.input, m.id, through, recorded)];
+    return [
+      MinerRunningAccount.checkpoint(inner.account.input, m.id, through, {
+        ...recorded,
+        characterIds: inner.characterIds,
+      }),
+    ];
   });
 }

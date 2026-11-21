@@ -50,11 +50,8 @@ export interface RunningDay {
   paidBefore?: number;
 }
 
-/**
- * A checkpoint's owed day as it is stored: the day's whole tax and what money had paid of it
- * beside what remains, so the day is rebuilt whole (M1). An older checkpoint holds `remaining` only.
- */
-type StoredOwedDay = CheckpointOwedDay & { tax?: number; credited?: number };
+/** A checkpoint's owed day as it is stored: an older one holds `remaining` only. */
+type StoredOwedDay = CheckpointOwedDay;
 
 /** What became of one day. */
 export interface DaySettlement {
@@ -248,7 +245,7 @@ export class MinerRunningAccount {
     input: MinerRunningAccountInput,
     minerId: string,
     through: string,
-    recorded: { at: string; by?: number }
+    recorded: { at: string; by?: number; characterIds?: readonly number[] }
   ): RunningAccountCheckpoint {
     const upTo = (date: string) => date <= through;
     const days = input.days.filter((d) => upTo(d.date));
@@ -272,32 +269,31 @@ export class MinerRunningAccount {
           date,
           remaining: d.remaining,
           ...(charge > 0 ? { charge } : {}),
+          // The day whole: `remaining` = `tax` − `credited` − `writtenOff` (`checkpointProblems`).
           tax: d.tax,
           credited: d.credited,
+          ...(d.writtenOff > 0 ? { writtenOff: d.writtenOff } : {}),
+          ...(d.held ? { held: true } : {}),
         };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
     const billed = account.byDay.size > 0 || input.checkpoint !== undefined;
-    // Paid through `through` with nothing owed. A day still owed, held by a dispute or not, caps
-    // it before that day (`checkpointProblem`); building from the checkpoint closes it again
-    // once those days are paid.
-    const first = owed[0]?.date;
+    // Paid through `through` with nothing owed. The oldest day a sync still owes (not held by a
+    // dispute, more than an officer's charge) caps it before that day (`checkpointProblems`).
+    const first = owed.find((d) => !d.held && d.remaining - (d.charge ?? 0) >= 1)?.date;
     const capped =
       first !== undefined && account.paidThrough !== null && account.paidThrough >= first
         ? shiftUtcDate(first, -1)
         : account.paidThrough;
-    // The account's balance leaves a held day out (it is not due yet); the checkpoint keeps it
-    // owed, so its balance counts it: always what it owes less its credit (`checkpointProblem`).
-    const heldOwed = owed
-      .filter((d) => account.byDay.get(d.date)?.held)
-      .reduce((sum, d) => sum + d.remaining, 0);
     return {
       minerId,
       through,
       owed,
       credit: account.credit,
-      balance: account.balance + heldOwed,
-      paidThrough: billed && owed.length === 0 ? through : capped,
+      // A held day stays owed but out of the balance, as the account counts it.
+      balance: account.balance,
+      paidThrough: billed && first === undefined ? through : capped,
+      ...(recorded.characterIds ? { characterIds: [...recorded.characterIds] } : {}),
       at: recorded.at,
       ...(recorded.by !== undefined ? { by: recorded.by } : {}),
     };

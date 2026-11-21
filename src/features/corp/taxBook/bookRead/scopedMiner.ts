@@ -12,7 +12,10 @@ import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
 import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
-import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
+import {
+  checkpointFits,
+  type RunningAccountCheckpoint,
+} from '../../../../../functions/src/corpTaxBookCheckpoint';
 import { NOTICE_ID_FIELD } from '../../../../../functions/src/corpTaxBookLateNotice';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -68,7 +71,11 @@ export async function readMinerScope(
   const characterIds = grouping.then((g) =>
     characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
   );
-  const from = checkpoint.then((c) => accountWindowStart(c, settingsFrom(book.data).startDate));
+  // A checkpoint summed for other characters than the Miner has now is none: read from the start.
+  const fitting = Promise.all([checkpoint, characterIds]).then(([c, ids]) =>
+    c && checkpointFits(c, ids) ? c : undefined
+  );
+  const from = fitting.then((c) => accountWindowStart(c, settingsFrom(book.data).startDate));
 
   const rowsOf = (snap: { docs: { data: () => unknown }[] }) =>
     snap.docs.flatMap((d) => readObservedRow(d.data() as Record<string, unknown>) ?? []);
@@ -113,7 +120,7 @@ export async function readMinerScope(
       },
       notices: () => notices,
       checkpoints: async () => {
-        const c = await checkpoint;
+        const c = await fitting;
         return c ? [c] : [];
       },
       payments: () => byMiner<SettlePayment>('payments'),
