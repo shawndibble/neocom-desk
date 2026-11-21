@@ -170,12 +170,6 @@ export interface MinerLike {
   characterIds: number[];
 }
 
-export interface StatementLike {
-  id: string;
-  minerId: string;
-  code: string;
-}
-
 // --- Donations into divisions the book does not read (#6207) --------------
 
 /** Engine `WALLET_DIVISIONS`. */
@@ -496,26 +490,7 @@ export function restampPlan(
   });
 }
 
-// --- Settlement -----------------------------------------------------------
-
-export interface SettleStatement {
-  id: string;
-  minerId: string;
-  amount: number;
-  issuedAt: string;
-  /** A running account's late notice (#6294): never settled, never an open balance. */
-  kind?: string;
-  lines: {
-    chargeKey?: string;
-    date?: string;
-    tax?: number;
-    structureId?: number;
-    kind?: string;
-    oreLines?: { typeId: number; quantity: number }[];
-    unitPrices?: Record<string, number>;
-    taxPct?: number;
-  }[];
-}
+// --- Payments -------------------------------------------------------------
 
 export interface SettlePayment {
   id: string;

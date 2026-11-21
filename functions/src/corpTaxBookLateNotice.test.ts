@@ -12,6 +12,8 @@ import {
   lateNoticeFromStatementDoc,
   lateNoticeStanding,
   type LateNoticeDayState,
+  lastNoticedDay,
+  noticedDates,
 } from './corpTaxBookLateNotice.js';
 
 /** A late notice as `issueStatement` stores it today, in `corps/{id}/statements`. */
@@ -315,5 +317,29 @@ describe('mergeNoticeDocs: one notice per id from both collections', () => {
     expect(mergeNoticeDocs([], [storedNotice]).map((n) => n.id)).toEqual([storedNotice.id]);
     expect(mergeNoticeDocs([], [{ ...storedNotice, kind: undefined }])).toEqual([]);
     expect(mergeNoticeDocs([{ id: 'x' }], [])).toEqual([]);
+  });
+});
+
+describe('noticedDates / lastNoticedDay: the days a Late notice listed', () => {
+  const listed = (...lines: { kind: string; date: string; characterId?: number }[]) => ({
+    lines: lines as { kind: 'mined' | 'late-ore' | 'correction'; date: string }[],
+  });
+  const notices = [
+    listed(
+      { kind: 'mined', date: '2026-10-05', characterId: 1 },
+      { kind: 'late-ore', date: '2026-10-02', characterId: 2 },
+      { kind: 'correction', date: '2026-10-20' }
+    ),
+    listed({ kind: 'mined', date: '2026-10-07', characterId: 1 }),
+  ];
+
+  it('is each mined or late-ore line’s day, never a correction’s or a day between', () => {
+    expect([...noticedDates(notices)].sort()).toEqual(['2026-10-02', '2026-10-05', '2026-10-07']);
+    expect(lastNoticedDay(notices)).toBe('2026-10-07');
+    expect(lastNoticedDay([])).toBeNull();
+  });
+
+  it("is one Character's lines alone when asked", () => {
+    expect([...noticedDates(notices, 2)]).toEqual(['2026-10-02']);
   });
 });

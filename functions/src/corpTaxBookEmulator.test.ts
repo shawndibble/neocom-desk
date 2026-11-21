@@ -635,6 +635,14 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         )
       ).toBe('day-on-statement');
       expect((await book().get()).get('rates')).toHaveLength(4);
+      // Only the days the notice listed: one inside its old range it never listed still reprices.
+      await edit(ACCOUNTANT, {
+        action: 'setRecordRate',
+        recordKey: '50:1000:2026-10-06',
+        pct: 3,
+        reason: 'late',
+      });
+      expect((await book().get()).get('rates')).toHaveLength(5);
     });
 
     it('keeps a per-refinery rate for each refinery on one day (#4621)', async () => {

@@ -28,15 +28,14 @@ import {
   BOOK_DEFAULTS,
   DIVISION_NAME_MAX,
   shiftDate,
-  statementDays,
   type ForfeitBasis,
-  type StatementDays,
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
   isFinalNoticeId,
+  noticedDates,
   paymentCode,
   type LateNotice,
   type LateNoticeLine,
@@ -578,19 +577,19 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
 /**
  * Why a book's start date cannot move from `oldStart` to `newStart`, else null. Never the
  * future, never before a former moon owner's leave day (`floor`); moving later is allowed
- * only while no issued Statement covers a day in the gap, so billed days stay billed.
+ * only while no Late notice listed a day in the gap (`noticedDates`), so billed days stay billed.
  */
 export function startDateMoveReason(
   oldStart: string,
   newStart: string,
   today: string,
   floor: string | null,
-  statements: readonly StatementDays[]
+  notices: Parameters<typeof noticedDates>[0]
 ): 'start-in-future' | 'start-before-leave' | 'start-over-billed' | null {
   if (newStart > today) return 'start-in-future';
   if (floor !== null && newStart < floor) return 'start-before-leave';
   if (newStart > oldStart) {
-    const billed = new Set(statements.flatMap((s) => [...statementDays(s)]));
+    const billed = noticedDates(notices);
     for (let d = oldStart; d < newStart; d = shiftDate(d, 1))
       if (billed.has(d)) return 'start-over-billed';
   }

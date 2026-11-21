@@ -100,9 +100,6 @@ import {
   BOOK_DEFAULTS,
   extractionIdOf,
   forfeitAllowed,
-  canOverrideRecordRate,
-  canRebillFrom,
-  lastStatementDay,
   rateStartRefusal,
   latestRecordedCorp,
   disputeHolds,
@@ -175,16 +172,17 @@ import {
 import {
   NOTICE_ID_FIELD,
   lateNoticeFromStatementDoc,
+  lastNoticedDay,
   lateNoticeRefusal,
   legacyStatementDocOf,
   lineKey,
+  noticedDates,
 } from './corpTaxBookLateNotice.js';
 import {
   dbReader,
   type DocReader,
   issueLateNoticeDocs,
   newVerifyToken,
-  readNoticeDocs,
   readNotices,
   ofCharacterFilter,
   ofMinerFilter,
@@ -1725,13 +1723,13 @@ async function storableSettledThrough(
 }
 
 /**
- * A new rate may start up to 30 days back but never on a day an issued Statement bills: that
- * Statement never changes. Statements are read only when a rate is backdated.
+ * A new rate may start up to 30 days back but never on or before the last day a Late notice
+ * listed: what it asked never changes. Notices are read only when a rate is backdated.
  */
 async function checkRateStarts(c: EditCtx, newRates: readonly { effectiveFrom: string }[]) {
   const today = utcDate(c.now);
   if (!newRates.some((r) => r.effectiveFrom < today)) return;
-  const last = lastStatementDay((await readNoticeDocs(c.tx, bookOf(c))) as never[]);
+  const last = lastNoticedDay(await readNotices(c.tx, bookOf(c)));
   for (const r of newRates) {
     const why = rateStartRefusal(r.effectiveFrom, today, last);
     if (why === 'too-old')
@@ -1773,8 +1771,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'setRecordRate': {
       const { characterId, date } = parseRecordKey(action.recordKey);
-      const onChar = await readNoticeDocs(tx, bookOf(c), ofCharacterFilter(characterId));
-      if (!canOverrideRecordRate(date, onChar as never[])) {
+      const onChar = await readNotices(tx, bookOf(c), ofCharacterFilter(characterId));
+      if (noticedDates(onChar, characterId).has(date)) {
         fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
       }
       const rate: StoredRate = { scope: 'record', recordKey: action.recordKey, pct: action.pct };
@@ -1847,13 +1845,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
-        const statements = await readNoticeDocs(tx, bookOf(c));
+        const notices = await readNotices(tx, bookOf(c));
         const reason = startDateMoveReason(
           oldStart ?? startDate,
           startDate,
           utcDate(now),
           await ownBookFloor((r) => tx.get(r), c.deps.db, c.corporationId),
-          statements as never[]
+          notices
         );
         if (reason) fail('failed-precondition', 'The start date cannot move there', reason);
         update.startDate = startDate;
@@ -2434,15 +2432,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'rebill': {
       staleCheckpoints(c, [action.minerId], action.fromDate);
-      const [statements, paidDoc, minerDoc] = await Promise.all([
-        readNoticeDocs(tx, bookOf(c), ofMinerFilter(action.minerId)),
-        tx.get(col(c, META).doc(PAID_DOC)),
-        tx.get(col(c, MINERS).doc(action.minerId)),
-      ]);
-      const paid = new Set<string>((paidDoc.data()?.ids as string[] | undefined) ?? []);
-      if (!canRebillFrom(action.fromDate, statements as never[], paid)) {
-        fail('failed-precondition', 'A paid Statement covers that day', 'paid-days-closed');
-      }
+      // No notice settles days for good, so nothing a notice listed stops a rebill.
+      const minerDoc = await tx.get(col(c, MINERS).doc(action.minerId));
       // A rebill that touches a corp member's days needs a Director (D22).
       let touchesMember = false;
       for (const characterId of minerCharacters(action.minerId, minerDoc.data())) {

@@ -343,6 +343,32 @@ export function mergeNoticeDocs(
   return [...out.values()];
 }
 
+/** A notice as the date rules read it: its lines' kinds, days and Characters. */
+type NoticedLines = {
+  lines: readonly Pick<LateNoticeLine, 'kind' | 'date' | 'characterId'>[];
+};
+
+/**
+ * The days these notices listed: each mined or late-ore line's day (a correction bills no day),
+ * one Character's alone when `characterId` is given. A day between two listed days was not
+ * listed. What an issued notice asked never changes, so the date rules refuse to reprice these.
+ */
+export function noticedDates(notices: readonly NoticedLines[], characterId?: number): Set<string> {
+  const out = new Set<string>();
+  for (const n of notices)
+    for (const l of n.lines)
+      if (l.kind !== 'correction' && (characterId === undefined || l.characterId === characterId))
+        out.add(l.date);
+  return out;
+}
+
+/** The latest day any of these notices listed, or null with none. */
+export function lastNoticedDay(notices: readonly NoticedLines[]): string | null {
+  let last: string | null = null;
+  for (const d of noticedDates(notices)) if (last === null || d > last) last = d;
+  return last;
+}
+
 /** Every line key any of these notices listed. */
 export function listedKeys(
   notices: readonly { lines: readonly Pick<LateNoticeLine, 'key'>[] }[]

@@ -23,7 +23,7 @@ import {
   type MatchBook,
   type MatchMiner,
 } from './corpTaxBookDonationMatch.js';
-import { dbReader, readNoticeDocs } from './corpTaxBookLateNoticeStore.js';
+import { dbReader, readNotices } from './corpTaxBookLateNoticeStore.js';
 
 /**
  * The resolver's view of the book for these senders: the groupings, every code (each notice's,
@@ -43,7 +43,7 @@ export async function loadMatchBook(
   const book = db.collection('corps').doc(String(corporationId));
   const [minerSnap, notices, accounts] = await Promise.all([
     book.collection(MINERS).get(),
-    readNoticeDocs(dbReader(db), book),
+    readNotices(dbReader(db), book),
     book.collection(ACCOUNTS).select().get(),
   ]);
   const miners: MatchMiner[] = minerSnap.docs.map((d) => ({
@@ -98,10 +98,9 @@ export async function loadMatchBook(
       if (!held.includes(minerId)) paidBefore.set(characterId, [...held, minerId]);
     }
   }
-  const listed = notices as { id: string; minerId: string; code?: string }[];
   const recorded = accounts.docs.map((d) => d.id);
   const ofBook = (recordedMinerIds: string[]) =>
-    matchBookOf({ miners, notices: listed, minedCharacterIds, recordedMinerIds, paidBefore });
+    matchBookOf({ miners, notices, minedCharacterIds, recordedMinerIds, paidBefore });
   const first = ofBook(recorded);
   // A code none of those names may be a solo Miner's the book bills but holds no record of yet:
   // only then are the Characters it bills read (their billed-by pointers name the book).
