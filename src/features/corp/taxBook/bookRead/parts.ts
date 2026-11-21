@@ -47,9 +47,9 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
   if (tab === undefined) return ALL_BOOK_PART_SET;
   const route = detail ?? tab;
   switch (route) {
-    // The Running accounts read the money, dismissals and corrections: the ledger.
+    // The Running accounts read the money, dismissals and corrections: the ledger. Needs you
+    // lists a declined grouping: the answers.
     case 'overview':
-      return new Set<BookPart>(['core', 'observed', 'ledger']);
     case 'miner':
     case 'miners':
       return new Set<BookPart>(['core', 'observed', 'ledger', 'answers']);

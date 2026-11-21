@@ -53,6 +53,7 @@ import { TaxSelectionBar } from './TaxSelectionBar';
 import { usePayeeFilter } from './usePayeeFilter';
 import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
+import { useUnheldCharacterItems } from './corpBook/useUnheldCharacterItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
 import { bookCreditsOf } from './owedNow';
@@ -363,7 +364,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     return { waiting, notPaying };
   }, [corpView, resolve.hidden, t, leftCorp]);
 
-  const attentionItems = useTaxAttentionItems({
+  const unheldItems = useUnheldCharacterItems(corpView, characterIds, reloadCorpBooks);
+  const taxAttentionItems = useTaxAttentionItems({
     data: ledger,
     resolvedCharacterFilter,
     personalRows,
@@ -381,6 +383,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     openUnassign: actions.confirmUnassignFor,
     resolve,
   });
+  const attentionItems = useMemo(
+    () => [...unheldItems, ...taxAttentionItems],
+    [unheldItems, taxAttentionItems]
+  );
 
   const { open: openRows, history } = useMemo(
     () => splitLedger(visibleRows, (dr) => dateRangeOf(dr).at(-1) ?? dr.row.entry.date),

@@ -8381,6 +8381,11 @@
         "detail": "{{amount}} ISK sent on {{date}} from {{character}}. Claim it to credit it to you; only you and {{corp}}'s officers can see it.",
         "action": "Claim",
         "failed": "The claim did not go through. Try again."
+      },
+      "unheld": {
+        "title": "{{corp}} counts {{character}} as yours. Add them to Neocom Desk to see their mining and payments.",
+        "decline": "Not yours? Tell {{corp}}",
+        "failed": "Couldn't tell the corporation. Try again."
       }
     },
     "status": {
@@ -18724,7 +18729,11 @@
           "queued": "A reminder for this late notice is already queued.",
           "missingLink": "This late notice has no verify link yet, so no mail can go."
         },
-        "none": "Nothing needs you."
+        "none": "Nothing needs you.",
+        "declinedGrouping": {
+          "title": "{{character}} says they aren't part of {{miner}}.",
+          "body": "They're billed on their own now."
+        }
       },
       "ledger": {
         "title": "Ledger",

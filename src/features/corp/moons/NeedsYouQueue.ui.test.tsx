@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -11,6 +11,7 @@ import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import { BookProvider } from './BookContext';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
+import type { GroupingAnswer } from '../taxBook/bookClient';
 
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(async () => ({})), readAudit: vi.fn() }));
 const loadDivisions = vi.fn(async () => ({ cached: null, needsReauth: false }) as unknown);
@@ -79,6 +80,7 @@ function renderQueue(
     divisions = [1],
     view = undefined as unknown,
     disputes = [] as OreDispute[],
+    groupingAnswers = [] as GroupingAnswer[],
   } = {}
 ) {
   render(
@@ -132,7 +134,7 @@ function renderQueue(
               refinery: () => 'Refinery',
               ore: () => 'Zeolites',
             },
-            data: { uncounted, disputes },
+            data: { uncounted, disputes, groupingAnswers },
             settings: { divisions, divisionNames: {}, noticeRules: DEFAULT_NOTICE_RULES },
             verdict: { canEdit: true },
             reload: vi.fn(),
@@ -326,6 +328,28 @@ describe('NeedsYouQueue (#6207)', () => {
       ],
     });
     expect(screen.queryByText(/went to Rival Corp/)).not.toBeInTheDocument();
+  });
+
+  it('lists a declined grouping, linking to the Miner, until the character is grouped again', () => {
+    const declined: GroupingAnswer = {
+      characterId: 8,
+      minerId: 'g1',
+      answer: 'declined',
+      at: '2026-10-19T00:00:00Z',
+      via: 'character',
+    };
+    const group = { ...miner('g1', 7), characterIds: [7, 9] };
+    renderQueue([], { miners: [group, miner('solo:8', 8)], groupingAnswers: [declined] });
+    expect(
+      screen.getByRole('link', { name: "Pilot 8 says they aren't part of Pilot 7." })
+    ).toHaveAttribute('href', '/corp/moons/miners/g1');
+    expect(screen.getByText("They're billed on their own now.")).toBeInTheDocument();
+    cleanup();
+    renderQueue([], {
+      miners: [{ ...group, characterIds: [7, 9, 8] }],
+      groupingAnswers: [declined],
+    });
+    expect(screen.queryByText(/says they aren't part of/)).not.toBeInTheDocument();
   });
 
   it('shows what a Miner declared, amount and note (#6206)', () => {

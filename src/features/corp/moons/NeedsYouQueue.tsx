@@ -174,7 +174,7 @@ export function NeedsYouQueue() {
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = view;
-  const { needsYou, uncounted, disputes, noticesDue, count } = useNeedsYou();
+  const { needsYou, uncounted, disputes, noticesDue, declined, count } = useNeedsYou();
   // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
@@ -672,6 +672,25 @@ export function NeedsYouQueue() {
                   </>
                 ) : null
               }
+            />
+          );
+        })}
+        {declined.map((a) => {
+          const group = miners.find((m) => m.id === a.minerId);
+          return (
+            <QueueCard
+              key={`g-${a.characterId}`}
+              tone="neutral"
+              title={
+                <MinerTitle minerId={group ? a.minerId : undefined}>
+                  {t('corpTaxBook.moons.needs.declinedGrouping.title', {
+                    character: names.character(a.characterId),
+                    miner: group ? names.character(group.mainCharacterId) : a.minerId,
+                  })}
+                </MinerTitle>
+              }
+              body={t('corpTaxBook.moons.needs.declinedGrouping.body')}
+              actions={null}
             />
           );
         })}
