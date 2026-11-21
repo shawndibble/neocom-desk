@@ -14,7 +14,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { LATE_NOTICES, LATE_NOTICE_LINKS, TOKENS_COLLECTION } from './corpTaxBook.js';
-import { NOTICE_ID_FIELD, mergeNoticeDocs, type LateNotice } from './corpTaxBookLateNotice.js';
+import { NOTICE_ID_FIELD, noticesOfDocs, type LateNotice } from './corpTaxBookLateNotice.js';
 import { VERIFY_TOKEN_BYTES } from './verifyToken.js';
 
 type Data = Record<string, unknown>;
@@ -37,15 +37,10 @@ export const dbReader = (db: Firestore): DocReader => ({
   getAll: (...refs) => db.getAll(...refs),
 });
 
-/** A Late notice as read. */
-export interface LoadedNotice {
-  notice: LateNotice;
-}
-
 export const noticeRef = (book: DocumentReference, id: string) =>
   book.collection(LATE_NOTICES).doc(id);
 
-/** A doc with its id, as `mergeNoticeDocs` reads it. */
+/** A doc with its id, as `noticesOfDocs` reads it. */
 const withId = (d: DocumentSnapshot): Data => ({ ...d.data(), id: d.id });
 
 /** A Late notice by id; undefined when there is none. */
@@ -53,10 +48,10 @@ export async function readLateNotice(
   reader: Pick<DocReader, 'getAll'>,
   book: DocumentReference,
   id: string
-): Promise<LoadedNotice | undefined> {
+): Promise<LateNotice | undefined> {
   const [doc] = await reader.getAll(noticeRef(book, id));
-  const [notice] = doc.exists ? mergeNoticeDocs([withId(doc)]) : [];
-  return notice && { notice };
+  const [notice] = doc.exists ? noticesOfDocs([withId(doc)]) : [];
+  return notice;
 }
 
 /** Narrows a notice read. */
@@ -83,7 +78,7 @@ export async function readNotices(
   where: NoticeFilter = everything
 ): Promise<LateNotice[]> {
   const snap = await reader.get(where(book.collection(LATE_NOTICES)));
-  return mergeNoticeDocs(snap.docs.map(withId));
+  return noticesOfDocs(snap.docs.map(withId));
 }
 
 /** A fresh verify-link token: `VERIFY_TOKEN_BYTES` random bytes, url-safe. */
@@ -119,10 +114,10 @@ export function issueLateNoticeDocs(
 export function writeNoticeMail(
   tx: Transaction,
   book: DocumentReference,
-  loaded: LoadedNotice,
+  notice: LateNotice,
   change: NoticeMailChange
 ): void {
-  tx.update(noticeRef(book, loaded.notice.id), {
+  tx.update(noticeRef(book, notice.id), {
     ...(change.kind === 'mailed'
       ? { 'mail.sent': FieldValue.increment(1), 'mail.lastAt': change.at }
       : change.kind === 'reminded'

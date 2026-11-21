@@ -52,7 +52,7 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { isRecord } from '@/engine/guards';
-import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
+import { noticesOfDocs } from '@/engine/corpTaxBook/lateNotices';
 import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
@@ -467,7 +467,7 @@ async function readOneBook(
     }
     miners.push(minerDocs.flatMap((d) => readMiner(d.id, d.data) ?? []));
   }
-  const notices = readLateNotices(noticeDocs);
+  const notices = noticesOfDocs(noticeDocs);
   const structureNames = refineryNamesOf(notices);
   return {
     ...settings,

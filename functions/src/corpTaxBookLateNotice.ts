@@ -317,8 +317,9 @@ export function lateNoticeRefusal(
  * The Late notices among `lateNotices` docs, their server stamp dropped; anything that is no
  * notice (a malformed doc) is left out.
  */
-export function mergeNoticeDocs(current: readonly Record<string, unknown>[]): LateNotice[] {
-  return current.flatMap((raw) => {
+export function noticesOfDocs(docs: readonly unknown[]): LateNotice[] {
+  return docs.flatMap((raw) => {
+    if (!isRecord(raw)) return [];
     if (typeof raw.id !== 'string' || typeof raw.minerId !== 'string') return [];
     if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) return [];
     const { updatedAt: _stamp, ...rest } = raw;

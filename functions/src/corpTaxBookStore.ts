@@ -164,6 +164,7 @@ import { isLocked, lockDateFor, type RunningAccountCheckpoint } from './corpTaxB
 import { pullWindow } from './corpTaxBookMoonDocs.js';
 import {
   NOTICE_ID_FIELD,
+  type LateNotice,
   adjustmentLineKey,
   lastNoticedDay,
   lateNoticeRefusal,
@@ -180,7 +181,6 @@ import {
   ofMinerFilter,
   readLateNotice,
   writeNoticeMail,
-  type LoadedNotice,
 } from './corpTaxBookLateNoticeStore.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
@@ -1193,10 +1193,10 @@ const minerNotices = (c: EditCtx, minerId: string) =>
   readNotices(c.tx, bookOf(c), ofMinerFilter(minerId));
 
 /** A Late notice by id, read in the transaction; not-found when neither collection holds it. */
-async function mustGetNotice(c: EditCtx, id: string): Promise<LoadedNotice> {
-  const loaded = await readLateNotice(c.tx, bookRef(c.deps.db, c.corporationId), id);
-  if (!loaded) fail('not-found', 'Late notice not found', 'not-found');
-  return loaded;
+async function mustGetNotice(c: EditCtx, id: string): Promise<LateNotice> {
+  const notice = await readLateNotice(c.tx, bookRef(c.deps.db, c.corporationId), id);
+  if (!notice) fail('not-found', 'Late notice not found', 'not-found');
+  return notice;
 }
 
 /** The sign-ins that read a Miner's own lines (`uids`): read in the transaction, before any write. */
@@ -2512,7 +2512,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'closeAccount':
       return closeAccount(c, action);
     case 'declare': {
-      const { notice } = await mustGetNotice(c, action.noticeId);
+      const notice = await mustGetNotice(c, action.noticeId);
       const id = `x${now}_${rand(4)}`;
       tx.create(col(c, DECLARATIONS).doc(id), {
         id,
@@ -2637,12 +2637,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { disputeId: action.disputeId, reason: action.reason, ...nextStep } };
     }
     case 'recordReminder': {
-      const loaded = await mustGetNotice(c, action.noticeId);
-      const { mail } = loaded.notice;
+      const notice = await mustGetNotice(c, action.noticeId);
+      const { mail } = notice;
       // A miner who opted out gets one manual reminder per notice (D27).
       if (!reminderAllowed(mail))
         fail('failed-precondition', 'This miner stopped reminders', 'reminders-stopped');
-      writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'reminded' });
+      writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), notice, { kind: 'reminded' });
       return { detail: { noticeId: action.noticeId } };
     }
     case 'recordAccounts': {
@@ -2704,8 +2704,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'recordLateNoticeMail': {
       // The queue sent this mail (D16): log it on the notice and in the audit trail.
       const { noticeId } = action;
-      const loaded = await mustGetNotice(c, noticeId);
-      writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'mailed', at: iso });
+      const notice = await mustGetNotice(c, noticeId);
+      writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), notice, { kind: 'mailed', at: iso });
       return { detail: { noticeId, mailId: action.mailId, kind: action.kind } };
     }
     case 'setPopSharing':
@@ -3323,7 +3323,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
   const { corporationId, noticeId } = input;
   const declared = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
-    const notice = (await readLateNotice(tx, bookRef(deps.db, corporationId), noticeId))?.notice;
+    const notice = await readLateNotice(tx, bookRef(deps.db, corporationId), noticeId);
     if (!notice || !notice.uids.includes(caller.uid))
       fail('not-found', 'Late notice not found', 'not-found');
     // The notice's Miner as the book groups it now: what a found transfer is credited to, and
@@ -3619,7 +3619,7 @@ async function noticeOfToken(
   reader: Pick<DocReader, 'getAll'>,
   book: DocumentReference,
   token: Data
-): Promise<LoadedNotice | undefined> {
+): Promise<LateNotice | undefined> {
   const id = token[NOTICE_ID_FIELD];
   return typeof id === 'string' && id !== '' ? readLateNotice(reader, book, id) : undefined;
 }
@@ -3634,9 +3634,8 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
   if (!tokenSnap.exists) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const { corporationId, ...held } = tokenSnap.data() as { corporationId: number } & Data;
   const book = bookRef(deps.db, corporationId);
-  const loaded = await noticeOfToken(deps.db, book, held);
-  if (!loaded) fail('not-found', 'Verify link is not valid', 'invalid-token');
-  const { notice } = loaded;
+  const notice = await noticeOfToken(deps.db, book, held);
+  if (!notice) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const minerId = notice.minerId;
   const [bookSnap, notices, payments, declarations, miner, account] = await Promise.all([
     book.get(),
@@ -3732,10 +3731,10 @@ export async function setRemindersByToken(deps: BookDeps, token: string, stopped
       minerId: string;
     } & Data;
     const book = bookRef(deps.db, corporationId);
-    const loaded = await noticeOfToken(tx, book, held);
-    if (!loaded) fail('not-found', 'Verify link is not valid', 'invalid-token');
+    const notice = await noticeOfToken(tx, book, held);
+    if (!notice) fail('not-found', 'Verify link is not valid', 'invalid-token');
     tx.update(tokenRef, { remindersStopped: stopped });
-    writeNoticeMail(tx, book, loaded, { kind: 'remindersStopped', stopped });
+    writeNoticeMail(tx, book, notice, { kind: 'remindersStopped', stopped });
     // The audit entry names the notice, never the token.
     appendAudit(
       tx,
@@ -3743,7 +3742,7 @@ export async function setRemindersByToken(deps: BookDeps, token: string, stopped
       corporationId,
       { characterId: null, name: 'Miner (verify link)', via: 'verify-link' },
       'stopReminders',
-      { noticeId: loaded.notice.id, minerId, stopped }
+      { noticeId: notice.id, minerId, stopped }
     );
   });
   return { stopped };

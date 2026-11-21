@@ -3,7 +3,7 @@ import {
   finalNoticeId,
   isFinalNoticeId,
   lateNoticeRefusal,
-  mergeNoticeDocs,
+  noticesOfDocs,
   legacyStatementDocOf,
   listedKeys,
   paymentCode,
@@ -280,17 +280,17 @@ describe('lateNoticeRefusal: two tabs never mail the same days', () => {
   });
 });
 
-describe('mergeNoticeDocs: the notices among lateNotices docs', () => {
+describe('noticesOfDocs: the notices among lateNotices docs', () => {
   it('keeps each notice without its stamp, and drops anything that is no notice', () => {
     const current = {
       ...lateNoticeFromStatementDoc(storedNotice)!,
       mail: { sent: 1, manualSent: 0, remindersStopped: false },
       updatedAt: { seconds: 1 },
     };
-    const [notice] = mergeNoticeDocs([current]);
+    const [notice] = noticesOfDocs([current]);
     expect(notice).not.toHaveProperty('updatedAt');
     expect(notice.lines).toEqual(current.lines);
-    expect(mergeNoticeDocs([{ id: 'x' }])).toEqual([]);
+    expect(noticesOfDocs([{ id: 'x' }])).toEqual([]);
   });
 });
 
