@@ -919,7 +919,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         .doc('m-b_2026-10-05')
         .set({ minerId: 'm-b', date: '2026-10-05', uids: ['char:62'] });
       await b.collection('accounts').doc('m-b').set({ minerId: 'm-b' });
-      await b.collection('minerTotals').doc('solo:63').set({ minerId: 'solo:63' });
+      await b.collection('accountCheckpoints').doc('solo:63').set({ minerId: 'solo:63' });
+      await b.collection('accountCheckpoints').doc('solo:60').set({ minerId: 'solo:60' });
+      await b
+        .collection('lateNotices')
+        .doc('n-b')
+        .set({ id: 'n-b', minerId: 'm-b', uids: ['char:62'] });
       await edit(ACCOUNTANT, {
         action: 'regroupMiner',
         minerId: 'solo:60',
@@ -940,7 +945,13 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         { minerId: 'solo:60', uids: readers }
       );
       expect((await b.collection('accounts').doc('m-b').get()).exists).toBe(false);
-      expect((await b.collection('minerTotals').doc('solo:63').get()).exists).toBe(false);
+      expect((await b.collection('accountCheckpoints').doc('solo:63').get()).exists).toBe(false);
+      // The surviving Miner's checkpoint no longer sums its history: the next load rolls a new one.
+      expect((await b.collection('accountCheckpoints').doc('solo:60').get()).exists).toBe(false);
+      expect((await b.collection('lateNotices').doc('n-b').get()).data()).toMatchObject({
+        minerId: 'solo:60',
+        uids: readers,
+      });
     });
 
     it('the backfill moves an older grouping alt records onto its group, and a re-run finds none (#6450)', async () => {
@@ -1928,30 +1939,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(
         await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] })
       ).toMatchObject({ settled: ['s1'] });
-    });
-
-    it('keeps the Miner’s stored totals hold-aware: filing, withdrawing and a lapse recompute them', async () => {
-      await turnOn();
-      await recordOre([50]);
-      await billDay();
-      await pastSetup();
-      const totals = async () =>
-        (await book().collection('minerTotals').doc('solo:50').get()).data();
-      const { disputeId } = await dispute(50, [line(50)]);
-      const held = await totals();
-      expect(held?.owed).toBeLessThan(held?.billed as number);
-      expect(typeof held?.overdueAt === 'string' || held?.overdueAt === null).toBe(true);
-      await withdrawDispute(
-        deps(),
-        who(50),
-        parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
-      );
-      expect((await totals())?.owed).toBe(held?.billed);
-      // Filed again, then answered: the officer's answer ends the hold.
-      await dispute(50, [line(50)]);
-      expect((await totals())?.owed).toBeLessThan(held?.billed as number);
-      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' });
-      expect((await totals())?.owed).toBe(held?.billed);
     });
 
     it('lets an officer reject a dispute once; the Miner may flag the day again, keeping the hold', async () => {

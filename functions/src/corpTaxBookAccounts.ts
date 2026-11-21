@@ -12,6 +12,21 @@ export interface OwedDay {
   tax: number;
 }
 
+/** A payment's tax: its amount less what an officer marked not tax. */
+const net = (p: Data) => {
+  const amount = Number(p.amount) || 0;
+  return Math.max(0, amount - Math.min(Number(p.notTaxAmount) || 0, amount));
+};
+
+/**
+ * What a Miner paid since an officer's tab recorded their account: their net payments now beyond
+ * the ones it counted (`paid`), whenever each was synced.
+ */
+export function paidSinceRecord(recorded: Data, payments: readonly Data[]): number {
+  const paidNow = payments.reduce((sum, p) => sum + net(p), 0);
+  return Math.max(0, paidNow - (Number(recorded.paid) || 0));
+}
+
 /**
  * A recorded running account less what the Miner paid since: their net payments now (less "not
  * tax") beyond the ones the officer's client counted, whenever each was synced. The money pays
@@ -30,12 +45,7 @@ export function liveAccount(
   /** The running days still owed after those payments; absent when the client recorded none. */
   unpaidDays?: OwedDay[];
 } {
-  const net = (p: Data) => {
-    const amount = Number(p.amount) || 0;
-    return Math.max(0, amount - Math.min(Number(p.notTaxAmount) || 0, amount));
-  };
-  const paidNow = payments.reduce((sum, p) => sum + net(p), 0);
-  const since = Math.max(0, paidNow - (Number(recorded.paid) || 0));
+  const since = paidSinceRecord(recorded, payments);
   const owed = Math.max(0, (Number(recorded.owed) || 0) - since);
   const recordedDays = Array.isArray(recorded.unpaidDays)
     ? (recorded.unpaidDays as OwedDay[])

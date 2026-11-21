@@ -94,7 +94,6 @@ import {
   type ObservedRow,
   type OutgoingDonation,
 } from './corpTaxBookEngine.js';
-import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 import { chunk } from './chunk.js';
 import { LATE_NOTICES } from './corpTaxBook.js';
@@ -553,19 +552,6 @@ export async function runBookSync(
       : [];
   for (const ids of chunk(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
-  }
-
-  // --- Holds that lapsed ---------------------------------------------------
-  // A Miner's stored totals count an open dispute's amount as not due while its hold lasts, and
-  // a hold lapses with only time passing. The run after a lapse is never quiet (no marker is
-  // written while a dispute holds), so it recomputes the totals of every Miner with an
-  // unanswered dispute that no longer holds. Best effort: the daily verifier repairs a miss.
-  if (!quiet) {
-    const at = new Date(deps.now()).toISOString();
-    const lapsed = new Set(
-      before.disputes.filter((d) => !d.resolution && !disputeHolds(d, at)).map((d) => d.minerId)
-    );
-    if (lapsed.size > 0) await refreshAfterEvent(db, corporationId, [...lapsed], deps.now);
   }
 
   // --- Quiet marker ---------------------------------------------------------

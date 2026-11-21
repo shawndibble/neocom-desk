@@ -1,11 +1,13 @@
 import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import {
+  ACCOUNT_CHECKPOINTS,
   ACCOUNTS,
   ADJUSTMENTS,
   DECLARATIONS,
   DISMISSALS,
   disputeIdFor,
   DISPUTES,
+  LATE_NOTICES,
   MINER_PAID,
   PAYMENTS,
   REBILLS,
@@ -13,7 +15,6 @@ import {
   TOLERANCE_EXEMPTIONS,
   WRITE_OFFS,
 } from './corpTaxBook.js';
-import { MINER_TOTALS } from './corpTaxBookMinerTotals.js';
 
 /**
  * Grouping Characters into one Miner (#6450): everything the absorbed Miners were billed, paid
@@ -40,6 +41,7 @@ export type RekeyWrite =
 
 /** Collections whose records carry `minerId`. */
 export const MINER_KEYED = [
+  LATE_NOTICES,
   STATEMENTS,
   PAYMENTS,
   WRITE_OFFS,
@@ -49,10 +51,10 @@ export const MINER_KEYED = [
   TOLERANCE_EXEMPTIONS,
 ];
 /**
- * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerTotals/{minerId}`,
- * `minerPaid/{minerId}`): only caches, rebuilt on the next read or record.
+ * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerPaid/{minerId}`,
+ * `accountCheckpoints/{minerId}`): figures an officer's tab records again on its next load.
  */
-export const MINER_CACHES = [ACCOUNTS, MINER_TOTALS, MINER_PAID];
+export const MINER_CACHES = [ACCOUNTS, MINER_PAID, ACCOUNT_CHECKPOINTS];
 
 /** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(

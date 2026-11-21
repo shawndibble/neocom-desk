@@ -12,13 +12,12 @@ import {
   type QuerySnapshot,
   type Transaction,
 } from 'firebase-admin/firestore';
+import { LATE_NOTICES, LATE_NOTICE_LINKS, TOKENS_COLLECTION } from './corpTaxBook.js';
 import {
-  LATE_NOTICES,
-  LATE_NOTICE_LINKS,
   NOTICE_ID_FIELD,
-  TOKENS_COLLECTION,
-} from './corpTaxBook.js';
-import { lateNoticeFromStatementDoc, type LateNotice } from './corpTaxBookLateNotice.js';
+  lateNoticeFromStatementDoc,
+  type LateNotice,
+} from './corpTaxBookLateNotice.js';
 import {
   legacyNoticeRef,
   mirrorIssue,

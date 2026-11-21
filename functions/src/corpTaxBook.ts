@@ -33,6 +33,7 @@ import {
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
 import {
+  NOTICE_ID_FIELD,
   finalNoticeId,
   type LateNotice,
   type LateNoticeKind,
@@ -103,11 +104,6 @@ export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
  * server `updatedAt`. Officers read every one; a Miner reads their own.
  */
 export const ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
-/**
- * The field a declaration and a verify token name their Late notice by: the wire name they had
- * when notices were stored as Statements, which every deployed client reads.
- */
-export const NOTICE_ID_FIELD = 'statementId';
 export const MINERS = 'miners';
 /**
  * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked

@@ -106,6 +106,12 @@ export interface LateNoticeDayState {
   settled: boolean;
 }
 
+/**
+ * The field a declaration and a verify token name their Late notice by: the wire name they had
+ * when notices were stored as Statements, which every deployed client reads.
+ */
+export const NOTICE_ID_FIELD = 'statementId';
+
 /** A line key that names an Adjustment rather than a day charge. */
 const ADJUSTMENT_PREFIX = 'adjustment:';
 

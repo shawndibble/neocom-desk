@@ -93,14 +93,27 @@ describe('planRekey', () => {
     );
   });
 
-  it('drops the absorbed Miner cached figures: accounts and totals', () => {
+  it('drops the absorbed Miner recorded figures: account and checkpoint', () => {
     const writes = planRekey({
       ...base,
-      records: [rec('accounts', 'solo:2', {}), rec('minerTotals', 'solo:2', {})],
+      records: [rec('accounts', 'solo:2', {}), rec('accountCheckpoints', 'solo:2', {})],
     });
     expect(writes).toEqual([
       { kind: 'delete', collection: 'accounts', id: 'solo:2' },
-      { kind: 'delete', collection: 'minerTotals', id: 'solo:2' },
+      { kind: 'delete', collection: 'accountCheckpoints', id: 'solo:2' },
+    ]);
+  });
+
+  it('moves a Late notice like any record carrying a minerId', () => {
+    expect(
+      planRekey({ ...base, records: [rec('lateNotices', 'n1', { minerId: 'solo:2', uids: [] })] })
+    ).toEqual([
+      {
+        kind: 'update',
+        collection: 'lateNotices',
+        id: 'n1',
+        fields: { minerId: 'g1', uids: ['char:1', 'char:2'] },
+      },
     ]);
   });
 });

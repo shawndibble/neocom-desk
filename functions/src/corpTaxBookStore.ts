@@ -66,7 +66,6 @@ import {
   TOKENS_COLLECTION,
   LATE_NOTICES,
   ACCOUNT_CHECKPOINTS,
-  NOTICE_ID_FIELD,
   WRITE_OFFS,
   TOLERANCE_EXEMPTIONS,
   MINER_PAID,
@@ -147,10 +146,9 @@ import {
   stampEditorUseIfSharing,
   stampFailedRoleCheck,
 } from './sharedPopsStore.js';
-import { editScope } from './corpTaxBookMinerTotals.js';
-import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
-import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
+import { refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { refreshReadModels } from './corpTaxBookReadModelsStore.js';
+import { movesReadModels } from './corpTaxBookReadModels.js';
 import {
   fail,
   requireLiveRoles,
@@ -170,6 +168,7 @@ import {
 } from './corpTaxBookClaims.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 import {
+  NOTICE_ID_FIELD,
   lateNoticeFromStatementDoc,
   legacyStatementDocOf,
   lineKey,
@@ -890,9 +889,7 @@ export async function syncBookAs(
     await storeUncounted(deps, input.corporationId, input.uncounted).catch((e) =>
       console.error('uncounted donations write failed', e instanceof Error ? e.message : e)
     );
-  if (paidMiners.size > 0)
-    await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners], deps.now);
-  // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
+  // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
   // A quiet run wrote none of either: the docs stand.
@@ -1312,6 +1309,9 @@ async function rekeyAbsorbed(
   if (writes.length > 450)
     fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
   return () => {
+    // The target's closed-through checkpoint summed only its own history: its next load rolls a
+    // new one forward over the history moved onto it.
+    if (writes.length > 0) tx.delete(at(ACCOUNT_CHECKPOINTS).doc(target));
     for (const w of writes) {
       if (w.kind === 'update') tx.update(at(w.collection).doc(w.id), w.fields);
       else if (w.kind === 'delete') tx.delete(at(w.collection).doc(w.id));
@@ -2730,13 +2730,6 @@ async function refreshMoonDocsAfterEdit(
   try {
     if (action.action === 'linkSurvey') {
       await refreshMoonDocs(db, corporationId, [action.extractionId]);
-    } else if (action.action === 'issueStatement') {
-      const days = (parseStatement(action.statement).lines as unknown as Data[]).flatMap((l) =>
-        typeof l.structureId === 'number' && typeof l.date === 'string'
-          ? [{ structureId: l.structureId, date: l.date }]
-          : []
-      );
-      await refreshMoonDocs(db, corporationId, await pullsOfDays(db, corporationId, days));
     } else if (
       (action.action === 'updateSettings' && action.patch.structureExpiryHours) ||
       action.action === 'setMiner' ||
@@ -2785,18 +2778,10 @@ export async function editBookAs(
       appendAudit(tx, deps, call.corporationId, actor, a.action, a.detail);
     return outcome.result ?? {};
   });
-  // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
-  await refreshAfterEvent(deps.db, call.corporationId, editScope(action), deps.now);
-  // Statements freeze a pull's tax, and a survey link or expiry changes its doc (ADR 0032). Best effort.
+  // A survey link, an expiry or a regroup changes a pull's doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
-  // The same edits move the Overview and Miners tab docs (ADR 0032). Best effort.
-  const scope = editScope(action);
-  if (
-    scope.all ||
-    scope.minerIds.length + scope.statementIds.length + scope.paymentIds.length > 0 ||
-    action.action === 'linkSurvey'
-  )
-    await refreshReadModels(deps.db, call.corporationId, deps.now());
+  // Edits that move the Overview and Miners tab docs (ADR 0032). Best effort.
+  if (movesReadModels(action)) await refreshReadModels(deps.db, call.corporationId, deps.now());
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
     await restampStructures(
@@ -2865,7 +2850,6 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
@@ -2894,7 +2878,6 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
@@ -2940,7 +2923,6 @@ export async function declineLink(
       link: true,
     });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return { declined: true as const };
 }
@@ -3084,7 +3066,6 @@ export async function claimPayment(
   options: { inReview?: boolean } = {}
 ) {
   const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId, options);
-  await refreshAfterEvent(deps.db, corporationId, [claimed.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return claimed;
 }
@@ -3256,7 +3237,6 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     );
     return { declarationId: id, minerId: notice.minerId, checks, confirmed: allFound };
   });
-  await refreshAfterEvent(deps.db, corporationId, [declared.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return {
     declarationId: declared.declarationId,
@@ -3317,11 +3297,9 @@ async function checkTransfers(
 export async function disputeConflict(deps: BookDeps, caller: Caller, input: DisputeConflictInput) {
   const characterId = signedInCharacter(caller);
   const { corporationId, date } = input;
-  let touched = '';
   const result = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
-    touched = minerId;
     const characters = new Set<number>();
     for (const line of input.lines) {
       const lineCharacter = parseRecordKey(line.recordKey).characterId;
@@ -3415,8 +3393,6 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     );
     return { disputeId };
   });
-  // A dispute holds its Statement's disputed amount, so the Miner's stored totals move (best effort).
-  await refreshAfterEvent(deps.db, corporationId, [touched], deps.now);
   return result;
 }
 
@@ -3428,11 +3404,9 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
 export async function withdrawDispute(deps: BookDeps, caller: Caller, input: WithdrawDisputeInput) {
   const characterId = signedInCharacter(caller);
   const { corporationId, date } = input;
-  let touched = '';
   const result = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
-    touched = minerId;
     const disputeId = disputeIdFor(minerId, date);
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
     const held = (await tx.get(ref)).data();
@@ -3460,8 +3434,6 @@ export async function withdrawDispute(deps: BookDeps, caller: Caller, input: Wit
     );
     return { disputeId };
   });
-  // The hold is released: the Miner's stored totals count the amount as due again (best effort).
-  await refreshAfterEvent(deps.db, corporationId, [touched], deps.now);
   return result;
 }
 
