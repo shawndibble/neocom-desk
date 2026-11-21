@@ -19,10 +19,17 @@ export interface TaxPayment {
   /** How much of it an officer marked "not tax". */
   notTaxAmount?: number;
   /**
-   * Legacy (#6207, reversed by #6300): a known sender's donation held Unmatched because their
-   * Miner owed nothing. No longer set; the next sync assigns any still stored.
+   * Why a donation waits Unmatched for an officer. `ambiguous`: the shared rule found it could be
+   * any of several Miners (`ambiguousMinerIds`). `no-open-balance` is legacy (#6207, reversed by
+   * #6300): no longer set, and the next sync assigns any still stored.
    */
-  reviewReason?: 'no-open-balance';
+  reviewReason?: 'no-open-balance' | 'ambiguous';
+  /** `ambiguous`: the Miners the donation could be, for the officer to pick from. */
+  ambiguousMinerIds?: string[];
+  /** A hand record of a transfer the book also noted in a division it does not read: that donation's id. */
+  transferId?: string;
+  /** When an officer last placed it on a Miner, or took it off one (`reassignPayment`). */
+  assignedAt?: string;
 }
 
 /** A `writeOffs` doc as the book stores it: the corporation forgave part of what a Miner owes. */

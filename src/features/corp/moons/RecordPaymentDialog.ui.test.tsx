@@ -214,6 +214,17 @@ describe('RecordPaymentDialog', () => {
     expect(onRecorded).not.toHaveBeenCalled();
   });
 
+  it('says plainly when the transfer is already in the book', async () => {
+    edit.mockImplementationOnce(() => {
+      throw Object.assign(new Error('exists'), { details: { reason: 'transfer-in-book' } });
+    });
+    const dialog = renderDialog();
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      /already in the book, so recording it would count it twice/
+    );
+  });
+
   it('offers no donation match when the wallet has none', () => {
     const dialog = renderDialog();
     expect(within(dialog).queryByText('Where the ISK came from')).not.toBeInTheDocument();

@@ -50,7 +50,12 @@ import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
 import { AccountLedger } from './AccountLedger';
-import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
+import {
+  MarkNotTaxDialog,
+  ReasonDialog,
+  ReassignPaymentDialog,
+  RecordPaymentDialog,
+} from './BookDialogs';
 import { isk, iskOrDash, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
@@ -108,6 +113,7 @@ export function MinerDetail({ id }: { id: string }) {
     | { kind: 'rate'; dayKey?: string }
     | { kind: 'adjust'; date?: string }
     | { kind: 'notTax'; payment: Payment }
+    | { kind: 'reassign'; payment: Payment }
     | { kind: 'reverse'; dismissalId: string }
     | { kind: 'editCorrection'; adjustmentId: string }
     | { kind: 'reverseCorrection'; adjustmentId: string }
@@ -372,6 +378,10 @@ export function MinerDetail({ id }: { id: string }) {
     markNotTax: (paymentId) => {
       const payment = detail?.payments.find((p) => p.id === paymentId);
       if (payment) setDialog({ kind: 'notTax', payment });
+    },
+    reassignPayment: (paymentId) => {
+      const payment = detail?.payments.find((p) => p.id === paymentId);
+      if (payment) setDialog({ kind: 'reassign', payment });
     },
     changeRate: (dayKey) => setDialog({ kind: 'rate', dayKey }),
     dismissDays: (keys) => {
@@ -1039,6 +1049,15 @@ export function MinerDetail({ id }: { id: string }) {
           onClose={() => setDialog(null)}
           payment={dialog.payment}
           fromName={names.character(dialog.payment.characterId)}
+        />
+      )}
+      {dialog?.kind === 'reassign' && (
+        <ReassignPaymentDialog
+          open
+          onClose={() => setDialog(null)}
+          payment={dialog.payment}
+          fromName={names.character(dialog.payment.characterId)}
+          minerName={name}
         />
       )}
       {dialog?.kind === 'editCorrection' &&

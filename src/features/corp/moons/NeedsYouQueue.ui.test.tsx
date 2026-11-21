@@ -215,6 +215,29 @@ describe('NeedsYouQueue (#6207)', () => {
     expect(screen.getByText(/owed no tax then/)).toBeInTheDocument();
   });
 
+  it('names the Miners an ambiguous donation could be, for the officer to pick', () => {
+    renderQueue(
+      [
+        {
+          kind: 'unmatched',
+          payment: {
+            id: 'j1_6',
+            characterId: 5,
+            amount: 1_000_000,
+            at: '2026-10-10T00:00:00Z',
+            source: 'donation',
+            reviewReason: 'ambiguous',
+            ambiguousMinerIds: ['solo:7', 'solo:8'],
+          },
+        },
+      ],
+      { miners: [miner('solo:7', 7), miner('solo:8', 8)] }
+    );
+    expect(
+      screen.getByText(/could credit it to Pilot 7 or Pilot 8 and cannot tell which/)
+    ).toBeInTheDocument();
+  });
+
   const dispute: OreDispute = {
     id: 'solo_7_2026-09-05',
     minerId: 'solo:7',

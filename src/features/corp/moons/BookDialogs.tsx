@@ -468,6 +468,80 @@ export function MarkNotTaxDialog({
   );
 }
 
+/**
+ * A payment's row menu: move it to another Miner, or off every Miner (Unmatched), for a donation
+ * the book placed wrongly (`reassignPayment`). An officer's placement stands over the book's match.
+ */
+export function ReassignPaymentDialog({
+  open,
+  onClose,
+  payment,
+  fromName,
+  minerName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  payment: { id: string; minerId: string; amount: number; at: string };
+  fromName: string;
+  /** Whose account it counts toward now. */
+  minerName: string;
+}) {
+  const { t } = useTranslation();
+  const k = 'corpTaxBook.moons.dialogs.reassign';
+  const { edit, view, names } = useBook();
+  const [to, setTo] = useState<'miner' | 'unmatched'>('miner');
+  const [minerId, setMinerId] = useState('');
+  const filterRef = useRef<HTMLInputElement>(null);
+  const others = view.miners.filter((m) => m.id !== payment.minerId);
+  return (
+    <DialogShell
+      initialFocusRef={filterRef}
+      open={open}
+      onClose={onClose}
+      title={t(`${k}.title`)}
+      confirmLabel={t(to === 'miner' ? `${k}.confirm` : `${k}.confirmUnmatched`)}
+      canConfirm={to === 'unmatched' || minerId !== ''}
+      showLogged="plain"
+      run={async () => {
+        await edit({
+          action: 'reassignPayment',
+          paymentId: payment.id,
+          minerId: to === 'miner' ? minerId : null,
+        });
+      }}
+    >
+      <p>
+        {t(`${k}.intro`, {
+          amount: isk(payment.amount),
+          name: fromName,
+          date: dateWithYear(payment.at.slice(0, 10)),
+          miner: minerName,
+        })}
+      </p>
+      <SegmentedControl
+        label={t(`${k}.to`)}
+        value={to}
+        onChange={setTo}
+        options={[
+          { value: 'miner', label: t(`${k}.toMiner`) },
+          { value: 'unmatched', label: t(`${k}.toUnmatched`) },
+        ]}
+        uppercase={false}
+      />
+      {to === 'miner' && (
+        <MinerPicker
+          miners={others}
+          nameOf={names.character}
+          value={minerId}
+          onChange={setMinerId}
+          filterRef={filterRef}
+        />
+      )}
+      <Effect>{t(to === 'miner' ? `${k}.effect` : `${k}.effectUnmatched`)}</Effect>
+    </DialogShell>
+  );
+}
+
 /** Needs-you: link an Unmatched donation to a Miner. */
 export function AssignDonationDialog({
   open,

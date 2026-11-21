@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { formatList } from '@/lib/listFormat';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
@@ -510,14 +511,22 @@ export function NeedsYouQueue() {
                   body={t(
                     // Held because the sender's Miner owed nothing (#6207); otherwise, from the book
                     // as it is now: a sender who has since joined a Miner is not a stranger.
-                    item.payment.reviewReason === 'no-open-balance'
-                      ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
-                      : miners.some((m) => m.characterIds.includes(item.payment.characterId))
-                        ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
-                        : 'corpTaxBook.moons.needs.unmatched.body',
+                    item.payment.reviewReason === 'ambiguous'
+                      ? 'corpTaxBook.moons.needs.unmatched.bodyAmbiguous'
+                      : item.payment.reviewReason === 'no-open-balance'
+                        ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
+                        : miners.some((m) => m.characterIds.includes(item.payment.characterId))
+                          ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
+                          : 'corpTaxBook.moons.needs.unmatched.body',
                     {
                       date: shortDate(item.payment.at),
                       name: names.character(item.payment.characterId),
+                      miners: formatList(
+                        (item.payment.ambiguousMinerIds ?? [])
+                          .filter((id) => miners.some((m) => m.id === id))
+                          .map(nameOf),
+                        'disjunction'
+                      ),
                     }
                   )}
                   actions={

@@ -49,6 +49,7 @@ export function AccountLedger({
     chargeShortfall: (e) => run(() => actions.chargeShortfall(e)),
     changeForgiven: (e) => run(() => actions.changeForgiven(e)),
     markNotTax: (id) => run(() => actions.markNotTax(id)),
+    reassignPayment: (id) => run(() => actions.reassignPayment(id)),
     changeRate: (key) => run(() => actions.changeRate(key)),
     dismissDays: (keys) => run(() => actions.dismissDays(keys)),
   };

@@ -108,6 +108,7 @@ function renderLedger(view = running(), canEdit = true, corrections: Adjustment[
     chargeShortfall: (e) => calls.push(`charge:${e.forDate}`),
     changeForgiven: (e) => calls.push(`forgiven:${e.forDate}`),
     markNotTax: (id) => calls.push(`notTax:${id}`),
+    reassignPayment: (id) => calls.push(`reassign:${id}`),
     changeRate: (key) => calls.push(`rate:${key}`),
     dismissDays: (keys) => calls.push(`dismiss:${keys.length}`),
   };
@@ -176,6 +177,14 @@ describe('the account ledger row menus', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Change rate' }));
     await vi.waitFor(() => expect(calls[0]).toMatch(/^rate:/));
     expect(screen.queryByRole('menuitem', { name: 'Dismiss tax' })).toBeNull();
+  });
+
+  it('offers a payment not tax and a move to another Miner, and the move opens its dialog', async () => {
+    const calls = renderLedger(running());
+    fireEvent.contextMenu(rowOf(/^Payment from Pilot 2/));
+    expect(await screen.findByRole('menuitem', { name: 'Mark part not tax' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Move to another Miner' }));
+    await vi.waitFor(() => expect(calls).toEqual(['reassign:p1']));
   });
 
   it('has no menu without edit rights', () => {

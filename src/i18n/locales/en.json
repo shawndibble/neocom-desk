@@ -18678,6 +18678,7 @@
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
           "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
+          "bodyAmbiguous": "{{date}}. The book could credit it to {{miners}} and cannot tell which. Assign it to the right Miner.",
           "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then, so an earlier sync held it. The next sync assigns it as credit. Mark it not tax if it was for something else, such as a buyback.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
@@ -18750,6 +18751,7 @@
           "marketCharge": "Charge this shortfall",
           "marketEdit": "Change amount forgiven",
           "notTax": "Mark part not tax",
+          "reassign": "Move to another Miner",
           "rate": "Change rate",
           "dismiss": "Dismiss tax"
         },
@@ -18874,6 +18876,7 @@
           "recordPayment": "recorded a payment",
           "markNotTax": "marked a donation as not tax",
           "assignPayment": "assigned a donation",
+          "reassignPayment": "moved a payment to another Miner",
           "dismiss": "dismissed tax",
           "reverseDismissal": "reversed a dismissal",
           "setMiner": "grouped characters into a Miner",
@@ -19276,6 +19279,7 @@
           "rate-too-old": "A rate can start at most 30 days back.",
           "day-on-statement": "That day is already on an issued Statement, so a rate cannot start on or before it.",
           "running-account": "This book bills a running account now, so it sends late notices instead of Statements. Reload the page to get the current version.",
+          "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
           "unknown-moon": "This book has no Extraction at that moon."
         }
@@ -19853,6 +19857,17 @@
           "find": "Find a Miner",
           "noMatch": "No Miner matches",
           "effect": "It is credited to that Miner's oldest debt, or held as credit. The player can still claim it themselves from their own lines."
+        },
+        "reassign": {
+          "title": "Move a payment",
+          "intro": "{{amount}} from {{name}}, {{date}}. It counts toward {{miner}}'s account now.",
+          "to": "Move it to",
+          "toMiner": "Another Miner",
+          "toUnmatched": "No Miner",
+          "confirm": "Move payment",
+          "confirmUnmatched": "Take it off this Miner",
+          "effect": "It pays that Miner's oldest unpaid day, or is held as their credit. This account owes it back. The sync does not move it again.",
+          "effectUnmatched": "It leaves this account, which owes it back, and waits in Needs you as Unmatched."
         },
         "writeOff": {
           "title": "Write off {{name}}'s balance",
