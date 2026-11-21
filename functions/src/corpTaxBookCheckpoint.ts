@@ -5,8 +5,9 @@
  *
  * ESI's mining ledgers reach back about 30 days, so a day more than 31 days old cannot gain ore.
  * The checkpoint rolls forward a month at a time, to the end of the last month that ended at
- * least `CLOSE_AFTER_DAYS` days ago, and never moves back. A fix to a closed day is an
- * Adjustment dated today.
+ * least `CLOSE_AFTER_DAYS` days ago. It is a strict cache, never a record: any edit dated on or
+ * before it, or any change to the Miner's characters, deletes it, and the next load recomputes
+ * from the full history (decision 20261120-235011, "the checkpoint is a strict cache").
  *
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free.
  * Stored at `corps/{id}/accountCheckpoints/{minerId}` for a Corp Tax Book (written by an
