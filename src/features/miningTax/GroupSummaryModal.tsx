@@ -63,6 +63,8 @@ interface GroupSummaryModalProps {
   onUnlinkPayment?: (key: string) => void;
   /** Opens with the "unassign all days?" question showing — the row menu's Unassign. */
   startWithUnassignConfirm?: boolean;
+  /** A day before it makes the entry read-only (decision 20261120-235011, "a lock date"). */
+  lockDate?: string;
 }
 
 /**
@@ -94,6 +96,7 @@ export function GroupSummaryModal({
   paidBy,
   onUnlinkPayment,
   startWithUnassignConfirm = false,
+  lockDate,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -105,6 +108,7 @@ export function GroupSummaryModal({
   const anyOutstanding = members.some((m) => m.assignment.status === 'outstanding');
   const anyGrown = members.some((m) => m.assignment.status === 'needs-review');
   const taxPct = members[0]?.assignment.taxPct;
+  const locked = lockDate !== undefined && dates[0] !== undefined && dates[0] < lockDate;
 
   const moreMenu = (
     <DropdownMenu>
@@ -174,7 +178,7 @@ export function GroupSummaryModal({
         {paidBy && paidBy.length > 0 && (
           <PaymentLinksCard
             paidBy={paidBy}
-            {...(onUnlinkPayment ? { onUnlink: onUnlinkPayment } : {})}
+            {...(onUnlinkPayment && !locked ? { onUnlink: onUnlinkPayment } : {})}
             busy={busy}
           />
         )}
@@ -236,8 +240,13 @@ export function GroupSummaryModal({
         )}
 
         <LedgerActionError error={saveError} />
+        {locked && (
+          <p className="text-xs text-text-dim">
+            {t('miningTax.detail.locked', { date: lockDate })}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
-          {anyGrown ? (
+          {locked ? null : anyGrown ? (
             <Button variant="primary" disabled={busy} onClick={onResolve}>
               {t('miningTax.resolveConfirm')}
             </Button>
@@ -249,12 +258,14 @@ export function GroupSummaryModal({
               </Button>
             )
           )}
-          <div className="flex">
-            <Button disabled={busy} onClick={onEdit} className="rounded-r-none">
-              {t('miningTax.combined.edit')}
-            </Button>
-            {moreMenu}
-          </div>
+          {!locked && (
+            <div className="flex">
+              <Button disabled={busy} onClick={onEdit} className="rounded-r-none">
+                {t('miningTax.combined.edit')}
+              </Button>
+              {moreMenu}
+            </div>
+          )}
           <Button className="ml-auto" onClick={onClose}>
             {t('common.close')}
           </Button>

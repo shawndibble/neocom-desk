@@ -3,12 +3,14 @@
  * Each row offers only what changes that row: a correction is edited or reversed (never deleted:
  * the record stays, struck through), a write-off is reversed, a forgiven shortfall is charged or
  * changed, a payment is marked not tax or moved to another Miner, a mined day gets its rate
- * changed or its tax dismissed. Officers only: without edit rights the row has no menu.
+ * changed or its tax dismissed. Officers only: without edit rights the row has no menu, and a
+ * row dated before the lock date has none either (decision 20261120-235011, "a lock date").
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MenuItem, RowActionsMenu } from '@/components/ui';
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
+import { isLocked } from '@/engine/corpTaxBook/lockDate';
 import { useBook } from './useBook';
 
 /** What a ledger row can open; each is bound by the Miner page, which owns the dialogs. */
@@ -46,8 +48,9 @@ export function LedgerRowMenu({
   children: ReactElement;
 }) {
   const { t } = useTranslation();
-  const { canEdit } = useBook();
-  if (!canEdit || entry.reversed || entry.reversal) return children;
+  const { canEdit, view } = useBook();
+  if (!canEdit || entry.reversed || entry.reversal || isLocked(entry.date, view.input.now))
+    return children;
   const item = (key: string, run: () => void) => (
     <MenuItem key={key} onSelect={run}>
       {t(`corpTaxBook.moons.ledger.menu.${key}`)}

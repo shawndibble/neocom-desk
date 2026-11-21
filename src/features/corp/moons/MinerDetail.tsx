@@ -49,6 +49,7 @@ import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
+import { isLocked } from '@/engine/corpTaxBook/lockDate';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
 import { MinerLedger } from './MinerLedger';
@@ -220,7 +221,10 @@ export function MinerDetail({ id }: { id: string }) {
     .reduce((s, d) => s + d.tax, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
-  const canSelect = (d: DayRow) => d.status === 'owed' || d.status === 'not-billable';
+  // A day before the lock date is read-only (decision 20261120-235011, "a lock date").
+  const locked = (date: string) => isLocked(date, view.input.now);
+  const canSelect = (d: DayRow) =>
+    (d.status === 'owed' || d.status === 'not-billable') && !locked(d.date);
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
   const moonName = (moonId: number | undefined) =>
     moonId === undefined ? undefined : names.moon(moonId);
@@ -922,7 +926,13 @@ export function MinerDetail({ id }: { id: string }) {
                   key={`d-${f.id}`}
                   at={d.at}
                   aside={
-                    canEdit && !d.reversed ? (
+                    canEdit &&
+                    !d.reversed &&
+                    !locked(
+                      d.scope === 'record'
+                        ? (detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
+                        : d.at
+                    ) ? (
                       <button
                         type="button"
                         className={entityLinkClassName(

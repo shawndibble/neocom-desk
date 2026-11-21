@@ -201,6 +201,15 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
     );
   });
 
+  it('gives a row dated before the lock date no menu: locked history is read-only', () => {
+    // On 18 Nov the lock date is 1 Sep: the August correction and payment are locked.
+    renderLedger(running({ adjustments: [correction], now: '2026-11-18T14:00:00Z' }));
+    fireEvent.contextMenu(rowOf(/^Adjustment/));
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    fireEvent.contextMenu(rowOf(/^Payment from Pilot 2/));
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+
   it('has no menu without edit rights', () => {
     renderLedger(running({ adjustments: [correction] }), false);
     fireEvent.contextMenu(rowOf(/^Adjustment/));

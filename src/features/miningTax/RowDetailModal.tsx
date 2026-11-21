@@ -99,6 +99,8 @@ interface RowDetailModalProps {
   corpNote?: ReactNode;
   /** Opens with the "unassign this entry?" question showing — the row menu's Unassign. */
   startWithUnassignConfirm?: boolean;
+  /** A row dated before it is read-only (decision 20261120-235011, "a lock date"). */
+  lockDate?: string;
 }
 
 /** Stand-in so the breakdown hook can run for a row with no assignment (its text is never used). */
@@ -157,7 +159,9 @@ export function RowDetailModal({
   onLinkWalletPayment,
   corpNote,
   startWithUnassignConfirm = false,
+  lockDate,
 }: RowDetailModalProps) {
+  const locked = lockDate !== undefined && row.entry.date < lockDate;
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [confirmUnassign, setConfirmUnassign] = useState(startWithUnassignConfirm);
@@ -352,7 +356,7 @@ export function RowDetailModal({
         {paidBy && paidBy.length > 0 && (
           <PaymentLinksCard
             paidBy={paidBy}
-            {...(onUnlinkPayment ? { onUnlink: onUnlinkPayment } : {})}
+            {...(onUnlinkPayment && !locked ? { onUnlink: onUnlinkPayment } : {})}
             busy={busy}
           />
         )}
@@ -405,7 +409,16 @@ export function RowDetailModal({
         )}
 
         <LedgerActionError error={saveError} />
-        {status === 'dismissed' ? (
+        {locked ? (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <p className="text-xs text-text-dim">
+              {t('miningTax.detail.locked', { date: lockDate })}
+            </p>
+            <Button className="ml-auto" onClick={onClose}>
+              {t('common.close')}
+            </Button>
+          </div>
+        ) : status === 'dismissed' ? (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" disabled={busy} onClick={onUndo}>
               {t('miningTax.undismissAction')}

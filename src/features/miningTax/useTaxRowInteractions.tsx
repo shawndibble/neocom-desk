@@ -1,5 +1,7 @@
 import { useCallback, useState, type ReactElement } from 'react';
 import { cx } from '@/lib/cx';
+import { utcDay } from '@/engine/localDay';
+import { lockDateFor } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import { TaxRowMenu } from '@/features/miningTax/TaxRowMenu';
 import type { TaxDialogActions } from '@/features/miningTax/useTaxDialogs';
@@ -32,7 +34,12 @@ export function useTaxRowInteractions(
   // Stable, so a row only re-renders when its own data changes (DataTable's note on `rowContextMenu`).
   const rowContextMenu = useCallback(
     (dr: DisplayRow, tr: ReactElement) => (
-      <TaxRowMenu dr={dr} systemName={systemName(dr)} onAction={actions.runRowMenuAction}>
+      <TaxRowMenu
+        dr={dr}
+        systemName={systemName(dr)}
+        lockDate={lockDateFor(utcDay())}
+        onAction={actions.runRowMenuAction}
+      >
         {tr}
       </TaxRowMenu>
     ),

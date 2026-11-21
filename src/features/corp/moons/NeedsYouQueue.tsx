@@ -21,6 +21,7 @@ import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { useNow } from '@/lib/useNow';
 import { useBook } from './useBook';
+import { isLocked } from '@/engine/corpTaxBook/lockDate';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { useNeedsYou } from './useNeedsYou';
@@ -652,7 +653,8 @@ export function NeedsYouQueue() {
                 )
               }
               actions={
-                canEdit ? (
+                // A dispute of a day before the lock date can no longer be answered.
+                canEdit && !isLocked(d.date, view.input.now) ? (
                   <>
                     <Button
                       size="sm"

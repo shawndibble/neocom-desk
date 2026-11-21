@@ -8818,7 +8818,8 @@
         "totalText": "Estimated value {{value}} ISK, tax owed {{tax}} ISK"
       },
       "editAction": "Edit",
-      "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed."
+      "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed.",
+      "locked": "Days before {{date}} are locked and can't be changed."
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
@@ -19278,7 +19279,8 @@
           "running-account": "This book bills a Running account, so it sends late notices. Reload the page to get the current version.",
           "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
-          "unknown-moon": "This book has no Extraction at that moon."
+          "unknown-moon": "This book has no Extraction at that moon.",
+          "locked": "That date is locked: nothing before the 1st of the month two months back can be changed. Add a correction dated today instead."
         }
       },
       "consent": {
@@ -19821,7 +19823,8 @@
           "stillOwes": "{{name}} still owes {{amount}}",
           "owesNothing": "{{name}} owes nothing",
           "creditHeld": "{{amount}} held as credit toward the next days",
-          "dayLine": "Day of {{date}}"
+          "dayLine": "Day of {{date}}",
+          "dateLocked": "Days before {{date}} are locked: record it dated today instead."
         },
         "notTax": {
           "title": "Mark part of a donation as not tax",

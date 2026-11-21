@@ -1,4 +1,6 @@
 import { utcDayOf } from '../../../functions/src/timeConstants';
+import { lockDateFor } from '../../../functions/src/corpTaxBookCheckpoint';
+import { utcDay } from '@/engine/localDay';
 import { soloCharacterId } from '../../../functions/src/corpTaxBookDonationMatch';
 import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -681,6 +683,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           dr.row.entry.solarSystemId === corpDetail.view.solarSystemId
       )
     : undefined;
+  // A personal entry dated before the lock date is read-only (decision 20261120-235011).
+  const lockDate = lockDateFor(utcDay());
 
   return (
     <>
@@ -695,6 +699,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
           saveError={actionError}
+          lockDate={lockDate}
           onEdit={() => actions.editFromDetail(detailTarget)}
           onSettleUp={
             detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
@@ -837,6 +842,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             // A failed link shows in its own dialog, open on top of this one.
             saveError={actionError}
             startWithUnassignConfirm={detailConfirmUnassign}
+            lockDate={lockDate}
             onAssigned={handleAssignedFromDetail}
             onDismiss={() => dismissEntry(detailTarget)}
             onResolve={() => resolveEntry(detailTarget)}

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -44,7 +45,8 @@ const assigned = (date: string, payeeId: string): MoonMiningTaxRow => ({
 });
 
 const snapshot = {
-  entries: [assigned('2026-10-17', 'p1'), assigned('2026-10-13', 'p2')],
+  // Recent days: a day before the lock date would not be selectable.
+  entries: [assigned(shiftUtcDate(utcDay(), -4), 'p1'), assigned(shiftUtcDate(utcDay(), -8), 'p2')],
   characters: [{ characterId: ME, characterName: 'Kestrel Vane' }],
   payeesByCharacter: new Map([[ME, [ASHFALL, BRIMSTONE]]]),
   paymentLinks: [],

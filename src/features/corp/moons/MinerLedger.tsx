@@ -98,7 +98,7 @@ export function MinerLedger({
                       actions={opened}
                       name={`${shortDate(r.date)} ${r.kind}`}
                       rateDays={dayOf(r)
-                        .filter(canOverrideDay)
+                        .filter((d) => canOverrideDay(d, view.input.now))
                         .map((d) => d.key)}
                       dismissDays={dayOf(r)
                         .filter((d) => d.status === 'owed')
