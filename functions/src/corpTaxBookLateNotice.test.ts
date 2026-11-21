@@ -12,6 +12,12 @@ import {
   lateNoticeFromStatementDoc,
   lateNoticeStanding,
   type LateNoticeDayState,
+  lastNoticedDay,
+  noticedDates,
+  reminderAllowed,
+  adjustmentLineKey,
+  lineKey,
+  noticeSpan,
 } from './corpTaxBookLateNotice.js';
 
 /** A late notice as `issueStatement` stores it today, in `corps/{id}/statements`. */
@@ -315,5 +321,56 @@ describe('mergeNoticeDocs: one notice per id from both collections', () => {
     expect(mergeNoticeDocs([], [storedNotice]).map((n) => n.id)).toEqual([storedNotice.id]);
     expect(mergeNoticeDocs([], [{ ...storedNotice, kind: undefined }])).toEqual([]);
     expect(mergeNoticeDocs([{ id: 'x' }], [])).toEqual([]);
+  });
+});
+
+describe('noticedDates / lastNoticedDay: the days a Late notice listed', () => {
+  const listed = (...lines: { kind: string; date: string; characterId?: number }[]) => ({
+    lines: lines as { kind: 'mined' | 'late-ore' | 'correction'; date: string }[],
+  });
+  const notices = [
+    listed(
+      { kind: 'mined', date: '2026-10-05', characterId: 1 },
+      { kind: 'late-ore', date: '2026-10-02', characterId: 2 },
+      { kind: 'correction', date: '2026-10-20' }
+    ),
+    listed({ kind: 'mined', date: '2026-10-07', characterId: 1 }),
+  ];
+
+  it('is each mined or late-ore line’s day, never a correction’s or a day between', () => {
+    expect([...noticedDates(notices)].sort()).toEqual(['2026-10-02', '2026-10-05', '2026-10-07']);
+    expect(lastNoticedDay(notices)).toBe('2026-10-07');
+    expect(lastNoticedDay([])).toBeNull();
+  });
+
+  it("is one Character's lines alone when asked", () => {
+    expect([...noticedDates(notices, 2)]).toEqual(['2026-10-02']);
+  });
+});
+
+describe('reminderAllowed: one manual reminder after the Miner stopped them (D27)', () => {
+  it('allows any while reminders run, and one once they are stopped', () => {
+    expect(reminderAllowed({ sent: 3, manualSent: 5, remindersStopped: false })).toBe(true);
+    expect(reminderAllowed({ sent: 3, manualSent: 0, remindersStopped: true })).toBe(true);
+    expect(reminderAllowed({ sent: 3, manualSent: 1, remindersStopped: true })).toBe(false);
+  });
+});
+
+describe('noticeSpan / adjustmentLineKey', () => {
+  it("is a notice's first and last listed day, or its issue day with no line", () => {
+    const lines = [{ date: '2026-10-02' }, { date: '2026-10-09' }];
+    expect(noticeSpan({ lines, issuedAt: '2026-11-01T00:00:00Z' })).toEqual({
+      first: '2026-10-02',
+      last: '2026-10-09',
+    });
+    expect(noticeSpan({ lines: [], issuedAt: '2026-11-01T00:00:00Z' })).toEqual({
+      first: '2026-11-01',
+      last: '2026-11-01',
+    });
+  });
+
+  it("is the key a correction's line carries, as lineKey spells it", () => {
+    expect(adjustmentLineKey('a1')).toBe('adjustment:a1');
+    expect(adjustmentLineKey('a1')).toBe(lineKey({ adjustmentId: 'a1', date: '2026-10-01' }));
   });
 });

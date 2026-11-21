@@ -16,7 +16,7 @@ import {
   useTabsId,
 } from '@/components/ui';
 import { LpStoreActions, WalletTabBar } from '@/features/loyalty/LpStoreChrome';
-import { useMarketHub } from '@/features/market/hub';
+import { pickHubFor, useHubFor } from '@/features/market/hub';
 import { JUMP_RANGES } from '@/engine/route/jumpRange';
 import { formatAge, MINUTE_MS } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
@@ -137,19 +137,18 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const data = useLpStoreLanding(active);
   const now = useTicker(MINUTE_MS);
 
-  const hubId = useMarketHub((s) => s.value);
-  const setHubId = useMarketHub((s) => s.setValue);
+  const { hubId } = useHubFor('lpStore');
   const priceBasis = usePriceBasis((s) => s.value);
   const setPriceBasis = usePriceBasis((s) => s.setValue);
   const ownLpValue = useLpValue((s) => s.value);
-  useHydratedStore(useMarketHub, usePriceBasis, useLpValue);
+  useHydratedStore(usePriceBasis, useLpValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const view = params.view;
   const query = params.q;
   const filterValue: LpLandingFilterValue = { ...filters, hubId, priceBasis };
   function onFilterChange(next: LpLandingFilterValue) {
-    if (next.hubId !== hubId) void setHubId(next.hubId);
+    if (next.hubId !== hubId) void pickHubFor('lpStore', next.hubId);
     if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
     // Only the filter's own fields reach the URL.
     setFilters(next);

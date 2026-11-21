@@ -5,7 +5,7 @@
 //
 // Firestore layout (rules in firestore.rules; every write is a callable):
 //   corps/{corporationId}                settings: start date, hub, Ore Form, rates, grace,
-//                                               minimum Statement, divisions, lastSync
+//                                               notice rules, divisions, lastSync
 //     officers/{uid}                            officer access record (24h) written by verifyOfficer
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
@@ -16,7 +16,7 @@
 //     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs
 //     accountCheckpoints/{minerId}              a Running account's closed-through checkpoint
 //     miners/{minerId}                          Miner groupings
-//     meta/paid                                 paidStatementIds, only ever grown (D22)
+//     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
 //     audit/{at~rand}                           immutable audit log
 //   corpTaxBookTokens/{token}                   verify-link tokens; no client access at all
@@ -28,16 +28,16 @@ import {
   BOOK_DEFAULTS,
   DIVISION_NAME_MAX,
   shiftDate,
-  statementDays,
   type ForfeitBasis,
-  type StatementDays,
 } from './corpTaxBookEngine.js';
-import { DAY_MS } from './timeConstants.js';
+import { DAY_MS, HOUR_MS, MINUTE_MS, utcDay } from './timeConstants.js';
+import { payOldestFirst, type OwedDay } from './corpTaxBookAccounts.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
   isFinalNoticeId,
   minerPaymentCode,
+  noticedDates,
   type LateNotice,
   type LateNoticeLine,
 } from './corpTaxBookLateNotice.js';
@@ -64,11 +64,35 @@ import {
   DISPUTE_KINDS,
   LIVE_CHECK_ACTION_NAMES,
   NOTICE_AFTER_KINDS,
+  NOTICE_RULE_BOUNDS,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
+  type NoticeRules,
 } from './corpTaxBookKinds.js';
 
 export { CLAIM_CHECK_RESULTS, DISPUTE_KINDS, TAX_CONTACT_MAX_CHARACTERS, TRANSFER_RECIPIENTS };
+
+// The book's subcollection names, declared once for both sides (corpTaxBookVersionKeys.ts).
+export {
+  OBSERVED,
+  EXTRACTIONS,
+  PAYMENTS,
+  DISMISSALS,
+  DECLARATIONS,
+  DISPUTES,
+  ADJUSTMENTS,
+  WRITE_OFFS,
+  TOLERANCE_EXEMPTIONS,
+  MINER_PAID,
+  REBILLS,
+  STATEMENTS,
+  STATEMENT_LINKS,
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  ACCOUNT_CHECKPOINTS,
+  MINERS,
+  META,
+} from './corpTaxBookVersionKeys.js';
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
@@ -81,45 +105,11 @@ export const TOKENS_COLLECTION = 'corpTaxBookTokens';
  */
 export const MEMBER_SETUP_MS = 72 * 60 * 60 * 1000;
 export const OFFICERS = 'officers';
-export const OBSERVED = 'observed';
-export const EXTRACTIONS = 'extractions';
-export const PAYMENTS = 'payments';
-export const DISMISSALS = 'dismissals';
-export const DECLARATIONS = 'declarations';
-/** `disputes/{minerId_date}`: a Miner says a Conflict day's ore went to another Payee (#6206). */
-export const DISPUTES = 'disputes';
-export const ADJUSTMENTS = 'adjustments';
-export const WRITE_OFFS = 'writeOffs';
-/** `toleranceExemptions/{id}`: an officer's limit on what one Miner-day shortfall may forgive. */
-export const TOLERANCE_EXEMPTIONS = 'toleranceExemptions';
-/**
- * `minerPaid/{minerId}`: a copy of the Miner's paid-through day from `meta/paid` (officer-only),
- * readable by that Miner so their own Tax tab can close the same days the book does.
- */
-export const MINER_PAID = 'minerPaid';
-export const REBILLS = 'rebills';
-export const STATEMENTS = 'statements';
-/** `statementLinks/{statementId}`: the verify token, readable by editors only. */
-export const STATEMENT_LINKS = 'statementLinks';
-/**
- * `lateNotices/{noticeId}`: a `LateNotice` and a server `updatedAt` (decision 20261120-235011).
- * Officers read every one; a Miner reads their own (`uids`).
- */
-export const LATE_NOTICES = 'lateNotices';
-/** `lateNoticeLinks/{noticeId}`: `{ token }`, the verify link's token. Editors only. */
-export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
-/**
- * `accountCheckpoints/{minerId}`: a `RunningAccountCheckpoint`, its Miner's readers (`uids`) and a
- * server `updatedAt`. Officers read every one; a Miner reads their own.
- */
-export const ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
-export const MINERS = 'miners';
 /**
  * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
  * them out (the server cannot price days), for the pay page's live total. Function-only.
  */
 export const ACCOUNTS = 'accounts';
-export const META = 'meta';
 export const PAID_DOC = 'paid';
 /** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
@@ -158,9 +148,9 @@ export const FEEDER_VIEWS = 'feederViews';
 export const BILLED_BY_COLLECTION = 'corpTaxBookBilledBy';
 
 /** Roles are trusted for at most this long without a live check (D7). */
-export const ROLE_CACHE_MS = 10 * 60_000;
+export const ROLE_CACHE_MS = 10 * MINUTE_MS;
 /** Read access lapses this long after the last check (D7). */
-export const ACCESS_TTL_MS = 24 * 3_600_000;
+export const ACCESS_TTL_MS = DAY_MS;
 
 export const MAX_SYNC_OBSERVED = 2000;
 export const MAX_SYNC_EXTRACTIONS = 200;
@@ -220,14 +210,13 @@ export function satisfies(roles: OfficerRoles, need: Need): boolean {
 }
 
 export function isCacheFresh(checkedAt: number, now: number): boolean {
-  return now - checkedAt <= ROLE_CACHE_MS && checkedAt <= now + 60_000;
+  return now - checkedAt <= ROLE_CACHE_MS && checkedAt <= now + MINUTE_MS;
 }
 
 // --- Input parsing --------------------------------------------------------
 
-export function utcDate(nowMs: number): string {
-  return new Date(nowMs).toISOString().slice(0, 10);
-}
+/** `YYYY-MM-DD` of a UTC instant in ms: `utcDay`, under the name the callables use. */
+export const utcDate = utcDay;
 
 export function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
@@ -415,28 +404,25 @@ export interface SettingsPatch {
   dayTolerancePct?: number;
 }
 
-/** Mirror of the client's `NoticeRules` (`src/engine/corpTaxBook/notices.ts`). */
-export interface NoticeRules {
-  after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
-  minimum: number;
-  cooldownDays: number;
-  /** Owing this much is due a notice early; absent: off. */
-  earlyAt?: number;
-}
-
 function parseNoticeRules(raw: unknown): NoticeRules {
   const d = record(raw);
   const a = record(d.after);
   const kind = oneOf(a.kind, 'noticeRules.after.kind', NOTICE_AFTER_KINDS);
+  const b = NOTICE_RULE_BOUNDS;
   return {
     after:
       kind === 'behind'
-        ? { kind, days: int(a.days, 'noticeRules.after.days', 1, 365) }
-        : { kind, day: int(a.day, 'noticeRules.after.day', 1, 28) },
-    minimum: num(d.minimum, 'noticeRules.minimum', 0, 1e12),
-    cooldownDays: int(d.cooldownDays, 'noticeRules.cooldownDays', 1, 90),
+        ? { kind, days: int(a.days, 'noticeRules.after.days', b.behindDays.min, b.behindDays.max) }
+        : { kind, day: int(a.day, 'noticeRules.after.day', b.dayOfMonth.min, b.dayOfMonth.max) },
+    minimum: num(d.minimum, 'noticeRules.minimum', b.minimum.min, b.minimum.max),
+    cooldownDays: int(
+      d.cooldownDays,
+      'noticeRules.cooldownDays',
+      b.cooldownDays.min,
+      b.cooldownDays.max
+    ),
     ...(d.earlyAt !== undefined && d.earlyAt !== null
-      ? { earlyAt: num(d.earlyAt, 'noticeRules.earlyAt', 1, 1e12) }
+      ? { earlyAt: num(d.earlyAt, 'noticeRules.earlyAt', b.earlyAt.min, b.earlyAt.max) }
       : {}),
   };
 }
@@ -579,19 +565,19 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
 /**
  * Why a book's start date cannot move from `oldStart` to `newStart`, else null. Never the
  * future, never before a former moon owner's leave day (`floor`); moving later is allowed
- * only while no issued Statement covers a day in the gap, so billed days stay billed.
+ * only while no Late notice listed a day in the gap (`noticedDates`), so billed days stay billed.
  */
 export function startDateMoveReason(
   oldStart: string,
   newStart: string,
   today: string,
   floor: string | null,
-  statements: readonly StatementDays[]
+  notices: Parameters<typeof noticedDates>[0]
 ): 'start-in-future' | 'start-before-leave' | 'start-over-billed' | null {
   if (newStart > today) return 'start-in-future';
   if (floor !== null && newStart < floor) return 'start-before-leave';
   if (newStart > oldStart) {
-    const billed = new Set(statements.flatMap((s) => [...statementDays(s)]));
+    const billed = noticedDates(notices);
     for (let d = oldStart; d < newStart; d = shiftDate(d, 1))
       if (billed.has(d)) return 'start-over-billed';
   }
@@ -795,7 +781,7 @@ export interface RecordedAccount {
   oldest?: string;
   paidThrough?: string;
   /** The running days still owed, oldest first (what the verify page lists); absent from an older client. */
-  unpaidDays?: { date: string; owed: number; tax: number }[];
+  unpaidDays?: OwedDay[];
   /**
    * The newest day the officer's client says is paid for good (D22), stored in `meta/paid`. Only
    * ever moves forward. The server has no prices, so it can't check the day was priced at a saved
@@ -1505,7 +1491,7 @@ export function checkpointRefusal(
     known: boolean;
     /** The Miner's characters now. */
     characterIds: readonly number[];
-    live?: { unpaidDays?: readonly { date: string; owed: number }[] };
+    live?: { unpaidDays?: readonly Pick<OwedDay, 'date' | 'owed'>[] };
     isDirector: boolean;
   }
 ): CheckpointRefusal[] {
@@ -1606,7 +1592,7 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
     const row = record(r);
     const date = dateString(row.date, 'date');
     const cachedAt = instant(row.cachedAt, 'cachedAt');
-    if (date > today || Date.parse(cachedAt) > nowMs + 3_600_000) {
+    if (date > today || Date.parse(cachedAt) > nowMs + HOUR_MS) {
       throw new HttpsError('invalid-argument', 'observed rows cannot be from the future');
     }
     return {
@@ -2143,18 +2129,12 @@ export function billedDisputeTax(
 export function disputesClosedByWriteOff(
   disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
   writeOff: { amount: number },
-  live?: { owed: number; unpaidDays?: readonly { date: string; owed: number }[] }
+  live?: { owed: number; unpaidDays?: readonly Pick<OwedDay, 'date' | 'owed'>[] }
 ): string[] {
   if (!live?.unpaidDays) return [];
   const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
   if (writeOff.amount >= live.owed - 0.01) return open.map((d) => d.id as string);
-  const forgiven = new Set<string>();
-  let left = writeOff.amount;
-  for (const day of live.unpaidDays) {
-    if (left < day.owed - 0.01) break;
-    left -= day.owed;
-    forgiven.add(day.date);
-  }
+  const forgiven = new Set(payOldestFirst(live.unpaidDays, writeOff.amount, 0.01).paid);
   return open
     .filter((d) => typeof d.date === 'string' && forgiven.has(d.date))
     .map((d) => d.id as string);

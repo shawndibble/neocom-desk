@@ -15,11 +15,9 @@ import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import { upcomingCommittedEvents } from '@/engine/character/calendarDeadline';
 import { isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { DAY_MS } from '@/lib/age';
 import type {
-  CalendarEventsBoardData,
   ContractsBoardData,
   MailBoardData,
   MiningTaxBoardData,
@@ -101,28 +99,15 @@ export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeve
   return data.summary.dueSoon > 0 ? 'warning' : 'clear';
 }
 
-/** How soon a committed calendar event has to be before the card flags it. */
+/** How soon a Calendar widget's clock has to be before it is flagged. */
 const COMING_UP_WATCH_MS = DAY_MS;
 
-/** One event's row tone: `watch` within a day, `clear` beyond. */
+/**
+ * One clock's tone on the Calendar widget: `watch` within a day (or past), `clear` beyond. A plan,
+ * not a problem, so never past `watch`; Next deadline rates the same clock on the full ladder.
+ */
 export function comingUpEventSeverity(atMs: number, nowMs: number): DeadlineSeverity {
   return atMs - nowMs <= COMING_UP_WATCH_MS ? 'watch' : 'clear';
-}
-
-/**
- * A committed event is a plan, not a problem, so this never goes past
- * `watch`: one starting within a day is worth a glance, and anything further
- * out is clear. The strip's Next deadline still rates the same event on the
- * full ladder, because there it is competing with real deadlines.
- */
-export function comingUpSeverity(
-  data: CalendarEventsBoardData | null,
-  nowMs: number
-): DeadlineSeverity | null {
-  if (data === null) return null;
-  if (data.needsReauth) return UNREADABLE;
-  const next = upcomingCommittedEvents(data.events, nowMs)[0];
-  return next === undefined ? 'clear' : comingUpEventSeverity(next.atMs, nowMs);
 }
 
 /**

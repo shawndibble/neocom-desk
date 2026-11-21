@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { CorpAssetInput } from './assetDivisions';
 import {
   buildItemLedger,
+  buildContentsTree,
   buildLocationLedger,
   classifyCorpAssets,
   countLedgerByState,
@@ -362,5 +363,40 @@ describe('buildLocationLedger', () => {
     const { others } = buildLocationLedger(c, { prices });
     expect(others).toHaveLength(1);
     expect(others[0]).toMatchObject({ state: 'assetSafety', locationId: STATION, itemCount: 1 });
+  });
+});
+
+describe('buildContentsTree', () => {
+  const stacksOf = (inputs: CorpAssetInput[]) =>
+    buildLocationLedger(classifyCorpAssets([office, ...inputs]), { prices }).offices[0].divisions[0]
+      .stacks;
+
+  it('nests contents under their containers, containers first, then by value', () => {
+    const tree = buildContentsTree(
+      stacksOf([
+        a({ itemId: 1, typeId: 300 }),
+        a({ itemId: 2, typeId: 301, locationId: 1, locationFlag: 'Unlocked' }),
+        a({ itemId: 3, typeId: 200, locationId: 2, locationFlag: 'Unlocked' }),
+        a({ itemId: 4, typeId: 100, locationId: 1, locationFlag: 'Unlocked', quantity: 5 }),
+        a({ itemId: 5, typeId: 200, quantity: 2 }),
+      ])
+    );
+    expect(tree.map((n) => n.itemId)).toEqual([1, 5]);
+    const box = tree[0];
+    expect(box).toMatchObject({ typeId: 300, itemCount: 3, estimatedValue: 1050 });
+    expect(box.children.map((n) => n.itemId)).toEqual([2, 4]);
+    expect(box.children[0].children.map((n) => n.itemId)).toEqual([3]);
+    expect(tree[1]).toMatchObject({ children: [], itemCount: 0, estimatedValue: 2000 });
+  });
+
+  it('keeps a container a filter left out, from the path of what it holds', () => {
+    const stacks = stacksOf([
+      a({ itemId: 1, typeId: 300 }),
+      a({ itemId: 2, typeId: 200, locationId: 1, locationFlag: 'Unlocked' }),
+    ]).filter((s) => s.itemId === 2);
+    const tree = buildContentsTree(stacks);
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ itemId: 1, typeId: 300, stack: null, itemCount: 1 });
+    expect(tree[0].children.map((n) => n.itemId)).toEqual([2]);
   });
 });

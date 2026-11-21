@@ -106,12 +106,13 @@ export function CalculationBreakdown({
   const rigRows = result.materials.flatMap((material) =>
     material.subBuild?.rigs ? [{ typeID: material.typeID, rigs: material.subBuild.rigs }] : []
   );
-  const taxPct = salesTaxPct(context.accountingLevel);
+  const taxPct = salesTaxPct(context.accountingLevel, context.standing?.feeDiscountFactor);
   const brokerPct = brokerFeePct(
     context.brokerRelationsLevel,
     context.standing?.factionStanding,
     context.standing?.corpStanding,
-    context.standing?.safetyTaxPct
+    context.standing?.safetyTaxPct,
+    context.standing?.feeDiscountFactor
   );
   const feePct = formatPercent(taxPct + brokerPct);
 
@@ -298,6 +299,14 @@ export function CalculationBreakdown({
                   corpStanding: context.standing?.corpStanding ?? 0,
                 })}
               </p>
+              {context.standing?.feeDiscountFactor !== undefined && (
+                <p>
+                  {t('industry.breakdown.feeDiscount', {
+                    hub: context.hubName,
+                    pct: formatPercent((1 - context.standing.feeDiscountFactor) * 100),
+                  })}
+                </p>
+              )}
               <Formula>
                 {t('industry.breakdown.feesFormula', {
                   taxPct: formatPercent(taxPct),

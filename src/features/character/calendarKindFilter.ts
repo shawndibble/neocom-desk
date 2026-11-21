@@ -64,6 +64,35 @@ export function shownKinds(hidden: readonly CharacterBoardItemKind[]): Set<Chara
   return new Set(CHARACTER_BOARD_ITEM_KINDS.filter((kind) => !hiddenSet.has(kind)));
 }
 
+/** Kinds read through an opt-in Permission: a filter gives them no row while unreadable. */
+export const OPT_IN_KINDS: ReadonlySet<CharacterBoardItemKind> = new Set([
+  'structureTimer',
+  'structureFuel',
+  'corpJob',
+  'moonChunk',
+  'sharedMoonPop',
+  'skyhookRaid',
+  'mercenaryDen',
+]);
+
+/**
+ * Whether a kind filter offers a row for this kind at all. A hidden kind always keeps its row (it
+ * is how the pilot turns it back on), and so does one that needs a sign-in (the row says why). An
+ * unreadable opt-in kind gets none: unreadable usually means its Permission is off, and a row
+ * would blame the network for a choice the pilot never made.
+ */
+export function kindHasFilterRow(
+  kind: CharacterBoardItemKind,
+  state: {
+    hidden: ReadonlySet<CharacterBoardItemKind>;
+    readable: ReadonlySet<CharacterBoardItemKind>;
+    reauth: ReadonlySet<CharacterBoardItemKind>;
+  }
+): boolean {
+  if (state.hidden.has(kind) || state.reauth.has(kind)) return true;
+  return state.readable.has(kind) || !OPT_IN_KINDS.has(kind);
+}
+
 /** Flips one kind, for a menu whose items are checkboxes over the shown set. */
 export function toggleHiddenKind(
   hidden: readonly CharacterBoardItemKind[],

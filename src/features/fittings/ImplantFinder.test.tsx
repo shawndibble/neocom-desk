@@ -111,7 +111,7 @@ vi.mock('./PriceHubSelect', () => ({ PriceHubSelect: () => null }));
 const target = vi.hoisted(() => ({ signatureRadius: 400, velocity: 0 }));
 vi.mock('./targetProfiles', () => ({ useTargetProfiles: () => ({ selected: target }) }));
 vi.mock('@/features/market/hub', () => ({
-  useMarketHub: (pick: (s: { value: string }) => unknown) => pick({ value: 'jita' }),
+  useHubFor: () => ({ hubId: 'jita', scope: 'global', hydrated: true }),
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: async () => new Map() }));
 vi.mock('@/features/market/ItemDetailModal', () => ({

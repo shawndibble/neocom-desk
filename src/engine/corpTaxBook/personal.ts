@@ -1519,7 +1519,10 @@ function settleRows(p: Prepared, rows: readonly BookRowView[]): UncreditedDonati
     }
     const money = (day.credited - day.forgiven) * share;
     if (!day.settled) {
-      row.taxOwed = Math.max(0, account.owedOf(row.date, row.billed));
+      // `owedOf` shares by what the row charges: its mined tax before a credit correction, and
+      // with an officer's raise (the row carries both).
+      const charging = Math.max(row.billed, row.correction?.before ?? 0);
+      row.taxOwed = Math.max(0, account.owedOf(row.date, charging));
       if (money >= 1) row.paidIsk = money;
       continue;
     }

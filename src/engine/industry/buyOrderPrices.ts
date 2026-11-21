@@ -23,7 +23,8 @@ export function buyOrderFeePct(
     skills[SKILL_IDS.brokerRelations] ?? 0,
     standing?.factionStanding,
     standing?.corpStanding,
-    standing?.safetyTaxPct
+    standing?.safetyTaxPct,
+    standing?.feeDiscountFactor
   );
 }
 

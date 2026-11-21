@@ -18,7 +18,7 @@ import type {
   FittingStats,
   PilotProfile,
 } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { freedLabel } from './makeItFitFreed';
 import { MakeItFitFixCard } from './MakeItFitFixCard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -69,7 +69,7 @@ function Implants({
 }: Omit<Props, 'resource'> & { goalId: 'cpu' | 'powergrid' }) {
   const { t } = useTranslation();
   const { fitting, profile, basis, onChange } = implants;
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
   const seed = useMemo(

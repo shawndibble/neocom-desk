@@ -297,4 +297,34 @@ describe('orderFloor', () => {
     expect(singleUnit!.relist).toBeGreaterThan(100);
     expect(bigStack!.relist).toBeLessThan(unitCost + 5);
   });
+
+  it('lowers the floor under a hub fee discount, and records the factor it used', () => {
+    const base = {
+      unitCost: 1_000_000,
+      remainingQuantity: 1,
+      accountingLevel: 5,
+      brokerRelationsLevel: 5,
+      advancedBrokerRelationsLevel: 5,
+    };
+    const full = orderFloor(base)!;
+    const half = orderFloor({ ...base, feeDiscountFactor: 0.5 })!;
+    expect(half.relist).toBeLessThan(full.relist);
+    expect(half.fill).toBeCloseTo(base.unitCost / (1 - salesTaxPct(5, 0.5) / 100), 6);
+    expect(half.feeDiscountFactor).toBe(0.5);
+    expect(full.feeDiscountFactor).toBeUndefined();
+  });
+
+  it('ignores the hub discount for an order at a player structure', () => {
+    const inputs = {
+      unitCost: 1_000_000,
+      remainingQuantity: 1,
+      accountingLevel: 5,
+      brokerRelationsLevel: 5,
+      advancedBrokerRelationsLevel: 5,
+      structureBrokerPct: 1,
+    };
+    expect(orderFloor({ ...inputs, feeDiscountFactor: 0.5 })!.relist).toBe(
+      orderFloor(inputs)!.relist
+    );
+  });
 });

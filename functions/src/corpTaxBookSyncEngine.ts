@@ -6,6 +6,7 @@
 // that runs both copies on the same inputs. Change the engine first, then this
 // file. Dependency-free apart from its sibling mirror, so that test can import it.
 
+import { utcDay } from './timeConstants.js';
 import {
   moonOnDay,
   shiftDate,
@@ -72,8 +73,6 @@ export interface GapInput {
   oldestEsiDate: Readonly<Record<number, string | undefined>>;
   retentionDays?: number;
 }
-
-const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Engine `detectGaps`. */
 export function detectGaps(input: GapInput): SyncGap[] {
@@ -168,12 +167,6 @@ export function donationsFromJournal(
 export interface MinerLike {
   id: string;
   characterIds: number[];
-}
-
-export interface StatementLike {
-  id: string;
-  minerId: string;
-  code: string;
 }
 
 // --- Donations into divisions the book does not read (#6207) --------------
@@ -496,26 +489,7 @@ export function restampPlan(
   });
 }
 
-// --- Settlement -----------------------------------------------------------
-
-export interface SettleStatement {
-  id: string;
-  minerId: string;
-  amount: number;
-  issuedAt: string;
-  /** A running account's late notice (#6294): never settled, never an open balance. */
-  kind?: string;
-  lines: {
-    chargeKey?: string;
-    date?: string;
-    tax?: number;
-    structureId?: number;
-    kind?: string;
-    oreLines?: { typeId: number; quantity: number }[];
-    unitPrices?: Record<string, number>;
-    taxPct?: number;
-  }[];
-}
+// --- Payments -------------------------------------------------------------
 
 export interface SettlePayment {
   id: string;

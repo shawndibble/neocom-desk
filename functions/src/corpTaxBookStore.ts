@@ -100,9 +100,6 @@ import {
   BOOK_DEFAULTS,
   extractionIdOf,
   forfeitAllowed,
-  canOverrideRecordRate,
-  canRebillFrom,
-  lastStatementDay,
   rateStartRefusal,
   latestRecordedCorp,
   disputeHolds,
@@ -175,17 +172,19 @@ import {
 import {
   NOTICE_ID_FIELD,
   lateNoticeFromStatementDoc,
+  adjustmentLineKey,
+  lastNoticedDay,
   lateNoticeRefusal,
   legacyStatementDocOf,
-  lineKey,
   minerPaymentCode,
+  noticedDates,
+  reminderAllowed,
 } from './corpTaxBookLateNotice.js';
 import {
   dbReader,
   type DocReader,
   issueLateNoticeDocs,
   newVerifyToken,
-  readNoticeDocs,
   readNotices,
   ofCharacterFilter,
   ofMinerFilter,
@@ -514,7 +513,7 @@ async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Pr
 
 /**
  * The player who turned the book on (or the CEO) deletes it outright: the book,
- * everything under it, its Statement verify links and billed-by pointers. The
+ * everything under it, its Late notice verify links and billed-by pointers. The
  * corporation's SRP data under the same `corps/{id}` document stays. `beforeDelete` lets the
  * caller drop what lives outside the book first (the scheduled-sync grant), so a
  * failure there leaves the book standing. Turning the book on again starts clean.
@@ -921,9 +920,8 @@ export async function syncBookAs(
     );
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
-  // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
-  // A quiet run wrote none of either: the docs stand.
-  if (!quiet && (donationsAdded > 0 || input.extractions.length > 0))
+  // Only Extractions are in the Overview doc (ADR 0032). Best effort. A quiet run wrote none.
+  if (!quiet && input.extractions.length > 0)
     await refreshReadModels(deps.db, input.corporationId, deps.now());
   // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
   // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
@@ -1090,8 +1088,8 @@ async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promis
 
 function minerCharacters(minerId: string, miner: Data | undefined): number[] {
   if (miner) return miner.characterIds as number[];
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return solo ? [Number(solo[1])] : [];
+  const solo = soloCharacterId(minerId);
+  return solo === undefined ? [] : [solo];
 }
 
 /** The characters that may read a Miner: an Officer claim and a legacy unconfirmed guest may not. */
@@ -1134,15 +1132,15 @@ async function assertAdjustmentReversible(
   adjustment: Record<string, unknown>
 ): Promise<void> {
   if (adjustment.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
-  const key = lineKey({ adjustmentId, date: '' });
+  const key = adjustmentLineKey(adjustmentId);
   const billed = (await minerNotices(c, adjustment.minerId as string)).some((n) =>
     n.lines.some((l) => l.key === key)
   );
   if (billed)
     fail(
       'failed-precondition',
-      'A Statement already billed this correction: add an opposite correction instead',
-      'billed-on-statement'
+      'A Late notice already listed this correction: add an opposite correction instead',
+      'billed-on-notice'
     );
 }
 
@@ -1167,11 +1165,9 @@ async function knownMiner(c: EditCtx, minerId: string): Promise<boolean> {
     col(c, ACCOUNTS).doc(minerId)
   );
   if (miner.exists || account.exists) return true;
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  if (!solo) return false;
-  const rows = await c.tx.get(
-    col(c, OBSERVED).where('characterId', '==', Number(solo[1])).select().limit(1)
-  );
+  const solo = soloCharacterId(minerId);
+  if (solo === undefined) return false;
+  const rows = await c.tx.get(col(c, OBSERVED).where('characterId', '==', solo).select().limit(1));
   return !rows.empty;
 }
 
@@ -1726,19 +1722,25 @@ async function storableSettledThrough(
 }
 
 /**
- * A new rate may start up to 30 days back but never on a day an issued Statement bills: that
- * Statement never changes. Statements are read only when a rate is backdated.
+ * A rate refused on a day a Late notice listed. Sent under its old name, which every client
+ * matches, until the soak ends (docs/deploy/late-notices.md): then `'day-on-notice'`.
+ */
+const DAY_ON_NOTICE = 'day-on-statement';
+
+/**
+ * A new rate may start up to 30 days back but never on or before the last day a Late notice
+ * listed: what it asked never changes. Notices are read only when a rate is backdated.
  */
 async function checkRateStarts(c: EditCtx, newRates: readonly { effectiveFrom: string }[]) {
   const today = utcDate(c.now);
   if (!newRates.some((r) => r.effectiveFrom < today)) return;
-  const last = lastStatementDay((await readNoticeDocs(c.tx, bookOf(c))) as never[]);
+  const last = lastNoticedDay(await readNotices(c.tx, bookOf(c)));
   for (const r of newRates) {
     const why = rateStartRefusal(r.effectiveFrom, today, last);
     if (why === 'too-old')
       fail('failed-precondition', 'A rate cannot start more than 30 days back', 'rate-too-old');
     if (why === 'on-statement')
-      fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
+      fail('failed-precondition', 'A Late notice already listed that day', DAY_ON_NOTICE);
   }
 }
 
@@ -1774,9 +1776,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'setRecordRate': {
       const { characterId, date } = parseRecordKey(action.recordKey);
-      const onChar = await readNoticeDocs(tx, bookOf(c), ofCharacterFilter(characterId));
-      if (!canOverrideRecordRate(date, onChar as never[])) {
-        fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
+      const onChar = await readNotices(tx, bookOf(c), ofCharacterFilter(characterId));
+      if (noticedDates(onChar, characterId).has(date)) {
+        fail('failed-precondition', 'A Late notice already listed that day', DAY_ON_NOTICE);
       }
       const rate: StoredRate = { scope: 'record', recordKey: action.recordKey, pct: action.pct };
       staleCheckpoints(c, 'all', date);
@@ -1842,19 +1844,19 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
       }
       if (showToMembers) update.membersSeeFrom = now;
-      // Once, and never back: Statements issued before it keep their own rules.
+      // Once, and never back: an older tab still sends it; every book is a Running account.
       if (switchToRunningAccount && typeof c.book.runningAccountFrom !== 'string') {
         update.runningAccountFrom = iso;
       }
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
-        const statements = await readNoticeDocs(tx, bookOf(c));
+        const notices = await readNotices(tx, bookOf(c));
         const reason = startDateMoveReason(
           oldStart ?? startDate,
           startDate,
           utcDate(now),
           await ownBookFloor((r) => tx.get(r), c.deps.db, c.corporationId),
-          statements as never[]
+          notices
         );
         if (reason) fail('failed-precondition', 'The start date cannot move there', reason);
         update.startDate = startDate;
@@ -2069,8 +2071,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'dismissRecords': {
-      // A day an active dismissal already covers is skipped, not dismissed twice. Days already on a
-      // Statement are dismissed as the single `dismiss` does (the Statement is not touched).
+      // A day an active dismissal already covers is skipped, not dismissed twice. Days a Late notice
+      // listed are dismissed as the single `dismiss` does (the notice is not touched).
       const wanted = new Map<string, number>();
       for (const t of action.targets) {
         wanted.set(t.targetId, (wanted.get(t.targetId) ?? 0) + t.amountIsk);
@@ -2435,15 +2437,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'rebill': {
       staleCheckpoints(c, [action.minerId], action.fromDate);
-      const [statements, paidDoc, minerDoc] = await Promise.all([
-        readNoticeDocs(tx, bookOf(c), ofMinerFilter(action.minerId)),
-        tx.get(col(c, META).doc(PAID_DOC)),
-        tx.get(col(c, MINERS).doc(action.minerId)),
-      ]);
-      const paid = new Set<string>((paidDoc.data()?.ids as string[] | undefined) ?? []);
-      if (!canRebillFrom(action.fromDate, statements as never[], paid)) {
-        fail('failed-precondition', 'A paid Statement covers that day', 'paid-days-closed');
-      }
+      // No notice settles days for good, so nothing a notice listed stops a rebill.
+      const minerDoc = await tx.get(col(c, MINERS).doc(action.minerId));
       // A rebill that touches a corp member's days needs a Director (D22).
       let touchesMember = false;
       for (const characterId of minerCharacters(action.minerId, minerDoc.data())) {
@@ -2578,8 +2573,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'dismissDispute': {
       // Only the disputed ore is waived, as a credit on the day (#6206): the rest of the day
-      // stays billed. The server prices it from the Statements that billed it, so a client cannot
-      // understate it to slip under the Director limit. A day on no Statement yet has no price
+      // stays billed. The server prices it from the Late notices that listed it, so a client cannot
+      // understate it to slip under the Director limit. A day on no notice yet has no price
       // here: the client's figure stands only for a Director, or a book with no limit.
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
@@ -2665,7 +2660,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const loaded = await mustGetNotice(c, action.noticeId);
       const { mail } = loaded.notice;
       // A miner who opted out gets one manual reminder per notice (D27).
-      if (mail.remindersStopped && mail.manualSent >= 1)
+      if (!reminderAllowed(mail))
         fail('failed-precondition', 'This miner stopped reminders', 'reminders-stopped');
       writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'reminded' });
       return { detail: { noticeId: action.noticeId } };
@@ -2825,7 +2820,10 @@ async function applyPopSharingEdit(
   return { detail };
 }
 
-/** Stores an issued Statement and its verify link; returns the link's token. Reads nothing: callers check first. */
+/**
+ * Stores a notice an older tab issued as a Statement (`issueStatement`): its legacy doc, its Late
+ * notice and its verify link; returns the link's token. Reads nothing: callers check first.
+ */
 async function issueStatementDoc(
   c: EditCtx,
   statement: StoredStatement,
@@ -2866,8 +2864,8 @@ function refuseCalendarStatement(statement: { kind?: string }): void {
 }
 
 /**
- * Guest close-account (epic #4055, #4184): a final Statement, then the Miner
- * is closed so Statement mail stops. Credit is refunded unless the guest
+ * Guest close-account (epic #4055, #4184): a final Late notice, then the Miner
+ * is closed so its mail stops. Credit is refunded unless the guest
  * consented or 90 days passed without a reply; a forfeit re-checks the role
  * live (`needsLiveCheck`). Members are not closed: a leaver's debt has its own
  * write-off.
@@ -3041,7 +3039,7 @@ export async function editBookAs(
   });
   // A survey link, an expiry or a regroup changes a pull's doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
-  // Edits that move the Overview and Miners tab docs (ADR 0032). Best effort.
+  // Edits that move the Overview doc (ADR 0032). Best effort.
   if (movesReadModels(action)) await refreshReadModels(deps.db, call.corporationId, deps.now());
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
@@ -3096,7 +3094,7 @@ export async function confirmGrouping(
       corporationId,
       minerId,
       [...new Set([...((miner.uids as string[] | undefined) ?? []), caller.uid])],
-      [`solo:${characterId}`]
+      [soloMinerId(characterId)]
     );
     tx.update(ref, {
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
@@ -3120,7 +3118,6 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
@@ -3156,7 +3153,6 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** The added character itself declines, signed in as itself. */
@@ -3209,7 +3205,6 @@ export async function declineLink(
       link: true,
     });
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
   return { declined: true as const };
 }
 
@@ -3349,7 +3344,7 @@ export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
  * A player privately claims an Unmatched donation of their own (D5): the
  * callable has no officer role, only the caller's uid, which must be the
  * donor's. The ISK then credits the Miner the caller's character belongs to
- * (its confirmed grouping, or a Miner of its own), oldest Statement first.
+ * (its confirmed grouping, or a Miner of its own), its oldest unpaid day first.
  * Audited like every write; the audit entry names the donor character and
  * that the player did it, never anything else.
  */
@@ -3359,18 +3354,6 @@ export async function claimPayment(
   corporationId: number,
   paymentId: string,
   options: { inReview?: boolean } = {}
-) {
-  const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId, options);
-  await refreshReadModels(deps.db, corporationId, deps.now());
-  return claimed;
-}
-
-async function claimPaymentTx(
-  deps: BookDeps,
-  caller: Caller,
-  corporationId: number,
-  paymentId: string,
-  options: { inReview?: boolean }
 ) {
   const characterId = signedInCharacter(caller);
   const paymentRef = sub(deps.db, corporationId, PAYMENTS).doc(paymentId);
@@ -3448,7 +3431,7 @@ async function callerMiner(
   const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
   return miner
     ? { minerId: miner.id, uids: miner.get('uids') as string[] }
-    : { minerId: `solo:${characterId}`, uids: [caller.uid] };
+    : { minerId: soloMinerId(characterId), uids: [caller.uid] };
 }
 
 /**
@@ -3556,7 +3539,6 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     );
     return { declarationId: id, minerId, checks, confirmed: allFound };
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
   return {
     declarationId: declared.declarationId,
     checks: declared.checks,

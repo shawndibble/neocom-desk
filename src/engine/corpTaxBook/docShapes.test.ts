@@ -106,16 +106,23 @@ describe('the small doc readers', () => {
   it('readCheckpoint reads a checkpoint that adds up, and skips one that does not', () => {
     const stored = {
       through: '2026-09-30',
-      owed: [{ date: '2026-09-12', remaining: 100 }],
+      owed: [{ date: '2026-09-12', remaining: 100, tax: 150, credited: 50 }],
       credit: 0,
       balance: 100,
       paidThrough: '2026-09-11',
+      characterIds: [5],
       at: '2026-11-02T00:00:00Z',
     };
     expect(readCheckpoint('solo:5', stored)).toMatchObject({
       minerId: 'solo:5',
       through: '2026-09-30',
+      owed: [{ date: '2026-09-12', remaining: 100, tax: 150, credited: 50 }],
+      characterIds: [5],
     });
+    // One recorded before the day's whole figures were kept does not add up any more.
+    expect(
+      readCheckpoint('solo:5', { ...stored, owed: [{ date: '2026-09-12', remaining: 100 }] })
+    ).toBeNull();
     expect(readCheckpoint('solo:5', { ...stored, balance: 999 })).toBeNull();
     expect(readCheckpoint('solo:5', { ...stored, owed: undefined })).toBeNull();
   });

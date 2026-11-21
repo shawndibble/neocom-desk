@@ -43,7 +43,15 @@ export interface RunningDay {
   tax: number;
   /** Of `tax`, what officer corrections charged: never forgiven by a day being recorded paid. */
   charge?: number;
+  /**
+   * A checkpoint's owed day: what money paid of it before the checkpoint (it is paid again by
+   * none), so the day keeps its whole tax, and its tolerance, after the checkpoint (M1).
+   */
+  paidBefore?: number;
 }
+
+/** A checkpoint's owed day as it is stored: an older one holds `remaining` only. */
+type StoredOwedDay = CheckpointOwedDay;
 
 /** What became of one day. */
 export interface DaySettlement {
@@ -105,6 +113,20 @@ export interface MinerRunningAccountInput {
 
 /** The UTC day of an ISO instant: which side of a checkpoint money falls. */
 const dayOf = (at: string) => at.slice(0, 10);
+
+/**
+ * A checkpoint's owed day as a running day: its whole tax and what was paid of it before, so its
+ * tolerance is the whole day's; an older checkpoint's holds only what remains.
+ */
+function owedDayOf(d: StoredOwedDay): RunningDay {
+  const whole = d.tax !== undefined && d.tax >= d.remaining;
+  return {
+    date: d.date,
+    tax: whole ? d.tax! : d.remaining,
+    ...(d.charge ? { charge: d.charge } : {}),
+    ...(whole && d.tax! > d.remaining ? { paidBefore: d.tax! - d.remaining } : {}),
+  };
+}
 
 /** The queue slot of a checkpoint's credit: the oldest money, and no payment of the Miner's. */
 const OPENING_CREDIT = '\u0000checkpoint';
@@ -169,11 +191,7 @@ export class MinerRunningAccount {
     const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
     const opening = Math.max(0, cp?.credit ?? 0);
     const days: RunningDay[] = [
-      ...(cp?.owed ?? []).map((d) => ({
-        date: d.date,
-        tax: d.remaining,
-        ...(d.charge ? { charge: d.charge } : {}),
-      })),
+      ...(cp?.owed ?? []).map((d: StoredOwedDay) => owedDayOf(d)),
       ...input.days.filter((d) => after(d.date)),
     ];
     const settled = settleDays(
@@ -227,7 +245,7 @@ export class MinerRunningAccount {
     input: MinerRunningAccountInput,
     minerId: string,
     through: string,
-    recorded: { at: string; by?: number }
+    recorded: { at: string; by?: number; characterIds?: readonly number[] }
   ): RunningAccountCheckpoint {
     const upTo = (date: string) => date <= through;
     const days = input.days.filter((d) => upTo(d.date));
@@ -239,38 +257,43 @@ export class MinerRunningAccount {
     });
     const charges = new Map(
       runningDaysFromLines([
-        ...(input.checkpoint?.owed ?? []).map((d) => ({ ...d, tax: d.remaining })),
+        ...(input.checkpoint?.owed ?? []).map((d: StoredOwedDay) => owedDayOf(d)),
         ...days,
       ]).map((d) => [d.date, d.charge ?? 0])
     );
     const owed = [...account.byDay]
       .filter(([, d]) => !d.settled)
-      .map(([date, d]): CheckpointOwedDay => {
+      .map(([date, d]): StoredOwedDay => {
         const charge = Math.min(charges.get(date) ?? 0, d.remaining);
-        return { date, remaining: d.remaining, ...(charge > 0 ? { charge } : {}) };
+        return {
+          date,
+          remaining: d.remaining,
+          ...(charge > 0 ? { charge } : {}),
+          // The day whole: `remaining` = `tax` − `credited` − `writtenOff` (`checkpointProblems`).
+          tax: d.tax,
+          credited: d.credited,
+          ...(d.writtenOff > 0 ? { writtenOff: d.writtenOff } : {}),
+          ...(d.held ? { held: true } : {}),
+        };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
     const billed = account.byDay.size > 0 || input.checkpoint !== undefined;
-    // Paid through `through` with nothing owed. A day still owed, held by a dispute or not, caps
-    // it before that day (`checkpointProblem`); building from the checkpoint closes it again
-    // once those days are paid.
-    const first = owed[0]?.date;
+    // Paid through `through` with nothing owed. The oldest day a sync still owes (not held by a
+    // dispute, more than an officer's charge) caps it before that day (`checkpointProblems`).
+    const first = owed.find((d) => !d.held && d.remaining - (d.charge ?? 0) >= 1)?.date;
     const capped =
       first !== undefined && account.paidThrough !== null && account.paidThrough >= first
         ? shiftUtcDate(first, -1)
         : account.paidThrough;
-    // The account's balance leaves a held day out (it is not due yet); the checkpoint keeps it
-    // owed, so its balance counts it: always what it owes less its credit (`checkpointProblem`).
-    const heldOwed = owed
-      .filter((d) => account.byDay.get(d.date)?.held)
-      .reduce((sum, d) => sum + d.remaining, 0);
     return {
       minerId,
       through,
       owed,
       credit: account.credit,
-      balance: account.balance + heldOwed,
-      paidThrough: billed && owed.length === 0 ? through : capped,
+      // A held day stays owed but out of the balance, as the account counts it.
+      balance: account.balance,
+      paidThrough: billed && first === undefined ? through : capped,
+      ...(recorded.characterIds ? { characterIds: [...recorded.characterIds] } : {}),
       at: recorded.at,
       ...(recorded.by !== undefined ? { by: recorded.by } : {}),
     };
@@ -351,18 +374,25 @@ export function runningDaysFromLines(
     /** A `correction` line's positive tax is an officer's charge. */
     kind?: string;
     charge?: number;
+    paidBefore?: number;
   }[]
 ): RunningDay[] {
-  const byDate = new Map<string, { tax: number; charge: number }>();
+  const byDate = new Map<string, { tax: number; charge: number; paidBefore: number }>();
   for (const l of lines) {
-    const held = byDate.get(l.date) ?? { tax: 0, charge: 0 };
+    const held = byDate.get(l.date) ?? { tax: 0, charge: 0, paidBefore: 0 };
     held.tax += l.tax;
     held.charge += l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0);
+    held.paidBefore += l.paidBefore ?? 0;
     byDate.set(l.date, held);
   }
   return [...byDate]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, tax: v.tax, ...(v.charge > 0 ? { charge: v.charge } : {}) }));
+    .map(([date, v]) => ({
+      date,
+      tax: v.tax,
+      ...(v.charge > 0 ? { charge: v.charge } : {}),
+      ...(v.paidBefore > 0 ? { paidBefore: v.paidBefore } : {}),
+    }));
 }
 
 /** The money `settleDays` spreads over the days, oldest day first. */
@@ -401,6 +431,8 @@ type Running = {
   paidIn: number;
   forgiven: number;
   pinned: boolean;
+  /** Of `credited`, what money paid before the checkpoint: billed and paid there, not here. */
+  before: number;
   /** An officer's limit on what this day may forgive; none uses the book's tolerance. */
   exempt?: number;
 };
@@ -418,8 +450,11 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
       {
         tax: d.tax,
         charge: d.charge ?? 0,
-        credited: 0,
-        paidIn: 0,
+        // What money paid of a checkpoint's owed day before it: paid, and by money, so the
+        // day's tolerance still applies.
+        credited: d.paidBefore ?? 0,
+        paidIn: d.paidBefore ?? 0,
+        before: d.paidBefore ?? 0,
         forgiven: 0,
         pinned: stored !== undefined && d.date <= stored,
         ...(input.toleranceExemptions?.has(d.date)
@@ -522,7 +557,8 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
       writtenOff = Math.max(writtenOff, Math.min(st.exempt, shortfall - chargeOwed));
     const remaining = shortfall - writtenOff;
     // A held day is not due.
-    if (!dayHeld) billed += Math.max(0, st.tax);
+    // What money paid of it before a checkpoint was billed and paid there.
+    if (!dayHeld) billed += Math.max(0, st.tax) - st.before;
     forgivenTotal += st.forgiven;
     writtenOffTotal += writtenOff;
     if (!settled && !dayHeld) {

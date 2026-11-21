@@ -19,7 +19,7 @@ import type { NpcStationEntry } from '@/sde/marketTypes';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { useMarketBpoOrders } from '@/features/bpcContracts/useMarketBpoOrders';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import {
   useBpcHideAuctionsDefault,
   useBpcHidePlexDefault,
@@ -141,8 +141,7 @@ export function useBpcSourcingData() {
   // The market BPO lookup's region when the Region filter is "All regions":
   // an Order Book is one region's, so it falls back to the pilot's own market
   // hub rather than guessing (issue #1241).
-  const marketHubId = useMarketHub((state) => state.value);
-  const marketHubHydrated = useHydratedStore(useMarketHub);
+  const { hubId: marketHubId, hydrated: marketHubHydrated } = useHubFor('industry');
   const marketHub = getTradeHub(marketHubId) ?? DEFAULT_TRADE_HUB;
   const [marketRefreshTick, setMarketRefreshTick] = useState(0);
   // Refresh lives in the page header, not in this panel: it re-reads the

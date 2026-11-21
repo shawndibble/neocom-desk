@@ -7,11 +7,12 @@
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free, and
  * `src/engine/corpTaxBook/notice.ts` re-exports it.
  *
- * Notices are stored today as `corps/{id}/statements` docs with `kind: 'notice'`, in the shape of
- * the calendar Statement they replaced; `lateNoticeFromStatementDoc` reads one into a `LateNotice`.
+ * Notices are stored as `corps/{id}/lateNotices` docs in this shape. Each is mirrored to a legacy
+ * `statements` doc (`kind: 'notice'`, `legacyStatementDocOf`) for older tabs until the soak ends;
+ * `lateNoticeFromStatementDoc` reads one of those, or an older one, into a `LateNotice`.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
-import { DAY_MS } from './timeConstants.js';
+import { DAY_MS, utcDayOf } from './timeConstants.js';
 
 /** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
 export type LateNoticeKind = 'late' | 'final';
@@ -50,6 +51,11 @@ export interface LateNoticeMail {
   manualSent: number;
   /** The Miner chose "Stop reminders" (D27). */
   remindersStopped: boolean;
+}
+
+/** D27: reminders run until the Miner stops them; after that an officer may send one by hand. */
+export function reminderAllowed(mail: LateNoticeMail): boolean {
+  return !mail.remindersStopped || mail.manualSent < 1;
 }
 
 /** The names a guest's notice page prints: a guest cannot look a structure's name up (#4066). */
@@ -170,7 +176,20 @@ function numberRecord(v: unknown): Record<number, number> | undefined {
 
 /** The key a stored line names: its day charge, else its Adjustment, else its date. */
 export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date: string }): string {
-  return line.chargeKey ?? `${ADJUSTMENT_PREFIX}${line.adjustmentId ?? line.date}`;
+  return line.chargeKey ?? adjustmentLineKey(line.adjustmentId ?? line.date);
+}
+
+/** The key a correction's line carries (`adjustment:<id>`): a later notice never lists it again. */
+export const adjustmentLineKey = (adjustmentId: string): string =>
+  `${ADJUSTMENT_PREFIX}${adjustmentId}`;
+
+/** The first and last day a notice listed (its lines are oldest first); its issue day with none. */
+export function noticeSpan(notice: { lines: readonly { date: string }[]; issuedAt: string }): {
+  first: string;
+  last: string;
+} {
+  const first = notice.lines[0]?.date ?? utcDayOf(notice.issuedAt);
+  return { first, last: notice.lines.at(-1)?.date ?? first };
 }
 
 /**
@@ -253,8 +272,7 @@ const DEFAULT_PRICING = { hubId: 'jita', oreForm: 'compressed' } as const;
  * (decision 20261120-235011, step 5): the inverse of `lateNoticeFromStatementDoc`.
  */
 export function legacyStatementDocOf(notice: LateNotice): Record<string, unknown> {
-  const first = notice.lines[0]?.date ?? notice.issuedAt.slice(0, 10);
-  const last = notice.lines.at(-1)?.date ?? first;
+  const { first, last } = noticeSpan(notice);
   const pricing = notice.pricing ?? DEFAULT_PRICING;
   return {
     id: notice.id,
@@ -341,6 +359,32 @@ export function mergeNoticeDocs(
     );
   }
   return [...out.values()];
+}
+
+/** A notice as the date rules read it: its lines' kinds, days and Characters. */
+type NoticedLines = {
+  lines: readonly Pick<LateNoticeLine, 'kind' | 'date' | 'characterId'>[];
+};
+
+/**
+ * The days these notices listed: each mined or late-ore line's day (a correction bills no day),
+ * one Character's alone when `characterId` is given. A day between two listed days was not
+ * listed. What an issued notice asked never changes, so the date rules refuse to reprice these.
+ */
+export function noticedDates(notices: readonly NoticedLines[], characterId?: number): Set<string> {
+  const out = new Set<string>();
+  for (const n of notices)
+    for (const l of n.lines)
+      if (l.kind !== 'correction' && (characterId === undefined || l.characterId === characterId))
+        out.add(l.date);
+  return out;
+}
+
+/** The latest day any of these notices listed, or null with none. */
+export function lastNoticedDay(notices: readonly NoticedLines[]): string | null {
+  let last: string | null = null;
+  for (const d of noticedDates(notices)) if (last === null || d > last) last = d;
+  return last;
 }
 
 /** Every line key any of these notices listed. */

@@ -1,0 +1,84 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useHubByCharacter } from './characterHubs';
+import { pickHubFor, setHubScope, tradeHubIdFor, useDefaultMarketHub, useMarketHub } from './hub';
+import { dropPageHub, parsePageHubs, resolvePageHub, setPageHub, usePageHubs } from './pageHubs';
+
+describe('parsePageHubs', () => {
+  it('keeps known areas at known hubs and drops the rest one by one', () => {
+    expect(parsePageHubs({ contracts: 'amarr', moonbase: 'jita' })).toEqual({ contracts: 'amarr' });
+    expect(parsePageHubs({ contracts: 'nowhere' })).toEqual({});
+    expect(parsePageHubs({ contracts: 3 })).toEqual({});
+  });
+
+  it('rejects a value that is not a map', () => {
+    expect(parsePageHubs('jita')).toBeNull();
+    expect(parsePageHubs(null)).toBeNull();
+    expect(parsePageHubs(['jita'])).toBeNull();
+  });
+});
+
+describe('page hub edits', () => {
+  it("resolves a page's own entry, else Global", () => {
+    expect(resolvePageHub({ contracts: 'amarr' }, 'contracts', 'jita')).toBe('amarr');
+    expect(resolvePageHub({}, 'contracts', 'jita')).toBe('jita');
+  });
+
+  it('sets and drops an entry', () => {
+    const map = setPageHub({}, 'contracts', 'rens');
+    expect(map).toEqual({ contracts: 'rens' });
+    expect(dropPageHub(map, 'contracts')).toEqual({});
+    expect(dropPageHub({}, 'contracts')).toEqual({});
+  });
+});
+
+async function reset(rows: { key: string; value: unknown }[]) {
+  await db.settings.clear();
+  await db.settings.bulkPut(rows);
+  useDefaultMarketHub.setState({ value: 'jita', hydrated: false });
+  useHubByCharacter.setState({ value: {}, hydrated: false });
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  useMarketHub.setState({ value: 'jita', hydrated: false });
+  usePageHubs.setState({ value: {}, hydrated: false });
+}
+
+describe('picking a hub for a page', () => {
+  beforeEach(() =>
+    reset([
+      { key: 'sync.marketHub', value: 'jita' },
+      { key: 'sync.pageHubs', value: { contracts: 'amarr' } },
+    ])
+  );
+
+  it('on its own entry, a pick moves only that page', async () => {
+    await pickHubFor('contracts', 'hek');
+    expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' });
+    expect(useMarketHub.getState().value).toBe('jita');
+  });
+
+  it('a Global hub change leaves a page with its own entry where it is', async () => {
+    await usePageHubs.getState().hydrate();
+    await useMarketHub.getState().setValue('dodixie');
+    expect(resolvePageHub(usePageHubs.getState().value, 'contracts', 'dodixie')).toBe('amarr');
+  });
+
+  it('back to Global drops the entry, and a pick then moves the Global hub', async () => {
+    await setHubScope('contracts', 'global');
+    expect(usePageHubs.getState().value).toEqual({});
+    await pickHubFor('contracts', 'rens');
+    expect(useMarketHub.getState().value).toBe('rens');
+    expect(usePageHubs.getState().value).toEqual({});
+  });
+
+  it('switching to the page starts it at the hub in use, so nothing re-prices', async () => {
+    await setHubScope('contracts', 'global');
+    await useMarketHub.getState().setValue('hek');
+    await setHubScope('contracts', 'page');
+    expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' });
+  });
+
+  it('background jobs still read the Global hub', async () => {
+    expect(await tradeHubIdFor(null)).toBe('jita');
+  });
+});
