@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { UNKNOWN_ACTION } from '../../../../functions/src/callableManifest';
 import { callableErrorReason } from '@/lib/callableError';
 import { LATE_NOTICES, LEGACY_NOTICES } from '@/engine/corpTaxBook/noticeCollections';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
@@ -819,12 +820,6 @@ export async function readVerifyTokens(
 
 /** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
 /**
- * The `reason` a server gives an action or edit it does not know (`UNKNOWN_ACTION`,
- * functions/src/inputParse.ts, which the client cannot import: it pulls in firebase-functions).
- */
-const UNKNOWN_ACTION_REASON = 'unknown-action';
-
-/**
  * Whether the server does not know this edit action yet, so the legacy one is the way (M7): its
  * `unknown-action` reason, or, from a server before that reason, the router's "Unknown action"
  * or the edit parser's "action must be one of ..." refusal. Any other refusal of a known action
@@ -832,7 +827,7 @@ const UNKNOWN_ACTION_REASON = 'unknown-action';
  */
 export const unknownAction = (error: unknown): boolean => {
   const reason = callableErrorReason(error);
-  if (reason !== null) return reason === UNKNOWN_ACTION_REASON;
+  if (reason !== null) return reason === UNKNOWN_ACTION;
   if (!errorCode(error).endsWith('invalid-argument')) return false;
   const message = error instanceof Error ? error.message : '';
   return /^(Unknown action|action must be one of )/.test(message);
