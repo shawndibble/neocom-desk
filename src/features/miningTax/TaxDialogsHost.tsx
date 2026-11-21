@@ -1,4 +1,6 @@
 import { soloCharacterId } from '../../../functions/src/corpTaxBookDonationMatch';
+import { lockDateFor } from '../../../functions/src/corpTaxBookCheckpoint';
+import { utcDay } from '@/engine/localDay';
 import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
 import { writeToClipboard } from '@/lib/clipboard';
 import { guarded } from '@/app/routeChunks';
@@ -1003,7 +1005,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             source={ledgerSource}
             typeNames={typeNames}
             {...(ledgerPicker ? { picker: ledgerPicker } : {})}
-            {...(ledgerTarget.kind === 'personal' ? { onUnlinkPayment: unlinkPayment } : {})}
+            {...(ledgerTarget.kind === 'personal'
+              ? { onUnlinkPayment: unlinkPayment }
+              : { lockDate: lockDateFor(utcDay()) })}
           />
         </Suspense>
       )}

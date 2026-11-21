@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -12,7 +12,7 @@ import {
   LEDGER_TYPE_NAMES,
 } from './payeeLedgerFixture';
 
-const renderPanel = (source: PayeeLedgerSource | null) =>
+const renderPanel = (source: PayeeLedgerSource | null, lockDate?: string) =>
   render(
     // An ore name links to its Market listing, so the panel needs a router.
     <MemoryRouter>
@@ -22,6 +22,7 @@ const renderPanel = (source: PayeeLedgerSource | null) =>
         payeeName="Bureau of Unified Harvesting"
         source={source}
         typeNames={LEDGER_TYPE_NAMES}
+        {...(lockDate ? { lockDate } : {})}
       />
     </MemoryRouter>
   );
@@ -89,6 +90,45 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText('No entries match these filters')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
     expect(bodyRows().length).toBeGreaterThan(1);
+  });
+
+  describe('lock divider', () => {
+    const divider = () => screen.queryByText(/^Locked before/);
+
+    it('sits at the boundary between locked and open rows, once', () => {
+      renderPanel(CORP_BOOK_LEDGER, '2026-10-10');
+      expect(screen.getAllByText(/^Locked before/)).toHaveLength(1);
+      expect(divider()).toHaveTextContent(
+        /Locked before .* · fix with a correction dated .* or later/
+      );
+      const rows = bodyRows();
+      const at = rows.findIndex((r) => r.textContent?.includes('Locked before'));
+      expect(rows[at - 1]).toHaveTextContent('2026-10-0');
+      expect(rows[at + 1]).toHaveTextContent('2026-10-1');
+    });
+
+    it('explains itself in a hint', () => {
+      renderPanel(CORP_BOOK_LEDGER, '2026-10-10');
+      fireEvent.focus(screen.getByRole('button', { name: 'Lock date' }));
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        /History before the lock date can't be changed.*A correction dated on or after .* puts an old mistake right\./
+      );
+    });
+
+    it('sits at the top when every row is older', () => {
+      renderPanel(CORP_BOOK_LEDGER, '2027-01-01');
+      expect(bodyRows()[0]).toHaveTextContent('Locked before');
+    });
+
+    it('is absent when every row is on or after the lock date', () => {
+      renderPanel(CORP_BOOK_LEDGER, '2026-10-01');
+      expect(divider()).toBeNull();
+    });
+
+    it('is absent for a personal ledger, which has no lock date', () => {
+      renderPanel(CORP_BOOK_LEDGER);
+      expect(divider()).toBeNull();
+    });
   });
 
   it('reads Paid through with credit for a Payee paid ahead', () => {

@@ -41,7 +41,7 @@ import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
-import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
+import { isLocked, lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
 import { MinerLedger } from './MinerLedger';
@@ -51,7 +51,7 @@ import {
   ReassignPaymentDialog,
   RecordPaymentDialog,
 } from './BookDialogs';
-import { atDate, isk, iskOrDash, shortDate, signedIsk } from './moonsFormat';
+import { atDate, dateWithYear, isk, iskOrDash, shortDate, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
@@ -66,6 +66,7 @@ import type { LedgerActions } from './LedgerRowMenu';
 import { isMinerAuditEntry } from './minerAudit';
 import { useAuditWords } from './useAuditWords';
 import { dayEndTime } from './dayEndTime';
+import { lockRowBoundary } from '@/features/miningTax/ledger/lockBoundary';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { tapTargetClassName } from './sectionHelpers';
 import { LateNoticePanel } from './LateNoticePanel';
@@ -205,6 +206,11 @@ export function MinerDetail({ id }: { id: string }) {
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   // A day before the lock date is read-only (decision 20261120-235011, "a lock date").
   const locked = (date: string) => isLocked(date, view.input.now);
+  // The one divider in each day list where the lock date falls, worded as the Ledger's is.
+  const lockDate = {
+    date: lockDateFor(view.input.now.slice(0, 10)),
+    label: dateWithYear(lockDateFor(view.input.now.slice(0, 10))),
+  };
   const canSelect = (d: DayRow) =>
     (d.status === 'owed' || d.status === 'not-billable') && !locked(d.date);
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
@@ -422,6 +428,12 @@ export function MinerDetail({ id }: { id: string }) {
             density="compact"
             stackLayout="dense"
             mobileSort
+            rowBoundary={lockRowBoundary(
+              shown,
+              lockDate,
+              (d) => d.date,
+              (d) => d.key
+            )}
             {...(opts.rowMenu && canEdit
               ? {
                   rowMoreActions: true,

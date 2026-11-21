@@ -1447,6 +1447,38 @@ describe('DataTable fullWidthRow', () => {
   });
 });
 
+describe('DataTable rowBoundary', () => {
+  it('draws one full-width row before the keyed row, outside the records', () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.id}
+        label="Items"
+        rowBoundary={{ beforeKey: rows[1]!.id, children: <span>Boundary note</span> }}
+      />
+    );
+    const tr = screen.getByText('Boundary note').closest('tr');
+    expect(tr).toHaveClass('dt-full-row');
+    expect(tr?.nextElementSibling).toHaveAttribute('data-row-key', String(rows[1]!.id));
+    expect(tr?.previousElementSibling).toHaveAttribute('data-row-key', String(rows[0]!.id));
+    expect(tr?.querySelector('td')).toHaveAttribute('colspan', String(columns.length));
+  });
+
+  it('draws nothing when no row has the key', () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.id}
+        label="Items"
+        rowBoundary={{ beforeKey: 'nope', children: <span>Boundary note</span> }}
+      />
+    );
+    expect(screen.queryByText('Boundary note')).toBeNull();
+  });
+});
+
 describe('DataTable virtualize', () => {
   const many: Row[] = Array.from({ length: 1_000 }, (_, i) => ({
     id: i + 1,

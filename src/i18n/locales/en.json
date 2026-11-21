@@ -8780,6 +8780,9 @@
       "subtitle": "Ledger, oldest first",
       "loading": "Loading the ledger",
       "tableLabel": "Ledger",
+      "lockDivider": "Locked before {{date}} · fix with a correction dated {{date}} or later",
+      "lockDividerLabel": "Lock date",
+      "lockDividerTip": "History before the lock date can't be changed, so locked days keep their figures. A correction dated on or after {{date}} puts an old mistake right.",
       "status": {
         "owes": "Owes",
         "days": "Days owed",
@@ -20583,6 +20586,7 @@
       "stateLoading": "Loading (Button loading)",
       "stateSelected": "Selected / on (aria-pressed)",
       "stateSelectedSegment": "Selected segment",
+      "lockBoundary": "Boundary row",
       "fieldCaret": "CaretDown in field chrome (a box sized like a field): opens a list to pick from",
       "pending": "Hourglass: pending, awaiting an answer"
     },
@@ -20604,6 +20608,7 @@
       "needsConnection": "Wrap any control that starts EVE's login in NeedsConnection: offline, the press would strand an installed app.",
       "selectedToggle": "On takes the accent tint.",
       "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
+      "lockBoundary": "One thin row where rows past it turn read-only: shown once, never a lock icon on every row.",
       "fieldCaret": "The box is a control (§6); the caret says it opens a list."
     },
     "samples": {

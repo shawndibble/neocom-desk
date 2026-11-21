@@ -6,10 +6,11 @@ import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
 import { minerAccountOf, type MinerDetail } from '@/engine/corpTaxBook/bookView';
 import { payeeLedger, type PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
 import { PayeeLedgerTable } from '@/features/miningTax/ledger/PayeeLedgerPanel';
+import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { canOverrideDay } from './dayEligibility';
 import { LedgerRowMenu, type LedgerActions } from './LedgerRowMenu';
 import { paymentWalletHref } from './paymentWalletHref';
-import { isk, shortDate } from './moonsFormat';
+import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { BookSection } from './sectionParts';
 import { useBook } from './useBook';
 
@@ -35,6 +36,7 @@ export function MinerLedger({
 }) {
   const { t } = useTranslation();
   const { view, names } = useBook();
+  const lockDate = lockDateFor(view.input.now.slice(0, 10));
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const ledger = useMemo(() => {
     const miner = minerAccountOf(view, minerId);
@@ -107,6 +109,8 @@ export function MinerLedger({
             typeNames={typeNames}
             density="compact"
             stackLayout="dense"
+            lockDate={lockDate}
+            lockDateLabel={dateWithYear(lockDate)}
             {...table}
             {...(opened
               ? {

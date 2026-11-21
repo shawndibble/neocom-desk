@@ -245,6 +245,50 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 
+  describe('the lock divider', () => {
+    const now = '2026-11-18T14:00:00Z';
+    const earlier = {
+      id: 'p1',
+      minerId: 'solo:2',
+      characterId: 2,
+      amount: 199_000,
+      at: '2026-08-12T10:00:00Z',
+      source: 'donation',
+    } as never;
+    const later = {
+      id: 'p2',
+      minerId: 'solo:2',
+      characterId: 2,
+      amount: 10_000,
+      at: '2026-10-20T10:00:00Z',
+      source: 'donation',
+    } as never;
+    const divider = () => screen.queryAllByText(/^Locked before/);
+
+    it('sits once between the open rows above and the locked rows below', () => {
+      renderLedger(running({ adjustments: [correction], payments: [earlier, later], now }));
+      expect(divider()).toHaveLength(1);
+      expect(divider()[0]).toHaveTextContent(
+        'Locked before 1 Sep · fix with a correction dated 1 Sep or later'
+      );
+      const tr = divider()[0]!.closest('tr')!;
+      // Newest first: the October row is above it, the August rows below.
+      expect(tr.previousElementSibling).toHaveTextContent('2026-10-20');
+      expect(tr.nextElementSibling).toHaveTextContent('2026-08');
+    });
+
+    it('sits at the top when every row is older', () => {
+      renderLedger(running({ adjustments: [correction], now }));
+      expect(divider()).toHaveLength(1);
+      expect(divider()[0]!.closest('tr')!.previousElementSibling).toBeNull();
+    });
+
+    it('is absent when every row is on or after the lock date', () => {
+      renderLedger(running({ adjustments: [correction] }));
+      expect(divider()).toHaveLength(0);
+    });
+  });
+
   it('has no menu without edit rights', () => {
     renderLedger(running({ adjustments: [correction] }), false);
     fireEvent.contextMenu(rowOf(/^Adjustment/));

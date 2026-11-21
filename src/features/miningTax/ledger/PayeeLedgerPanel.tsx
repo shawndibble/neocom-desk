@@ -33,6 +33,7 @@ import type { CsvColumn } from '@/lib/csv';
 import { formatIsk } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
 import { LedgerRowDetail } from './LedgerRowDetail';
+import { lockRowBoundary } from './lockBoundary';
 
 /** The panel's filter and the words for each row, shared by its table and its export. */
 const LEDGER_KINDS: readonly PayeeLedgerKind[] = ['charge', 'payment', 'writeOff', 'notice'];
@@ -137,6 +138,11 @@ export interface PayeeLedgerPanelProps {
    * is offered again. Absent for a Corp Tax Book's Payee, whose payments the corporation owns.
    */
   onUnlinkPayment?: (paymentId: string) => void;
+  /**
+   * A Corp Tax Book's lock date (`YYYY-MM-DD`): a divider marks where history turns read-only.
+   * Absent for a personal Payee, whose ledger has none.
+   */
+  lockDate?: string;
 }
 
 /**
@@ -153,6 +159,7 @@ export function PayeeLedgerPanel({
   typeNames,
   picker,
   onUnlinkPayment,
+  lockDate,
 }: PayeeLedgerPanelProps) {
   const { t } = useTranslation();
   const ledger = useMemo(() => (source ? payeeLedger(source) : null), [source]);
@@ -167,7 +174,12 @@ export function PayeeLedgerPanel({
     >
       {picker && <div className="mb-3">{picker}</div>}
       {ledger ? (
-        <LedgerBody ledger={ledger} typeNames={typeNames} onUnlinkPayment={onUnlinkPayment} />
+        <LedgerBody
+          ledger={ledger}
+          typeNames={typeNames}
+          onUnlinkPayment={onUnlinkPayment}
+          lockDate={lockDate}
+        />
       ) : (
         <Spinner block="panel" label={t('miningTax.ledger.loading')} />
       )}
@@ -220,10 +232,12 @@ function LedgerBody({
   ledger,
   typeNames,
   onUnlinkPayment,
+  lockDate,
 }: {
   ledger: PayeeLedger;
   typeNames?: ReadonlyMap<number, string>;
   onUnlinkPayment?: ((paymentId: string) => void) | undefined;
+  lockDate?: string | undefined;
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>(DEFAULT_LEDGER_FILTER);
@@ -306,6 +320,7 @@ function LedgerBody({
             rows={rows}
             typeNames={typeNames}
             {...(onUnlinkPayment ? { onUnlinkPayment } : {})}
+            {...(lockDate ? { lockDate } : {})}
           />
         )}
       </Panel>
@@ -323,6 +338,8 @@ export function PayeeLedgerTable({
   typeNames,
   rowContextMenu,
   onUnlinkPayment,
+  lockDate,
+  lockDateLabel,
   ...rest
 }: {
   rows: readonly PayeeLedgerRow[];
@@ -332,6 +349,13 @@ export function PayeeLedgerTable({
   rowContextMenu?: (row: PayeeLedgerRow, tr: ReactElement) => ReactElement;
   /** Offers Unlink in a payment row's detail (a personal Payee's ledger, a legacy link too). */
   onUnlinkPayment?: (paymentId: string) => void;
+  /**
+   * A Corp Tax Book's lock date (`YYYY-MM-DD`): one divider marks where the rows before it turn
+   * read-only. Only for a book's ledger; a personal Payee's has no lock date, so passes none.
+   */
+  lockDate?: string;
+  /** The lock date as the page writes dates; the year-bearing day label when left out. */
+  lockDateLabel?: string;
 } & Omit<
   DataTableProps<PayeeLedgerRow>,
   'rows' | 'label' | 'columns' | 'rowKey' | 'expandableRow' | 'rowContextMenu'
@@ -416,6 +440,14 @@ export function PayeeLedgerTable({
       columns={columns}
       rows={[...rows]}
       rowKey={(r) => r.key}
+      rowBoundary={lockRowBoundary(
+        rows,
+        lockDate
+          ? { date: lockDate, label: lockDateLabel ?? formatDateWithYear(lockDate) }
+          : undefined,
+        (r) => r.date,
+        (r) => r.key
+      )}
       expandableRow={{
         leadingIcon: true,
         renderDetail: (r) => (

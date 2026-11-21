@@ -65,6 +65,7 @@ import { HubMenu } from '@/features/market/HubMenu';
 import { cx } from '@/lib/cx';
 import { OfflineStrip } from '@/app/OfflineBanner';
 import { MissingGrantBadge } from '@/features/notifications/ScheduledPushBadge';
+import { LockDividerLine } from '@/features/miningTax/ledger/LockDividerLine';
 import { ChannelOffTip } from '@/features/notifications/ChannelOffTip';
 
 const SAMPLE_ROWS = [
@@ -597,6 +598,11 @@ export function InteractionGrammar() {
             <Cue rule={k('rules.stateSelected')} note={k('notes.selectedToggle')}>
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOn')} pressed />
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOff')} pressed={false} />
+            </Cue>
+            <Cue rule={k('rules.lockBoundary')} note={k('notes.lockBoundary')}>
+              <span className="w-full rounded-xs bg-panel-2 px-2 py-1">
+                <LockDividerLine date="1 Oct" />
+              </span>
             </Cue>
             <Cue rule={k('rules.stateSelectedSegment')} note={k('notes.selectedSegment')}>
               <SegmentedControl

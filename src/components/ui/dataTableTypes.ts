@@ -406,6 +406,13 @@ export interface DataTableProps<T> {
    */
   fullWidthRow?: (row: T) => ReactNode | null;
   /**
+   * One thin, full-width row drawn just before the row whose key is `beforeKey`: a boundary in
+   * the list that explains what lies past it (the Corp Tax Book's lock date, §6c "Boundary
+   * row"). Not a record: it never expands, never activates `onRowClick`, is not exported and
+   * has no row menu. Drawn nothing when no row has that key. Not for a virtualized table.
+   */
+  rowBoundary?: { beforeKey: string | number; children: ReactNode };
+  /**
    * Mounts only the rows near the viewport (TanStack Virtual, windowed
    * against the page the way `NotificationsPanel` is), so a list of tens of
    * thousands — a region-wide public contract snapshot — costs what a
