@@ -3,8 +3,9 @@
  * scenario and reads its facts (who owes what, from which day), never builds data inline.
  * Every figure follows from `bookSeed.ts`'s flat pricing: one ordinary mined day owes `DAY_TAX`.
  */
-import { BookSeed, DAY_TAX, verifyToken } from './bookSeed';
-import { MINER, solo } from './identities';
+import { closedThroughFor } from '../../../functions/src/corpTaxBookCheckpoint';
+import { BookSeed, DAY_TAX, day, verifyToken } from './bookSeed';
+import { MINER, OFFICER, solo } from './identities';
 
 /**
  * A book with months of history, from before Late notices moved out of `statements`: its
@@ -254,5 +255,48 @@ export function lateNoticeBook() {
     ada: { owed: 3 * DAY_TAX },
     bram: { owed: 2 * DAY_TAX },
     guest: { unlisted: 2 * DAY_TAX, unlistedFromBack: 4, unlistedThroughBack: 3 },
+  };
+}
+
+/**
+ * A Miner whose history passes a closed month (GLOSSARY "Closed-through checkpoint"). Ada mined
+ * three days about three months ago and two this month, and paid two days' tax then: she still
+ * owes the third old day, inside the closed month, and both new ones. The closed-through date
+ * is the end of the last month at least 31 days old, so her old days are always inside it and
+ * her new ones always after it.
+ */
+export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
+  const minerId = solo(MINER.ada.id);
+  const seed = new BookSeed({ startBack: 130 }).mine(MINER.ada.id, [100, 99, 98, 20, 10]).donation({
+    id: 'j1_940001',
+    characterId: MINER.ada.id,
+    amount: 2 * DAY_TAX,
+    back: 90,
+    minerId,
+  });
+  /** What an officer's tab records for her (`RunningAccountCheckpoint`): the old day still owed. */
+  const checkpoint = {
+    minerId,
+    through: closedThroughFor(day(0, seed.now)),
+    owed: [{ date: day(98, seed.now), remaining: DAY_TAX }],
+    credit: 0,
+    balance: DAY_TAX,
+    paidThrough: day(99, seed.now),
+  };
+  if (how.checkpointed) {
+    seed.raw('accountCheckpoints', minerId, {
+      ...checkpoint,
+      at: new Date(seed.now).toISOString(),
+      by: OFFICER.id,
+    });
+  }
+  return {
+    seed,
+    minerId,
+    checkpoint,
+    owed: 3 * DAY_TAX,
+    days: 3,
+    oldestBack: 98,
+    paid: 2 * DAY_TAX,
   };
 }
