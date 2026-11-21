@@ -17,6 +17,7 @@ import {
   disputesClosedByWriteOff,
   checkClaimedTransfer,
   checkpointRefusal,
+  handRecordMatch,
   checkClaimedTransfers,
   needsLiveCheck,
   parseEditAction,
@@ -643,6 +644,51 @@ describe('parsers', () => {
     });
   });
 
+  it('records a hand payment with no notice on it, whatever an older tab sends', () => {
+    const payment = {
+      action: 'recordPayment',
+      paymentId: 'm_x1',
+      minerId: 'm1',
+      characterId: 7,
+      amount: 5,
+      at: '2026-11-01T00:00:00.000Z',
+      statementId: 's1',
+    };
+    expect(parseEditAction(payment)).not.toHaveProperty('statementId');
+  });
+
+  it('moves a payment to another Miner, or back to Unmatched, re-checking the role live', () => {
+    const move = parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1', minerId: 'm2' });
+    expect(move).toEqual({ action: 'reassignPayment', paymentId: 'j1_1', minerId: 'm2' });
+    expect(
+      parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1', minerId: null })
+    ).toEqual({ action: 'reassignPayment', paymentId: 'j1_1', minerId: null });
+    expect(needsLiveCheck(move)).toBe(true);
+    expect(() => parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1' })).toThrow();
+  });
+
+  it('syncs a donation with no Miner or notice the client named: the server decides', () => {
+    const input = parseSyncInput(
+      {
+        corporationId: 1,
+        donations: [
+          {
+            refId: 1,
+            division: 1,
+            characterId: 7,
+            amount: 5,
+            at: '2026-11-01T00:00:00Z',
+            minerId: 'solo:7',
+            statementId: 's1',
+          },
+        ],
+      },
+      Date.parse('2026-11-02T00:00:00Z')
+    );
+    expect(input.donations[0]).not.toHaveProperty('minerId');
+    expect(input.donations[0]).not.toHaveProperty('statementId');
+  });
+
   it('parses a manual payment or a donation match that confirms a declaration', () => {
     const payment = {
       action: 'recordPayment',
@@ -1229,9 +1275,20 @@ describe('checkClaimedTransfer', () => {
   describe('only a payment no one holds yet', () => {
     const open = { id: 'j1_9', characterId: 7, amount: 25_000_000, at: transfer.at };
 
-    it('does not find a payment already credited to a Miner', () => {
+    it('says which Miner a payment the book already placed is credited to', () => {
       const payments = [{ ...open, minerId: 'm-a' }];
-      expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments })).toEqual({
+        result: 'credited',
+        paymentId: 'j1_9',
+        minerId: 'm-a',
+      });
+      // One still open wins: that is the one the claim can credit.
+      expect(
+        checkClaimedTransfer(transfer, {
+          ...ctx,
+          payments: [...payments, { ...open, id: 'j1_10' }],
+        })
+      ).toEqual({ result: 'found', paymentId: 'j1_10' });
     });
 
     it('does not find a payment an officer marked wholly not tax', () => {
@@ -1614,6 +1671,27 @@ describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be
     // Days after `through` are not the checkpoint's to owe.
     expect(
       checkpointRefusal(k, { ...ctx, live: { unpaidDays: [{ date: '2026-09-02', owed: 70 }] } })
+    ).toBeNull();
+  });
+});
+
+describe('handRecordMatch: the same ISK is never counted twice', () => {
+  const stated = { characterId: 7, amount: 5_000_000, at: '2026-11-02T00:00:00.000Z' };
+  const held = [{ id: 'j1_1', characterId: 7, amount: 5_000_000, at: '2026-11-01T03:00:00.000Z' }];
+  const uncounted = [
+    { id: 'j3_9', characterId: 7, amount: 5_000_000.5, at: '2026-11-02T06:00:00.000Z' },
+  ];
+
+  it('finds a donation the book holds, or one noted in an unread division, nearest first', () => {
+    expect(handRecordMatch(stated, { held, uncounted })).toEqual({ kind: 'uncounted', id: 'j3_9' });
+    expect(handRecordMatch(stated, { held, uncounted: [] })).toEqual({ kind: 'held', id: 'j1_1' });
+  });
+
+  it('is nothing for another sender, another amount, or a transfer days away', () => {
+    expect(handRecordMatch({ ...stated, characterId: 8 }, { held, uncounted })).toBeNull();
+    expect(handRecordMatch({ ...stated, amount: 4_000_000 }, { held, uncounted })).toBeNull();
+    expect(
+      handRecordMatch({ ...stated, at: '2026-11-08T00:00:00.000Z' }, { held, uncounted })
     ).toBeNull();
   });
 });

@@ -68,3 +68,23 @@ running account).
 - **Browser tests cover the flows end to end**: a book with history moving over, payments
   landing oldest first (short, exact, over), Settle up, late notices and the verify link,
   disputes and declarations, the ledger, and a closed month.
+
+## Added 2026-11-21: linking money under one payment model
+
+- **A pilot's payment links to a Payee, never to entries or days.** A Made Payment (wallet
+  journal, or a contract paid in kind with the pilot's figure) is stored as a link to one Payee
+  and pays that Payee's oldest unpaid days; what is over is credit. Assignments no longer carry a
+  paid status or a payment. Suggestions only identify the recipient (the learned entity, then the
+  name, across every record of a merged Payee), with no day window or entry checklist; amount alone
+  never suggests a transfer the corporation's book holds or has in flight. An automatic match is one
+  to one or nothing. A Default System may take over a day only after its Payee's paid-through.
+- **A donation links to a Miner, never to a late notice.** One resolver,
+  `functions/src/corpTaxBookDonationMatch.ts`, decides whose money a donation is, and the server
+  runs it on every donation it stores, whichever sync sent it (a client's Miner is ignored).
+  "Known" means grouped or seen mining, not "has paid before". An ambiguous donation is stored for
+  review, shown in Needs you, and never claimed automatically. An officer can move a payment to
+  another Miner. A hand-recorded payment is checked against uncounted and in-flight transfers so
+  the same ISK is not counted twice.
+- **One rule per question.** Whether two records are the same transfer, which Miner a Character
+  is in (earliest grouping wins), and when money pays a day (the Running account, a date at a
+  time) each have one shared definition, used by both sides.

@@ -11,16 +11,21 @@ deployed now keep working at each point, so the steps can run before the PR merg
   - `lateNoticeLinks/{noticeId}`: `{ token }`, editors only (as `statementLinks`).
   - `accountCheckpoints/{minerId}`: officers read every one; a Miner reads their own (`uids`).
 - **Indexes:** none. Every new query is on a single field (`minerId`, `characterIds`,
-  `issuedAt`, `extractionId`, `chunkArrivalTime`).
+  `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and `books.<corporationId>` on
+  `corpTaxBookBilledBy`, which Firestore indexes as a map field by default).
 - **Functions:**
   - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`,
     `recordCheckpoints` and `resetCheckpoint` edits; Late notices written beside their
     `statements` mirror; the verify page, Stop reminders and declarations read `lateNotices`
     first; a write-off pins no notice, and an older tab's write-off that names one is refused
     with "reload the page".
-  - `syncCorpTaxBooks` (scheduled sync): donations matched by the shared rule
-    (`corpTaxBookDonationMatch.ts`): a known sender's money is their own Miner's; a stranger's is
-    named by each Miner's code or a notice's, and a code two Miners hold goes to review.
+  - `syncCorpTaxBooks` (scheduled sync) and every officer sync: the server decides whose money
+    each stored donation is (`corpTaxBookDonationMatch.ts`), ignoring a client's Miner or notice:
+    a grouped sender, or one seen mining what the book bills, pays their own Miner (the earliest
+    grouping); a stranger is named by a Miner's or a notice's code, else by the Miner their earlier
+    payments named; one that could be two Miners' is stored for review (`reviewReason:
+'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
+    unread division is linked to it and never counted again. `reassignPayment` moves a payment.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
     frozen tax) and the tab read models (schema 2, from recorded accounts), and deletes the
     retired `minerTotals` docs.
