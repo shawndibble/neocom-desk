@@ -30,6 +30,8 @@ export interface TaxPayment {
   transferId?: string;
   /** When an officer last placed it on a Miner, or took it off one (`reassignPayment`). */
   assignedAt?: string;
+  /** An officer's note on a payment recorded by hand; the Miner reads it too. */
+  note?: string;
 }
 
 /** A `writeOffs` doc as the book stores it: the corporation forgave part of what a Miner owes. */

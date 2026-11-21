@@ -38,7 +38,6 @@ vi.mock('firebase/firestore/lite', () => ({
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
-vi.mock('./useTabsProjection', () => ({ useTabsProjection: () => ({ miners: [], needsYou: [] }) }));
 // No Statement run is due: only the read's own items count.
 vi.mock('@/engine/corpTaxBook/bookView', async (orig) => ({
   ...(await orig<typeof import('@/engine/corpTaxBook/bookView')>()),
@@ -96,6 +95,7 @@ function needsYouOf(data: BookRead) {
         now: '2026-09-18T00:00:00Z',
       },
       miners: [],
+      needsYou: [],
       internals: { byMiner: new Map() },
     },
     names: {},

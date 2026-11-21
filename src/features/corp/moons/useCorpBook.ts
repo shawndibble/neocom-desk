@@ -14,6 +14,7 @@
  * is open: the book is then its window's rows plus the moon docs (#5716), or the whole book when a
  * doc is missing. `readBook` (taxBook/bookRead) decides which.
  */
+import { soloCharacterId } from '../../../../functions/src/corpTaxBookDonationMatch';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { bookViewInputOf, loadBookPrices } from './bookViewOf';
@@ -364,8 +365,8 @@ export function useCorpBook(
       // A refinery page reads no ledger row, so a Miner in no grouping is known only by the id in a moon doc.
       for (const d of fetched.data.refinery?.docs.values() ?? [])
         for (const m of d.miners) {
-          const solo = /^solo:(\d+)$/.exec(m.minerId);
-          if (solo) characterIds.add(Number(solo[1]));
+          const solo = soloCharacterId(m.minerId);
+          if (solo !== undefined) characterIds.add(solo);
         }
       // Moon owners are corporations; the universe names lookup resolves both kinds.
       // A payee the moon owner named is a player or another corporation.

@@ -16,7 +16,6 @@ import {
   activityFeed,
   daysByPhase,
   extractionBilling,
-  oldestUnsettled,
   minerMoons,
   minersOnMoon,
   moonByStructure,
@@ -319,18 +318,6 @@ describe('extractionBilling', () => {
     );
     expect(extractionBilling(viewOf([]), 'x').paid).toBe(false);
     expect(extractionBilling(viewOf([{ status: 'dismissed' }]), 'x').paid).toBe(false);
-  });
-});
-
-describe('oldestUnsettled', () => {
-  it('is the oldest issued Statement that is not settled, whatever the list order', () => {
-    const list = [
-      { id: 'sep', issuedAt: '2026-10-01T00:00:00Z' },
-      { id: 'aug', issuedAt: '2026-09-01T00:00:00Z' },
-      { id: 'jul', issuedAt: '2026-08-01T00:00:00Z' },
-    ];
-    expect(oldestUnsettled(list, (id) => id === 'jul')?.id).toBe('aug');
-    expect(oldestUnsettled(list, () => true)).toBeUndefined();
   });
 });
 

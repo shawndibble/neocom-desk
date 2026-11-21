@@ -13,6 +13,7 @@
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
+import { useAuditWords } from '@/features/corp/moons/useAuditWords';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -87,13 +88,14 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
   const { t } = useTranslation();
   const audit = useBookAudit(200);
   const subject = useAuditSubject();
+  const words = useAuditWords();
   return (
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
       ) : (
         // A Miner link opens their page: close over it rather than cover it.
-        <AuditFeed entries={audit.entries} subject={subject} onOpen={onClose} />
+        <AuditFeed entries={audit.entries} subject={subject} words={words} onOpen={onClose} />
       )}
     </SlideOver>
   );

@@ -24,7 +24,8 @@ import type {
   RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import { countedPayments, paymentNet, type TaxPayment } from './payments';
-import { shiftUtcDate } from '@/engine/localDay';
+import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
+import { shiftUtcDate, utcDayOf } from '@/engine/localDay';
 
 /** What is left of a day below this is float residue: the day is done (whole ISK on every screen). */
 export const RESIDUE_ISK = 0.5;
@@ -48,6 +49,11 @@ export interface RunningDay {
    * none), so the day keeps its whole tax, and its tolerance, after the checkpoint (M1).
    */
   paidBefore?: number;
+  /**
+   * Whether the line was priced at a saved close-of-day price (`savedPrice`); absent counts as
+   * saved. Only a date whose every line is may be stored as paid for good (`closableThrough`).
+   */
+  savedPrice?: boolean;
 }
 
 /** A checkpoint's owed day as it is stored: an older one holds `remaining` only. */
@@ -112,7 +118,7 @@ export interface MinerRunningAccountInput {
 }
 
 /** The UTC day of an ISO instant: which side of a checkpoint money falls. */
-const dayOf = (at: string) => at.slice(0, 10);
+const dayOf = utcDayOf;
 
 /**
  * A checkpoint's owed day as a running day: its whole tax and what was paid of it before, so its
@@ -197,7 +203,6 @@ export class MinerRunningAccount {
     const settled = settleDays(
       { ...input, days },
       {
-        extraCorrections: 0,
         paymentPool: opening + paid,
         payments: [
           ...(opening > 0 ? [{ paymentId: OPENING_CREDIT, left: opening }] : []),
@@ -304,6 +309,41 @@ export class MinerRunningAccount {
     return this.byDay.get(date);
   }
 
+  /** The days still owed, oldest first, in whole ISK: neither settled, held nor under an ISK. */
+  owedDays(): OwedDay[] {
+    return [...this.byDay]
+      .filter(([, d]) => !d.settled && !d.held && Math.round(d.remaining) > 0)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, d]) => ({ date, owed: Math.round(d.remaining), tax: Math.round(d.tax) }));
+  }
+
+  /** The dates an open dispute holds, oldest first. */
+  heldDates(): string[] {
+    return [...this.byDay]
+      .filter(([, d]) => d.held)
+      .map(([date]) => date)
+      .sort();
+  }
+
+  /**
+   * What the tolerance (or a day recorded paid) wrote off, by day, dated by the last of `payments`
+   * that reached the day, else the day itself.
+   */
+  writtenOffDays(
+    payments: readonly { id: string; at: string }[]
+  ): { date: string; amount: number; at: string }[] {
+    const paidAt = new Map(payments.map((p) => [p.id, p.at]));
+    const closedAt = new Map<string, string>();
+    for (const p of this.applications.payments) {
+      const at = paidAt.get(p.paymentId);
+      if (at) for (const d of p.days) closedAt.set(d.date, at);
+    }
+    return [...this.byDay]
+      .filter(([, d]) => d.writtenOff >= 1)
+      .map(([date, d]) => ({ date, amount: d.writtenOff, at: closedAt.get(date) ?? date }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   /** The dates still owed, oldest first: neither settled nor held by an open dispute. */
   owedDates(): string[] {
     return [...this.byDay]
@@ -343,15 +383,20 @@ export class MinerRunningAccount {
    * has no prices. The stored day never moves back (`paidThrough` holds it).
    */
   closableThrough(
-    /** The account's days, with whether every line was priced at a saved close-of-day price. */
-    days: readonly { date: string; savedPrices: boolean }[],
     /** The UTC date of the read; ore for it is still coming in. */
     today: string
   ): string | null {
     if (this.paidThrough === null) return null;
     const closed = this.input.checkpoint?.through;
+    // A checkpoint's owed day was priced then: it is billed here from its stored figures.
+    const byDate = new Map<string, boolean>(
+      (this.input.checkpoint?.owed ?? []).map((d) => [d.date, true])
+    );
+    for (const l of this.input.days)
+      byDate.set(l.date, (byDate.get(l.date) ?? true) && l.savedPrice !== false);
+    const days = [...byDate].map(([date, savedPrices]) => ({ date, savedPrices }));
     let through: string | null = null;
-    for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+    for (const d of days.sort((a, b) => a.date.localeCompare(b.date))) {
       const day = this.byDay.get(d.date);
       // A day the checkpoint closed is not billed here any more: it was settled and priced then.
       // One it still owes is billed here, and holds the rest back until it is paid.
@@ -397,8 +442,6 @@ export function runningDaysFromLines(
 
 /** The money `settleDays` spreads over the days, oldest day first. */
 interface DayPools {
-  /** Credit from outside the days that is not a payment: it pays days without the tolerance. */
-  extraCorrections: number;
   /** The payments' money for the days, paid in one go (a day's tolerance can close mid-run). */
   paymentPool: number;
   /** Each payment's share of `paymentPool`, oldest first: only says whose money each slice was. */
@@ -523,7 +566,7 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
 
   // A day that came out negative (credit corrections) pays the oldest owed days, as a dismissal would.
   const corrections = days.reduce((sum, d) => sum + Math.max(0, -d.tax), 0);
-  let credit = pay(corrections + pools.extraCorrections, 'correction');
+  let credit = pay(corrections, 'correction');
   credit += pay(pools.paymentPool, 'payment');
   pay(pools.writeOffPool, 'writeOff'); // a leftover is dropped, never credit
 

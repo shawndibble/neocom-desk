@@ -4,7 +4,7 @@
  * rolls up to a Miner — one or more characters billed together (D18), one per
  * character by default.
  */
-import { minerIdFor } from '../../../functions/src/corpTaxBookDonationMatch';
+import { minerIdFor, soloCharacterId } from '../../../functions/src/corpTaxBookDonationMatch';
 import { observedEntryKey } from './observed';
 import { resolveRate, type RateScope, type TaxRate } from './rates';
 import { valueObservedEntry } from './valuation';
@@ -33,8 +33,8 @@ export interface Miner {
 export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): number[] {
   const grouped = miners.find((m) => m.id === minerId);
   if (grouped) return grouped.characterIds;
-  const solo = Number(minerId.replace(/^solo:/, ''));
-  return Number.isFinite(solo) && minerId.startsWith('solo:') ? [solo] : [];
+  const solo = soloCharacterId(minerId);
+  return solo === undefined ? [] : [solo];
 }
 
 /**
@@ -53,9 +53,8 @@ export function bookMinersOf(grouped: readonly Miner[], ids: readonly string[]):
   const seen = new Set(grouped.map((m) => m.id));
   const held = new Set(grouped.flatMap((m) => m.characterIds));
   for (const id of ids) {
-    const solo = /^solo:(\d+)$/.exec(id);
-    if (!solo || seen.has(id)) continue;
-    const characterId = Number(solo[1]);
+    const characterId = soloCharacterId(id);
+    if (characterId === undefined || seen.has(id)) continue;
     if (held.has(characterId)) continue;
     seen.add(id);
     out.push({ id, characterIds: [characterId], mainCharacterId: characterId });

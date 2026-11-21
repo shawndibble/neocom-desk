@@ -23,7 +23,6 @@ import { useNow } from '@/lib/useNow';
 import { useBook } from './useBook';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
-import { useTabsProjection } from './useTabsProjection';
 import { useNeedsYou } from './useNeedsYou';
 import {
   AssignDonationDialog,
@@ -174,7 +173,7 @@ export function NeedsYouQueue() {
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
-  const { miners } = useTabsProjection();
+  const { miners } = view;
   const { needsYou, uncounted, disputes, noticesDue, count } = useNeedsYou();
   // A closed month the server records only with a Director's approval: quiet, never an error.
   const awaitingDirector = useCheckpointsAwaitingDirector(corporationId);

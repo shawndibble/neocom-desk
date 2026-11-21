@@ -24,13 +24,12 @@ const view = () =>
         [
           'm1',
           {
+            // The account's own owed days (`owedDays`): settled and held ones are left out there.
             account: {
-              byDay: new Map([
-                ['2026-11-04', { tax: 1000.4, held: false, settled: false, remaining: 400.2 }],
-                ['2026-11-03', { tax: 900, held: false, settled: false, remaining: 900 }],
-                ['2026-11-02', { tax: 500, held: false, settled: true, remaining: 0 }],
-                ['2026-11-05', { tax: 700, held: true, settled: false, remaining: 700 }],
-              ]),
+              owedDays: () => [
+                { date: '2026-11-03', owed: 900, tax: 900 },
+                { date: '2026-11-04', owed: 400, tax: 1000 },
+              ],
             },
           },
         ],

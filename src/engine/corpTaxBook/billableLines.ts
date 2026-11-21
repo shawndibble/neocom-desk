@@ -4,7 +4,10 @@
  * late notice keeps the ones it asked for, as they were priced (`LateNoticeLine`). A dismissed
  * day bills nothing; it is listed so a screen can say who dismissed it.
  */
-import { lineKey, type LateNoticeLine } from '../../../functions/src/corpTaxBookLateNotice';
+import {
+  adjustmentLineKey,
+  type LateNoticeLine,
+} from '../../../functions/src/corpTaxBookLateNotice';
 import type { Adjustment } from './adjustments';
 import type { DayCharge } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
@@ -63,7 +66,7 @@ export function minerBillableLines(input: {
     out.lines.push({
       kind: 'correction',
       date: adj.date,
-      key: lineKey({ adjustmentId: adj.id, date: adj.date }),
+      key: adjustmentLineKey(adj.id),
       oreLines: [],
       estimatedValue: 0,
       tax: adj.amount,

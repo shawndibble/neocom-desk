@@ -3,6 +3,7 @@
  * so an officer's client records each Miner's account (`recordAccounts`) and the verify link
  * shows it, less what the Miner paid since (`liveAccount`, functions).
  */
+import { utcDayOf } from '@/engine/localDay';
 import {
   canAdvanceCheckpoint,
   closedThroughFor,
@@ -48,14 +49,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
   return view.miners.flatMap((m) => {
     if (only !== undefined && m.id !== only) return [];
     const { owes, paidThrough, closableThrough } = m.account;
-    const unpaidDays = [...(view.internals.byMiner.get(m.id)?.account.byDay ?? [])]
-      .filter(([, d]) => !d.settled && !d.held && Math.round(d.remaining) > 0)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, d]) => ({
-        date,
-        owed: Math.round(d.remaining),
-        tax: Math.round(d.tax),
-      }));
+    const unpaidDays = view.internals.byMiner.get(m.id)?.account.owedDays() ?? [];
     return [
       {
         minerId: m.id,
@@ -82,7 +76,7 @@ export function dueCheckpoints(
   view: BookView,
   recorded: { at: string; by: number }
 ): RunningAccountCheckpoint[] {
-  const today = recorded.at.slice(0, 10);
+  const today = utcDayOf(recorded.at);
   const through = closedThroughFor(today);
   if (through < view.input.startDate) return [];
   return view.miners.flatMap((m) => {
