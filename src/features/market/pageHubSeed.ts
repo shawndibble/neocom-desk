@@ -19,6 +19,7 @@ import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { FIRST_PULL_WAIT_MS, syncSettled } from '@/features/overview/widgets/firstRun';
 import type { TradeHub } from '@/market/hubs';
+import { registerTestReset } from '@/lib/testResets';
 import { subscribeSyncStatus } from '@/sync/status';
 import {
   ownChoice,
@@ -67,6 +68,8 @@ function afterFirstPull(): Promise<void> {
  * nothing to fold in; the marker is set either way.
  */
 const running = new Map<string, Promise<void>>();
+// A run left in flight by one test must not be handed to the next (it would read that test's cleared data).
+registerTestReset(() => running.clear());
 
 export function seedPageHubsOnce(
   markerKey: string,
