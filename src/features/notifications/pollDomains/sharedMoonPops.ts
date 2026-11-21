@@ -80,10 +80,11 @@ async function currentMuted(): Promise<ReadonlySet<number>> {
 }
 
 /**
- * The Shared Pops that already alert this Character (Shared moon pop alerts on for some channel,
- * in its audience), with their moon names, for the calendar alerts to recognise the same fleet by.
+ * The Shared Pops that cover this Character (Shared moon pop alerts on for some channel, in its
+ * audience), with their moon names, for the calendar alerts to recognise the same fleet by.
  * A muted sharing corporation still counts: muting the pop is dismissing that fleet, and its
- * in-game calendar event must not alert in its place. Best effort: a failed read is none, and the calendar alerts then run as they always did.
+ * in-game calendar event must not alert in its place. Best effort: a failed read is none, and
+ * the calendar alerts then run as they always did.
  */
 export async function alertedSharedPops(characterId: number): Promise<SharedPopMatchSource[]> {
   await hydrateNotificationPreferences();
