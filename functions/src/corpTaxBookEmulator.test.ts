@@ -10,6 +10,7 @@ import {
   planPaymentReadersBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
 import { minerPaymentCode } from './corpTaxBookLateNotice.js';
+import { drainReaders } from './corpTaxBookReaders.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -3506,6 +3507,46 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         await edit(ACCOUNTANT, { action: 'unlink', minerId: 'g', characterId: 51 });
         expect(await readers('j1_11')).toEqual(['char:50', 'char:52']);
         expect(await readers('j1_12')).toEqual(['char:50', 'char:51', 'char:52']);
+      });
+
+      it("declining a link narrows the group's payments and rows, and moves the readers epoch", async () => {
+        await turnOn();
+        await minedHere(50, 51, 52);
+        await group([50, 51, 52]);
+        await donate(13, 50);
+        const epoch = async () => ((await book().get()).get('readersEpoch') as number) ?? 0;
+        const before = await epoch();
+        await declineLink(deps(), who(51), CORP, 'g');
+        expect(await readers('j1_13')).toEqual(['char:50', 'char:52']);
+        const row51 = await book().collection('observed').where('characterId', '==', 51).get();
+        expect(row51.docs.map((d) => d.get('uids'))).toEqual([['char:51']]);
+        expect(await epoch()).toBeGreaterThan(before);
+        expect((await book().collection('readersQueue').doc('pending').get()).data()).toEqual({
+          characters: {},
+          miners: {},
+        });
+      });
+
+      it('keeps a marked rewrite until a drain finishes it, within its budget', async () => {
+        await turnOn();
+        await minedHere(50, 51);
+        await group([50, 51]);
+        await donate(14, 50);
+        await book()
+          .collection('payments')
+          .doc('j1_14')
+          .update({ uids: ['char:50'] });
+        await book()
+          .collection('readersQueue')
+          .doc('pending')
+          .set({ characters: {}, miners: { g: 'n1' } });
+        expect(await drainReaders(db, CORP, 0)).toEqual({ written: 0, left: 1 });
+        expect(await readers('j1_14')).toEqual(['char:50']);
+        expect(await drainReaders(db, CORP)).toEqual({ written: 1, left: 0 });
+        expect(await readers('j1_14')).toEqual(['char:50', 'char:51']);
+        expect(await payment('j1_14')).toHaveProperty('updatedAt');
+        // Idempotent: nothing left, nothing written.
+        expect(await drainReaders(db, CORP)).toEqual({ written: 0, left: 0 });
       });
 
       it('a promoted claim widens a payment stored before `uids`, with the whole group', async () => {
