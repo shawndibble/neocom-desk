@@ -50,10 +50,10 @@ test.describe('PI phone layout', () => {
   test('header strip: the buyback picker shows its whole label', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await open(page, 'plan');
-    const picker = page.getByRole('combobox', { name: 'Where do you sell?' });
+    const picker = page.getByRole('button', { name: /, Where do you sell\?$/ });
     await expect(picker).toBeVisible({ timeout: 20_000 });
     await picker.click();
-    await page.getByRole('option', { name: /corp buyback/i }).click();
+    await page.getByRole('menuitemradio', { name: /corp buyback/i }).click();
     const clipped = await picker.evaluate((el) => {
       return [el, ...el.querySelectorAll('*')].some((n) => n.scrollWidth > n.clientWidth);
     });

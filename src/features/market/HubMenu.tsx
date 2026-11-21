@@ -28,20 +28,38 @@ import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS, type TradeHub } from '@/mar
 import { loadHubFor, pickHubFor, setHubScope, useHubFor, type HubScope } from './hub';
 import { pageHubAreaName, type PageHubArea } from './pageHubs';
 
+/** An option a page lists after the hubs, in the same radio group (PI's corp buyback). */
+export interface HubMenuOption {
+  value: string;
+  label: string;
+  onSelect: () => void;
+}
+
+/** What changed: a hub was picked, or the page moved between Global and its own hub. */
+export type HubPickKind = 'hub' | 'scope';
+
 export function HubMenu({
   area,
   triggerClassName,
   triggerLabel,
   shownHubId,
   onPicked,
+  extraOptions = [],
+  selectedOption,
+  triggerId,
   children,
 }: {
   area: PageHubArea;
   /** The hub on screen when it is not the stored one (a Market link naming a hub); ticked instead. */
   shownHubId?: TradeHub['id'];
   /** After a hub pick (or a scope switch) is written, with the hub now in use: for a page that also points its URL at it. */
-  onPicked?: (hubId: TradeHub['id']) => void;
+  onPicked?: (hubId: TradeHub['id'], kind: HubPickKind) => void;
+  /** Options after the hubs; picking one runs its `onSelect` and writes no hub. */
+  extraOptions?: readonly HubMenuOption[];
+  /** The `extraOptions` value in force, ticked instead of the hub. */
+  selectedOption?: string;
   triggerClassName?: string;
+  triggerId?: string;
   /** The trigger's accessible name; it starts with the visible hub (WCAG 2.5.3). */
   triggerLabel: string;
   /** The trigger's visible content, usually the hub's name. */
@@ -51,7 +69,7 @@ export function HubMenu({
   const { hubId, scope } = useHubFor(area);
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className={triggerClassName} aria-label={triggerLabel}>
+      <DropdownMenuTrigger id={triggerId} className={triggerClassName} aria-label={triggerLabel}>
         {children}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
@@ -62,7 +80,7 @@ export function HubMenu({
             // After the switch the page may use another hub (Global's): report it like a pick.
             void setHubScope(area, next as HubScope)
               .then(() => loadHubFor(area))
-              .then((hub) => onPicked?.(hub));
+              .then((hub) => onPicked?.(hub, 'scope'));
           }}
         >
           {/* preventDefault keeps the menu open; Radix still fires onValueChange for a radio item. */}
@@ -75,16 +93,23 @@ export function HubMenu({
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={shownHubId ?? hubId}
+          value={selectedOption ?? shownHubId ?? hubId}
           aria-label={t('pageHubs.hubLabel')}
           onValueChange={(next) => {
+            const option = extraOptions.find((each) => each.value === next);
+            if (option) return option.onSelect();
             void pickHubFor(area, next as TradeHub['id']);
-            onPicked?.(next as TradeHub['id']);
+            onPicked?.(next as TradeHub['id'], 'hub');
           }}
         >
           {TRADE_HUBS.map((hub) => (
             <DropdownMenuRadioItem key={hub.id} value={hub.id}>
               {hub.stationLabel}
+            </DropdownMenuRadioItem>
+          ))}
+          {extraOptions.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -105,10 +130,18 @@ export function HubField({
   className,
   shownHubId,
   onPicked,
+  extraOptions,
+  selectedOption,
+  id,
 }: {
   area: PageHubArea;
   shownHubId?: TradeHub['id'];
-  onPicked?: (hubId: TradeHub['id']) => void;
+  onPicked?: (hubId: TradeHub['id'], kind: HubPickKind) => void;
+  extraOptions?: readonly HubMenuOption[];
+  /** The `extraOptions` value in force: the field shows its label in place of the hub. */
+  selectedOption?: string;
+  /** For a `Field`'s `htmlFor`. */
+  id?: string;
   /** What the field picks ("Priced at"); the trigger is named "<hub>, <label>" so it starts with what shows. */
   label: string;
   size?: ControlSize;
@@ -117,15 +150,20 @@ export function HubField({
   const { t } = useTranslation();
   const { hubId } = useHubFor(area);
   const hub = getTradeHub(shownHubId ?? hubId) ?? DEFAULT_TRADE_HUB;
+  const shown =
+    extraOptions?.find((option) => option.value === selectedOption)?.label ?? hub.systemName;
   return (
     <HubMenu
       area={area}
       shownHubId={shownHubId}
       onPicked={onPicked}
+      extraOptions={extraOptions}
+      selectedOption={selectedOption}
+      triggerId={id}
       triggerClassName={cx(selectTriggerClassName(size), className)}
-      triggerLabel={t('pageHubs.fieldLabel', { hub: hub.systemName, label })}
+      triggerLabel={t('pageHubs.fieldLabel', { hub: shown, label })}
     >
-      <span>{hub.systemName}</span>
+      <span>{shown}</span>
       <SelectChevron size={size} />
     </HubMenu>
   );

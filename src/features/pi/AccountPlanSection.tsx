@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import type { PiData } from '@/sde/types';
 import { AccountPlanPanel } from './AccountPlanPanel';
 import { accountView } from './accountPlanModel';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { usePiSettings } from './piSettings';
+import { useSellHub } from './sellHub';
 import type { PlanAdvice } from './planAdviceModel';
 import { useAccountPlan } from './useAccountPlan';
 import { usePiPriceVsMedian } from './usePiPriceVsMedian';
@@ -16,7 +16,7 @@ import { usePiPriceVsMedian } from './usePiPriceVsMedian';
 export function AccountPlanSection({ advice, pi }: { advice: PlanAdvice; pi: PiData }) {
   const settings = usePiSettings((state) => state.value);
   const haul = settings.haulBetweenPlanets === true;
-  const hub = getTradeHub(settings.hub) ?? DEFAULT_TRADE_HUB;
+  const { hub } = useSellHub();
   const regionId = hub.regionId;
   const account = useAccountPlan(advice, pi, { haul, buyTiers: settings.buyTiers, regionId });
   const view = useMemo(() => (account.plan ? accountView(account.plan) : null), [account.plan]);

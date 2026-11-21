@@ -11336,7 +11336,11 @@
       "lpStore": "LP Store",
       "corpSrp": "Corp SRP",
       "market": "Market",
-      "appraisal": "Appraisal"
+      "appraisal": "Appraisal",
+      "pi": "Planetary Industry",
+      "mining": "Mining",
+      "assets": "Assets",
+      "overview": "Overview"
     }
   },
   "contractDetail": {

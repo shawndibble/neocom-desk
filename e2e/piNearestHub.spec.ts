@@ -41,7 +41,9 @@ for (const [label, viewport] of VIEWPORTS) {
       if (dir) await page.screenshot({ path: `${dir}/nearest-hub-${home}-${label}.png` });
       await hint.getByRole('button', { name: `Sell at ${hub}` }).click();
       await expect(hint).toBeHidden();
-      await expect(page.getByRole('combobox', { name: 'Where do you sell?' })).toHaveText(hub);
+      await expect(page.getByRole('button', { name: `${hub}, Where do you sell?` })).toHaveText(
+        hub
+      );
     });
   }
 }
