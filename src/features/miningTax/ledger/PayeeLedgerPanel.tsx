@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -15,6 +15,7 @@ import {
   StatChips,
   type DataTableColumn,
 } from '@/components/ui';
+import type { DataTableProps } from '@/components/ui/dataTableTypes';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import {
@@ -137,69 +138,6 @@ function LedgerBody({
     rows,
     columns: csvColumns,
   });
-  const columns = useMemo<DataTableColumn<PayeeLedgerRow>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('miningTax.ledger.column.date'),
-        headerTooltip: t('miningTax.ledger.column.dateTooltip'),
-        className: 'whitespace-nowrap tabular-nums',
-        render: (r) => r.date,
-      },
-      {
-        id: 'what',
-        header: t('miningTax.ledger.column.what'),
-        primary: true,
-        render: (r) => {
-          const note =
-            r.kind === 'charge'
-              ? r.held
-                ? t('miningTax.ledger.held')
-                : r.charge.reason
-              : r.kind === 'writeOff'
-                ? r.reason
-                : r.kind === 'payment'
-                  ? r.payment.note
-                  : undefined;
-          return (
-            <>
-              {ledgerWhat(r, t)}
-              {note && <span className="block text-xs text-text-dim">{note}</span>}
-            </>
-          );
-        },
-      },
-      {
-        id: 'charged',
-        header: t('miningTax.ledger.column.charged'),
-        align: 'right',
-        className: 'tabular-nums',
-        cellClassName: (r) => (r.kind === 'charge' && r.held ? 'text-text-dim' : undefined),
-        render: (r) => amountCell(r.charged),
-      },
-      {
-        id: 'credited',
-        header: t('miningTax.ledger.column.credited'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (r) => amountCell(r.paid),
-      },
-      {
-        id: 'balance',
-        header: t('miningTax.ledger.column.balance'),
-        align: 'right',
-        className: 'tabular-nums font-medium',
-        // Owed reads positive; money ahead reads as credit, never as a negative balance.
-        cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
-        render: (r) =>
-          r.balance < -0.005
-            ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
-            : formatIsk(Math.max(0, r.balance)),
-      },
-    ],
-    [t]
-  );
-
   if (ledger.rows.length === 0)
     return (
       <EmptyState title={t('miningTax.ledger.emptyTitle')} hint={t('miningTax.ledger.emptyHint')} />
@@ -266,19 +204,123 @@ function LedgerBody({
             }
           />
         ) : (
-          <DataTable
+          <PayeeLedgerTable
             {...tableExport.tableProps}
             label={t('miningTax.ledger.tableLabel')}
-            columns={columns}
             rows={rows}
-            rowKey={(r) => r.key}
-            expandableRow={{
-              leadingIcon: true,
-              renderDetail: (r) => <LedgerRowDetail row={r} typeNames={typeNames} />,
-            }}
+            typeNames={typeNames}
           />
         )}
       </Panel>
     </div>
+  );
+}
+
+/**
+ * The ledger's table, for a page that holds its own frame: the Payee panel's, and an officer's
+ * Miner page, which adds a row menu. `rows` in the order to show them.
+ */
+export function PayeeLedgerTable({
+  rows,
+  label,
+  typeNames,
+  rowContextMenu,
+  ...rest
+}: {
+  rows: readonly PayeeLedgerRow[];
+  label: string;
+  typeNames?: ReadonlyMap<number, string>;
+  /** A row's menu (right-click, touch-and-hold, ⋮); without it the rows have none. */
+  rowContextMenu?: (row: PayeeLedgerRow, tr: ReactElement) => ReactElement;
+} & Omit<
+  DataTableProps<PayeeLedgerRow>,
+  'rows' | 'label' | 'columns' | 'rowKey' | 'expandableRow' | 'rowContextMenu'
+>) {
+  const { t } = useTranslation();
+  const columns = useMemo<DataTableColumn<PayeeLedgerRow>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('miningTax.ledger.column.date'),
+        headerTooltip: t('miningTax.ledger.column.dateTooltip'),
+        className: 'whitespace-nowrap tabular-nums',
+        render: (r) => r.date,
+      },
+      {
+        id: 'what',
+        header: t('miningTax.ledger.column.what'),
+        primary: true,
+        render: (r) => {
+          const note =
+            r.kind === 'charge'
+              ? r.held
+                ? t('miningTax.ledger.held')
+                : r.charge.reason
+              : r.kind === 'writeOff'
+                ? r.reason
+                : r.kind === 'payment'
+                  ? r.payment.note
+                  : undefined;
+          return (
+            <>
+              {/* A record an officer undid stays, struck through; its reversal follows. */}
+              {r.reversed ? (
+                <span>
+                  <span className="text-text-dim line-through decoration-text-faint">
+                    {ledgerWhat(r, t)}
+                  </span>{' '}
+                  <span className="text-xs text-text-dim">{t('miningTax.ledger.reversedTag')}</span>
+                </span>
+              ) : (
+                ledgerWhat(r, t)
+              )}
+              {note && <span className="block text-xs text-text-dim">{note}</span>}
+            </>
+          );
+        },
+      },
+      {
+        id: 'charged',
+        header: t('miningTax.ledger.column.charged'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (r) => (r.kind === 'charge' && r.held ? 'text-text-dim' : undefined),
+        render: (r) => amountCell(r.charged),
+      },
+      {
+        id: 'credited',
+        header: t('miningTax.ledger.column.credited'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (r) => amountCell(r.paid),
+      },
+      {
+        id: 'balance',
+        header: t('miningTax.ledger.column.balance'),
+        align: 'right',
+        className: 'tabular-nums font-medium',
+        // Owed reads positive; money ahead reads as credit, never as a negative balance.
+        cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
+        render: (r) =>
+          r.balance < -0.005
+            ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
+            : formatIsk(Math.max(0, r.balance)),
+      },
+    ],
+    [t]
+  );
+  return (
+    <DataTable
+      {...rest}
+      label={label}
+      columns={columns}
+      rows={[...rows]}
+      rowKey={(r) => r.key}
+      expandableRow={{
+        leadingIcon: true,
+        renderDetail: (r) => <LedgerRowDetail row={r} typeNames={typeNames} />,
+      }}
+      {...(rowContextMenu ? { rowMoreActions: true, rowContextMenu } : {})}
+    />
   );
 }
