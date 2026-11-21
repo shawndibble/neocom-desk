@@ -99,6 +99,47 @@ export function liveRunningAccount(
   };
 }
 
+/** One advance of a Miner's recorded paid-through day, and when it was recorded. */
+export interface PaidAdvance {
+  day: string;
+  at: string;
+}
+
+/** How many advances a Miner's history keeps (`meta/paid.paidHistory.<minerId>`). */
+export const PAID_HISTORY_MAX = 60;
+
+/** The history with one more advance, the oldest dropped past `PAID_HISTORY_MAX`. */
+export function withPaidAdvance(
+  history: readonly PaidAdvance[] | undefined,
+  advance: PaidAdvance
+): PaidAdvance[] {
+  return [...(history ?? []), advance].slice(-PAID_HISTORY_MAX);
+}
+
+/**
+ * Where a release rolls a Miner's recorded paid-through day back to (decision 20261121-112254),
+ * and the history that stays: the last day recorded before the money taken off came in
+ * (`beforeAt`, a payment's `at`), or before a day now owed (`beforeDay`). Undefined when nothing
+ * changes: no day is recorded, or the day stands from before. `day: null` drops it: no history
+ * (older data), no earlier advance, or no bound known.
+ */
+export function rolledBackPaidThrough(
+  current: string | undefined,
+  history: readonly PaidAdvance[] | undefined,
+  bound: { beforeAt: string } | { beforeDay: string } | null
+): { day: string | null; history: PaidAdvance[] } | undefined {
+  if (current === undefined) return undefined;
+  const drop = { day: null, history: [] };
+  if (!bound || !history || history.length === 0) return drop;
+  const kept = history.filter((h) =>
+    'beforeAt' in bound ? h.at < bound.beforeAt : h.day < bound.beforeDay
+  );
+  const last = kept.at(-1);
+  if (!last) return drop;
+  if (last.day >= current) return undefined;
+  return { day: last.day, history: kept };
+}
+
 /** A Running account as the verify page shows it (`VerifyPayload.account`). */
 export type LiveRunningAccount = ReturnType<typeof liveRunningAccount>;
 

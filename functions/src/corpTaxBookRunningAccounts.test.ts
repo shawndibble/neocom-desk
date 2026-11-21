@@ -6,6 +6,8 @@ import {
   netPayment,
   paidSinceRecord,
   payOldestFirst,
+  rolledBackPaidThrough,
+  withPaidAdvance,
 } from './corpTaxBookRunningAccounts.js';
 
 describe('liveRunningAccount', () => {
@@ -183,5 +185,50 @@ describe('netPayment', () => {
     expect(netPayment({ amount: 10, notTaxAmount: 3 })).toBe(7);
     expect(netPayment({ amount: 10, notTaxAmount: 30 })).toBe(0);
     expect(netPayment({ amount: 10 })).toBe(10);
+  });
+});
+
+describe('paid-through history: a release rolls back only past what the money could have paid', () => {
+  const history = [
+    { day: '2026-10-05', at: '2026-10-06T01:00:00.000Z' },
+    { day: '2026-10-09', at: '2026-10-10T01:00:00.000Z' },
+    { day: '2026-10-12', at: '2026-10-13T01:00:00.000Z' },
+  ];
+
+  it('keeps the last 60 advances, oldest first', () => {
+    const long = Array.from({ length: 60 }, (_, i) => ({ day: `d${i}`, at: `t${i}` }));
+    const next = withPaidAdvance(long, { day: 'd60', at: 't60' });
+    expect(next).toHaveLength(60);
+    expect(next[0].day).toBe('d1');
+    expect(next.at(-1)).toEqual({ day: 'd60', at: 't60' });
+  });
+
+  it('rolls back to the last day recorded before the payment came in', () => {
+    expect(
+      rolledBackPaidThrough('2026-10-12', history, { beforeAt: '2026-10-11T00:00:00.000Z' })
+    ).toEqual({ day: '2026-10-09', history: history.slice(0, 2) });
+  });
+
+  it('changes nothing when the day stands from before the payment', () => {
+    expect(
+      rolledBackPaidThrough('2026-10-12', history, { beforeAt: '2026-10-20T00:00:00.000Z' })
+    ).toBeUndefined();
+  });
+
+  it('rolls back to the last day before a day now owed', () => {
+    expect(rolledBackPaidThrough('2026-10-12', history, { beforeDay: '2026-10-07' })).toEqual({
+      day: '2026-10-05',
+      history: history.slice(0, 1),
+    });
+  });
+
+  it('drops the day with no history, no earlier day, or no bound', () => {
+    const drop = { day: null, history: [] };
+    expect(rolledBackPaidThrough('2026-10-12', undefined, { beforeAt: 'x' })).toEqual(drop);
+    expect(
+      rolledBackPaidThrough('2026-10-12', history, { beforeAt: '2026-10-01T00:00:00.000Z' })
+    ).toEqual(drop);
+    expect(rolledBackPaidThrough('2026-10-12', history, null)).toEqual(drop);
+    expect(rolledBackPaidThrough(undefined, history, null)).toBeUndefined();
   });
 });

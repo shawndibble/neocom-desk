@@ -113,7 +113,14 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import { type FeederExtraction, type StoredExtractionKey } from './corpTaxBookSyncEngine.js';
-import { ledgerDays, ledgerPayments, liveRunningAccount } from './corpTaxBookRunningAccounts.js';
+import {
+  ledgerDays,
+  ledgerPayments,
+  liveRunningAccount,
+  rolledBackPaidThrough,
+  withPaidAdvance,
+  type PaidAdvance,
+} from './corpTaxBookRunningAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
@@ -1019,8 +1026,8 @@ interface EditCtx {
   checkpointIds?: string[];
   /** Whose copied readers the edit changed: marked for the readers drain in its transaction. */
   dirty: { characters: Set<number>; miners: Set<string> };
-  /** Miners whose recorded paid-through the edit releases (`releasePaidThrough`): null drops it. */
-  released: Map<string, string | null>;
+  /** Miners whose recorded paid-through the edit releases (`releasePaidThrough`). */
+  released: Map<string, Release>;
   /** Whose money epoch the edit moves (`moneyEpochOf`): every Miner's (`book`), or these. */
   epochs: { book: boolean; miners: Set<string> };
 }
@@ -1040,18 +1047,31 @@ interface EditOutcome {
 }
 
 /**
- * Money taken off a Miner (a payment moved away, more of it marked not tax) reopens the days it
- * paid: their recorded paid-through day (`meta/paid`, and their `minerPaid` copy) is dropped, and
- * the next officer load records it again without that money (decision 20261121-093000). Read in
- * the transaction before any write; a Miner with no day recorded writes nothing.
+ * Money taken off a Miner (a payment moved away, more of it marked not tax, a credit undone)
+ * reopens the days it paid: their recorded paid-through day (`meta/paid`, and their `minerPaid`
+ * copy) rolls back to the last day recorded before that money came in (`bound`), or is dropped
+ * with no history to go by, and the next officer load records it again (decisions
+ * 20261121-093000 and 20261121-112254). Read in the transaction before any write; a Miner with no
+ * day recorded, or whose day stands from before, writes nothing.
  */
-async function releasePaidThrough(c: EditCtx, minerId: string | null | undefined): Promise<void> {
+async function releasePaidThrough(
+  c: EditCtx,
+  minerId: string | null | undefined,
+  bound: Parameters<typeof rolledBackPaidThrough>[2]
+): Promise<void> {
   if (typeof minerId !== 'string') return;
-  const held = (await c.tx.get(col(c, META).doc(PAID_DOC))).get(
-    new FieldPath('minerPaidThrough', minerId)
-  ) as unknown;
+  const paid = (await c.tx.get(col(c, META).doc(PAID_DOC))).data();
   const copy = await c.tx.get(col(c, MINER_PAID).doc(minerId));
-  if (held !== undefined || copy.exists) c.released.set(minerId, null);
+  const current =
+    (paid?.minerPaidThrough as Record<string, string> | undefined)?.[minerId] ??
+    (copy.exists ? (copy.get('paidThrough') as string) : undefined);
+  const history = (paid?.paidHistory as Record<string, PaidAdvance[]> | undefined)?.[minerId];
+  const rolled = rolledBackPaidThrough(current, history, bound);
+  if (!rolled) return;
+  // Two releases in one edit keep the earlier day.
+  const held = c.released.get(minerId);
+  if (held && (held.day === null || (rolled.day !== null && held.day <= rolled.day))) return;
+  c.released.set(minerId, { ...rolled, copy: copy.exists });
 }
 
 /** The fields that end a payment's wait for review, once an officer places it. */
@@ -1130,17 +1150,25 @@ function dropCheckpoints(
   writeMoneyEffects(tx, db, corporationId, { book: false, miners: new Set(ids) }, new Map());
 }
 
+/** A released paid-through day: rolled back to `day` (null drops it), the history kept. */
+interface Release {
+  day: string | null;
+  history: PaidAdvance[];
+  /** Whether the Miner's `minerPaid` copy exists, to follow the day. */
+  copy: boolean;
+}
+
 /**
  * One write of `meta/paid` for a transaction's money effects: each moved epoch, and each released
- * paid-through day (`null` drops it, a day rolls it back to that day), with the Miner's
- * `minerPaid` copy following. Call after the transaction's reads.
+ * paid-through day with its history, the Miner's `minerPaid` copy following. Call after the
+ * transaction's reads.
  */
 function writeMoneyEffects(
   tx: Transaction,
   db: Firestore,
   corporationId: number,
   epochs: { book: boolean; miners: ReadonlySet<string> },
-  released: ReadonlyMap<string, string | null>
+  released: ReadonlyMap<string, Release>
 ): void {
   const miners = new Set([...epochs.miners, ...released.keys()]);
   if (!epochs.book && miners.size === 0) return;
@@ -1148,15 +1176,19 @@ function writeMoneyEffects(
   if (epochs.book) patch.bookEpoch = FieldValue.increment(1);
   if (miners.size > 0)
     patch.minerEpochs = Object.fromEntries([...miners].map((id) => [id, FieldValue.increment(1)]));
-  if (released.size > 0)
+  if (released.size > 0) {
     patch.minerPaidThrough = Object.fromEntries(
-      [...released].map(([id, day]) => [id, day ?? FieldValue.delete()])
+      [...released].map(([id, r]) => [id, r.day ?? FieldValue.delete()])
     );
+    patch.paidHistory = Object.fromEntries(
+      [...released].map(([id, r]) => [id, r.history.length > 0 ? r.history : FieldValue.delete()])
+    );
+  }
   tx.set(sub(db, corporationId, META).doc(PAID_DOC), patch, { merge: true });
-  for (const [id, day] of released) {
+  for (const [id, r] of released) {
     const copy = sub(db, corporationId, MINER_PAID).doc(id);
-    if (day === null) tx.delete(copy);
-    else tx.set(copy, { paidThrough: day }, { merge: true });
+    if (r.day === null) tx.delete(copy);
+    else if (r.copy) tx.update(copy, { paidThrough: r.day });
   }
 }
 
@@ -1260,6 +1292,17 @@ async function knownMiner(c: EditCtx, minerId: string): Promise<boolean> {
 /** A Miner's Late notices, from both collections, read in the transaction. */
 const minerNotices = (c: EditCtx, minerId: string) =>
   readNotices(c.tx, bookOf(c), ofMinerFilter(minerId));
+
+/**
+ * Money is placed only on a Miner the book knows (`knownMiner`) whose account is open: a typo'd or
+ * dead id would hold money nobody owes against, and a closed account takes no more.
+ */
+async function requireOpenMiner(c: EditCtx, minerId: string): Promise<void> {
+  if (!(await knownMiner(c, minerId))) fail('not-found', 'Unknown Miner', 'unknown-miner');
+  const miner = await c.tx.get(col(c, MINERS).doc(minerId));
+  if (miner.exists && miner.get('closedAt') != null)
+    fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+}
 
 /** A Late notice by id, read in the transaction; not-found when neither collection holds it. */
 async function mustGetNotice(c: EditCtx, id: string): Promise<LoadedNotice> {
@@ -1675,6 +1718,8 @@ function removeFromMiner(
   if (characterIds.length === before.length) return false;
   if (characterIds.length <= 1) {
     tx.delete(ref);
+    // Its recorded account goes with it, so no list offers a Miner that is gone.
+    tx.delete(ref.parent.parent!.collection(RUNNING_ACCOUNTS).doc(ref.id));
   } else {
     tx.update(ref, {
       characterIds,
@@ -1773,7 +1818,7 @@ async function storableSettledThrough(
   accounts: readonly { minerId: string; settledThrough?: string; epoch?: number }[],
   paidRef: DocumentReference,
   iso: string
-): Promise<{ settled: Record<string, string>; stale: string[] }> {
+): Promise<{ settled: Record<string, string>; stale: string[]; paid?: Data }> {
   const asked = accounts.filter((a) => a.settledThrough !== undefined);
   if (asked.length === 0) return { settled: {}, stale: [] };
   const paid = (await c.tx.get(paidRef)).data();
@@ -1806,7 +1851,7 @@ async function storableSettledThrough(
   const settled: Record<string, string> = {};
   for (const { minerId, settledThrough: day } of candidates)
     if (day !== undefined && day < (heldFrom.get(minerId) ?? '9999')) settled[minerId] = day;
-  return { settled, stale };
+  return { settled, stale, paid };
 }
 
 /**
@@ -2003,6 +2048,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       });
       if (same?.kind === 'held' || (same && sent.some((p) => p.transferId === same.id)))
         fail('already-exists', 'That transfer is already in the book', 'transfer-in-book');
+      await requireOpenMiner(c, action.minerId);
       const uid = `char:${action.characterId}`;
       const uids = paymentUids(await minerUids(c, action.minerId), uid);
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
@@ -2038,7 +2084,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       // More of it not tax is money taken off its Miner.
       if (action.notTaxAmount > ((payment.notTaxAmount as number | undefined) ?? 0))
-        await releasePaidThrough(c, payment.minerId as string | undefined);
+        await releasePaidThrough(c, payment.minerId as string | undefined, {
+          beforeAt: String(payment.at ?? ''),
+        });
       staleCheckpoints(c, [payment.minerId as string | undefined], earliestDay(payment.at));
       tx.update(ref, {
         notTaxAmount: action.notTaxAmount,
@@ -2074,6 +2122,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const payment = await mustGet(c, ref, 'Payment');
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
+      await requireOpenMiner(c, action.minerId);
       const uids = paymentUids(await minerUids(c, action.minerId), payment.uid);
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       staleCheckpoints(c, [action.minerId], earliestDay(payment.at));
@@ -2095,8 +2144,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const from = typeof payment.minerId === 'string' ? payment.minerId : null;
       if (from === action.minerId)
         return { detail: { paymentId: action.paymentId, from, to: from } };
+      if (action.minerId !== null) await requireOpenMiner(c, action.minerId);
       const readers = action.minerId === null ? [] : await minerUids(c, action.minerId);
-      await releasePaidThrough(c, from);
+      await releasePaidThrough(c, from, { beforeAt: String(payment.at ?? '') });
       staleCheckpoints(c, [from, action.minerId], earliestDay(payment.at));
       tx.update(ref, {
         minerId: action.minerId ?? FieldValue.delete(),
@@ -2756,7 +2806,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'recordAccounts': {
       // Every book is a running account (decision 20261117-060555).
       const paidRef = col(c, META).doc(PAID_DOC);
-      const { settled, stale } = await storableSettledThrough(c, action.accounts, paidRef, iso);
+      const { settled, stale, paid } = await storableSettledThrough(
+        c,
+        action.accounts,
+        paidRef,
+        iso
+      );
       // Every editor's open tab records the same figures (#6313): one already stored is not
       // written again, so a second tab adds no write and no newer `at`/`by`.
       const refs = action.accounts.map((a) => col(c, RUNNING_ACCOUNTS).doc(a.minerId));
@@ -2774,9 +2829,25 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         tx.set(refs[i], { ...a, at: iso, by });
         written.push(a);
       });
-      // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
+      // Only ever grown here (D22); money taken off later rolls it back to the day recorded
+      // before that money came in, so each advance is kept with when it was recorded.
       if (Object.keys(settled).length > 0)
-        tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
+        tx.set(
+          paidRef,
+          {
+            minerPaidThrough: settled,
+            paidHistory: Object.fromEntries(
+              Object.entries(settled).map(([id, day]) => [
+                id,
+                withPaidAdvance(
+                  (paid?.paidHistory as Record<string, PaidAdvance[]> | undefined)?.[id],
+                  { day, at: iso }
+                ),
+              ])
+            ),
+          },
+          { merge: true }
+        );
       advanced.forEach((id, i) =>
         tx.set(col(c, MINER_PAID).doc(id), { id, paidThrough: settled[id], uids: advancedUids[i] })
       );
