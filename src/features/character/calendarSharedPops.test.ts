@@ -4,8 +4,9 @@ import { buildCharacterBoard } from '@/engine/character/board';
 import { filterByCorporation, filterBySharingCorporation } from '@/engine/character/deadlines';
 import { parseStartLink, popOfStartLink } from '@/features/survey/startLink';
 import type { SharedPopView } from '@/sync/sharedPops';
-import type { BoardCalendarEventSource } from '@/engine/character/board';
+import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import {
+  boardSourcesWithSharedPops,
   dropEventsOfSharedPops,
   sharedPopIsShown,
   sharedPopMiningState,
@@ -350,6 +351,47 @@ describe('Calendar events a Shared Pop already shows', () => {
       retainUntil: iso(NOW - 1),
     });
     expect(drop([e], [gone])).toEqual(['1']);
+  });
+});
+
+describe('the board sources with Shared Pops resolved', () => {
+  const popAt = NOW + 10 * HOUR_MS;
+  const named = entry({ refineryName: 'Ainsan - Foil Finish Foundry', popAt: iso(popAt) });
+  const fleet: BoardCalendarEventSource = {
+    id: '1',
+    subject: 'Ainsan Foil Finish',
+    detail: '',
+    deadlineMs: popAt,
+    response: 'accepted',
+    important: false,
+  };
+  const other: BoardCalendarEventSource = { ...fleet, id: '2', subject: 'Alliance meeting' };
+  const data = {
+    calendarEvents: [fleet, other],
+    sharedMoonPops: [] as BoardClockSource[],
+    sharedPops: [named],
+    readableRefineries: [],
+    loadedAtMs: NOW,
+  };
+
+  it('drops the event that is the pop and rebuilds the pop rows at the chosen Pop Time', () => {
+    const out = boardSourcesWithSharedPops(data, 'asShared');
+    expect(out.calendarEvents?.map((e) => e.id)).toEqual(['2']);
+    expect(out.sharedMoonPops?.map((p) => p.id)).toEqual(['98000001_x1']);
+  });
+
+  it('takes the events it is given (the RSVP overrides) in place of the read ones', () => {
+    const out = boardSourcesWithSharedPops(data, 'asShared', [{ ...other, response: 'declined' }]);
+    expect(out.calendarEvents).toEqual([{ ...other, response: 'declined' }]);
+  });
+
+  it('leaves a source that could not be read unread', () => {
+    const out = boardSourcesWithSharedPops(
+      { ...data, calendarEvents: undefined, sharedMoonPops: undefined },
+      'asShared'
+    );
+    expect(out.calendarEvents).toBeUndefined();
+    expect(out.sharedMoonPops).toBeUndefined();
   });
 });
 

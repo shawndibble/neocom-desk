@@ -11,6 +11,7 @@
 
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { HubPrices, SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface ProductSellNowInput {
   productTypeID: number;
@@ -23,6 +24,8 @@ export interface ProductSellNowInput {
   totalCost: number;
   /** On the sell-value basis, what the owned materials would net if sold instead. */
   forgone?: number;
+  /** The sale hub's resolved standing (its temporary fee discount rides on it). Absent keeps standard rates. */
+  standing?: ResolvedStandings;
 }
 
 export interface ProductSellNow {
@@ -47,6 +50,7 @@ export function productSellNow({
   skills,
   totalCost,
   forgone = 0,
+  standing,
 }: ProductSellNowInput): ProductSellNow | null {
   if (productQuantity <= 0) return null;
   const sale = ownedStockSale(
@@ -64,7 +68,8 @@ export function productSellNow({
     ],
     hubBuyPrices,
     'instant',
-    skills
+    skills,
+    standing
   );
   const line = sale.lines[0];
   if (!line) return null;

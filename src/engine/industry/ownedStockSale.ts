@@ -167,7 +167,7 @@ export function ownedStockSale(
     }
 
     const gross = material.ownedQuantity * unitPrice;
-    const tax = salesTax(gross, accounting);
+    const tax = salesTax(gross, accounting, standing?.feeDiscountFactor);
     // One order per material, so the 100 ISK minimum bites per stack listed —
     // which is exactly why listing a small stack can net less than filling a
     // buy order does.
@@ -178,7 +178,8 @@ export function ownedStockSale(
             brokerRelations,
             standing?.factionStanding,
             standing?.corpStanding,
-            standing?.safetyTaxPct
+            standing?.safetyTaxPct,
+            standing?.feeDiscountFactor
           )
         : 0;
     lines.push({

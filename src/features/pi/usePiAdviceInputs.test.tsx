@@ -72,7 +72,7 @@ describe('usePiAdviceInputs', () => {
       if (result.current.status !== 'prices-failed' || !result.current.input)
         throw new Error('wait');
     });
-    expect(hubBooks).toHaveBeenLastCalledWith({ prices: {}, buyPrices: {} }, 0);
+    expect(hubBooks).toHaveBeenLastCalledWith({ prices: {}, buyPrices: {} }, 0, 1);
   });
 
   it('reports prices-failed when the loader throws a 503', async () => {

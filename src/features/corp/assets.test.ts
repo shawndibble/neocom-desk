@@ -358,6 +358,29 @@ describe('corp asset labels', () => {
     expect(names.size).toBe(0);
   });
 
+  it('keeps an Upwell structure an office sits in, which ESI types as an item', () => {
+    const STRUCTURE_ID = 1_053_725_032_929;
+    const OFFICE_ID = 1_060_000_000_001;
+    const assets: CorporationAsset[] = [
+      {
+        ...ASSETS[0],
+        item_id: OFFICE_ID,
+        type_id: 27,
+        location_id: STRUCTURE_ID,
+        location_type: 'item',
+        location_flag: 'OfficeFolder',
+      },
+      {
+        ...ASSETS[1],
+        item_id: OFFICE_ID + 1,
+        location_id: OFFICE_ID,
+        location_type: 'item',
+        location_flag: 'CorpSAG5',
+      },
+    ];
+    expect(assetPlaceIds(assets)).toEqual([STRUCTURE_ID]);
+  });
+
   it('looks up only the real structures however many containers hold assets', async () => {
     const FLOOR = 1_000_000_000_000;
     const STRUCTURES = [FLOOR + 900, FLOOR + 901];

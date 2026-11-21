@@ -803,6 +803,7 @@ function CorpAssetsView({
                       <CorpAssetLocationTable
                         rows={locationRows}
                         labels={labels}
+                        assetNames={assetNames}
                         onOpenRow={openLocationRow}
                         renderToolbar={(picker, exportMenu) => (
                           <div className="border-b border-line p-3">

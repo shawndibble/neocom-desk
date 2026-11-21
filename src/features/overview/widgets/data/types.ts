@@ -13,8 +13,10 @@ import type { EsiEndpointId } from '@/esi/registry';
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { ExtractionPrices } from '@/features/character/useExtractionPrices';
 import type { OpenOrdersPageSnapshot } from '@/features/market/openOrdersPageSnapshot';
+import type { CalendarBoardData } from '@/features/character/calendarBoardData';
+import type { SharedPopTimePref } from '@/features/character/calendarSharedPops';
+import type { CharacterBoardItemKind } from '@/engine/character/board';
 import type {
-  CalendarEventsBoardData,
   ContractsBoardData,
   IndustryBoardData,
   MailBoardData,
@@ -330,7 +332,8 @@ export interface FeedMap {
   planetary: PlanetaryBoardData;
   industry: IndustryBoardData;
   contracts: ContractsBoardData;
-  calendar: CalendarEventsBoardData;
+  /** The Calendar page's whole board read: every clock the Character can read. */
+  calendar: CalendarBoardData;
   mail: MailBoardData;
   priceAlerts: PriceAlertsBoardData;
   /** `board` is null when the pilot stocks no market. */
@@ -406,8 +409,10 @@ export interface BuildContext {
   range: WidgetRange;
   /** The widget's Omega plan (PLEX per 30 days), for kinds that read one. */
   plexPer30Days?: number;
-  /** Which calendar events a Coming up widget lists; left out, accepted and tentative. */
+  /** Which calendar events a Calendar widget lists; left out, accepted and tentative. */
   calendarEvents?: CalendarEventsChoice;
+  /** The Clock Kinds a Calendar widget leaves out; left out, none. */
+  hiddenKinds?: CharacterBoardItemKind[];
   /** Skyhook raids: whose space it lists; left out, My alliance. */
   raidsWhere?: RaidsWhere;
   /** Skyhook raids Near me: the jumps radius; left out, the default. */
@@ -424,4 +429,6 @@ export interface BuildContext {
   show?: WidgetShow;
   /** The Time format clock days are cut on (`useTimeZone`); left out, the machine's own. */
   zone?: DayZone;
+  /** The Calendar's Pop Time choice for Shared Pops (`useSharedPopTime`); left out, as shared. */
+  sharedPopTime?: SharedPopTimePref;
 }

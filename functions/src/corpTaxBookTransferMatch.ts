@@ -11,8 +11,7 @@
 //   journal entry. The Collector chose the amount, so it must be exact; both sides are dates, so
 //   the window is whole days.
 
-const MINUTE_MS = 60_000;
-const DAY_MS = 86_400_000;
+import { DAY_MS, MINUTE_MS } from './timeConstants.js';
 
 /** How far apart two journals stamp one transfer. */
 export const SAME_TRANSFER_MS = 10 * MINUTE_MS;

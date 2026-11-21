@@ -46,4 +46,18 @@ describe('orderFees', () => {
     });
     expect(orderFees(order, ctx).fees).toBeLessThan(worse.fees);
   });
+
+  it('halves both rates under a hub fee discount, and a buy order still pays only the sales tax', () => {
+    const discounted: OrderFeeContext = {
+      ...ctx,
+      standing: { ...ctx.standing, feeDiscountFactor: 0.5 },
+    };
+    const sell = orderFees({ price: 1_000, is_buy_order: false }, discounted);
+    const plain = orderFees({ price: 1_000, is_buy_order: false }, ctx);
+    expect(sell.fees).toBeCloseTo(plain.fees / 2, 9);
+    expect(orderFees({ price: 1_000, is_buy_order: true }, discounted).fees).toBeCloseTo(
+      1_000 * pct(salesTaxPct(5)) * 0.5,
+      9
+    );
+  });
 });

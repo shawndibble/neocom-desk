@@ -33,7 +33,7 @@ describe('estimatedBodyHeight', () => {
   });
 
   it('reserves the header row and the size rows for the Table view, plain rows taller on a phone', () => {
-    // Coming up at Medium: the headline, a labelled header row and five rows.
+    // Calendar at Medium: the headline, a labelled header row and five rows.
     expectNear(est('comingUp', 'table', 'M', false), 216);
     expectNear(est('comingUp', 'table', 'M', true), 236);
     expect(est('comingUp', 'table', 'L', false)).toBeGreaterThan(

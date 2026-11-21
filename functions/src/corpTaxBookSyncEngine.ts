@@ -6,6 +6,7 @@
 // that runs both copies on the same inputs. Change the engine first, then this
 // file. Dependency-free apart from its sibling mirror, so that test can import it.
 
+import { utcDay } from './timeConstants.js';
 import {
   moonOnDay,
   shiftDate,
@@ -72,8 +73,6 @@ export interface GapInput {
   oldestEsiDate: Readonly<Record<number, string | undefined>>;
   retentionDays?: number;
 }
-
-const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Engine `detectGaps`. */
 export function detectGaps(input: GapInput): SyncGap[] {

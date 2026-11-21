@@ -123,7 +123,10 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   const unpriceable = unpricedMaterials.length > 0 || !productPriced;
 
   const revenue = productPriced ? product.quantity * runs * productPrice : null;
-  const tax = revenue === null ? null : salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
+  const tax =
+    revenue === null
+      ? null
+      : salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0, standing?.feeDiscountFactor);
   const broker =
     revenue === null
       ? null
@@ -132,7 +135,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
           skills[SKILL_IDS.brokerRelations] ?? 0,
           standing?.factionStanding,
           standing?.corpStanding,
-          standing?.safetyTaxPct
+          standing?.safetyTaxPct,
+          standing?.feeDiscountFactor
         );
   const netRevenue =
     revenue === null || tax === null || broker === null ? null : revenue - tax - broker;
@@ -162,7 +166,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     skills[SKILL_IDS.brokerRelations] ?? 0,
     standing?.factionStanding,
     standing?.corpStanding,
-    standing?.safetyTaxPct
+    standing?.safetyTaxPct,
+    standing?.feeDiscountFactor
   );
 
   return {

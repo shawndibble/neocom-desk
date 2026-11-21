@@ -45,7 +45,12 @@ import {
   BpcSourcingPanel,
   type BpcSourcingHeaderState,
 } from '@/features/bpcContracts/BpcSourcingPanel';
-import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
+import {
+  mostRecentlyUpdatedPlan,
+  newBuildPlan,
+  newPlanHub,
+} from '@/features/industry/newBuildPlan';
+import { useHubFor } from '@/features/market/hub';
 import {
   blueprintPriceSourcing,
   clearPlanSeed,
@@ -81,7 +86,6 @@ import type {
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -131,6 +135,9 @@ export function Industry() {
   const navigate = useNavigate();
   const location = useLocation();
   const workspace = useIndustryWorkspace();
+  // Read so the page re-renders, and re-prices, when the Industry page hub changes, and so a new
+  // plan (`newPlanHubId`) never starts before page hubs are read.
+  const { hydrated: industryHubHydrated } = useHubFor('industry');
   const {
     activeCharacterId,
     hydrated,
@@ -557,7 +564,7 @@ export function Industry() {
     return map;
   }, [groups, groupedPlans, groupedRows]);
 
-  if (!hydrated) {
+  if (!hydrated || !industryHubHydrated) {
     return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
@@ -779,10 +786,11 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
-  // The Trade Hub a new plan starts at (the latest plan's), not a fixed default: rows price
-  // with the settings the plan page uses, and a click opens a plan with those same settings.
+  // The Trade Hub a new plan starts at (`newPlanHubId`: the Industry page hub, else the latest
+  // plan's), not a fixed default: rows price with the settings the plan page uses, and a click
+  // opens a plan with those same settings.
   const latestPlan = mostRecentlyUpdatedPlan(plans);
-  const marketWideHub = (latestPlan && getTradeHub(latestPlan.hubId)) ?? DEFAULT_TRADE_HUB;
+  const marketWideHub = newPlanHub(latestPlan);
   // Not mounted until the plans have loaded: the hub it prices at is the latest plan's,
   // and a scan restored at Jita would flip when that lands.
   const marketWidePanel = catalog && plans !== undefined && (

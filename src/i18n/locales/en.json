@@ -1095,7 +1095,7 @@
       "unknownItemCount": "{{name}} ×{{count}}",
       "unknownItemsMore_one": "…and {{count}} more",
       "unknownItemsMore_other": "…and {{count}} more",
-      "priceSell": "Buy now at Jita: {{value}} ISK",
+      "priceSell": "Buy now at {{hub}}: {{value}} ISK",
       "priceHub": "Priced at",
       "manage": "Manage",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
@@ -3813,6 +3813,7 @@
       "revenue": "Sum of every confirmed sale: linked past wallet transactions plus filled watched orders.",
       "revenueFormula": "Gross revenue = {{revenue}}",
       "feesTitle": "Sales tax and broker fee",
+      "feeDiscount": "A temporary market discount at this hub cuts both rates by {{pct}} (sales tax and broker fee; the 100 ISK minimum and any Safety Tax are unchanged). The rates below already include it.",
       "salesTax": "Sales tax applies to all gross revenue. Accounting {{accounting}} sets the rate ({{pct}}).",
       "salesTaxFormula": "Sales tax = {{tax}}",
       "brokerFee": "Broker fee applies only to sales from a watched sell order. It is not charged on a linked wallet sale, because the wallet can't say if that was an instant sale or an order fill. Broker Relations {{broker}} and standings toward the station owner ({{factionStanding}} faction, {{corpStanding}} corp) set the rate ({{pct}}), 100 ISK minimum per order.",
@@ -4140,6 +4141,7 @@
       "sellNowFormulaSellValue": "{{quantity}} units × {{unitPrice}} = {{gross}} − sales tax {{tax}} − total cost {{total}} − your materials {{forgone}} = {{profit}}",
       "sellNowDepth": "Priced at the highest buy order. A large quantity may sell for less.",
       "sellNowNone": "{{hub}} has no buy orders for {{product}}, so there is no Sell now figure.",
+      "feeDiscount": "{{hub}} has a temporary market discount: sales tax and broker fee are both {{pct}} lower than the skill rates. It lapses on its own at an assumed end date. The 100 ISK minimum and any Safety Tax are unchanged.",
       "fees": "From your skills: Accounting {{accounting}} sets sales tax, Broker Relations {{broker}} sets broker fee. Standings toward the station owner: {{factionStanding}} faction, {{corpStanding}} corp.",
       "feesFormula": "Sales tax {{taxPct}} = {{tax}} · broker fee {{brokerPct}} = {{broker}}",
       "profitTitle": "Profit",
@@ -6070,15 +6072,15 @@
         }
       },
       "comingUp": {
-        "title": "Coming up",
-        "description": "Calendar events you accepted or may attend",
-        "empty": "No accepted or tentative events ahead.",
-        "emptyAll": "No events ahead.",
+        "title": "Calendar",
+        "description": "What comes up next on your Calendar: events, timers, jobs and the rest",
+        "empty": "Nothing ahead.",
+        "allHidden": "Every type is switched off. Turn one on from this widget's menu.",
         "more": "+{{count}} more in 24h",
         "col": {
-          "event": "Event",
+          "item": "What",
           "in": "In",
-          "response": "Response"
+          "kind": "Type"
         }
       },
       "contracts": {
@@ -6848,10 +6850,13 @@
           "jumps_other": "{{count}} jumps"
         },
         "comingUp": {
-          "note": "Stratop fleet forms · 2 events ahead",
+          "note": "Stratop fleet forms · 2 more today",
           "fleet": "Stratop fleet",
-          "forms": "Forms",
-          "meeting": "Alliance meeting"
+          "forms": "Calendar event",
+          "timer": "Efa - Tatara armor timer",
+          "timerKind": "Structure timer",
+          "job": "Raven Navy Issue",
+          "jobKind": "Industry job"
         },
         "contracts": {
           "unit": "couriers due",
@@ -6896,7 +6901,7 @@
       "titleLater": "Start from a role",
       "body": "Pick all that apply. We set up your Overview from your picks, and you can change any widget later.",
       "group": "Roles",
-      "always": "Always included: Wallet, Training, Coming up and Mail.",
+      "always": "Always included: Wallet, Training, Calendar and Mail.",
       "build": "Build my Overview",
       "basics": "Just the basics",
       "cancel": "Cancel",
@@ -6963,6 +6968,8 @@
       "trendFollowQuickbar": "Follow my Quickbar",
       "trendCancel": "Cancel",
       "trendSave": "Save",
+      "types": "Types",
+      "typesHidden": "Types ({{count}} hidden)",
       "events": "Events",
       "eventsChoice": {
         "committed": "Accepted and tentative",
@@ -11329,6 +11336,20 @@
       "cueLabel": "Buyback contract"
     }
   },
+  "pageHubs": {
+    "global": "Global",
+    "fieldLabel": "{{hub}}, {{label}}",
+    "scopeLabel": "Hub used here",
+    "hubLabel": "Trade Hub",
+    "area": {
+      "fittings": "Ship Fit Costs",
+      "skills": "Skills",
+      "contracts": "Contracts",
+      "industry": "Industry",
+      "lpStore": "LP Store",
+      "corpSrp": "Corp SRP"
+    }
+  },
   "contractDetail": {
     "regionLabel": "Region",
     "showMoreItems_one": "Show {{count}} more item",
@@ -11355,6 +11376,7 @@
     "priceCheckBuy": "Buy orders",
     "priceCheckSell": "Sell orders",
     "priceCheckShowSide": "Show {{side}}",
+    "priceCheckHubMenu": "{{hub}}, choose another Trade Hub",
     "priceCheckAsking": "Asking price",
     "priceCheckDifference": "Difference",
     "priceCheckSaving": "Saving",
@@ -14941,7 +14963,7 @@
           "settings": "These preferences. Every other preference stays on this device:",
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
-            "defaults": "Defaults: trade hub (the default, and the trade hub of each character), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
+            "defaults": "Defaults: trade hub (the default, the trade hub of each character, and the trade hub of each page you set one for), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
@@ -15453,6 +15475,15 @@
     "tradeHubHidePerCharacter": "Hide per character",
     "tradeHubFor": "Trade Hub for {{name}}",
     "tradeHubApplyAll": "Apply default to all",
+    "pageHubsLabel": "Page hubs",
+    "pageHubsNote": "Pages that price at their own Trade Hub instead of your Trade Hub above. Each page's hub menu can switch between the two.",
+    "pageHubFor": "Trade Hub for {{page}}",
+    "pageHubAdd": "Add page hub",
+    "pageHubAddOne": "Add {{page}} hub",
+    "pageHubRemove": "Remove",
+    "pageHubRemoveFor": "Remove {{page}} hub",
+    "pageHubRemoved": "{{page}} uses your Trade Hub again",
+    "pageHubUndo": "Undo",
     "courierCollateralLabel": "Flag courier collateral at",
     "courierCollateralHint": "Shows a High collateral warning when a courier contract's collateral is this many times its reward or more.",
     "courierCollateralOption": "{{count}}× reward",
@@ -15460,7 +15491,7 @@
     "itemContractFlagHint": "On the Items board, flags an item contract that asks this many times the hub's buy-now price. A blueprint copy is flagged when it asks more than the original, whatever this says.",
     "itemContractFlagOption": "{{count}}× hub price",
     "bpcMarketHubLabel": "Market hub",
-    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the active character’s Trade Hub in Settings › Market defaults.",
+    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. The Industry hub: your Trade Hub, unless Industry has its own in Settings › Page hubs.",
     "bpcHideAuctionsLabel": "Hide auctions",
     "bpcHidePlexLabel": "Hide PLEX contracts",
     "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens. You can change it per search in the filter bar.",
@@ -15995,6 +16026,8 @@
       "groupTotals_other": "{{count, number}} items · {{value}} ISK",
       "emptyOffice": "Empty office",
       "nothingStored": "Nothing stored here",
+      "contentsOf": "Contents of {{place}}",
+      "stackValue": "{{value}} ISK",
       "divisionsInUse": "{{count}} of 7 divisions in use",
       "noMatchesTitle": "Nothing matches",
       "noMatchesHint": "Clear the search or a filter, or pick another tab.",
@@ -20537,6 +20570,7 @@
       "absenceNote": "Small dim text at a row's right edge: the row's item has none of something here; the row is not dimmed and stays clickable",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",
+      "hubMenu": "Hub in a readout, accent with a dashed underline: opens Global · <page> and the hub list",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
@@ -20610,6 +20644,8 @@
       "hintContent": "The full name, in a tooltip.",
       "figureHistory": "4.4%",
       "figureBreakdown": "1.6M",
+      "hubMenuTitle": "Is it fair?",
+      "hubMenu": "Jita 4-4",
       "communityMark": "Shared in a Community",
       "channelOffLabel": "Device",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",

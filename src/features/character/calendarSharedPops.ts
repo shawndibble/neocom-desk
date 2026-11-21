@@ -214,3 +214,34 @@ export function dropEventsOfSharedPops<T extends BoardCalendarEventSource>(
     );
   });
 }
+
+/** What `boardSourcesWithSharedPops` reads from a Calendar board read. */
+export interface SharedPopBoardInput {
+  calendarEvents?: BoardCalendarEventSource[];
+  sharedMoonPops?: BoardClockSource[];
+  sharedPops: SharedPopEntry[];
+  readableRefineries: number[];
+  loadedAtMs: number;
+}
+
+/**
+ * The board's sources as the Calendar shows them: a pop the corp also put in the in-game calendar
+ * is one row (the pop, at the viewer's Pop Time), not the event too. `calendarEvents` replaces the
+ * read events (the page's RSVP overrides). A source that was not read stays `undefined`.
+ * Shared by the Calendar page and the Overview's Calendar widget so both list the same rows.
+ */
+export function boardSourcesWithSharedPops<D extends SharedPopBoardInput>(
+  data: D,
+  pref: SharedPopTimePref,
+  calendarEvents: BoardCalendarEventSource[] | undefined = data.calendarEvents
+): D {
+  const readable = new Set(data.readableRefineries);
+  return {
+    ...data,
+    calendarEvents:
+      calendarEvents &&
+      dropEventsOfSharedPops(calendarEvents, data.sharedPops, readable, data.loadedAtMs, pref),
+    sharedMoonPops:
+      data.sharedMoonPops && toSharedPopSources(data.sharedPops, readable, data.loadedAtMs, pref),
+  };
+}

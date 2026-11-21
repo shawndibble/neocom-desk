@@ -579,6 +579,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes, entered by hand because ESI cannot read the game client's own autopilot avoidance list. Part of **Travel Settings**; not a **Route Preference**.
 - **Route Preference**: Which trip a distance describes: the game's Prefer shorter, Prefer safer or Prefer less secure, one vocabulary app-wide. The pilot's default lives in **Travel Settings**; a page with its own picker opens on it and overrides it for that view only.
 - **Travel Settings**: The in-game autopilot's route options, for planning: the default **Route Preference**, the security penalty, and what to avoid (the **Avoided Systems**, EDENCOM and Triglavian minor-victory systems, and systems over a pod-kill count in ESI's last-hour report).
+- **Fee Discount**: A temporary multiplier on a **Trade Hub**'s sales tax and broker fee rates, applied after skills and standings. Amarr VIII has 0.5 (the Deaconry of Economic Oversight) until an assumed end date (`TradeHub.feeDiscount`, `hubFeeDiscountFactor`). It never scales the broker fee's 100 ISK minimum or a **Safety Tax**.
 - **Safety Tax**: Exordium's extra market charge, 5% of an order's value, paid when a non-instant buy or sell order is placed. Its own line beside the broker fee and sales tax; instant trades and relists pay none, and the broker fee's 100 ISK minimum does not absorb it (`TradeHub.safetyTaxPct`).
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate from material cost. Sized from EIV, the system's **Cost Index**, a fixed SCC surcharge, the facility's tax, and, in Exordium, the region's own Exordium Industrial Tax (5% of EIV).
 - **Max Production Limit**: The most runs one job may be installed for, a property of the blueprint (`maxProductionLimit`; absent means no cap). A Build Plan node past it is built as several jobs of near-equal runs that run in parallel. Distinct from `MAX_JOB_RUNS`, the app's own clamp on a plan's runs.
@@ -807,6 +808,8 @@ here — they go one per file in `docs/context/decisions/`.
   the pilot builds. Distinct from the **Corp Board** (`/corp`), which
   answers the same question for a corporation.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan. Five empire hubs (Jita, Amarr, Dodixie, Rens, Hek) plus **Manifest**, Exordium's starter hub, which every-hub views leave out.
+- **Global hub**: The Trade Hub every page prices at unless it has a **Page hub**: the active Character's hub, else the account default (Settings' Default Trade Hub). `useMarketHub` in code.
+- **Page hub**: A Trade Hub one page area (Market, Contracts, Ship Fit Costs, …) prices at instead of the **Global hub**, set in Settings › Page hubs or by switching that page's hub menu from Global to the page. Account-wide. `sync.pageHubs`; read with `useHubFor(area)`.
 - **Hauling Opportunities**: The Market page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
 - **Selling into buy orders**: Shown as **Sell now** in the Hauling mode picker, against **Sell order** for listing. (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, with no **Days to Sell** or demand.
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing.
@@ -832,7 +835,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in their own words, what leaves their device. Not documentation but a **commitment**: the **Synced Collection** registry is the authoritative set, and every synced collection must be accounted for. Names its own exceptions (Notification Feed rows, Scheduled Push occurrences, crash reports) rather than rounding them off.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants: five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values. Stored on the Skill Plan and synced with it.
 - **Widget**: One tile on a **Widget board** (the Overview or the **Corp Board**): an instance of a **Widget Kind** with
-  its own **Size**, **View**, optional rename, character scope and range. The
+  its own **Size**, **View**, optional rename, character scope and range, plus
+  any setting its kind adds (the Calendar widget's Types and Events). The
   same kind may appear more than once. Always in one **Widget State**.
 - **Widget board**: A page drawn as a **Widget** grid: the Overview or the
   **Corp Board**. One engine (grid, Customize, **Gallery**, menu) with the

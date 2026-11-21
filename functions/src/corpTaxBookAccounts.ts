@@ -1,9 +1,14 @@
 /**
- * A running account's figures on the verify link (#6294). Pure and dependency-free, so the root
- * parity test (`functionsMirror.test.ts`) can check its payment sum against the client's `netOf`.
+ * A running account's figures on the verify link (#6294). Pure and dependency-free: the client
+ * imports `netPayment` (`src/engine/corpTaxBook/payments.ts`), and the root parity test
+ * (`functionsMirror.test.ts`) checks `liveAccount` against it.
  */
 type Data = Record<string, unknown>;
 
+/**
+ * A day a Running account still owes, as an officer's tab records it (`RecordedAccount.unpaidDays`)
+ * and the verify page lists it: the one shape of an owed day on both sides.
+ */
 export interface OwedDay {
   date: string;
   /** What is still owed of the day. */
@@ -12,11 +17,8 @@ export interface OwedDay {
   tax: number;
 }
 
-/**
- * A payment's tax: its amount less what an officer marked not tax. The one copy of the rule the
- * client's `netOf` (src/engine/corpTaxBook/paymentPreview.ts) repeats: it can import this instead.
- */
-export const netPayment = (p: Data): number => {
+/** A payment's tax: its amount less what an officer marked not tax, never below zero. */
+export const netPayment = (p: { amount?: unknown; notTaxAmount?: unknown }): number => {
   const amount = Number(p.amount) || 0;
   return Math.max(0, amount - Math.min(Number(p.notTaxAmount) || 0, amount));
 };
@@ -31,10 +33,31 @@ export function paidSinceRecord(recorded: Data, payments: readonly Data[]): numb
 }
 
 /**
+ * Pays `amount` into `days` (oldest first) the way a Running account does: the oldest day first,
+ * then part of the next. What each still owes after, and the dates paid in full; a day left owing
+ * no more than `tolerance` reads as paid.
+ */
+export function payOldestFirst<D extends { date: string; owed: number }>(
+  days: readonly D[],
+  amount: number,
+  tolerance = 0
+): { unpaid: D[]; paid: string[] } {
+  const unpaid: D[] = [];
+  const paid: string[] = [];
+  let left = Math.max(0, amount);
+  for (const d of days) {
+    const take = Math.min(d.owed, left);
+    left -= take;
+    if (d.owed - take <= tolerance) paid.push(d.date);
+    else unpaid.push(take > 0 ? { ...d, owed: d.owed - take } : d);
+  }
+  return { unpaid, paid };
+}
+
+/**
  * A recorded running account less what the Miner paid since: their net payments now (less "not
- * tax") beyond the ones the officer's client counted, whenever each was synced. The money pays
- * what the client counted, oldest first: what the running days did not cover (older Statements),
- * then the recorded days oldest first, as the book's own allocation does.
+ * tax") beyond the ones the officer's client counted, whenever each was synced, paying the
+ * recorded days oldest first (`payOldestFirst`).
  */
 export function liveAccount(
   recorded: Data,
@@ -45,43 +68,39 @@ export function liveAccount(
   oldest: string | null;
   paidThrough: string | null;
   asOf: string;
+  /** The credit the record counted, and what the Miner paid since beyond what it said they owed. */
+  credit: number;
   /** The running days still owed after those payments; absent when the client recorded none. */
   unpaidDays?: OwedDay[];
 } {
   const since = paidSinceRecord(recorded, payments);
-  const owed = Math.max(0, (Number(recorded.owed) || 0) - since);
+  const recordedOwed = Number(recorded.owed) || 0;
+  const owed = Math.max(0, recordedOwed - since);
   const recordedDays = Array.isArray(recorded.unpaidDays)
     ? (recorded.unpaidDays as OwedDay[])
     : undefined;
-  let unpaidDays: OwedDay[] | undefined;
-  let days = Number(recorded.days) || 0;
-  let oldest = (recorded.oldest as string | undefined) ?? null;
-  if (recordedDays) {
-    const covered = recordedDays.reduce((sum, d) => sum + d.owed, 0);
-    // What older Statements owe: they take the new money before any running day.
-    // A few ISK of per-day rounding is no Statement debt.
-    const gap = Math.max(0, (Number(recorded.owed) || 0) - covered);
-    const olderStatements = gap <= recordedDays.length + 1 ? 0 : gap;
-    let left = Math.max(0, since - olderStatements);
-    unpaidDays = [];
-    for (const d of recordedDays) {
-      const take = Math.min(d.owed, left);
-      left -= take;
-      if (d.owed - take > 0) unpaidDays.push({ ...d, owed: d.owed - take });
-    }
-    days = Math.max(0, days - (recordedDays.length - unpaidDays.length));
-    // The oldest owed day moves on once the days before it are paid; older Statements keep theirs.
-    if (olderStatements - since <= 0 && unpaidDays.length > 0) oldest = unpaidDays[0].date;
-  }
+  const unpaidDays = recordedDays && payOldestFirst(recordedDays, since).unpaid;
+  const recordedCount = Number(recorded.days) || 0;
+  const days = recordedDays
+    ? Math.max(0, recordedCount - (recordedDays.length - unpaidDays!.length))
+    : recordedCount;
+  const oldest =
+    unpaidDays && unpaidDays.length > 0
+      ? unpaidDays[0].date
+      : ((recorded.oldest as string | undefined) ?? null);
   return {
     owed,
     days: owed > 0 ? days : 0,
     oldest: owed > 0 ? oldest : null,
     paidThrough: (recorded.paidThrough as string | undefined) ?? null,
     asOf: recorded.at as string,
+    credit: (Number(recorded.credit) || 0) + Math.max(0, since - recordedOwed),
     ...(unpaidDays ? { unpaidDays } : {}),
   };
 }
+
+/** A Running account as the verify page shows it (`VerifyPayload.account`). */
+export type LiveAccount = ReturnType<typeof liveAccount>;
 
 /**
  * The Miner's mined days for the verify page's ledger: each date once, from the newest Late notice

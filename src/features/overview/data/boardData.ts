@@ -30,7 +30,6 @@ import {
   summarizeContractsBoard,
   type ContractsBoardSummary,
 } from '@/engine/contracts/contractsBoard';
-import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
@@ -48,7 +47,6 @@ import type {
 } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { PopShareMark } from '@/engine/corpTaxBook/popShareMarks';
-import type { CalendarEventSummary } from '@/esi/endpoints';
 import type { CorpLabel } from '@/features/corp/corpTicker';
 import { DAY_MS } from '@/lib/age';
 
@@ -370,26 +368,6 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   const soonestRoute = soonest ? routes[soonest.contractId] : undefined;
   const route = soonestRoute ? `${soonestRoute[0]} → ${soonestRoute[1]}` : null;
   return { summary, route, routes, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
-}
-
-// --- Calendar ---------------------------------------------------------------
-
-export interface CalendarEventsBoardData {
-  events: CalendarEventSummary[];
-  needsReauth: boolean;
-  fetchedAt: Date | null;
-}
-
-/**
- * The pilot's calendar, for the "Next deadline" strip's calendar candidate
- * (`engine/calendarDeadline`) — not a card of its own, so this is the whole
- * event list rather than anything already summarised.
- */
-export async function loadCalendarEventsBoard(
-  characterId: number
-): Promise<CalendarEventsBoardData> {
-  const { cached, needsReauth } = await loadCalendarEvents(characterId);
-  return { events: cached?.data ?? [], needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }
 
 // --- SP extraction ----------------------------------------------------------

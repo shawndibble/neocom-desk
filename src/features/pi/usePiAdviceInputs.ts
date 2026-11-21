@@ -21,6 +21,7 @@ import { loadInterplanetaryConsolidation } from './planetSlots';
 import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
 import { usePiSnapshot } from './usePiSnapshot';
+import { hubFeeDiscountFactor } from '@/market/hubs';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
@@ -225,7 +226,11 @@ function useLiveAdviceInputs(
         customsOverrides: snapshot.customsOverrides,
         richness,
       },
-      books: hubBooks(usable ?? { prices: {}, buyPrices: {} }, snapshot.accountingLevel),
+      books: hubBooks(
+        usable ?? { prices: {}, buyPrices: {} },
+        snapshot.accountingLevel,
+        hubFeeDiscountFactor(hub, snapshot.nowMs)
+      ),
       market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
       cadence,
       preference,
@@ -248,6 +253,6 @@ function useLiveAdviceInputs(
     preference,
     routes,
     systemKey,
-    hub.systemName,
+    hub,
   ]);
 }

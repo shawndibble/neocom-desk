@@ -14,6 +14,7 @@ import {
   WRITE_OFFS,
 } from './corpTaxBook.js';
 import { paymentUids } from './corpTaxBookClaims.js';
+import { soloMinerId } from './corpTaxBookDonationMatch.js';
 import { LEGACY_MINER_KEYED } from './corpTaxBookLegacyMirror.js';
 
 /**
@@ -63,7 +64,7 @@ export function absorbedMinerIds(
   characterIds: readonly number[],
   absorbMinerIds: readonly string[]
 ): string[] {
-  const ids = new Set([...absorbMinerIds, ...characterIds.map((c) => `solo:${c}`)]);
+  const ids = new Set([...absorbMinerIds, ...characterIds.map(soloMinerId)]);
   ids.delete(target);
   return [...ids];
 }
@@ -131,7 +132,8 @@ export function soloTargets(
   const out = new Map<string, string>();
   for (const m of miners)
     for (const c of m.characterIds)
-      if (`solo:${c}` !== m.id && !m.pendingConfirmation?.includes(c)) out.set(`solo:${c}`, m.id);
+      if (soloMinerId(c) !== m.id && !m.pendingConfirmation?.includes(c))
+        out.set(soloMinerId(c), m.id);
   return out;
 }
 

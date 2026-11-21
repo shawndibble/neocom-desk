@@ -430,6 +430,7 @@ function buildRow(
           advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
           factionStanding: standing?.factionStanding,
           corpStanding: standing?.corpStanding,
+          feeDiscountFactor: standing?.feeDiscountFactor,
           structureBrokerPct: ownerPct === undefined ? undefined : structureBrokerPct(ownerPct),
         })
       : null;

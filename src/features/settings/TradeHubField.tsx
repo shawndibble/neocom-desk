@@ -26,7 +26,8 @@ import {
 } from '@/features/market/tradeHubActions';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 
-function HubSelect({
+/** A field select over every Trade Hub, by name; shared by the Settings hub controls. */
+export function HubSelect({
   value,
   onChange,
   label,

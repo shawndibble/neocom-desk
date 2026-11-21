@@ -38,12 +38,13 @@ export function RealizedProfitBreakdown({
   netLoss = 0,
 }: RealizedProfitBreakdownProps) {
   const { t } = useTranslation();
-  const taxPct = salesTaxPct(accountingLevel);
+  const taxPct = salesTaxPct(accountingLevel, standing?.feeDiscountFactor);
   const brokerPct = brokerFeePct(
     brokerRelationsLevel,
     standing?.factionStanding,
     standing?.corpStanding,
-    standing?.safetyTaxPct
+    standing?.safetyTaxPct,
+    standing?.feeDiscountFactor
   );
 
   return (
@@ -69,6 +70,13 @@ export function RealizedProfitBreakdown({
               pct: formatPercent(taxPct),
             })}
           </p>
+          {standing?.feeDiscountFactor !== undefined && (
+            <p>
+              {t('industry.realizedBreakdown.feeDiscount', {
+                pct: formatPercent((1 - standing.feeDiscountFactor) * 100),
+              })}
+            </p>
+          )}
           <Formula>
             {t('industry.realizedBreakdown.salesTaxFormula', {
               tax: formatIsk(profit.salesTax),
