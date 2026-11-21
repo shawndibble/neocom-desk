@@ -172,10 +172,10 @@ import {
 import {
   NOTICE_ID_FIELD,
   lateNoticeFromStatementDoc,
+  adjustmentLineKey,
   lastNoticedDay,
   lateNoticeRefusal,
   legacyStatementDocOf,
-  lineKey,
   minerPaymentCode,
   noticedDates,
   reminderAllowed,
@@ -1132,7 +1132,7 @@ async function assertAdjustmentReversible(
   adjustment: Record<string, unknown>
 ): Promise<void> {
   if (adjustment.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
-  const key = lineKey({ adjustmentId, date: '' });
+  const key = adjustmentLineKey(adjustmentId);
   const billed = (await minerNotices(c, adjustment.minerId as string)).some((n) =>
     n.lines.some((l) => l.key === key)
   );

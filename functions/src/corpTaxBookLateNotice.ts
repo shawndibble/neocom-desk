@@ -12,7 +12,7 @@
  * `lateNoticeFromStatementDoc` reads one of those, or an older one, into a `LateNotice`.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
-import { DAY_MS } from './timeConstants.js';
+import { DAY_MS, utcDayOf } from './timeConstants.js';
 
 /** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
 export type LateNoticeKind = 'late' | 'final';
@@ -176,7 +176,20 @@ function numberRecord(v: unknown): Record<number, number> | undefined {
 
 /** The key a stored line names: its day charge, else its Adjustment, else its date. */
 export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date: string }): string {
-  return line.chargeKey ?? `${ADJUSTMENT_PREFIX}${line.adjustmentId ?? line.date}`;
+  return line.chargeKey ?? adjustmentLineKey(line.adjustmentId ?? line.date);
+}
+
+/** The key a correction's line carries (`adjustment:<id>`): a later notice never lists it again. */
+export const adjustmentLineKey = (adjustmentId: string): string =>
+  `${ADJUSTMENT_PREFIX}${adjustmentId}`;
+
+/** The first and last day a notice listed (its lines are oldest first); its issue day with none. */
+export function noticeSpan(notice: { lines: readonly { date: string }[]; issuedAt: string }): {
+  first: string;
+  last: string;
+} {
+  const first = notice.lines[0]?.date ?? utcDayOf(notice.issuedAt);
+  return { first, last: notice.lines.at(-1)?.date ?? first };
 }
 
 /**
@@ -259,8 +272,7 @@ const DEFAULT_PRICING = { hubId: 'jita', oreForm: 'compressed' } as const;
  * (decision 20261120-235011, step 5): the inverse of `lateNoticeFromStatementDoc`.
  */
 export function legacyStatementDocOf(notice: LateNotice): Record<string, unknown> {
-  const first = notice.lines[0]?.date ?? notice.issuedAt.slice(0, 10);
-  const last = notice.lines.at(-1)?.date ?? first;
+  const { first, last } = noticeSpan(notice);
   const pricing = notice.pricing ?? DEFAULT_PRICING;
   return {
     id: notice.id,
