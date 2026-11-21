@@ -71,6 +71,10 @@ export function LedgerRowDetail({
       )}
       {row.kind === 'payment' && (
         <>
+          {row.payment.source && <p>{k(`source.${row.payment.source}`)}</p>}
+          {row.payment.notTax ? (
+            <p className="text-warning">{k('notTax', { amount: isk(row.payment.notTax) })}</p>
+          ) : null}
           {row.payment.note && <p>{k('note', { note: row.payment.note })}</p>}
           {row.days.length > 0 && <Days title={k('paidDays')} days={row.days} />}
           {row.credit > 0 && <p>{k('leftAsCredit', { amount: isk(row.credit) })}</p>}

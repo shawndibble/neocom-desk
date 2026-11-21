@@ -19,7 +19,6 @@ import {
   moonByStructure,
   moonSchedule,
   oreTaxLines,
-  paymentLedger,
   splitPlace,
 } from './bookSections';
 
@@ -237,23 +236,6 @@ describe('splitPlace', () => {
   });
   it('keeps the whole name when stripping would leave nothing', () => {
     expect(splitPlace('Efa VII - Moon 1', 'Efa VII - Moon 1').station).toBe('Efa VII - Moon 1');
-  });
-});
-
-describe('paymentLedger', () => {
-  it('merges payments and corrections newest first, tagged by kind', () => {
-    const rows = paymentLedger(
-      [{ id: 'p1', at: '2026-09-02T10:00:00Z' }],
-      [
-        { id: 'a1', at: '2026-09-05T10:00:00Z' },
-        { id: 'a0', at: '2026-08-01T10:00:00Z' },
-      ]
-    );
-    expect(rows.map((r) => [r.kind, r.id])).toEqual([
-      ['correction', 'a1'],
-      ['payment', 'p1'],
-      ['correction', 'a0'],
-    ]);
   });
 });
 

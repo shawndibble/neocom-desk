@@ -7,7 +7,7 @@
 import type { Page } from '@playwright/test';
 import { expect, minerUrl, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { officerBook } from './support/taxBook/bookScenarios';
-import { DAY_TAX, isk, shortDay } from './support/taxBook/bookSeed';
+import { DAY_TAX, day, isk, shortDay } from './support/taxBook/bookSeed';
 import { readDoc } from './support/taxBook/emulator';
 import { CORP, MINER } from './support/taxBook/identities';
 
@@ -175,9 +175,12 @@ test('a disputed day is held: payments skip it and pay the next days', async ({ 
 
   await openMinerInApp(page, MINER.dax.name);
   // His 2,000,000 paid the days either side; the held day is the one left.
-  await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
-    `Paid 2 days, from ${shortDay(book.dax.heldBack + 1)}`
+  const ledger = page.getByRole('table', { name: 'Ledger', exact: true });
+  await ledger.getByRole('row', { name: /Payment from/ }).click();
+  await expect(ledger).toContainText(
+    `Days it paid${day(book.dax.heldBack + 1)}${isk(DAY_TAX)} ISK${day(book.dax.heldBack - 1)}`
   );
+  await expect(ledger).not.toContainText(`Days it paid${day(book.dax.heldBack)}`);
   const earlier = page.getByRole('table', { name: 'Earlier days' });
   await expect(earlier).toContainText(shortDay(book.dax.heldBack + 1));
   await expect(earlier).toContainText(shortDay(book.dax.heldBack - 1));

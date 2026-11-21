@@ -8851,6 +8851,11 @@
         "reason": "Reason: {{reason}}",
         "noDetail": "No ore or place recorded for this charge.",
         "paidDays": "Days it paid",
+        "source": {
+          "donation": "A donation",
+          "manual": "Recorded by hand"
+        },
+        "notTax": "{{amount}} marked not tax, so not credited.",
         "leftAsCredit": "{{amount}} left as credit.",
         "officer": "An officer forgave this much of the oldest unpaid days.",
         "tolerance": "A payment fell short of the day by no more than the tolerance, so the gap was forgiven.",
@@ -18420,23 +18425,11 @@
         "dismissed": "Dismissed"
       },
       "payment": {
-        "donation": "Donation",
-        "manual": "Recorded by hand",
         "markNotTax": "Mark not tax",
-        "markedNotTax": "{{amount}} marked not tax",
-        "oldestFirst": "Pays the oldest days first",
-        "correction": "Correction by {{name}}",
-        "correctionCredit": "Credit by {{name}}",
-        "correctionCharge": "Charge by {{name}}",
-        "correctsDay": "For {{date}}",
         "markNotTaxNone": "No payment to mark",
         "markNotTaxTarget": "Payment of {{date}}, {{amount}}",
-        "listedOn": "On the <link/>, for {{date}}",
         "openNotice": "Open the late notice of {{date}}",
-        "noticeOf": "late notice of {{date}}",
-        "paidDays_one": "Paid {{count}} day, from {{from}}",
-        "paidDays_other": "Paid {{count}} days, from {{from}}",
-        "heldAsCredit": "{{amount}} held as credit"
+        "noticeOf": "late notice of {{date}}"
       },
       "cols": {
         "moon": "Moon",
@@ -18790,10 +18783,8 @@
         "oldestUnpaid": "Oldest unpaid",
         "lastPayment": "Last payment",
         "owedDaysHint": "Paid oldest first; a payment pays these as soon as the book holds it",
-        "payments": "Payments",
-        "paymentsHint": "Credited oldest debt first",
-        "sum": "Days billed {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
-        "sumNoWriteOff": "Days billed {{billed}} − payments and dismissals {{settled}} = {{owed}} owed",
+        "billed": "Days billed",
+        "settled": "Payments and dismissals",
         "dismissals": "Dismissals",
         "reversed": "reversed",
         "reversedFrom": "reversed from {{date}}",
@@ -18817,14 +18808,11 @@
           "owedDays": "No day is owed.",
           "stillAccruing": "Nothing in today's mining.",
           "earlier": "No earlier days.",
-          "payments": "No payments yet.",
           "activity": "Nothing has happened for this Miner yet."
         },
         "overdueNote_one": "Overdue {{count}} day",
         "overdueNote_other": "Overdue {{count}} days",
         "paid": "Paid",
-        "paymentsSummary_one": "{{count}} entry · {{amount}} credited",
-        "paymentsSummary_other": "{{count}} entries · {{amount}} credited",
         "activitySummary_one": "{{count}} entry",
         "activitySummary_other": "{{count}} entries",
         "filter": {

@@ -79,6 +79,8 @@ export function minerLedgerSource(
       ...(from ? { from } : {}),
       ...(p.note ? { note: p.note } : {}),
       ...(href ? { href } : {}),
+      source: p.source,
+      ...(p.notTaxAmount ? { notTax: p.notTaxAmount } : {}),
     };
   });
   // A write-off on or before the checkpoint is in its balance already: it forgives no later day.

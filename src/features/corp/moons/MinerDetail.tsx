@@ -2,8 +2,7 @@ import { formatCount } from '@/lib/formatCount';
 import { LEGACY_ISSUE_ACTION } from '../taxBook/bookClient';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -32,17 +31,10 @@ import {
   rangeStart,
   type DayRange,
   moonByStructure,
-  paymentLedger,
   type ActivityKind,
-  type LedgerRow,
 } from '@/engine/corpTaxBook/bookSections';
 import { bookMiner, minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
-import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
-import {
-  adjustmentLineKey,
-  NOTICE_ID_FIELD,
-  type LateNotice,
-} from '../../../../functions/src/corpTaxBookLateNotice';
+import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
@@ -59,7 +51,7 @@ import {
   ReassignPaymentDialog,
   RecordPaymentDialog,
 } from './BookDialogs';
-import { atDate, isk, iskOrDash, shortDate, shortDateTime, signedIsk } from './moonsFormat';
+import { atDate, isk, iskOrDash, shortDate, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
@@ -73,7 +65,6 @@ import {
 import type { LedgerActions } from './LedgerRowMenu';
 import { isMinerAuditEntry } from './minerAudit';
 import { useAuditWords } from './useAuditWords';
-import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { tapTargetClassName } from './sectionHelpers';
@@ -90,12 +81,11 @@ const STATUS_TONE: Record<DayStatus, string> = {
 
 type Detail = NonNullable<ReturnType<typeof minerDetail>>;
 type Payment = Detail['payments'][number];
-type PaymentRow = LedgerRow<Payment, Adjustment>;
 
 /**
  * A Miner's page: the owed figure and its facts first, then one
- * scroll of Today's mining, Owed days, Earlier days, Payments (corrections are a kind of
- * row in it), Moons and Activity (mail, dismissals and the audit log behind filter chips).
+ * scroll of the Ledger (payments and corrections are rows in it), Today's mining, Owed days,
+ * Earlier days, Moons and Activity (mail, dismissals and the audit log behind filter chips).
  * No inner tabs; each section carries its count and pages its newest ten rows.
  */
 export function MinerDetail({ id }: { id: string }) {
@@ -154,14 +144,6 @@ export function MinerDetail({ id }: { id: string }) {
     [detail, from]
   );
   const moonOf = useMemo(() => moonByStructure(view), [view]);
-  const ledger = useMemo(
-    () =>
-      paymentLedger(
-        (detail?.payments ?? []).filter((p) => inRange(p.at, from)),
-        data.adjustments.filter((a) => a.minerId === id && !a.reversed && inRange(a.at, from))
-      ),
-    [detail, data.adjustments, id, from]
-  );
   const feed = useMemo(
     () =>
       activityFeed({
@@ -481,148 +463,6 @@ export function MinerDetail({ id }: { id: string }) {
     </>
   );
 
-  /** The late notice that listed a correction; undefined while none has. */
-  const listedOn = (adjustment: Adjustment) => {
-    const key = adjustmentLineKey(adjustment.id);
-    return detail.notices.find((n) => n.lines.some((l) => l.key === key));
-  };
-
-  /** Which days a payment paid, oldest first (money pays the oldest day whatever it says). */
-  const paymentDays = new Map(detail.paymentDays.map((p) => [p.paymentId, p]));
-  const paymentCredited = (payment: Payment) => {
-    const paid = paymentDays.get(payment.id);
-    const days = paid?.days ?? [];
-    return (
-      <span className="text-xs text-text-dim">
-        {days.length > 0
-          ? t('corpTaxBook.moons.payment.paidDays', {
-              count: days.length,
-              from: shortDate(days[0]!.date),
-            })
-          : !payment.notTaxAmount && t('corpTaxBook.moons.payment.oldestFirst')}
-        {(paid?.credit ?? 0) >= 1 && (
-          <span className="block">
-            {t('corpTaxBook.moons.payment.heldAsCredit', { amount: isk(paid!.credit) })}
-          </span>
-        )}
-        {payment.notTaxAmount ? (
-          <span className="block text-warning">
-            {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(payment.notTaxAmount) })}
-          </span>
-        ) : null}
-        {payment.note && <span className="block">“{payment.note}”</span>}
-      </span>
-    );
-  };
-
-  const paymentColumns: DataTableColumn<PaymentRow>[] = [
-    {
-      id: 'at',
-      header: t('corpTaxBook.moons.cols.when'),
-      render: (r) => {
-        const href = r.kind === 'payment' ? paymentWalletHref(r.payment.id) : null;
-        return href ? (
-          <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
-            {shortDateTime(r.at, zone)}
-          </Link>
-        ) : (
-          shortDateTime(r.at, zone)
-        );
-      },
-      sortValue: (r) => r.at,
-      sortFirst: 'desc',
-    },
-    {
-      id: 'from',
-      header: t('corpTaxBook.moons.cols.from'),
-      primary: true,
-      render: (r) =>
-        r.kind === 'payment' ? (
-          <span>
-            {names.character(r.payment.characterId)}
-            <span className="block text-xs text-text-dim">
-              {t(`corpTaxBook.moons.payment.${r.payment.source}`)}
-            </span>
-          </span>
-        ) : (
-          <span>
-            {r.correction.reason}
-            <span className="block text-xs text-text-dim">
-              {t(
-                r.correction.amount < 0
-                  ? 'corpTaxBook.moons.payment.correctionCredit'
-                  : 'corpTaxBook.moons.payment.correctionCharge',
-                { name: names.character(r.correction.by) }
-              )}
-            </span>
-          </span>
-        ),
-      sortValue: (r) =>
-        r.kind === 'payment' ? names.character(r.payment.characterId) : r.correction.reason,
-    },
-    {
-      id: 'amount',
-      header: t('corpTaxBook.moons.cols.amount'),
-      align: 'right',
-      className: 'tabular-nums',
-      cardCorner: true,
-      render: (r) =>
-        r.kind === 'payment' ? (
-          <span className="text-isk-pos">{isk(r.payment.amount)}</span>
-        ) : (
-          <span className={r.correction.amount < 0 ? 'text-isk-pos' : 'text-warning'}>
-            {signedIsk(r.correction.amount)}
-          </span>
-        ),
-      sortValue: (r) => (r.kind === 'payment' ? r.payment.amount : r.correction.amount),
-    },
-    {
-      id: 'credited',
-      header: t('corpTaxBook.moons.cols.creditedTo'),
-      render: (r) =>
-        r.kind === 'correction' ? (
-          <span className="text-xs text-text-dim">
-            {(() => {
-              const n = listedOn(r.correction);
-              const date = shortDate(r.correction.date);
-              return n ? (
-                <Trans
-                  i18nKey="corpTaxBook.moons.payment.listedOn"
-                  values={{ date }}
-                  components={{ link: noticeLink(n) }}
-                />
-              ) : (
-                t('corpTaxBook.moons.payment.correctsDay', { date })
-              );
-            })()}
-          </span>
-        ) : (
-          paymentCredited(r.payment)
-        ),
-    },
-    ...(canEdit
-      ? [
-          {
-            id: 'actions',
-            header: '',
-            align: 'right',
-            render: (r: PaymentRow) =>
-              r.kind === 'payment' ? (
-                <button
-                  type="button"
-                  className={entityLinkClassName(
-                    cx('shrink-0 whitespace-nowrap', tapTargetClassName)
-                  )}
-                  onClick={() => setDialog({ kind: 'notTax', payment: r.payment })}
-                >
-                  {t('corpTaxBook.moons.payment.markNotTax')}
-                </button>
-              ) : null,
-          } satisfies DataTableColumn<PaymentRow>,
-        ]
-      : []),
-  ];
-
   const guestOpen = row.standing === 'guest' && !closedAt;
   // The reason a disabled action is inert, printed under it: a menu item has no tooltip on touch.
   const remindItem = reminder.block ? (
@@ -741,6 +581,12 @@ export function MinerDetail({ id }: { id: string }) {
         }
         facts={[
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
+          // Billed − written off − settled = owed: the figures the old Payments footer printed.
+          { label: t('corpTaxBook.moons.miner.billed'), value: isk(billedTotal) },
+          {
+            label: t('corpTaxBook.moons.miner.settled'),
+            value: isk(billedTotal - toleranceTotal - row.owed),
+          },
           {
             label: t('corpTaxBook.moons.miner.oldestUnpaid'),
             value: <OldestUnpaid account={bookMiner(view, id)!.account} />,
@@ -770,25 +616,6 @@ export function MinerDetail({ id }: { id: string }) {
               ]),
         ]}
       />
-      <MinerLedger minerId={id} detail={detail} phone={phone} actions={ledgerActions} />
-      {daysSection(
-        t('corpTaxBook.moons.sections.stillAccruing'),
-        'stillAccruing',
-        <InfoTooltip
-          label={t('corpTaxBook.moons.sections.stillAccruing')}
-          content={t('corpTaxBook.moons.miner.dayEndTip', {
-            time: dayEndTime(view.input.graceHours),
-          })}
-          glyph="info"
-        />,
-        { select: true, status: false, startOpen: false, rowMenu: true }
-      )}
-      {daysSection(
-        t('corpTaxBook.moons.sections.owedDays'),
-        'owed',
-        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.owedDaysHint')}</span>,
-        { select: true, status: false, startOpen: true, rowMenu: true }
-      )}
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
           label={t('corpTaxBook.moons.account.range.label')}
@@ -808,56 +635,31 @@ export function MinerDetail({ id }: { id: string }) {
           </span>
         )}
       </div>
+      <MinerLedger minerId={id} detail={detail} phone={phone} actions={ledgerActions} from={from} />
+      {daysSection(
+        t('corpTaxBook.moons.sections.stillAccruing'),
+        'stillAccruing',
+        <InfoTooltip
+          label={t('corpTaxBook.moons.sections.stillAccruing')}
+          content={t('corpTaxBook.moons.miner.dayEndTip', {
+            time: dayEndTime(view.input.graceHours),
+          })}
+          glyph="info"
+        />,
+        { select: true, status: false, startOpen: false, rowMenu: true }
+      )}
+      {daysSection(
+        t('corpTaxBook.moons.sections.owedDays'),
+        'owed',
+        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.owedDaysHint')}</span>,
+        { select: true, status: false, startOpen: true, rowMenu: true }
+      )}
       {daysSection(
         t('corpTaxBook.moons.sections.earlierDays'),
         'earlier',
         <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.earlierHint')}</span>,
         { select: false, status: true, startOpen: false }
       )}
-      <BookSection
-        title={t('corpTaxBook.moons.miner.payments')}
-        noun={noun('payments')}
-        empty={t('corpTaxBook.moons.miner.empty.payments')}
-        rows={ledger}
-        sortColumns={paymentColumns}
-        meta={
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
-        }
-        phone={phone}
-        summary={t('corpTaxBook.moons.miner.paymentsSummary', {
-          count: ledger.length,
-          amount: isk(paidTotal),
-        })}
-      >
-        {(shown, table) => (
-          <>
-            <DataTable
-              label={t('corpTaxBook.moons.miner.payments')}
-              columns={paymentColumns}
-              rows={[...shown]}
-              rowKey={(r) => `${r.kind}-${r.id}`}
-              density="compact"
-              stackLayout="dense"
-              mobileSort
-              {...table}
-            />
-            <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
-              {/* Nothing written off: leave the term out rather than print "− written off —". */}
-              {t(
-                Math.abs(toleranceTotal) < 1
-                  ? 'corpTaxBook.moons.miner.sumNoWriteOff'
-                  : 'corpTaxBook.moons.miner.sum',
-                {
-                  billed: isk(billedTotal),
-                  written: iskOrDash(toleranceTotal),
-                  settled: isk(billedTotal - toleranceTotal - row.owed),
-                  owed: isk(row.owed),
-                }
-              )}
-            </p>
-          </>
-        )}
-      </BookSection>
       <BookSection
         title={t('corpTaxBook.moons.miner.activity')}
         noun={noun('activity')}

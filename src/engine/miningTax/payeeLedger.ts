@@ -50,6 +50,10 @@ export interface LedgerPayment {
   note?: string;
   /** Where it sits in a wallet, an in-app route: its row's detail links there. */
   href?: string;
+  /** A wallet donation, or a payment an officer recorded by hand. */
+  source?: 'donation' | 'manual';
+  /** What an officer marked not tax: the account credits only the rest. */
+  notTax?: number;
 }
 
 /** An officer's write-off, as the account was given it. */
