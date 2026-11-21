@@ -11,7 +11,6 @@
 import {
   LATE_NOTICES,
   RUNNING_ACCOUNT_CHECKPOINTS,
-  STATEMENTS as LEGACY_NOTICES,
 } from '../../../../functions/src/corpTaxBookVersionKeys';
 import {
   collection,
@@ -351,7 +350,6 @@ async function readOneBook(
   const inReview: InReviewPayment[] = [];
   const dismissals: Dismissal[][] = [];
   const noticeDocs: unknown[] = [];
-  const legacyNoticeDocs: unknown[] = [];
   const checkpoints = new Map<string, RunningAccountCheckpoint>();
   const miners: Miner[][] = [];
   const adjustments: Adjustment[][] = [];
@@ -398,7 +396,6 @@ async function readOneBook(
       observedDocs,
       paymentDocs,
       dismissalDocs,
-      legacyDocs,
       lateNoticeDocs,
       checkpointDocs,
       minerDocs,
@@ -421,8 +418,6 @@ async function readOneBook(
       }),
       part('payments', 'uid'),
       part('dismissals', 'uids'),
-      // Late notices: the `lateNotices` docs, and the `statements` mirror older servers wrote.
-      part(LEGACY_NOTICES, 'uids'),
       written(LATE_NOTICES) ? orNone(part(LATE_NOTICES, 'uids')) : Promise.resolve(null),
       written(RUNNING_ACCOUNT_CHECKPOINTS)
         ? orNone(part(RUNNING_ACCOUNT_CHECKPOINTS, 'uids'))
@@ -468,7 +463,6 @@ async function readOneBook(
       if (read.inReview) inReview.push(read.inReview);
     }
     dismissals.push(dismissalDocs.flatMap((d) => readDismissal(d.id, d.data) ?? []));
-    for (const d of legacyDocs) legacyNoticeDocs.push({ ...d.data, id: d.id });
     for (const d of lateNoticeDocs ?? []) noticeDocs.push({ ...d.data, id: d.id });
     for (const d of checkpointDocs ?? []) {
       const cp = readCheckpoint(d.id, d.data);
@@ -476,7 +470,7 @@ async function readOneBook(
     }
     miners.push(minerDocs.flatMap((d) => readMiner(d.id, d.data) ?? []));
   }
-  const notices = readLateNotices(noticeDocs, legacyNoticeDocs);
+  const notices = readLateNotices(noticeDocs);
   const structureNames = refineryNamesOf(notices);
   return {
     ...settings,

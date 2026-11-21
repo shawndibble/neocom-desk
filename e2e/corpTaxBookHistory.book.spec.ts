@@ -1,8 +1,6 @@
 /**
- * A Corp Tax Book with months of history moving over to the Running account (decision
- * 20261120-235011): its Late notices are still only in the legacy `statements` collection.
- * The officer's Miners list, a Miner's page and the Late notices tab read them as they read a
- * book that started on the Running account.
+ * A Corp Tax Book with months of history on the Running account (decision 20261120-235011): the
+ * officer's Miners list, a Miner's page and the Late notices tab.
  */
 import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { historyBook } from './support/taxBook/bookScenarios';
@@ -44,7 +42,7 @@ test('the old Statements address opens the Late notices tab', async ({ page }) =
   await expect(page.getByRole('tab', { name: 'Late notices', selected: true })).toBeVisible();
 });
 
-test('late notices from the legacy collection are listed as sent', async ({ page }) => {
+test('late notices are listed as sent', async ({ page }) => {
   await signInAsOfficer(page, './corp/moons/late-notices');
   const sent = page.getByRole('table', { name: 'Notices sent' });
   await expect(sent.getByRole('row', { name: /Ada Lunar/ })).toContainText(
@@ -56,7 +54,7 @@ test('late notices from the legacy collection are listed as sent', async ({ page
   );
 });
 
-test('a settled legacy notice reads as paid on the Miner page', async ({ page }) => {
+test('a settled notice reads as paid on the Miner page', async ({ page }) => {
   await openMiner(page, solo(MINER.ada.id), MINER.ada.name);
   const august = shortDay(book.notices.adaAugust.issuedBack);
   await page

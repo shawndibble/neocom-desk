@@ -18,7 +18,6 @@ import { DialogShell, Effect, GroupLabel, Label } from './BookDialogs';
 import { dateWithYear, isk } from './moonsFormat';
 import { useBook } from './useBook';
 import { noticeRefineryNames, useCorporationName } from './lateNoticeMailing';
-import { legacyStatementDocOf } from '../../../../functions/src/corpTaxBookLateNotice';
 
 type Basis = 'consent' | 'no-reply';
 /** What happens to what is still owed: a final late notice goes out, or the tax is waived. */
@@ -73,10 +72,9 @@ export function CloseAccountDialog({
       }
       run={async () => {
         if (!dismissing && plan?.notice && corporationName === null) return;
-        // The close takes its final notice as the legacy doc the server has always stored it as.
-        const statement =
+        const notice =
           !dismissing && plan?.notice && corporationName !== null
-            ? legacyStatementDocOf({
+            ? {
                 ...plan.notice,
                 issuedBy: characterId,
                 names: {
@@ -84,7 +82,7 @@ export function CloseAccountDialog({
                   minerName,
                   refineryNames: noticeRefineryNames(plan.notice, names),
                 },
-              })
+              }
             : undefined;
         // Waive first, so the close finds nothing to bill; a failed close can be retried.
         if (dismissing) {
@@ -101,7 +99,7 @@ export function CloseAccountDialog({
           minerId: miner.id,
           reason: reason.trim(),
           credit: disposition,
-          ...(statement ? { statement } : {}),
+          ...(notice ? { notice } : {}),
           // The Running account's credit only this client can price (#6294).
           ...(plan ? { runningCredit: Math.round(plan.creditAfter) } : {}),
         });

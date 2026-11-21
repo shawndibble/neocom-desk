@@ -25,14 +25,8 @@ import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import {
   LATE_NOTICES,
   RUNNING_ACCOUNT_CHECKPOINTS,
-  STATEMENTS as LEGACY_NOTICES,
 } from '../../../../../functions/src/corpTaxBookVersionKeys';
-import {
-  bookDeclarationOf,
-  readsLegacyNotices,
-  settingsFrom,
-  type BookDeclaration,
-} from '../bookClient';
+import { bookDeclarationOf, settingsFrom, type BookDeclaration } from '../bookClient';
 import { errorCode } from '../openBook';
 import { ALL_BOOK_PARTS, type BookPart, type BookPartSet } from './parts';
 import { bookOf, readSlices, type BookRead, type ReadContext } from './slices';
@@ -58,7 +52,7 @@ export async function readMinerScope(
     const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
     return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
   };
-  // Best effort: a server that keeps no checkpoints yet, or rules that predate them, read none.
+  // Best effort: none until the server has written one.
   const checkpoint = (async () => {
     if (!book.written(RUNNING_ACCOUNT_CHECKPOINTS)) return undefined;
     try {
@@ -68,10 +62,11 @@ export async function readMinerScope(
     }
   })();
   const grouping = one('miners');
-  const notices = Promise.all([
-    book.written(LATE_NOTICES) ? byMiner<unknown>(LATE_NOTICES).catch(() => []) : [],
-    readsLegacyNotices(book).then((reads) => (reads ? byMiner<unknown>(LEGACY_NOTICES) : [])),
-  ]).then(([current, legacy]) => readLateNotices(current, legacy));
+  const notices = (
+    book.written(LATE_NOTICES)
+      ? byMiner<unknown>(LATE_NOTICES).catch(() => [])
+      : Promise.resolve([])
+  ).then(readLateNotices);
   const characterIds = grouping.then((g) =>
     characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
   );

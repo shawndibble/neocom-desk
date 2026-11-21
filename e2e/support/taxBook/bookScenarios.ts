@@ -8,8 +8,7 @@ import { BookSeed, DAY_TAX, day, verifyToken } from './bookSeed';
 import { MINER, OFFICER, solo } from './identities';
 
 /**
- * A book with months of history, from before Late notices moved out of `statements`: its
- * notices are only in the legacy collection (`kind: 'notice'`), none in `lateNotices`.
+ * A book with months of history.
  *
  * - Ada mined ten days over four months. 7 days' tax came in at once a month ago, so she owes the
  *   three newest. Her August notice is settled; her November one is open.
@@ -37,8 +36,8 @@ export function historyBook() {
       back: 30,
       minerId: solo(MINER.ada.id),
     })
-    .legacyNotice({ ...notices.adaAugust, characterId: MINER.ada.id, token: tokens.adaAugust })
-    .legacyNotice({ ...notices.adaNovember, characterId: MINER.ada.id, token: tokens.adaNovember })
+    .lateNotice({ ...notices.adaAugust, characterId: MINER.ada.id, token: tokens.adaAugust })
+    .lateNotice({ ...notices.adaNovember, characterId: MINER.ada.id, token: tokens.adaNovember })
     .mine(MINER.bram.id, [60, 59, 58])
     .donation({
       id: 'j1_910002',
@@ -47,7 +46,7 @@ export function historyBook() {
       back: 45,
       minerId: solo(MINER.bram.id),
     })
-    .legacyNotice({ ...notices.bram, characterId: MINER.bram.id, token: tokens.bram })
+    .lateNotice({ ...notices.bram, characterId: MINER.bram.id, token: tokens.bram })
     .mine(MINER.cora.id, [5, 4]);
   return {
     seed,
