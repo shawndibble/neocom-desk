@@ -58,7 +58,12 @@ export function bookLedgerSource(
     }),
     payments: miner.payments.map((p) => {
       const from = nameOf(p.characterId);
-      return { id: p.id, at: p.at, ...(from ? { from } : {}) };
+      return {
+        id: p.id,
+        at: p.at,
+        ...(from ? { from } : {}),
+        ...(p.note ? { note: p.note } : {}),
+      };
     }),
     writeOffs: writeOffs
       .filter((w) => w.minerId === miner.minerId && !w.reversed)

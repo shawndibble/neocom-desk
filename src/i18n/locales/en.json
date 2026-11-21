@@ -8259,7 +8259,8 @@
           "openInWallet": "Open in wallet",
           "inFlight": "Your donation, {{time}}, not credited by {{corp}} yet",
           "corrections": "Credit from corrections (not a payment)",
-          "writtenOff": "Forgiven by an officer (not a payment)"
+          "writtenOff": "Forgiven by an officer (not a payment)",
+          "withNote": "{{label}} · “{{note}}”"
         },
         "factOriginal": "Originally billed",
         "settled": {},
@@ -8877,7 +8878,8 @@
         "listedDays": "Days it listed",
         "noticeSettled": "Every day it listed is paid.",
         "noticeRemaining": "{{amount}} still owed on its days.",
-        "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today."
+        "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today.",
+        "note": "The officer noted: {{note}}"
       },
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",

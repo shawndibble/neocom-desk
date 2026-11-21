@@ -45,6 +45,8 @@ export interface LedgerPayment {
   at: string;
   /** Who sent it, already named. */
   from?: string;
+  /** An officer's note on a payment recorded by hand. */
+  note?: string;
 }
 
 /** An officer's write-off, as the account was given it. */
