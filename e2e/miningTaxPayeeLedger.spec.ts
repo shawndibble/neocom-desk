@@ -103,7 +103,7 @@ test("a payment's row opens in place to show the days it paid", async ({ page })
   await expect(ledger).toContainText(day(6));
 });
 
-test('a Payee whose history passes a closed month opens on its balance through it', async ({
+test("a personal Payee's ledger lists its whole history, with no snapshot row", async ({
   page,
 }) => {
   // Two days three months ago, one of them paid then; two days this week.
@@ -121,14 +121,14 @@ test('a Payee whose history passes a closed month opens on its balance through i
   await openPersonalTax(page, data, { characterId: CHARACTER_ID, mining: personalLedger(days) });
   const owed = page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` });
   await expect(owed).toContainText(isk(3 * DAY_TAX));
-  // That visit stored the device's checkpoint; the next reads it and only the days after it.
+  // A personal account is always built from the device's full history (no device snapshot).
   await page.reload();
   await expect(owed).toContainText(isk(3 * DAY_TAX));
   await owed.click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
   const rows = bodyRows(ledger);
-  await expect(rows.first()).toContainText(/Balance through/);
-  await expect(rows.first().getByRole('cell').last()).toHaveText(isk(DAY_TAX));
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(5);
+  await expect(ledger).not.toContainText(/Balance through/);
+  await expect(ledger).toContainText(day(100));
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*3`));
 });
