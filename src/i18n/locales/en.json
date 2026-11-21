@@ -8876,7 +8876,7 @@
         "dateTooltip": "The EVE (UTC) day.",
         "what": "What",
         "charged": "Charged",
-        "paid": "Paid",
+        "credited": "Credited",
         "balance": "Balance"
       },
       "kind": {
@@ -8899,7 +8899,8 @@
         "officer": "Written off by an officer",
         "tolerance": "Shortfall forgiven",
         "late": "Late notice sent",
-        "final": "Final notice sent"
+        "final": "Final notice sent",
+        "opening": "Balance through {{date}}"
       },
       "held": "On hold while a dispute is open",
       "detail": {
@@ -8913,7 +8914,8 @@
         "nothingToForgive": "Nothing was left to forgive.",
         "listedDays": "Days it listed",
         "noticeSettled": "Every day it listed is paid.",
-        "noticeRemaining": "{{amount}} still owed on its days."
+        "noticeRemaining": "{{amount}} still owed on its days.",
+        "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today."
       },
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
