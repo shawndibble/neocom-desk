@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { legacyPaymentLinks, unreadLegacyLinks } from './legacyPaidMarks';
+import { legacyPaymentLinks } from './legacyPaidMarks';
 
 const assignment = (
   id: string,
@@ -110,26 +110,5 @@ describe('legacyPaymentLinks', () => {
         assignment('d', '2026-10-01', { status: 'dismissed', payeeId: undefined }),
       ])
     ).toEqual([]);
-  });
-});
-
-describe('unreadLegacyLinks', () => {
-  it('reads each mark once: an id already known is left alone, whatever the mark holds now', () => {
-    const marks = [
-      assignment('a', '2026-10-01', settled('pay1')),
-      assignment('b', '2026-10-02', settled('pay2')),
-    ];
-    expect(unreadLegacyLinks(marks, new Set(['legacy:pay1'])).map((l) => l.refId)).toEqual([
-      'pay2',
-    ]);
-    // A journal attached later by an older client changes nothing: the id is the payment's.
-    const later = [
-      assignment(
-        'a',
-        '2026-10-01',
-        settled('pay1', { journalLinks: [{ refId: 41, source: 'auto' }] })
-      ),
-    ];
-    expect(unreadLegacyLinks(later, new Set(['legacy:pay1']))).toEqual([]);
   });
 });

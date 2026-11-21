@@ -167,27 +167,6 @@ function mergeById<T extends { id: string }>(lists: readonly (readonly T[])[]): 
 }
 
 /**
- * The book's payments as the member's reads returned them: by each Character's own `uid`, and by
- * `uids` (every reader of the payment's Miner, so an alt's donation that pays the group reaches
- * the pilot's tab). One doc read twice, or by two Characters, is one payment.
- */
-export function readMemberPayments(lists: readonly (readonly { id: string; data: Data }[])[]) {
-  const payments: TaxPayment[] = [];
-  const held: HeldPayment[] = [];
-  const claimable: ClaimablePayment[] = [];
-  const inReview: InReviewPayment[] = [];
-  for (const d of mergeById(lists)) {
-    const read = readPayment(d.id, d.data);
-    if (!read) continue;
-    held.push(read.held);
-    if (read.payment) payments.push(read.payment);
-    if (read.claimable) claimable.push(read.claimable);
-    if (read.inReview) inReview.push(read.inReview);
-  }
-  return { payments, held, claimable, inReview };
-}
-
-/**
  * The books of the corporations the tracked Characters are in, each with those
  * Characters' own lines. A corp with no active book (D24) is simply absent;
  * a read that fails (offline, signed out, a lapsed grant) drops that corp
@@ -366,7 +345,10 @@ async function readOneBook(
   const bookCreatedAt = typeof bookDoc?.createdAt === 'number' ? bookDoc.createdAt : undefined;
 
   const rows: ObservedRow[] = [];
-  const paymentDocLists: Docs[] = [];
+  const payments: TaxPayment[] = [];
+  const held: HeldPayment[] = [];
+  const claimable: ClaimablePayment[] = [];
+  const inReview: InReviewPayment[] = [];
   const dismissals: Dismissal[][] = [];
   const noticeDocs: unknown[] = [];
   const legacyNoticeDocs: unknown[] = [];
@@ -385,7 +367,7 @@ async function readOneBook(
     // Its own key: a member's copy holds only its own lines, never an officer's whole book.
     const key = `member:${characterId}:${corporationId}`;
     const store = memberPartStore(characterId, corporationId);
-    const part = (name: string, field: 'uid' | 'uids', slot?: string): Promise<Docs> =>
+    const part = (name: string, field: 'uid' | 'uids'): Promise<Docs> =>
       cachedPart(
         key,
         name,
@@ -399,7 +381,7 @@ async function readOneBook(
               )
             )
           ),
-        { store, ...(slot ? { slot } : {}) }
+        { store }
       );
     // Readable by a Character the book bills; any one of them will do. Cached only
     // while this load's pointer names the book; with no pointer read, live as before.
@@ -415,7 +397,6 @@ async function readOneBook(
     const [
       observedDocs,
       paymentDocs,
-      groupPaymentDocs,
       dismissalDocs,
       legacyDocs,
       lateNoticeDocs,
@@ -439,9 +420,6 @@ async function readOneBook(
         bookCreatedAt,
       }),
       part('payments', 'uid'),
-      // Every reader of the payment's Miner: an alt's donation for the group. A server that has
-      // not stamped `uids` on payments yet refuses this read; the `uid` read above still stands.
-      orNone(part('payments', 'uids', 'payments:uids')),
       part('dismissals', 'uids'),
       // Late notices: the `lateNotices` docs, and the `statements` mirror older servers wrote.
       part(LEGACY_NOTICES, 'uids'),
@@ -481,7 +459,14 @@ async function readOneBook(
       const row = readObservedRow(d.data);
       if (row) rows.push(row);
     }
-    paymentDocLists.push(paymentDocs, groupPaymentDocs ?? []);
+    for (const d of paymentDocs) {
+      const read = readPayment(d.id, d.data);
+      if (!read) continue;
+      held.push(read.held);
+      if (read.payment) payments.push(read.payment);
+      if (read.claimable) claimable.push(read.claimable);
+      if (read.inReview) inReview.push(read.inReview);
+    }
     dismissals.push(dismissalDocs.flatMap((d) => readDismissal(d.id, d.data) ?? []));
     for (const d of legacyDocs) legacyNoticeDocs.push({ ...d.data, id: d.id });
     for (const d of lateNoticeDocs ?? []) noticeDocs.push({ ...d.data, id: d.id });
@@ -491,7 +476,6 @@ async function readOneBook(
     }
     miners.push(minerDocs.flatMap((d) => readMiner(d.id, d.data) ?? []));
   }
-  const { payments, held, claimable, inReview } = readMemberPayments(paymentDocLists);
   const notices = readLateNotices(noticeDocs, legacyNoticeDocs);
   const structureNames = refineryNamesOf(notices);
   return {

@@ -764,7 +764,6 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
     paidOn: l.paidOn,
     source: l.source,
     ...(l.refs !== undefined ? { refs: l.refs } : {}),
-    ...(l.unlinked ? { unlinked: true } : {}),
     updatedAt: l.updatedAt,
     ownerHash,
     deleted: false,
@@ -779,7 +778,6 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
     paidOn: r.paidOn,
     source: r.source,
     ...(r.refs !== undefined ? { refs: r.refs } : {}),
-    ...(r.unlinked ? { unlinked: true as const } : {}),
     updatedAt: r.updatedAt,
   }),
 });

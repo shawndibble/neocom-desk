@@ -1,18 +1,13 @@
 /**
  * The paid marks Assignments carried before a payment linked to a Payee (decision 20261120-235011):
- * `status: 'paid'` and a `payment` naming its lump sum and the transactions behind it. They stay
- * readable, since dev and production share one Firebase project and an older client still writes
- * them, but nothing reads them for what is paid any more. Each is read once into the link it
- * stands for (`readLegacyPaidMarks`), under an id that never changes, so reading it again finds
- * the link already there. The marks are never written or cleared. Pure.
+ * `status: 'paid'` and a `payment` naming its lump sum and the transactions behind it. Each device
+ * reads them once into the links they stand for, then clears them (`readLegacyPaidMarks`). A
+ * link's id never depends on what the mark holds, so two devices reading the same mark make one
+ * link. Pure.
  */
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentInfo } from '@/db';
 import { utcDay } from '@/engine/localDay';
-import {
-  paymentLinkKey,
-  type PayeePaymentLink,
-  type PayeePaymentRef,
-} from '@/engine/miningTax/payeeRunningAccount';
+import type { PayeePaymentLink, PayeePaymentRef } from '@/engine/miningTax/payeeRunningAccount';
 
 /**
  * A mark's payment as the newest legacy shape: the oldest stored a bare `journalRefId` /
@@ -40,12 +35,9 @@ export interface LegacyLink extends PayeePaymentLink {
 }
 
 /**
- * One link per payment the marks recorded (decision 20261120-235011, "reading old paid marks is
- * passive and idempotent"). Its id never depends on what the mark holds now: `legacy:<paymentId>`,
- * or `legacy:mark:<assignmentId>` for a bare "mark paid". It pays the old payment's recorded
- * amount (a bare mark: the day's tax as stored when first read); the transactions the payment
- * named are kept on it as `refs`, held but never paying on their own. A journal attached later, or
- * a second installment on the same payment, changes nothing: the id is already there.
+ * One link per payment the marks recorded: `legacy:<paymentId>`, or `legacy:mark:<assignmentId>`
+ * for a bare "mark paid". It pays the old payment's recorded amount (a bare mark: the day's tax);
+ * the transactions the payment named are kept on it as `refs`, held but never paying on their own.
  */
 export function legacyPaymentLinks(
   assignments: readonly MiningTaxAssignmentRecord[]
@@ -89,12 +81,4 @@ export function legacyPaymentLinks(
     });
   }
   return out;
-}
-
-/** The legacy links not read yet: no link (an unlinked one included) and no tombstone has its id. */
-export function unreadLegacyLinks(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  known: ReadonlySet<string>
-): LegacyLink[] {
-  return legacyPaymentLinks(assignments).filter((l) => !known.has(paymentLinkKey(l)));
 }

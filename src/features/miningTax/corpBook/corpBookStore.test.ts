@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readBilledByPointer, readMemberPayments, refineryNamesOf } from './corpBookStore';
+import { readBilledByPointer, refineryNamesOf } from './corpBookStore';
 import {
   readAdjustment,
   readBookSettings,
@@ -160,32 +160,6 @@ describe('readPayment', () => {
 
   it('skips what is not a payment', () => {
     expect(readPayment('x', { amount: 'a' })).toBeNull();
-  });
-});
-
-describe('readMemberPayments', () => {
-  const doc = (id: string, characterId: number) => ({
-    id,
-    data: {
-      characterId,
-      amount: 100,
-      at: '2026-10-01T10:00:00Z',
-      source: 'donation',
-      minerId: 'g1',
-    },
-  });
-
-  it("counts an alt's donation read by `uids`, and one payment read twice once", () => {
-    const own = doc('j1_1', 1);
-    const alt = doc('j2_1', 2);
-    // By `uid` as Character 1; by `uids` as Character 1 and again as a second tracked Character.
-    const read = readMemberPayments([[own], [own, alt], [alt]]);
-    expect(read.payments.map((p) => p.id)).toEqual(['j1_1', 'j2_1']);
-    expect(read.held).toHaveLength(2);
-  });
-
-  it('reads the `uid` payments alone when an older server refused the `uids` read', () => {
-    expect(readMemberPayments([[doc('j1_1', 1)], []]).payments).toHaveLength(1);
   });
 });
 

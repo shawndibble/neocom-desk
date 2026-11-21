@@ -2023,22 +2023,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       expect(stateOf(out, ME)).toBe('paid');
       expect(stateOf(out, ALT)).toBe('paid');
     });
-
-    it("an alt this device does not track still shows its mined days on the main's tab", () => {
-      // The alt's row reached the main by `uids` (`readMemberObserved`); only the main is tracked.
-      const out = overlay(
-        [entry()],
-        [
-          twoMiners({
-            characterIds: [ME],
-            miners: [{ id: 'g1', characterIds: [ME, ALT], mainCharacterId: ME }],
-          }),
-        ]
-      );
-      expect(stateOf(out, ALT)).toBe('billed');
-      const [summary] = out.books;
-      expect(summary?.account?.owes?.amount).toBeCloseTo(2 * DAY, 2);
-    });
   });
 
   describe('ore the book bills that a hand-made Payee also lists', () => {

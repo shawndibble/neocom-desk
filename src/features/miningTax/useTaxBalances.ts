@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { PayeeRecord } from '@/db';
-import type {
-  PayeePaymentLink,
-  StoredPayeeCheckpoint,
-} from '@/engine/miningTax/payeeRunningAccount';
-import { utcDay } from '@/engine/localDay';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
 import { computeOwedByPayee } from './owedByPayee';
 import { owedBalances, unassignedSummary } from './owedNow';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
-import { savePayeeCheckpoints } from './paymentLinkStore';
 
 interface Args {
   characterFiltered: readonly DisplayRow[];
@@ -26,8 +21,6 @@ interface Args {
   links: readonly PayeePaymentLink[];
   /** The one accounts build (`useTaxCorpBooks`). */
   accounts: PayeeRunningAccounts;
-  /** When the account inputs were read: a checkpoint is only stored while they still hold. */
-  historyGen: number | undefined;
   /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
   bookCorporations: ReadonlySet<number>;
   /** Each Corp Tax Book Payee's credit, by its id (`bookCreditsOf`). */
@@ -48,7 +41,6 @@ export function useTaxBalances({
   madePayments,
   links,
   accounts,
-  historyGen,
   bookCorporations,
   bookCredits,
 }: Args) {
@@ -76,23 +68,6 @@ export function useTaxBalances({
     accounts,
     bookCorporations,
   });
-
-  // Each account closes through the end of the last month that is at least 31 days old, on the
-  // device (decision 20261120-235011), once per checkpoint it moves to.
-  const storedRef = useRef(new Set<string>());
-  useEffect(() => {
-    const today = utcDay();
-    const next = new Map<string, StoredPayeeCheckpoint>();
-    for (const [id, account] of accounts.entries()) {
-      const stored = account.nextCheckpoint(today, new Date().toISOString());
-      const key = stored ? `${id}|${stored.checkpoint.through}|${historyGen ?? ''}` : '';
-      if (!stored || storedRef.current.has(key)) continue;
-      storedRef.current.add(key);
-      next.set(id, stored);
-    }
-    if (next.size > 0 && historyGen !== undefined)
-      void savePayeeCheckpoints(next, historyGen).catch(() => undefined);
-  }, [accounts, historyGen]);
 
   // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(

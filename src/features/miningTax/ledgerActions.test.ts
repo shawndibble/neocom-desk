@@ -418,7 +418,7 @@ describe('deletePayee', () => {
     await db.miningTaxPaymentLinks.clear();
   });
 
-  it('moves every day of a Combined Entry with an owed day, keeping each status, and coalesce leaves it whole', async () => {
+  it('moves every day of a Combined Entry with an owed day, and coalesce leaves it whole', async () => {
     await db.miningTaxAssignments.bulkPut([paidDay, owedDay]);
     await db.miningTaxPaymentLinks.put(linkOfA());
 
@@ -427,11 +427,10 @@ describe('deletePayee', () => {
     const after = await stored();
     expect(after.map((a) => [a.id, a.payeeId, a.status, a.groupId])).toEqual(
       expect.arrayContaining([
-        ['g1', 'p2', 'paid', 'g'],
+        ['g1', 'p2', 'outstanding', 'g'],
         ['g2', 'p2', 'outstanding', 'g'],
       ])
     );
-    expect(after.find((a) => a.id === 'g1')!.payment).toEqual(payment);
     expect(await db.payees.get('p1')).toBeUndefined();
     expect((await readTombstones(tombstoneKey(PAYEES, CHAR))).map((t) => t.id)).toEqual(['p1']);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {

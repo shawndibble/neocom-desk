@@ -18,7 +18,6 @@ import {
   type Firestore,
 } from 'firebase/firestore/lite';
 import { db, type PlanetRichnessRecord, type StationPinRecord } from '@/db';
-import { notifyRecordsChanged } from './recordsChanged';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
@@ -291,16 +290,6 @@ export async function syncEditableCollection(
   }
   if (plan.deleteLocal.length > 0) {
     await table.bulkDelete(plan.deleteLocal);
-  }
-  // Whoever keeps something derived from these rows hears what the pull changed.
-  if (plan.pullUpserts.length > 0 || plan.deleteLocal.length > 0) {
-    const gone = new Set(plan.deleteLocal);
-    const upserted = new Set(plan.pullUpserts.map((r) => r.id));
-    await notifyRecordsChanged(spec.table, {
-      upserted: plan.pullUpserts.map((r) => spec.toLocalRecord(r)),
-      before: local.filter((r) => upserted.has(r.id)),
-      deleted: local.filter((r) => gone.has(r.id)),
-    });
   }
   // A remote tombstone pulled down here (`deleteLocal`) previously left no
   // local trace once the row itself was gone — so `deletedAtByKey()`

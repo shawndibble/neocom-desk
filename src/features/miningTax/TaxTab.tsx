@@ -274,7 +274,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     madePayments,
     links: data?.paymentLinks ?? NO_LINKS,
     accounts: bookAccounts,
-    historyGen: data?.payeeHistoryGen,
     bookCorporations: bookCorporationIds,
     bookCredits,
   });
