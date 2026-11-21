@@ -32,7 +32,7 @@ async function visit(page: Page) {
   await wipeFirestore();
   await writeDocs(book.seed.docs());
   await signInAsOfficer(page, minerUrl(book.id('bram')));
-  await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible({
+  await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible({
     timeout: COLD_MS,
   });
   for (const path of ['miners', 'overview', 'late-notices']) {

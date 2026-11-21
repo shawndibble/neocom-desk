@@ -235,7 +235,7 @@ export async function openMiner(page: Page, minerId: string, name: string): Prom
   await signInAsOfficer(page, minerUrl(minerId));
   // Two signals in their order: the book read (the ledger), then the Miner's name, which ESI
   // resolves only after it.
-  await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
