@@ -397,6 +397,8 @@ export interface LedgerCell {
   volume: number | null;
   /** Up to three stacks, highest value first. */
   topStacks: LedgerStack[];
+  /** Every stack in the cell, containers and their contents alike (`buildContentsTree` nests them). */
+  stacks: LedgerStack[];
 }
 
 export interface OfficeDivisionCell extends LedgerCell {
@@ -439,7 +441,7 @@ function buildCell(stacks: readonly LedgerStack[], hasVolumes: boolean): LedgerC
         b.estimatedValue - a.estimatedValue || b.quantity - a.quantity || a.itemId - b.itemId
     )
     .slice(0, 3);
-  return { itemCount, estimatedValue, volume, topStacks };
+  return { itemCount, estimatedValue, volume, topStacks, stacks: [...stacks] };
 }
 
 /** By-location ledger over the whole classification (not tab-filtered: the page picks `offices` / `others`). */
@@ -504,4 +506,61 @@ export function buildLocationLedger(
     .map((g) => ({ state: g.state, locationId: g.locationId, ...buildCell(g.stacks, hasVolumes) }));
 
   return { offices, others };
+}
+
+/** One stack in a place's contents, with whatever sits inside it. */
+export interface LedgerContentsNode {
+  itemId: number;
+  typeId: number;
+  /** Null for a container a filter left out, kept because something it holds passed. */
+  stack: LedgerStack | null;
+  children: LedgerContentsNode[];
+  /** Stacks anywhere beneath this one. */
+  itemCount: number;
+  /** This stack's value plus everything beneath it. */
+  estimatedValue: number;
+}
+
+/**
+ * Nests one place's stacks (a `LedgerCell`'s) by their container paths, the
+ * way the in-game hangar shows them: containers first, then by value. A
+ * container missing from `stacks` (filtered out) is rebuilt from the path of
+ * what it holds, so a search still shows where a hit sits.
+ */
+export function buildContentsTree(stacks: readonly LedgerStack[]): LedgerContentsNode[] {
+  const nodes = new Map<number, LedgerContentsNode>();
+  const roots: LedgerContentsNode[] = [];
+  const nodeFor = (itemId: number, typeId: number, parent: LedgerContentsNode | null) => {
+    let node = nodes.get(itemId);
+    if (!node) {
+      node = { itemId, typeId, stack: null, children: [], itemCount: 0, estimatedValue: 0 };
+      nodes.set(itemId, node);
+      (parent?.children ?? roots).push(node);
+    }
+    return node;
+  };
+  for (const stack of stacks) {
+    let parent: LedgerContentsNode | null = null;
+    for (const entry of stack.path) parent = nodeFor(entry.itemId, entry.typeId, parent);
+    nodeFor(stack.itemId, stack.typeId, parent).stack = stack;
+  }
+  const settle = (list: LedgerContentsNode[]): void => {
+    for (const node of list) {
+      settle(node.children);
+      node.estimatedValue = node.stack?.estimatedValue ?? 0;
+      node.itemCount = 0;
+      for (const child of node.children) {
+        node.estimatedValue += child.estimatedValue;
+        node.itemCount += 1 + child.itemCount;
+      }
+    }
+    list.sort(
+      (a, b) =>
+        Number(b.children.length > 0) - Number(a.children.length > 0) ||
+        b.estimatedValue - a.estimatedValue ||
+        a.itemId - b.itemId
+    );
+  };
+  settle(roots);
+  return roots;
 }
