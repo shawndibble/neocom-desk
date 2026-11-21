@@ -19,7 +19,7 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import { closedThroughFor } from './corpTaxBookCheckpoint.js';
-import { HOUR_MS } from './timeConstants.js';
+import { HOUR_MS, utcDay } from './timeConstants.js';
 
 export const MOON_DOCS = 'moonDocs';
 /**
@@ -68,8 +68,6 @@ export interface MoonDoc {
   frozenLines: number;
 }
 
-const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-
 /** Engine `fractureAndExpiry`, as the dates it covers. Null when the dates do not parse. */
 export function pullWindow(
   x: Pick<MirrorExtraction, 'structureId' | 'naturalDecayTime' | 'laserFiredAt'>,
@@ -82,7 +80,7 @@ export function pullWindow(
     MAX_EXPIRY_HOURS
   );
   const expiresAt = fracturedAt + hours * HOUR_MS;
-  return { fracturedAt, expiresAt, from: day(fracturedAt), to: day(expiresAt) };
+  return { fracturedAt, expiresAt, from: utcDay(fracturedAt), to: utcDay(expiresAt) };
 }
 
 const sorted = (m: Map<number, number>): OreQty[] =>

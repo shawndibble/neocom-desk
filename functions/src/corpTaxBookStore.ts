@@ -172,12 +172,13 @@ import {
 import {
   NOTICE_ID_FIELD,
   lateNoticeFromStatementDoc,
+  adjustmentLineKey,
   lastNoticedDay,
   lateNoticeRefusal,
   legacyStatementDocOf,
-  lineKey,
   minerPaymentCode,
   noticedDates,
+  reminderAllowed,
 } from './corpTaxBookLateNotice.js';
 import {
   dbReader,
@@ -1087,8 +1088,8 @@ async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promis
 
 function minerCharacters(minerId: string, miner: Data | undefined): number[] {
   if (miner) return miner.characterIds as number[];
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return solo ? [Number(solo[1])] : [];
+  const solo = soloCharacterId(minerId);
+  return solo === undefined ? [] : [solo];
 }
 
 /** The characters that may read a Miner: an Officer claim and a legacy unconfirmed guest may not. */
@@ -1131,7 +1132,7 @@ async function assertAdjustmentReversible(
   adjustment: Record<string, unknown>
 ): Promise<void> {
   if (adjustment.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
-  const key = lineKey({ adjustmentId, date: '' });
+  const key = adjustmentLineKey(adjustmentId);
   const billed = (await minerNotices(c, adjustment.minerId as string)).some((n) =>
     n.lines.some((l) => l.key === key)
   );
@@ -1164,11 +1165,9 @@ async function knownMiner(c: EditCtx, minerId: string): Promise<boolean> {
     col(c, ACCOUNTS).doc(minerId)
   );
   if (miner.exists || account.exists) return true;
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  if (!solo) return false;
-  const rows = await c.tx.get(
-    col(c, OBSERVED).where('characterId', '==', Number(solo[1])).select().limit(1)
-  );
+  const solo = soloCharacterId(minerId);
+  if (solo === undefined) return false;
+  const rows = await c.tx.get(col(c, OBSERVED).where('characterId', '==', solo).select().limit(1));
   return !rows.empty;
 }
 
@@ -2661,7 +2660,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const loaded = await mustGetNotice(c, action.noticeId);
       const { mail } = loaded.notice;
       // A miner who opted out gets one manual reminder per notice (D27).
-      if (mail.remindersStopped && mail.manualSent >= 1)
+      if (!reminderAllowed(mail))
         fail('failed-precondition', 'This miner stopped reminders', 'reminders-stopped');
       writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'reminded' });
       return { detail: { noticeId: action.noticeId } };
@@ -3095,7 +3094,7 @@ export async function confirmGrouping(
       corporationId,
       minerId,
       [...new Set([...((miner.uids as string[] | undefined) ?? []), caller.uid])],
-      [`solo:${characterId}`]
+      [soloMinerId(characterId)]
     );
     tx.update(ref, {
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
@@ -3432,7 +3431,7 @@ async function callerMiner(
   const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
   return miner
     ? { minerId: miner.id, uids: miner.get('uids') as string[] }
-    : { minerId: `solo:${characterId}`, uids: [caller.uid] };
+    : { minerId: soloMinerId(characterId), uids: [caller.uid] };
 }
 
 /**
