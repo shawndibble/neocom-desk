@@ -45,6 +45,12 @@ describe('PayeeLedgerPanel', () => {
     expect(within(table()).getByRole('columnheader', { name: 'Credited' })).toBeInTheDocument();
   });
 
+  it('writes every date, the status line included, the way its rows do', () => {
+    renderPanel(CORP_BOOK_LEDGER);
+    expect(screen.getByText('Oldest unpaid').parentElement).toHaveTextContent(/\d{4}-\d{2}-\d{2}/);
+    expect(document.body).not.toHaveTextContent(/[A-Z][a-z]{2} \d{1,2}, \d{4}/);
+  });
+
   it('opens a row in place to say what it was', async () => {
     const user = userEvent.setup();
     renderPanel(CORP_BOOK_LEDGER);

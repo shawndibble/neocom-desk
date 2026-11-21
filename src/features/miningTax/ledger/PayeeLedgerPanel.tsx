@@ -28,7 +28,6 @@ import {
   type PayeeLedgerRow,
   type PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
-import { formatDateWithYear } from '@/lib/formatDateTick';
 import type { CsvColumn } from '@/lib/csv';
 import { formatIsk } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
@@ -201,16 +200,13 @@ function LedgerStatus({ ledger }: { ledger: PayeeLedger }) {
             emphasis
           />
           <StatChip label={t('miningTax.ledger.status.days')} value={status.days} />
-          <StatChip
-            label={t('miningTax.ledger.status.oldest')}
-            value={formatDateWithYear(status.oldest)}
-          />
+          <StatChip label={t('miningTax.ledger.status.oldest')} value={status.oldest} />
         </>
       )}
       {status.kind === 'paid' && (
         <StatChip
           label={t('miningTax.ledger.status.paidThrough')}
-          value={formatDateWithYear(status.through)}
+          value={status.through}
           tone="success"
           emphasis
         />
@@ -354,7 +350,7 @@ export function PayeeLedgerTable({
    * read-only. Only for a book's ledger; a personal Payee's has no lock date, so passes none.
    */
   lockDate?: string;
-  /** The lock date as the page writes dates; the year-bearing day label when left out. */
+  /** The lock date as the page writes dates; the table's own `YYYY-MM-DD` when left out. */
   lockDateLabel?: string;
 } & Omit<
   DataTableProps<PayeeLedgerRow>,
@@ -442,9 +438,7 @@ export function PayeeLedgerTable({
       rowKey={(r) => r.key}
       rowBoundary={lockRowBoundary(
         rows,
-        lockDate
-          ? { date: lockDate, label: lockDateLabel ?? formatDateWithYear(lockDate) }
-          : undefined,
+        lockDate ? { date: lockDate, label: lockDateLabel ?? lockDate } : undefined,
         (r) => r.date,
         (r) => r.key
       )}
