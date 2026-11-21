@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
@@ -260,21 +261,10 @@ export function uploadSync(characterId: number, upload: SyncUpload): Promise<Syn
 }
 
 /**
- * Edits that re-check the Character's roles live (D7). The callable refuses
- * them on the 10-minute cache, so the access token travels with them.
+ * Edits that re-check the Character's roles live (D7). The callable refuses them on the 10-minute
+ * cache, so the access token travels with them. The server's own list, so the two cannot drift.
  */
-export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
-  'dismiss',
-  'dismissRecords',
-  'dismissDispute',
-  'reverseDismissal',
-  'reverseAdjustment',
-  'editAdjustment',
-  'reverseWriteOff',
-  'setToleranceExemption',
-  'writeOff',
-  'markNotTax',
-]);
+export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set(LIVE_CHECK_ACTION_NAMES);
 
 /** A close-account that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 function needsLiveToken(action: { action: string } & Record<string, unknown>): boolean {

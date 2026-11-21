@@ -60,6 +60,7 @@ import {
 import {
   CLAIM_CHECK_RESULTS,
   DISPUTE_KINDS,
+  LIVE_CHECK_ACTION_NAMES,
   NOTICE_AFTER_KINDS,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
@@ -820,21 +821,9 @@ export interface RecordedAccount {
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
 
 /** Dismissals, write-offs, rebills and "not tax" re-check the role live (D7). */
-export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
-  'dismiss',
-  'dismissRecords',
-  'dismissDispute',
-  'reverseDismissal',
-  'reverseAdjustment',
-  'editAdjustment',
-  'reverseWriteOff',
-  'setToleranceExemption',
-  'writeOff',
-  'rebill',
-  'markNotTax',
-  'resetCheckpoint',
-  'reassignPayment',
-]);
+export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set(
+  LIVE_CHECK_ACTION_NAMES satisfies readonly EditAction['action'][]
+);
 
 /** A close that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 export function needsLiveCheck(action: EditAction): boolean {
