@@ -89,7 +89,7 @@ export function LedgerRowDetail({
             </p>
           )}
           {onUnlinkPayment && (
-            <p>
+            <div>
               <button
                 type="button"
                 className={textActionClassName()}
@@ -97,7 +97,8 @@ export function LedgerRowDetail({
               >
                 {t('miningTax.unlinkTransactionAction')}
               </button>
-            </p>
+              <p className="text-xs text-text-dim">{k('unlinkHint')}</p>
+            </div>
           )}
         </>
       )}

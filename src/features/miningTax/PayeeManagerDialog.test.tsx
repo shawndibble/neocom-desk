@@ -162,7 +162,7 @@ describe('PayeeManagerDialog — trade hub', () => {
     renderDialog([
       { id: 'p1', characterId: CHAR, name: 'Landlord', defaultTaxPct: 10, updatedAt: 1 },
     ]);
-    expect(screen.getByText('10% · Jita')).toBeInTheDocument();
+    expect(screen.getByText('10% · priced at Jita')).toBeInTheDocument();
   });
 
   it('keeps the Default Systems through an edit that only changes the hub', async () => {
@@ -383,7 +383,9 @@ describe('PayeeManagerDialog — list rows', () => {
         [3, 'Ainsan'],
       ]),
     });
-    expect(screen.getByText('5% · Jita · Ainsan, Sabusi, Talidal')).toBeInTheDocument();
+    expect(
+      screen.getByText('5% · priced at Jita · mined in Ainsan, Sabusi, Talidal')
+    ).toBeInTheDocument();
   });
 
   it('keeps the add form hidden until Add Payee is pressed', async () => {

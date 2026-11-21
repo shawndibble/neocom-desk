@@ -69,6 +69,8 @@ describe('PayeeLedgerPanel', () => {
       </MemoryRouter>
     );
     await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
+    // It says what Unlink does before the pilot presses it.
+    expect(await screen.findByText(/Unlinking frees this payment/)).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Unlink' }));
     expect(onUnlinkPayment).toHaveBeenCalledWith(expect.any(String));
     unmount();
@@ -76,6 +78,7 @@ describe('PayeeLedgerPanel', () => {
     await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
     expect(screen.getByText('Days it paid')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Unlink' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unlinking frees this payment/)).not.toBeInTheDocument();
   });
 
   it('filters by kind, and offers a reset when nothing is left', async () => {
