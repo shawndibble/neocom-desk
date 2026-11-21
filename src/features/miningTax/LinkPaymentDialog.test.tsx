@@ -95,18 +95,10 @@ describe('LinkPaymentDialog — value handed over', () => {
     expect(screen.getByRole('button', { name: 'Link to Mining Corp' })).toBeEnabled();
   });
 
-  it('records what the Payee owes when left blank', async () => {
-    const user = userEvent.setup();
+  it("links nothing left blank: a cargo's worth is never assumed to be the whole balance (N4)", () => {
     renderDialog();
-
-    expect(screen.getByRole('textbox', { name: 'Value handed over' })).toHaveAttribute(
-      'placeholder',
-      '250,000'
-    );
-    await user.click(screen.getByRole('button', { name: 'Link to Mining Corp' }));
-
-    await waitFor(() => expect(settle).toHaveBeenCalled());
-    expect(recordedAmount()).toBe(250_000);
+    expect(screen.getByRole('button', { name: 'Link to Mining Corp' })).toBeDisabled();
+    expect(settle).not.toHaveBeenCalled();
   });
 });
 
@@ -125,6 +117,7 @@ describe('LinkPaymentDialog — a failed save', () => {
     const user = userEvent.setup();
     renderDialog(IN_KIND, { onLinked, onClose });
 
+    await user.type(screen.getByRole('textbox', { name: 'Value handed over' }), '250000');
     await user.click(screen.getByRole('button', { name: 'Link to Mining Corp' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
@@ -144,6 +137,7 @@ describe('LinkPaymentDialog — a failed save', () => {
     } as LinkSuggestion;
     renderDialog(fromKnownSender, { onLinked, onClose });
 
+    await user.type(screen.getByRole('textbox', { name: 'Value handed over' }), '250000');
     await user.click(screen.getByRole('button', { name: 'Link to Mining Corp' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

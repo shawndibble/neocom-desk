@@ -50,10 +50,9 @@ export function LinkPaymentDialog({
 
   const selected = suggestions.find((s) => s.payment.key === selectedKey) ?? null;
   const account = selected ? accountOf(selected.payee.id) : undefined;
-  const owed = account?.owes?.amount ?? 0;
+  // A payment in kind's figure is the pilot's to give: never assumed to be the whole balance.
   const amount =
-    selected?.payment.amount ??
-    (amountInKind.trim() === '' ? Math.round(owed) : Number(amountInKind));
+    selected?.payment.amount ?? (amountInKind.trim() === '' ? Number.NaN : Number(amountInKind));
   const amountValid =
     Number.isFinite(amount) &&
     amount > 0 &&
@@ -156,7 +155,6 @@ export function LinkPaymentDialog({
               value={amountInKind}
               onChange={setAmountInKind}
               onParseableChange={setAmountInKindParses}
-              defaultAmount={Math.round(owed)}
               aria-label={t('miningTax.linkPaymentAmountLabel')}
               className="w-full"
             />
