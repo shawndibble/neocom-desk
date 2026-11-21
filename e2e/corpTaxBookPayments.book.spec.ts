@@ -36,8 +36,9 @@ test('an exact payment pays the oldest day and leaves the next owed', async ({ p
   await openMiner(page, b.minerId, MINER.ada.name);
   await expect(page.getByRole('main')).toContainText(`Owed${isk(DAY_TAX)}`);
   await expect(minerFact(page, 'Oldest unpaid')).toContainText(shortDay(b.newestBack));
+  // Credited, then the balance after it: owed reads positive.
   await expect(ledgerRow(page, /Payment from Ada Lunar/)).toContainText(
-    `${isk(b.paid)}−${isk(DAY_TAX)}`
+    `${isk(b.paid)}${isk(DAY_TAX)}`
   );
   await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
     `Paid 1 day, from ${shortDay(b.oldestBack)}`
@@ -85,7 +86,7 @@ test('an overpayment pays every day and holds the rest as credit', async ({ page
     ledgerRow(page, /Payment from Ada Lunar/)
       .getByRole('cell')
       .nth(4)
-  ).toHaveText(new RegExp(`^\\+?${isk(credit)}$`));
+  ).toHaveText(`${isk(credit)} credit`);
   await expect(page.getByRole('heading', { name: 'Owed days · 0' })).toBeVisible();
 });
 
