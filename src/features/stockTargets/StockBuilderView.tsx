@@ -23,7 +23,11 @@ import { addBuildGroup, useBuildGroups } from '@/features/industry/buildGroups';
 import { createBuildPlans } from '@/features/industry/buildPlanStore';
 import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
 import { loadActivityFacilityDefaults } from '@/features/industry/facilityDefaults';
-import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
+import {
+  loadNewPlanHubInputs,
+  mostRecentlyUpdatedPlan,
+  newBuildPlan,
+} from '@/features/industry/newBuildPlan';
 import { useItemActions } from '@/features/market/itemActions';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
@@ -140,6 +144,8 @@ export function StockBuilderView({
       const [facilityDefaults, plans] = await Promise.all([
         loadActivityFacilityDefaults(),
         db.buildPlans.where('characterId').equals(activeCharacterId).toArray(),
+        // Outside the Industry page, so nothing has read the hubs a new plan starts at.
+        loadNewPlanHubInputs(),
       ]);
       const buildGroupId = crypto.randomUUID();
       const now = Date.now();

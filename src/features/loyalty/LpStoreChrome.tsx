@@ -3,32 +3,23 @@ import { useTranslation } from 'react-i18next';
 import { Field, Fields, Tabs } from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
-import { TradeHubSelect } from '@/features/loyalty/TradeHubSelect';
-import { useMarketHub } from '@/features/market/hub';
-import { useHydratedStore } from '@/lib/useHydratedStore';
+import { HubField } from '@/features/market/HubMenu';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 
 /**
  * The header's gear for the two settings this page's numbers lean on: LP
- * Value and the Trade hub. The hub is the app-wide one (`useMarketHub`) the
- * filter row's select writes too, so the two never disagree.
+ * Value and the Trade hub. The hub is the LP Store page hub (`useHubFor('lpStore')`),
+ * the one the filter row's select applies to as well, so the two never disagree.
  */
 export function LpStoreActions() {
   const { t } = useTranslation();
-  const hubId = useMarketHub((s) => s.value);
-  const setHubId = useMarketHub((s) => s.setValue);
-  useHydratedStore(useMarketHub);
   return (
     <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
       <div className="space-y-4">
         <Fields variant="form">
-          <Field label={t('loyaltyStore.hubLabel')} htmlFor="lp-store-gear-hub">
-            <TradeHubSelect
-              id="lp-store-gear-hub"
-              value={hubId}
-              onValueChange={(id) => void setHubId(id)}
-            />
+          <Field label={t('loyaltyStore.hubLabel')}>
+            <HubField area="lpStore" label={t('loyaltyStore.hubLabel')} />
           </Field>
         </Fields>
         <LpValueSettingsForm />

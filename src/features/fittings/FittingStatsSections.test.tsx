@@ -1308,7 +1308,7 @@ describe('FittingStatsSections price', () => {
 
     expect(body.getByText('Rare Thing ×3')).toBeInTheDocument();
     expect(body.queryByText('Priced Thing')).toBeNull();
-    expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
+    expect(body.getByRole('button', { name: 'Jita, Priced at' })).toBeInTheDocument();
   });
 
   it('prices on sell orders alone: no Buy fact, and a missing buy order is not "unpriced"', async () => {

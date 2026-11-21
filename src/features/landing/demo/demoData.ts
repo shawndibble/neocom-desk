@@ -38,6 +38,7 @@ import type { Translate } from '@/lib/translate';
 import type { Widget } from '@/features/overview/widgets/layout';
 import { formatIskCompact } from '@/lib/isk';
 import { NEXT_EVENT } from './demoCast';
+import { toCalendarEventSources } from '@/features/character/calendarBoardSources';
 
 /** The wallet balance the journal walks to. */
 const BALANCE = 1_842_600_000;
@@ -194,7 +195,20 @@ const feedsAt = (now: number): Feeds => {
   return {
     wallet: ok({ result: cached(BALANCE, fetched(2)), needsReauth: false }),
     journal: ok({ result: cached(journal(now), fetched(2)), needsReauth: false }),
-    calendar: ok({ events, needsReauth: false, fetchedAt: fetched(5) }),
+    calendar: ok({
+      calendarEvents: toCalendarEventSources(events),
+      corporations: [],
+      sharedPops: [],
+      readableRefineries: [],
+      sharingCorporations: [],
+      skyhookRaidDetails: [],
+      readableKinds: ['calendarEvent'],
+      reauthKinds: [],
+      oldestFetchedAt: fetched(5),
+      fromCache: false,
+      events,
+      loadedAtMs: now,
+    }),
     mining: ok({
       unpaidIsk: 17_400_000,
       payeeCount: 2,

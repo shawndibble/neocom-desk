@@ -94,13 +94,15 @@ export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAsse
  * The distinct places a corporation's assets sit: stations, Upwell structures
  * and solar systems. A `location_id` that is another asset's `item_id` is a
  * container or ship, not a place; item ids sit above `UPWELL_STRUCTURE_ID_FLOOR`
- * too, so looking them up as structures costs a refused request each.
+ * too, so looking them up as structures costs a refused request each. ESI
+ * types an office in an Upwell structure `location_type: 'item'`, so that
+ * type alone never rules a place out.
  */
 export function assetPlaceIds(assets: readonly CorporationAsset[]): number[] {
   const itemIds = new Set(assets.map((asset) => asset.item_id));
   const places = new Set<number>();
   for (const asset of assets) {
-    if (asset.location_type === 'item' || itemIds.has(asset.location_id)) continue;
+    if (itemIds.has(asset.location_id)) continue;
     places.add(asset.location_id);
   }
   return [...places];

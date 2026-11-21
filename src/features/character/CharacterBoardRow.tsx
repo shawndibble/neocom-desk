@@ -24,7 +24,7 @@ import { pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import { highlightHref } from '@/lib/highlightParam';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -72,9 +72,7 @@ export function CharacterBoardRow({
   const openable = item.kind === 'calendarEvent' && onSelectEvent !== undefined;
   /** The one other kind with a fixed destination — no callback needed, unlike a calendar event's modal. */
   const contractHref =
-    item.kind === 'contractExpiry'
-      ? `/contracts/history?${HIGHLIGHT_PARAM}=${item.sourceId}`
-      : null;
+    item.kind === 'contractExpiry' ? highlightHref('/contracts/history', item.sourceId) : null;
 
   const body = (
     <>

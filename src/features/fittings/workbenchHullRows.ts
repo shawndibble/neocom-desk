@@ -50,7 +50,7 @@ import {
   matchWorkbenchSightings,
   type WorkbenchSighting,
 } from '@/engine/fittings/workbenchSightings';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -59,7 +59,6 @@ import { loadFittingFromText } from './loadFittingFromText';
 import { loadPopularFits, type PopularFitsResult } from './popularFits';
 import { yieldToEventLoop } from './yieldToEventLoop';
 import { loadWorkbenchFits, type WorkbenchFit, type WorkbenchFitsResult } from './workbenchFits';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** What the Workbench rows read from outside. */
 export interface WorkbenchHullSources {
@@ -293,8 +292,7 @@ export function useWorkbenchHullRows(
     [checks, popular, shipTypeId]
   );
 
-  const hubId = useMarketHub((state) => state.value);
-  useHydratedStore(useMarketHub);
+  const { hubId } = useHubFor('fittings');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const { current, outOfDate } = useMemo(
     () =>

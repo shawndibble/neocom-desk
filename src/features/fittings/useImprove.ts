@@ -11,7 +11,7 @@ import type { HullRef } from '@/engine/fittings/improve';
 import type { ChargeLoadStep } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { createWorkerPool, searchPoolSize, type WorkerPool } from './fittingWorker';
 import { fitCheckOf, modulePool } from './improveModulePool';
 import {
@@ -93,7 +93,7 @@ export function useImprove(
   config: ImproveConfig,
   chargePlan: readonly ChargeLoadStep[] = NO_CHARGES
 ): ImproveSearch {
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   // The plan and config are new objects each render; the search reruns only when their content changes.
   const chargePlanKey = JSON.stringify(chargePlan);
   const configKey = JSON.stringify(config);

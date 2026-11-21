@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { loadLoyaltyStoreOffersStatus, loadCorporationName } from './store';
@@ -78,8 +78,7 @@ export interface LoyaltyStoreResult {
 
 export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult {
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
-  const hubId = useMarketHub((s) => s.value);
-  const hubHydrated = useMarketHub((s) => s.hydrated);
+  const { hubId, hydrated: hubHydrated } = useHubFor('lpStore');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceBasis = usePriceBasis((s) => s.value);
   // Issue #1238: LP store offers carry no issuing-corp home station in this

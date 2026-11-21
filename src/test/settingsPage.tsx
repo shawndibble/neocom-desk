@@ -18,6 +18,7 @@ import {
   DEFAULT_CALENDAR_WEEK_START,
 } from '@/features/character/calendarWeekStart';
 import { useMarketHub } from '@/features/market/hub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import { useAssumedTe } from '@/features/industry/assumedTe';
 import {
@@ -93,6 +94,7 @@ async function resetSettingsSession() {
   useAvoidedSystems.setState({ value: [], hydrated: false });
   useCalendarWeekStart.setState({ value: DEFAULT_CALENDAR_WEEK_START, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
+  usePageHubs.setState({ value: {}, hydrated: false });
   useAssumedMe.setState({ value: 0, hydrated: false });
   useAssumedTe.setState({ value: 0, hydrated: false });
   useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });

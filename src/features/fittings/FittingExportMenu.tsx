@@ -11,12 +11,14 @@ import {
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { formatIsk } from '@/lib/isk';
+import { useHubFor } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import type { EditorShare } from './useEditorShare';
 import { useFittingExport, type FittingExport } from './useFittingExport';
 
 interface Props {
   fitting: Fitting;
-  /** The Fitting's Jita price (`fittingPrice.ts`); null while it loads. */
+  /** The Fitting's price at the Fittings hub (`fittingPrice.ts`); null while it loads. */
   price: Appraisal | null;
   /** The pilot's active clone, left off the multibuy list (`useFittingExport`). */
   cloneImplants?: readonly number[];
@@ -53,6 +55,8 @@ export function FittingExportItems({
   share?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const { hubId } = useHubFor('fittings');
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   return (
     <>
       <DropdownMenuItem onSelect={() => void copyShareLink()}>
@@ -79,7 +83,12 @@ export function FittingExportItems({
       <DropdownMenuSeparator />
       <div className="px-2 py-1.5 text-xs text-text-dim">
         {price ? (
-          <p>{t('fittings.stats.priceSell', { value: formatIsk(price.totals.sell) })}</p>
+          <p>
+            {t('fittings.stats.priceSell', {
+              hub: hub.systemName,
+              value: formatIsk(price.totals.sell),
+            })}
+          </p>
         ) : (
           <p>{t('fittings.stats.priceLoading')}</p>
         )}
@@ -93,7 +102,7 @@ export function FittingExportItems({
 
 /**
  * The Fittings page's one Export menu (issue #1543): copy the Share Link or permanent link, EFT,
- * an in-game chat link or a multibuy list, and see the Fitting's Jita price
+ * an in-game chat link or a multibuy list, and see the Fitting's price
  * with a way into Appraisal for the same list.
  */
 export function FittingExportMenu({ fitting, price, cloneImplants, share }: Props) {

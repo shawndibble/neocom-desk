@@ -10,6 +10,7 @@
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { getKind, showOf, type WidgetKindDef, type WidgetShow } from '../kinds';
 import {
+  cleanHiddenKinds,
   cleanHiddenLayers,
   DEFAULT_RAIDS_RADIUS,
   DEFAULT_RANGE,
@@ -17,6 +18,7 @@ import {
 } from '../layout';
 import type { CalendarEventsChoice, ProfitSource, WidgetRange } from '../layout';
 import type { LayerId } from '@/engine/netWorth/series';
+import type { CharacterBoardItemKind } from '@/engine/character/board';
 import type { BuildContext } from './types';
 
 /** A widget's own settings, as stored; every field is absent when left at its default. */
@@ -27,6 +29,8 @@ export interface ViewSettings {
   plexPer30Days?: number;
   /** Which calendar events the widget lists; left out, accepted and tentative. */
   calendarEvents?: CalendarEventsChoice;
+  /** Calendar: the Clock Kinds switched off; left out, every kind shows. */
+  hiddenKinds?: CharacterBoardItemKind[];
   /** Skyhook raids: 'near' lists any holder's space within `raidsRadius` jumps; left out, My alliance. */
   raidsWhere?: 'near';
   raidsRadius?: number;
@@ -55,6 +59,7 @@ export type SettingsContext = Pick<
   | 'range'
   | 'plexPer30Days'
   | 'calendarEvents'
+  | 'hiddenKinds'
   | 'raidsWhere'
   | 'raidsRadius'
   | 'profitSource'
@@ -86,8 +91,11 @@ export const VIEW_SETTINGS = {
   },
   calendarEvents: {
     enabledFor: (k) => k.hasCalendarEvents,
-    fields: ['calendarEvents'],
-    resolve: (s) => ({ calendarEvents: s.calendarEvents === 'all' ? 'all' : 'committed' }),
+    fields: ['calendarEvents', 'hiddenKinds'],
+    resolve: (s) => ({
+      calendarEvents: s.calendarEvents === 'all' ? 'all' : 'committed',
+      hiddenKinds: cleanHiddenKinds(s.hiddenKinds),
+    }),
   },
   raids: {
     enabledFor: (k) => k.hasRaidsWhere,
