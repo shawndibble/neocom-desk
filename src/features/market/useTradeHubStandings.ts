@@ -96,10 +96,24 @@ export function useTradeHubStandingsByCharacter(
   return useKeyedLoad(key, load).data ?? NO_STANDINGS_BY_CHARACTER;
 }
 
+const zeroStandingsCache = new Map<TradeHub['id'], ResolvedStandings>();
+
 /** No standing at a hub, but still the hub's own Safety Tax and fee discount: they are the market's, not the pilot's. */
 export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
   const hub = getTradeHub(hubId);
-  return hub ? withHubFeeModifiers(hub, ZERO_STANDINGS) : ZERO_STANDINGS;
+  if (!hub) return ZERO_STANDINGS;
+  const resolved = withHubFeeModifiers(hub, ZERO_STANDINGS);
+  // A stable reference per distinct result: callers key memos on the standing, and this runs per render.
+  const cached = zeroStandingsCache.get(hubId);
+  if (
+    cached &&
+    cached.safetyTaxPct === resolved.safetyTaxPct &&
+    cached.feeDiscountFactor === resolved.feeDiscountFactor
+  ) {
+    return cached;
+  }
+  zeroStandingsCache.set(hubId, resolved);
+  return resolved;
 }
 
 /** `standings.get(hubId)`, defaulting to zero for a hub not yet resolved. */

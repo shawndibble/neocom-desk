@@ -38,6 +38,7 @@ import type { ResolvedStandings } from '@/engine/market/standings';
 import { resolveLocationStandings } from './locationStandings';
 import type { CharacterSkills } from './openOrdersModel';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { hubFeeDiscountFactor, TRADE_HUBS } from '@/market/hubs';
 import { orderSlotBreakdown, type OrderSlotBreakdown } from '@/engine/market/orderSlots';
 
 export interface OpenOrdersPageSnapshot {
@@ -211,7 +212,15 @@ export async function loadOpenOrdersSnapshot(
     async ({ characterId, order }) => {
       const standings = standingsByCharacter.get(characterId) ?? [];
       const resolved = await resolveLocationStandings(order.location_id, standings);
-      standingsByOrder.set(order.order_id, resolved);
+      // An order at a Trade Hub's station pays that hub's temporary fee discount.
+      const feeDiscountFactor = hubFeeDiscountFactor(
+        TRADE_HUBS.find((hub) => hub.stationId === order.location_id),
+        Date.now()
+      );
+      standingsByOrder.set(
+        order.order_id,
+        feeDiscountFactor === 1 ? resolved : { ...resolved, feeDiscountFactor }
+      );
     }
   );
 

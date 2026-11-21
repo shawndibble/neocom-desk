@@ -41,11 +41,15 @@ export interface OrderFloorInputs {
   advancedBrokerRelationsLevel: number;
   factionStanding?: number;
   corpStanding?: number;
+  /** The hub's temporary fee discount factor (`hubFeeDiscountFactor`) for an NPC-station order; ignored at a player structure. */
+  feeDiscountFactor?: number;
   /** Total broker fee % when the order sits at a player structure (SCC surcharge + the owner's rate). Replaces the skill/standing-derived NPC rate; 0 is a real rate, so test for undefined. */
   structureBrokerPct?: number;
 }
 
 export interface OrderFloor {
+  /** The fee discount factor this floor was solved with, so a reader re-deriving its sales tax matches; absent is none. */
+  feeDiscountFactor?: number;
   /** Lowest price worth RE-PRICING to: sales tax plus a broker fee charged again on the edit. */
   relist: number;
   /** Lowest price worth letting it FILL at: sales tax only, because the broker fee was paid at listing. */
@@ -62,6 +66,7 @@ export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
     advancedBrokerRelationsLevel,
     factionStanding,
     corpStanding,
+    feeDiscountFactor,
     structureBrokerPct,
   } = inputs;
 
@@ -77,7 +82,8 @@ export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
           brokerRelationsLevel,
           advancedBrokerRelationsLevel,
           factionStanding,
-          corpStanding
+          corpStanding,
+          feeDiscountFactor
         )
       : relistBreakEvenPriceAtBrokerPct(
           unitCost * remainingQuantity,
@@ -87,8 +93,9 @@ export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
           advancedBrokerRelationsLevel
         );
   // remainingQuantity > 0, so relistBreakEvenPrice never returns null here.
-  const tax = salesTaxPct(accountingLevel);
+  const taxFactor = structureBrokerPct === undefined ? feeDiscountFactor : undefined;
+  const tax = salesTaxPct(accountingLevel, taxFactor);
   const fill = unitCost / (1 - tax / 100);
 
-  return { relist: relist as number, fill };
+  return { relist: relist as number, fill, feeDiscountFactor: taxFactor };
 }
