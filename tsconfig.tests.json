@@ -27,6 +27,7 @@
     "vitest.setup.dom.ts",
     "vitest.runner.ts",
     "playwright.config.ts",
+    "playwright.book.config.ts",
     "vitest.rules.config.ts",
     "rules-tests"
   ]

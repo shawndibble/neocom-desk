@@ -31,6 +31,7 @@ storybook-static
 
 # Firestore emulator logs (npm run test:rules)
 firestore-debug.log
+firebase-debug.log
 ui-debug.log
 
 # TypeScript incremental build info
