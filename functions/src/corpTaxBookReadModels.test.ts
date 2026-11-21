@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MINER_LIST_DOC,
   OVERVIEW_DOC,
   READ_MODELS_SCHEMA,
   buildReadModels,
@@ -16,7 +15,7 @@ const pull = (id: string, naturalDecayTime: string, extra: Record<string, unknow
   ...extra,
 });
 
-describe('buildReadModels: the Overview’s Extractions and the Miners the book recorded', () => {
+describe('buildReadModels: the Overview’s Extractions', () => {
   it('lists the pulls not cancelled and expired no more than a day ago', () => {
     const live = pull('live', '2026-11-19T00:00:00Z');
     const models = buildReadModels(
@@ -32,16 +31,8 @@ describe('buildReadModels: the Overview’s Extractions and the Miners the book 
     );
     expect(models).toEqual({
       [OVERVIEW_DOC]: { schema: READ_MODELS_SCHEMA, extractions: [live] },
-      [MINER_LIST_DOC]: { schema: READ_MODELS_SCHEMA, miners: [] },
     });
     expect(READ_MODELS_SCHEMA).toBe(2);
-  });
-
-  it('lists each Miner an officer’s visit recorded an account for, by id, sorted', () => {
-    expect(
-      buildReadModels({ expiryHours: {}, extractions: [], accountIds: ['solo:7', 'g1'] }, NOW)
-        .minerList
-    ).toEqual({ schema: READ_MODELS_SCHEMA, miners: [{ minerId: 'g1' }, { minerId: 'solo:7' }] });
   });
 
   it('keeps a pull its refinery’s own expiry still holds', () => {
@@ -57,34 +48,37 @@ describe('buildReadModels: the Overview’s Extractions and the Miners the book 
 });
 
 describe('planReadModels', () => {
-  const fresh = buildReadModels({ expiryHours: {}, extractions: [], accountIds: ['g1'] }, NOW);
+  const fresh = buildReadModels({ expiryHours: {}, extractions: [] }, NOW);
   const overview = { schema: READ_MODELS_SCHEMA, extractions: [] };
-  const minerList = { schema: READ_MODELS_SCHEMA, miners: [{ minerId: 'g1' }] };
 
   it('writes a missing or changed doc, and leaves a current one', () => {
-    expect(planReadModels(fresh, new Map()).writes).toEqual([
-      { id: OVERVIEW_DOC, data: overview },
-      { id: MINER_LIST_DOC, data: minerList },
+    expect(planReadModels(fresh, new Map()).writes).toEqual([{ id: OVERVIEW_DOC, data: overview }]);
+    const stale = new Map<string, Record<string, unknown>>([
+      [OVERVIEW_DOC, { schema: READ_MODELS_SCHEMA - 1, extractions: [] }],
     ]);
-    const held = new Map<string, Record<string, unknown>>([
-      [OVERVIEW_DOC, overview],
-      [MINER_LIST_DOC, { schema: READ_MODELS_SCHEMA, miners: [] }],
-    ]);
-    expect(planReadModels(fresh, held)).toEqual({
-      writes: [{ id: MINER_LIST_DOC, data: minerList }],
-      mismatches: [{ id: MINER_LIST_DOC, kind: 'stale' }],
+    expect(planReadModels(fresh, stale)).toEqual({
+      writes: [{ id: OVERVIEW_DOC, data: overview }],
+      mismatches: [{ id: OVERVIEW_DOC, kind: 'stale' }],
     });
+    const held = new Map<string, Record<string, unknown>>([[OVERVIEW_DOC, overview]]);
+    expect(planReadModels(fresh, held)).toEqual({ writes: [], mismatches: [] });
   });
 });
 
 describe('movesReadModels', () => {
-  it('rebuilds after an edit that moves an Extraction, its expiry or the Miners recorded', () => {
-    for (const action of ['linkSurvey', 'setFullyMined', 'recordAccounts', 'regroupMiner'])
+  it('rebuilds after an edit that moves an Extraction or its expiry', () => {
+    for (const action of ['linkSurvey', 'setFullyMined'])
       expect(movesReadModels({ action })).toBe(true);
     expect(
       movesReadModels({ action: 'updateSettings', patch: { structureExpiryHours: { 1: 48 } } })
     ).toBe(true);
-    for (const action of ['issueLateNotice', 'assignPayment', 'markNotTax'])
+    for (const action of [
+      'issueLateNotice',
+      'assignPayment',
+      'markNotTax',
+      'recordAccounts',
+      'regroupMiner',
+    ])
       expect(movesReadModels({ action })).toBe(false);
     expect(movesReadModels({ action: 'updateSettings', patch: { startDate: '2026-10-01' } })).toBe(
       false

@@ -1,9 +1,6 @@
 // The tab read models (issue #5259, ADR 0032), under `corps/{id}/readModels`:
 // - `overview`: the rolling window of Extractions the Overview and Extractions tabs read, falling
 //   back to the Extractions themselves while it is missing. Each pull's state is computed on read.
-// - `minerList`: the id of every Miner an officer's visit recorded an account for
-//   (`accounts/{minerId}`), so a page read for one Miner can offer the others (the Move dialog
-//   lists the solo ones from it). Its figures live in the accounts, never here.
 //
 // Pure and dependency-free.
 
@@ -16,7 +13,6 @@ import { READ_MODELS_SCHEMA } from './corpTaxBookVersionKeys.js';
 import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 export const READ_MODELS = 'readModels';
-export const MINER_LIST_DOC = 'minerList';
 export const OVERVIEW_DOC = 'overview';
 export { READ_MODELS_SCHEMA };
 
@@ -31,23 +27,14 @@ export interface OverviewDoc {
   extractions: Data[];
 }
 
-export interface MinerListDoc {
-  schema: number;
-  /** Every Miner with a recorded account, by id, sorted. */
-  miners: { minerId: string }[];
-}
-
 export interface ReadModels {
   [OVERVIEW_DOC]: OverviewDoc;
-  [MINER_LIST_DOC]: MinerListDoc;
 }
 
-/** What the docs are built from: the recent Extractions, each refinery's expiry, the accounts' ids. */
+/** What the doc is built from: the recent Extractions and each refinery's expiry. */
 export interface ReadModelInputs {
   expiryHours: Readonly<Record<string, number>>;
   extractions: readonly Data[];
-  /** `accounts/{minerId}` doc ids; absent reads as none. */
-  accountIds?: readonly string[];
 }
 
 /** Whether an Extraction is still worth listing at `now` (ms): not cancelled, expiry no more than a day gone. */
@@ -73,23 +60,13 @@ export function buildReadModels(inputs: ReadModelInputs, now: number): ReadModel
   );
   return {
     [OVERVIEW_DOC]: { schema: READ_MODELS_SCHEMA, extractions: extractions as unknown as Data[] },
-    [MINER_LIST_DOC]: {
-      schema: READ_MODELS_SCHEMA,
-      miners: [...new Set(inputs.accountIds ?? [])].sort().map((minerId) => ({ minerId })),
-    },
   };
 }
 
-/** Edits that change an Extraction the Overview lists, or which Miners have a recorded account. */
-const READ_MODEL_EDITS: ReadonlySet<string> = new Set([
-  'linkSurvey',
-  'setFullyMined',
-  'recordAccounts',
-  'setMiner',
-  'regroupMiner',
-]);
+/** Edits that change an Extraction the Overview lists. */
+const READ_MODEL_EDITS: ReadonlySet<string> = new Set(['linkSurvey', 'setFullyMined']);
 
-/** Whether an edit moves a read model: an Extraction, a refinery's expiry, or a recorded account. */
+/** Whether an edit moves a read model: an Extraction or a refinery's expiry. */
 export function movesReadModels(action: { action: string; patch?: object }): boolean {
   if (READ_MODEL_EDITS.has(action.action)) return true;
   const patch = (action.action === 'updateSettings' ? action.patch : undefined) as Data | undefined;
@@ -115,21 +92,20 @@ export interface ReadModelsPlan {
   mismatches: { id: string; kind: 'missing' | 'stale' }[];
 }
 
-/** Which docs differ from what `fresh` says they should be (`updatedAt` and unknown fields ignored). */
+/** Whether the doc differs from what `fresh` says it should be (`updatedAt` and unknown fields ignored). */
 export function planReadModels(
   fresh: ReadModels,
   existing: ReadonlyMap<string, Data>
 ): ReadModelsPlan {
-  const plan: ReadModelsPlan = { writes: [], mismatches: [] };
-  for (const id of [OVERVIEW_DOC, MINER_LIST_DOC] as const) {
-    const want = plainData(fresh[id]) as unknown as Data;
-    const held = existing.get(id);
-    const same =
-      held !== undefined &&
-      Object.entries(want).every(([k, v]) => canonical(held[k]) === canonical(v));
-    if (same) continue;
-    plan.writes.push({ id, data: want });
-    plan.mismatches.push({ id, kind: held === undefined ? 'missing' : 'stale' });
-  }
-  return plan;
+  const id = OVERVIEW_DOC;
+  const want = plainData(fresh[id]) as unknown as Data;
+  const held = existing.get(id);
+  const same =
+    held !== undefined &&
+    Object.entries(want).every(([k, v]) => canonical(held[k]) === canonical(v));
+  if (same) return { writes: [], mismatches: [] };
+  return {
+    writes: [{ id, data: want }],
+    mismatches: [{ id, kind: held === undefined ? 'missing' : 'stale' }],
+  };
 }
