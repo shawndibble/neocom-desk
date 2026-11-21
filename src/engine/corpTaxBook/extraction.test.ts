@@ -132,6 +132,40 @@ describe('estimateChunk', () => {
     });
   });
 
+  it('sizes a survey chunk by the survey measured volume when its scan is in the cycle', () => {
+    const survey = [{ typeId: ORE_A, fraction: 1 }];
+    const at = Date.parse('2026-07-07T06:00:00Z');
+    expect(
+      estimateChunk(ex, { survey, surveyVolumeM3: 1_000_000, surveyAt: at, chunkM3PerHour: 20_000 })
+    ).toEqual({
+      source: 'survey',
+      oreLines: [{ typeId: ORE_A, quantity: 100_000 }],
+      measuredVolume: true,
+    });
+    // No timestamp: accepted.
+    expect(estimateChunk(ex, { survey, surveyVolumeM3: 1_000_000 }).measuredVolume).toBe(true);
+  });
+
+  it('falls back to hours x rate when the survey volume is unusable or its scan is another cycle', () => {
+    const survey = [{ typeId: ORE_A, fraction: 1 }];
+    const rate = { chunkM3PerHour: 20_000 };
+    const base = { survey, surveyVolumeM3: 1_000_000, ...rate };
+    const fallback = {
+      source: 'survey',
+      oreLines: [{ typeId: ORE_A, quantity: 288_000 }],
+      rate: { m3PerHour: 20_000, basis: 'manual' },
+    };
+    expect(estimateChunk(ex, { survey, surveyVolumeM3: 0, ...rate })).toEqual(fallback);
+    // Before the chunk arrived.
+    expect(estimateChunk(ex, { ...base, surveyAt: Date.parse('2026-07-06T00:00:00Z') })).toEqual(
+      fallback
+    );
+    // After the extraction's expiry (fracture 07-07T03:00 + 48h).
+    expect(estimateChunk(ex, { ...base, surveyAt: Date.parse('2026-07-09T04:00:00Z') })).toEqual(
+      fallback
+    );
+  });
+
   it('prefers the refinery measured rate, then the manual one, then the default', () => {
     const survey = [{ typeId: ORE_A, fraction: 1 }];
     const total = (sources: Parameters<typeof estimateChunk>[1]) =>

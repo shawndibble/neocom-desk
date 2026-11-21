@@ -15,6 +15,17 @@ describe('rankedSearch', () => {
     expect(rankedSearch(rows, '', { primary: byName, limit: 50 })).toEqual([]);
   });
 
+  it('ignores quote marks in the query, the primary and the secondary fields', () => {
+    const rows: Row[] = [
+      { name: "'Augmented' Wasp", groupName: 'Drones' },
+      { name: 'Other', groupName: "O'Brien" },
+    ];
+    const options = { primary: byName, secondary: [byGroup], limit: 50 };
+    expect(rankedSearch(rows, 'augmented wasp', options)).toEqual([rows[0]]);
+    expect(rankedSearch(rows, "'Augmented' Wasp", options)).toEqual([rows[0]]);
+    expect(rankedSearch(rows, 'obrien', options)).toEqual([rows[1]]);
+  });
+
   it('returns [] for a whitespace-only query', () => {
     const rows: Row[] = [{ name: 'Widget', groupName: 'Gadgets' }];
     expect(rankedSearch(rows, '   ', { primary: byName, limit: 50 })).toEqual([]);

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,7 +7,11 @@ import '@/i18n';
 import { ExtractionsTab } from './ExtractionsTab';
 
 const tableProps = vi.hoisted(() => ({ calls: [] as Record<string, unknown>[] }));
-const book = vi.hoisted(() => ({ canEdit: true, rows: null as unknown[] | null }));
+const book = vi.hoisted(() => ({
+  canEdit: true,
+  rows: null as unknown[] | null,
+  feeders: [] as unknown[],
+}));
 
 const real = vi.hoisted(() => ({ table: false }));
 
@@ -59,6 +63,7 @@ vi.mock('./useBook', () => ({
         { ...ex('e', 'survey', 0), state: 'expired' },
       ],
     },
+    data: { feeders: book.feeders },
     canEdit: book.canEdit,
     edit: vi.fn(),
     names: {
@@ -137,6 +142,9 @@ describe('ExtractionsTab on a phone', () => {
 });
 
 describe('ExtractionsTab with moon owners (#6097)', () => {
+  afterEach(() => {
+    book.feeders = [];
+  });
   const shown = (rows: unknown[]) => {
     real.table = true;
     book.rows = rows;
@@ -158,6 +166,21 @@ describe('ExtractionsTab with moon owners (#6097)', () => {
     expect(row).toHaveTextContent('Extracting');
     // No notification is read for a moon owner: without a linked Survey the ore is unknown.
     expect(row).toHaveTextContent('Ore unknown');
+  });
+
+  it("says on an unknown chunk that the moon owner's permission lacks the extraction notices", () => {
+    book.feeders = [{ corporationId: 98000002, readsNotifications: false }];
+    shown([{ ...ex('m', 'unknown', 0), sourceCorporationId: 98000002 }, ex('o', 'unknown', 0)]);
+    const [owner, own] = screen.getAllByRole('button', { name: 'Why the ore is unknown' });
+    fireEvent.focus(owner!);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      "Corp 98000002's permission doesn't include extraction notices"
+    );
+    fireEvent.blur(owner!);
+    // The book's own chunk keeps the general reason; Link a Survey stays on both.
+    fireEvent.focus(own!);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('The game sent no ore details');
+    expect(screen.getAllByRole('button', { name: 'Link a Survey' })).toHaveLength(2);
   });
 
   it('names the book’s own corporation beside a moon owner’s, and none when every chunk is its own', () => {

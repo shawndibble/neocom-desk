@@ -33,8 +33,11 @@ export interface ScheduledSyncRun {
   extractions?: number;
   donationsAdded?: number;
   settled?: number;
-  /** Sources the holder could not read that run. */
-  missing?: ('extractions' | 'donations')[];
+  /**
+   * Sources the holder could not read that run. `ore`: the holder lacks Station_Manager, so
+   * neither the book's Extractions nor their ore were read.
+   */
+  missing?: ('extractions' | 'donations' | 'ore')[];
 }
 
 export interface ScheduledSyncStatus {

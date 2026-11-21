@@ -66,6 +66,12 @@ describe('FullyMinedPanel', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
+  it('a make-up rebuilt from what was mined: loss is Unknown, never 0%', () => {
+    renderPanel({ oreLines: ORE, oreSource: 'mined' });
+    expect(screen.getByText(/Unknown: no notification or survey/)).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
   it('is read-only without canEdit', () => {
     renderPanel({ oreLines: ORE, fullyMined: FLAG }, false);
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();

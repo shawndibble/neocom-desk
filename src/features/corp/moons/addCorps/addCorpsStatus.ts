@@ -16,7 +16,10 @@ export type CorpState =
   // Read without refinery names (a grant from before the structure scope, decision 20261021-084219):
   // one the player can sign in for again, and one only its own officer can.
   | 'needs-names'
-  | 'names-not-shared';
+  | 'names-not-shared'
+  // Read without each chunk's ore (a grant from before the notifications scope): one of the
+  // player's own they can sign in for again. Another officer's is told on its chunks instead.
+  | 'needs-ore';
 
 export type NeedsYouState = Exclude<CorpState, 'ready' | 'connected'>;
 
@@ -48,6 +51,8 @@ export interface OwnerRowLike {
   sameOwner?: boolean;
   /** Whether its grant reads refinery names; absent until its first read since #4654. */
   readsStructureNames?: boolean;
+  /** Whether its grant reads the Extraction started notifications; absent until a read says. */
+  readsNotifications?: boolean;
 }
 
 export interface NeedsYouItem {
@@ -56,6 +61,8 @@ export interface NeedsYouItem {
   state: NeedsYouState;
   /** For a refusal with no fixed wording: its reason code, read through `addCorpsErrorText`. */
   reason?: string;
+  /** `needs-names` whose grant also reads no chunk ore: the one Grant again fixes both. */
+  alsoOre?: true;
 }
 
 /** Whether a moon owner row of the player's own is no longer being read. */
@@ -69,6 +76,14 @@ const READ = new Set(['active', 'rate-asked', 'no-rate', 'settled-otherwise']);
 const lacksNames = (row: OwnerRowLike): boolean =>
   row.readsStructureNames === false && READ.has(row.status);
 
+/** Whether a moon owner the book reads came without each chunk's ore. */
+const lacksOre = (row: OwnerRowLike): boolean =>
+  row.readsNotifications === false && READ.has(row.status);
+
+/** Whether an item's fix is Grant again: an own corp read without names or without the ore. */
+export const offersGrantAgain = (item: Pick<NeedsYouItem, 'state'>): boolean =>
+  item.state === 'needs-names' || item.state === 'needs-ore';
+
 /** Whether an item is the player's to fix (counted), rather than information about another officer's. */
 export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'names-not-shared';
 
@@ -76,8 +91,10 @@ export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'n
  * Corporations that need the player: run outcomes that did not connect, and the
  * player's own moon owners that stopped answering, and moon owners read without
  * refinery names: `needs-names` for one of the player's own that they can sign in
- * as the CEO of (`grantable`), `names-not-shared` for the rest. A corporation the
- * book now reads well is never listed, whatever the run once said about it.
+ * as the CEO of (`grantable`), `names-not-shared` for the rest. One of those own
+ * ones read without each chunk's ore is `needs-ore` (names, when both lack, since
+ * the one Grant again fixes both). A corporation the book now reads well is never
+ * listed, whatever the run once said about it.
  */
 export function needsYou(
   run: AddCorpsRun | null,
@@ -119,6 +136,20 @@ export function needsYou(
           r.sameOwner === true && grantable.has(r.corporationId)
             ? 'needs-names'
             : 'names-not-shared',
+        ...(lacksOre(r) && r.sameOwner === true && grantable.has(r.corporationId)
+          ? { alsoOre: true as const }
+          : {}),
+      });
+    } else if (
+      lacksOre(r) &&
+      r.sameOwner === true &&
+      grantable.has(r.corporationId) &&
+      !items.has(r.corporationId)
+    ) {
+      items.set(r.corporationId, {
+        corporationId: r.corporationId,
+        name: name(r.corporationId),
+        state: 'needs-ore',
       });
     }
   }

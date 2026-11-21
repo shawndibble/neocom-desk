@@ -20,7 +20,7 @@ vi.mock('@/features/miningTax/pricing', async (orig) => ({
   sourcesAtHubOnDate: vi.fn().mockReturnValue([]),
 }));
 
-import { loadBookPrices } from './bookViewOf';
+import { loadBookPrices, surveyTypeIdsOf } from './bookViewOf';
 import { loadNeedsYouCount } from './moonsAttentionCount';
 
 const ROW = { characterId: 9, typeId: 45490, date: '2026-11-01', quantity: 100 };
@@ -108,6 +108,17 @@ describe('loadBookPrices on a refinery page', () => {
       ...book([]),
       refinery: { structureId: 1, docs: new Map([['x', doc as never]]) },
     });
+    expect(loadDatedUnitPricesByHub.mock.calls[0]![0]).toEqual([45492]);
+  });
+});
+
+describe('survey ores', () => {
+  it('are priced with the ones the read holds, though no row or notification names them', async () => {
+    const survey = new Map([['x1', [{ typeId: 45492, quantity: 5 }]]]);
+    expect([...surveyTypeIdsOf(survey)]).toEqual([45492]);
+    expect([...surveyTypeIdsOf(undefined)]).toEqual([]);
+
+    await loadBookPrices(book([]), undefined, surveyTypeIdsOf(survey));
     expect(loadDatedUnitPricesByHub.mock.calls[0]![0]).toEqual([45492]);
   });
 });

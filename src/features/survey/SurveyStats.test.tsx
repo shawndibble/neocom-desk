@@ -59,7 +59,7 @@ describe('SurveyStats cleared field', () => {
     render(<SurveyStats summary={clearedAfter(25 * 60_000)} />);
     expect(screen.getByText('Total time')).toBeTruthy();
     expect(screen.getByText('25m')).toBeTruthy();
-    for (const label of ['m³ left', 'Time left', 'Rocks left', 'ISK left']) {
+    for (const label of ['m³ left', 'Time left', 'Rocks left', 'ISK left at last scan']) {
       expect(screen.queryByText(label)).toBeNull();
     }
   });

@@ -12,7 +12,7 @@
  * against `rankedSearch`'s ~1.5 ms. Either is well under the ticket's 8 ms
  * budget, so no worker and no debounce.
  */
-import { queryTokens, tokenPrefixMatch, wordsOf } from '@/lib/tokenSearch';
+import { queryTokens, searchKey, tokenPrefixMatch, wordsOf } from '@/lib/tokenSearch';
 import { isOnline } from '@/stores/network';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
@@ -34,12 +34,10 @@ export type MarketItemIndex = readonly IndexedItem[];
 
 export function buildMarketItemIndex(catalogue: readonly MarketTypeEntry[]): MarketItemIndex {
   return catalogue
-    .map(({ typeId, name }) => ({
-      typeId,
-      name,
-      lower: name.toLowerCase(),
-      words: wordsOf(name.toLowerCase()),
-    }))
+    .map(({ typeId, name }) => {
+      const lower = searchKey(name);
+      return { typeId, name, lower, words: wordsOf(lower) };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -53,7 +51,7 @@ export function searchMarketItems(
   query: string,
   limit: number
 ): IndexedItem[] {
-  const q = query.trim().toLowerCase();
+  const q = searchKey(query.trim());
   if (!q) return [];
   const exact: IndexedItem[] = [];
   const prefix: IndexedItem[] = [];

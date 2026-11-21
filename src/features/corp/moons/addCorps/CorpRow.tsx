@@ -13,6 +13,7 @@ const STATE_TONE: Record<CorpState, PillTone> = {
   failed: 'danger',
   'needs-names': 'warning',
   'names-not-shared': 'neutral',
+  'needs-ore': 'warning',
 };
 
 /** One corporation's state as a word on a tint. */

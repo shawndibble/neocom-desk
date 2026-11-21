@@ -485,6 +485,23 @@ describe('a same-owner moon owner', () => {
   });
 });
 
+describe("what the moon owner's grant reads", () => {
+  it('carries whether it reads names and Extraction notices; absent while unknown', () => {
+    const rows = buildMoonOwners(
+      input({
+        feeders: [feeder(A, { readsStructureNames: true, readsNotifications: false }), feeder(B)],
+      })
+    ).rows;
+    expect(rows.find((r) => r.corporationId === A)).toMatchObject({
+      readsStructureNames: true,
+      readsNotifications: false,
+    });
+    const unknown = rows.find((r) => r.corporationId === B);
+    expect(unknown).not.toHaveProperty('readsStructureNames');
+    expect(unknown).not.toHaveProperty('readsNotifications');
+  });
+});
+
 describe('refineries seen (#6097)', () => {
   const extractions = extractionRefineriesOf([
     { structureId: 10, sourceCorporationId: A },

@@ -26,7 +26,9 @@ export function FullyMinedPanel({ id }: { id: string }) {
   const row = extractionDetail(view, id)?.row;
   if (!row) return null;
   const mined = minersOnMoon(view, id).flatMap((m) => m.lines);
-  const loss = moonLoss(row.oreLines, mined, row.fullyMined !== undefined);
+  // A chunk rebuilt from what was mined has nothing to lose: its loss is unknowable, not 0%.
+  const loss =
+    row.oreSource === 'mined' ? null : moonLoss(row.oreLines, mined, row.fullyMined !== undefined);
   const setMark = async (fullyMined: boolean) => {
     setBusy(true);
     setError(undefined);
@@ -41,7 +43,11 @@ export function FullyMinedPanel({ id }: { id: string }) {
   if (!loss)
     return (
       <p className="text-sm text-text-dim">
-        {t('corpTaxBook.moons.fullyMined.noSource')}
+        {t(
+          row.oreSource === 'mined'
+            ? 'corpTaxBook.moons.fullyMined.unknownLoss'
+            : 'corpTaxBook.moons.fullyMined.noSource'
+        )}
         {row.fullyMined && canEdit && (
           <>
             {' '}

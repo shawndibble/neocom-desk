@@ -188,8 +188,11 @@ export type SyncOutcome =
       reassignError?: string;
     };
 
-/** A source this Character could not read this time; the rest still synced. */
-export type MissingSource = 'extractions' | 'donations';
+/**
+ * A source this Character could not read this time; the rest still synced. `ore`: no
+ * Station_Manager role (or no extraction scope), so neither the Extractions nor their ore were read.
+ */
+export type MissingSource = 'extractions' | 'donations' | 'ore';
 
 const paymentId = (d: JournalDonation) => `j${d.division}_${d.refId}`;
 
@@ -237,6 +240,8 @@ export async function syncCorpTaxBook(
     ? { rows: [], structureIds: [], oldestEsiDate: {}, truncated: false, systemIds: {} }
     : feedRead;
   if (canExtract && esiExtractions === null) missing.push('extractions');
+  // A corp with no refinery of its own (only moon owners) has no chunk of its own to read.
+  if (!canExtract && !noRefineries) missing.push('ore');
   if (!capabilities.canReadWallet || donations === null) missing.push('donations');
 
   const now = deps.now();

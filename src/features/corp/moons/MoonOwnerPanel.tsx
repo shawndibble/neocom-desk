@@ -21,7 +21,8 @@ import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
-import { RefineryNamesBanner } from './RefineryNamesBanner';
+import { GrantAgainBanner } from './GrantAgainBanner';
+import { grantLack } from './grantLack';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { atDate, dateTimeAt } from './moonsFormat';
 import { enqueuePayeeChangeMail } from '@/features/corpTaxBook/mailQueue';
@@ -86,6 +87,7 @@ export function MoonOwnerPanel({
     );
   else {
     const { view, access } = load;
+    const lacks = grantLack(view.summary);
     body = (
       <MoonOwnerView
         view={view}
@@ -155,15 +157,13 @@ export function MoonOwnerPanel({
                 {reconnectError && <InlineError>{reconnectError}</InlineError>}
               </>
             )}
-            {/* Optional (#4654): a grant from before reads no refinery names. Reconnect covers it while stale. */}
-            {view.summary.refineryNamesGranted === false &&
-              view.summary.status === 'active' &&
-              !isStale(view.summary) && (
-                <>
-                  <RefineryNamesBanner onGrant={reconnect} />
-                  {reconnectError && <InlineError>{reconnectError}</InlineError>}
-                </>
-              )}
+            {/* Optional (#4654): a grant from before reads no refinery names or no chunk ore. Reconnect covers it while stale. */}
+            {lacks !== null && view.summary.status === 'active' && !isStale(view.summary) && (
+              <>
+                <GrantAgainBanner lacks={lacks} onGrant={reconnect} />
+                {reconnectError && <InlineError>{reconnectError}</InlineError>}
+              </>
+            )}
             {view.summary.status === 'pending-removal' && (
               <OwnerStatusStrip
                 title={

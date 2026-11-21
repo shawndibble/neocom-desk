@@ -10,6 +10,7 @@ import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
 import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { atDate } from './moonsFormat';
+import { oreUnknownCause } from './oreUnknownCause';
 import { useBook } from './useBook';
 import { tapTargetClassName } from './sectionHelpers';
 
@@ -62,17 +63,22 @@ export function OverdueWord({ days, paused }: { days: number | null; paused?: bo
   );
 }
 
-/** Ore make-up of a chunk, or D13's fallback. `onLink` adds the "Link a Survey" action to the unknown case. */
+/**
+ * Ore make-up of a chunk, or D13's fallback. `onLink` adds the "Link a Survey" action to the
+ * unknown case, whose tooltip names the cause when the book knows it (a moon owner's grant that
+ * reads no Extraction notices).
+ */
 export function OreLine({
   row,
   onLink,
 }: {
-  row: Pick<ExtractionRow, 'oreLines'>;
+  row: Pick<ExtractionRow, 'oreLines' | 'sourceCorporationId'>;
   onLink?: () => void;
 }) {
   const { t } = useTranslation();
-  const { names } = useBook();
-  if (row.oreLines.length === 0)
+  const { names, data } = useBook();
+  if (row.oreLines.length === 0) {
+    const cause = oreUnknownCause(row, data.feeders);
     return (
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="inline-flex items-center gap-1 text-warning">
@@ -80,7 +86,13 @@ export function OreLine({
           {t('corpTaxBook.moons.oreUnknown')}
           <InfoTooltip
             label={t('corpTaxBook.moons.oreUnknownLabel')}
-            content={t('corpTaxBook.moons.oreUnknownWhy')}
+            content={
+              cause
+                ? t('corpTaxBook.moons.oreUnknownWhyOwnerGrant', {
+                    name: names.corporation(cause.corporationId),
+                  })
+                : t('corpTaxBook.moons.oreUnknownWhy')
+            }
             glyph="info"
           />
         </span>
@@ -91,6 +103,7 @@ export function OreLine({
         )}
       </span>
     );
+  }
   const total = row.oreLines.reduce((s, l) => s + l.quantity, 0);
   return (
     <span>

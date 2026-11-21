@@ -139,6 +139,12 @@ export interface FeederRecord {
   /** The current grant carries the structure scope (#4654); absent on grants from before. */
   readsStructureNames?: boolean;
   /**
+   * The current grant carries the notifications scope, so the sync reads each chunk's ore from the
+   * holder's Extraction started notifications. Mirrored from the grant by the sync; absent until a
+   * read since it existed (unknown, not lacking).
+   */
+  readsNotifications?: boolean;
+  /**
    * ESI refused the moon owner's Extractions (#6097): the grant holder lacks Station_Manager.
    * Not asked again until a week has passed. Absent while they read fine or were never refused.
    */
