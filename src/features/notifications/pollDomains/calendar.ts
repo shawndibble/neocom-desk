@@ -54,8 +54,9 @@ const isCalendarEventEntrySnapshot = shapeGuard<CalendarEventEntrySnapshot>({
 });
 
 /**
- * The events with those a Shared Pop already alerts about taken out: the corp put the same fleet
- * in the in-game calendar, and the pop's own alert is the one the pilot gets (the Calendar page
+ * The events with those a Shared Pop already covers taken out: the corp put the same fleet
+ * in the in-game calendar, and the pop's own alert is the one the pilot gets, or none when they
+ * muted that corporation's pops (the Calendar page
  * likewise shows the pop, not the event, though it keeps the event for a refinery the pilot reads
  * as a corp moon chunk; the alerts have no such exception). Out of the snapshot, so neither the diff nor the Projection announce it.
  */
