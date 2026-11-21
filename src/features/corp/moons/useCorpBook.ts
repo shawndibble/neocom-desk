@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
-import { bookViewInputOf, loadBookPrices } from './bookViewOf';
+import { bookViewInputOf, loadBookPrices, surveyTypeIdsOf, type BookPrices } from './bookViewOf';
 import {
   learnedSystemsOf,
   officerLabelsOf,
@@ -169,7 +169,17 @@ export function useCorpBook(
   const [now, setNow] = useState(utcNow);
   const [names, setNames] = useState(EMPTY_NAMES);
   const [memberIds, setMemberIds] = useState<ReadonlySet<number> | undefined>(undefined);
-  const [surveyOreLines, setSurveyOreLines] = useState<BookViewInput['surveyOreLines']>(undefined);
+  // Built from one read: a newer read (reload, late rows, another scope) must not borrow its prices.
+  const [builtSurvey, setSurvey] = useState<
+    | {
+        from: Fetched;
+        lines: NonNullable<BookViewInput['surveyOreLines']>;
+        prices: BookPrices | undefined;
+      }
+    | undefined
+  >(undefined);
+  const survey = builtSurvey?.from === fetched ? builtSurvey : undefined;
+  const surveyOreLines = survey?.lines;
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
   // The Moon owners tab reads no ledger rows unless its summaries cannot stand in (#5717).
   const needsRows =
@@ -332,8 +342,16 @@ export function useCorpBook(
           })
         );
       }
-      await Promise.resolve();
-      if (!cancelled) setSurveyOreLines(found.size > 0 ? found : undefined);
+      // The survey's ores are priced like the notified ones: the read's prices never saw them.
+      // A failed price load keeps the lines (and their names); the read's own prices stand in.
+      const prices =
+        found.size > 0
+          ? await loadBookPrices(data, data.minerScope?.from, surveyTypeIdsOf(found)).catch(
+              () => undefined
+            )
+          : undefined;
+      if (!cancelled)
+        setSurvey(found.size > 0 ? { from: fetched, lines: found, prices } : undefined);
     })().catch(() => undefined);
     return () => {
       cancelled = true;
@@ -343,12 +361,15 @@ export function useCorpBook(
   const view = useMemo(() => {
     if (fetched.status !== 'loaded' || corporationId === null) return null;
     const built = buildBookView(
-      bookViewInputOf(corporationId, now, fetched.data, fetched, { memberIds, surveyOreLines })
+      bookViewInputOf(corporationId, now, fetched.data, survey?.prices ?? fetched, {
+        memberIds,
+        surveyOreLines,
+      })
     );
     const { moon, scopedMiner: minerId, minerScope } = fetched.data;
     if (moon) return withMoonDocs(built, moon.docs, moon.fromDocs);
     return minerId !== undefined ? withMinerTotals(built, minerId, minerScope?.totals) : built;
-  }, [fetched, now, corporationId, memberIds, surveyOreLines]);
+  }, [fetched, now, corporationId, memberIds, survey, surveyOreLines]);
 
   // Names, resolved after the figures so the tables never wait on them.
   useEffect(() => {
@@ -401,6 +422,7 @@ export function useCorpBook(
     const typeIds = new Set<number>();
     for (const c of view.charges) for (const l of c.oreLines) typeIds.add(l.typeId);
     for (const x of view.input.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
+    for (const id of surveyTypeIdsOf(view.input.surveyOreLines)) typeIds.add(id);
     (async () => {
       const [characters, ores, moons] = await Promise.all([
         resolveNames([...characterIds]).catch(() => new Map<number, string>()),
