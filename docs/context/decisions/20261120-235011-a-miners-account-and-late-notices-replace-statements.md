@@ -163,3 +163,10 @@ Replaces "the checkpoint is a strict cache" and the copied `uids` on rows and pa
 - **No copied reader lists.** Rows and payments are not given `uids`, and no queue maintains them.
   A pilot sees an alt's lines through the Mining Tax page's character selector ("All characters"),
   as before.
+- **A warning when the corporation counts a character the pilot has not added.** The Mining Tax
+  page reads only the Characters the pilot holds in Neocom Desk. When a book's Miner includes a
+  Character the pilot does not hold (an officer grouped it with theirs), a thin warning bar says
+  so on the Mining Tax page: "{corp} counts {character} as yours. Add them to Neocom Desk to see
+  their mining and payments." with "Not yours? Tell {corp}", which declines the grouping
+  (`declineLink`). One bar per corporation, naming every such Character; it goes once each is added
+  or declined.
