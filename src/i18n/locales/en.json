@@ -20568,6 +20568,7 @@
       "iskAmount": "IskAmount: B/M/K suffix, exact value on hover or tap",
       "rowCaret": "Trailing CaretRight on a row: goes to another page (RowCaret)",
       "disclosureCaret": "Leading caret that rotates: expands in place",
+      "cardChevron": "Trailing chevron on a phone card: the card opens in place, and the chevron turns",
       "pagerCarets": "Paired carets in IconButtons: pages",
       "legendPopover": "Bordered Legend button + CaretDown: read-only key to a view's marks",
       "countedSegments": "SegmentedControl with a count per segment, in a filter box: the split before choosing",
@@ -20611,7 +20612,8 @@
       "selectedToggle": "On takes the accent tint.",
       "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
       "lockBoundary": "One thin row where rows past it turn read-only: shown once, never a lock icon on every row.",
-      "fieldCaret": "The box is a control (§6); the caret says it opens a list."
+      "fieldCaret": "The box is a control (§6); the caret says it opens a list.",
+      "cardChevron": "A table's leading caret is hidden on a card, since the card is the tap target; this chevron stands in for it. A card that cannot open has none. Tap the sample."
     },
     "samples": {
       "altActionRow": "Jita IV - Moon 4",
@@ -20666,6 +20668,8 @@
       "factionAmarr": "Amarr Empire",
       "factionGallente": "Gallente Federation",
       "tableLabel": "Row menu sample",
+      "cardTableLabel": "Expandable card sample",
+      "cardDetail": "Slasher: a frigate. This detail is what the card opened to show.",
       "selectableLabel": "Selected row sample",
       "nameHeader": "Ship",
       "menuItem": "Rename",

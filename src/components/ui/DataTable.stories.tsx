@@ -133,5 +133,28 @@ export const PhoneDenseCards: Story = {
   ...phone,
 };
 
+/**
+ * A card hides the leading caret (the card is the tap target), so a stacked table whose rows open
+ * in place (`expandableRow` with `leadingIcon`) draws a trailing chevron on each card, which turns
+ * when the card is open. A table that cannot expand shows none.
+ *
+ * @summary Phone cards that open in place: a trailing chevron says so and turns when open.
+ */
+export const PhoneCardsExpandable: Story = {
+  args: {
+    stacked: true,
+    expandableRow: {
+      leadingIcon: true,
+      initialKey: 'Pyerite',
+      // The story's args are typed `unknown`-row, as the meta's component generic is.
+      renderDetail: (r: unknown) => {
+        const { name, quantity } = r as Row;
+        return `${name}: ${quantity.toLocaleString('en')} units in stock.`;
+      },
+    },
+  },
+  ...phone,
+};
+
 /** @summary Keeps real columns on a phone and scrolls sideways; right when comparing across columns is the point. */
 export const TableOnPhone: Story = { args: { responsive: 'table' }, ...phone };

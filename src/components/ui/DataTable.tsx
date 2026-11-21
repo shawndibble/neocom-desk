@@ -433,6 +433,14 @@ export function DataTable<T>({
         expanded={expanded}
         hideExpandIcon={(expandableRow?.hideIcon ?? false) || (expandableRow?.leadingIcon ?? false)}
         leadingExpandIcon={expandableRow?.leadingIcon ?? false}
+        // A card hides the leading caret (the card is the tap target), so the trailing chevron
+        // stands in for it: the one cue that the card opens. Not when the caret is a real button.
+        cardChevron={
+          isStacked &&
+          (expandableRow?.leadingIcon ?? false) &&
+          !(expandableRow?.hideIcon ?? false) &&
+          !buttonToggle
+        }
         toggleLabel={buttonToggle ? expandableRow?.toggleLabel?.(row) : undefined}
         onToggle={toggleRow}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}

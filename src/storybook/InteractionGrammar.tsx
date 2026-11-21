@@ -388,6 +388,28 @@ export function InteractionGrammar() {
             {k('samples.disclosure')}
           </button>
         </Cue>
+        <Cue rule={k('rules.cardChevron')} note={k('notes.cardChevron')}>
+          <div className="w-72 max-w-full">
+            <DataTable
+              label={k('samples.cardTableLabel')}
+              stacked
+              columns={[
+                {
+                  id: 'name',
+                  header: k('samples.nameHeader'),
+                  primary: true,
+                  render: (row: (typeof SAMPLE_ROWS)[number]) => row.name,
+                },
+              ]}
+              rows={SAMPLE_ROWS.slice(0, 2)}
+              rowKey={(row) => row.id}
+              expandableRow={{
+                leadingIcon: true,
+                renderDetail: () => k('samples.cardDetail'),
+              }}
+            />
+          </div>
+        </Cue>
         <Cue rule={k('rules.fieldCaret')} note={k('notes.fieldCaret')}>
           <Select defaultValue="forge">
             <SelectTrigger aria-label={k('samples.region')} className="w-44">
