@@ -97,6 +97,9 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     // the Assignments covering it, so it has to see one fused record rather than two halves of
     // the same obligation. The fresh entries are passed only so it can tell a split day from an
     // exact duplicate (and leave an unverifiable pair alone).
+    // Read before the accounts, never after: a known ownership set is never unknown again, so the
+    // accounts read next hold a set at least as new, and a book's own Payee is never planned.
+    const ownershipKnown = await isBookOwnedKnown().catch(() => false);
     const accounts = await loadPayeeRunningAccounts();
     await Promise.all(
       ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries, accounts))
@@ -109,8 +112,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     // nothing else has touched.
     // Only once the books' ownership has been stored: until then a book's own Payee is not known
     // to be one, and must not be given an Assignment (the Tax tab stores it on its first load).
-    if (await isBookOwnedKnown().catch(() => false))
-      await applyDefaultSystems(ledgers, accounts).catch(() => []);
+    if (ownershipKnown) await applyDefaultSystems(ledgers, accounts).catch(() => []);
     // Read again: a Survey or a Default System may have billed a paid day anew.
     const grown = await loadPayeeRunningAccounts();
     await Promise.all(
