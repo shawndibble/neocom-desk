@@ -197,6 +197,12 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       // no menu at all, because Acknowledge is visible and the one remaining item
       // would be under the two-action minimum.
       'src/features/notifications/AlertGroupRow.tsx',
+      // Mining Tax payee ledger rows: actions with no other route from the row.
+      'src/features/miningTax/OwedBalances.tsx',
+      // Stops row menu: Remove, replacing the duplicate ✕ (#6557).
+      'src/features/travel/StopsPanel.tsx',
+      // Character card: the row's trailing ⋮ (hints off), placed in #6565.
+      'src/features/character/CharacterCard.tsx',
     ];
     // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');
