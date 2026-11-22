@@ -1055,3 +1055,85 @@ export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & 
   }
   return out;
 }
+
+// --- Moon ore variants (engine `moonOreVariants.ts`) ------------------------
+
+/** Engine `MOON_ORE_VARIANTS`: base moon ore → its +15% and +100% variants. */
+export const MOON_ORE_VARIANTS: ReadonlyMap<number, readonly [number, number]> = new Map([
+  [45490, [46280, 46281]],
+  [45491, [46282, 46283]],
+  [45492, [46284, 46285]],
+  [45493, [46286, 46287]],
+  [45494, [46288, 46289]],
+  [45495, [46290, 46291]],
+  [45496, [46292, 46293]],
+  [45497, [46294, 46295]],
+  [45498, [46296, 46297]],
+  [45499, [46298, 46299]],
+  [45500, [46300, 46301]],
+  [45501, [46302, 46303]],
+  [45502, [46304, 46305]],
+  [45503, [46306, 46307]],
+  [45504, [46308, 46309]],
+  [45506, [46310, 46311]],
+  [45510, [46312, 46313]],
+  [45511, [46314, 46315]],
+  [45512, [46316, 46317]],
+  [45513, [46318, 46319]],
+]);
+
+const VARIANT_BASE = new Map(
+  [...MOON_ORE_VARIANTS].flatMap(([base, variants]) => variants.map((v) => [v, base] as const))
+);
+
+/** Engine `moonOreBaseOf`. */
+export const moonOreBaseOf = (typeId: number): number => VARIANT_BASE.get(typeId) ?? typeId;
+
+interface OreQty {
+  typeId: number;
+  quantity: number;
+}
+
+function familyWeights(base: number, lines: readonly OreQty[]): Map<number, number> {
+  const family = new Map<number, number>();
+  for (const l of lines) {
+    if (l.quantity > 0 && moonOreBaseOf(l.typeId) === base)
+      family.set(l.typeId, (family.get(l.typeId) ?? 0) + l.quantity);
+  }
+  return family;
+}
+
+/** Engine `splitChunkVariants`. */
+export function splitChunkVariants(
+  chunk: readonly OreQty[],
+  mined: readonly OreQty[],
+  survey: readonly OreQty[] = []
+): OreQty[] {
+  const named = new Set(
+    chunk.filter((l) => VARIANT_BASE.has(l.typeId)).map((l) => moonOreBaseOf(l.typeId))
+  );
+  return chunk.flatMap((line): OreQty[] => {
+    if (!MOON_ORE_VARIANTS.has(line.typeId) || named.has(line.typeId)) return [line];
+    let weights = familyWeights(line.typeId, mined);
+    if (weights.size === 0) weights = familyWeights(line.typeId, survey);
+    if (weights.size === 0 || (weights.size === 1 && weights.has(line.typeId))) return [line];
+    const total = [...weights.values()].reduce((s, w) => s + w, 0);
+    const parts = [...weights]
+      .sort(([a], [b]) => a - b)
+      .map(([typeId, w]) => ({ typeId, quantity: Math.floor((line.quantity * w) / total), w }));
+    const largest = parts.reduce((best, p) => (p.w > best.w ? p : best));
+    largest.quantity += line.quantity - parts.reduce((s, p) => s + p.quantity, 0);
+    return parts.map(({ typeId, quantity }) => ({ typeId, quantity }));
+  });
+}
+
+/** Engine `chunkMinedPct`. */
+export function chunkMinedPct(chunk: readonly OreQty[], mined: readonly OreQty[]): number | null {
+  const got = new Map<number, number>();
+  for (const m of mined) got.set(m.typeId, (got.get(m.typeId) ?? 0) + m.quantity);
+  const lines = splitChunkVariants(chunk, mined);
+  const total = lines.reduce((s, l) => s + l.quantity, 0);
+  if (total <= 0) return null;
+  const share = lines.reduce((s, l) => s + Math.min(l.quantity, got.get(l.typeId) ?? 0), 0);
+  return Math.min(100, Math.round((share / total) * 100));
+}

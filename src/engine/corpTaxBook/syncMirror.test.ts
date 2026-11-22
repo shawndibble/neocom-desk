@@ -208,6 +208,62 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       expect(mirror.reconcileExtractions(esi, [], [])).toEqual(reconcileExtractions(esi, [], []));
     });
 
+    it('takes a chunk’s ore from the notifications after it arrives the same way', () => {
+      const finished = (structureId: number, moonId: number, auto: number) =>
+        [
+          `structureID: ${structureId}`,
+          `moonID: ${moonId}`,
+          `autoTime: ${ticks(auto)}`,
+          'oreVolumeByType:',
+          '  45492: 10324680.4',
+          '  45490: 8728494.2',
+        ].join('\n');
+      const esi = [
+        {
+          structure_id: 2000,
+          moon_id: 9,
+          extraction_start_time: '2026-10-12T00:00:00Z',
+          chunk_arrival_time: '2026-10-17T00:00:00Z',
+          natural_decay_time: '2026-10-17T03:00:00Z',
+        },
+      ];
+      const notes = [
+        {
+          type: 'MoonminingAutomaticFracture',
+          at: '2026-10-17T03:00:00Z',
+          text: finished(2000, 9, 0),
+        },
+        {
+          type: 'MoonminingExtractionFinished',
+          at: '2026-10-17T00:00:01Z',
+          text: finished(4000, 12, decay),
+        },
+      ];
+      const ours = notes.map((n) => ({
+        type: n.type,
+        timestamp: n.at,
+        payload: parseEveNotificationPayload(n.text),
+      }));
+      const theirs = notes.map((n) => ({
+        type: n.type,
+        timestamp: n.at,
+        payload: mirror.parseMoonPayload(n.text),
+      }));
+      // ESI no longer lists 4000's chunk: only the book's stored copy names it.
+      const stored = [
+        {
+          structureId: 4000,
+          moonId: 12,
+          extractionStartTime: '2026-10-01T00:00:00.000Z',
+          chunkArrivalTime: '2026-10-17T00:00:00.000Z',
+          naturalDecayTime: '2026-10-17T03:00:00.000Z',
+        },
+      ];
+      const reconciled = reconcileExtractions(esi, ours, stored);
+      expect(reconciled.map((x) => x.oreLines?.length)).toEqual([2, 2]);
+      expect(mirror.reconcileExtractions(esi, theirs, stored)).toEqual(reconciled);
+    });
+
     it('places observed rows on a system and a moon the same way', () => {
       const extractions: SyncExtraction[] = [
         {

@@ -163,6 +163,16 @@ describe('moon doc chunk and tax', () => {
     // ore 1 caps at its 600, ore 2 gives 100: 700 of 1000.
     expect(doc.minedPct).toBe(70);
   });
+
+  it('counts a variant mined against the base ore the notification names', () => {
+    const notified = { ...EXTRACTIONS[0], oreLines: [{ typeId: 45492, quantity: 1000 }] };
+    const doc = computeMoonDoc(
+      notified,
+      [row({ typeId: 45492, quantity: 400 }), row({ typeId: 46284, quantity: 400 })],
+      rules()
+    );
+    expect(doc.minedPct).toBe(80);
+  });
 });
 
 describe('moon doc plan', () => {

@@ -28,7 +28,9 @@ export const ESI_LEDGER_RETENTION_DAYS = 30;
 /** The moon drill notification types the sync reads (the server mirrors the list; a test pins it). */
 export const MOON_NOTIFICATION_TYPES = [
   'MoonminingExtractionStarted',
+  'MoonminingExtractionFinished',
   'MoonminingLaserFired',
+  'MoonminingAutomaticFracture',
   'MoonminingExtractionCancelled',
 ] as const;
 /** After this long without a sync the book warns (D9). */
@@ -400,17 +402,48 @@ export interface MoonNotification {
 export type StoredExtractionKey = Pick<
   SyncExtraction,
   'structureId' | 'moonId' | 'extractionStartTime' | 'chunkArrivalTime'
->;
+> &
+  Partial<Pick<SyncExtraction, 'naturalDecayTime' | 'oreLines'>>;
 
 const SAME_CHUNK_MS = 10 * MINUTE_MS;
 const WINDOW_SLACK_MS = 5 * MINUTE_MS;
 const iso = (ms: number) => new Date(ms).toISOString();
 
+/** The notifications sent once a chunk has arrived that also name its ore. */
+const ORE_AFTER_ARRIVAL: ReadonlySet<string> = new Set([
+  'MoonminingExtractionFinished',
+  'MoonminingLaserFired',
+  'MoonminingAutomaticFracture',
+]);
+
+/** Whether an after-arrival notification is about the chunk arriving at `arrival`, fracturing by `decay`. */
+function namesChunk(n: MoonNotification, arrival: number, decay: number): boolean {
+  const at = Date.parse(n.timestamp);
+  if (n.type === 'MoonminingExtractionFinished') {
+    // Sent as the chunk arrives; its autoTime is that chunk's own fracture time.
+    const auto = n.payload.autoTimeMs;
+    return auto !== undefined
+      ? Math.abs(auto - decay) <= SAME_CHUNK_MS
+      : Math.abs(at - arrival) <= SAME_CHUNK_MS;
+  }
+  return at >= arrival - WINDOW_SLACK_MS && at <= decay + WINDOW_SLACK_MS;
+}
+
+const unitsOf = (volumes: readonly { typeId: number; volumeM3: number }[]) =>
+  volumes.map((o) => ({
+    typeId: o.typeId,
+    quantity: Math.floor(o.volumeM3 / MOON_ORE_M3_PER_UNIT),
+  }));
+
 /**
  * The Extractions to upload: ESI's current ones, plus any a started
- * notification remembers that ESI no longer lists, each carrying what the
+ * notification remembers that ESI no longer lists, plus a stored one ESI no
+ * longer lists whose ore a later notification names, each carrying what the
  * moon notifications add (the chunk's ore, when the laser fired, a
- * cancellation). Identity is structure + start time on the server, so an
+ * cancellation). The ore is the started notification's; without it, that of
+ * Extraction finished, Laser fired or Automatic fracture, which name the same
+ * chunk (the started one is weeks old by then, often gone from the feed).
+ * Identity is structure + start time on the server, so an
  * Extraction the book already stores keeps its stored start time even when
  * ESI and the notification disagree by seconds.
  */
@@ -455,6 +488,27 @@ export function reconcileExtractions(
     });
   }
 
+  const namesOre = (n: MoonNotification, x: StoredExtractionKey, decay: number) =>
+    ORE_AFTER_ARRIVAL.has(n.type) &&
+    n.payload.structureId === x.structureId &&
+    n.payload.moonId === x.moonId &&
+    !!n.payload.oreVolumes?.length &&
+    namesChunk(n, Date.parse(x.chunkArrivalTime), decay);
+  for (const x of stored) {
+    if (x.oreLines?.length || x.naturalDecayTime === undefined) continue;
+    if (base.some((b) => sameChunk(b, x.structureId, x.moonId, Date.parse(x.chunkArrivalTime))))
+      continue;
+    const decay = Date.parse(x.naturalDecayTime);
+    if (!notifications.some((n) => namesOre(n, x, decay))) continue;
+    base.push({
+      structureId: x.structureId,
+      moonId: x.moonId,
+      extractionStartTime: x.extractionStartTime,
+      chunkArrivalTime: x.chunkArrivalTime,
+      naturalDecayTime: x.naturalDecayTime,
+    });
+  }
+
   return base
     .map((x): SyncExtraction => {
       const keep = stored.find((s) =>
@@ -466,6 +520,8 @@ export function reconcileExtractions(
       const arrival = Date.parse(out.chunkArrivalTime);
       const start = Date.parse(out.extractionStartTime);
       const decay = Date.parse(out.naturalDecayTime);
+      // The started notification's ore, once read, is never replaced by a later one.
+      let exact = (keep?.oreLines?.length ?? 0) > 0;
       for (const n of notifications) {
         if (n.payload.structureId !== out.structureId || n.payload.moonId !== out.moonId) continue;
         const at = Date.parse(n.timestamp);
@@ -474,18 +530,19 @@ export function reconcileExtractions(
           if (readyTimeMs === undefined || Math.abs(readyTimeMs - arrival) > SAME_CHUNK_MS)
             continue;
           if (oreVolumes?.length) {
-            out.oreLines = oreVolumes.map((o) => ({
-              typeId: o.typeId,
-              quantity: Math.floor(o.volumeM3 / MOON_ORE_M3_PER_UNIT),
-            }));
+            out.oreLines = unitsOf(oreVolumes);
+            exact = true;
           }
-        } else if (n.type === 'MoonminingLaserFired') {
+          continue;
+        }
+        if (n.type === 'MoonminingLaserFired') {
           if (at >= arrival - WINDOW_SLACK_MS && at <= decay + WINDOW_SLACK_MS) {
             out.laserFiredAt = iso(at);
           }
         } else if (n.type === 'MoonminingExtractionCancelled') {
           if (at >= start - WINDOW_SLACK_MS && at <= arrival) out.cancelledAt = iso(at);
         }
+        if (!exact && namesOre(n, out, decay)) out.oreLines = unitsOf(n.payload.oreVolumes!);
       }
       return out;
     })

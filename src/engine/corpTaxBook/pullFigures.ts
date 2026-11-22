@@ -16,6 +16,7 @@ import {
 } from '../../../functions/src/corpTaxBookMoonDocs';
 import type { BookView, ExtractionRow } from './bookView';
 import { extractionId, type SyncExtraction } from './sync';
+import { chunkMinedPct } from './moonOreVariants';
 
 /** A doc this client can read: current schema and the fields the page takes. */
 export function moonDocUsable(doc: MoonDoc | undefined): doc is MoonDoc {
@@ -92,15 +93,7 @@ export function withMoonDocs(
   if (fromDocs.size === 0) return view;
   const figures = (row: ExtractionRow, doc: MoonDoc): ExtractionRow => {
     let minedPct: number | null = null;
-    if (row.fracturedAt && row.oreLines.length) {
-      const mined = new Map(doc.mined.map((m) => [m.typeId, m.quantity]));
-      const total = row.oreLines.reduce((s, l) => s + l.quantity, 0);
-      const got = row.oreLines.reduce(
-        (s, l) => s + Math.min(l.quantity, mined.get(l.typeId) ?? 0),
-        0
-      );
-      minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
-    }
+    if (row.fracturedAt && row.oreLines.length) minedPct = chunkMinedPct(row.oreLines, doc.mined);
     return { ...row, minedPct, minerCount: doc.minerCount };
   };
   return {

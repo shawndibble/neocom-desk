@@ -310,13 +310,12 @@ export function useCorpBook(
     };
   }, [fetched, corporationId]);
 
-  // A chunk with no notification takes its ore from a linked Moon Ore Survey (D13).
+  // A chunk with no notification takes its ore from a linked Moon Ore Survey (D13). One with a
+  // notification reads it too: until its ore is mined, the survey splits a base ore into variants.
   useEffect(() => {
     if (fetched.status !== 'loaded') return;
     const { data } = fetched;
-    const wanted = data.state.extractions.filter(
-      (x) => x.surveyId !== undefined && (x.oreLines ?? []).length === 0
-    );
+    const wanted = data.state.extractions.filter((x) => x.surveyId !== undefined);
     let cancelled = false;
     const measured = learnChunkRates(data.state.extractions.map(measurable));
     (async () => {

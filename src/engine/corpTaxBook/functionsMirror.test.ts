@@ -12,6 +12,7 @@ import { DAY_SETTLE_TOLERANCE_PCT, daySettleTolerance } from './minerRunningAcco
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import { extractionId, type SyncExtraction } from './sync';
+import * as variants from './moonOreVariants';
 import {
   clampCoverageFrom,
   closePeriod,
@@ -771,5 +772,38 @@ describe('latest recorded corp mirror', () => {
     for (const order of [rows, [...rows].reverse()]) {
       expect(mirror.latestRecordedCorp(order)).toEqual(latestRecordedCorp(order));
     }
+  });
+});
+
+describe('moon ore variants mirror', () => {
+  const BITUMENS = 45492;
+  const BRIMFUL = 46284;
+  const GLISTENING = 46285;
+  const chunk = [
+    { typeId: 45490, quantity: 1000 },
+    { typeId: BITUMENS, quantity: 2003 },
+    { typeId: 7, quantity: 50 },
+  ];
+  const mined = [
+    { typeId: BITUMENS, quantity: 700 },
+    { typeId: BRIMFUL, quantity: 500 },
+    { typeId: GLISTENING, quantity: 10 },
+    { typeId: 7, quantity: 80 },
+  ];
+  const survey = [
+    { typeId: 45490, quantity: 3 },
+    { typeId: 46281, quantity: 1 },
+  ];
+
+  it('keeps the variant table equal', () => {
+    expect([...mirror.MOON_ORE_VARIANTS]).toEqual([...variants.MOON_ORE_VARIANTS]);
+  });
+
+  it('splits and counts a chunk the same', () => {
+    expect(mirror.splitChunkVariants(chunk, mined, survey)).toEqual(
+      variants.splitChunkVariants(chunk, mined, survey)
+    );
+    expect(mirror.chunkMinedPct(chunk, mined)).toBe(variants.chunkMinedPct(chunk, mined));
+    expect(mirror.chunkMinedPct([], [])).toBe(variants.chunkMinedPct([], []));
   });
 });

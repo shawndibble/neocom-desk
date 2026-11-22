@@ -304,7 +304,9 @@ export function parseMoonPayload(text: string): MoonPayload {
 /** The moon drill notification types the sync reads (client: `MOON_NOTIFICATION_TYPES` in sync.ts). */
 export const MOON_NOTIFICATION_TYPES = [
   'MoonminingExtractionStarted',
+  'MoonminingExtractionFinished',
   'MoonminingLaserFired',
+  'MoonminingAutomaticFracture',
   'MoonminingExtractionCancelled',
 ] as const;
 
@@ -358,11 +360,37 @@ export function moonNotificationsOf(
 export type StoredExtractionKey = Pick<
   SyncExtraction,
   'structureId' | 'moonId' | 'extractionStartTime' | 'chunkArrivalTime'
->;
+> &
+  Partial<Pick<SyncExtraction, 'naturalDecayTime' | 'oreLines'>>;
 
 const SAME_CHUNK_MS = 10 * 60_000;
 const WINDOW_SLACK_MS = 5 * 60_000;
 const iso = (ms: number) => new Date(ms).toISOString();
+
+/** Engine `ORE_AFTER_ARRIVAL`. */
+const ORE_AFTER_ARRIVAL: ReadonlySet<string> = new Set([
+  'MoonminingExtractionFinished',
+  'MoonminingLaserFired',
+  'MoonminingAutomaticFracture',
+]);
+
+/** Engine `namesChunk`. */
+function namesChunk(n: MoonNotification, arrival: number, decay: number): boolean {
+  const at = Date.parse(n.timestamp);
+  if (n.type === 'MoonminingExtractionFinished') {
+    const auto = n.payload.autoTimeMs;
+    return auto !== undefined
+      ? Math.abs(auto - decay) <= SAME_CHUNK_MS
+      : Math.abs(at - arrival) <= SAME_CHUNK_MS;
+  }
+  return at >= arrival - WINDOW_SLACK_MS && at <= decay + WINDOW_SLACK_MS;
+}
+
+const unitsOf = (volumes: readonly { typeId: number; volumeM3: number }[]) =>
+  volumes.map((o) => ({
+    typeId: o.typeId,
+    quantity: Math.floor(o.volumeM3 / MOON_ORE_M3_PER_UNIT),
+  }));
 
 /** Engine `reconcileExtractions`. */
 export function reconcileExtractions(
@@ -406,6 +434,27 @@ export function reconcileExtractions(
     });
   }
 
+  const namesOre = (n: MoonNotification, x: StoredExtractionKey, decay: number) =>
+    ORE_AFTER_ARRIVAL.has(n.type) &&
+    n.payload.structureId === x.structureId &&
+    n.payload.moonId === x.moonId &&
+    !!n.payload.oreVolumes?.length &&
+    namesChunk(n, Date.parse(x.chunkArrivalTime), decay);
+  for (const x of stored) {
+    if (x.oreLines?.length || x.naturalDecayTime === undefined) continue;
+    if (base.some((b) => sameChunk(b, x.structureId, x.moonId, Date.parse(x.chunkArrivalTime))))
+      continue;
+    const decay = Date.parse(x.naturalDecayTime);
+    if (!notifications.some((n) => namesOre(n, x, decay))) continue;
+    base.push({
+      structureId: x.structureId,
+      moonId: x.moonId,
+      extractionStartTime: x.extractionStartTime,
+      chunkArrivalTime: x.chunkArrivalTime,
+      naturalDecayTime: x.naturalDecayTime,
+    });
+  }
+
   return base
     .map((x): SyncExtraction => {
       const keep = stored.find((s) =>
@@ -417,6 +466,7 @@ export function reconcileExtractions(
       const arrival = Date.parse(out.chunkArrivalTime);
       const start = Date.parse(out.extractionStartTime);
       const decay = Date.parse(out.naturalDecayTime);
+      let exact = (keep?.oreLines?.length ?? 0) > 0;
       for (const n of notifications) {
         if (n.payload.structureId !== out.structureId || n.payload.moonId !== out.moonId) continue;
         const at = Date.parse(n.timestamp);
@@ -425,18 +475,19 @@ export function reconcileExtractions(
           if (readyTimeMs === undefined || Math.abs(readyTimeMs - arrival) > SAME_CHUNK_MS)
             continue;
           if (volumes?.length) {
-            out.oreLines = volumes.map((o) => ({
-              typeId: o.typeId,
-              quantity: Math.floor(o.volumeM3 / MOON_ORE_M3_PER_UNIT),
-            }));
+            out.oreLines = unitsOf(volumes);
+            exact = true;
           }
-        } else if (n.type === 'MoonminingLaserFired') {
+          continue;
+        }
+        if (n.type === 'MoonminingLaserFired') {
           if (at >= arrival - WINDOW_SLACK_MS && at <= decay + WINDOW_SLACK_MS) {
             out.laserFiredAt = iso(at);
           }
         } else if (n.type === 'MoonminingExtractionCancelled') {
           if (at >= start - WINDOW_SLACK_MS && at <= arrival) out.cancelledAt = iso(at);
         }
+        if (!exact && namesOre(n, out, decay)) out.oreLines = unitsOf(n.payload.oreVolumes!);
       }
       return out;
     })

@@ -406,6 +406,68 @@ describe('reconcileExtractions', () => {
     ]);
   });
 
+  describe('the chunk’s ore from the notifications sent once it arrives', () => {
+    const ore = (volumeM3: number) => ({ oreVolumes: [{ typeId: 45492, volumeM3 }] });
+    const finished = note('MoonminingExtractionFinished', '2026-07-10T12:00:01Z', {
+      autoTimeMs: at('2026-07-10T15:00:00Z'),
+      ...ore(2_000_000),
+    });
+
+    it('takes it from Extraction finished, Laser fired or Automatic fracture', () => {
+      const fired = note('MoonminingLaserFired', '2026-07-10T13:00:00Z', ore(3_000_000));
+      const auto = note('MoonminingAutomaticFracture', '2026-07-10T15:00:00Z', ore(4_000_000));
+      expect(reconcileExtractions([esi], [finished], [])[0].oreLines).toEqual([
+        { typeId: 45492, quantity: 200_000 },
+      ]);
+      expect(reconcileExtractions([esi], [fired], [])[0].oreLines).toEqual([
+        { typeId: 45492, quantity: 300_000 },
+      ]);
+      expect(reconcileExtractions([esi], [auto], [])[0].oreLines).toEqual([
+        { typeId: 45492, quantity: 400_000 },
+      ]);
+    });
+
+    it('lets the started notification win, whichever comes first', () => {
+      const started = note('MoonminingExtractionStarted', '2026-07-01T12:00:05Z', {
+        readyTimeMs: at('2026-07-10T12:00:00Z'),
+        autoTimeMs: at('2026-07-10T15:00:00Z'),
+        ...ore(1_000_000),
+      });
+      for (const notes of [
+        [started, finished],
+        [finished, started],
+      ])
+        expect(reconcileExtractions([esi], notes, [])[0].oreLines).toEqual([
+          { typeId: 45492, quantity: 100_000 },
+        ]);
+    });
+
+    it('ignores one for another chunk of the same moon', () => {
+      const later = note('MoonminingExtractionFinished', '2026-08-10T12:00:00Z', {
+        autoTimeMs: at('2026-08-10T15:00:00Z'),
+        ...ore(2_000_000),
+      });
+      expect(reconcileExtractions([esi], [later], [])[0].oreLines).toBeUndefined();
+    });
+
+    it('gives it to a stored extraction ESI no longer lists, under its stored start', () => {
+      const stored = {
+        structureId: 1001,
+        moonId: 40,
+        extractionStartTime: '2026-07-01T12:00:00.000Z',
+        chunkArrivalTime: '2026-07-10T12:00:00.000Z',
+        naturalDecayTime: '2026-07-10T15:00:00.000Z',
+      };
+      expect(reconcileExtractions([], [finished], [stored])).toEqual([
+        { ...stored, oreLines: [{ typeId: 45492, quantity: 200_000 }] },
+      ]);
+      // One that already holds its ore, or that no notification names, is not uploaded again.
+      const held = { ...stored, oreLines: [{ typeId: 45492, quantity: 1 }] };
+      expect(reconcileExtractions([], [finished], [held])).toEqual([]);
+      expect(reconcileExtractions([], [], [stored])).toEqual([]);
+    });
+  });
+
   it('adds when the laser was fired or the extraction cancelled, to the extraction they fall in', () => {
     const fired = note('MoonminingLaserFired', '2026-07-10T13:00:00Z', {});
     const cancelled = note('MoonminingExtractionCancelled', '2026-07-05T00:00:00Z', {});

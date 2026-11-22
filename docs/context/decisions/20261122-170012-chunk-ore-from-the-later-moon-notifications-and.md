@@ -1,0 +1,10 @@
+# Scope decisions — Chunk ore from the later moon notifications and moon ore variants split by what was mined
+
+_Recorded 2026-11-22._
+
+> Amends `20261121-112002-moon-chunk-ore-make-up-source-order-and.md`: "the ExtractionStarted notification first" now reads "a moon drill notification first".
+
+- **A chunk's ore comes from any moon drill notification that names it, the started one first.** Extraction finished, Laser fired and Automatic fracture carry the same `oreVolumeByType` as Extraction started. The started one is weeks old when the chunk pops and is often gone from ESI's feed, so a chunk fell back to a survey or a chunk-rate guess while the exact figure sat in the holder's notifications. The started notification's ore, once read or stored, is never replaced by a later one. A later notification also attaches its ore to a stored Extraction ESI no longer lists (matched by structure, moon and window), keeping the stored start.
+- **A notification names only base moon ores; each base ore is split into the variants that make it up.** EVE decides which rocks come up as a variant (+15%/+100%, e.g. Brimful/Glistening Bitumens) when the chunk fractures, and the ledger records each variant as its own type. Compared type by type, every variant mined matched nothing: a moon mined to 80% read 50%, with a false loss on the base ore. The table is `MOON_ORE_VARIANTS` (`src/engine/corpTaxBook/moonOreVariants.ts`, the SDE's, pinned by a test against `public/data/types.json`; mirrored in `functions/src/corpTaxBookEngine.ts`).
+- **The split is what was mined of that ore, else a linked survey's; mined always wins.** A survey scanned part-way through mining is skewed, so it stands in only until the ledger shows any of that ore. With neither, the base ore stays whole. Each base ore's total is kept exactly. Mined %, the ore-loss panel and the estimated value all read the split; a variant's loss is its share of its base ore's (residue is taken as falling evenly across them).
+- **Nothing new is stored.** The split is derived at view time, like the rest of the make-up; the server's moon docs count a variant mined against its base ore the same way.

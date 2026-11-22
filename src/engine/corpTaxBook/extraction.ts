@@ -4,7 +4,7 @@
  * fired or the chunk breaks on its own at `natural_decay_time`, and Expired
  * once the field is assumed gone: fracture + 48h by default, overridable per
  * structure up to 4 days. ESI lists only current extractions and no ore, so
- * the chunk's make-up comes from the ExtractionStarted notification, else a
+ * the chunk's make-up comes from a moon drill notification, else a
  * linked Moon Ore Survey, else it is unknown.
  */
 import type { ObservedMiningEntry, OreLine } from './types';
@@ -77,7 +77,7 @@ export function extractionStatus(
 }
 
 export interface ChunkSources {
-  /** Ore volumes from the MoonminingExtractionStarted notification. */
+  /** Ore volumes from a moon drill notification (started, else finished or fractured). */
   notified?: readonly { typeId: number; volumeM3: number }[];
   /** A linked Moon Ore Survey's composition, as fractions of the chunk. */
   survey?: readonly { typeId: number; fraction: number }[];
