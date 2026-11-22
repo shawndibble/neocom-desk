@@ -29,6 +29,7 @@ const DAYS = [6, 5, 4];
 const OWED = DAYS.length * DAY_TAX;
 const ledgerButton = (page: Page) =>
   page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` });
+const owedCard = (page: Page) => page.getByRole('group', { name: ROOK.name });
 
 async function openLinkWallet(page: Page) {
   await page
@@ -64,7 +65,7 @@ test('a payment to the Payee is suggested, and linking it pays the oldest days',
   await expect(dialog).toContainText(`Sent to ${ROOK.name}`);
   await dialog.getByRole('button', { name: `Link to ${ROOK.name}` }).click();
   await expect(dialog).toBeHidden();
-  await expect(ledgerButton(page)).toContainText(isk(OWED - 2 * DAY_TAX));
+  await expect(owedCard(page)).toContainText(isk(OWED - 2 * DAY_TAX));
   const links = await readStore<MiningTaxPaymentLinkRecord>(page, 'miningTaxPaymentLinks');
   expect(links.map((l) => [l.id, l.payeeId, l.amount])).toEqual([
     ['journal:7201', ROOK_PAYEE_ID, 2 * DAY_TAX],
@@ -93,7 +94,7 @@ test('a payment to someone else is linked by hand', async ({ page }) => {
   // Opened from the Payee's card, a payment picked by hand goes to that Payee.
   await dialog.getByRole('button', { name: `Link to ${ROOK.name}` }).click();
   await expect(dialog).toBeHidden();
-  await expect(ledgerButton(page)).toContainText(isk(OWED - DAY_TAX));
+  await expect(owedCard(page)).toContainText(isk(OWED - DAY_TAX));
 });
 
 test('old paid marks are read into a link and the figures stay the same', async ({ page }) => {
@@ -120,7 +121,7 @@ test('old paid marks are read into a link and the figures stay the same', async 
   await forgetPaidMarksRead(page);
   await page.reload();
   await page.getByRole('tab', { name: 'Tax', selected: true }).waitFor();
-  await expect(ledgerButton(page)).toContainText(isk(DAY_TAX));
+  await expect(owedCard(page)).toContainText(isk(DAY_TAX));
   await ledgerButton(page).click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
   await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(DAY_TAX)} ISK`));

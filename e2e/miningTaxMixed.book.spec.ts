@@ -46,8 +46,9 @@ import type { MiningTaxPaymentLinkRecord } from '../src/db/records';
 const CORP_NAME = 'Test Corp';
 const ledgerButton = (page: Page, name: string) =>
   page.getByRole('button', { name: `Open the ledger of ${name}` });
+const cardOf = (page: Page, name: string) => page.getByRole('group', { name });
 const settleUpOf = (page: Page, name: string) =>
-  ledgerButton(page, name).locator('xpath=following::button[normalize-space()="Settle up"][1]');
+  cardOf(page, name).getByRole('button', { name: 'Settle up' });
 const openRows = (page: Page) => page.getByRole('row').filter({ hasText: /\d{4}-\d{2}-\d{2}/ });
 /** A Payee ledger's rows, by what they say. */
 const ledgerOf = (page: Page, name: string) => page.getByRole('dialog', { name });
@@ -66,8 +67,8 @@ test('ore a book and a Default System Payee both could claim is billed once, eac
 
   // The book bills the 6,000 units it recorded of day 6 and of day 4; Rook keeps the other 4,000
   // of day 6. Neither Payee is billed the ore the other has.
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.bookOwes));
-  await expect(ledgerButton(page, ROOK.name)).toContainText(isk(s.rookOwes));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.bookOwes));
+  await expect(cardOf(page, ROOK.name)).toContainText(isk(s.rookOwes));
   await expect(page.getByRole('region', { name: 'You owe' })).toContainText(
     `${isk(s.bookOwes + s.rookOwes)} ISK`
   );
@@ -103,8 +104,8 @@ test('ore a Default System Payee was given and the book also recorded is a Confl
   // The book's row stands as a Conflict, and the Conflicts card says it is not owed yet. The
   // pilot's own Payee waits on it (the corporation's card keeps the book's own figure), so the day
   // is counted once: Rook has no card, and "You owe" has nothing to add up.
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(DAY_TAX));
-  await expect(ledgerButton(page, ROOK.name)).toHaveCount(0);
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(DAY_TAX));
+  await expect(cardOf(page, ROOK.name)).toHaveCount(0);
   await expect(page.getByText(/across \d+ payees/)).toHaveCount(0);
   const conflicts = page.getByText('Conflicts', { exact: true }).locator('xpath=ancestor::*[3]');
   await expect(conflicts).toContainText(isk(DAY_TAX));
@@ -133,8 +134,8 @@ test('paying the book does not pay a personal Payee, and paying the Payee does n
     ],
   });
   await openMixed(page, s, book, esi);
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.bookOwes - sent));
-  await expect(ledgerButton(page, ROOK.name)).toContainText(isk(s.rookOwes));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.bookOwes - sent));
+  await expect(cardOf(page, ROOK.name)).toContainText(isk(s.rookOwes));
 
   // Settling up with Rook records one link to Rook, and the book's figure does not move.
   await settleUpOf(page, ROOK.name).click();
@@ -142,7 +143,7 @@ test('paying the book does not pay a personal Payee, and paying the Payee does n
   await expect(dialog).toContainText(`Amount${isk(s.rookOwes)} ISK`);
   await dialog.getByRole('button', { name: 'Record payment' }).click();
   await expect(dialog).toBeHidden();
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.bookOwes - sent));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.bookOwes - sent));
   const links = await readStore<MiningTaxPaymentLinkRecord>(page, 'miningTaxPaymentLinks');
   expect(links.map((l) => ({ payeeId: l.payeeId, amount: l.amount }))).toEqual([
     { payeeId: ROOK_PAYEE_ID, amount: s.rookOwes },
@@ -228,8 +229,8 @@ test('a book and a corporation with no book are each paid oldest first, from the
   await openMixed(page, scenario, book, esi);
   // The donation to the book's corporation is the book's: it pays the book's oldest day. The one
   // to Cinder is not linked yet, so it pays nothing, and the card says so.
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.owed - DAY_TAX));
-  await expect(ledgerButton(page, CINDER.name)).toContainText(isk(s.owed));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.owed - DAY_TAX));
+  await expect(cardOf(page, CINDER.name)).toContainText(isk(s.owed));
   await expect(page.getByRole('region', { name: 'You owe' })).toContainText(/isn't linked yet/);
 
   await ledgerButton(page, CORP_NAME).click();
@@ -272,8 +273,8 @@ test('a wallet payment to a corporation with no book is suggested for that Payee
   await expect(dialog).toBeHidden();
 
   // Cinder's oldest day is paid; the book's figure is only what its own donation moved.
-  await expect(ledgerButton(page, CINDER.name)).toContainText(isk(s.owed - DAY_TAX));
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.owed - DAY_TAX));
+  await expect(cardOf(page, CINDER.name)).toContainText(isk(s.owed - DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.owed - DAY_TAX));
   const links = await readStore<MiningTaxPaymentLinkRecord>(page, 'miningTaxPaymentLinks');
   expect(links.map((l) => ({ id: l.id, payeeId: l.payeeId, amount: l.amount }))).toEqual([
     { id: `journal:${s.cinderRefId}`, payeeId: CINDER_PAYEE_ID, amount: DAY_TAX },
@@ -294,7 +295,7 @@ test("Settle up for the corporation with no book records a link to it, and the b
   await dialog.getByRole('button', { name: 'Record payment' }).click();
   await expect(dialog).toBeHidden();
   // The book owes what it did: a payment to Cinder is not a donation to the book.
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.owed));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.owed));
   const links = await readStore<MiningTaxPaymentLinkRecord>(page, 'miningTaxPaymentLinks');
   expect(links.map((l) => ({ payeeId: l.payeeId, amount: l.amount }))).toEqual([
     { payeeId: CINDER_PAYEE_ID, amount: s.owed },
@@ -312,8 +313,8 @@ test("a pilot in two books reads each book's figures, ledger and payment code ap
 }) => {
   const s = twoBooksScenario();
   await openMixed(page, { docs: s.docs, alt: s.alt, esi: s.esi() }, book, esi);
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
-  await expect(ledgerButton(page, 'Other Corp')).toContainText(isk(s.altOwes));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
+  await expect(cardOf(page, 'Other Corp')).toContainText(isk(s.altOwes));
   await expect(page.getByRole('region', { name: 'You owe' })).toContainText(
     `${isk(s.ownerOwes + s.altOwes)} ISK`
   );
@@ -394,15 +395,12 @@ test("a corporation's new book is its one card; the pilot's older personal histo
   const bookOwes = s.bookDays.length * DAY_TAX;
   // One corporation, one card: the book's, tagged. The pilot's own Payee for the same corporation
   // has no card, and its old balance (credit or owed) counts nowhere.
-  const cards = page.getByRole('button', { name: `Open the ledger of ${CORP_NAME}` });
+  const cards = cardOf(page, CORP_NAME);
   await expect(cards).toHaveCount(1);
   await expect(cards).toContainText(isk(bookOwes));
   await expect(page.getByText('Corp Tax Book', { exact: true })).toHaveCount(1);
-  await expect(page.getByRole('button', { name: `Show only ${CORP_NAME}'s entries` })).toHaveCount(
-    1
-  );
 
-  await cards.click();
+  await ledgerButton(page, CORP_NAME).click();
   const billed = ledgerOf(page, CORP_NAME);
   await expect(billed.getByRole('row', { name: /Mined at E2E Athanor Alpha/ })).toHaveCount(3);
   await expect(billed.getByRole('row', { name: /Payment/ })).toHaveCount(0);
@@ -435,8 +433,8 @@ test('This character and All characters each show the rows of the books they cov
   await openMixed(page, { docs: s.docs, alt: s.alt, esi: s.esi() }, book, esi);
   // All characters (the first visit's choice with two): both books' rows and cards.
   await expect(openRows(page)).toHaveCount(5);
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
-  await expect(ledgerButton(page, 'Other Corp')).toContainText(isk(s.altOwes));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
+  await expect(cardOf(page, 'Other Corp')).toContainText(isk(s.altOwes));
 
   await page
     .getByRole('button', { name: /^All characters/ })
@@ -449,8 +447,8 @@ test('This character and All characters each show the rows of the books they cov
   // count in the headline.
   await expect(openRows(page)).toHaveCount(3);
   await expect(openRows(page).filter({ hasText: 'Other Corp' })).toHaveCount(0);
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
-  await expect(ledgerButton(page, 'Other Corp')).toHaveCount(0);
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
+  await expect(cardOf(page, 'Other Corp')).toHaveCount(0);
   await expect(page.getByText(/across \d+ payees/)).toHaveCount(0);
 
   await page
@@ -488,8 +486,8 @@ test("an alt's donation pays the group the alt is in, whichever corporation the 
     esi
   );
   // In flight: it pays the alt's group in its corporation's book, and the main's book not at all.
-  await expect(ledgerButton(page, 'Other Corp')).toContainText(isk(s.altOwes - DAY_TAX));
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
+  await expect(cardOf(page, 'Other Corp')).toContainText(isk(s.altOwes - DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
 
   // Once the book credits it (the group's Miner, as the code names it) it stays counted.
   await book.seed([
@@ -501,8 +499,8 @@ test("an alt's donation pays the group the alt is in, whichever corporation the 
     }),
   ]);
   await page.reload();
-  await expect(ledgerButton(page, 'Other Corp')).toContainText(isk(s.altOwes - DAY_TAX));
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
+  await expect(cardOf(page, 'Other Corp')).toContainText(isk(s.altOwes - DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
 });
 
 test("an alt in another corporation that mines the main's moons is billed in the main's book, and its donation pays that group", async ({
@@ -516,8 +514,8 @@ test("an alt in another corporation that mines the main's moons is billed in the
   await openMixed(page, { docs: s.docs, alt: s.alt, esi: s.esi() }, book, esi);
   // The group (main and alt) owes four days in the main's book, less the alt's donation, which the
   // book credited to the group the alt is grouped in; the alt's own corporation's book is apart.
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.groupOwes - DAY_TAX));
-  await expect(ledgerButton(page, 'Other Corp')).toContainText(isk(s.altOwes));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.groupOwes - DAY_TAX));
+  await expect(cardOf(page, 'Other Corp')).toContainText(isk(s.altOwes));
   await ledgerButton(page, CORP_NAME).click();
   const corp = ledgerOf(page, CORP_NAME);
   await expect(corp.getByRole('row', { name: /Mined at E2E Athanor Alpha/ })).toHaveCount(4);
@@ -572,7 +570,7 @@ test('a pilot who left the corporation still sees what its book lists, the late 
 
   await expect(page.getByText(`You left ${CORP_NAME}`)).toBeVisible();
   await expect(page.getByText(/nothing new is added/)).toContainText(isk(s.owed));
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.owed));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(s.owed));
   // The late notice they were sent is still theirs to read.
   await page.getByRole('button', { name: /needs? attention/ }).click();
   await expect(page.getByText(/Late notice .*not paid yet/)).toBeVisible();

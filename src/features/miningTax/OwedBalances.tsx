@@ -297,7 +297,11 @@ export function OwedBalances({
             return (
               <Panel key={balance.payee.id} padded={false} fill className="flex flex-col">
                 {wide ? (
-                  <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4">
+                  <div
+                    role="group"
+                    aria-label={balance.payee.name}
+                    className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4"
+                  >
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-start gap-2">
                         {nameOf(balance)}
@@ -312,7 +316,11 @@ export function OwedBalances({
                   // Cards in a row share its height; the meta line and buttons
                   // sit at the bottom, so they line up across cards whether a
                   // Payee's name takes one line or two.
-                  <div className="flex flex-1 flex-col gap-2 p-3">
+                  <div
+                    role="group"
+                    aria-label={balance.payee.name}
+                    className="flex flex-1 flex-col gap-2 p-3"
+                  >
                     <div className="flex items-start gap-2">
                       {nameOf(balance)}
                       {owedFigure(balance)}
@@ -449,10 +457,11 @@ function PayeeActions({
 }) {
   const { t } = useTranslation();
   const openAfterMenu = useOpenAfterMenu();
-  const textAction = (label: string, run: () => void, extra?: string) => (
+  const textAction = (label: string, run: () => void, ariaLabel?: string) => (
     <button
       type="button"
-      className={textActionClassName(cx('px-3 first:pl-0 last:pr-0', extra))}
+      aria-label={ariaLabel}
+      className={textActionClassName('px-3 first:pl-0 last:pr-0')}
       onClick={run}
     >
       {label}
@@ -474,7 +483,12 @@ function PayeeActions({
           both ? 'hidden sm:flex' : 'flex'
         )}
       >
-        {onOpenLedger && textAction(t('miningTax.owed.ledgerAction'), () => onOpenLedger(balance))}
+        {onOpenLedger &&
+          textAction(
+            t('miningTax.owed.ledgerAction'),
+            () => onOpenLedger(balance),
+            t('miningTax.ledger.openFor', { payee: balance.payee.name })
+          )}
         {onLinkPayment && textAction(t('miningTax.owed.linkPayment'), () => onLinkPayment(balance))}
       </div>
       {both && (

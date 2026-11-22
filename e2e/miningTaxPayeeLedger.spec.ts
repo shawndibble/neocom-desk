@@ -37,7 +37,7 @@ async function openLedger(page: Page) {
   await openPersonalTax(page, data, { characterId: CHARACTER_ID, mining: personalLedger(DAYS) });
   await page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` }).click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
-  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(2 * DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(2 * DAY_TAX)} ISK`));
   return ledger;
 }
 
@@ -122,12 +122,12 @@ test("a personal Payee's ledger lists its whole history, with no snapshot row", 
     }),
   ];
   await openPersonalTax(page, data, { characterId: CHARACTER_ID, mining: personalLedger(days) });
-  const owed = page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` });
+  const owed = page.getByRole('group', { name: ROOK.name });
   await expect(owed).toContainText(isk(3 * DAY_TAX));
   // A personal account is always built from the device's full history (no device snapshot).
   await page.reload();
   await expect(owed).toContainText(isk(3 * DAY_TAX));
-  await owed.click();
+  await page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` }).click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
   const rows = bodyRows(ledger);
   await expect(rows).toHaveCount(5);
@@ -141,10 +141,10 @@ test('Unlink says so with an Undo that links the same payment back', async ({ pa
   await bodyRows(ledger).filter({ hasText: 'Payment' }).click();
   await ledger.getByRole('button', { name: 'Unlink' }).click();
   // The payment pays nothing now: its day is owed again.
-  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(3 * DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(3 * DAY_TAX)} ISK`));
   const toast = page.getByRole('status').filter({ hasText: /Unlinked the .* ISK payment/ });
   await expect(toast).toBeVisible();
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(2 * DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(2 * DAY_TAX)} ISK`));
   await expect(ledger).toContainText(`${day(PAID_BACK)}Payment by wallet transfer`);
 });

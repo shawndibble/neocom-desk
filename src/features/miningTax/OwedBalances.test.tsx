@@ -268,7 +268,7 @@ describe('OwedBalances card actions', () => {
     const onOpenLedger = vi.fn();
     const onLinkPayment = vi.fn();
     renderBalances([balance('a', 1_000_000)], { onOpenLedger, onLinkPayment });
-    await userEvent.click(screen.getAllByRole('button', { name: 'Ledger' })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Open the ledger of/ })[0]!);
     await userEvent.click(screen.getAllByRole('button', { name: 'Link payment' })[0]!);
     expect(onOpenLedger).toHaveBeenCalledOnce();
     expect(onLinkPayment).toHaveBeenCalledOnce();
@@ -279,7 +279,9 @@ describe('OwedBalances card actions', () => {
       onOpenLedger: vi.fn(),
       hideLinkPayment: () => true,
     });
-    expect(screen.getAllByRole('button', { name: 'Ledger' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /^Open the ledger of/ }).length).toBeGreaterThan(
+      0
+    );
     expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Link payment' })).toBeNull();
   });

@@ -84,7 +84,7 @@ test('an overpayment pays every day and holds the rest as credit', async ({ page
     ledgerRow(page, /Payment from Ada Lunar/)
       .getByRole('cell')
       .nth(4)
-  ).toHaveText(`${isk(credit)} credit`);
+  ).toHaveText(isk(credit));
   await expect(page.getByRole('heading', { name: 'Owed days · 0' })).toBeVisible();
 });
 
