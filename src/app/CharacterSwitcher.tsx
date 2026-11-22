@@ -97,7 +97,10 @@ export function CharacterSwitcher({
                         navigate(grantMissingPath([]));
                       })
                     }
-                    className={cx(inlineLinkClassName, 'relative p-0 text-xs tabular-nums')}
+                    className={cx(
+                      inlineLinkClassName,
+                      'relative inline-flex min-h-6 items-center p-0 text-xs tabular-nums'
+                    )}
                   >
                     {t('nav.permissionsCount', { granted: row.granted, total: row.total })}
                   </button>
