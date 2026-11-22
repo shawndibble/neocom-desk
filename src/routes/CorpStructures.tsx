@@ -323,7 +323,9 @@ export function CorpStructures() {
         render: (row) =>
           row.fuel ? (
             <span className="flex flex-col items-end">
-              <span className={SEVERITY_TEXT[row.fuel.severity]}>{structureWhen(row.fuel, t)}</span>
+              <span className={`whitespace-nowrap ${SEVERITY_TEXT[row.fuel.severity]}`}>
+                {structureWhen(row.fuel, t)}
+              </span>
               {row.fuel.deadlineMs !== null && (
                 <span className="text-xs text-text-dim max-sm:hidden">
                   {formatEveDateTime(new Date(row.fuel.deadlineMs))}
@@ -648,19 +650,21 @@ export function CorpStructures() {
                   }
                 />
               ) : (
-                <DataTable
-                  label={t('corp.structures.title')}
-                  columns={columns}
-                  rows={visible}
-                  rowKey={(row) => row.source.structureId}
-                  sort={sort}
-                  onSortChange={setSort}
-                  // Opening pushes, so Back closes the panel; closing replaces.
-                  onRowClick={(row) => setOpenId(row.source.structureId, { push: true })}
-                  selectedRowKey={openId}
-                  stackLayout="dense"
-                  mobileSort
-                />
+                <div className="overflow-x-auto">
+                  <DataTable
+                    label={t('corp.structures.title')}
+                    columns={columns}
+                    rows={visible}
+                    rowKey={(row) => row.source.structureId}
+                    sort={sort}
+                    onSortChange={setSort}
+                    // Opening pushes, so Back closes the panel; closing replaces.
+                    onRowClick={(row) => setOpenId(row.source.structureId, { push: true })}
+                    selectedRowKey={openId}
+                    stackLayout="dense"
+                    mobileSort
+                  />
+                </div>
               )}
               {visible.length > 0 && (
                 <div className="space-y-1 border-t border-line px-3 py-2 text-sm">
@@ -678,14 +682,16 @@ export function CorpStructures() {
                       />
                     </label>
                     <span data-testid="fuel-total" className="tabular-nums">
-                      {t('corp.structures.fuelPlan.total', {
-                        count: totalNeeded,
-                        blocks: formatCount(totalNeeded),
-                        volume: formatCount(totalNeeded * FUEL_BLOCK_VOLUME_M3),
-                      })}
+                      {/* All unknown: a "Total 0" would read as a fact. */}
+                      {unknownNeeded < visible.length &&
+                        t('corp.structures.fuelPlan.total', {
+                          count: totalNeeded,
+                          blocks: formatCount(totalNeeded),
+                          volume: formatCount(totalNeeded * FUEL_BLOCK_VOLUME_M3),
+                        })}
                       {unknownNeeded > 0 && (
                         <span className="text-text-dim">
-                          {' · '}
+                          {unknownNeeded < visible.length && ' · '}
                           {t('corp.structures.fuelPlan.unknown', { count: unknownNeeded })}
                         </span>
                       )}
