@@ -28,6 +28,7 @@ import {
   creditedDonation,
   donationSent,
 } from './support/taxBook/memberSeed';
+import { justNow } from './support/taxBook/timingScenarios';
 import {
   CINDER,
   CINDER_PAYEE_ID,
@@ -128,6 +129,7 @@ test('paying the book does not pay a personal Payee, and paying the Payee does n
         to: CORP,
         amount: sent,
         back: 1,
+        at: justNow(30),
         reason: minerPaymentCode(PILOT_MINER_ID),
       }),
     ],
@@ -213,6 +215,7 @@ function twoPayeeWallet() {
       to: CORP,
       amount: DAY_TAX,
       back: 1,
+      at: justNow(30),
       reason: minerPaymentCode(PILOT_MINER_ID),
     }),
   ];
@@ -339,7 +342,7 @@ test("a pilot in two books reads each book's figures, ledger and payment code ap
     const dialog = page.getByRole('dialog', { name: `Settle up — ${c.name}` });
     await expect(dialog).toContainText(`Amount${isk(c.owed)} ISK`);
     await expect(dialog).toContainText(`Reason${c.code}`);
-    await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(1);
     await page.keyboard.press('Escape');
   }
   expect(minerPaymentCode(s.ownerMinerId)).not.toBe(minerPaymentCode(s.altMinerId));
@@ -467,7 +470,7 @@ test("an alt's donation pays the group the alt is in, whichever corporation the 
   esi,
 }) => {
   const s = twoBooksScenario();
-  const sent = { refId: 971_001, amount: DAY_TAX, back: 1 };
+  const sent = { refId: 971_001, amount: DAY_TAX, back: 1, at: justNow(30) };
   await openMixed(
     page,
     {
