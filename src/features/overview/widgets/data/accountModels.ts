@@ -154,6 +154,12 @@ const mail: Builder = (feeds, { t, now, activeCharacterId }) => {
   };
 };
 
+/** The oldest real read among the entries; null when none landed (a failed read is not a fresh one). */
+function oldestFetch(entries: readonly { fetchedAt: number }[]): Date | null {
+  const times = entries.map((entry) => entry.fetchedAt).filter((at) => at > 0);
+  return times.length > 0 ? new Date(Math.min(...times)) : null;
+}
+
 const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const feed = feeds.orders;
   const snapshot = feed?.data ?? null;
@@ -198,8 +204,8 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
         hasStaleData: rows.length > 0,
       })
     ),
-    // The snapshot's own clock: when its orders were read, not when this view was built.
-    fetchedAt: new Date(snapshot.now),
+    // When ESI last answered for these Characters, never when this view was built.
+    fetchedAt: oldestFetch(asked),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),

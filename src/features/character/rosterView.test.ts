@@ -90,6 +90,23 @@ describe('mergeRosterCore', () => {
     expect(merged.size).toBe(2);
   });
 
+  it('keeps the previous queue when the refreshed queue read never landed', () => {
+    const queue = {
+      data: [],
+      fetchedAt: new Date('2026-01-01T00:00:00Z'),
+      fromCache: true,
+      truncated: false,
+    };
+    const previous = rosterCoreMap([entry({ characterId: 1, name: 'A', queue })], NOW);
+    const merged = mergeRosterCore(
+      previous,
+      entry({ characterId: 1, name: 'A', queue: null }),
+      NOW
+    );
+    expect(merged.get(1)?.queue).toEqual(previous.get(1)?.queue);
+    expect(merged.get(1)?.queue.state).not.toBe('unknown');
+  });
+
   it('keeps the previous jobSlotSkills/totalSp when a refresh comes back with no skills row (a failed /skills call nulls the field rather than sinking the character — roster.ts)', () => {
     const withSkills = entry({
       characterId: 1,
