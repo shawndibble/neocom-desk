@@ -1,3 +1,4 @@
+import { parsePercent } from '@/lib/parsePercent';
 import { earliestRateStart } from '@/engine/corpTaxBook/rates';
 
 /**
@@ -6,10 +7,11 @@ import { earliestRateStart } from '@/engine/corpTaxBook/rates';
  * (`earliestRateStart`). The server also refuses a day an issued late notice already lists.
  */
 export function datedRateReady(pct: string, effectiveFrom: string, today: string): boolean {
+  const value = parsePercent(pct);
   return (
-    pct.trim() !== '' &&
-    Number(pct) >= 0 &&
-    Number(pct) <= 100 &&
+    value !== null &&
+    value >= 0 &&
+    value <= 100 &&
     effectiveFrom !== '' &&
     effectiveFrom >= earliestRateStart(today)
   );

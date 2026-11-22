@@ -116,11 +116,11 @@ describe('moon owner payee line', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Change who gets paid' }));
     await user.type(screen.getByLabelText('Corporation or player'), 'Somebody');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await pick('Goonswarm Federation', 'alliance', 1354830081);
     expect(screen.getByRole('alert')).toHaveTextContent("An alliance can't be paid.");
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('has no Change for a viewer who may not edit', () => {

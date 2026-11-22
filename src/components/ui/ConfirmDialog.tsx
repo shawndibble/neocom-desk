@@ -16,6 +16,7 @@ export function ConfirmDialog({
   returnFocusFallback,
   cancelLabel,
   failedLabel,
+  closeOnBack,
 }: {
   open: boolean;
   title: string;
@@ -30,6 +31,8 @@ export function ConfirmDialog({
   /** Default to the Communities wording; pass your own outside Communities. */
   cancelLabel?: string;
   failedLabel?: string;
+  /** `Modal`'s: false when a Back press already led here and the confirm must not own a history entry. */
+  closeOnBack?: boolean;
 }) {
   const { t } = useTranslation();
   const [working, setWorking] = useState(false);
@@ -56,6 +59,7 @@ export function ConfirmDialog({
       }}
       title={title}
       returnFocusFallback={returnFocusFallback}
+      closeOnBack={closeOnBack}
     >
       <p className="text-xs text-text-dim">{body}</p>
       {failed && (

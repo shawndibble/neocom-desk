@@ -1,3 +1,4 @@
+import { parsePercent } from '@/lib/parsePercent';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -290,7 +291,7 @@ export function BookSettingsDialog({
   const rateFilled = ratePct !== '';
 
   const formRate = (): NewRate => {
-    const base = { pct: Number(ratePct), effectiveFrom: rateFrom };
+    const base = { pct: parsePercent(ratePct) ?? 0, effectiveFrom: rateFrom };
     return rateScope === 'miner'
       ? { scope: 'miner', minerId: rateMiner, ...base }
       : rateScope === 'moon'

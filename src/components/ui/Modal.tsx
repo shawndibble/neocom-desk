@@ -16,6 +16,7 @@ import { PortalContainerProvider } from './portalContainer';
 import { RowTappableContext } from './tooltipHold';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { useSheetSwipe } from './useSheetSwipe';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export type ModalPlacement =
   'center' | 'sheet' | 'sheet-full' | 'medium' | 'detail' | 'wide' | 'page' | 'media';
@@ -61,6 +62,12 @@ interface ModalProps {
    * Escape, Back, the close button and the form's own Cancel still close it.
    */
   dismissOnOutsidePress?: boolean;
+  /**
+   * The body holds typed input not yet saved. Every dismissal that is not the
+   * form's own Cancel or Save (Escape, Back, the close button, a swipe, the
+   * backdrop) then asks before discarding it, and "Keep editing" returns to the form.
+   */
+  dirty?: boolean;
   /**
    * Where focus goes on close when nothing on the page held it as the modal
    * opened (a sheet a URL opened), or that element is gone.
@@ -142,16 +149,19 @@ export function Modal({
   initialFocusRef,
   closeOnBack = true,
   dismissOnOutsidePress = true,
+  dirty = false,
   returnFocusFallback,
 }: ModalProps) {
   const { t } = useTranslation();
+  const [askingDiscard, setAskingDiscard] = useState(false);
+  const requestClose = () => (dirty ? setAskingDiscard(true) : onClose());
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Whether the current press began inside the dialog. It can end outside once
   // the content reflows under it; that is not a dismissal.
   const pressBeganInside = useRef(false);
   const isSheet = placement.startsWith('sheet');
-  useOverlayHistory(open, onClose, closeOnBack);
-  const swipe = useSheetSwipe(dialogRef, onClose, isSheet, open);
+  useOverlayHistory(open, requestClose, closeOnBack);
+  const swipe = useSheetSwipe(dialogRef, requestClose, isSheet, open);
   const titleId = useId();
   // State, not a ref: a Radix portal needs to re-render once the node exists,
   // and a ref assignment alone would not schedule that render.
@@ -213,100 +223,116 @@ export function Modal({
     isSheet && !hasFooter ? ' scroll-pb-20 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]' : '';
 
   return (
-    <dialog
-      ref={dialogRef}
-      id={id}
-      aria-labelledby={titleId}
-      onCancel={(event) => {
-        // preventDefault so the browser never closes behind React's back:
-        // every close path routes through `onClose` and the parent's `open`,
-        // which the effect turns into dialog.close().
-        event.preventDefault();
-        // React carries `cancel` up its own tree: a Modal opened from inside
-        // another (a confirm over Settings) must close only itself.
-        event.stopPropagation();
-        onClose();
-      }}
-      onPointerDown={(event) => {
-        pressBeganInside.current = event.target !== dialogRef.current;
-      }}
-      onClick={(event) => {
-        // With `p-0`, the only clicks whose target is the dialog element are
-        // ones that landed on its ::backdrop. The press must not have begun
-        // inside: a press on content that reflows away lands its release on the
-        // backdrop, and the click then targets the dialog (their common ancestor).
-        if (
-          dismissOnOutsidePress &&
-          event.target === dialogRef.current &&
-          !pressBeganInside.current
-        )
-          onClose();
-        pressBeganInside.current = false;
-      }}
-      className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
-    >
-      {open && (
-        // The provider spans the header too, not just the body: a title can
-        // carry its own overlay (e.g. an item name's right-click menu), and
-        // one portaled to `document.body` would
-        // land behind the top layer — see `portalContainer.ts`.
-        <PortalContainerProvider value={portalContainer}>
-          <div className={`flex ${heightClass} flex-col`}>
-            {/* The drag zone for swipe-down-to-dismiss: grabber plus header,
+    <>
+      <dialog
+        ref={dialogRef}
+        id={id}
+        aria-labelledby={titleId}
+        onCancel={(event) => {
+          // preventDefault so the browser never closes behind React's back:
+          // every close path routes through `onClose` and the parent's `open`,
+          // which the effect turns into dialog.close().
+          event.preventDefault();
+          // React carries `cancel` up its own tree: a Modal opened from inside
+          // another (a confirm over Settings) must close only itself.
+          event.stopPropagation();
+          requestClose();
+        }}
+        onPointerDown={(event) => {
+          pressBeganInside.current = event.target !== dialogRef.current;
+        }}
+        onClick={(event) => {
+          // With `p-0`, the only clicks whose target is the dialog element are
+          // ones that landed on its ::backdrop. The press must not have begun
+          // inside: a press on content that reflows away lands its release on the
+          // backdrop, and the click then targets the dialog (their common ancestor).
+          if (
+            dismissOnOutsidePress &&
+            event.target === dialogRef.current &&
+            !pressBeganInside.current
+          )
+            requestClose();
+          pressBeganInside.current = false;
+        }}
+        className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
+      >
+        {open && (
+          // The provider spans the header too, not just the body: a title can
+          // carry its own overlay (e.g. an item name's right-click menu), and
+          // one portaled to `document.body` would
+          // land behind the top layer — see `portalContainer.ts`.
+          <PortalContainerProvider value={portalContainer}>
+            <div className={`flex ${heightClass} flex-col`}>
+              {/* The drag zone for swipe-down-to-dismiss: grabber plus header,
               never the scrolled body. `touch-none` keeps the browser from
               taking the vertical pan for itself. */}
-            <div {...swipe} className={isSheet ? 'touch-none bg-panel-2' : undefined}>
-              {isSheet && (
-                // Decorative: Escape, Back and the close button are the
-                // accessible ways out, so it is neither focusable nor read.
-                <div aria-hidden="true" className="flex justify-center pt-2">
-                  <span className="h-1 w-10 rounded-full bg-line-bright" />
-                </div>
-              )}
-              <header className="flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1">
-                <h2 id={titleId} className={cx(eyebrowClassName, 'min-w-0 flex-1 truncate')}>
-                  {title}
-                </h2>
-                {titleActions}
-                {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
+              <div {...swipe} className={isSheet ? 'touch-none bg-panel-2' : undefined}>
+                {isSheet && (
+                  // Decorative: Escape, Back and the close button are the
+                  // accessible ways out, so it is neither focusable nor read.
+                  <div aria-hidden="true" className="flex justify-center pt-2">
+                    <span className="h-1 w-10 rounded-full bg-line-bright" />
+                  </div>
+                )}
+                <header className="flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1">
+                  <h2 id={titleId} className={cx(eyebrowClassName, 'min-w-0 flex-1 truncate')}>
+                    {title}
+                  </h2>
+                  {titleActions}
+                  {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
                 this replaced: DESIGN.md's icon rules require an icon-only
                 control to be an `IconButton` and forbid a dingbat character
                 standing in for one, and the mobile "More" sheet's close
                 control was flagged at 23×28px — under the documented 36px
                 touch tier every other icon action in the header now gets. */}
-                <IconButton
-                  variant="plain"
-                  icon={<Icon.Close />}
-                  label={t('common.close')}
-                  onClick={onClose}
-                />
-              </header>
-            </div>
-            {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
+                  <IconButton
+                    variant="plain"
+                    icon={<Icon.Close />}
+                    label={t('common.close')}
+                    onClick={requestClose}
+                  />
+                </header>
+              </div>
+              {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
               index.css: a native dialog does not lock the page behind it, so
               on a phone a scroll that starts over the sheet would otherwise
               chain straight into the page underneath. */}
-            {/* No footer: scroll padding keeps a control focused near a
+              {/* No footer: scroll padding keeps a control focused near a
               sheet's bottom clear of sticky content (WCAG 2.4.11). */}
-            <RowTappableContext.Provider value={false}>
-              <div
-                ref={bodyRef}
-                tabIndex={-1}
-                className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${bodyBottomClass}`}
-              >
-                {children}
-              </div>
-              {hasFooter && (
+              <RowTappableContext.Provider value={false}>
                 <div
-                  className={`shrink-0 border-t border-line bg-panel px-3 pt-2 ${isSheet ? 'pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]' : 'pb-2'}`}
+                  ref={bodyRef}
+                  tabIndex={-1}
+                  className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${bodyBottomClass}`}
                 >
-                  {footer}
+                  {children}
                 </div>
-              )}
-            </RowTappableContext.Provider>
-          </div>
-        </PortalContainerProvider>
+                {hasFooter && (
+                  <div
+                    className={`shrink-0 border-t border-line bg-panel px-3 pt-2 ${isSheet ? 'pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]' : 'pb-2'}`}
+                  >
+                    {footer}
+                  </div>
+                )}
+              </RowTappableContext.Provider>
+            </div>
+          </PortalContainerProvider>
+        )}
+      </dialog>
+      {open && askingDiscard && (
+        <ConfirmDialog
+          open
+          title={t('common.discardInputTitle')}
+          body={t('common.discardInputBody')}
+          actionLabel={t('common.discardInputConfirm')}
+          cancelLabel={t('common.discardInputKeep')}
+          closeOnBack={false}
+          onConfirm={async () => {
+            onClose();
+          }}
+          onClose={() => setAskingDiscard(false)}
+        />
       )}
-    </dialog>
+    </>
   );
 }
