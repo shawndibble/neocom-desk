@@ -117,7 +117,7 @@ export function MinerLedger({
                     <LedgerRowMenu
                       entry={r}
                       actions={opened}
-                      name={`${shortDate(r.date)} ${r.kind}`}
+                      name={`${shortDate(r.date)} ${t(`miningTax.ledger.kindOne.${r.kind}`)}`}
                       rateDays={dayOf(r)
                         .filter((d) => canOverrideDay(d, view.input.now))
                         .map((d) => d.key)}

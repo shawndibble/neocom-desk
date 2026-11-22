@@ -8810,6 +8810,12 @@
         "writeOff": "Write-offs",
         "notice": "Late notices"
       },
+      "kindOne": {
+        "charge": "Charge",
+        "payment": "Payment",
+        "writeOff": "Write-off",
+        "notice": "Late notice"
+      },
       "filter": {
         "show": "Show",
         "from": "From",

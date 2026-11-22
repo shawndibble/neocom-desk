@@ -591,7 +591,7 @@ test('an officer charges a forgiven shortfall: the Miner owes it again, on the p
   await expect(officerLedger(page)).toBeVisible();
   await owedDaysHeading(page, 0);
   await expect(officerRow(page, /Shortfall forgiven/)).toContainText(isk(short));
-  await page.getByRole('button', { name: /^More actions for .* writeOff$/ }).click();
+  await page.getByRole('button', { name: /^More actions for .* Write-off$/ }).click();
   await page.getByRole('menuitem', { name: 'Charge this shortfall' }).click();
   const dialog = page.getByRole('dialog', { name: 'Charge this shortfall?' });
   await dialog.getByRole('textbox').fill('Short again this month');
