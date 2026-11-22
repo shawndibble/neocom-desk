@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, InfoTooltip } from '@/components/ui';
-import { LiveNote } from '@/components/ui/LiveStatus';
+import { LiveNote, LiveStatus } from '@/components/ui/LiveStatus';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatTimeOfDay } from '@/lib/timestamp';
@@ -150,12 +150,15 @@ export function NotificationsDelivery({
         the explanation on exactly the platform it exists for.
       */}
       {installRequired && (permission === 'default' || permission === 'unsupported') && (
-        <LiveNote className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim">
-          {t('settings.notifications.installRequiredNotice')}{' '}
-          <Link to={tabPath(SETTINGS_TABS, 'app')} className={inlineLinkClassName}>
-            {t('settings.notifications.installRequiredLink')}
-          </Link>
-        </LiveNote>
+        <>
+          <LiveStatus>{t('settings.notifications.installRequiredNotice')}</LiveStatus>
+          <p className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim">
+            {t('settings.notifications.installRequiredNotice')}{' '}
+            <Link to={tabPath(SETTINGS_TABS, 'app')} className={inlineLinkClassName}>
+              {t('settings.notifications.installRequiredLink')}
+            </Link>
+          </p>
+        </>
       )}
     </>
   );
