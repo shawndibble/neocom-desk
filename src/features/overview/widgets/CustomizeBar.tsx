@@ -53,7 +53,7 @@ export function CustomizeBar({
       data-customize-bar
       role="region"
       aria-label={t(boardKey(board, 'customize.barLabel'))}
-      className="flex flex-wrap items-center gap-2 rounded-xs border border-dashed border-line-bright bg-panel px-3 py-2"
+      className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-xs border border-dashed border-line-bright bg-panel px-3 py-2"
     >
       <b className="text-sm">{t('overview.customize.title')}</b>
       <span className="text-xs text-text-dim">

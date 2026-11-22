@@ -4,7 +4,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
 import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
-import { visibleSettingsGroups, type SettingsGroup } from '@/features/settings/sections';
+import {
+  settingsSectionLabelKey,
+  visibleSettingsGroups,
+  type SettingsGroup,
+} from '@/features/settings/sections';
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
@@ -129,7 +133,11 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-page space-y-4">
-      <PageHeader title={t('settings.title')} actions={<SettingsBackLink />} />
+      <PageHeader
+        title={t('settings.title')}
+        meta={<span className="text-sm text-text-dim">{t(settingsSectionLabelKey(section))}</span>}
+        actions={<SettingsBackLink />}
+      />
       <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
         <SettingsNav groups={groups} value={section} />
         <div className="min-w-0 space-y-4" data-settings-section={section}>

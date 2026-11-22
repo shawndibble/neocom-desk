@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { clearNeedsLogin } from '@/stores/authFailure';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -26,6 +27,7 @@ export function RemoveCharacterDialog({
   onFailed: (name: string) => void;
 }) {
   const { t } = useTranslation();
+  const phone = useIsPhone();
   const focusAfterCommit = useFocusAfterCommit();
   const cancelRef = useRef<HTMLButtonElement>(null);
   /** The removal is running: the confirm stays open and busy until it finishes. */
@@ -79,9 +81,14 @@ export function RemoveCharacterDialog({
       onClose={() => {
         if (!removing) onClose();
       }}
-      title={t('characters.remove')}
+      placement={phone ? 'sheet' : 'center'}
+      title={t('characters.removeTitle', { name: target?.name ?? '' })}
       initialFocusRef={cancelRef}
     >
+      {/* The warning leads: it is the one thing that can lose data. */}
+      {target && (
+        <UnsyncedChangesWarning characterIds={[target.id]} syncConfigured={isSyncConfigured()} />
+      )}
       <p className="text-xs text-text-dim">
         {target && t('characters.removeConfirm', { name: target.name })}
       </p>
@@ -91,9 +98,6 @@ export function RemoveCharacterDialog({
           checked={removeShared}
           onChange={setRemoveShared}
         />
-      )}
-      {target && (
-        <UnsyncedChangesWarning characterIds={[target.id]} syncConfigured={isSyncConfigured()} />
       )}
       <DialogFooter className="mt-3">
         <Button ref={cancelRef} size="sm" disabled={removing} onClick={onClose}>

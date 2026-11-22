@@ -16,9 +16,7 @@ import { AttentionDot, sectionRailClassName, SectionRailLink } from './sectionRa
 import { ActionResult } from './settingsFields';
 import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
 import { useStorageAtRisk } from './storageAtRisk';
-import type { SettingsGroup, SettingsSectionId } from './sections';
-
-const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
+import { settingsSectionLabelKey, type SettingsGroup, type SettingsSectionId } from './sections';
 
 interface SettingsNavProps {
   groups: readonly SettingsGroup[];
@@ -50,7 +48,7 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
             {group.sections.map((id) => (
               <li key={id}>
                 <SectionRailLink to={tabPath(SETTINGS_TABS, id)} active={id === value}>
-                  {t(LABEL_KEYS.get(id) ?? id)}
+                  {t(settingsSectionLabelKey(id))}
                   {id === 'app' && updateAvailable && (
                     <AttentionDot label={t('settings.update.available')} />
                   )}
@@ -113,7 +111,7 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                     >
                       <span className="min-w-0">
                         <span className="block text-text">
-                          {t(LABEL_KEYS.get(id) ?? id)}
+                          {t(settingsSectionLabelKey(id))}
                           {id === 'offline' && storageAtRisk && (
                             <AttentionDot label={t('settings.offline.atRisk')} />
                           )}
@@ -171,7 +169,7 @@ export function SettingsBackLink() {
     <Link
       to={SETTINGS_TABS.base}
       className={cx(
-        'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:hidden',
+        'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-sm text-text-dim hover:text-text active:text-text-dim md:hidden',
         interactiveClassName,
         focusRingClassName
       )}
