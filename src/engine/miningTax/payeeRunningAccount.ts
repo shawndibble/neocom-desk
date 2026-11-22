@@ -11,7 +11,7 @@
  * Pure: the caller loads the Assignments and the links.
  */
 import { MinerRunningAccount, type RunningAccountOwes } from '../corpTaxBook/minerRunningAccount';
-import { previewPayment, type PaymentOutcome } from '../corpTaxBook/paymentPreview';
+import type { PaymentOutcome } from '../corpTaxBook/paymentPreview';
 import type { TaxPayment } from '../corpTaxBook/payments';
 
 /**
@@ -69,6 +69,25 @@ export function heldPaymentKeys(links: readonly PayeePaymentLink[]): Set<string>
   return out;
 }
 
+/**
+ * A bare "Mark paid" an older client left (`legacyPaymentLinks`): a legacy link whose id is
+ * `mark:<assignmentId>`, with no payment behind it. It is the pilot's word that one Assignment's
+ * day was paid, never money: it settles only that day, after the real money.
+ */
+export function isBareMark(link: Pick<PayeePaymentLink, 'kind' | 'refId'>): boolean {
+  return link.kind === 'legacy' && typeof link.refId === 'string' && link.refId.startsWith('mark:');
+}
+
+/** What one bare mark settled on the account: its own day, for what real money left of it. */
+export interface PayeeMarkedDay {
+  /** The mark's link key (`paymentLinkKey`). */
+  id: string;
+  /** The day it settled; null when its Assignment no longer bills this Payee. */
+  date: string | null;
+  /** What it settled: 0 when real money had paid the day already. */
+  amount: number;
+}
+
 /** One billed Assignment, as its Payee's account bills it. */
 export interface PayeeCharge {
   id: string;
@@ -110,16 +129,47 @@ export class PayeeRunningAccount {
     readonly charges: readonly PayeeCharge[],
     readonly links: readonly PayeePaymentLink[],
     /** The Running account itself. */
-    readonly account: MinerRunningAccount
+    readonly account: MinerRunningAccount,
+    /** What each bare mark settled (`isBareMark`), after the real money. */
+    readonly marked: readonly PayeeMarkedDay[]
   ) {}
 
+  /**
+   * Real money first: every link but a bare mark pays the oldest unpaid day, as a book's does.
+   * Then each bare mark settles its own Assignment's day, for no more than it said and than real
+   * money left of that day. A mark never pays another day and never creates credit.
+   */
   static build(input: PayeeRunningAccountInput): PayeeRunningAccount {
     const links = input.links;
-    const account = MinerRunningAccount.build({
-      days: input.charges.map((c) => ({ date: c.date, tax: c.tax })),
-      payments: links.map((l) => taxPaymentOf(input.payeeId, l)),
-    });
-    return new PayeeRunningAccount(input.payeeId, input.charges, links, account);
+    const days = input.charges.map((c) => ({ date: c.date, tax: c.tax }));
+    const money = links.filter((l) => !isBareMark(l)).map((l) => taxPaymentOf(input.payeeId, l));
+    const marks = links
+      .filter(isBareMark)
+      .sort((a, b) => paymentLinkKey(a).localeCompare(paymentLinkKey(b)));
+    const byMoney = MinerRunningAccount.build({ days, payments: money });
+    const left = new Map<string, number>();
+    const marked: PayeeMarkedDay[] = [];
+    const settles: { date: string; tax: number }[] = [];
+    for (const mark of marks) {
+      const charge = input.charges.find((c) => `mark:${c.id}` === mark.refId);
+      const day = charge ? byMoney.day(charge.date) : undefined;
+      if (!charge || !day) {
+        marked.push({ id: paymentLinkKey(mark), date: null, amount: 0 });
+        continue;
+      }
+      const open = left.get(charge.date) ?? (day.held ? 0 : day.remaining);
+      const amount = Math.max(0, Math.min(mark.amount, charge.tax, open));
+      left.set(charge.date, open - amount);
+      marked.push({ id: paymentLinkKey(mark), date: charge.date, amount });
+      if (amount > 0) settles.push({ date: charge.date, tax: -amount });
+    }
+    // The settled part comes off its day as a credit line on that date, so the money still pays
+    // only what is left, and the account (and its previews) read the days as settled.
+    const account =
+      settles.length === 0
+        ? byMoney
+        : MinerRunningAccount.build({ days: [...days, ...settles], payments: money });
+    return new PayeeRunningAccount(input.payeeId, input.charges, links, account, marked);
   }
 
   get paidThrough(): string | null {
@@ -150,16 +200,37 @@ export class PayeeRunningAccount {
 
   /** What one more payment of `amount` on `paidOn` (a UTC day) would do, before it is recorded. */
   preview(amount: number, paidOn: string): PaymentOutcome {
-    return previewPayment(
-      this.account.input,
-      taxPaymentOf(this.payeeId, {
-        payeeId: this.payeeId,
-        kind: 'recorded',
-        refId: '\u0000preview',
-        amount,
-        paidOn,
-        source: 'manual',
-      })
-    );
+    // Built as recording builds it (real money first, then the marks), never from the settled
+    // input: a mark's credit line would make the preview skip a day the payment really pays.
+    const link: PayeePaymentLink = {
+      payeeId: this.payeeId,
+      kind: 'recorded',
+      refId: '\u0000preview',
+      amount,
+      paidOn,
+      source: 'manual',
+    };
+    const after = PayeeRunningAccount.build({
+      payeeId: this.payeeId,
+      charges: this.charges,
+      links: [...this.links, link],
+    }).account;
+    const mine = after.applications.payments.find((p) => p.paymentId === paymentLinkKey(link));
+    const lines = (mine?.days ?? []).map((d) => {
+      const day = after.day(d.date);
+      return {
+        date: d.date,
+        applied: d.amount,
+        remainingAfter: day?.settled ? 0 : (day?.remaining ?? 0),
+        settled: day?.settled ?? false,
+      };
+    });
+    return {
+      lines,
+      owedBefore: this.account.owes?.amount ?? 0,
+      owedAfter: after.owes?.amount ?? 0,
+      creditAfter: after.credit,
+      creditAdded: Math.max(0, after.credit - this.account.credit),
+    };
   }
 }

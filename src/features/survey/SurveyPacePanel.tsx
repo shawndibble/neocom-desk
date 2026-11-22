@@ -103,7 +103,7 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
                 position: 'insideTopLeft',
                 offset: 8,
                 fill: 'var(--color-text-dim)',
-                fontSize: '0.625rem',
+                fontSize: '0.6875rem',
               },
             })}
             <Area
@@ -128,7 +128,7 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
                 position="top"
                 offset={4}
                 fill="var(--color-text)"
-                fontSize="0.625rem"
+                fontSize="0.6875rem"
                 formatter={(value: unknown) =>
                   typeof value === 'number' ? formatCount(value) : ''
                 }

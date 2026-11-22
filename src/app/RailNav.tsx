@@ -92,11 +92,11 @@ function GoToButton() {
       <Icon.GoTo aria-hidden="true" size={Icon.ICON_SIZE.sm} />
       <span>{t('nav.goTo')}</span>
       {nudge && (
-        <span className="rounded-xs bg-accent px-1 text-[0.625rem] font-semibold tracking-widest text-accent-contrast uppercase">
+        <span className="rounded-xs bg-accent px-1 text-[0.6875rem] font-semibold tracking-widest text-accent-contrast uppercase">
           {t('nav.goToNew')}
         </span>
       )}
-      <kbd className="ml-auto rounded-xs border border-line px-1 font-sans text-[0.625rem]">
+      <kbd className="ml-auto rounded-xs border border-line px-1 font-sans text-[0.6875rem]">
         {chord}
       </kbd>
     </button>
@@ -108,7 +108,7 @@ function NavGroupLabel({ id, children }: { id: string; children: string }) {
   return (
     <p
       id={id}
-      className="mt-3 px-2 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase"
+      className="mt-3 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
     >
       {children}
     </p>

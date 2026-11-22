@@ -37,8 +37,11 @@ export function LedgerRowDetail({
   row,
   typeNames,
   onUnlinkPayment,
+  onLinkWalletPayment,
 }: {
   row: PayeeLedgerRow;
+  /** Given on a personal Payee's ledger: opens the wallet payments to link to this Payee. */
+  onLinkWalletPayment?: (() => void) | undefined;
   typeNames?: ReadonlyMap<number, string> | undefined;
   /** Given on a personal Payee's ledger: unlinks this payment (a legacy link too). */
   onUnlinkPayment?: ((paymentId: string) => void) | undefined;
@@ -74,6 +77,34 @@ export function LedgerRowDetail({
       )}
       {row.kind === 'payment' && (
         <>
+          {row.payment.via === 'marked' && (
+            <>
+              <p>{k('markedNoPayment')}</p>
+              <p className="text-text-dim">{k('marked')}</p>
+              {onLinkWalletPayment && row.paid > 0 && (
+                <button
+                  type="button"
+                  className={textActionClassName()}
+                  onClick={onLinkWalletPayment}
+                >
+                  {k('linkWalletPayment')}
+                </button>
+              )}
+            </>
+          )}
+          {row.payment.via === 'recorded' && !row.payment.href && <p>{k('recordedWaits')}</p>}
+          {(row.payment.via === 'journal' ||
+            row.payment.via === 'contract' ||
+            row.payment.via === 'legacy') &&
+            row.payment.to && (
+              <p>
+                {k('sentTo', {
+                  payee: row.payment.to,
+                  amount: isk(row.payment.amount ?? row.paid),
+                  date: row.payment.at.slice(0, 10),
+                })}
+              </p>
+            )}
           {row.payment.source && <p>{k(`source.${row.payment.source}`)}</p>}
           {row.payment.notTax ? (
             <p className="text-warning">{k('notTax', { amount: isk(row.payment.notTax) })}</p>
@@ -84,7 +115,7 @@ export function LedgerRowDetail({
           {row.payment.href && (
             <p>
               <Link to={row.payment.href} className={inlineLinkClassName}>
-                {k('viewPayment')}
+                {row.payment.via ? k('viewWalletEntry') : k('viewPayment')}
               </Link>
             </p>
           )}

@@ -37,7 +37,7 @@ export function Donut({ model, size }: { model: DonutChartModel; size: number })
         <div className="absolute inset-0 grid place-items-center text-center leading-tight font-semibold tabular-nums">
           <span>
             {model.centre}
-            <small className="block text-[0.625rem] font-normal text-text-dim">
+            <small className="block text-[0.6875rem] font-normal text-text-dim">
               {model.centreNote}
             </small>
           </span>

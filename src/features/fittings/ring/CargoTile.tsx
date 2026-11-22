@@ -49,7 +49,7 @@ export function CargoTile({
       onDragEnd={draggable ? endFittingDrag : undefined}
     >
       <TypeIcon typeId={typeId} size={64} className="h-full w-full" />
-      <span className="absolute right-0 bottom-0 bg-bg/85 px-0.5 text-[0.625rem] leading-tight font-semibold text-text tabular-nums">
+      <span className="absolute right-0 bottom-0 bg-bg/85 px-0.5 text-[0.6875rem] leading-tight font-semibold text-text tabular-nums">
         {shown}
       </span>
     </button>

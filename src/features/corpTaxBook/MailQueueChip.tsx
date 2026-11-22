@@ -51,7 +51,7 @@ export function MailQueueChip(props: ChipProps) {
           <span
             aria-hidden="true"
             className={cx(
-              'absolute -top-1 -right-1 min-w-4 rounded-xs px-1 text-center text-[0.625rem] leading-4 font-semibold tabular-nums',
+              'absolute -top-1 -right-1 min-w-4 rounded-xs px-1 text-center text-[0.6875rem] leading-4 font-semibold tabular-nums',
               tone
             )}
           >

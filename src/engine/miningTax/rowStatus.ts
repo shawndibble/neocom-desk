@@ -1,5 +1,7 @@
+// `tracked`: a day of a Payee a Corp Tax Book is the authority for, shown for the record; nothing
+// here settles it, so it counts in no total.
 export type MiningTaxRowStatus =
-  'unassigned' | 'outstanding' | 'paid' | 'needs-review' | 'dismissed';
+  'unassigned' | 'outstanding' | 'tracked' | 'paid' | 'needs-review' | 'dismissed';
 
 /**
  * A status's i18n key segment (`miningTax.status.<key>`), not the status
@@ -16,6 +18,7 @@ export const STATUS_LABEL_KEY: Record<MiningTaxRowStatus, string> = {
   unassigned: 'unassigned',
   'needs-review': 'needsReview',
   outstanding: 'outstanding',
+  tracked: 'tracked',
   paid: 'paid',
   dismissed: 'dismissed',
 };

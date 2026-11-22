@@ -79,3 +79,27 @@ function ofOneCharacter(
       : []
   );
 }
+
+/**
+ * The ids of every Payee record that is the corporation of one of the member's Corp Tax Books: the
+ * Payees a book is the authority for (decision 20261122, one card per corporation). One carrying
+ * the corporation's id (kind `corporation`, or none recorded) is it; one with no entity id at all
+ * is it when named exactly as it (EVE names are unique, so an unlinked label of that name is the
+ * same recipient, whether or not the link was ever made). One linked to anything else is never it.
+ */
+export function bookOwnedPayeeIds(
+  payees: readonly PayeeLike[],
+  corporations: readonly NamedCorporation[]
+): Set<string> {
+  const out = new Set<string>();
+  for (const p of payees)
+    for (const corporation of corporations) {
+      const owned =
+        p.entityId === undefined
+          ? corporationNamed(p.name, [corporation]) !== undefined
+          : p.entityId === corporation.corporationId &&
+            (p.entityKind === undefined || p.entityKind === 'corporation');
+      if (owned) out.add(p.id);
+    }
+  return out;
+}

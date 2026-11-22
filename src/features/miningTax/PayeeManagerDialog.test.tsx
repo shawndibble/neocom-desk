@@ -63,6 +63,8 @@ type ExtraProps = Pick<
   | 'bookCorporations'
   | 'accountOf'
   | 'onOpenLedger'
+  | 'isArchived'
+  | 'bookOwnerOf'
 >;
 
 function renderDialog(payees: PayeeRecord[] = [], extra: ExtraProps = {}) {
@@ -948,5 +950,59 @@ describe('PayeeManagerDialog — one Payee per recipient', () => {
     });
     expect((await db.payees.get('b'))?.defaultTaxPct).toBe(7);
     expect(screen.queryByText('Your characters bill this Payee differently.')).toBeNull();
+  });
+});
+
+describe('PayeeManagerDialog: archiving and the Corp Tax Book', () => {
+  const ion: PayeeRecord = {
+    id: 'ion',
+    characterId: CHAR,
+    name: 'Ion Strider',
+    defaultTaxPct: 10,
+    updatedAt: 1,
+  };
+
+  beforeEach(async () => {
+    await db.payees.clear();
+    await db.payees.put(ion);
+  });
+
+  it('archives a Payee that owes nothing, stamping it', async () => {
+    renderDialog([ion], { owedByPayee: new Map() });
+    await userEvent.click(screen.getByRole('button', { name: 'Archive Ion Strider' }));
+    await waitFor(async () =>
+      expect((await db.payees.get('ion'))?.archivedAt).toBeTypeOf('number')
+    );
+  });
+
+  it('offers no Archive while the Payee owes, and says why', () => {
+    renderDialog([ion], {
+      owedByPayee: new Map([['ion', { amount: 5, count: 1, moving: 1 }]]),
+    });
+    expect(screen.queryByRole('button', { name: /^Archive/ })).toBeNull();
+    expect(screen.getByText('Settle what you owe to archive this Payee.')).toBeInTheDocument();
+  });
+
+  it('lists an archived Payee under Archived, with Unarchive', async () => {
+    await db.payees.put({ ...ion, archivedAt: 5 });
+    renderDialog([{ ...ion, archivedAt: 5 }], { isArchived: () => true });
+    const section = screen.getByRole('region', { name: 'Archived' });
+    await userEvent.click(within(section).getByRole('button', { name: 'Unarchive Ion Strider' }));
+    await waitFor(async () => expect((await db.payees.get('ion'))?.archivedAt).toBeUndefined());
+  });
+
+  it('says a book tracks a Payee that is its corporation, and offers only the old history', async () => {
+    const onOpenLedger = vi.fn();
+    renderDialog([ion], {
+      owedByPayee: new Map(),
+      bookOwnerOf: () => 'Bureau of Unified Harvesting',
+      onOpenLedger,
+    });
+    expect(
+      screen.getByText("Tracked by Bureau of Unified Harvesting's Corp Tax Book now")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Archive/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Old history' }));
+    expect(onOpenLedger).toHaveBeenCalledWith('ion');
   });
 });

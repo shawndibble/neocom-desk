@@ -91,7 +91,7 @@ export function ContactNameCell({
     <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
       <span className="truncate">{name}</span>
       {contactKind(contact) === 'npc' && (
-        <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+        <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('contacts.npcBadge')}
         </span>
       )}

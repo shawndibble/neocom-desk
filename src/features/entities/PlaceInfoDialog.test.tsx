@@ -95,4 +95,12 @@ describe('PlaceInfoDialog', () => {
     renderPlace(30000142);
     expect(await screen.findByText("Can't find this place")).toBeInTheDocument();
   });
+
+  it('says a structure read failed, not that the Character has no access', async () => {
+    const { loadStructureName } = await import('@/features/character/structures');
+    vi.mocked(loadStructureName).mockRejectedValueOnce(new Error('network'));
+    renderPlace(STRUCTURE);
+    expect(await screen.findByText('Couldn’t load this place')).toBeInTheDocument();
+    expect(screen.queryByText("Can't read this structure")).toBeNull();
+  });
 });

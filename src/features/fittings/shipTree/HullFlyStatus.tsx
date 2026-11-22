@@ -27,7 +27,7 @@ export function HullFlyStatus({ status }: { status: ShipTreeHullStatus | undefin
             'inline-flex items-center gap-px',
             mastery >= 5 ? 'text-mastery-elite' : 'text-text-dim'
           )}
-          ringClassName="flex h-5 min-w-5 items-center justify-center rounded-full border border-current px-1 text-[0.625rem] font-bold"
+          ringClassName="flex h-5 min-w-5 items-center justify-center rounded-full border border-current px-1 text-[0.6875rem] font-bold"
         />
         <span>
           {mastery

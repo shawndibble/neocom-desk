@@ -221,7 +221,7 @@ export function Tabs({
                 {tab.count !== undefined && (
                   <span
                     className={cx(
-                      'ml-1.5 inline-grid h-4.5 min-w-4.5 place-items-center rounded-full border px-1 text-[0.625rem] tracking-normal tabular-nums',
+                      'ml-1.5 inline-grid h-4.5 min-w-4.5 place-items-center rounded-full border px-1 text-[0.6875rem] tracking-normal tabular-nums',
                       tab.countTone === 'danger' && 'border-danger text-danger',
                       tab.countTone === 'warning' && 'border-warning text-warning',
                       tab.countTone === undefined &&

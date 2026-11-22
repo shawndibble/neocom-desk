@@ -88,7 +88,7 @@ function Tally({ label, isk, ships }: { label: string; isk: number; ships: numbe
   return (
     <div className="min-w-0 flex-1 rounded-xs border border-line px-3 py-2">
       <p className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</p>
-      <p className="text-lg font-semibold tabular-nums">
+      <p className="text-base font-semibold tabular-nums">
         <IskAmount value={isk} />
       </p>
       <p className="text-xs text-text-dim">{t('wars.modal.ships', { count: ships })}</p>

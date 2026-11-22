@@ -112,7 +112,7 @@ export function PilotCard({
             <span className="sr-only">{t('travel.pilot.list.killsLabel')}: </span>
             {big}
           </b>
-          <span aria-hidden className="text-[0.625rem] tracking-widest text-text-dim uppercase">
+          <span aria-hidden className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
             {t('travel.pilot.list.killsLabel')}
           </span>
         </div>
@@ -172,7 +172,7 @@ export function PilotCard({
             const { count } = ready.bySpace[space];
             return (
               <div key={space} className="bg-panel-2 px-2 py-1">
-                <dt className="text-[0.625rem] tracking-widest text-text-dim uppercase">
+                <dt className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
                   {t(`common.spaceOption.${space}`)}
                 </dt>
                 <dd className="leading-tight tabular-nums">

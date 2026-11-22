@@ -21,6 +21,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Checkbox, NeedsConnection } from '@/components/ui';
+import { InlineError } from '@/components/ui/InlineError';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
 import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { useCustomizePermissionsSelection } from './customizeSelection';
@@ -65,6 +66,7 @@ export function CustomizePermissionsDialog({
   // must survive.
   const [pending, setPending] = useState<ReadonlySet<ScopeGroup> | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loginFailed, setLoginFailed] = useState(false);
   const selected = pending ?? new Set(stored.groups);
   const locked = !hydrated || submitting;
 
@@ -77,11 +79,13 @@ export function CustomizePermissionsDialog({
 
   function handleClose() {
     setPending(null);
+    setLoginFailed(false);
     onClose();
   }
 
   async function submit() {
     setSubmitting(true);
+    setLoginFailed(false);
     try {
       const groups = [...selected];
       // Best-effort: a device-local preference-save failure (quota, private
@@ -95,6 +99,7 @@ export function CustomizePermissionsDialog({
       setPending(null);
     } catch {
       setSubmitting(false);
+      setLoginFailed(true);
     }
   }
 
@@ -114,7 +119,7 @@ export function CustomizePermissionsDialog({
           onChange={() => toggle(group)}
           tag={
             !meta.defaultOn && (
-              <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+              <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.6875rem] text-text-dim">
                 {t('permissions.customize.optInTag')}
               </span>
             )
@@ -132,6 +137,7 @@ export function CustomizePermissionsDialog({
       placement="wide"
       footer={
         <div className="flex flex-wrap gap-2">
+          {loginFailed && <InlineError>{t('permissions.customize.loginFailed')}</InlineError>}
           <NeedsConnection>
             <Button variant="primary" disabled={locked} onClick={() => void submit()}>
               {t('permissions.customize.submit')}
@@ -155,7 +161,7 @@ export function CustomizePermissionsDialog({
                 checked
                 disabled
                 tag={
-                  <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+                  <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.6875rem] text-text-dim">
                     {t('permissions.customize.requiredTag')}
                   </span>
                 }

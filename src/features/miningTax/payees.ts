@@ -195,6 +195,35 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
 }
 
 /**
+ * Archives (`archivedAt` stamped) or unarchives (the key dropped: Firestore rejects `undefined`)
+ * every record of a merged Payee, syncing each Character once. Whether it then reads archived is
+ * `isArchivedPayee`'s: nothing owed, nothing newer.
+ */
+export async function setPayeesArchived(
+  records: readonly PayeeRecord[],
+  archived: boolean,
+  now: number = Date.now()
+): Promise<void> {
+  const written: PayeeRecord[] = [];
+  // The stored record is read in the write's own transaction: only the archive stamp changes, so
+  // a newer edit made while the dialog was open is never replaced by its snapshot.
+  await db.transaction('rw', db.payees, async () => {
+    for (const record of records) {
+      const stored = await db.payees.get(record.id);
+      if (!stored) continue;
+      const next: PayeeRecord = { ...stored, updatedAt: now };
+      if (archived) next.archivedAt = now;
+      else delete next.archivedAt;
+      written.push(next);
+    }
+    await db.payees.bulkPut(written);
+  });
+  for (const characterId of new Set(written.map((p) => p.characterId))) {
+    scheduleSync(characterId, { collections: ['payees'] });
+  }
+}
+
+/**
  * Makes every target bill like `source` (#6308: the pilot picks which of a merged Payee's records
  * wins): its name, tax %, Trade Hub and EVE link. Default Systems are left alone, they route one
  * Character's ore. Returns nothing; each target's Character is synced once.

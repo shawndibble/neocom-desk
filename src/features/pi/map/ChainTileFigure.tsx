@@ -14,7 +14,7 @@ export function ChainEstimateMark({ tight = false }: { tight?: boolean }) {
   return (
     <span
       className={cx(
-        'rounded-xs border border-warning/60 px-1 text-[0.625rem] font-semibold text-warning',
+        'rounded-xs border border-warning/60 px-1 text-[0.6875rem] font-semibold text-warning',
         tight ? 'leading-[0.6875rem]' : 'leading-[0.875rem]'
       )}
     >

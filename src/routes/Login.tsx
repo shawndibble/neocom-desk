@@ -6,6 +6,7 @@ import { BootScreen } from '@/app/BootScreen';
 import { releaseLandingShell } from '@/app/landingShell';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
+import { InlineError } from '@/components/ui/InlineError';
 import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
 import { LandingFaq } from '@/features/landing/LandingFaq';
@@ -28,6 +29,7 @@ import { setLoginReturnTo, usableLoginReturnTo } from '@/auth/loginReturnTo';
 export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
+  const [loginFailed, setLoginFailed] = useState(false);
   // Read once: a TWA launch referrer only exists on the first load.
   const [inApp] = useState(isPlayStoreApp);
 
@@ -63,9 +65,13 @@ export function Login() {
 
   function onLogin() {
     setPending(true);
+    setLoginFailed(false);
     // The add-a-character branch: nobody is signed in yet, so there is no
     // grant to union with and the base set is the whole request (#295).
-    void beginAddCharacterLogin().catch(() => setPending(false));
+    void beginAddCharacterLogin().catch(() => {
+      setPending(false);
+      setLoginFailed(true);
+    });
   }
 
   if (characterCount === undefined) return <BootScreen gate="login" />;
@@ -77,6 +83,7 @@ export function Login() {
         <LogoMark className="size-20" />
         <h1 className="text-2xl font-bold tracking-wide">{t('app.name')}</h1>
         <EveSsoButton size="large" pending={pending} onClick={onLogin} label={t('login.button')} />
+        {loginFailed && <InlineError>{t('login.failed')}</InlineError>}
         <CustomizeLink onClick={() => setCustomizing(true)} />
         <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
       </main>
@@ -117,6 +124,7 @@ export function Login() {
                   onClick={onLogin}
                   label={t('login.button')}
                 />
+                {loginFailed && <InlineError>{t('login.failed')}</InlineError>}
                 <CustomizeLink onClick={() => setCustomizing(true)} />
               </div>
             </div>

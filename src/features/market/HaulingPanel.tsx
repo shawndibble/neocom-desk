@@ -802,7 +802,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             ref={listRef}
             className="flex flex-col gap-1 border-b border-line bg-panel-2 px-3 pt-1 pb-3"
           >
-            <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('market.hauling.multibuyList')}
             </span>
             <pre

@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, SearchInput, textActionClassName } from '@/components/ui';
+import { InlineError } from '@/components/ui/InlineError';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
@@ -33,7 +34,7 @@ export function SurveyOwnerChange({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<{ key: string; list: RecipientSearchHit[] } | null>(null);
+  const [hits, setHits] = useState<{ key: string; list: RecipientSearchHit[] | null } | null>(null);
   const [chosen, setChosen] = useState<RecipientSearchHit | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -46,7 +47,7 @@ export function SurveyOwnerChange({
     const controller = new AbortController();
     const timer = setTimeout(() => {
       void searchMailRecipients(characterId, searchKey, controller.signal)
-        .catch(() => [])
+        .catch(() => null)
         .then((list) => {
           if (!controller.signal.aborted) setHits({ key: searchKey, list });
         });
@@ -79,7 +80,9 @@ export function SurveyOwnerChange({
     }
   }
 
-  const list = hits?.key === searchKey ? hits.list : [];
+  const answered = hits?.key === searchKey ? hits : null;
+  const searchFailed = answered !== null && answered.list === null;
+  const list = answered?.list ?? [];
 
   return (
     <>
@@ -97,7 +100,8 @@ export function SurveyOwnerChange({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            {searchKey !== '' && hits?.key === searchKey && list.length === 0 && (
+            {searchFailed && <InlineError>{t('survey.changeOwner.searchFailed')}</InlineError>}
+            {answered !== null && !searchFailed && list.length === 0 && (
               <p className="text-sm text-text-dim">{t('survey.changeOwner.noMatches')}</p>
             )}
             <ul className="flex max-h-64 flex-col overflow-auto">

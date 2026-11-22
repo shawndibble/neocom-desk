@@ -4,7 +4,10 @@ import type { CorpBookView } from './corpBook/corpBookView';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { PayeeRecord } from '@/db';
 
-const hoisted = vi.hoisted(() => ({ view: null as CorpBookView | null }));
+const hoisted = vi.hoisted(() => ({
+  view: null as CorpBookView | null,
+  shownBooks: [] as { corporationId: number; memberCharacterIds: number[] }[],
+}));
 
 vi.mock('./useMadePayments', () => ({
   useMadePayments: () => ({ madePayments: [], paymentSources: [] }),
@@ -25,13 +28,18 @@ vi.mock('@/features/miningTax/corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
     view: hoisted.view,
     booksRead: true,
+    booksKnown: true,
     reload: vi.fn(),
-    shownBooks: [],
-    corpNameOf: (id: number) => `Corp ${id}`,
+    shownBooks: hoisted.shownBooks,
+    corpNameOf: (id: number) => (id === 5 ? 'Ashfall' : `Corp ${id}`),
     hiddenLeft: [],
   }),
 }));
-vi.mock('./paymentLinkStore', () => ({ saveBilledElsewhere: vi.fn(async () => true) }));
+const saveBookOwned = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('./paymentLinkStore', () => ({
+  saveBilledElsewhere: vi.fn(async () => true),
+  saveBookOwned,
+}));
 
 import { useTaxCorpBooks } from './useTaxCorpBooks';
 
@@ -52,6 +60,7 @@ const assignment = {
 
 describe('useTaxCorpBooks billed elsewhere', () => {
   beforeEach(() => {
+    hoisted.shownBooks = [];
     // A book that took the day whole; the stored copy has not seen it yet.
     hoisted.view = {
       overlay: {
@@ -74,5 +83,42 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     } as unknown as TaxSnapshot;
     const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
     expect(result.current.accounts.of('p1')?.owes?.amount ?? 0).toBe(0);
+  });
+
+  it('stores the Payees a book owns, an unlinked one named as its corporation included', async () => {
+    hoisted.view = {
+      ...hoisted.view,
+      books: [{ left: false, corpName: 'Ashfall', loaded: { corporationId: 5 } }],
+    } as unknown as CorpBookView;
+    // Ownership reads the loaded books, not the priced view.
+    hoisted.shownBooks = [{ corporationId: 5, memberCharacterIds: [1] }];
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const onOwnershipStored = vi.fn();
+    const { result } = renderHook(() => useTaxCorpBooks(data, [], null, onOwnershipStored));
+    expect(result.current.accounts.isBookOwned('p1')).toBe(true);
+    expect(saveBookOwned).toHaveBeenCalledWith(new Set(['p1']));
+    // No Payee has Default Systems, so nothing was held back: no second read.
+    // Wait on the store itself settling (and its follow-up), not on a duration.
+    await saveBookOwned.mock.results.at(-1)?.value;
+    await Promise.resolve();
+    expect(onOwnershipStored).not.toHaveBeenCalled();
+
+    // With Default Systems held back until ownership was stored, the snapshot is read again.
+    const withDefaults = {
+      ...data,
+      payeesByCharacter: new Map([
+        [1, [{ ...payee, defaultSystems: [{ systemId: 30000142, from: '2026-01-01' }] }]],
+      ]),
+    } as unknown as TaxSnapshot;
+    const again = vi.fn();
+    renderHook(() => useTaxCorpBooks(withDefaults, [], null, again));
+    await vi.waitFor(() => expect(again).toHaveBeenCalledTimes(1));
   });
 });

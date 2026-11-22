@@ -132,7 +132,7 @@ export function AssumptionControls({
         >
           {ATTRIBUTE_NAMES.map((name) => (
             <label key={name} className="flex flex-col items-center gap-0.5">
-              <span className="text-[0.625rem] tracking-widest text-text-dim uppercase">
+              <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">
                 {attributeShort(name)}
               </span>
               <TextInput

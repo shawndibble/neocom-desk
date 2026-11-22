@@ -68,7 +68,7 @@ export function VettingInvitesDialog({
   const [error, setError] = useState<string | null>(null);
   const [made, setMade] = useState<VettingInvite | null>(null);
   const [revoking, setRevoking] = useState<VettingInvite | null>(null);
-  const { copied, flash } = useCopyFeedback<string>(2000);
+  const { copied, flash } = useCopyFeedback<{ code: string; failed: boolean }>(2000);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   // Each row's Copy link, so focus has somewhere to land once a revoked row is gone (§7).
   const copyButtons = useRef(new Map<string, HTMLButtonElement>());
@@ -103,9 +103,10 @@ export function VettingInvitesDialog({
   const copy = async (invite: VettingInvite) => {
     try {
       await writeToClipboard(applyLink(corporationId, invite.code));
-      flash(invite.code);
+      flash({ code: invite.code, failed: false });
     } catch {
-      // The clipboard was refused; nothing was copied and nothing claims it was.
+      // The clipboard was refused: nothing was copied, and the button says so.
+      flash({ code: invite.code, failed: true });
     }
   };
   const copyButton = (invite: VettingInvite, inRow = false) => (
@@ -122,7 +123,13 @@ export function VettingInvitesDialog({
       aria-label={t('vetting.invites.copyNamed', { label: invite.label })}
       onClick={() => void copy(invite)}
     >
-      {t(copied === invite.code ? 'vetting.copied' : 'vetting.invites.copy')}
+      {t(
+        copied?.code !== invite.code
+          ? 'vetting.invites.copy'
+          : copied.failed
+            ? 'vetting.copyFailed'
+            : 'vetting.copied'
+      )}
     </Button>
   );
 
@@ -285,7 +292,9 @@ export function VettingInvitesDialog({
           {form}
           {madeLink}
         </div>
-        <LiveStatus>{copied !== null ? t('vetting.copied') : ''}</LiveStatus>
+        <LiveStatus>
+          {copied === null ? '' : t(copied.failed ? 'vetting.copyFailed' : 'vetting.copied')}
+        </LiveStatus>
       </Modal>
       <ConfirmDialog
         open={revoking !== null}

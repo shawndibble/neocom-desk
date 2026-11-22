@@ -174,7 +174,7 @@ export function useItemsColumns({
               ? plexPrice !== null && (
                   // The figure above already counts the PLEX at market; say so,
                   // since the contract itself asks for PLEX, not that much ISK.
-                  <span className="block text-[0.625rem] text-text-dim">
+                  <span className="block text-[0.6875rem] text-text-dim">
                     {t('contractSearch.includesPlex', {
                       plex: formatCount(row.requestedPlex),
                     })}
@@ -184,7 +184,7 @@ export function useItemsColumns({
                   // A barter's 0 ISK is real but not a price (issue #1080) — the
                   // row's own tap already opens the detail modal, which shows
                   // both sides of the exchange correctly.
-                  <span className="block text-[0.625rem] text-text-dim">
+                  <span className="block text-[0.6875rem] text-text-dim">
                     {t('contractSearch.unpricedOfferMarker')}
                   </span>
                 )}

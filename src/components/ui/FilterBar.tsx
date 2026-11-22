@@ -351,7 +351,7 @@ function FilterTrigger({
       {activeCount > 0 && (
         <span
           aria-hidden
-          className="pointer-events-none absolute -top-1 -right-1 min-w-4 rounded-full border border-accent-dim bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-accent-contrast tabular-nums"
+          className="pointer-events-none absolute -top-1 -right-1 min-w-4 rounded-full border border-accent-dim bg-accent px-1 text-center text-[0.6875rem] leading-4 font-semibold text-accent-contrast tabular-nums"
         >
           {activeCount}
         </span>

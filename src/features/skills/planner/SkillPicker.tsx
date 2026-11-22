@@ -308,7 +308,7 @@ export function SkillPicker({
                         >
                           {t('plans.level', { level: roman })}
                           {flagKey && (
-                            <span className="ml-1 text-[0.625rem] uppercase">{t(flagKey)}</span>
+                            <span className="ml-1 text-[0.6875rem] uppercase">{t(flagKey)}</span>
                           )}
                         </Button>
                       );

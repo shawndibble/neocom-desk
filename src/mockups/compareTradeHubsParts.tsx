@@ -79,7 +79,7 @@ const OWN_HUB_NAME = COMPARED_HUBS.find((hub) => hub.id === OWN_HUB)!.systemName
 /** A best figure carries the word, not just the colour (DESIGN.md "New since last time" rule). */
 function BestTag({ children }: { children: string }) {
   return (
-    <span className="ml-1.5 text-[0.625rem] font-semibold tracking-wide text-success uppercase">
+    <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
       {children}
     </span>
   );

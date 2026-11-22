@@ -6,7 +6,13 @@ import { useBook } from './useBook';
 const NONE: AuditEntry[] = [];
 
 /** The newest audit-log entries (D7), re-read whenever the book reloads. */
-export function useBookAudit(count = 100): { entries: AuditEntry[]; loading: boolean } {
+export function useBookAudit(count = 100): {
+  entries: AuditEntry[];
+  loading: boolean;
+  /** The read threw: `entries` is unknown, not empty. */
+  failed: boolean;
+  retry: () => void;
+} {
   const { characterId, corporationId, data } = useBook();
   const load = useCallback(
     () => readAudit(characterId, corporationId, count),
@@ -18,5 +24,7 @@ export function useBookAudit(count = 100): { entries: AuditEntry[]; loading: boo
   return {
     entries: read.status === 'ready' ? read.data : NONE,
     loading: read.status === 'idle' || read.status === 'loading',
+    failed: read.status === 'failed',
+    retry: read.retry,
   };
 }

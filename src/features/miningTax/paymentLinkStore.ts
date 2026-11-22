@@ -160,15 +160,51 @@ export async function saveBilledElsewhere(next: ReadonlyMap<string, number>): Pr
   });
 }
 
+/** The Payee records a Corp Tax Book is the authority for, as the device last saw the books. */
+const BOOK_OWNED_KEY = 'miningTaxBookOwnedPayees';
+
+/** The ids of the Payee records that are a Corp Tax Book's corporation (`bookOwnedPayeeIds`). */
+export async function loadBookOwned(): Promise<Set<string>> {
+  const value = (await db.settings.get(BOOK_OWNED_KEY))?.value;
+  return new Set(
+    Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+  );
+}
+
+/** Whether the device has ever stored which Payees the books own (an empty set counts). */
+export async function isBookOwnedKnown(): Promise<boolean> {
+  return (await db.settings.get(BOOK_OWNED_KEY)) !== undefined;
+}
+
+/**
+ * Stores which Payees the books own, as the Tax tab reads them now, so every account build (the
+ * load path's safeguards, the journal's, Settle up's) applies the same rule the tab does. Returns
+ * whether it changed.
+ */
+export async function saveBookOwned(next: ReadonlySet<string>): Promise<boolean> {
+  return db.transaction('rw', db.settings, async () => {
+    const known = (await db.settings.get(BOOK_OWNED_KEY)) !== undefined;
+    const held = await loadBookOwned();
+    if (known && held.size === next.size && [...next].every((id) => held.has(id))) return false;
+    await db.settings.put({ key: BOOK_OWNED_KEY, value: [...next].sort() });
+    return true;
+  });
+}
+
 /** What every account build reads besides the Assignments and Payees. */
 export interface RunningAccountInputs {
   links: PayeePaymentLink[];
   billedElsewhere: Map<string, number>;
+  bookOwned: Set<string>;
 }
 
 export async function loadRunningAccountInputs(): Promise<RunningAccountInputs> {
-  const [links, billedElsewhere] = await Promise.all([loadPaymentLinks(), loadBilledElsewhere()]);
-  return { links: links.map(linkOf), billedElsewhere };
+  const [links, billedElsewhere, bookOwned] = await Promise.all([
+    loadPaymentLinks(),
+    loadBilledElsewhere(),
+    loadBookOwned(),
+  ]);
+  return { links: links.map(linkOf), billedElsewhere, bookOwned };
 }
 
 /**

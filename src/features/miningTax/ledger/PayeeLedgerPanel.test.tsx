@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import '@/i18n';
 import { payeeLedger, type PayeeLedgerSource } from '@/engine/miningTax/payeeLedger';
 import { formatIsk } from '@/lib/isk';
 import { PayeeLedgerPanel } from './PayeeLedgerPanel';
+import { ledgerCsvColumns } from './ledgerCsv';
+import i18n from '@/i18n';
 import {
   CORP_BOOK_LEDGER,
   CREDIT_LEDGER,
@@ -215,5 +216,14 @@ describe('PayeeLedgerPanel', () => {
     unmount();
     renderPanel(null);
     expect(screen.getByRole('status', { name: 'Loading the ledger' })).toBeInTheDocument();
+  });
+});
+
+describe('ledgerCsvColumns', () => {
+  const t = i18n.t.bind(i18n);
+  it('has a balance column on a normal ledger, none on an old history', () => {
+    const balance = t('miningTax.ledger.column.balance');
+    expect(ledgerCsvColumns(t).map((c) => c.header)).toContain(balance);
+    expect(ledgerCsvColumns(t, true).map((c) => c.header)).not.toContain(balance);
   });
 });
