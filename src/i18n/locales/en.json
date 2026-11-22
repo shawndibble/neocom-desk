@@ -5133,7 +5133,6 @@
     "densityComfortable": "Comfortable",
     "densitySpacious": "Spacious",
     "remove": "Remove",
-    "removeButtonLabel": "Remove {{name}}",
     "removeMenuLabel": "Remove {{name}}",
     "removeTitle": "Remove {{name}}?",
     "removeConfirm": "This deletes their skill plans, build plans, quickbar and saved game data from this device. If sync is on, what has already synced stays on our servers, so adding {{name}} back restores it. It is deleted automatically once no device has synced {{name}} for 90 days. Anything that has not synced yet is lost. This can't be undone here.",
@@ -6936,7 +6935,7 @@
           "note": "From your last Below market view"
         }
       },
-      "subtitle": "{{total}} widgets · {{onBoard}} on your Overview",
+      "subtitle": "{{onBoard}} on your Overview",
       "onBoard": "On your Overview ×{{count}}"
     },
     "roles": {
@@ -16251,7 +16250,7 @@
         "emptyBody": "Add widgets to track what your corporation needs."
       },
       "gallery": {
-        "subtitle": "{{total}} widgets · {{onBoard}} on your Corp Board",
+        "subtitle": "{{onBoard}} on your Corp Board",
         "onBoard": "On your Corp Board ×{{count}}"
       },
       "menu": {

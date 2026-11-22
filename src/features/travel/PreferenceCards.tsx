@@ -22,6 +22,11 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { formatNumber } from '@/lib/numberLocale';
+import { SegmentedControl } from '@/components/ui';
+import { useIsPhone } from '@/lib/useIsPhone';
+
+/** The game's own order on a phone: Shorter is the usual choice, so it leads. */
+const PHONE_ORDER: readonly RoutePreferenceKind[] = ['shortest', 'prefer-highsec', 'avoid-highsec'];
 
 function Strip({ securities }: { securities: PreferenceCard['securities'] }) {
   return (
@@ -101,6 +106,7 @@ export function PreferenceCards({
   onSelect: (preference: RoutePreferenceKind) => void;
 }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   // One tab stop: the chosen card, or the first when none shows as chosen.
   const stop = Math.max(
@@ -123,6 +129,29 @@ export function PreferenceCards({
     event.preventDefault();
     buttons.current[next]?.focus();
     onSelect(cards[next]!.preference);
+  }
+  if (isPhone) {
+    // One segmented control, then the facts of the chosen route: a half-clipped carousel hid two of three cards.
+    const chosen = cards.find((card) => card.active) ?? cards[0];
+    return (
+      <div className="flex flex-col gap-2">
+        <SegmentedControl
+          fill
+          label={t('travel.options.label')}
+          value={chosen?.preference ?? PHONE_ORDER[0]!}
+          options={PHONE_ORDER.map((preference) => ({
+            value: preference,
+            label: t(ROUTE_PREFERENCE_SHORT_LABEL_KEYS[preference]),
+          }))}
+          onChange={onSelect}
+        />
+        {chosen && (
+          <div className="flex flex-col gap-3 rounded-xs border border-line bg-panel p-3">
+            <CardBody card={chosen} />
+          </div>
+        )}
+      </div>
+    );
   }
   return (
     <div
