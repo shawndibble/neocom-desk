@@ -53,8 +53,10 @@ export function PopoverContent({
           sideOffset={sideOffset}
           className={cx(
             menuContentClassName,
-            'max-h-[min(32rem,var(--radix-popover-content-available-height))] overscroll-contain',
-            'motion-pop-exit',
+            // Tailwind cannot resolve two max-height utilities, so a caller's own cap replaces the default.
+            !className?.includes('max-h-') &&
+              'max-h-[min(32rem,var(--radix-popover-content-available-height))]',
+            'overflow-y-auto overscroll-contain motion-pop-exit',
             className
           )}
           {...props}
