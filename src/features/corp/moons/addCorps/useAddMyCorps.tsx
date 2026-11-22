@@ -174,9 +174,12 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   };
 
   const pending = run !== null && !isDone(run);
-  // Own corps the player is CEO of: the ones Grant again can sign in for.
-  const grantable = useMemo(() => new Set(own.corps.map((c) => c.corporationId)), [own.corps]);
-  const items = canEdit ? needsYou(run, rows, names.corporation, grantable) : [];
+  // Own corps the player is CEO of, with that CEO's name: the ones Grant again can sign in for.
+  const ceoByCorp = useMemo(
+    () => new Map(own.corps.map((c) => [c.corporationId, c.ceoName])),
+    [own.corps]
+  );
+  const items = canEdit ? needsYou(run, rows, names.corporation, ceoByCorp) : [];
   // Grant again is one guided pass over every own corp without names or ore, the clicked one first.
   const grantAgain = (id: number) => {
     const wanted = items.filter(offersGrantAgain).map((i) => i.corporationId);
