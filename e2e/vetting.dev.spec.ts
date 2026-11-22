@@ -109,3 +109,78 @@ test('the apply link shows its start page with nobody logged in', async ({ page 
   // No account: the app's rail is not drawn around a public page.
   await expect(page.getByRole('navigation')).toHaveCount(0);
 });
+
+/** The nearest ancestor of `el` that scrolls on x, or null: its fit metrics. */
+const scrollerFit = (el: import('@playwright/test').Locator) =>
+  el.evaluate((node) => {
+    let n = node.parentElement;
+    while (n && !/auto|scroll/.test(getComputedStyle(n).overflowX)) n = n.parentElement;
+    if (!n) return null;
+    return {
+      scrollWidth: n.scrollWidth,
+      clientWidth: n.clientWidth,
+      right: n.getBoundingClientRect().right,
+    };
+  });
+
+async function signInAsDirector(page: Page): Promise<void> {
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const json = (body: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Director'] });
+    if (path === `/corporations/${CORPORATION_ID}/`)
+      return json({ name: 'Sample Corp', ceo_id: 1, member_count: 40, tax_rate: 0.1 });
+    if (path.startsWith(`/corporations/${CORPORATION_ID}/`)) return json([]);
+    await route.fallback();
+  });
+  await signInAndGoto(page, './settings', [...SCOPES, ...scopesForGroup('corp')]);
+  await expect(page.locator('main')).toBeVisible();
+}
+
+for (const width of [1024, 1280]) {
+  test(`the vetting queue and a report's Declared characters fit their panels at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await signInAsDirector(page);
+    await installAndOpen(page, '/corp/vetting/open', CHARACTER_ID);
+
+    const table = page.getByRole('table', { name: 'Open vetting reviews' });
+    const row = table.getByRole('row', { name: /Tamsin Vell/ });
+    await expect(row).toContainText('3 flags');
+    const charactersHeader = table.getByRole('columnheader', { name: 'Characters' });
+    if (width === 1024) {
+      await expect(charactersHeader).toBeHidden();
+      const panel = (await table.evaluate((el) => {
+        const box = el.closest('section, [data-panel], div')!.getBoundingClientRect();
+        return box.right;
+      })) as number;
+      const tableBox = (await table.boundingBox())!;
+      expect(tableBox.x + tableBox.width, 'table inside its panel').toBeLessThanOrEqual(panel + 1);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+        ),
+        'page scrolls sideways'
+      ).toBe(true);
+      const forCell = row.getByText(/Promotion|Application|Accountant/).first();
+      expect((await row.boundingBox())!.height, 'queue row at most two lines').toBeLessThan(80);
+      await expect(forCell).toBeVisible();
+    } else {
+      await expect(charactersHeader).toBeVisible();
+    }
+
+    await row.click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Tamsin Vell' })).toBeVisible();
+    const declared = page.getByRole('table', { name: 'Declared characters' });
+    await expect(declared).toBeVisible();
+    const fit = await scrollerFit(declared);
+    expect(fit, 'Declared characters has its own scroller').not.toBeNull();
+    const box = (await declared.boundingBox())!;
+    if (box.x + box.width > fit!.right + 1) {
+      // Wider than the panel: it scrolls inside, never past the border.
+      expect(fit!.scrollWidth).toBeGreaterThan(fit!.clientWidth);
+    }
+  });
+}
