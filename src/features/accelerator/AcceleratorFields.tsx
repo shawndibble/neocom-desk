@@ -132,6 +132,9 @@ export function AcceleratorFields({
     editTimeOnOpen ? { expiresAt, bonus } : null
   );
   // Focus moves to the field just opened from its text, and back on Enter or Escape.
+  // What is typed in the bonus box, so it can be emptied on the way to a new number
+  // instead of snapping to the minimum; null shows the committed bonus.
+  const [bonusDraft, setBonusDraft] = useState<string | null>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const timeFieldRef = useRef<HTMLInputElement | null>(null);
   const bonusFieldRef = useRef<HTMLInputElement | null>(null);
@@ -261,12 +264,22 @@ export function AcceleratorFields({
           ref={bonusFieldRef}
           size="md"
           type="number"
+          inputMode="numeric"
           min={1}
           max={MAX_BOOSTER_BONUS}
-          value={bonus}
-          onChange={(e) => onBonusChange(clampBoosterBonus(Number(e.target.value)))}
+          value={bonusDraft ?? bonus}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setBonusDraft(raw);
+            if (raw.trim() !== '' && Number.isFinite(Number(raw))) {
+              onBonusChange(clampBoosterBonus(Number(raw)));
+            }
+          }}
           onFocus={() => startEditing('bonus')}
-          onBlur={closeOnLeave}
+          onBlur={(event) => {
+            setBonusDraft(null);
+            closeOnLeave(event);
+          }}
           onKeyDown={onFieldKeyDown}
           {...invalidProps}
           className="field-no-spinner w-16 text-center"

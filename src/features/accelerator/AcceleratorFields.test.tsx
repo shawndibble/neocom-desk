@@ -80,3 +80,19 @@ describe('AcceleratorFields once a time is set', () => {
     expect(bonus).toHaveFocus();
   });
 });
+
+describe('AcceleratorFields bonus box', () => {
+  it('can be emptied without snapping to the minimum, and shows the bonus again on leaving', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={null} />);
+    const field = screen.getByLabelText('Bonus');
+    expect(field).toHaveAttribute('inputmode', 'numeric');
+    await user.clear(field);
+    expect(field).toHaveValue(null);
+    await user.type(field, '8');
+    expect(field).toHaveValue(8);
+    await user.clear(field);
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(screen.getByLabelText('Bonus')).toHaveValue(8);
+  });
+});

@@ -3,10 +3,17 @@
  * taking it out. Mounted per item opened, so the field starts at that
  * item's own count.
  */
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, FieldError, Modal, TextInput } from '@/components/ui';
 import { DialogFooter } from '@/components/ui/DialogFooter';
+import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
+
+/** A whole count, 0 or more; blank or anything else is null, never 0. */
+function parseCount(text: string): number | null {
+  const value = parseLocalizedNumber(text);
+  return value !== null && Number.isInteger(value) && value >= 0 ? value : null;
+}
 
 interface CargoQuantityDialogProps {
   name: string;
@@ -24,6 +31,8 @@ export function CargoQuantityDialog({
 }: CargoQuantityDialogProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(String(quantity));
+  const [invalid, setInvalid] = useState(false);
+  const errorId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   return (
     <Modal
@@ -36,8 +45,11 @@ export function CargoQuantityDialog({
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          const next = Math.floor(Number(draft));
-          if (!Number.isFinite(next) || next < 0) return;
+          const next = parseCount(draft);
+          if (next === null) {
+            setInvalid(true);
+            return;
+          }
           onConfirm(next);
         }}
       >
@@ -47,14 +59,19 @@ export function CargoQuantityDialog({
         <TextInput
           ref={fieldRef}
           id="fitting-cargo-quantity"
-          type="number"
-          min={0}
+          inputMode="numeric"
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? errorId : undefined}
           className="w-full"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setInvalid(false);
+          }}
           // Selected on focus, so typing replaces the count rather than appending to it.
           onFocus={(e) => e.currentTarget.select()}
         />
+        {invalid && <FieldError id={errorId}>{t('fittings.item.quantityInvalid')}</FieldError>}
         <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
           <Button type="submit" variant="primary">
