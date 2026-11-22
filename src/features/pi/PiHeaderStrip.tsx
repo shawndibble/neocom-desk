@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   IconButton,
+  LiveNote,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -195,17 +196,13 @@ export function PiHeaderStrip({
         />
       </div>
       {nearest && nearestOption && buybackPct === null && (
-        <div
-          className="flex flex-wrap items-center gap-2 text-sm"
-          role="status"
-          data-testid="pi-nearest-hub"
-        >
-          <span className="text-text-dim">
+        <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="pi-nearest-hub">
+          <LiveNote as="span" className="text-text-dim">
             {t('piPlan.strip.nearestHub', {
               count: nearest.jumps,
               hub: nearestOption.systemName,
             })}
-          </span>
+          </LiveNote>
           <Button size="sm" onClick={() => sellAtNearest(nearestOption.id)}>
             {t('piPlan.strip.useHub', { hub: nearestOption.systemName })}
           </Button>
