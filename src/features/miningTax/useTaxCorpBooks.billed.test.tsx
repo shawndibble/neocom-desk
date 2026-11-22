@@ -25,13 +25,18 @@ vi.mock('@/features/miningTax/corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
     view: hoisted.view,
     booksRead: true,
+    booksKnown: true,
     reload: vi.fn(),
     shownBooks: [],
     corpNameOf: (id: number) => `Corp ${id}`,
     hiddenLeft: [],
   }),
 }));
-vi.mock('./paymentLinkStore', () => ({ saveBilledElsewhere: vi.fn(async () => true) }));
+const saveBookOwned = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('./paymentLinkStore', () => ({
+  saveBilledElsewhere: vi.fn(async () => true),
+  saveBookOwned,
+}));
 
 import { useTaxCorpBooks } from './useTaxCorpBooks';
 
@@ -74,5 +79,23 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     } as unknown as TaxSnapshot;
     const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
     expect(result.current.accounts.of('p1')?.owes?.amount ?? 0).toBe(0);
+  });
+
+  it('stores the Payees a book owns, an unlinked one named as its corporation included', () => {
+    hoisted.view = {
+      ...hoisted.view,
+      books: [{ left: false, corpName: 'Ashfall', loaded: { corporationId: 5 } }],
+    } as unknown as CorpBookView;
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
+    expect(result.current.accounts.isBookOwned('p1')).toBe(true);
+    expect(saveBookOwned).toHaveBeenCalledWith(new Set(['p1']));
   });
 });

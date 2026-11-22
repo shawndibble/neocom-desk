@@ -172,6 +172,15 @@ export class PayeeRunningAccounts {
       });
   }
 
+  /**
+   * The Payee records a new Assignment may be offered, suggested or pre-filled with (the picker, the
+   * last-used and Default System suggestions): never a Payee a book is the authority for, nor an
+   * archived one.
+   */
+  assignable<P extends Pick<PayeeRecord, 'id'>>(payees: readonly P[]): P[] {
+    return payees.filter((p) => !this.isBookOwned(p.id) && !this.isArchived(p.id));
+  }
+
   /** The newest day a Payee has nothing owed on or before; null while none is paid. */
   paidThroughOf(payeeId: string): string | null {
     return (this.of(payeeId) ?? this.historyOf(payeeId))?.paidThrough ?? null;
@@ -199,13 +208,37 @@ export class PayeeRunningAccounts {
   }
 
   /**
+   * `statusOf` as a row is shown: a day of a Payee a book is the authority for that its old
+   * history has not paid is Tracked by the book, not Outstanding, since nothing here can settle it.
+   * For the display only: every safeguard reads `statusOf`, where such a day is still unpaid.
+   */
+  displayStatusOf(
+    a: Pick<MiningTaxAssignmentRecord, 'payeeId' | 'status' | 'date'>
+  ): MiningTaxAssignmentStatus | 'tracked' {
+    const status = this.statusOf(a);
+    return status === 'outstanding' && this.isBookOwned(a.payeeId!) ? 'tracked' : status;
+  }
+
+  /**
    * The Assignment as the tab reads it (`statusOf`), its legacy paid mark left off: only ever a
    * view, never written back.
    */
   view<T extends MiningTaxAssignmentRecord>(a: T): T {
-    const status = this.statusOf(a);
+    return this.viewAs(a, this.statusOf(a));
+  }
+
+  /** `view` as a row is shown (`displayStatusOf`): what the Tax tab and the Overview read. */
+  displayView<T extends MiningTaxAssignmentRecord>(a: T): T {
+    return this.viewAs(a, this.displayStatusOf(a));
+  }
+
+  private viewAs<T extends MiningTaxAssignmentRecord>(
+    a: T,
+    status: MiningTaxAssignmentStatus | 'tracked'
+  ): T {
     if (status === a.status && a.payment === undefined && a.paidAt === undefined) return a;
-    const out = { ...a, status };
+    // `tracked` is a display status only: it is never stored.
+    const out = { ...a, status: status as MiningTaxAssignmentStatus };
     delete out.payment;
     delete out.paidAt;
     return out;
@@ -228,14 +261,14 @@ export function linkOf(record: MiningTaxPaymentLinkRecord): PayeePaymentLink {
 
 /**
  * The ledger's entries as the tab reads them: each Assignment viewed through its Payee's account
- * (`PayeeRunningAccounts.view`). The Tax tab and the Overview read the same.
+ * (`PayeeRunningAccounts.displayView`). The Tax tab and the Overview read the same.
  */
 export function withPaidStatus(
   entries: readonly MoonMiningTaxRow[],
   accounts: PayeeRunningAccounts
 ): MoonMiningTaxRow[] {
   return entries.map((row) => {
-    const assignments = row.assignments.map((a) => accounts.view(a));
+    const assignments = row.assignments.map((a) => accounts.displayView(a));
     return assignments.every((a, i) => a === row.assignments[i]) ? row : { ...row, assignments };
   });
 }

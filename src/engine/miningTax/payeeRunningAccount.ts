@@ -146,15 +146,9 @@ export class PayeeRunningAccount {
     const marks = links
       .filter(isBareMark)
       .sort((a, b) => paymentLinkKey(a).localeCompare(paymentLinkKey(b)));
-    if (marks.length === 0)
-      return new PayeeRunningAccount(
-        input.payeeId,
-        input.charges,
-        links,
-        MinerRunningAccount.build({ days, payments: money }),
-        []
-      );
     const byMoney = MinerRunningAccount.build({ days, payments: money });
+    if (marks.length === 0)
+      return new PayeeRunningAccount(input.payeeId, input.charges, links, byMoney, []);
     const left = new Map<string, number>();
     const marked: PayeeMarkedDay[] = [];
     const settles: { date: string; tax: number }[] = [];

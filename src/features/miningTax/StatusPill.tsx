@@ -32,6 +32,7 @@ const STATUS_PILL_TINT: Record<MiningTaxRowStatus, string> = {
   unassigned: '',
   'needs-review': 'bg-warning/10',
   outstanding: 'bg-danger/10',
+  tracked: '',
   paid: '',
   dismissed: '',
 };

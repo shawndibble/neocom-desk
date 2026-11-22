@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
-import { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
+import type { MoonMiningTaxRow } from './snapshot';
 
 const payee = (id: string, characterId: number, entityId?: number): PayeeRecord => ({
   id,
@@ -156,6 +157,56 @@ describe('PayeeRunningAccounts', () => {
       const accounts = build();
       expect(accounts.historyOf('p2')?.credit).toBe(300);
       expect(accounts.of('q')?.owes?.amount).toBe(70);
+    });
+  });
+
+  describe('the Assignments of a Payee a book is the authority for', () => {
+    const owned = new Set(['p1']);
+    const build = () =>
+      PayeeRunningAccounts.build({
+        assignments: [
+          assignment('paid', 'p1', '2026-10-01', 100),
+          assignment('open', 'p1', '2026-10-02', 100),
+          assignment('mine', 'q', '2026-10-02', 70),
+        ],
+        payees: [payee('p1', 1, 98000001), payee('q', 1, 5)],
+        links: [link('p1', 100, 7)],
+        bookOwned: owned,
+      });
+
+    it('read Tracked, not Outstanding, when nothing can settle them; a paid day stays Paid', () => {
+      const accounts = build();
+      const read = (id: string) =>
+        accounts.displayStatusOf(assignment(id, id === 'mine' ? 'q' : 'p1', '2026-10-02', 1));
+      expect(read('open')).toBe('tracked');
+      expect(read('mine')).toBe('outstanding');
+      expect(accounts.displayStatusOf(assignment('paid', 'p1', '2026-10-01', 100))).toBe('paid');
+      expect(
+        accounts.displayStatusOf(assignment('r', 'p1', '2026-10-02', 1, { status: 'needs-review' }))
+      ).toBe('needs-review');
+    });
+
+    it('are never offered to a new Assignment: neither suggested, pre-filled nor listed', () => {
+      const payees = [payee('p1', 1, 98000001), payee('q', 1, 5)];
+      expect(
+        build()
+          .assignable(payees)
+          .map((p) => p.id)
+      ).toEqual(['q']);
+    });
+
+    it('stay Outstanding to the safeguards, which never read a paid day as unpaid or the reverse', () => {
+      const accounts = build();
+      expect(accounts.statusOf(assignment('open', 'p1', '2026-10-02', 100))).toBe('outstanding');
+      expect(accounts.statusOf(assignment('paid', 'p1', '2026-10-01', 100))).toBe('paid');
+    });
+
+    it('count in no total: the ledger view leaves them out of what is owed', () => {
+      const accounts = build();
+      const row = {
+        assignments: [assignment('open', 'p1', '2026-10-02', 100)],
+      } as unknown as MoonMiningTaxRow;
+      expect(withPaidStatus([row], accounts)[0].assignments[0].status).toBe('tracked');
     });
   });
 

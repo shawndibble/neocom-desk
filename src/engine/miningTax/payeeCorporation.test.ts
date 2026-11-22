@@ -135,11 +135,38 @@ describe('bookOwnedPayeeIds', () => {
     ]).toEqual(['a']);
   });
 
-  it('never goes by name: a same-named Payee that is not verified as the corporation is not its', () => {
+  it('takes an unlinked Payee named exactly as the corporation, ignoring case and spaces', () => {
     const ids = bookOwnedPayeeIds(
       [
-        record({ id: 'named', name: bureau.name }),
+        record({ id: 'typed', name: '  bureau of unified HARVESTING ' }),
+        record({ id: 'similar', name: 'Bureau of Unified Harvesting Alt' }),
+      ],
+      [bureau]
+    );
+    expect([...ids]).toEqual(['typed']);
+  });
+
+  it('takes the unlinked same-named Payee beside a verified one', () => {
+    const ids = bookOwnedPayeeIds(
+      [
+        record({ id: 'verified', entityId: bureau.corporationId, entityKind: 'corporation' }),
+        record({ id: 'typed', name: bureau.name }),
+      ],
+      [bureau]
+    );
+    expect([...ids].sort()).toEqual(['typed', 'verified']);
+  });
+
+  it('never takes a Payee linked to someone else, whatever its name', () => {
+    const ids = bookOwnedPayeeIds(
+      [
         record({ id: 'someoneElse', name: bureau.name, entityId: 7, entityKind: 'character' }),
+        record({
+          id: 'sameIdOtherKind',
+          name: 'Ion',
+          entityId: bureau.corporationId,
+          entityKind: 'character',
+        }),
       ],
       [bureau]
     );

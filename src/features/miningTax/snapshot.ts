@@ -106,7 +106,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     await applySurveyConnections(ledgers, Date.now(), accounts).catch(() => []);
     // Last resort, after the Survey has had first claim: a Payee's Default Systems assign what
     // nothing else has touched.
-    await applyDefaultSystems(ledgers).catch(() => []);
+    await applyDefaultSystems(ledgers, accounts).catch(() => []);
     // Read again: a Survey or a Default System may have billed a paid day anew.
     const grown = await loadPayeeRunningAccounts();
     await Promise.all(

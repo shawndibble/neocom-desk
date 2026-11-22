@@ -7,8 +7,8 @@ import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
-import { saveBilledElsewhere } from './paymentLinkStore';
-import { billedElsewhereOf, bookOwnedPayees } from './owedNow';
+import { saveBilledElsewhere, saveBookOwned } from './paymentLinkStore';
+import { billedElsewhereOf, bookOwnersOf } from './owedNow';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
@@ -58,6 +58,7 @@ export function useTaxCorpBooks(
   const {
     view: corpView,
     booksRead,
+    booksKnown,
     reload: reloadCorpBooks,
     shownBooks,
     corpNameOf,
@@ -81,7 +82,9 @@ export function useTaxCorpBooks(
     [overlay, data?.billedElsewhere]
   );
   // A Payee that is a book's corporation is the book's to answer for: its account counts nowhere.
-  const bookOwned = useMemo(() => bookOwnedPayees(payees, corpView), [payees, corpView]);
+  // The one reading of it (with the corporation's name): the accounts and Manage Payees share it.
+  const bookOwners = useMemo(() => bookOwnersOf(payees, corpView), [payees, corpView]);
+  const bookOwned = useMemo(() => new Set(bookOwners.keys()), [bookOwners]);
   // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
   const accounts = useMemo(
     () =>
@@ -108,6 +111,14 @@ export function useTaxCorpBooks(
     stored.current = billed;
     void saveBilledElsewhere(billed).catch(() => undefined);
   }, [overlay, billed, data]);
+  // Likewise which Payees a book owns, once the books are known (never from a guess made before):
+  // the load path's safeguards and the wallet journal read the accounts with the same rule.
+  const storedOwned = useRef<ReadonlySet<string> | undefined>(undefined);
+  useEffect(() => {
+    if (!data || !booksKnown || storedOwned.current === bookOwned) return;
+    storedOwned.current = bookOwned;
+    void saveBookOwned(bookOwned).catch(() => undefined);
+  }, [data, booksKnown, bookOwned]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
   const { failed: failedClaims } = useAutoClaimDonations(
@@ -125,6 +136,8 @@ export function useTaxCorpBooks(
     madePayments,
     paymentSources,
     corpView,
+    booksKnown,
+    bookOwners,
     reloadCorpBooks,
     leftCorp: { shownBooks, corpNameOf, hiddenLeft, hide: leftAck.hide, show: leftAck.show },
     failedClaims,

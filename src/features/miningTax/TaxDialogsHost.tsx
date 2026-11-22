@@ -280,11 +280,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   /** Prefill for a new Assignment's Payee: the one last used in that system, by that pilot. */
   const pickablePayees = useMemo(
-    () =>
-      allPayees.filter(
-        (p) =>
-          !duplicateAliases.has(p.id) && !accounts.isArchived(p.id) && !accounts.isBookOwned(p.id)
-      ),
+    () => accounts.assignable(allPayees).filter((p) => !duplicateAliases.has(p.id)),
     [allPayees, duplicateAliases, accounts]
   );
 
@@ -306,7 +302,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   function suggestionFor(row: MoonMiningTaxRow) {
     return suggestPayeeForSystem(
       everyAssignment.filter((a) => a.characterId === row.characterId),
-      allPayees.filter((p) => !accounts.isArchived(p.id)),
+      accounts.assignable(allPayees),
       row.entry.solarSystemId,
       row.characterId,
       duplicateAliases

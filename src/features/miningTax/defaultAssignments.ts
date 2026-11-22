@@ -13,21 +13,28 @@ import { loadDefaultOptOuts } from './defaultOptOuts';
 import { assign } from './ledgerActions';
 import { readCompressedOre } from './oreForm';
 import { loadPayees } from './payees';
+import { loadPayeeRunningAccounts } from './paymentLinkStore';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 
 /**
  * Assigns, for each ledger, what its Character's Default Systems plan, one Assignment per entry,
  * each priced at its Payee's hub on the mined date. Resolves to the Assignments made; an entry
- * that fails to price or save is skipped, and tried again on the next load.
+ * that fails to price or save is skipped, and tried again on the next load. A Payee a Corp Tax
+ * Book is the authority for is never assigned to: the book bills that corporation, and nothing
+ * here could settle the day.
  */
 export async function applyDefaultSystems(
-  ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[]
+  ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
+  /** Every personal Payee's account (`loadPayeeRunningAccounts`), read from Dexie when absent. */
+  accounts?: Pick<PayeeRunningAccounts, 'isBookOwned'>
 ): Promise<MiningTaxAssignmentRecord[]> {
   const created: MiningTaxAssignmentRecord[] = [];
   const optedOut = await loadDefaultOptOuts();
   for (const ledger of ledgers) {
     if (ledger.entries.length === 0) continue;
-    const payees = await loadPayees(ledger.characterId);
+    const owner = accounts ?? (await loadPayeeRunningAccounts());
+    const payees = (await loadPayees(ledger.characterId)).filter((p) => !owner.isBookOwned(p.id));
     if (!payees.some((p) => p.defaultSystems?.length)) continue;
     const assignments = await db.miningTaxAssignments
       .where('characterId')

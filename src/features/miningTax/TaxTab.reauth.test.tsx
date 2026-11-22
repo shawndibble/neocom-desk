@@ -45,6 +45,7 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
 vi.mock('./corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
     booksRead: true,
+    booksKnown: true,
     view: null,
     reload: vi.fn(),
     shownBooks: [],

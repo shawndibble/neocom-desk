@@ -57,7 +57,7 @@ import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useUnheldCharacterItems } from './corpBook/useUnheldCharacterItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
-import { bookCreditsOf, bookDaysOf, bookOwesOf, bookOwnersOf } from './owedNow';
+import { bookCreditsOf, bookDaysOf, bookOwesOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -142,6 +142,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     madePayments,
     paymentSources,
     corpView,
+    booksKnown,
+    bookOwners,
     reloadCorpBooks,
     leftCorp,
     failedClaims,
@@ -157,11 +159,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         credit: b.summary.credit,
       })) ?? [],
     [corpView]
-  );
-  // The Payees a book answers for, with its corporation's name: Manage Payees says so on each.
-  const bookOwners = useMemo(
-    () => bookOwnersOf([...(data?.payeesByCharacter.values() ?? [])].flat(), corpView),
-    [data?.payeesByCharacter, corpView]
   );
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
@@ -525,56 +522,62 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               />
             ) : (
               <>
-                <OwedBalances
-                  balances={balances}
-                  unassigned={unassigned}
-                  unlinkedPaymentCount={linkable.length}
-                  characterNameOf={
-                    characters.length > 1
-                      ? (balance) =>
-                          characters.find((c) => c.characterId === balance.payee.characterId)
-                            ?.characterName
-                      : undefined
-                  }
-                  isSoleFilter={isSolePayee}
-                  onFilterPayee={filterToPayee}
-                  onSettleUp={(balance) =>
-                    isCorpPayeeId(balance.payee.id)
-                      ? actions.openCorpPay(corporationOfPayee(balance.payee.id))
-                      : settleUpBalance(balance.members)
-                  }
-                  onLinkPayment={(balance) =>
-                    actions.openLinkPayment({ payeeId: balance.payee.id })
-                  }
-                  onOpenLedger={(balance) =>
-                    actions.openLedger(
+                {/* A Payee that is a book's corporation is only told once the books are known: until
+                    then no Payee card shows, rather than one the book's card then replaces. */}
+                {!booksKnown ? (
+                  <Spinner block="panel" label={t('common.loading')} />
+                ) : (
+                  <OwedBalances
+                    balances={balances}
+                    unassigned={unassigned}
+                    unlinkedPaymentCount={linkable.length}
+                    characterNameOf={
+                      characters.length > 1
+                        ? (balance) =>
+                            characters.find((c) => c.characterId === balance.payee.characterId)
+                              ?.characterName
+                        : undefined
+                    }
+                    isSoleFilter={isSolePayee}
+                    onFilterPayee={filterToPayee}
+                    onSettleUp={(balance) =>
                       isCorpPayeeId(balance.payee.id)
-                        ? { kind: 'book', corporationId: corporationOfPayee(balance.payee.id) }
-                        : { kind: 'personal', payeeId: balance.payee.id }
-                    )
-                  }
-                  hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
-                  uncreditedOf={(balance) =>
-                    isCorpPayeeId(balance.payee.id)
-                      ? uncreditedByCorp.get(corporationOfPayee(balance.payee.id))
-                      : undefined
-                  }
-                  unlinkedOf={(balance) => unlinkedSentFor(linkable, balance.payee.id)}
-                  onAssignNext={assignNext}
-                  onReviewPayments={() => actions.openLinkPayment({})}
-                  conflicts={conflicts}
-                  onReviewConflicts={() => {
-                    const first = conflicts?.first.corp;
-                    if (first?.kind !== 'row') return;
-                    const payeeId = first.view.overlap?.payeeIds[0];
-                    resolve.open(
-                      conflictTarget(
-                        first.view,
-                        payeeId !== undefined ? payeeById.get(payeeId)?.name : undefined
+                        ? actions.openCorpPay(corporationOfPayee(balance.payee.id))
+                        : settleUpBalance(balance.members)
+                    }
+                    onLinkPayment={(balance) =>
+                      actions.openLinkPayment({ payeeId: balance.payee.id })
+                    }
+                    onOpenLedger={(balance) =>
+                      actions.openLedger(
+                        isCorpPayeeId(balance.payee.id)
+                          ? { kind: 'book', corporationId: corporationOfPayee(balance.payee.id) }
+                          : { kind: 'personal', payeeId: balance.payee.id }
                       )
-                    );
-                  }}
-                />
+                    }
+                    hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
+                    uncreditedOf={(balance) =>
+                      isCorpPayeeId(balance.payee.id)
+                        ? uncreditedByCorp.get(corporationOfPayee(balance.payee.id))
+                        : undefined
+                    }
+                    unlinkedOf={(balance) => unlinkedSentFor(linkable, balance.payee.id)}
+                    onAssignNext={assignNext}
+                    onReviewPayments={() => actions.openLinkPayment({})}
+                    conflicts={conflicts}
+                    onReviewConflicts={() => {
+                      const first = conflicts?.first.corp;
+                      if (first?.kind !== 'row') return;
+                      const payeeId = first.view.overlap?.payeeIds[0];
+                      resolve.open(
+                        conflictTarget(
+                          first.view,
+                          payeeId !== undefined ? payeeById.get(payeeId)?.name : undefined
+                        )
+                      );
+                    }}
+                  />
+                )}
 
                 {data && <PendingGroupingNotice characters={characters} />}
 
