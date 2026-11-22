@@ -359,8 +359,8 @@ for (const { kind, title } of SAME_DAY_CASES) {
       // 4,000 over: credit, nothing owed.
       await expect(ledgerButton(page)).toContainText(new RegExp(`${isk(-gap)}\\s*ISK credit`));
       await ledgerButton(page).click();
-      await expect(pilotLedger(page)).toContainText(`Mined at E2E Athanor Alpha${isk(tax)}`);
-      await expect(pilotLedger(page)).toContainText(`${isk(-gap)} credit`);
+      await expect(pilotLedger(page)).toContainText(`Mined at E2E Athanor Alpha\u2212${isk(tax)}`);
+      await expect(pilotLedger(page)).toContainText(isk(-gap));
       await page.keyboard.press('Escape');
       await gotoMiner(page);
       await expect(page.getByRole('main')).toContainText(`Credit${isk(-gap)}`);

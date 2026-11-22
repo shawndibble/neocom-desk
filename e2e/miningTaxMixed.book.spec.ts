@@ -85,7 +85,7 @@ test('ore a book and a Default System Payee both could claim is billed once, eac
   // The Payee ledgers carry the same shares: Rook's one charge is the part the book left.
   await ledgerButton(page, ROOK.name).click();
   const rookLedger = ledgerOf(page, ROOK.name);
-  await expect(rookLedger).toContainText(new RegExp(`Owes\\s*${isk(s.rookOwes)} ISK`));
+  await expect(rookLedger).toContainText(new RegExp(`Owes\\s*\u2212${isk(s.rookOwes)} ISK`));
   await expect(rookLedger.getByRole('row', { name: /Mined at/ })).toHaveCount(1);
   await expect(rookLedger.getByRole('row', { name: /Mined at/ })).toContainText(isk(s.rookOwes));
   await page.keyboard.press('Escape');

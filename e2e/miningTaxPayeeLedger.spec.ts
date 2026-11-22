@@ -53,9 +53,11 @@ test('the ledger lists every charge and payment with a running balance', async (
   const rows = bodyRows(ledger);
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText(
-    `${day(PAID_BACK)}Payment by wallet transfer${isk(DAY_TAX)}${isk(2 * DAY_TAX)}`
+    `${day(PAID_BACK)}Payment by wallet transfer${isk(DAY_TAX)}\u2212${isk(2 * DAY_TAX)}`
   );
-  await expect(rows.nth(3)).toContainText(`${day(6)}Mined at Jita${isk(DAY_TAX)}${isk(DAY_TAX)}`);
+  await expect(rows.nth(3)).toContainText(
+    `${day(6)}Mined at Jita\u2212${isk(DAY_TAX)}\u2212${isk(DAY_TAX)}`
+  );
   await expect(ledger).toContainText('Ledger, newest first');
 });
 

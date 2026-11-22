@@ -36,7 +36,7 @@ test('an exact payment pays the oldest day and leaves the next owed', async ({ p
   await expect(page.getByRole('main')).toContainText(`Owed${isk(DAY_TAX)}`);
   await expect(minerFact(page, 'Oldest unpaid')).toContainText(shortDay(b.newestBack));
   await expect(ledgerRow(page, /Payment from Ada Lunar/)).toContainText(
-    `${isk(b.paid)}${isk(DAY_TAX)}`
+    `${isk(b.paid)}\u2212${isk(DAY_TAX)}`
   );
   await expect(await openPayment(page, /Payment from Ada Lunar/)).toContainText(
     `Days it paid${day(b.oldestBack)}`
