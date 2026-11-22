@@ -146,6 +146,19 @@ export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggest
   return byAmount.length === 1 ? { payment, payee: byAmount[0]!, confidence: 'amount' } : null;
 }
 
+/**
+ * What `payeeId` was already sent that nothing accounts for yet: its suggestions, counted. Above 0
+ * its owed figure is overstated until they are linked, which the Payee card and Settle up both say.
+ */
+export function unlinkedSentFor(
+  suggestions: readonly LinkSuggestion[],
+  payeeId: string
+): { count: number; amount: number } | undefined {
+  const mine = suggestions.filter((s) => s.payee.id === payeeId);
+  if (mine.length === 0) return undefined;
+  return { count: mine.length, amount: mine.reduce((sum, s) => sum + (s.payment.amount ?? 0), 0) };
+}
+
 /** Every payment worth offering, the surest first, then newest. */
 export function suggestLinks(payments: readonly MadePayment[], ctx: LinkContext): LinkSuggestion[] {
   const rank: Record<LinkConfidence, number> = { entity: 0, name: 1, amount: 2 };

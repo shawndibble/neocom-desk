@@ -9,7 +9,7 @@
  * Figures follow `bookSeed.ts`: flat prices (`prices.ts`), so one ordinary day of `DAY_QTY` units
  * at a Payee's `taxPct` of 10 owes `DAY_TAX`.
  */
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { signInAndGoto } from '../authSeed';
 import type {
   MiningTaxAssignmentRecord,
@@ -158,6 +158,28 @@ export async function seedPersonal(page: Page, data: PersonalData): Promise<void
   }, data);
 }
 
+/**
+ * Makes the app read an older client's paid marks (`legacyPaidAssignment`) again on its next start.
+ * It reads them once per device, as it first starts, and a spec seeds after that start: the
+ * "already read" flag (`paymentLinkStore.ts`) is dropped so the next start reads what was seeded.
+ */
+export async function forgetPaidMarksRead(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('neocom');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction('settings', 'readwrite');
+      tx.objectStore('settings').delete('miningTaxPaidMarksRead');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    database.close();
+  });
+}
+
 /** What the app holds of a store now, for asserting what an action wrote. */
 export async function readStore<T>(page: Page, store: string): Promise<T[]> {
   return page.evaluate(async (name: string) => {
@@ -246,8 +268,9 @@ export function rookOwed(characterId: number, days: readonly number[] = [6, 5, 4
 
 /**
  * Signs the pilot in (main suite: `signInAndGoto`'s token), seeds `data` and opens the Tax tab.
- * It lands on the tab first and reloads after seeding: the app has opened its database by then,
- * and the reload is served the tab's modules from the browser's cache.
+ * It lands on the tab first and seeds after: the app has opened its database by then (the seed
+ * cannot make the later stores before it does). The tab is then left and entered again, which
+ * reads the seeded rows; no reload, which would boot the whole app a second time.
  */
 export async function openPersonalTax(
   page: Page,
@@ -256,7 +279,17 @@ export async function openPersonalTax(
 ): Promise<void> {
   await installPilotEsi(page, { ...esi, names: nameOf });
   await signInAndGoto(page, './mining/tax');
+  // Each step waits for the one before it with `waitFor` (the action clock, as `click` waits), not
+  // the 5s `expect` clock an app boot can overrun under load; and a click lands only on a tab the
+  // page has finished drawing, or it is dropped.
+  const selected = (name: string) => page.getByRole('tab', { name, selected: true });
+  await selected('Tax').waitFor();
   await seedPersonal(page, data);
-  await page.reload();
-  await expect(page.getByRole('tab', { name: 'Tax', selected: true })).toBeVisible();
+  // Away and back by the page's own tabs (there at every width): the Tax tab mounts again and
+  // reads what was seeded, without a second full boot of the app (a reload's boot is what
+  // overran the 5s clock under load).
+  await page.getByRole('tab', { name: 'Overview' }).click();
+  await selected('Overview').waitFor();
+  await page.getByRole('tab', { name: 'Tax' }).click();
+  await selected('Tax').waitFor();
 }

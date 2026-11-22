@@ -675,7 +675,10 @@
   }
 
   /* The leading expand caret (`expandableRow.leadingIcon`) is a desktop cue:
-     a card is itself the tap target. */
+     a card is itself the tap target. A card that opens in place says so with
+     the trailing disclosure chevron instead (`td.dt-disclosure`, drawn by
+     `DataTableRow` only for a stacked table with `leadingIcon`), which turns
+     when the card is open. */
   .dt-stacked .dt-lead-caret {
     display: none;
   }

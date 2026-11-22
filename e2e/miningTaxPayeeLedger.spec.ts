@@ -48,12 +48,15 @@ test('the ledger lists every charge and payment with a running balance', async (
   const ledger = await openLedger(page);
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*2`));
   await expect(ledger).toContainText(/Oldest unpaid/);
+  // Newest first, like a bank statement: the payment on top, the first day's charge last. Each
+  // row's balance is still the one after it in date order.
   const rows = bodyRows(ledger);
   await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText(`${day(6)}Mined at Jita${isk(DAY_TAX)}${isk(DAY_TAX)}`);
-  await expect(rows.nth(3)).toContainText(
+  await expect(rows.nth(0)).toContainText(
     `${day(PAID_BACK)}Payment${isk(DAY_TAX)}${isk(2 * DAY_TAX)}`
   );
+  await expect(rows.nth(3)).toContainText(`${day(6)}Mined at Jita${isk(DAY_TAX)}${isk(DAY_TAX)}`);
+  await expect(ledger).toContainText('Ledger, newest first');
 });
 
 test('the kind filter shows only payments, and clearing it brings every row back', async ({
@@ -77,8 +80,8 @@ test('the date range keeps only the days inside it', async ({ page }) => {
   await ledger.getByRole('textbox', { name: 'From' }).fill(day(5));
   await ledger.getByRole('textbox', { name: 'To' }).fill(day(4));
   await expect(bodyRows(ledger)).toHaveCount(2);
-  await expect(bodyRows(ledger).nth(0)).toContainText(day(5));
-  await expect(bodyRows(ledger).nth(1)).toContainText(day(4));
+  await expect(bodyRows(ledger).nth(0)).toContainText(day(4));
+  await expect(bodyRows(ledger).nth(1)).toContainText(day(5));
 });
 
 test('the ledger downloads as CSV, a line per row', async ({ page }) => {
@@ -131,4 +134,17 @@ test("a personal Payee's ledger lists its whole history, with no snapshot row", 
   await expect(ledger).not.toContainText(/Balance through/);
   await expect(ledger).toContainText(day(100));
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*3`));
+});
+
+test('Unlink says so with an Undo that links the same payment back', async ({ page }) => {
+  const ledger = await openLedger(page);
+  await bodyRows(ledger).filter({ hasText: 'Payment' }).click();
+  await ledger.getByRole('button', { name: 'Unlink' }).click();
+  // The payment pays nothing now: its day is owed again.
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(3 * DAY_TAX)} ISK`));
+  const toast = page.getByRole('status').filter({ hasText: /Unlinked the .* ISK payment/ });
+  await expect(toast).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(2 * DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(`${day(PAID_BACK)}Payment`);
 });

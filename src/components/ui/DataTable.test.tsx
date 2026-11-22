@@ -834,6 +834,52 @@ describe('DataTable', () => {
       expect(document.querySelector('.dt-lead-caret')).toHaveClass('mr-auto');
     });
 
+    describe('the chevron a stacked card shows for a leading caret', () => {
+      const disclosure = () => [...document.querySelectorAll('td.dt-disclosure')];
+      const drawn = () => disclosure().filter((td) => td.querySelector('svg'));
+
+      it('draws one on every card of a stacked table, and turns it when the card opens', async () => {
+        const user = userEvent.setup();
+        renderTable({ stacked: true, expandableRow: { ...expandableRow, leadingIcon: true } });
+        expect(drawn()).toHaveLength(rows.length);
+        const before = drawn()[0]!.innerHTML;
+        await user.click(screen.getAllByRole('cell')[0]!);
+        expect(drawn()[0]!.innerHTML).not.toBe(before);
+        // Only the open card's chevron turned.
+        expect(drawn()[1]!.innerHTML).toBe(before);
+      });
+
+      it('draws none in a table, where the leading caret is the cue', () => {
+        renderTable({ expandableRow: { ...expandableRow, leadingIcon: true } });
+        expect(drawn()).toHaveLength(0);
+        expect(document.querySelectorAll('.dt-lead-caret')).toHaveLength(rows.length);
+      });
+
+      it('draws none on a stacked card that cannot expand', () => {
+        renderTable({ stacked: true });
+        expect(disclosure()).toHaveLength(0);
+      });
+
+      it('draws none where the caret is its own button, or the caller hides the icon', () => {
+        const { unmount } = renderTable({
+          stacked: true,
+          expandableRow: {
+            ...expandableRow,
+            leadingIcon: true,
+            trigger: 'button',
+            toggleLabel: (row) => `Open ${row.item}`,
+          },
+        });
+        expect(drawn()).toHaveLength(0);
+        unmount();
+        renderTable({
+          stacked: true,
+          expandableRow: { ...expandableRow, leadingIcon: true, hideIcon: true },
+        });
+        expect(drawn()).toHaveLength(0);
+      });
+    });
+
     it('keeps at most one row open — opening a second row closes the first', async () => {
       const user = userEvent.setup();
       renderTable({ expandableRow });

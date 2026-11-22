@@ -17,6 +17,7 @@ import type { ResolveTarget } from '@/features/miningTax/corpBook/resolve/target
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
+import { isCorpPayeeId } from '@/features/miningTax/corpBook/corpRows';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { minerPayCodes } from '@/features/miningTax/corpBook/minerPayCodes';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
@@ -33,13 +34,19 @@ import {
 import { buildPriceBreakdown } from '@/features/miningTax/usePriceBreakdown';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import type { RowMenuAction } from '@/features/miningTax/rowMenu';
-import { linkablePayments, type MadePayment } from '@/features/miningTax/paymentLinks';
+import {
+  linkablePayments,
+  unlinkedSentFor,
+  type MadePayment,
+} from '@/features/miningTax/paymentLinks';
 import {
   paymentLinkKey,
   linkAt,
+  PayeeRunningAccount,
   type PayeePaymentLink,
   heldPaymentKeys,
 } from '@/engine/miningTax/payeeRunningAccount';
+import { formatIsk } from '@/lib/isk';
 import type { LedgerCharge, LedgerPayment } from '@/engine/miningTax/payeeLedger';
 import type { PayeeRunningAccounts } from '@/features/miningTax/payeeRunningAccounts';
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
@@ -99,11 +106,6 @@ const PayeeLedgerPanel = lazy(() =>
     default: m.PayeeLedgerPanel,
   }))
 );
-const LinkWalletPaymentDialog = lazy(() =>
-  guarded(() => import('@/features/miningTax/LinkWalletPaymentDialog')).then((m) => ({
-    default: m.LinkWalletPaymentDialog,
-  }))
-);
 
 export interface TaxDialogsHostProps {
   store: TaxDialogStore;
@@ -158,7 +160,8 @@ export interface TaxDialogsHostProps {
   /** The Add-payee shortcut in the row detail; absent when there is no character to add one for. */
   onAddPayee: (() => void) | undefined;
   /** A short confirmation for a row-menu action that has no dialog to show it in ("Copied"). */
-  onToast: (message: string) => void;
+  /** A transient message; with `onUndo` it carries an Undo (DESIGN 6c, Transient messages). */
+  onToast: (message: string, onUndo?: () => void) => void;
 }
 
 /**
@@ -219,12 +222,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     joinCandidateOverride,
     settleUpRows,
     settleUpStart,
-    linkWalletTarget,
+    linkPaymentTarget,
     corpPayTarget,
     corpPayFocus,
     ledgerTarget,
     bulkDismissOpen,
-    linkPaymentOpen,
   } = useTaxDialogState(store);
 
   // Every row action and the Link-transaction confirm run through this, so a
@@ -411,8 +413,27 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     actions.openLedger({ kind: 'personal', payeeId });
   }
 
+  /**
+   * Unlinks a payment from a Payee's ledger, then says so with an Undo that links the same payment
+   * to the same Payee again (as it was: amount, day and owner).
+   */
   function unlinkPayment(key: string) {
-    void runAndClose(() => unlinkPayments([key]));
+    const was = links.find((l) => paymentLinkKey(l) === key);
+    void runAndClose(async () => {
+      const result = await unlinkPayments([key]);
+      if (result.ok && was) {
+        const { characterId } = was;
+        onToast(
+          t('miningTax.ledger.unlinkedToast', { amount: formatIsk(was.amount, 0) }),
+          characterId === undefined
+            ? undefined
+            : () => {
+                void linkPayment(was, characterId).then(() => refresh());
+              }
+        );
+      }
+      return result;
+    });
   }
 
   function resolveEntry(dr: DisplayRow, fromMenu = false) {
@@ -452,11 +473,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     void runAndClose(() => uncombine(members), fromMenu ? dr : undefined);
   }
 
-  /** "Link a wallet payment" for a row: a payment to its Payee, which pays the oldest days. */
+  /** "Link a payment" for a row: a payment to its Payee, which pays the oldest days. */
   function linkWalletFor(dr: DisplayRow) {
     const payeeId = dr.assignment?.payeeId;
     if (!payeeId) return;
-    actions.linkWalletFromDetail({ payeeId: accounts.primaryIdOf(payeeId) });
+    actions.linkPaymentFromDetail({ payeeId: accounts.primaryIdOf(payeeId) });
   }
 
   function copyBreakdown(dr: DisplayRow) {
@@ -522,7 +543,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   }
   useEffect(() => actions.registerRowMenuRunner(runMenuAction));
 
-  const linkWalletPayee = payeeById.get(linkWalletTarget?.payeeId ?? '') ?? null;
+  // The personal Payees a payment may be linked to (a Corp Tax Book credits itself).
+  const linkablePayees = useMemo(
+    () => accounts.linkable(allPayees).filter((p) => !isCorpPayeeId(p.id)),
+    [accounts, allPayees]
+  );
   // Every payment no link holds and no Corp Tax Book counts: whichever Character sent it, since a
   // merged Payee's money can come from any alt.
   const linkCandidates = useMemo(
@@ -594,8 +619,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   const ledgerSource = useMemo(() => {
     if (!ledgerTarget) return null;
     if (ledgerTarget.kind === 'personal') {
-      const account = accounts.of(ledgerTarget.payeeId);
-      if (!account) return null;
+      // A Payee nothing was billed to has no account: its ledger opens empty.
+      const account =
+        accounts.of(ledgerTarget.payeeId) ??
+        PayeeRunningAccount.build({ payeeId: ledgerTarget.payeeId, charges: [], links: [] });
       const byId = new Map(everyAssignment.map((a) => [a.id, a]));
       return {
         account: account.account,
@@ -924,6 +951,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             rows={liveSettleUpRows ?? settleUpRows}
             {...(settleUpStart.payerId !== undefined ? { payerId: settleUpStart.payerId } : {})}
             arrivalCheck={settleUpRecheck}
+            unlinked={unlinkedSentFor(linkSuggestions, settleUpPayee.id)}
             owedFor={() => settleUpAccount.owes?.amount ?? 0}
             preview={(amount, paidOn) => settleUpAccount.preview(amount, paidOn)}
             reason={buildSettleUpReason(
@@ -957,41 +985,31 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             }}
             onPickFromWallet={() => {
               actions.openSettleUp(null);
-              actions.openLinkWallet({ payeeId: settleUpPayee.id });
+              actions.openLinkPayment({ payeeId: settleUpPayee.id });
             }}
           />
         </Suspense>
       )}
 
-      {linkWalletPayee && hasData && (
+      {linkPaymentTarget && hasData && (
         <Suspense fallback={null}>
-          <LinkWalletPaymentDialog
-            key={linkWalletPayee.id}
+          <LinkPaymentDialog
+            key={linkPaymentTarget.payeeId ?? 'all'}
             open
-            onClose={() => actions.openLinkWallet(null)}
-            payee={linkWalletPayee}
-            {...(accounts.of(linkWalletPayee.id)
-              ? { account: accounts.of(linkWalletPayee.id) }
+            onClose={() => actions.openLinkPayment(null)}
+            {...(linkPaymentTarget.payeeId !== undefined
+              ? { scopeId: accounts.primaryIdOf(linkPaymentTarget.payeeId) }
               : {})}
+            payees={linkablePayees}
+            suggestions={linkSuggestions}
             candidates={linkCandidates}
+            accountOf={(id) => accounts.of(id)}
             characters={trackedCharacters}
             paymentSources={paymentSources}
             onLinked={() => {
               onClearSelection();
               refresh();
             }}
-          />
-        </Suspense>
-      )}
-
-      {linkPaymentOpen && hasData && linkSuggestions.length > 0 && (
-        <Suspense fallback={null}>
-          <LinkPaymentDialog
-            open
-            onClose={() => actions.openLinkPayment(false)}
-            suggestions={linkSuggestions}
-            accountOf={(id) => accounts.of(id)}
-            onLinked={refresh}
           />
         </Suspense>
       )}

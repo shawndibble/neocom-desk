@@ -8649,7 +8649,11 @@
       }
     },
     "linkWallet": {
-      "title": "Link a wallet payment",
+      "matchesLabel": "Likely matches",
+      "manualLabel": "Pick from your wallet",
+      "otherLabel": "Other payments from your wallet",
+      "payeeLabel": "Which Payee did it pay?",
+      "payeePlaceholder": "Pick a Payee",
       "subtitle": "Pick the payment you sent {{payee}} ({{amount}} ISK owed now). It pays the oldest unpaid days first; anything over is kept as credit.",
       "searchLabel": "Search wallet payments",
       "searchPlaceholder": "Amount, date or recipient",
@@ -8743,7 +8747,7 @@
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",
     "detail": {
-      "linkWalletPayment": "Link a wallet payment",
+      "linkWalletPayment": "Link a payment",
       "splitAction": "Split between Payees",
       "reviewSplitAction": "Give new ore to another Payee",
       "moreLabel": "More actions for this entry",
@@ -8778,7 +8782,7 @@
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
     "saveFailed": "Couldn’t save — nothing was changed. Try again.",
     "ledger": {
-      "subtitle": "Ledger, oldest first",
+      "subtitle": "Ledger, newest first",
       "loading": "Loading the ledger",
       "tableLabel": "Ledger",
       "lockDivider": "Locked before {{date}} · fix with a correction dated {{date}} or later",
@@ -8847,6 +8851,7 @@
         "viewPayment": "View the payment",
         "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link."
       },
+      "unlinkedToast": "Unlinked the {{amount}} ISK payment. Its days are owed again.",
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
@@ -20568,6 +20573,7 @@
       "iskAmount": "IskAmount: B/M/K suffix, exact value on hover or tap",
       "rowCaret": "Trailing CaretRight on a row: goes to another page (RowCaret)",
       "disclosureCaret": "Leading caret that rotates: expands in place",
+      "cardChevron": "Trailing chevron on a phone card: the card opens in place, and the chevron turns",
       "pagerCarets": "Paired carets in IconButtons: pages",
       "legendPopover": "Bordered Legend button + CaretDown: read-only key to a view's marks",
       "countedSegments": "SegmentedControl with a count per segment, in a filter box: the split before choosing",
@@ -20611,7 +20617,8 @@
       "selectedToggle": "On takes the accent tint.",
       "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
       "lockBoundary": "One thin row where rows past it turn read-only: shown once, never a lock icon on every row.",
-      "fieldCaret": "The box is a control (§6); the caret says it opens a list."
+      "fieldCaret": "The box is a control (§6); the caret says it opens a list.",
+      "cardChevron": "A table's leading caret is hidden on a card, since the card is the tap target; this chevron stands in for it. A card that cannot open has none. Tap the sample."
     },
     "samples": {
       "altActionRow": "Jita IV - Moon 4",
@@ -20666,6 +20673,8 @@
       "factionAmarr": "Amarr Empire",
       "factionGallente": "Gallente Federation",
       "tableLabel": "Row menu sample",
+      "cardTableLabel": "Expandable card sample",
+      "cardDetail": "Slasher: a frigate. This detail is what the card opened to show.",
       "selectableLabel": "Selected row sample",
       "nameHeader": "Ship",
       "menuItem": "Rename",

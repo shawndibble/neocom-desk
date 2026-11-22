@@ -28,7 +28,6 @@ import {
   type PayeeLedgerRow,
   type PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
-import { formatDateWithYear } from '@/lib/formatDateTick';
 import type { CsvColumn } from '@/lib/csv';
 import { formatIsk } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
@@ -147,7 +146,7 @@ export interface PayeeLedgerPanelProps {
 
 /**
  * A Payee ledger (decision 20261120-235011): every charge, payment, write-off and late notice
- * of one Payee's Running account, oldest first with a running balance, under its "Owes" or
+ * of one Payee's Running account, newest first with a running balance, under its "Owes" or
  * "Paid through" status. One panel for a Corp Tax Book's Payee and a personal one: the caller
  * fills `source`. A row opens in place to say what it was.
  */
@@ -201,16 +200,13 @@ function LedgerStatus({ ledger }: { ledger: PayeeLedger }) {
             emphasis
           />
           <StatChip label={t('miningTax.ledger.status.days')} value={status.days} />
-          <StatChip
-            label={t('miningTax.ledger.status.oldest')}
-            value={formatDateWithYear(status.oldest)}
-          />
+          <StatChip label={t('miningTax.ledger.status.oldest')} value={status.oldest} />
         </>
       )}
       {status.kind === 'paid' && (
         <StatChip
           label={t('miningTax.ledger.status.paidThrough')}
-          value={formatDateWithYear(status.through)}
+          value={status.through}
           tone="success"
           emphasis
         />
@@ -241,12 +237,18 @@ function LedgerBody({
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>(DEFAULT_LEDGER_FILTER);
+  // In date order: each row's balance is the account's balance after it, computed there.
   const rows = useMemo(() => filterLedgerRows(ledger.rows, filter), [ledger.rows, filter]);
+  // Shown newest first, like a bank statement: the latest payment is the top row, not the bottom
+  // of a long list. Only the order is reversed; no balance is recomputed.
+  const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
   const csvColumns = useMemo(() => ledgerCsvColumns(t), [t]);
+  // The file stays in date order (oldest first), whichever way the table reads.
   const tableExport = useTableExport({
     surface: 'mining-tax-payee-ledger',
     rows,
     columns: csvColumns,
+    source: 'rows',
   });
   if (ledger.rows.length === 0)
     return (
@@ -317,7 +319,7 @@ function LedgerBody({
           <PayeeLedgerTable
             {...tableExport.tableProps}
             label={t('miningTax.ledger.tableLabel')}
-            rows={rows}
+            rows={newestFirst}
             typeNames={typeNames}
             {...(onUnlinkPayment ? { onUnlinkPayment } : {})}
             {...(lockDate ? { lockDate } : {})}
@@ -330,7 +332,8 @@ function LedgerBody({
 
 /**
  * The ledger's table, for a page that holds its own frame: the Payee panel's, and an officer's
- * Miner page, which adds a row menu. `rows` in the order to show them.
+ * Miner page, which adds a row menu. `rows` in the order to show them: newest first in both, each
+ * row's balance still the account's balance after it.
  */
 export function PayeeLedgerTable({
   rows,
@@ -354,7 +357,7 @@ export function PayeeLedgerTable({
    * read-only. Only for a book's ledger; a personal Payee's has no lock date, so passes none.
    */
   lockDate?: string;
-  /** The lock date as the page writes dates; the year-bearing day label when left out. */
+  /** The lock date as the page writes dates; the table's own `YYYY-MM-DD` when left out. */
   lockDateLabel?: string;
 } & Omit<
   DataTableProps<PayeeLedgerRow>,
@@ -442,9 +445,7 @@ export function PayeeLedgerTable({
       rowKey={(r) => r.key}
       rowBoundary={lockRowBoundary(
         rows,
-        lockDate
-          ? { date: lockDate, label: lockDateLabel ?? formatDateWithYear(lockDate) }
-          : undefined,
+        lockDate ? { date: lockDate, label: lockDateLabel ?? lockDate } : undefined,
         (r) => r.date,
         (r) => r.key
       )}

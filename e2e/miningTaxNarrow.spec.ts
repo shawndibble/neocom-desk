@@ -285,9 +285,9 @@ test.describe('Balances strip Payee filter button — touch target', () => {
  * no layout engine, so only a real browser can tell 36 from 28 — hence a Playwright spec.
  *
  * The rows: Bulk Dismiss's itemized entries, and since every Payee is paid oldest first
- * (decision 20261120-235011) the payment lists of Link a wallet payment (the Payee card's Link
- * payment) and Link a payment you already made (the "Payments to link" card's Review). Settle up
- * and the link dialogs no longer list entries, so those rows are gone.
+ * (decision 20261120-235011) the payment lists of Link a payment you already made, opened from the
+ * Payee card's Link payment or the "Payments to link" card's Review (its
+ * suggestions). Settle up and the link dialog no longer list entries, so those rows are gone.
  *
  * Rows are ticked through the table's real checkbox column and the real selection toolbar rather
  * than by poking state, because "can this even be opened at 390px?" is half of what the fix has
@@ -316,7 +316,7 @@ test.describe('Mining Tax dialog rows — touch target', () => {
       .getByRole('region', { name: 'You owe' })
       .getByRole('button', { name: 'Link payment', exact: true })
       .click();
-    const dialog = page.getByRole('dialog', { name: 'Link a wallet payment' });
+    const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
     await expect(dialog).toBeVisible();
     return dialog;
   }
@@ -339,18 +339,18 @@ test.describe('Mining Tax dialog rows — touch target', () => {
     return dialog;
   }
 
-  test('Link a wallet payment: payment row reaches 36px on phone', async ({ page }) => {
+  test('Link a payment from a Payee card: payment row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });
     await page.goto('./mining/tax');
 
     const dialog = await openLinkWallet(page);
-    const row = dialog.getByRole('list', { name: 'Wallet payments' }).getByRole('radio');
-    expect(await labelHeight(row.first())).toBeGreaterThanOrEqual(36);
+    // One row component serves the suggested matches and the hand-picked list.
+    expect(await labelHeight(dialog.getByRole('radio').first())).toBeGreaterThanOrEqual(36);
   });
 
-  test('Link a payment you already made: payment row reaches 36px on phone', async ({ page }) => {
+  test('Link a payment from Review: suggested row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });

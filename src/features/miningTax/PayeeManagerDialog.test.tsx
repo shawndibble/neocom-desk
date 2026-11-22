@@ -358,7 +358,7 @@ describe('PayeeManagerDialog — list rows', () => {
     expect(screen.getByText('Settled')).toBeInTheDocument();
   });
 
-  it("opens any Payee's ledger from its balance, settled or not, when it has an account", async () => {
+  it("opens any Payee's ledger from its balance, settled or not, even with no account", async () => {
     const onOpenLedger = vi.fn();
     const account = { credit: 0 } as PayeeRunningAccount;
     renderDialog([bureau, police], {
@@ -370,8 +370,11 @@ describe('PayeeManagerDialog — list rows', () => {
       screen.getByRole('button', { name: `Open the ledger of ${bureau.name}` })
     );
     expect(onOpenLedger).toHaveBeenCalledWith('p1');
-    // Nothing ever billed: no account, so no ledger to open.
-    expect(screen.queryByRole('button', { name: `Open the ledger of ${police.name}` })).toBeNull();
+    // Nothing ever billed: no account, and "Settled" still opens its (empty) ledger.
+    await userEvent.click(
+      screen.getByRole('button', { name: `Open the ledger of ${police.name}` })
+    );
+    expect(onOpenLedger).toHaveBeenLastCalledWith(police.id);
   });
 
   it('lists the systems mined for a Payee after its rate and hub', () => {

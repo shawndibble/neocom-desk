@@ -4,18 +4,18 @@ Route `/mining`. Two tabs. Overview = personal mining output (ISK, ISK/day, m3, 
 
 User goals: Overview = "what did I mine, what is it worth, ISK/day". Tax = "never miss an alt's obligation, bill each landlord the right amount at the right price, know what is paid".
 
-| Feature                                                                    | Where                                                                                                       |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Route shell, Character gate, tab bar                                       | `src/routes/MoonMiningTax.tsx`                                                                              |
-| Overview: tiles, charts, table, day detail                                 | `OverviewTab.tsx`, `MiningYieldCharts.tsx`, `YieldDetailModal.tsx`                                          |
-| Overview prefs (range, basis, buyback %, refining, chart metric, columns)  | `OverviewSettings.tsx`, `*Pref.ts`, `overviewColumns.ts`                                                    |
-| Tax: owed cards, attention strip, continue card, ledger, selection toolbar | `TaxTab.tsx`, `OwedBalances.tsx`, `AttentionStrip.tsx`, `ContinueSessionCard.tsx`, `SelectionToolbar.tsx`   |
-| Row detail, Assign, combined summary, edit                                 | `RowDetailModal.tsx`, `AssignDialog.tsx`, `GroupSummaryModal.tsx`, `EntryEditDialog.tsx`                    |
-| Split, Combine, bulk dismiss                                               | `SplitDialog.tsx`, `JoinAssignDialog.tsx`, `BulkDismissDialog.tsx`                                          |
-| Settle up, link payment / wallet payment, Payee ledger                     | `SettleUpDialog.tsx`, `LinkPaymentDialog.tsx`, `LinkWalletPaymentDialog.tsx`, `ledger/PayeeLedgerPanel.tsx` |
-| Payees, Ore tags, page settings                                            | `PayeeManagerDialog.tsx`, `TypeOverridesDialog.tsx`, `src/features/settings/MiningTaxSettingsForm.tsx`      |
-| CSV                                                                        | `yieldCsv.ts`, `taxCsv.ts` via `TableActionsMenu`                                                           |
-| Pure engine                                                                | `src/engine/miningTax/*`; refining math `src/engine/industry/{reprocessing,characterModifiers}.ts`          |
+| Feature                                                                    | Where                                                                                                     |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Route shell, Character gate, tab bar                                       | `src/routes/MoonMiningTax.tsx`                                                                            |
+| Overview: tiles, charts, table, day detail                                 | `OverviewTab.tsx`, `MiningYieldCharts.tsx`, `YieldDetailModal.tsx`                                        |
+| Overview prefs (range, basis, buyback %, refining, chart metric, columns)  | `OverviewSettings.tsx`, `*Pref.ts`, `overviewColumns.ts`                                                  |
+| Tax: owed cards, attention strip, continue card, ledger, selection toolbar | `TaxTab.tsx`, `OwedBalances.tsx`, `AttentionStrip.tsx`, `ContinueSessionCard.tsx`, `SelectionToolbar.tsx` |
+| Row detail, Assign, combined summary, edit                                 | `RowDetailModal.tsx`, `AssignDialog.tsx`, `GroupSummaryModal.tsx`, `EntryEditDialog.tsx`                  |
+| Split, Combine, bulk dismiss                                               | `SplitDialog.tsx`, `JoinAssignDialog.tsx`, `BulkDismissDialog.tsx`                                        |
+| Settle up, link payment / wallet payment, Payee ledger                     | `SettleUpDialog.tsx`, `LinkPaymentDialog.tsx`, `ledger/PayeeLedgerPanel.tsx`                              |
+| Payees, Ore tags, page settings                                            | `PayeeManagerDialog.tsx`, `TypeOverridesDialog.tsx`, `src/features/settings/MiningTaxSettingsForm.tsx`    |
+| CSV                                                                        | `yieldCsv.ts`, `taxCsv.ts` via `TableActionsMenu`                                                         |
+| Pure engine                                                                | `src/engine/miningTax/*`; refining math `src/engine/industry/{reprocessing,characterModifiers}.ts`        |
 
 Paths below are under `src/features/miningTax/` unless stated.
 
@@ -199,7 +199,7 @@ Offered when a wholly unassigned entry has the same Character + system on the EV
 - Sources: wallet journal outgoing amounts (amount < 0, absolute value) with ref_type in `player_donation, contract_price, contract_price_payment_corp, contract_deposit` (contract refs = method contract, else donation); completed item-exchange contracts issued by the Character with price 0 and assignee != 0 (payment in kind; amount null, never priced from cargo, pilot confirms). Each Character's reads fail independently; results newest first; counterparty names via `resolveNames`. Scopes: wallet journal + contracts, ungated.
 - Linkable: a Made Payment no link holds and not sent to a corporation with a Corp Tax Book (the book reads its own wallet).
 - Suggestions (`suggestLink`) match only on who received it: the Payee's learned entity, then its name, across every record of a merged Payee, and only when one Payee matches at that tier. There is no day window. Amount alone (`amountsMatch(a,b)`: `|a-b| <= max(1, 0.005 x b)`) never suggests a Payee.
-- "Link a wallet payment" (from a Payee card): the pilot picks the payment; it pays the Payee's oldest days (the preview says which) and is always the pilot's own (`manual`) link. Row detail's "Paid by" (`PaymentLinksCard`) lists the links whose money reached the day, from the account's applications, each with Unlink.
+- "Link a payment you already made" (`LinkPaymentDialog`, the one dialog for linking a payment): suggested matches on top (`paymentMatches.ts` / `paymentLinks.ts`: the learned entity, then the name; an amount alone never suggests a transfer a Corp Tax Book holds), then every other unlinked wallet payment, searchable. Opened from a Payee card, a row, or Settle up's "Link payment", it is scoped to that Payee (its own suggestions; a hand pick goes to it). Opened from the "Payments to link" card it covers every Payee: suggestions grouped by Payee, and a hand pick asks which Payee. The pilot picks the payment; it pays the Payee's oldest days (the preview says which) and is always the pilot's own (`manual`) link. Row detail's "Paid by" (`PaymentLinksCard`) lists the links whose money reached the day, from the account's applications, each with Unlink.
 - Resolve's "Which payment was it?" (`claimablePayments`) never offers a payment a link holds, nor a donation the book already holds.
 
 ### Payee ledger (`ledger/`)

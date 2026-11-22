@@ -61,7 +61,7 @@ export function TaxSelectionBar({
         onLinkPayment={() => {
           const payeeId = selectedPayeeIds[0];
           if (!payeeId) return;
-          actions.openLinkWallet({ payeeId });
+          actions.openLinkPayment({ payeeId });
         }}
       />
     </div>

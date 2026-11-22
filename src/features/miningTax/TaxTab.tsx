@@ -24,6 +24,7 @@ import {
   corpPayeeId,
   isCorpPayeeId,
 } from '@/features/miningTax/corpBook/corpRows';
+import { unlinkedSentFor } from '@/features/miningTax/paymentLinks';
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import {
   useCorpStateHint,
@@ -537,7 +538,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       ? actions.openCorpPay(corporationOfPayee(balance.payee.id))
                       : settleUpBalance(balance.members)
                   }
-                  onLinkPayment={(balance) => actions.openLinkWallet({ payeeId: balance.payee.id })}
+                  onLinkPayment={(balance) =>
+                    actions.openLinkPayment({ payeeId: balance.payee.id })
+                  }
                   onOpenLedger={(balance) =>
                     actions.openLedger(
                       isCorpPayeeId(balance.payee.id)
@@ -551,16 +554,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       ? uncreditedByCorp.get(corporationOfPayee(balance.payee.id))
                       : undefined
                   }
-                  unlinkedOf={(balance) => {
-                    const mine = linkable.filter((s) => s.payee.id === balance.payee.id);
-                    if (mine.length === 0) return undefined;
-                    return {
-                      count: mine.length,
-                      amount: mine.reduce((sum, s) => sum + (s.payment.amount ?? 0), 0),
-                    };
-                  }}
+                  unlinkedOf={(balance) => unlinkedSentFor(linkable, balance.payee.id)}
                   onAssignNext={assignNext}
-                  onReviewPayments={() => actions.openLinkPayment(true)}
+                  onReviewPayments={() => actions.openLinkPayment({})}
                   conflicts={conflicts}
                   onReviewConflicts={() => {
                     const first = conflicts?.first.corp;
@@ -732,7 +728,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           priceSourcesFor={priceSourcesFor}
           onClearSelection={selection.clearSelection}
           onAddPayee={onAddPayee}
-          onToast={(message) => setToast({ message })}
+          onToast={(message, onUndo) =>
+            setToast({
+              message,
+              ...(onUndo
+                ? {
+                    onUndo: () => {
+                      setToast(null);
+                      onUndo();
+                    },
+                  }
+                : {}),
+            })
+          }
         />
       </TabPanel>
     </div>

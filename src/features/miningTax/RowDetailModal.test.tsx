@@ -269,7 +269,7 @@ describe('RowDetailModal owed entry', () => {
     const onLinkWalletPayment = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onLinkWalletPayment });
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a wallet payment' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a payment' }));
     expect(onLinkWalletPayment).toHaveBeenCalledTimes(1);
   });
 });

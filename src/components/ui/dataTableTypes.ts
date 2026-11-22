@@ -178,9 +178,11 @@ export interface DataTableExpandableRow<T> {
   hideIcon?: boolean;
   /**
    * Draws the §6c expand-in-place cue instead: a leading rotating caret in
-   * the first cell, hidden in the stacked card layout (the card is the tap
-   * target). Implies `hideIcon`'s trailing chevron being dropped, so a row
-   * with a ⋮ keeps one trailing control.
+   * the first cell. A table keeps one cue per layout, so the trailing chevron
+   * is dropped from the table, and the stacked card, which hides the leading
+   * caret (the card is the tap target), shows that trailing chevron instead:
+   * it turns when the card is open. A `trigger: 'button'` caret stays a
+   * button in the card, so it gets no chevron.
    */
   leadingIcon?: boolean;
   /**

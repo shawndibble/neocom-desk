@@ -87,7 +87,7 @@ interface RowDetailModalProps {
   suggestion?: PayeeSuggestion;
   /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
   onSettleUp?: () => void;
-  /** Opens "Link a wallet payment" for this entry's Payee, for ISK already sent. */
+  /** Opens "Link a payment" for this entry's Payee, for ISK already sent. */
   onLinkWalletPayment?: () => void;
   /** What a Corp Tax Book says about this entry (pending record, unattributed), shown under the status line (#4065). */
   corpNote?: ReactNode;
