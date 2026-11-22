@@ -7,6 +7,7 @@ import { idSetKey } from '@/lib/idSetKey';
  */
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LiveNote } from '@/components/ui';
 import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/losses/netLoss';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { loadWalletJournal } from '@/features/character/wallet';
@@ -77,16 +78,16 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
 
   if (pricesFailed) {
     return (
-      <p role="status" className="text-xs text-warning">
+      <LiveNote className="text-xs text-warning">
         {t('travel.pilot.recent.lossSummary.pricesFailed')}
-      </p>
+      </LiveNote>
     );
   }
   if (prices === null) {
     return (
-      <p role="status" className="text-xs text-text-dim">
+      <LiveNote className="text-xs text-text-dim">
         {t('travel.pilot.recent.lossSummary.loading')}
-      </p>
+      </LiveNote>
     );
   }
 

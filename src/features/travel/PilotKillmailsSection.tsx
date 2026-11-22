@@ -6,7 +6,7 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, TypeIcon } from '@/components/ui';
+import { Button, Caret, LiveNote, TypeIcon } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { resolveNames } from '@/features/character/names';
 import { cx } from '@/lib/cx';
@@ -135,9 +135,7 @@ export function PilotKillmailsSection({
         </ExternalLink>
       </div>
       {result === null ? (
-        <p role="status" className="text-xs text-text-dim">
-          {t('travel.pilot.recent.loading')}
-        </p>
+        <LiveNote className="text-xs text-text-dim">{t('travel.pilot.recent.loading')}</LiveNote>
       ) : !result.ok ? (
         <div role="status" className="flex items-center gap-2 text-xs text-warning">
           <span>{t(zkillFailureKey(result.reason, 'travel.pilot.recent.failed'))}</span>
