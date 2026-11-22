@@ -422,6 +422,19 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
     });
   });
 
+  it('says so when Auto Build changed no plan', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    const onAutoBuild = vi.fn().mockResolvedValue(0);
+    renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onAutoBuild });
+
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+    expect((await screen.findAllByText(/Auto Build changed nothing/)).length).toBeGreaterThan(0);
+  });
+
   it('has no depth control and no Planetary chip (issue #798)', () => {
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
     renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG });

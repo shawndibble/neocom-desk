@@ -138,6 +138,23 @@ export function Toast({
     if (persistent && pathname !== mountedPathname.current) onCloseRef.current?.();
   }, [persistent, pathname]);
 
+  // The Undo is portalled to the end of the page, past anything Tab reaches in
+  // 8s. Alt+Z moves focus onto it (which also holds the clock); Escape hands
+  // focus back. Mounted order is registration order, so the newest toast
+  // takes focus last.
+  const undoRef = useRef<HTMLButtonElement>(null);
+  const hasUndo = Boolean(undo);
+  useEffect(() => {
+    if (!hasUndo) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.code !== 'KeyZ') return;
+      e.preventDefault();
+      undoRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasUndo]);
+
   // Where focus was before it entered the toast, so Escape can hand it back.
   const rootRef = useRef<HTMLDivElement>(null);
   const cameFrom = useRef<HTMLElement | null>(null);
@@ -197,7 +214,13 @@ export function Toast({
       </span>
       <LiveStatus announceKey={occurrence}>{message}</LiveStatus>
       {undo && (
-        <button type="button" className={`${inlineLinkClassName} shrink-0`} onClick={undo.onUndo}>
+        <button
+          ref={undoRef}
+          type="button"
+          aria-keyshortcuts="Alt+Z"
+          className={`${inlineLinkClassName} shrink-0`}
+          onClick={undo.onUndo}
+        >
           {undo.label}
         </button>
       )}

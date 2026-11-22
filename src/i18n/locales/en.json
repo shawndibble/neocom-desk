@@ -4582,6 +4582,9 @@
       "fill": "Fill the Have column",
       "withCorp": "{{scope}} + Corp Assets"
     },
+    "autoBuildGroupNothing": "Auto Build changed nothing: no plan in this group has a build or buy choice to change.",
+    "autoBuildGroupApplied_one": "Auto Build changed {{count}} plan in this group.",
+    "autoBuildGroupApplied_other": "Auto Build changed {{count}} plans in this group.",
     "strategyApplied_one": "Build strategy applied: {{count}} part built here.",
     "strategyApplied_other": "Build strategy applied: {{count}} parts built here.",
     "craftScopeReactionsIncluded": "incl. reactions",
@@ -7064,6 +7067,8 @@
       "undo": "Undo",
       "undoDismissed": "{{title}} dismissed",
       "undoDismissedMany": "{{title}} dismissed · {{count}} alerts",
+      "undoMarkedRead_one": "{{count}} alert marked read",
+      "undoMarkedRead_other": "{{count}} alerts marked read",
       "undoStopped": "{{title}} alerts off for all characters",
       "undoStoppedOne": "{{title}} alerts off",
       "showMore_one": "Show {{count}} more",
@@ -20864,7 +20869,11 @@
         "selected": "{{count}} selected",
         "clear": "Clear",
         "approve": "Approve ({{count}})",
-        "markPaid": "Mark paid ({{count}})"
+        "markPaid": "Mark paid ({{count}})",
+        "confirmApproveTitle": "Approve claims",
+        "confirmApproveBody": "Approve {{count}} claims totalling {{isk}} ISK?",
+        "confirmPaidTitle": "Mark as paid",
+        "confirmPaidBody": "Mark {{count}} claims totalling {{isk}} ISK as paid?"
       },
       "reject": {
         "title": "Reject {{pilot}}'s claim?",

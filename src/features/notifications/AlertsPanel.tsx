@@ -74,11 +74,25 @@ const LEAVE_MS = 400;
 
 const NOTIFICATION_SETTINGS_PATH = tabPath(SETTINGS_TABS, 'notifications');
 
+/** The one deferred commit Mark all read raises; not a group key. */
+const MARK_ALL_READ_ID = 'mark-all-read';
+
 export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const now = useNow();
-  const allEntries = useVisibleAlertEntries();
+  const feedEntries = useVisibleAlertEntries();
+  const deferred = useDeferredCommits();
+  const { hiddenIds } = deferred;
+  /** The fires Mark all read swept; hidden while its Undo toast (or write) is pending. */
+  const [markedReadIds, setMarkedReadIds] = useState<ReadonlySet<string>>(new Set());
+  const allEntries = useMemo(
+    () =>
+      hiddenIds.has(MARK_ALL_READ_ID)
+        ? feedEntries.filter((entry) => !markedReadIds.has(entry.id))
+        : feedEntries,
+    [feedEntries, hiddenIds, markedReadIds]
+  );
   const snoozeMap = useSnoozeStore((state) => state.value);
   const { permission } = useNotificationPermission();
   const dismissOnView = useNotificationPreferences((state) => isDismissOnView(state.value));
@@ -90,8 +104,6 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const leaveTimers = useRef(new Map<string, number>());
   const reducedMotion = usePrefersReducedMotion();
-  const deferred = useDeferredCommits();
-  const { hiddenIds } = deferred;
   const { characters, namesById: nameById } = useAccountCharacters();
   // One-Character device: the name is the same on every row, so it is dropped.
   const showCharacter = characters.length > 1;
@@ -260,7 +272,13 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
             disabled={readable.length === 0}
             onClick={() => {
               focusAfterCommit(heading);
-              void dismissFeedEntriesAndSync(readable);
+              const swept = readable;
+              setMarkedReadIds(new Set(swept.map((entry) => entry.id)));
+              deferred.defer({
+                id: MARK_ALL_READ_ID,
+                message: t('alerts.panel.undoMarkedRead', { count: swept.length }),
+                commit: () => dismissFeedEntriesAndSync(swept),
+              });
             }}
           >
             {t('alerts.panel.markAllRead')}

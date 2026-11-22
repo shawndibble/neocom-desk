@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { Button, IconButton, TextInput } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { inlineLinkClassName, stackedLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -129,6 +130,13 @@ export function MailComposeBox({
   // nothing else stops a slow resolution from landing after typing has
   // already started and silently overwriting it.
   const touchedRef = useRef(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+
+  // Cancel discards: a half-written draft would otherwise come back on the next Reply.
+  function discard() {
+    void clearDraft(characterId, header.mail_id).catch(() => undefined);
+    onClose();
+  }
 
   // Hydrates from a saved draft, or builds this decision's reply/forward
   // defaults (`engine/mail.ts`) otherwise. Mail.tsx keys this component by
@@ -446,17 +454,22 @@ export function MailComposeBox({
       >
         <Button
           size="sm"
-          onClick={() => {
-            // Cancel discards: a half-written draft would otherwise come back on the next Reply.
-            void clearDraft(characterId, header.mail_id).catch(() => undefined);
-            onClose();
-          }}
+          onClick={() => (touchedRef.current ? setConfirmingDiscard(true) : discard())}
           disabled={sending}
         >
           {t('mail.cancel')}
         </Button>
         {!online && <span className="truncate text-xs text-text-dim">{t('mail.draftSaved')}</span>}
       </MailComposeFooter>
+      <ConfirmDialog
+        open={confirmingDiscard}
+        title={t('mail.discardTitle')}
+        body={t('mail.discardBody')}
+        actionLabel={t('mail.discardConfirm')}
+        cancelLabel={t('mail.discardKeep')}
+        onConfirm={async () => discard()}
+        onClose={() => setConfirmingDiscard(false)}
+      />
     </div>
   );
 }
