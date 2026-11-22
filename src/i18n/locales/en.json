@@ -4958,7 +4958,7 @@
     "footerDataCredit": "Data credit",
     "footerDiscord": "Discord",
     "permissionsPrivacy": "How your data is stored and deleted:",
-    "failed": "Couldn’t start the sign-in. Check your connection and try again."
+    "failed": "Couldn’t start the login. Check your connection and try again."
   },
   "callback": {
     "completing": "Completing login…",
@@ -14656,7 +14656,7 @@
       "selectNone": "Select none",
       "optionalCount": "Optional · {{count}} of {{total}}",
       "submit": "Log in with selected permissions",
-      "loginFailed": "Couldn’t start the sign-in. Your choices are kept; try again."
+      "loginFailed": "Couldn’t start the login. Your choices are kept; try again."
     }
   },
   "pageSettings": {
