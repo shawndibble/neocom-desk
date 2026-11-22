@@ -131,7 +131,7 @@ describe('ContactsStandings header', () => {
     renderTab();
 
     expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveAttribute('aria-disabled');
     expect(screen.getByText(/just now|ago/i)).toBeInTheDocument();
     expect(loadMock).toHaveBeenCalledWith(91, { force: false });
   });
@@ -215,7 +215,12 @@ describe('ContactsStandings header', () => {
     loadMock.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Refresh' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    );
     expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
     finish({ entries: [ENTRY], fetchedAt: new Date(), fromCache: true, available: true });
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();

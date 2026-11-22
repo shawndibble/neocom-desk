@@ -196,7 +196,7 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
         <IconButton
           icon={<Icon.Refresh />}
           label={t('skillCompare.refresh')}
-          disabled={compare.refreshing}
+          busy={compare.refreshing}
           onClick={compare.refresh}
         />
       )}

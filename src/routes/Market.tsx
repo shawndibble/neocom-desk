@@ -700,7 +700,7 @@ export function Market() {
                 icon={<Icon.Refresh />}
                 label={t('market.refresh')}
                 onClick={haulingRefresh.refresh}
-                disabled={haulingRefresh.disabled}
+                busy={haulingRefresh.disabled}
               />
             ) : undefined
           }

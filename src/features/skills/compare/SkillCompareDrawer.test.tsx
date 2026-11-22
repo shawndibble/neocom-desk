@@ -517,14 +517,17 @@ describe('SkillCompareDrawer', () => {
       await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
       expect(screen.getByRole('table', { name: 'Skill comparison' })).toBe(table);
-      expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Refresh' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
       expect(within(skillRow(table, 'Gunnery')).getAllByRole('cell')[0]).toHaveTextContent('3');
 
       held.resolve();
       await waitFor(() =>
         expect(within(skillRow(table, 'Gunnery')).getAllByRole('cell')[0]).toHaveTextContent('4')
       );
-      expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveAttribute('aria-disabled');
     });
 
     it('drops a deselected character column without a loading frame', async () => {

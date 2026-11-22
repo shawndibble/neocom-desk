@@ -555,7 +555,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
             {/* The gear takes the ⋮'s slot: last before the bell, after Refresh. */}
             {headerLayout !== 'wide' && (

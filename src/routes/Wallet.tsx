@@ -235,7 +235,7 @@ export function Wallet() {
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
               onClick={handlePersonalRefresh}
-              disabled={loading || journalView.loading}
+              busy={loading || journalView.loading}
             />
           </>
         }

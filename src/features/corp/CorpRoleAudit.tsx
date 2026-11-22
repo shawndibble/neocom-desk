@@ -296,7 +296,7 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
             icon={<Icon.Refresh />}
             label={t('corp.roles.refresh')}
             onClick={snapshot.refresh}
-            disabled={snapshot.loading}
+            busy={snapshot.loading}
           />
         }
       />
