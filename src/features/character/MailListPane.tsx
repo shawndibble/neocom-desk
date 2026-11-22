@@ -165,7 +165,12 @@ export function MailListPane({
       )}
       {hasMore && (
         <div className="border-t border-line p-2">
-          <Button size="sm" className="w-full" onClick={onLoadMore} disabled={loadingMore}>
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={onLoadMore}
+            aria-disabled={loadingMore || undefined}
+          >
             {loadingMore ? t('common.loading') : t('mail.loadMore')}
           </Button>
           {loadMoreFailure !== null && (

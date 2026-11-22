@@ -162,7 +162,8 @@ export function FittingLoadCard({
           size="md"
           variant="primary"
           onClick={() => void handleLoad()}
-          disabled={loading || text.trim() === ''}
+          loading={loading}
+          aria-disabled={text.trim() === '' || undefined}
         >
           {t('fittings.load.button')}
         </Button>
@@ -199,7 +200,7 @@ export function FittingLoadCard({
               if (file) void handleFittingXmlFile(file);
             }}
           />
-          <Button size="md" onClick={() => fileInputRef.current?.click()} disabled={xmlLoading}>
+          <Button size="md" onClick={() => fileInputRef.current?.click()} loading={xmlLoading}>
             {t('fittings.load.xml.browse')}
           </Button>
 
