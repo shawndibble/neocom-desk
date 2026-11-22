@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
@@ -292,7 +292,9 @@ describe('Widget states', () => {
       store.set('mail', { data: mailData(7), error: true, loading: false })
     );
     const region = screen.getByRole('region', { name: 'Mail' });
-    expect(within(region).getByRole('alert')).toHaveTextContent('Could not load');
+    await waitFor(() =>
+      expect(within(region).getByRole('status')).toHaveTextContent('Could not load')
+    );
     expect(within(region).getByText(/Last updated 5m ago/)).toBeInTheDocument();
     expect(within(region).getByText('7').closest('.opacity-45')).not.toBeNull();
     await user.click(within(region).getByRole('button', { name: 'Retry' }));
@@ -616,7 +618,9 @@ describe('Kills and losses widget', () => {
       feed(store, [kill(1, 'kill')], true)
     );
     const region = screen.getByRole('region', { name: 'Kills and losses' });
-    expect(within(region).getByRole('alert')).toHaveTextContent('Could not load');
+    await waitFor(() =>
+      expect(within(region).getByRole('status')).toHaveTextContent('Could not load')
+    );
     expect(within(region).getByText('1').closest('.opacity-45')).not.toBeNull();
     await user.click(within(region).getByRole('button', { name: 'Retry' }));
     expect(refresh).toHaveBeenCalledTimes(1);

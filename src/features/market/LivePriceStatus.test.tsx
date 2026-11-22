@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import '@/i18n';
 import { LivePriceStatus, PriceMark } from './LivePriceStatus';
 
@@ -14,24 +14,28 @@ describe('LivePriceStatus', () => {
     expect(container).toHaveTextContent('');
   });
 
-  it('shows the count while checking but announces only the start', () => {
+  it('shows the count while checking but announces only the start', async () => {
     const { rerender } = render(
       <LivePriceStatus live={{ ...progress, checking: true, done: 1, total: 60 }} />
     );
     expect(screen.getByText('Checking live prices 1 / 60')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/^Checking live prices$/);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/^Checking live prices$/)
+    );
     rerender(<LivePriceStatus live={{ ...progress, checking: true, done: 23, total: 60 }} />);
     expect(screen.getByText('Checking live prices 23 / 60')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/^Checking live prices$/);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/^Checking live prices$/)
+    );
   });
 
-  it('announces the finish without the ticking age', () => {
+  it('announces the finish without the ticking age', async () => {
     render(
       <LivePriceStatus
         live={{ ...progress, done: 60, total: 60, checkedAt: Date.now() - 14_000 }}
       />
     );
-    expect(screen.getByRole('status')).toHaveTextContent(/^Live prices$/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^Live prices$/));
   });
 
   it('says how old the live prices are once done', () => {

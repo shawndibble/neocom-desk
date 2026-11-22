@@ -2,6 +2,7 @@
  * The ticked set overruns: the covers added so far, each with its own tick,
  * the swaps on offer that would cover it, and the implant alternative.
  */
+import { LiveNote } from '@/components/ui/LiveStatus';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';
@@ -55,9 +56,9 @@ export function ImproveCoverOffer({
         </label>
       ))}
       {!overruns ? null : offered === null ? (
-        <p className="text-text-dim text-xs" role="status">
+        <LiveNote className="text-text-dim text-xs">
           {t('fittings.improve.cover.searching')}
-        </p>
+        </LiveNote>
       ) : (
         <>
           <p className="text-xs font-medium">

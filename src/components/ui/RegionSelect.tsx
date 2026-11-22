@@ -1,3 +1,4 @@
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { cx } from '@/lib/cx';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
@@ -209,9 +210,9 @@ export function RegionSelect({
               {shortcut.label}
             </button>
             {shortcut.note && (
-              <span role="status" className="block px-2 text-xs text-text-dim">
+              <LiveNote as="span" className="block px-2 text-xs text-text-dim">
                 {shortcut.note}
-              </span>
+              </LiveNote>
             )}
           </div>
         )}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RegionSelect } from './RegionSelect';
 
@@ -131,7 +131,9 @@ describe('RegionSelect', () => {
     await user.click(trigger());
     expect(screen.getByRole('dialog', { name: 'Region' })).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText('Search regions…'), 'zzzz');
-    expect(await screen.findByRole('status')).toHaveTextContent('No matching regions');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('No matching regions')
+    );
     expect(screen.getByText('No matching regions', { selector: 'p' })).toHaveAttribute(
       'aria-hidden',
       'true'
@@ -207,7 +209,7 @@ describe('RegionSelect shortcut', () => {
     await user.click(trigger());
     await user.click(screen.getByRole('button', { name: 'From my region' }));
 
-    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getAllByText('Unavailable')).toHaveLength(2);
     expect(onSelect).not.toHaveBeenCalled();
   });
 });

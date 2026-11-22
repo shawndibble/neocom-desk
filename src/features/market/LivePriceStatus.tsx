@@ -5,6 +5,7 @@
  * Colour never carries the meaning alone: the mark is an icon with a spoken
  * and hover label.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { priceMarkKey } from './priceStateLabel';
 import { useTranslation } from 'react-i18next';
 import { ProgressBar, Tooltip } from '@/components/ui';
@@ -77,9 +78,7 @@ export function LivePriceStatus({
     live.total > 0 && live.checking ? t('market.appraisal.live.announceChecking') : summary;
   return (
     <>
-      <span className="sr-only" role="status">
-        {announcement}
-      </span>
+      <LiveStatus>{announcement}</LiveStatus>
       {live.total > 0 && live.checking && (
         <span className={cx(STATUS_LINE, 'text-xs text-text-dim tabular-nums')} aria-hidden="true">
           {t('market.appraisal.live.checking', { done: live.done, total: live.total })}

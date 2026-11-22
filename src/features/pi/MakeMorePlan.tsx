@@ -1,3 +1,4 @@
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
@@ -157,9 +158,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
 
   return (
     <div className="space-y-4">
-      <div role="status" aria-live="polite" className="sr-only">
-        {headlineText(view, t)}
-      </div>
+      <LiveStatus>{headlineText(view, t)}</LiveStatus>
       <AssumedCustomsNote
         names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />

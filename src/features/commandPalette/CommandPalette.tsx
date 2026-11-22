@@ -1,3 +1,4 @@
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { formatCount } from '@/lib/formatCount';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -662,9 +663,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             {altOutcome.text}
           </p>
         )}
-        <span role="status" aria-live="polite" className="sr-only">
-          {statusText}
-        </span>
+        <LiveStatus>{statusText}</LiveStatus>
       </div>
     </Modal>
   );

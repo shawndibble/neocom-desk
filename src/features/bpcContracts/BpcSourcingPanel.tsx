@@ -663,7 +663,7 @@ export function BpcSourcingPanel({
               list flush against the filter bar it read as more page furniture
               and went unnoticed — the whole feature hangs on picking from it. */}
             {/* Always mounted, so the count is announced when the list appears. */}
-            <span role="status" aria-live="polite" className="sr-only">
+            <LiveStatus>
               {openSuggestions !== null &&
                 (highlightedSuggestion
                   ? t('bpcContracts.suggestionsHighlighted', {
@@ -671,7 +671,7 @@ export function BpcSourcingPanel({
                       name: highlightedSuggestion.name,
                     })
                   : t('bpcContracts.suggestionsCount', { count: openSuggestions.length }))}
-            </span>
+            </LiveStatus>
             {openSuggestions !== null && (
               <div className="border-b border-line bg-panel-2 px-3 py-2">
                 <p className={cx(eyebrowClassName, 'pb-1.5')}>

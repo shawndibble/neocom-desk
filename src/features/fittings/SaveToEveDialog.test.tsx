@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { SaveToEveDialog } from './SaveToEveDialog';
@@ -101,8 +101,10 @@ describe('SaveToEveDialog', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Save as' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Replace "Old Rifter"' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'This deletes "Old Rifter" from your in-game Fittings and replaces it with this one.'
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'This deletes "Old Rifter" from your in-game Fittings and replaces it with this one.'
+      )
     );
     await userEvent.click(screen.getByRole('button', { name: 'Replace' }));
 
@@ -295,7 +297,9 @@ describe('SaveToEveDialog', () => {
       <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('may not have been saved');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('may not have been saved')
+    );
   });
 
   describe('with no connection', () => {
@@ -319,8 +323,10 @@ describe('SaveToEveDialog', () => {
           onSaveToMyFittings={onSaveToMyFittings}
         />
       );
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        'Saving to EVE needs a connection. You can still save to My Fittings.'
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Saving to EVE needs a connection. You can still save to My Fittings.'
+        )
       );
       await userEvent.click(screen.getByRole('button', { name: 'Save to My Fittings' }));
       expect(onSaveToMyFittings).toHaveBeenCalledOnce();
@@ -338,7 +344,9 @@ describe('SaveToEveDialog', () => {
           onSaved={vi.fn()}
         />
       );
-      expect(await screen.findByRole('alert')).toHaveTextContent('Needs a connection.');
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('Needs a connection.')
+      );
       expect(screen.getByRole('button', { name: 'Save to My Fittings' })).toBeDisabled();
     });
   });

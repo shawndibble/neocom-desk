@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { LiveStatus } from './LiveStatus';
+import { LiveNote, LiveStatus } from './LiveStatus';
 
 /**
  * Visually hidden polite live region (WCAG 4.1.3, §7). It has no visual cue
@@ -33,3 +33,8 @@ export const Reannounce: Story = { args: { children: 'Copied', announceKey: 1 } 
 
 /** @summary Status message (§7): an empty region is silent but stays mounted. */
 export const Silent: Story = { args: { children: null } };
+
+/** @summary Visible notice (§7): `LiveNote` shows the text and announces it politely. */
+export const VisibleNotice: StoryObj<typeof LiveNote> = {
+  render: () => <LiveNote className="text-xs text-warning">Prices are a day old.</LiveNote>,
+};

@@ -1,3 +1,4 @@
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
@@ -56,11 +57,7 @@ export function RailUpgradeButton() {
           <p>{t('nav.upgradeCallout')}</p>
         </PopoverContent>
       </Popover>
-      {notice && (
-        <span role="status" className="sr-only">
-          {notice.text}
-        </span>
-      )}
+      <LiveStatus>{notice?.text}</LiveStatus>
     </>
   );
 }

@@ -3,6 +3,7 @@
  * move (a figure that stays put is left out), what they cost, and any
  * problem they cause. While the check runs, or if it failed, a line says so.
  */
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
 import type { FittingStats } from '@/engine/fittings/types';
@@ -55,11 +56,11 @@ export function ImproveSelectionSummary({ summary, checked, iskBudget }: Props) 
           <SelectionCost summary={summary} iskBudget={iskBudget} />
         </>
       ) : (
-        <p className="text-text-dim text-xs" role="status">
+        <LiveNote className="text-text-dim text-xs">
           {checked === null
             ? t('fittings.improve.selection.failed')
             : t('fittings.improve.selection.checking')}
-        </p>
+        </LiveNote>
       )}
     </div>
   );

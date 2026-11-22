@@ -1,3 +1,4 @@
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -1039,9 +1040,9 @@ export function Market() {
                             <div className="flex flex-col items-end gap-1 text-xs text-text-dim">
                               {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
                               {failedRegionCount > 0 && (
-                                <p role="status" className="text-warning">
+                                <LiveNote className="text-warning">
                                   {t('market.regionsFailed', { count: failedRegionCount })}
-                                </p>
+                                </LiveNote>
                               )}
                             </div>
                           )}

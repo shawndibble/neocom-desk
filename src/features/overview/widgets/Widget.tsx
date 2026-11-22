@@ -15,6 +15,7 @@
  * No view-cyclers in the header: view switching lives in the settings menu, so
  * a stray click changes nothing.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -393,7 +394,8 @@ function WidgetFrame({
     );
   } else if (state === 'failed') {
     body = (
-      <div role="alert" className="grid gap-2 p-3 text-[0.8125rem]">
+      <div className="grid gap-2 p-3 text-[0.8125rem]">
+        <LiveStatus>{t('overview.widgets.failed.title')}</LiveStatus>
         <b className="flex items-center gap-1.5 text-danger">
           <SeverityIcon severity="critical" />
           {t('overview.widgets.failed.title')}

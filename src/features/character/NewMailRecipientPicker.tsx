@@ -4,6 +4,7 @@
  * picks (Forward's contacts) and ESI search hits for characters,
  * corporations and alliances.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
@@ -240,7 +241,7 @@ export function NewMailRecipientPicker({
         <span className={cx('text-xs tabular-nums', full ? 'text-warning' : 'text-text-dim')}>
           {t('mail.counter', { count: recipients.length, max: MAX_RECIPIENTS })}
         </span>
-        <span role="status" aria-live="polite" className="sr-only">
+        <LiveStatus>
           {open &&
             !full &&
             candidates.length > 0 &&
@@ -250,7 +251,7 @@ export function NewMailRecipientPicker({
                   name: candidates[combo.highlight].name,
                 })
               : t('mail.recipientResultsCount', { count: candidates.length }))}
-        </span>
+        </LiveStatus>
         {open && !full && (
           <ul
             {...combo.listboxProps}

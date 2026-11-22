@@ -1,3 +1,4 @@
+import { LiveNote } from '@/components/ui/LiveStatus';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,9 +31,9 @@ interface Props {
 export function FittingExportNotice({ notice }: { notice: string | null }) {
   if (notice === null) return null;
   return (
-    <span role="status" className="text-xs text-text-dim">
+    <LiveNote as="span" className="text-xs text-text-dim">
       {notice}
-    </span>
+    </LiveNote>
   );
 }
 

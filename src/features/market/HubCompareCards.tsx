@@ -11,6 +11,7 @@
  * hub, and the hub it is quoted at reads as selected. The system name is the
  * card's title button, not a SystemLink, so the card has one action.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
@@ -216,9 +217,7 @@ export function HubCompareCards({
         a screen reader hears, and ten of them would be ten places for it to
         come from.
       */}
-      <span role="status" aria-live="polite" className="sr-only">
-        {copied === null ? '' : t('market.appraisal.copiedToClipboard')}
-      </span>
+      <LiveStatus>{copied === null ? '' : t('market.appraisal.copiedToClipboard')}</LiveStatus>
     </>
   );
 }

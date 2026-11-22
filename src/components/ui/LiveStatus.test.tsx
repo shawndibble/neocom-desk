@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveStatus } from './LiveStatus';
+import { LiveNote, LiveStatus } from './LiveStatus';
 import { Modal } from './Modal';
 
 describe('LiveStatus', () => {
@@ -70,5 +70,22 @@ describe('LiveStatus', () => {
     );
     flush();
     expect(screen.getByRole('dialog')).toContainElement(screen.getByRole('status'));
+  });
+});
+
+describe('LiveNote', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows the text with no role and announces it through a LiveStatus', () => {
+    vi.useFakeTimers();
+    render(<LiveNote className="text-warning">Heads up</LiveNote>);
+    expect(screen.getByText('Heads up')).not.toHaveAttribute('role');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Heads up');
   });
 });

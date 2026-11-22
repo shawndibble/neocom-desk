@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ElementType, type ReactNode } from 'react';
 
 interface LiveStatusProps {
   /** The message. `null`, `false` or `''` is silent. */
@@ -52,5 +52,28 @@ export function LiveStatus({ children, announceKey, id, 'data-testid': testId }:
     <span role="status" id={id} data-testid={testId} className="sr-only">
       {quiet ? null : children}
     </span>
+  );
+}
+
+interface LiveNoteProps {
+  /** The visible element: `p` (default) or `span`. */
+  as?: ElementType;
+  className?: string;
+  children: ReactNode;
+}
+
+/**
+ * A visible notice that is also announced politely: the text renders in its
+ * element (no role, so nothing mounts as a live region with its text) and the
+ * same text goes to a sibling `LiveStatus`. Use it where a bare
+ * `<p role="status">` mounted together with its text. Renders two siblings, so
+ * mind the `LiveStatus` placement rule above.
+ */
+export function LiveNote({ as: Tag = 'p', className, children }: LiveNoteProps) {
+  return (
+    <>
+      <LiveStatus>{children}</LiveStatus>
+      <Tag className={className}>{children}</Tag>
+    </>
   );
 }

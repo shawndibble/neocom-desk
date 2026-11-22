@@ -7,6 +7,7 @@
  * the pilot their original — a failed *delete* after a successful save
  * leaves both, which this dialog reports rather than hiding.
  */
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
@@ -242,9 +243,9 @@ export function SaveToEveDialog({
           </label>
         )}
         {overwriteTarget && (
-          <p role="alert" className="text-xs text-warning">
+          <LiveNote className="text-xs text-warning">
             {t('fittings.saveToEve.overwriteConfirm', { name: overwriteTarget.name })}
-          </p>
+          </LiveNote>
         )}
         {needsPermission && (
           <GrantBanner
@@ -254,20 +255,20 @@ export function SaveToEveDialog({
           />
         )}
         {!online ? (
-          <p role="alert" className="text-xs text-warning">
+          <LiveNote className="text-xs text-warning">
             {t(
               onSaveToMyFittings
                 ? 'fittings.saveToEve.needsConnectionKeepMine'
                 : 'fittings.saveToEve.needsConnection'
             )}
-          </p>
+          </LiveNote>
         ) : (
           offlineFailed && <InlineError>{t('fittings.saveToEve.offlineFailed')}</InlineError>
         )}
         {unconfirmed && (
-          <p role="alert" className="text-xs text-warning">
+          <LiveNote className="text-xs text-warning">
             {t('fittings.saveToEve.unconfirmed')}
-          </p>
+          </LiveNote>
         )}
         {errorMessage && (
           <InlineError>

@@ -13,6 +13,7 @@
  * `aria-activedescendant`, Enter or a click opens the store, Escape closes the
  * popover and returns focus to the button.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -241,7 +242,7 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
             aria-activedescendant={highlighted ? optionId(highlighted.corporationId) : undefined}
             autoComplete="off"
           />
-          <span role="status" aria-live="polite" className="sr-only">
+          <LiveStatus>
             {listOpen &&
               (highlighted
                 ? t('loyaltyStore.pickerHighlighted', {
@@ -250,7 +251,7 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
                   })
                 : t('loyaltyStore.pickerResultsCount', { count: options.length }))}
             {noMatches && t('loyaltyStore.pickerNoResults')}
-          </span>
+          </LiveStatus>
           {noMatches && (
             <span aria-hidden="true" className="px-2 py-1.5 text-text-dim">
               {t('loyaltyStore.pickerNoResults')}

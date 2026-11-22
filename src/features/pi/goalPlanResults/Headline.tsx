@@ -2,6 +2,7 @@
  * Is it worth it: the **Lift** over the **Baseline** (never a gross margin),
  * whether every goal is met, and the caveats behind the numbers.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -113,11 +114,7 @@ function LiveVerdict({ text, pending }: { text: string; pending: boolean }) {
     const timer = setTimeout(() => setAnnounced(text), pending ? 5_000 : 500);
     return () => clearTimeout(timer);
   }, [text, pending]);
-  return (
-    <span role="status" aria-live="polite" className="sr-only">
-      {announced}
-    </span>
-  );
+  return <LiveStatus>{announced}</LiveStatus>;
 }
 
 export function Headline({

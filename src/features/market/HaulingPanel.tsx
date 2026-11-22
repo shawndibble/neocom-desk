@@ -1,3 +1,4 @@
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { formatAge } from '@/lib/age';
 import { HaulingHowItWorks } from './HaulingHowItWorks';
@@ -719,7 +720,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   } else if (state.status === 'loading') {
     content = (
       <Panel padded={false}>
-        <div className="flex items-center gap-3 px-3 py-10" role="status">
+        <div className="flex items-center gap-3 px-3 py-10">
+          <LiveStatus>{progressText(state.progress)}</LiveStatus>
           <Spinner label={t('common.loading')} size="sm" />
           <span className="text-sm text-text-dim">{progressText(state.progress)}</span>
         </div>

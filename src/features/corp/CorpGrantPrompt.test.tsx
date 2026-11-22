@@ -48,7 +48,7 @@ function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorpo
   };
 }
 
-const prompt = () => screen.queryByRole('alert', { name: /corporation access/i });
+const prompt = () => screen.queryByLabelText(/corporation access/i);
 
 beforeEach(async () => {
   vi.clearAllMocks();
