@@ -362,7 +362,7 @@ export function GoalResults({
                     <Button
                       variant="primary"
                       size="sm"
-                      disabled={busy}
+                      aria-disabled={busy || undefined}
                       onClick={() => onAdd(fix.typeIds)}
                     >
                       {fix.typeIds.length > 1
@@ -558,7 +558,7 @@ function GradeAction({
     <Button
       variant={row.inSet ? 'ghost' : 'primary'}
       size="sm"
-      disabled={busy}
+      aria-disabled={busy || undefined}
       aria-label={t('fittings.implantFinder.actionLabel', { action, name })}
       data-implant-action=""
       onClick={() => (row.inSet ? onRemove(row.grade.typeId) : onAdd(row.grade.typeId))}

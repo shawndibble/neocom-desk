@@ -1015,7 +1015,7 @@ describe('AppraisalPanel', () => {
       });
       const dialog = await screen.findByRole('dialog', { name: 'Which column is the quantity?' });
       const confirm = within(dialog).getByRole('button', { name: 'Use this column' });
-      expect(confirm).toBeDisabled();
+      expect(confirm).toHaveAttribute('aria-disabled', 'true');
       await user.click(within(dialog).getByRole('radio', { name: 'Column 3 · 10000' }));
       await user.click(confirm);
       expect(chooseQuantityColumn).toHaveBeenCalledWith(3);
@@ -1541,7 +1541,10 @@ describe('AppraisalPanel — the row as an item', () => {
 
     it('is disabled with no Character to store the share as', () => {
       renderPanel({ controller: controller({ result: SHARED }), characterId: null });
-      expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Copy Share Link' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
     });
   });
 

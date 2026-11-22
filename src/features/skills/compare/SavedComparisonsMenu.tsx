@@ -13,6 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -242,14 +243,18 @@ export function SavedComparisonsMenu({
             >
               {t('skillCompare.savedTitle')}
             </h3>
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={selectedIds.length === 0}
-              onClick={handleSave}
+            <Tooltip
+              content={selectedIds.length === 0 ? t('skillCompare.saveNeedsSelection') : null}
             >
-              {t('skillCompare.saveComparison')}
-            </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                aria-disabled={selectedIds.length === 0 || undefined}
+                onClick={handleSave}
+              >
+                {t('skillCompare.saveComparison')}
+              </Button>
+            </Tooltip>
           </div>
           {value.items.length === 0 ? (
             <EmptyState

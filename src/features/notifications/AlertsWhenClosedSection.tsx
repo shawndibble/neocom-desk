@@ -288,7 +288,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                 <Button
                   size="sm"
                   onClick={() => setConfirming(walking.map((need) => need.characterId))}
-                  disabled={busyId !== null}
+                  aria-disabled={busyId !== null || undefined}
                 >
                   {t('settings.notifications.alertsWhenClosed.signInAll', {
                     count: summaryNeeds.characters,
@@ -353,7 +353,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                           size="sm"
                           variant={state === 'needs-reauth' ? 'primary' : 'ghost'}
                           loading={busy}
-                          disabled={busyId !== null}
+                          aria-disabled={busyId !== null || undefined}
                           aria-label={t(
                             state === 'needs-reauth'
                               ? 'settings.notifications.alertsWhenClosed.reauthorizeFor'
@@ -374,7 +374,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                       <Button
                         size="sm"
                         loading={busy && !need?.needsWalk}
-                        disabled={busyId !== null}
+                        aria-disabled={busyId !== null || undefined}
                         aria-label={t('settings.notifications.alertsWhenClosed.turnOffFor', {
                           name: character.name,
                         })}

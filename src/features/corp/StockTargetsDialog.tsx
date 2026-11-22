@@ -276,7 +276,7 @@ function AddTarget({
             }}
           />
         </div>
-        <Button type="submit" variant="primary" disabled={disabled}>
+        <Button type="submit" variant="primary" aria-disabled={disabled || undefined}>
           {t('corp.stockTargets.add')}
         </Button>
       </div>

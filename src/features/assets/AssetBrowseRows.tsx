@@ -328,8 +328,11 @@ function SearchMatchRow({
               ))}
               {ship && (
                 <MenuItem
-                  disabled={openInFittings.pending}
-                  onSelect={() => openInFittings.open(() => assetShipEditLocation(ship, name))}
+                  aria-disabled={openInFittings.pending || undefined}
+                  onSelect={() => {
+                    if (!openInFittings.pending)
+                      openInFittings.open(() => assetShipEditLocation(ship, name));
+                  }}
                 >
                   {t('assets.openInFittings')}
                 </MenuItem>
@@ -383,8 +386,11 @@ function NodeRowView({
         extraItems={
           node.kind === 'ship' ? (
             <MenuItem
-              disabled={openInFittings.pending}
-              onSelect={() => openInFittings.open(() => assetShipEditLocation(node, label))}
+              aria-disabled={openInFittings.pending || undefined}
+              onSelect={() => {
+                if (!openInFittings.pending)
+                  openInFittings.open(() => assetShipEditLocation(node, label));
+              }}
             >
               {t('assets.openInFittings')}
             </MenuItem>

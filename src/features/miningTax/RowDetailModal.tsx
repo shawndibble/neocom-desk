@@ -446,7 +446,7 @@ export function RowDetailModal({
             )}
             <div className="flex">
               <Button
-                disabled={busy}
+                aria-disabled={busy || undefined}
                 onClick={onEdit}
                 className={moreMenu ? 'rounded-r-none' : undefined}
               >

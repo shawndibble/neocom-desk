@@ -54,6 +54,7 @@ import {
   Tabs,
   useTabsId,
   IncompleteNotice,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -657,13 +658,17 @@ function CorpAssetsView({
               : undefined
           }
         />
-        <Button
-          className="ml-auto"
-          disabled={!targetsApi.hydrated || data?.corporationId == null}
-          onClick={() => setTargetsOpen(true)}
+        <Tooltip
+          content={!targetsApi.hydrated || data?.corporationId == null ? t('common.loading') : null}
         >
-          {t('corp.assets.stockTargetsButton')}
-        </Button>
+          <Button
+            className="ml-auto"
+            aria-disabled={!targetsApi.hydrated || data?.corporationId == null || undefined}
+            onClick={() => setTargetsOpen(true)}
+          >
+            {t('corp.assets.stockTargetsButton')}
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );
@@ -768,22 +773,36 @@ function CorpAssetsView({
                       >
                         {t('assets.select.selectAllInView')}
                       </Button>
-                      <Button
-                        size="sm"
-                        disabled={selectedKeys.size === 0}
-                        onClick={() => setSelectedKeys(() => EMPTY_KEYS)}
+                      <Tooltip
+                        content={
+                          selectedKeys.size === 0 ? t('assets.select.deselectAllEmpty') : null
+                        }
                       >
-                        {t('assets.select.deselectAll')}
-                      </Button>
+                        <Button
+                          size="sm"
+                          aria-disabled={selectedKeys.size === 0 || undefined}
+                          onClick={() => setSelectedKeys(() => EMPTY_KEYS)}
+                        >
+                          {t('assets.select.deselectAll')}
+                        </Button>
+                      </Tooltip>
                       {selectedKeys.size > 0 && (
                         <>
-                          <Button
-                            size="sm"
-                            disabled={!itemActions.quickbar.available}
-                            onClick={handleBulkAddToQuickbar}
+                          <Tooltip
+                            content={
+                              itemActions.quickbar.available
+                                ? null
+                                : t('market.contextMenu.quickbarNoCharacter')
+                            }
                           >
-                            {t('assets.select.addToQuickbar')}
-                          </Button>
+                            <Button
+                              size="sm"
+                              aria-disabled={!itemActions.quickbar.available || undefined}
+                              onClick={handleBulkAddToQuickbar}
+                            >
+                              {t('assets.select.addToQuickbar')}
+                            </Button>
+                          </Tooltip>
                           <Button size="sm" onClick={handleBulkAddToCompare}>
                             {t('assets.select.addToCompare')}
                           </Button>

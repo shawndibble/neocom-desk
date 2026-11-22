@@ -82,7 +82,7 @@ describe('BootScreen', () => {
       screen.getByRole('button', { name: 'Reload' }).click();
     });
     const button = screen.getByRole('button', { name: 'Reloading…' });
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     button.click();
     expect(recoverFromStalledBoot).toHaveBeenCalledOnce();
   });

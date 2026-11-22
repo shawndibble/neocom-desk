@@ -10,6 +10,7 @@ import {
   Checkbox,
   TextArea,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import {
   MAX_LINES_PER_REQUEST,
@@ -528,13 +529,23 @@ export function ComposeRequestDialog({
           <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>
-            {editing
-              ? t('communities.board.compose.save')
-              : t(
-                  standingMode ? 'communities.board.buyback.post' : 'communities.board.compose.post'
-                )}
-          </Button>
+          <Tooltip content={!canSubmit ? t('common.needsInput') : null}>
+            <Button
+              size="sm"
+              variant="primary"
+              type="submit"
+              loading={busy}
+              aria-disabled={!canSubmit || undefined}
+            >
+              {editing
+                ? t('communities.board.compose.save')
+                : t(
+                    standingMode
+                      ? 'communities.board.buyback.post'
+                      : 'communities.board.compose.post'
+                  )}
+            </Button>
+          </Tooltip>
         </DialogFooter>
       </form>
     </Modal>

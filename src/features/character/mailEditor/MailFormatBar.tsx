@@ -84,9 +84,8 @@ export function MailFormatBar({
       label={label}
       tooltip={extra.tooltip}
       pressed={extra.pressed}
-      disabled={disabled}
       // `aria-disabled`, not native: a native-disabled button fires no hover/focus, so its reason would never show.
-      aria-disabled={extra.unavailable || undefined}
+      aria-disabled={disabled || extra.unavailable || undefined}
       data-bar-key={key}
       tabIndex={key === stop ? 0 : -1}
       onFocus={() => setStop(key)}

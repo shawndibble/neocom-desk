@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Radio } from '@/components/ui';
+import { Button, Modal, Radio, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { AppraisalUnreadableLine } from '@/engine/market/appraisalPaste';
 
@@ -47,18 +47,22 @@ export function QuantityColumnModal({
       footer={
         <>
           <Button onClick={close}>{t('market.appraisal.quantityColumn.leave')}</Button>
-          <Button
-            variant="primary"
-            disabled={selected === null}
-            onClick={() => {
-              if (selected === null) return;
-              const column = selected;
-              setSelected(null);
-              onChoose(column);
-            }}
+          <Tooltip
+            content={selected === null ? t('market.appraisal.quantityColumn.confirmEmpty') : null}
           >
-            {t('market.appraisal.quantityColumn.confirm')}
-          </Button>
+            <Button
+              variant="primary"
+              aria-disabled={selected === null || undefined}
+              onClick={() => {
+                if (selected === null) return;
+                const column = selected;
+                setSelected(null);
+                onChoose(column);
+              }}
+            >
+              {t('market.appraisal.quantityColumn.confirm')}
+            </Button>
+          </Tooltip>
         </>
       }
     >

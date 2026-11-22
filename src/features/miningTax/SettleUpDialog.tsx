@@ -13,6 +13,7 @@ import {
   SelectValue,
   TextInput,
   textActionClassName,
+  Tooltip,
 } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
@@ -408,7 +409,7 @@ export function SettleUpDialog({
               <Button
                 size="sm"
                 variant="danger"
-                disabled={saving}
+                loading={saving}
                 onClick={() => void dismissBalance()}
               >
                 {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
@@ -425,13 +426,16 @@ export function SettleUpDialog({
         )}
         <div className="flex flex-wrap gap-2 pt-1">
           {record ? (
-            <Button
-              variant="primary"
-              disabled={saving || amountToSend <= 0 || paidOn === ''}
-              onClick={() => void commit()}
-            >
-              {t('miningTax.settleUp.recordAction')}
-            </Button>
+            <Tooltip content={amountToSend <= 0 || paidOn === '' ? t('common.needsInput') : null}>
+              <Button
+                variant="primary"
+                loading={saving}
+                aria-disabled={amountToSend <= 0 || paidOn === '' || undefined}
+                onClick={() => void commit()}
+              >
+                {t('miningTax.settleUp.recordAction')}
+              </Button>
+            </Tooltip>
           ) : (
             <Button variant="primary" onClick={onClose}>
               {t('common.close')}

@@ -78,7 +78,7 @@ export function LostShipsList({ rows, onFile, onOpen, busyKillmailId = null }: L
                   variant="ghost"
                   size="sm"
                   aria-label={t('srpMember.lost.fileShip', { hull: r.hullName })}
-                  disabled={busyKillmailId !== null}
+                  aria-disabled={busyKillmailId !== null || undefined}
                   onClick={() => onFile(r)}
                 >
                   {t('srpMember.lost.file')}

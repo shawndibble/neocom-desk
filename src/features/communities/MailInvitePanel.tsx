@@ -3,7 +3,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { Field, Fields, TextInput, NeedsConnection, Button } from '@/components/ui';
+import { Field, Fields, TextInput, NeedsConnection, Button, Tooltip } from '@/components/ui';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { sendMail } from '@/features/character/mail';
 import { resolvePilotByName } from '@/features/travel/pilotLookup';
@@ -182,9 +182,16 @@ export function MailInvitePanel({
           </Field>
         </Fields>
         <NeedsConnection>
-          <Button type="submit" size="sm" loading={busy} disabled={disabled || name.trim() === ''}>
-            {t('communities.mailInvite.send')}
-          </Button>
+          <Tooltip content={name.trim() === '' ? t('common.needsInput') : null}>
+            <Button
+              type="submit"
+              size="sm"
+              loading={busy}
+              aria-disabled={disabled || name.trim() === '' || undefined}
+            >
+              {t('communities.mailInvite.send')}
+            </Button>
+          </Tooltip>
         </NeedsConnection>
       </form>
       {remaining !== null && (

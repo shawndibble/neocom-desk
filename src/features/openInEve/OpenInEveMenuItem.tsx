@@ -68,10 +68,10 @@ export function OpenInEveMenuItem({
   }
   return (
     <MenuItem
-      disabled={sending}
+      aria-disabled={sending || undefined}
       onSelect={(event) => {
         event.preventDefault();
-        send();
+        if (!sending) send();
       }}
     >
       {content}

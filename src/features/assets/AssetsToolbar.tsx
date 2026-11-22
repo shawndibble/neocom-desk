@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount, LiveStatus } from '@/components/ui';
+import { Button, IskAmount, LiveStatus, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import { formatCubicMetres } from '@/lib/volume';
 import { AssetsFilterRow } from './AssetsFilterRow';
@@ -102,18 +102,30 @@ export function AssetsToolbar({
           <Button size="sm" onClick={handleSelectAllInView}>
             {t('assets.select.selectAllInView')}
           </Button>
-          <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
-            {t('assets.select.deselectAll')}
-          </Button>
+          <Tooltip content={selectedIds.size === 0 ? t('assets.select.deselectAllEmpty') : null}>
+            <Button
+              size="sm"
+              aria-disabled={selectedIds.size === 0 || undefined}
+              onClick={handleDeselectAll}
+            >
+              {t('assets.select.deselectAll')}
+            </Button>
+          </Tooltip>
           {selectedIds.size > 0 && (
             <>
-              <Button
-                size="sm"
-                disabled={activeCharacterId === null}
-                onClick={handleBulkAddToQuickbar}
+              <Tooltip
+                content={
+                  activeCharacterId === null ? t('market.contextMenu.quickbarNoCharacter') : null
+                }
               >
-                {t('assets.select.addToQuickbar')}
-              </Button>
+                <Button
+                  size="sm"
+                  aria-disabled={activeCharacterId === null || undefined}
+                  onClick={handleBulkAddToQuickbar}
+                >
+                  {t('assets.select.addToQuickbar')}
+                </Button>
+              </Tooltip>
               <Button size="sm" onClick={handleBulkAppraise}>
                 {t('assets.select.appraise')}
               </Button>

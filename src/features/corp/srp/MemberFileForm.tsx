@@ -1,6 +1,6 @@
 import { useId, type FormEvent, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Field, FieldError, Fields, TextInput } from '@/components/ui';
+import { Button, Field, FieldError, Fields, TextInput, Tooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import type { DoctrineCheckRecord } from '../srpTypes';
 import { DoctrineCheckView } from './DoctrineCheckView';
@@ -122,14 +122,17 @@ export function MemberFileForm({
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={busy || link.trim() === ''}
-          className={cx(fullWidth && 'min-h-9 w-full')}
-        >
-          {busy ? t('srpMember.file.filing') : t('srpMember.file.submit')}
-        </Button>
+        <Tooltip content={link.trim() === '' ? t('common.needsInput') : null}>
+          <Button
+            type="submit"
+            variant="primary"
+            loading={busy}
+            aria-disabled={link.trim() === '' || undefined}
+            className={cx(fullWidth && 'min-h-9 w-full')}
+          >
+            {busy ? t('srpMember.file.filing') : t('srpMember.file.submit')}
+          </Button>
+        </Tooltip>
       </div>
     </form>
   );

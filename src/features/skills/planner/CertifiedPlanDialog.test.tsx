@@ -93,7 +93,7 @@ describe('CertifiedPlanDialog', () => {
     const user = userEvent.setup();
     const { onPick } = renderDialog();
     const create = await screen.findByRole('button', { name: 'Create plan' });
-    expect(create).toBeDisabled();
+    expect(create).toHaveAttribute('aria-disabled', 'true');
 
     await user.click(screen.getByRole('tab', { name: 'Industrialist' }));
     const row = screen.getByRole('radio', { name: /Manufacturer/ });
@@ -168,7 +168,10 @@ describe('CertifiedPlanDialog', () => {
       trainedSkillsKnown: false,
     } as unknown as ReturnType<typeof usePlanEditorData>);
     renderDialog();
-    expect(await screen.findByRole('button', { name: 'Create plan' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Create plan' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 });

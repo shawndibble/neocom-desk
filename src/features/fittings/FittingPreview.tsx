@@ -177,9 +177,15 @@ function RowPreview({
             ) : (
               compareButton
             )}
-            <Button variant="primary" disabled={fitting === null} onClick={onOpen}>
-              {t('fittings.start.preview.open')}
-            </Button>
+            <Tooltip content={fitting === null ? t('fittings.start.preview.openLoading') : null}>
+              <Button
+                variant="primary"
+                aria-disabled={fitting === null || undefined}
+                onClick={onOpen}
+              >
+                {t('fittings.start.preview.open')}
+              </Button>
+            </Tooltip>
           </div>
         </div>
 

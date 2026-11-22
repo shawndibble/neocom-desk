@@ -2228,7 +2228,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     const importButton = screen.getByRole('button', { name: 'Import' });
     await importFromQueue(user);
-    expect(importButton).toBeDisabled();
+    expect(importButton).toHaveAttribute('aria-disabled', 'true');
 
     resolveQueue(queueResult([]));
     await waitFor(() => expect(importButton).not.toBeDisabled());

@@ -6,6 +6,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
   IskAmount,
   isRowOwnEvent,
+  DisabledMenuItem,
   MenuItem,
   MenuSeparator,
   MenuSub,
@@ -136,22 +137,27 @@ export const PlanRow = memo(function PlanRow({
       <MenuSub>
         <MenuSubTrigger>{t('industry.moveToGroup')}</MenuSubTrigger>
         <MenuSubContent>
-          {groups.map((group) => (
-            <MenuItem
-              key={group.id}
-              disabled={plan.buildGroupId === group.id}
-              onSelect={() => onMovePlan(plan.id, group.id)}
-            >
-              {group.name}
-            </MenuItem>
-          ))}
+          {groups.map((group) =>
+            plan.buildGroupId === group.id ? (
+              <DisabledMenuItem key={group.id} reason={t('industry.alreadyInGroup')}>
+                {group.name}
+              </DisabledMenuItem>
+            ) : (
+              <MenuItem key={group.id} onSelect={() => onMovePlan(plan.id, group.id)}>
+                {group.name}
+              </MenuItem>
+            )
+          )}
           {groups.length > 0 && <MenuSeparator />}
-          <MenuItem
-            disabled={plan.buildGroupId === undefined}
-            onSelect={() => onMovePlan(plan.id, null)}
-          >
-            {t('industry.removeFromGroup')}
-          </MenuItem>
+          {plan.buildGroupId === undefined ? (
+            <DisabledMenuItem reason={t('industry.notInGroup')}>
+              {t('industry.removeFromGroup')}
+            </DisabledMenuItem>
+          ) : (
+            <MenuItem onSelect={() => onMovePlan(plan.id, null)}>
+              {t('industry.removeFromGroup')}
+            </MenuItem>
+          )}
         </MenuSubContent>
       </MenuSub>
       <MenuItem onSelect={startRename}>{t('industry.rename')}</MenuItem>

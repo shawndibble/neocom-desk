@@ -73,8 +73,8 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
             <button
               type="button"
               className={plainTextActionClassName('min-h-9 md:min-h-6')}
-              disabled={busy}
-              onClick={() => void withdraw()}
+              aria-disabled={busy || undefined}
+              onClick={busy ? undefined : () => void withdraw()}
             >
               {t(k('withdraw'))}
             </button>

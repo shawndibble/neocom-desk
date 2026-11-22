@@ -44,6 +44,9 @@ describe('FitGoalModal', () => {
 
   it('does not offer a Fitting that is already flyable', () => {
     render(<FitGoalModal open options={options} onClose={vi.fn()} onPick={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /Now fit/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Now fit/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });

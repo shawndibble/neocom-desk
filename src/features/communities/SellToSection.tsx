@@ -230,7 +230,7 @@ export function SellToSection({
             size="sm"
             variant="primary"
             loading={busy === 'quote'}
-            disabled={text.trim() === '' || busy !== null}
+            aria-disabled={text.trim() === '' || busy !== null || undefined}
             onClick={() => void getQuote()}
           >
             {t('communities.board.sellTo.getQuote')}
@@ -242,7 +242,7 @@ export function SellToSection({
               size="sm"
               variant="ghost"
               loading={busy === 'clear'}
-              disabled={busy !== null}
+              aria-disabled={busy !== null || undefined}
               onClick={() => void clear()}
             >
               {t('communities.board.sellTo.clear')}

@@ -132,7 +132,7 @@ describe('Templates in the info panel', () => {
 
     const dialog = await screen.findByRole('dialog');
     const save = within(dialog).getByRole('button', { name: 'Save template' }) as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
+    expect(save.getAttribute('aria-disabled')).toBe('true');
     await user.click(within(dialog).getByRole('checkbox', { name: /Notes/ }));
     await user.type(within(dialog).getByLabelText('Name'), 'Efa run');
     await user.click(save);

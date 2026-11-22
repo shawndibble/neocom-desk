@@ -91,7 +91,7 @@ describe('useEditorShare', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
     const item = await screen.findByRole('menuitem', { name: 'Share to Pals' });
-    expect(item).toHaveAttribute('data-disabled');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Sharing to a Community needs a connection.')).toBeVisible();
   });
 });

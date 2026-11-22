@@ -244,7 +244,7 @@ describe('MemberSrp', () => {
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Re-file claim for Ferox' }));
     const submit = screen.getByRole('button', { name: 'Re-file claim' });
-    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    expect((submit as HTMLButtonElement).getAttribute('aria-disabled')).toBe('true');
     await userEvent.type(screen.getByLabelText('Note'), 'FC was Kestrel Vane.');
     await userEvent.click(submit);
     await waitFor(() =>
@@ -260,7 +260,7 @@ describe('MemberSrp', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Re-file claim for Ferox' }));
     await userEvent.type(screen.getByLabelText('Note'), 'It was a fleet.');
     const submit = screen.getByRole('button', { name: 'Re-file claim' });
-    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    expect((submit as HTMLButtonElement).getAttribute('aria-disabled')).toBe('true');
     // The dialog's field is the last one in the document; the page form's comes first.
     await userEvent.type(screen.getAllByLabelText('Fleet or FC').at(-1)!, 'Kestrel Vane');
     await userEvent.click(submit);

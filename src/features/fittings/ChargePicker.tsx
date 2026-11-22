@@ -80,7 +80,7 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
               <button
                 key={key}
                 type="button"
-                disabled={!onLoad}
+                aria-disabled={!onLoad || undefined}
                 onClick={() => onLoad?.(choice.typeId)}
                 aria-pressed={group.loaded.has(choice.typeId)}
                 className={chargeRowClassName(

@@ -84,7 +84,7 @@ export function ColorDialog({ open, onClose, phone, canReset, current, onPick }:
             </button>
           ))}
         </div>
-        <Button size="md" onClick={() => pick(null)} disabled={!canReset}>
+        <Button size="md" onClick={() => pick(null)} aria-disabled={!canReset || undefined}>
           {t('mail.format.colorDefault')}
         </Button>
         <form onSubmit={submitHex} className="space-y-1">
@@ -149,8 +149,9 @@ export function SizeDialog({ open, onClose, phone, canReset, current, onPick }: 
             <button
               type="button"
               aria-pressed={active === p.id}
-              disabled={p.px === null && !canReset}
+              aria-disabled={(p.px === null && !canReset) || undefined}
               onClick={() => {
+                if (p.px === null && !canReset) return;
                 onPick(p.px);
                 onClose();
               }}

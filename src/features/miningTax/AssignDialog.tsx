@@ -14,6 +14,7 @@ import {
   SelectValue,
   TextInput,
   Checkbox,
+  Tooltip,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
 import { defaultPayeeForSystem } from '@/engine/miningTax/defaultSystems';
@@ -439,21 +440,24 @@ export function AssignDialog({
       )}
       <LedgerActionError error={saveError} />
       <div className="flex flex-wrap gap-2 pt-1">
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!canAssign || saving || busy}
-          onClick={() => void handleAssign()}
-        >
-          {warnUnpricedOffline
-            ? t('miningTax.assignAnywayAction')
-            : selectedPayee && Number.isFinite(taxOwed)
-              ? t('miningTax.assignToAction', {
-                  payee: selectedPayee.name,
-                  amount: maskIsk(Math.round(taxOwed)),
-                })
-              : t('miningTax.assignAction')}
-        </Button>
+        <Tooltip content={!canAssign ? t('common.needsInput') : null}>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={saving || busy}
+            aria-disabled={!canAssign || undefined}
+            onClick={() => void handleAssign()}
+          >
+            {warnUnpricedOffline
+              ? t('miningTax.assignAnywayAction')
+              : selectedPayee && Number.isFinite(taxOwed)
+                ? t('miningTax.assignToAction', {
+                    payee: selectedPayee.name,
+                    amount: maskIsk(Math.round(taxOwed)),
+                  })
+                : t('miningTax.assignAction')}
+          </Button>
+        </Tooltip>
         {extraActions}
         <Button size="sm" onClick={onCancel}>
           {t('filters.cancel')}

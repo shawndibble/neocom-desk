@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
+  DisabledMenuItem,
   MenuCheckboxItem,
   MenuItem,
   MenuLabel,
@@ -187,7 +188,12 @@ function PlexPlanDialog({
           <Button type="button" onClick={onClose}>
             {t('overview.menu.plexPlanCancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={!valid}>
+          <Button
+            type="submit"
+            variant="primary"
+            aria-disabled={!valid || undefined}
+            aria-describedby={hintId}
+          >
             {t('overview.menu.plexPlanSave')}
           </Button>
         </DialogFooter>
@@ -234,15 +240,20 @@ function CalendarTypesSub({ widget }: { widget: Widget }) {
           </MenuCheckboxItem>
         ))}
         <MenuSeparator />
-        <MenuItem
-          disabled={hidden.length === 0}
-          onSelect={(event) => {
-            event.preventDefault();
-            edit.setHiddenKinds(widget.id, []);
-          }}
-        >
-          {t('calendar.filter.showAll')}
-        </MenuItem>
+        {hidden.length === 0 ? (
+          <DisabledMenuItem reason={t('overview.menu.showAllNothingHidden')}>
+            {t('calendar.filter.showAll')}
+          </DisabledMenuItem>
+        ) : (
+          <MenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              edit.setHiddenKinds(widget.id, []);
+            }}
+          >
+            {t('calendar.filter.showAll')}
+          </MenuItem>
+        )}
       </MenuSubContent>
     </MenuSub>
   );
@@ -494,21 +505,33 @@ export function WidgetMenu({
       <MenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
         {t('overview.menu.rename')}
       </MenuItem>
-      <MenuItem
-        disabled={edit.layout.widgets.length >= MAX_WIDGETS}
-        onSelect={() => edit.duplicate(widget.id)}
-      >
-        {t('overview.menu.duplicate')}
-      </MenuItem>
-      <MenuItem disabled={index <= 0} onSelect={() => edit.moveEdge(widget.id, 'top')}>
-        {t('overview.menu.top')}
-      </MenuItem>
-      <MenuItem
-        disabled={index < 0 || index >= last}
-        onSelect={() => edit.moveEdge(widget.id, 'bottom')}
-      >
-        {t('overview.menu.bottom')}
-      </MenuItem>
+      {edit.layout.widgets.length >= MAX_WIDGETS ? (
+        <DisabledMenuItem reason={t('overview.menu.duplicateAtLimit')}>
+          {t('overview.menu.duplicate')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={() => edit.duplicate(widget.id)}>
+          {t('overview.menu.duplicate')}
+        </MenuItem>
+      )}
+      {index <= 0 ? (
+        <DisabledMenuItem reason={t('overview.menu.alreadyTop')}>
+          {t('overview.menu.top')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={() => edit.moveEdge(widget.id, 'top')}>
+          {t('overview.menu.top')}
+        </MenuItem>
+      )}
+      {index < 0 || index >= last ? (
+        <DisabledMenuItem reason={t('overview.menu.alreadyBottom')}>
+          {t('overview.menu.bottom')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={() => edit.moveEdge(widget.id, 'bottom')}>
+          {t('overview.menu.bottom')}
+        </MenuItem>
+      )}
       <MenuCheckboxItem
         checked={widget.showOnPhone}
         onCheckedChange={(next) => edit.setShowOnPhone(widget.id, next === true)}

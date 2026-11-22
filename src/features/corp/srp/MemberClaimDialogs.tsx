@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, FieldError, Modal, TextArea, TextInput } from '@/components/ui';
+import { Button, FieldError, Modal, TextArea, TextInput, Tooltip } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
@@ -56,14 +56,23 @@ export function RefileDialog({
           <Button variant="ghost" className="w-full sm:w-auto" onClick={onClose}>
             {t('srpMember.refile.cancel')}
           </Button>
-          <Button
-            variant="primary"
-            className="w-full sm:w-auto"
-            disabled={busy || note.trim() === '' || (needsFleet && fleet.trim() === '')}
-            onClick={() => onSubmit(note.trim(), needsFleet ? fleet.trim() : undefined)}
+          <Tooltip
+            content={
+              note.trim() === '' || (needsFleet && fleet.trim() === '')
+                ? t('common.needsInput')
+                : null
+            }
           >
-            {t('srpMember.refile.submit')}
-          </Button>
+            <Button
+              variant="primary"
+              className="w-full sm:w-auto"
+              loading={busy}
+              aria-disabled={note.trim() === '' || (needsFleet && fleet.trim() === '') || undefined}
+              onClick={() => onSubmit(note.trim(), needsFleet ? fleet.trim() : undefined)}
+            >
+              {t('srpMember.refile.submit')}
+            </Button>
+          </Tooltip>
         </div>
       }
     >

@@ -12,6 +12,7 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import { parsePercent } from '@/lib/parsePercent';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -508,9 +509,17 @@ export function ComposeFleetPayoutDialog({
           <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>
-            {t('communities.payouts.compose.create')}
-          </Button>
+          <Tooltip content={!canSubmit ? t('common.needsInput') : null}>
+            <Button
+              size="sm"
+              variant="primary"
+              type="submit"
+              loading={busy}
+              aria-disabled={!canSubmit || undefined}
+            >
+              {t('communities.payouts.compose.create')}
+            </Button>
+          </Tooltip>
         </DialogFooter>
       </form>
     </Modal>

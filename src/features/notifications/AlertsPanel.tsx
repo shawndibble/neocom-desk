@@ -269,8 +269,9 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
           <button
             type="button"
             className={textActionClassName()}
-            disabled={readable.length === 0 || hiddenIds.has(MARK_ALL_READ_ID)}
+            aria-disabled={readable.length === 0 || hiddenIds.has(MARK_ALL_READ_ID) || undefined}
             onClick={() => {
+              if (readable.length === 0 || hiddenIds.has(MARK_ALL_READ_ID)) return;
               focusAfterCommit(heading);
               const swept = readable;
               setMarkedReadIds(new Set(swept.map((entry) => entry.id)));

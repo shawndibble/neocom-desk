@@ -7,6 +7,7 @@ import {
   Spinner,
   TabPanel,
   Tabs,
+  Tooltip,
   useTabsId,
   type TabItem,
 } from '@/components/ui';
@@ -189,9 +190,24 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
         )}
 
         <div className="flex gap-2">
-          <Button variant="primary" size="sm" onClick={create} disabled={!picked || !loaded}>
-            {t('plans.certified.create')}
-          </Button>
+          <Tooltip
+            content={
+              !loaded
+                ? t('plans.certified.createLoading')
+                : !picked
+                  ? t('plans.certified.createNeedsPick')
+                  : null
+            }
+          >
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={create}
+              aria-disabled={!picked || !loaded || undefined}
+            >
+              {t('plans.certified.create')}
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={onClose}>
             {t('common.cancel')}
           </Button>

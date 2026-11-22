@@ -81,7 +81,7 @@ describe('ResolveDialog', () => {
     await user.click(screen.getByRole('radio', { name: /Not paying/ }));
     await user.click(screen.getByRole('checkbox', { name: /Tell Bureau why/ }));
     const send = screen.getByRole('button', { name: 'Hide it and tell them' });
-    expect(send).toBeDisabled();
+    expect(send).toHaveAttribute('aria-disabled', 'true');
     await user.type(screen.getByRole('textbox', { name: /Why/ }), 'Untaxed op');
     await user.click(send);
     expect(submit.tellNotPaying).toHaveBeenCalledWith(mail, row, 'Untaxed op');
@@ -118,7 +118,10 @@ describe('ResolveDialog', () => {
     expect(screen.getByRole('radio', { name: /Pay it/ })).toBeChecked();
     await userEvent.click(screen.getByRole('radio', { name: /I already paid/ }));
     expect(screen.getByText(/No Late notice has asked for it yet/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send proof' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   describe('donations the book holds for review without counting them', () => {

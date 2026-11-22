@@ -5,7 +5,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Modal, TextInput, Toast } from '@/components/ui';
+import { Button, Checkbox, Modal, TextInput, Toast, Tooltip } from '@/components/ui';
 import {
   findTemplateByName,
   heldInclude,
@@ -121,9 +121,17 @@ export function SaveTemplateDialog({ fields, moon, templates, onClose, onSaved }
         </fieldset>
         {replacing && <p className="text-xs text-text-dim">{t('survey.templates.replaceHint')}</p>}
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button type="submit" variant="primary" size="sm" disabled={!ready}>
-            {replacing ? t('survey.templates.replace') : t('survey.templates.save')}
-          </Button>
+          <Tooltip content={name.trim() === '' || !anything ? t('common.needsInput') : null}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={saving}
+              aria-disabled={!ready || undefined}
+            >
+              {replacing ? t('survey.templates.replace') : t('survey.templates.save')}
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={onClose}>
             {t('common.cancel')}
           </Button>
@@ -199,14 +207,16 @@ export function ManageTemplatesDialog({ templates, fields, moon, onClose }: Mana
                         setRenaming({ id: template.id, name: event.target.value })
                       }
                     />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="primary"
-                      disabled={renaming.name.trim() === ''}
-                    >
-                      {t('common.save')}
-                    </Button>
+                    <Tooltip content={renaming.name.trim() === '' ? t('common.needsInput') : null}>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="primary"
+                        aria-disabled={renaming.name.trim() === '' || undefined}
+                      >
+                        {t('common.save')}
+                      </Button>
+                    </Tooltip>
                     <Button size="sm" onClick={() => setRenaming(null)}>
                       {t('common.cancel')}
                     </Button>
@@ -224,16 +234,25 @@ export function ManageTemplatesDialog({ templates, fields, moon, onClose }: Mana
                       >
                         {t('survey.templates.rename')}
                       </Button>
-                      <Button
-                        size="sm"
-                        disabled={
+                      <Tooltip
+                        content={
                           Object.keys(templateFields(fields, heldInclude(template, { moon })))
                             .length === 0
+                            ? t('survey.templates.updateNothing')
+                            : null
                         }
-                        onClick={() => void update(template)}
                       >
-                        {t('survey.templates.updateFromCurrent')}
-                      </Button>
+                        <Button
+                          size="sm"
+                          aria-disabled={
+                            Object.keys(templateFields(fields, heldInclude(template, { moon })))
+                              .length === 0 || undefined
+                          }
+                          onClick={() => void update(template)}
+                        >
+                          {t('survey.templates.updateFromCurrent')}
+                        </Button>
+                      </Tooltip>
                       <Button
                         size="sm"
                         variant="danger"

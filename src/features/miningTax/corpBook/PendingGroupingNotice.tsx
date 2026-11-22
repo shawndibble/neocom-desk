@@ -86,7 +86,7 @@ export function PendingGroupingNotice({
               <Button
                 size="sm"
                 variant="primary"
-                disabled={busy}
+                aria-disabled={busy || undefined}
                 onClick={() => void answer(q, 'confirm')}
               >
                 {t('miningTax.corpBook.grouping.confirm', { name: characterName(q.characterId) })}
@@ -94,7 +94,7 @@ export function PendingGroupingNotice({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={busy}
+                aria-disabled={busy || undefined}
                 onClick={() => void answer(q, 'decline')}
               >
                 {t('miningTax.corpBook.grouping.decline')}

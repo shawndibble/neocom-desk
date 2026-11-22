@@ -15,6 +15,7 @@ import {
   StatChip,
   TextArea,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantNote } from '@/app/GrantNote';
@@ -260,9 +261,11 @@ export function AppraisalPasteCard({
           >
             {t('market.appraisal.appraise')}
           </Button>
-          <Button size="md" onClick={controller.clear} disabled={text === ''}>
-            {t('market.appraisal.clear')}
-          </Button>
+          <Tooltip content={text === '' ? t('market.appraisal.clearEmpty') : null}>
+            <Button size="md" onClick={controller.clear} aria-disabled={text === '' || undefined}>
+              {t('market.appraisal.clear')}
+            </Button>
+          </Tooltip>
         </div>
 
         {unmatchedNote}

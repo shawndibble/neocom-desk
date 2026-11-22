@@ -283,8 +283,8 @@ export function SurveyBoard({
                         key="finish"
                         type="button"
                         className={textActionClassName()}
-                        disabled={finishing === 'busy'}
-                        onClick={() => void finish()}
+                        aria-disabled={finishing === 'busy' || undefined}
+                        onClick={finishing === 'busy' ? undefined : () => void finish()}
                       >
                         {t('survey.markCleared')}
                       </button>,

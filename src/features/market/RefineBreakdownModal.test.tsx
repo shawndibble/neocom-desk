@@ -225,7 +225,10 @@ describe('RefineBreakdownModal', () => {
         onToggleSource: vi.fn(),
       },
     });
-    expect(screen.getByRole('button', { name: 'Use my numbers' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Use my numbers' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(screen.getByText(/Log in with a Character/)).toBeInTheDocument();
   });
 

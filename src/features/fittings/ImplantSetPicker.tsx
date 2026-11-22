@@ -34,6 +34,7 @@ import {
   SearchInput,
   TabPanel,
   Tabs,
+  Tooltip,
   TypeIcon,
   useTabsId,
   type TabItem,
@@ -216,9 +217,11 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
           placeholder={t('fittings.implants.addPlaceholder')}
           aria-label={t('fittings.implants.addLabel')}
         />
-        <Button type="submit" disabled={query.trim() === ''}>
-          {t('fittings.implants.add')}
-        </Button>
+        <Tooltip content={query.trim() === '' ? t('fittings.implants.addNeedsQuery') : null}>
+          <Button type="submit" aria-disabled={query.trim() === '' || undefined}>
+            {t('fittings.implants.add')}
+          </Button>
+        </Tooltip>
       </form>
       {error && <p className="text-xs text-danger">{error}</p>}
       <ul
