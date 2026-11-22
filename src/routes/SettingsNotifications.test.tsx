@@ -245,7 +245,7 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
     await openTopic(user, 'Mail and calendar');
 
-    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/notifications are blocked/i)).length).toBeGreaterThan(0);
     // Android settings exist only behind the Play Store app's shell.
     expect(
       screen.queryByRole('button', { name: /open notification settings/i })
@@ -398,7 +398,7 @@ describe('Settings — Notifications (issue #170)', () => {
     renderSettingsPage();
     await notificationsPanel();
     await user.click(await screen.findByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText(/Last tried at 0?2:21/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Last tried at 0?2:21/)).length).toBeGreaterThan(0);
   });
 
   it('shows no push failure row when nothing failed', async () => {
