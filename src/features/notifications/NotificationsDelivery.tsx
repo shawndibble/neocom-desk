@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, InfoTooltip } from '@/components/ui';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatTimeOfDay } from '@/lib/timestamp';
@@ -107,9 +108,9 @@ export function NotificationsDelivery({
       {browserBlocked &&
         (inPlayStoreApp ? (
           <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
-            <p role="status" className="text-xs text-warning">
+            <LiveNote className="text-xs text-warning">
               {t('settings.notifications.blockedNoticePlayApp')}
-            </p>
+            </LiveNote>
             <Button
               size="sm"
               variant="primary"
@@ -119,22 +120,19 @@ export function NotificationsDelivery({
             </Button>
           </div>
         ) : (
-          <p
-            role="status"
-            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
-          >
+          <LiveNote className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning">
             {t('settings.notifications.blockedNotice')}
-          </p>
+          </LiveNote>
         ))}
       {pushFailure && permission === 'granted' && (
         <div className="flex flex-wrap items-center gap-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
-          <p role="status" className="min-w-0 flex-1 text-xs text-warning">
+          <LiveNote className="min-w-0 flex-1 text-xs text-warning">
             {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}{' '}
             {/* Restamped by every failed attempt, so a Retry that fails again still changes it. */}
             {t('settings.notifications.pushFailedAt', {
               time: formatTimeOfDay(new Date(pushFailure.at)),
             })}
-          </p>
+          </LiveNote>
           <Button
             size="sm"
             variant="primary"
@@ -152,15 +150,12 @@ export function NotificationsDelivery({
         the explanation on exactly the platform it exists for.
       */}
       {installRequired && (permission === 'default' || permission === 'unsupported') && (
-        <p
-          role="status"
-          className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
-        >
+        <LiveNote className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim">
           {t('settings.notifications.installRequiredNotice')}{' '}
           <Link to={tabPath(SETTINGS_TABS, 'app')} className={inlineLinkClassName}>
             {t('settings.notifications.installRequiredLink')}
           </Link>
-        </p>
+        </LiveNote>
       )}
     </>
   );
