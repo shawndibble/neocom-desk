@@ -1,13 +1,14 @@
 /**
  * The member's reads of a Corp Tax Book (issue #4065, ADR 0023). Firestore
  * rules let any signed-in Character `get` a book's settings and read their OWN
- * lines (`uid` / `uids`) — observed rows, payments, Statements, dismissals and
+ * lines (`uid` / `uids`) — observed rows, payments, Late notices, dismissals and
  * Miner groupings — in any corp's book, including after leaving the corp. This
  * module reads exactly those, as each tracked Character in turn (the Firebase
  * session is one Character at a time); `engine/corpTaxBook/docShapes.ts` parses them
  * defensively into the engine's shapes. Every write is a callable; the only one a player makes is
  * claiming their own Unmatched donation.
  */
+import { LATE_NOTICES, RUNNING_ACCOUNTS } from '../../../../functions/src/corpTaxBookVersionKeys';
 import {
   collection,
   doc,
@@ -20,6 +21,7 @@ import {
 import { db as localDb } from '@/db';
 import {
   readAdjustment,
+  readCheckpoint,
   readToleranceExemption,
   readBookSettings,
   readDismissal,
@@ -27,7 +29,6 @@ import {
   readMemberDeclaration,
   readMiner,
   readPayment,
-  readStatement,
   readWriteOff,
   type ClaimablePayment,
   type HeldPayment,
@@ -41,7 +42,7 @@ import {
   type Declaration,
 } from '@/engine/corpTaxBook/overdue';
 import { readDisputes, type DisputeKind, type OreDispute } from '@/engine/corpTaxBook/disputes';
-import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/payments';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
@@ -49,7 +50,11 @@ import { groupObservedEntries, readObservedRow } from '@/engine/corpTaxBook/obse
 import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import { isRecord } from '@/engine/guards';
+import { noticesOfDocs } from '@/engine/corpTaxBook/lateNotices';
+import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
+import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import { loadStructureName } from '@/features/character/structures';
 import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/types';
@@ -72,10 +77,6 @@ export interface LoadedCorpBook {
   corporationId: number;
   startDate: string;
   graceHours: number;
-  /** Days after issue an unsettled Statement goes Overdue (the book's setting). */
-  overdueDays?: number;
-  /** The instant the book switched to a running account (#6294). */
-  runningAccountFrom?: string;
   hubId: string;
   oreForm: 'compressed' | 'raw';
   /** The book's divisions, division 1 by default — where a donation should go. */
@@ -96,7 +97,10 @@ export interface LoadedCorpBook {
   /** The tracked Characters' donations it holds for review without counting them (#6207). */
   inReview?: InReviewPayment[];
   dismissals: Dismissal[];
-  statements: Statement[];
+  /** The tracked Characters' own Late notices. */
+  notices: LateNotice[];
+  /** Their Miners' snapshots (`accounts/{minerId}.snapshot`), by Miner id. */
+  checkpoints?: Map<string, RunningAccountCheckpoint>;
   miners: Miner[];
   /** The tracked Characters this was read for — the ones whose lines it holds. */
   characterIds: number[];
@@ -108,7 +112,7 @@ export interface LoadedCorpBook {
   adjustments?: Adjustment[];
   /** The tracked Characters' own officer write-offs (#4637). */
   writeOffs?: RecordedWriteOff[];
-  /** Declarations on their own Statements (#6206); absent before the rules let members read them. */
+  /** Declarations on their own Late notices (#6206); absent before the rules let members read them. */
   declarations?: Declaration[];
   /** Their own Conflict disputes (#6206). */
   disputes?: OreDispute[];
@@ -116,17 +120,17 @@ export interface LoadedCorpBook {
   toleranceExemptions?: ToleranceExemption[];
   /** Each of their Miners' paid-through day, as the book recorded it. */
   minerPaidThrough?: Map<string, string>;
-  /** Refinery names, where a Statement or ESI gave one (#4622). */
+  /** Refinery names, where a Late notice or ESI gave one (#4622). */
   structureNames?: Record<number, string>;
 }
 
-/** Refinery names the Statements were issued with; the officer side's placeholder (older Statements) is no name. */
+/** Refinery names the Late notices went out with; the officer side's placeholder is no name. */
 export function refineryNamesOf(
-  statements: readonly { refineryNames?: Record<string, string> }[]
+  notices: readonly Pick<LateNotice, 'names'>[]
 ): Record<number, string> {
   const out: Record<number, string> = {};
-  for (const s of statements) {
-    for (const [id, name] of Object.entries(s.refineryNames ?? {})) {
+  for (const n of notices) {
+    for (const [id, name] of Object.entries(n.names?.refineryNames ?? {})) {
       const structureId = Number(id);
       if (!Number.isSafeInteger(structureId) || typeof name !== 'string') continue;
       if (name.trim() === '' || isRefineryPlaceholder(name, id)) continue;
@@ -136,7 +140,7 @@ export function refineryNamesOf(
   return out;
 }
 
-/** Names ESI gives the miner's own Characters for refineries no Statement named. Never throws. */
+/** Names ESI gives the miner's own Characters for refineries no Late notice named. Never throws. */
 async function namesFromEsi(
   observed: readonly { structureId: number; characterId: number }[],
   known: Record<number, string>
@@ -223,7 +227,7 @@ export async function readCorpBooks(
         )
       );
       if (!book) continue;
-      // ESI names what no Statement did; no Firebase session needed for that.
+      // ESI names what no Late notice did; no Firebase session needed for that.
       const named = book.structureNames ?? {};
       const structureNames = { ...named, ...(await namesFromEsi(book.observed, named)) };
       books.push({ ...book, structureNames, memberCharacterIds: [...members] });
@@ -343,7 +347,8 @@ async function readOneBook(
   const claimable: ClaimablePayment[] = [];
   const inReview: InReviewPayment[] = [];
   const dismissals: Dismissal[][] = [];
-  const statements: Statement[][] = [];
+  const noticeDocs: unknown[] = [];
+  const checkpoints = new Map<string, RunningAccountCheckpoint>();
   const miners: Miner[][] = [];
   const adjustments: Adjustment[][] = [];
   const writeOffs: RecordedWriteOff[][] = [];
@@ -389,7 +394,8 @@ async function readOneBook(
       observedDocs,
       paymentDocs,
       dismissalDocs,
-      statementDocs,
+      lateNoticeDocs,
+      checkpointDocs,
       minerDocs,
       adjustmentDocs,
       writeOffDocs,
@@ -410,7 +416,8 @@ async function readOneBook(
       }),
       part('payments', 'uid'),
       part('dismissals', 'uids'),
-      part('statements', 'uids'),
+      written(LATE_NOTICES) ? orNone(part(LATE_NOTICES, 'uids')) : Promise.resolve(null),
+      written(RUNNING_ACCOUNTS) ? orNone(part(RUNNING_ACCOUNTS, 'uids')) : Promise.resolve(null),
       part('miners', 'uids'),
       orNone(part('adjustments', 'uids')),
       orNone(part('writeOffs', 'uids')),
@@ -452,11 +459,16 @@ async function readOneBook(
       if (read.inReview) inReview.push(read.inReview);
     }
     dismissals.push(dismissalDocs.flatMap((d) => readDismissal(d.id, d.data) ?? []));
-    statements.push(statementDocs.flatMap((d) => readStatement(d.id, d.data) ?? []));
+    for (const d of lateNoticeDocs ?? []) noticeDocs.push({ ...d.data, id: d.id });
+    for (const d of checkpointDocs ?? []) {
+      const { snapshot } = d.data;
+      const cp = isRecord(snapshot) ? readCheckpoint(d.id, snapshot) : null;
+      if (cp) checkpoints.set(cp.minerId, cp);
+    }
     miners.push(minerDocs.flatMap((d) => readMiner(d.id, d.data) ?? []));
   }
-  const merged = mergeById(statements);
-  const structureNames = refineryNamesOf(merged as { refineryNames?: Record<string, string> }[]);
+  const notices = noticesOfDocs(noticeDocs);
+  const structureNames = refineryNamesOf(notices);
   return {
     ...settings,
     observed: groupObservedEntries(rows),
@@ -468,12 +480,13 @@ async function readOneBook(
     toleranceExemptions: mergeById(exemptions),
     ...(paidThrough.size > 0 ? { minerPaidThrough: paidThrough } : {}),
     structureNames,
-    payments: mergeById([payments]),
+    payments,
     held,
-    claimable: mergeById([claimable]),
-    inReview: mergeById([inReview]),
+    claimable,
+    inReview,
     dismissals: mergeById(dismissals),
-    statements: merged,
+    notices,
+    ...(checkpoints.size > 0 ? { checkpoints } : {}),
     miners: mergeById(miners),
     characterIds: [...characterIds],
     memberCharacterIds: [...characterIds],
@@ -515,14 +528,18 @@ export async function claimCorpTaxBookPayment(
 }
 
 /**
- * A Miner's own "I paid this another way" on one of their Statements (#6206), with an optional
+ * A Miner's own "I paid this another way" on one of their Late notices (#6206), with an optional
  * amount and note. It pauses Overdue until an officer confirms or rejects it.
  */
 export async function declareCorpTaxBookPayment(
   characterId: number,
-  input: {
+  {
+    noticeId,
+    ...input
+  }: {
     corporationId: number;
-    statementId: string;
+    /** The Late notice it is about, sent as `NOTICE_ID_FIELD`. */
+    noticeId: string;
     amount?: number;
     note?: string;
     /** The transfers from the member's wallet journal: checked against the book before any officer sees them. */
@@ -530,10 +547,11 @@ export async function declareCorpTaxBookPayment(
   }
 ): Promise<{ declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }> {
   return underFirebaseSession(async () => {
+    const payload = { ...input, [NOTICE_ID_FIELD]: noticeId };
     return callSignedIn<
-      typeof input,
+      typeof payload,
       { declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }
-    >(characterId, 'declareCorpTaxBookPaymentCallable', input);
+    >(characterId, 'declareCorpTaxBookPaymentCallable', payload);
   });
 }
 

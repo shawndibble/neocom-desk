@@ -1,3 +1,4 @@
+import { NOTICE_RULE_BOUNDS } from './corpTaxBookKinds.js';
 import { describe, expect, it } from 'vitest';
 import {
   rateKey,
@@ -16,20 +17,22 @@ import {
   billedDisputeTax,
   disputesClosedByWriteOff,
   checkClaimedTransfer,
+  checkpointRefusal,
+  handRecordMatch,
   checkClaimedTransfers,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
   sameDivisions,
-  parseStatement,
+  parseLateNotice,
   parseSyncInput,
   donationsReadAtPatch,
   parseToken,
   parseTurnOnInput,
-  reanchorCadence,
   satisfies,
   startDateMoveReason,
 } from './corpTaxBook.js';
+import { finalNoticeId, minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 
 describe('decideRoles (D8)', () => {
   it.each([
@@ -106,16 +109,9 @@ describe('parsers', () => {
     ).toThrow();
   });
 
-  it('parses the audit-only recordMail action and bounds it', () => {
-    expect(
-      parseEditAction({ action: 'recordMail', statementId: 's1', mailId: 77, kind: 'statement' })
-    ).toEqual({ action: 'recordMail', statementId: 's1', mailId: 77, kind: 'statement' });
-    expect(() =>
-      parseEditAction({ action: 'recordMail', statementId: 's1', mailId: 0, kind: 'statement' })
-    ).toThrow();
-    expect(() =>
-      parseEditAction({ action: 'recordMail', statementId: 's1', mailId: 5, kind: 'other' })
-    ).toThrow();
+  it('no longer takes an older tab’s Statement actions', () => {
+    for (const action of ['recordMail', 'issueStatement', 'settleStatements'])
+      expect(() => parseEditAction({ action, statementId: 's1', mailId: 1 })).toThrow();
   });
 
   it('wants a main inside the group', () => {
@@ -140,11 +136,7 @@ describe('parsers', () => {
     });
   });
 
-  it('takes the running account switch and bounds its notice rules', () => {
-    expect(parseSettingsPatch({ switchToRunningAccount: true })).toEqual({
-      switchToRunningAccount: true,
-    });
-    expect(() => parseSettingsPatch({ switchToRunningAccount: false })).toThrow();
+  it('bounds the notice rules', () => {
     const rules = { after: { kind: 'dayOfMonth', day: 5 }, minimum: 10_000_000, cooldownDays: 7 };
     expect(parseSettingsPatch({ noticeRules: rules, dayTolerancePct: 0.5 })).toEqual({
       noticeRules: rules,
@@ -162,6 +154,18 @@ describe('parsers', () => {
     });
     expect(() => parseSettingsPatch({ noticeRules: { ...rules, earlyAt: -1 } })).toThrow();
     expect(() => parseSettingsPatch({ dayTolerancePct: 6 })).toThrow();
+  });
+
+  it('bounds the notice rules by the shared NOTICE_RULE_BOUNDS', () => {
+    const rules = { after: { kind: 'behind', days: 14 }, minimum: 0, cooldownDays: 7 };
+    const { behindDays, dayOfMonth, cooldownDays } = NOTICE_RULE_BOUNDS;
+    const at = (patch: object) => () => parseSettingsPatch({ noticeRules: { ...rules, ...patch } });
+    expect(at({ after: { kind: 'behind', days: behindDays.max } })).not.toThrow();
+    expect(at({ after: { kind: 'behind', days: behindDays.max + 1 } })).toThrow();
+    expect(at({ after: { kind: 'dayOfMonth', day: dayOfMonth.max } })).not.toThrow();
+    expect(at({ after: { kind: 'dayOfMonth', day: dayOfMonth.max + 1 } })).toThrow();
+    expect(at({ cooldownDays: cooldownDays.max })).not.toThrow();
+    expect(at({ cooldownDays: cooldownDays.max + 1 })).toThrow();
   });
 
   it('takes an added division and the divisions list a change started from', () => {
@@ -304,19 +308,19 @@ describe('parsers', () => {
     expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
   });
 
-  it('parses a Miner declaring their own Statement paid: amount and note optional (#6206)', () => {
-    expect(parseDeclareOwnInput({ corporationId: 9, statementId: 's1' })).toEqual({
+  it('parses a Miner declaring their own Late notice paid: amount and note optional (#6206)', () => {
+    expect(parseDeclareOwnInput({ corporationId: 9, noticeId: 's1' })).toEqual({
       corporationId: 9,
-      statementId: 's1',
+      noticeId: 's1',
     });
     expect(
       parseDeclareOwnInput({
         corporationId: 9,
-        statementId: 's1',
+        noticeId: 's1',
         amount: 1500000,
         note: ' sent by contract ',
       })
-    ).toEqual({ corporationId: 9, statementId: 's1', amount: 1500000, note: 'sent by contract' });
+    ).toEqual({ corporationId: 9, noticeId: 's1', amount: 1500000, note: 'sent by contract' });
     expect(() => parseDeclareOwnInput({ corporationId: 9, statementId: '../x' })).toThrow();
     expect(() =>
       parseDeclareOwnInput({ corporationId: 9, statementId: 's1', amount: 0 })
@@ -532,13 +536,15 @@ describe('parsers', () => {
     });
   });
 
-  describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it closes (#6307)', () => {
-    const statement = {
-      id: 's1',
-      amount: 900_000,
-      coversFrom: '2026-11-01',
-      coversThrough: '2026-11-02',
-      lines: [{ kind: 'mined', date: '2026-11-01' }],
+  describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it forgives (#6307)', () => {
+    // The Miner's account as it stands now: what each unpaid day still owes, oldest first.
+    const live = {
+      owed: 900_000,
+      unpaidDays: [
+        { date: '2026-11-01', owed: 400_000, tax: 400_000 },
+        { date: '2026-11-02', owed: 300_000, tax: 500_000 },
+        { date: '2026-11-09', owed: 200_000, tax: 200_000 },
+      ],
     };
     const dispute = (id: string, date: string, resolution?: unknown) => ({ id, date, resolution });
     const disputes = [
@@ -548,57 +554,64 @@ describe('parsers', () => {
       dispute('d', '2026-11-01', { kind: 'rejected' }),
     ];
 
-    it('a Statement written off in full closes the open disputes of its days', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, statement)).toEqual([
+    it('forgives the oldest days first, held days too: their open disputes close', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 700_000 }, live)).toEqual(['a', 'b']);
+      expect(disputesClosedByWriteOff(disputes, { amount: 500_000 }, live)).toEqual(['a']);
+    });
+
+    it('a day only partly forgiven keeps its dispute open', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 300_000 }, live)).toEqual([]);
+    });
+
+    it('a write-off of the whole balance closes every open dispute', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, live)).toEqual([
         'a',
         'b',
+        'c',
       ]);
     });
 
-    it('a part write-off leaves them open', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 400_000 }, statement)).toEqual([]);
-    });
-
-    it('the leaver write-off, with no Statement, closes every open dispute', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual(['a', 'b', 'c']);
+    it('closes none when the account’s days are unknown', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual([]);
+      expect(disputesClosedByWriteOff(disputes, { amount: 10_000_000 }, { owed: 5 })).toEqual([]);
     });
   });
 
-  describe('billedDisputeTax: a waived dispute priced from the book’s issued Statements', () => {
+  describe('billedDisputeTax: a waived dispute priced from the Late notices that listed it', () => {
     const disputed = {
       lines: [
         { recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100, payeeName: 'A' },
         { recordKey: '77:1000:2026-11-01', typeId: 45491, quantity: 50, payeeName: 'A' },
       ],
     };
-    const mined = (chargeKey: string, typeId: number, quantity: number, taxPct = 10) => ({
+    const mined = (key: string, typeId: number, quantity: number, taxPct = 10) => ({
       kind: 'mined',
       date: '2026-11-01',
-      chargeKey,
+      key,
       oreLines: [{ typeId, quantity }],
       unitPrices: { [typeId]: typeId === 45490 ? 1000 : 2000 },
       taxPct,
     });
 
-    it('prices the disputed ore at the prices and rate its Statement billed', () => {
-      const statements = [
+    it('prices the disputed ore at the prices and rate the notice listed it at', () => {
+      const notices = [
         { lines: [mined('60:1000:2026-11-01', 45490, 100)] },
         { lines: [mined('77:1000:2026-11-01', 45491, 50, 20)] },
       ];
       // 100 × 1000 × 10% + 50 × 2000 × 20%
-      expect(billedDisputeTax(disputed, statements)).toBe(30_000);
+      expect(billedDisputeTax(disputed, notices)).toBe(30_000);
     });
 
-    it('caps the disputed ore at what the Statements billed, late ore included', () => {
+    it('caps the disputed ore at what the notices listed, late ore included', () => {
       const late = { ...mined('60:1000:2026-11-01', 45490, 30), kind: 'late-ore' };
-      const statements = [
+      const notices = [
         { lines: [mined('60:1000:2026-11-01', 45490, 40), late] },
         { lines: [mined('77:1000:2026-11-01', 45491, 50)] },
       ];
-      expect(billedDisputeTax(disputed, statements)).toBe(70 * 100 + 50 * 200);
+      expect(billedDisputeTax(disputed, notices)).toBe(70 * 100 + 50 * 200);
     });
 
-    it('cannot price a disputed record no Statement billed yet', () => {
+    it('cannot price a disputed record no notice listed yet', () => {
       expect(
         billedDisputeTax(disputed, [{ lines: [mined('60:1000:2026-11-01', 45490, 100)] }])
       ).toBeUndefined();
@@ -607,28 +620,79 @@ describe('parsers', () => {
 
     // A rate dispute is about the rate: waiving it credits the gap, never the whole tax.
     it('prices a rate dispute as the gap between the billed and claimed rates', () => {
-      const statements = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
+      const notices = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
       const rate = {
         kind: 'rate' as const,
         claimedPct: 10,
         lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100 }],
       };
-      expect(billedDisputeTax(rate, statements)).toBeCloseTo(100 * 1000 * 0.02);
-      expect(billedDisputeTax({ ...rate, claimedPct: 15 }, statements)).toBe(0);
+      expect(billedDisputeTax(rate, notices)).toBeCloseTo(100 * 1000 * 0.02);
+      expect(billedDisputeTax({ ...rate, claimedPct: 15 }, notices)).toBe(0);
     });
 
     it('ignores correction lines and malformed lines', () => {
-      const statements = [
+      const notices = [
         {
           lines: [
-            { kind: 'correction', date: '2026-11-01', adjustmentId: 'a1', tax: -5 },
-            { kind: 'mined', chargeKey: '77:1000:2026-11-01' },
+            { kind: 'correction', date: '2026-11-01', key: 'adjustment:a1', tax: -5 },
+            { kind: 'mined', key: '77:1000:2026-11-01' },
             mined('60:1000:2026-11-01', 45490, 100),
           ],
         },
       ];
-      expect(billedDisputeTax(disputed, statements)).toBeUndefined();
+      expect(billedDisputeTax(disputed, notices)).toBeUndefined();
     });
+  });
+
+  it('records a hand payment with no notice on it, whatever an older tab sends', () => {
+    const payment = {
+      action: 'recordPayment',
+      paymentId: 'm_x1',
+      minerId: 'm1',
+      characterId: 7,
+      amount: 5,
+      at: '2026-11-01T00:00:00.000Z',
+      statementId: 's1',
+    };
+    expect(parseEditAction(payment)).not.toHaveProperty('statementId');
+  });
+
+  it('refuses an edit it does not know', () => {
+    expect(() => parseEditAction({ action: 'fromTheFuture' })).toThrow(
+      expect.objectContaining({ code: 'invalid-argument' })
+    );
+  });
+
+  it('moves a payment to another Miner, or back to Unmatched, re-checking the role live', () => {
+    const move = parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1', minerId: 'm2' });
+    expect(move).toEqual({ action: 'reassignPayment', paymentId: 'j1_1', minerId: 'm2' });
+    expect(
+      parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1', minerId: null })
+    ).toEqual({ action: 'reassignPayment', paymentId: 'j1_1', minerId: null });
+    expect(needsLiveCheck(move)).toBe(true);
+    expect(() => parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1' })).toThrow();
+  });
+
+  it('syncs a donation with no Miner or notice the client named: the server decides', () => {
+    const input = parseSyncInput(
+      {
+        corporationId: 1,
+        donations: [
+          {
+            refId: 1,
+            division: 1,
+            characterId: 7,
+            amount: 5,
+            at: '2026-11-01T00:00:00Z',
+            minerId: 'solo:7',
+            statementId: 's1',
+          },
+        ],
+      },
+      Date.parse('2026-11-02T00:00:00Z')
+    );
+    expect(input.donations[0]).not.toHaveProperty('minerId');
+    expect(input.donations[0]).not.toHaveProperty('statementId');
   });
 
   it('parses a manual payment or a donation match that confirms a declaration', () => {
@@ -660,49 +724,6 @@ describe('parsers', () => {
   it('accepts only a 43-character url-safe token', () => {
     expect(parseToken({ token: 'a'.repeat(43) })).toHaveLength(43);
     expect(() => parseToken({ token: 'short' })).toThrow();
-  });
-
-  it('keeps the Statement fields the book relies on', () => {
-    expect(() => parseStatement({ id: 's' })).toThrow();
-  });
-
-  describe('display names for the verify page', () => {
-    const raw = {
-      id: 's1',
-      minerId: 'solo:1',
-      code: 'MT1',
-      periodStart: '2026-08-01',
-      periodEnd: '2026-08-31',
-      coversFrom: '2026-08-01',
-      coversThrough: '2026-08-31',
-      issuedAt: '2026-09-01T00:00:00Z',
-      hubId: 'jita',
-      oreForm: 'compressed',
-      lines: [],
-      amount: 5,
-      characterIds: [1],
-    };
-
-    it('keeps the corporation, Miner and refinery names, typed and bounded', () => {
-      const parsed = parseStatement({
-        ...raw,
-        corporationName: 'Brass Meridian',
-        minerName: 'Varro',
-        refineryNames: { '77': 'Efa V - Moon 3' },
-      });
-      expect(parsed).toMatchObject({
-        corporationName: 'Brass Meridian',
-        minerName: 'Varro',
-        refineryNames: { '77': 'Efa V - Moon 3' },
-      });
-    });
-
-    it('refuses names that are not strings or too many refineries', () => {
-      expect(() => parseStatement({ ...raw, minerName: 5 })).toThrow();
-      expect(() => parseStatement({ ...raw, refineryNames: { x: 'bad id' } })).toThrow();
-      const many = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [String(i + 1), 'r']));
-      expect(() => parseStatement({ ...raw, refineryNames: many })).toThrow();
-    });
   });
 
   describe('closeAccount (#4184)', () => {
@@ -969,11 +990,8 @@ describe('moveStartRate', () => {
 });
 
 describe('startDateMoveReason (CX-23)', () => {
-  const st = (coversFrom: string, coversThrough: string) => ({
-    id: 's',
-    coversFrom,
-    coversThrough,
-    lines: [],
+  const st = (...dates: string[]) => ({
+    lines: dates.map((date) => ({ kind: 'mined' as const, date })),
   });
   const today = '2026-10-23';
   it('allows moving earlier, never into the future or before the leave day', () => {
@@ -985,7 +1003,7 @@ describe('startDateMoveReason (CX-23)', () => {
       'start-before-leave'
     );
   });
-  it('allows moving later only when no Statement covers the gap', () => {
+  it('allows moving later only when no Late notice listed a day in the gap', () => {
     expect(startDateMoveReason('2026-10-01', '2026-10-10', today, null, [])).toBeNull();
     expect(
       startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-10', '2026-10-15')])
@@ -993,6 +1011,10 @@ describe('startDateMoveReason (CX-23)', () => {
     expect(
       startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-05', '2026-10-12')])
     ).toBe('start-over-billed');
+    // The days between two listed days were not listed.
+    expect(
+      startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-09-30', '2026-10-12')])
+    ).toBeNull();
   });
 });
 
@@ -1044,23 +1066,6 @@ describe('settings patch: start date and member visibility', () => {
     expect(() => parseSettingsPatch({ divisionNames: { '2': 7 } })).toThrow();
     expect(() => parseSettingsPatch({ divisionNames: { '2': 'x'.repeat(51) } })).toThrow();
     expect(() => parseSettingsPatch({ divisionNames: ['x'] })).toThrow();
-  });
-});
-
-describe('reanchorCadence', () => {
-  const days = { kind: 'days', days: 7, anchor: '2026-10-01' };
-  it('moves an N-day anchor that sat on the old start to the new start', () => {
-    expect(reanchorCadence(days, '2026-10-01', '2026-09-25')).toEqual({
-      kind: 'days',
-      days: 7,
-      anchor: '2026-09-25',
-    });
-  });
-  it('leaves a custom anchor, a monthly cadence and no cadence alone', () => {
-    expect(reanchorCadence(days, '2026-09-01', '2026-09-25')).toBe(days);
-    const monthly = { kind: 'monthly' };
-    expect(reanchorCadence(monthly, '2026-10-01', '2026-09-25')).toBe(monthly);
-    expect(reanchorCadence(undefined, '2026-10-01', '2026-09-25')).toBeUndefined();
   });
 });
 
@@ -1217,9 +1222,20 @@ describe('checkClaimedTransfer', () => {
   describe('only a payment no one holds yet', () => {
     const open = { id: 'j1_9', characterId: 7, amount: 25_000_000, at: transfer.at };
 
-    it('does not find a payment already credited to a Miner', () => {
+    it('says which Miner a payment the book already placed is credited to', () => {
       const payments = [{ ...open, minerId: 'm-a' }];
-      expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments })).toEqual({
+        result: 'credited',
+        paymentId: 'j1_9',
+        minerId: 'm-a',
+      });
+      // One still open wins: that is the one the claim can credit.
+      expect(
+        checkClaimedTransfer(transfer, {
+          ...ctx,
+          payments: [...payments, { ...open, id: 'j1_10' }],
+        })
+      ).toEqual({ result: 'found', paymentId: 'j1_10' });
     });
 
     it('does not find a payment an officer marked wholly not tax', () => {
@@ -1319,5 +1335,337 @@ describe('parseDeclareOwnInput transfers', () => {
         transfers: [{ ...t, recipient: 'someone' }],
       })
     ).toThrow();
+  });
+});
+
+describe('Late notices and checkpoints (decision 20261120-235011)', () => {
+  const line = {
+    kind: 'mined',
+    date: '2026-11-01',
+    key: '9001:1000:2026-11-01',
+    characterId: 9001,
+    structureId: 1000,
+    oreLines: [{ typeId: 46280, quantity: 100 }],
+    unitPrices: { 46280: 1000 },
+    priceSources: { 46280: 'hub' },
+    estimatedValue: 100_000,
+    taxPct: 10,
+    rateEffectiveFrom: '2026-10-01',
+    tax: 10_000,
+  };
+  const notice = {
+    id: 'notice_solo:9001_2026-11-18',
+    minerId: 'solo:9001',
+    characterIds: [9001],
+    kind: 'late',
+    issuedAt: '2026-11-18T09:00:00Z',
+    code: minerPaymentCode('solo:9001'),
+    pricing: { hubId: 'jita', oreForm: 'compressed' },
+    uids: ['char:1'],
+    lines: [
+      line,
+      {
+        kind: 'correction',
+        date: '2026-11-03',
+        key: 'adjustment:a1',
+        oreLines: [],
+        estimatedValue: 0,
+        reason: 'fix',
+        tax: 5,
+      },
+    ],
+    listed: 1,
+    mail: { sent: 4, manualSent: 2, remindersStopped: true },
+    names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
+  };
+
+  it('parses a Late notice: what it listed is summed here, never taken on the client’s word', () => {
+    const parsed = parseLateNotice(notice);
+    expect(parsed).toMatchObject({
+      id: notice.id,
+      minerId: 'solo:9001',
+      characterIds: [9001],
+      kind: 'late',
+      issuedAt: '2026-11-18T09:00:00.000Z',
+      code: minerPaymentCode('solo:9001'),
+      pricing: { hubId: 'jita', oreForm: 'compressed' },
+      listed: 10_005,
+      names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
+    });
+    expect(parsed.lines[0]).toEqual({ ...line, unitPrices: { 46280: 1000 } });
+    expect(parsed.lines[1]).toMatchObject({
+      kind: 'correction',
+      key: 'adjustment:a1',
+      reason: 'fix',
+    });
+  });
+
+  it('starts a notice unmailed, read by no one until the server names its readers', () => {
+    const parsed = parseLateNotice(notice);
+    expect(parsed.mail).toEqual({ sent: 0, manualSent: 0, remindersStopped: false });
+    expect(parsed.uids).toEqual([]);
+    expect(parsed.issuedBy).toBeUndefined();
+  });
+
+  it('prints no pricing or names it cannot name', () => {
+    const parsed = parseLateNotice({
+      ...notice,
+      pricing: undefined,
+      names: undefined,
+    });
+    expect(parsed).not.toHaveProperty('pricing');
+    expect(parsed).not.toHaveProperty('names');
+  });
+
+  it('refuses a malformed notice', () => {
+    expect(() => parseLateNotice({ ...notice, id: 'a/b' })).toThrow();
+    expect(() => parseLateNotice({ ...notice, kind: 'statement' })).toThrow();
+    expect(() => parseLateNotice({ ...notice, lines: [{ ...line, date: 'soon' }] })).toThrow();
+    expect(() => parseLateNotice({ ...notice, lines: [{ ...line, kind: 'other' }] })).toThrow();
+    expect(() => parseLateNotice({ ...notice, pricing: { hubId: 'x', oreForm: 'raw' } })).toThrow();
+    expect(() => parseLateNotice({ ...notice, names: { minerName: 5 } })).toThrow();
+    const many = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [String(i + 1), 'r']));
+    expect(() => parseLateNotice({ ...notice, names: { refineryNames: many } })).toThrow();
+  });
+
+  it('never issues a final notice: only closing the account sends one', () => {
+    expect(() => parseLateNotice({ ...notice, kind: 'final' })).toThrow();
+    expect(() =>
+      parseLateNotice({ ...notice, kind: 'final', id: finalNoticeId('solo:9001') })
+    ).toThrow();
+    expect(() => parseLateNotice({ ...notice, id: finalNoticeId('solo:9001') })).toThrow();
+    expect(() => parseLateNotice({ ...notice, id: 'final_other' })).toThrow();
+  });
+
+  it('reads a final notice only from closing the account, under the Miner’s final id', () => {
+    const final = { ...notice, kind: 'final', id: finalNoticeId('solo:9001') };
+    expect(
+      parseEditAction({
+        action: 'closeAccount',
+        minerId: 'solo:9001',
+        reason: 'Left',
+        credit: { kind: 'refund' },
+        notice: final,
+      })
+    ).toMatchObject({ notice: { id: final.id, kind: 'final' } });
+    expect(() => parseLateNotice(final)).toThrow();
+    expect(() => parseLateNotice({ ...final, id: 'final_other' }, 'final')).toThrow();
+    expect(() => parseLateNotice({ ...final, kind: 'late' }, 'final')).toThrow();
+  });
+
+  it("prints the Miner's one code, and refuses any other, the id's own included", () => {
+    const own = minerPaymentCode('solo:9001');
+    expect(parseLateNotice({ ...notice, code: own }).code).toBe(own);
+    expect(parseLateNotice({ ...notice, code: undefined }).code).toBe(own);
+    expect(() => parseLateNotice({ ...notice, code: paymentCode(notice.id) })).toThrow();
+    expect(() => parseLateNotice({ ...notice, code: 'MT00AB12' })).toThrow();
+  });
+
+  it('issues a Late notice through the edit union', () => {
+    const action = parseEditAction({ action: 'issueLateNotice', notice });
+    expect(action).toMatchObject({ action: 'issueLateNotice', notice: { id: notice.id } });
+    const huge = {
+      ...notice,
+      lines: Array.from({ length: 4000 }, () => ({ ...line, reason: 'x'.repeat(400) })),
+    };
+    expect(() => parseEditAction({ action: 'issueLateNotice', notice: huge })).toThrow();
+  });
+
+  it('records a Late notice’s mail, as recordMail does', () => {
+    expect(
+      parseEditAction({ action: 'recordLateNoticeMail', noticeId: 'n1', mailId: 7, kind: 'notice' })
+    ).toEqual({ action: 'recordLateNoticeMail', noticeId: 'n1', mailId: 7, kind: 'notice' });
+    expect(
+      parseEditAction({
+        action: 'recordLateNoticeMail',
+        noticeId: 'n1',
+        mailId: 7,
+        kind: 'reminder',
+      })
+    ).toMatchObject({ kind: 'reminder' });
+    expect(() =>
+      parseEditAction({
+        action: 'recordLateNoticeMail',
+        noticeId: 'n/1',
+        mailId: 7,
+        kind: 'notice',
+      })
+    ).toThrow();
+  });
+
+  it('takes a noticeId where a Statement id was named, and the old name still', () => {
+    for (const key of ['noticeId', 'statementId'])
+      expect(parseEditAction({ action: 'declare', [key]: 'n1', kind: 'contract' })).toMatchObject({
+        action: 'declare',
+        noticeId: 'n1',
+      });
+    for (const key of ['noticeId', 'statementId'])
+      expect(parseEditAction({ action: 'recordReminder', [key]: 'n1' })).toEqual({
+        action: 'recordReminder',
+        noticeId: 'n1',
+      });
+    expect(parseDeclareOwnInput({ corporationId: 1, noticeId: 'n1' })).toMatchObject({
+      noticeId: 'n1',
+    });
+    expect(parseDeclareOwnInput({ corporationId: 1, statementId: 'n1' })).toMatchObject({
+      noticeId: 'n1',
+    });
+    expect(() => parseEditAction({ action: 'declare', kind: 'contract' })).toThrow();
+  });
+
+  it('a write-off names no notice', () => {
+    expect(
+      parseEditAction({ action: 'writeOff', minerId: 'm1', amount: 5, reason: 'left' })
+    ).toEqual({ action: 'writeOff', minerId: 'm1', amount: 5, reason: 'left' });
+  });
+
+  it('records an account’s credit when the tab sends it', () => {
+    const base = { minerId: 'm1', owed: 0, paid: 0, days: 0 };
+    expect(
+      parseEditAction({ action: 'recordAccounts', accounts: [{ ...base, credit: 25 }] })
+    ).toMatchObject({ accounts: [{ credit: 25 }] });
+    expect(() =>
+      parseEditAction({ action: 'recordAccounts', accounts: [{ ...base, credit: -1 }] })
+    ).toThrow();
+  });
+
+  it('no longer resets a checkpoint: a snapshot never goes stale', () => {
+    expect(() => parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' })).toThrow();
+  });
+
+  describe('recordAccounts: a snapshot rides on its account', () => {
+    const account = { minerId: 'solo:9001', owed: 0, paid: 0, days: 0 };
+    const snapshot = {
+      minerId: 'solo:9001',
+      through: '2026-09-30',
+      owed: [{ date: '2026-09-02', remaining: 50, tax: 60, credited: 10, charge: 10, held: true }],
+      credit: 0,
+      balance: 50,
+      paidThrough: '2026-09-01',
+      characterIds: [9001, 9001],
+      at: '2026-11-18T09:00:00Z',
+      by: 1,
+    };
+    const parse = (patch: object) =>
+      parseEditAction({
+        action: 'recordAccounts',
+        accounts: [{ ...account, snapshot: { ...snapshot, ...patch } }],
+      });
+
+    it('parses the snapshot; who recorded it and when are the server’s, its Miner the account’s', () => {
+      expect(parse({ minerId: 'm-other' })).toEqual({
+        action: 'recordAccounts',
+        accounts: [
+          {
+            ...account,
+            snapshot: {
+              minerId: 'solo:9001',
+              through: '2026-09-30',
+              owed: [
+                {
+                  date: '2026-09-02',
+                  remaining: 50,
+                  tax: 60,
+                  credited: 10,
+                  charge: 10,
+                  held: true,
+                },
+              ],
+              credit: 0,
+              balance: 50,
+              paidThrough: '2026-09-01',
+              characterIds: [9001],
+            },
+          },
+        ],
+      });
+      expect(parse({ paidThrough: null, owed: [] })).toMatchObject({
+        accounts: [{ snapshot: { paidThrough: null, owed: [] } }],
+      });
+    });
+
+    it('refuses a malformed snapshot', () => {
+      expect(() => parse({ through: '2026-9-30' })).toThrow();
+      expect(() => parse({ credit: -1 })).toThrow();
+      expect(() => parse({ owed: [{ date: 'x', remaining: 1 }] })).toThrow();
+      expect(() => parse({ paidThrough: 5 })).toThrow();
+      // The day's whole figures and the characters it summed are required.
+      expect(() => parse({ owed: [{ date: '2026-09-02', remaining: 50 }] })).toThrow();
+      expect(() => parse({ characterIds: undefined })).toThrow();
+      expect(() => parse({ owed: [{ ...snapshot.owed[0], held: 'yes' }] })).toThrow();
+    });
+
+    it('no longer takes a snapshot on its own', () => {
+      expect(() =>
+        parseEditAction({ action: 'recordCheckpoints', checkpoints: [snapshot] })
+      ).toThrow();
+    });
+  });
+});
+
+describe('checkpointRefusal: one snapshot per Miner per lock date', () => {
+  // On 18 Nov the lock date is 1 Sep: a snapshot covers every day through 31 Aug.
+  const k = {
+    minerId: 'solo:5',
+    through: '2026-08-31',
+    owed: [{ date: '2026-08-20', remaining: 100, tax: 100, credited: 0 }],
+    credit: 0,
+    balance: 100,
+    paidThrough: '2026-08-19',
+    characterIds: [5],
+  };
+  const ctx = { today: '2026-11-18', known: true, characterIds: [5] };
+  const stored = { ...k, at: '2026-11-02T10:00:00.000Z' };
+
+  it('stores one through the day before the lock date that adds up', () => {
+    expect(checkpointRefusal(k, ctx)).toBeUndefined();
+  });
+
+  it('refuses one through any other day', () => {
+    expect(checkpointRefusal({ ...k, through: '2026-09-30' }, ctx)).toBe('wrong-date');
+    expect(checkpointRefusal({ ...k, through: '2026-07-31' }, ctx)).toBe('wrong-date');
+  });
+
+  it('refuses one when a snapshot already covers that day', () => {
+    expect(checkpointRefusal(k, { ...ctx, stored })).toBe('exists');
+  });
+
+  it('replaces a stored one that is no snapshot: older, the strict cache, or other characters', () => {
+    const older = { ...stored, through: '2026-07-31' };
+    expect(checkpointRefusal(k, { ...ctx, stored: older })).toBeUndefined();
+    const strictCache = { ...stored, through: '2026-09-30', at: '2026-11-02T10:00:00.000Z' };
+    expect(checkpointRefusal(k, { ...ctx, stored: strictCache })).toBeUndefined();
+    const others = { ...stored, characterIds: [5, 6] };
+    expect(checkpointRefusal(k, { ...ctx, stored: others })).toBeUndefined();
+    // One stored with no record of when is no snapshot either.
+    const undated = { ...stored, at: undefined as unknown as string };
+    expect(checkpointRefusal(k, { ...ctx, stored: undated })).toBeUndefined();
+  });
+
+  it('refuses one that does not add up, for an unknown Miner, or for other characters', () => {
+    expect(checkpointRefusal({ ...k, balance: 5 }, ctx)).toBe('balance');
+    expect(checkpointRefusal(k, { ...ctx, known: false })).toBe('unknown-miner');
+    expect(checkpointRefusal(k, { ...ctx, characterIds: [5, 6] })).toBe('characters-changed');
+  });
+});
+
+describe('handRecordMatch: the same ISK is never counted twice', () => {
+  const stated = { characterId: 7, amount: 5_000_000, at: '2026-11-02T00:00:00.000Z' };
+  const held = [{ id: 'j1_1', characterId: 7, amount: 5_000_000, at: '2026-11-01T03:00:00.000Z' }];
+  const uncounted = [
+    { id: 'j3_9', characterId: 7, amount: 5_000_000.5, at: '2026-11-02T06:00:00.000Z' },
+  ];
+
+  it('finds a donation the book holds, or one noted in an unread division, nearest first', () => {
+    expect(handRecordMatch(stated, { held, uncounted })).toEqual({ kind: 'uncounted', id: 'j3_9' });
+    expect(handRecordMatch(stated, { held, uncounted: [] })).toEqual({ kind: 'held', id: 'j1_1' });
+  });
+
+  it('is nothing for another sender, another amount, or a transfer days away', () => {
+    expect(handRecordMatch({ ...stated, characterId: 8 }, { held, uncounted })).toBeNull();
+    expect(handRecordMatch({ ...stated, amount: 4_000_000 }, { held, uncounted })).toBeNull();
+    expect(
+      handRecordMatch({ ...stated, at: '2026-11-08T00:00:00.000Z' }, { held, uncounted })
+    ).toBeNull();
   });
 });

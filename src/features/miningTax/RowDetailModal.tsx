@@ -24,14 +24,13 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { unreportedClaims } from '@/engine/miningTax/ownership';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { OrePricedCard } from './OrePricedCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
-import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
@@ -73,9 +72,6 @@ interface RowDetailModalProps {
   /** Opens `EntryEditDialog` for this entry — the same edit form a combined entry uses, owed or paid. */
   onEdit: () => void;
   onDismiss: () => void;
-  onMarkPaid: () => void;
-  /** Takes a Paid row back to owed, dropping its payment record. */
-  onUnmarkPaid?: () => void;
   onResolve: () => void;
   /** Deletes the Assignment outright — "Undo" on a Dismissed row, "Unassign" on any other assigned one, so a wrong Payee or a mis-split can always be taken back to Unassigned. */
   onUndo: () => void;
@@ -85,25 +81,13 @@ interface RowDetailModalProps {
   onSplit?: () => void;
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
-  /**
-   * The Assignment's payment, resolved for display — present only once
-   * `status` is `paid` (or was, before a later needs-review clears it) and a
-   * `payment` record exists. Absent entirely (rather than an empty list)
-   * when there is no payment to show, so the section renders nothing.
-   */
-  linkedTransactions?: readonly LinkedTransaction[];
-  /** The other entries this entry's payment also settled. */
-  alsoCovers?: readonly CoveredEntry[];
-  /** Opens one of the `alsoCovers` entries in place of this one. */
-  onOpenCovered?: (id: string) => void;
-  /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
-  onLinkTransaction?: () => void;
-  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  /** Opens its Payee's ledger: every payment and the days it paid. Absent: no link. */
+  onOpenLedger?: () => void;
   /** The Payee to pre-select for an unassigned entry — see `AssignDialog.suggestion`. */
   suggestion?: PayeeSuggestion;
   /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
   onSettleUp?: () => void;
-  /** Opens "Link a wallet payment" for this entry's Payee, for ISK already sent. */
+  /** Opens "Link a payment" for this entry's Payee, for ISK already sent. */
   onLinkWalletPayment?: () => void;
   /** What a Corp Tax Book says about this entry (pending record, unattributed), shown under the status line (#4065). */
   corpNote?: ReactNode;
@@ -155,18 +139,12 @@ export function RowDetailModal({
   onAssigned,
   onEdit,
   onDismiss,
-  onMarkPaid,
-  onUnmarkPaid,
   onResolve,
   onUndo,
   onJoin,
   onSplit,
   onAddPayee,
-  linkedTransactions,
-  alsoCovers,
-  onOpenCovered,
-  onLinkTransaction,
-  onUnlinkTransaction,
+  onOpenLedger,
   suggestion,
   onSettleUp,
   onLinkWalletPayment,
@@ -221,24 +199,9 @@ export function RowDetailModal({
   });
 
   const moreItems = [
-    onLinkWalletPayment && status === 'outstanding' && (
+    onLinkWalletPayment && (status === 'outstanding' || status === 'paid') && (
       <DropdownMenuItem key="wallet" onSelect={onLinkWalletPayment}>
         {t('miningTax.detail.linkWalletPayment')}
-      </DropdownMenuItem>
-    ),
-    onLinkTransaction && (
-      <DropdownMenuItem key="transaction" onSelect={onLinkTransaction}>
-        {t('miningTax.linkTransactionAction')}
-      </DropdownMenuItem>
-    ),
-    status === 'outstanding' && (
-      <DropdownMenuItem key="mark-paid" onSelect={onMarkPaid}>
-        {t('miningTax.markPaidAction')}
-      </DropdownMenuItem>
-    ),
-    onUnmarkPaid && status === 'paid' && (
-      <DropdownMenuItem key="unmark-paid" onSelect={onUnmarkPaid}>
-        {t('miningTax.unmarkPaidAction')}
       </DropdownMenuItem>
     ),
     onJoin && status === 'outstanding' && (
@@ -337,8 +300,6 @@ export function RowDetailModal({
                 {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
               </>
             )}
-            {assignment?.paidAt !== undefined &&
-              ` · ${t('miningTax.paidAtLabel')} ${formatLocalDate(new Date(assignment.paidAt))}`}
           </span>
           <StatusPill status={status} label={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)} />
         </div>
@@ -379,16 +340,10 @@ export function RowDetailModal({
           />
         )}
 
-        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
-          <PaymentLinksCard
-            linkedTransactions={linkedTransactions}
-            onLinkTransaction={onLinkTransaction}
-            onUnlinkTransaction={onUnlinkTransaction}
-            busy={busy}
-            alsoCovers={alsoCovers}
-            onOpenCovered={onOpenCovered}
-            paid={assignment?.payment}
-          />
+        {payee && onOpenLedger && (
+          <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
+            {t('miningTax.openLedger', { payee: payee.name })}
+          </button>
         )}
 
         {assignment && row.duplicateAssignmentIds?.includes(assignment.id) && (

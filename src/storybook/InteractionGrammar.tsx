@@ -4,6 +4,7 @@ import {
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { Pill } from '@/components/ui/Pill';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
@@ -64,6 +65,7 @@ import { HubMenu } from '@/features/market/HubMenu';
 import { cx } from '@/lib/cx';
 import { OfflineStrip } from '@/app/OfflineBanner';
 import { MissingGrantBadge } from '@/features/notifications/ScheduledPushBadge';
+import { LockDividerLine } from '@/features/miningTax/ledger/LockDividerLine';
 import { ChannelOffTip } from '@/features/notifications/ChannelOffTip';
 
 const SAMPLE_ROWS = [
@@ -189,6 +191,14 @@ export function InteractionGrammar() {
           <button type="button" className={textActionClassName()}>
             {k('samples.textAction')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.balanceFigure')} note={k('notes.balanceFigure')}>
+          <span className="flex items-center gap-2">
+            <span className="font-semibold">{k('samples.payeeName')}</span>
+            <button type="button" className={plainTextActionClassName('shrink-0')}>
+              <span className="font-semibold text-isk-neg tabular-nums">2,000,000 ISK</span>
+            </button>
+          </span>
         </Cue>
         <Cue rule={k('rules.externalLink')}>
           <ExternalLink href="https://zkillboard.com">zKillboard</ExternalLink>
@@ -377,6 +387,28 @@ export function InteractionGrammar() {
             <Caret expanded={expanded} />
             {k('samples.disclosure')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.cardChevron')} note={k('notes.cardChevron')}>
+          <div className="w-72 max-w-full">
+            <DataTable
+              label={k('samples.cardTableLabel')}
+              stacked
+              columns={[
+                {
+                  id: 'name',
+                  header: k('samples.nameHeader'),
+                  primary: true,
+                  render: (row: (typeof SAMPLE_ROWS)[number]) => row.name,
+                },
+              ]}
+              rows={SAMPLE_ROWS.slice(0, 2)}
+              rowKey={(row) => row.id}
+              expandableRow={{
+                leadingIcon: true,
+                renderDetail: () => k('samples.cardDetail'),
+              }}
+            />
+          </div>
         </Cue>
         <Cue rule={k('rules.fieldCaret')} note={k('notes.fieldCaret')}>
           <Select defaultValue="forge">
@@ -588,6 +620,11 @@ export function InteractionGrammar() {
             <Cue rule={k('rules.stateSelected')} note={k('notes.selectedToggle')}>
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOn')} pressed />
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOff')} pressed={false} />
+            </Cue>
+            <Cue rule={k('rules.lockBoundary')} note={k('notes.lockBoundary')}>
+              <span className="w-full rounded-xs bg-panel-2 px-2 py-1">
+                <LockDividerLine date="1 Oct" />
+              </span>
             </Cue>
             <Cue rule={k('rules.stateSelectedSegment')} note={k('notes.selectedSegment')}>
               <SegmentedControl

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import i18n from '@/i18n';
-import { HeldElsewhereError, type LedgerActionResult } from './ledgerActions';
+import type { LedgerActionResult } from './ledgerActions';
 import { useLedgerAction } from './useLedgerAction';
 
 const ok: LedgerActionResult = { ok: true, value: undefined };
@@ -35,22 +35,6 @@ describe('useLedgerAction', () => {
 
     await act(() => result.current.run(async () => ok, onDone));
     expect(result.current.error).toBeNull();
-  });
-
-  it('names the entries and stays open when a corp Settle up hits ore held elsewhere', async () => {
-    const { result } = renderHook(() => useLedgerAction());
-    const onDone = vi.fn();
-    const held: LedgerActionResult = {
-      ok: false,
-      reason: 'held-elsewhere',
-      cause: new HeldElsewhereError([
-        { id: 'b', date: '2026-09-05' },
-        { id: 'a', date: '2026-09-04' },
-      ]),
-    };
-    await act(() => result.current.run(async () => held, onDone));
-    expect(onDone).not.toHaveBeenCalled();
-    expect(result.current.error).toMatch(/2 entries \(2026-09-04, 2026-09-05\)/);
   });
 
   it('is pending while the action runs', async () => {

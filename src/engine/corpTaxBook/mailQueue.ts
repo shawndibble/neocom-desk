@@ -21,13 +21,13 @@ const MAX_RATE_LIMIT_WAIT_MS = 10 * MINUTE_MS;
 /**
  * `rate-change` (#4515), `removal`/`removalCancelled` (#4520), `payee-change` (#4653) and
  * `mode-change` (settled otherwise on or off, #6209) and `grant-stale` (the ledger can't be read,
- * #6210) are moon owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
+ * #6210) are moon owner mails, not late notices. `srp-result` (an officer telling a pilot an SRP claim was decided)
  * `vetting-result` (a reviewer telling a pilot how their vetting review was decided) and
  * `vetting-request` (the asking officer telling a member a review awaits them) belong to
  * no Corp Tax Book at all: they only ride the same paced queue.
  */
 export type MailKind =
-  | 'statement'
+  | 'notice'
   | 'reminder'
   | 'rate-change'
   | 'payee-change'
@@ -39,20 +39,24 @@ export type MailKind =
   | 'vetting-result'
   | 'vetting-request';
 
-/** Only Statement mail is logged on a Statement; other kinds have none to log on. */
-export const isStatementMail = (kind: MailKind): kind is 'statement' | 'reminder' =>
-  kind === 'statement' || kind === 'reminder';
+/** Only a late notice's mail is logged on the notice; other kinds have none to log on. */
+export const isLateNoticeMail = (kind: string): kind is 'notice' | 'reminder' =>
+  kind === 'notice' || kind === 'reminder';
 export type MailStatus = 'waiting' | 'sent' | 'failed';
 export type MailFailureReason = 'cspa' | 'auth' | 'other';
 
 export interface MailQueueItem {
   id: string;
-  /** One "Send N Statements" press. */
+  /** One "Send N late notices" press. */
   batchId: string;
   corporationId: number;
+  /**
+   * What the mail is about: the late notice's id, or a moon owner mail's own key. Stored under its
+   * old name, which the device's queue table indexes.
+   */
   statementId: string;
   kind: MailKind;
-  /** The moon owner a removal (#4520) or payee (#4653) mail is about; absent on Statement mail. */
+  /** The moon owner a removal (#4520) or payee (#4653) mail is about; absent on a late notice's mail. */
   feederCorporationId?: number;
   /**
    * A removal notice to the moon owner's CEO or payee: sending it starts the removal's 24 hours
@@ -67,7 +71,7 @@ export interface MailQueueItem {
   senderCharacterId: number;
   recipientId: number;
   recipientName: string;
-  /** The Statement's balance, for the queue list. */
+  /** What the Miner owes, for the queue list. */
   amount: number;
   subject: string;
   body: string;
@@ -90,6 +94,9 @@ export interface MailQueueItem {
 }
 
 /** Whole minutes (rounded up) `count` mails take at EVE's limit. */
+/** D27: an officer's manual reminder to a Miner who opted out is one per late notice (shared). */
+export { reminderAllowed } from '../../../functions/src/corpTaxBookLateNotice';
+
 export function estimateMinutes(count: number): number {
   return Math.ceil(count / MAILS_PER_MINUTE);
 }
@@ -97,14 +104,6 @@ export function estimateMinutes(count: number): number {
 /** The pause after a send, 12–15 s; `random` is a `[0, 1)` draw. */
 export function sendGapMs(random: number): number {
   return Math.round(SEND_GAP_MIN_MS + random * (SEND_GAP_MAX_MS - SEND_GAP_MIN_MS));
-}
-
-/** D27: an officer's manual reminder to a Miner who opted out is limited to one per Statement. */
-export function reminderAllowed(statement: {
-  remindersStopped: boolean;
-  manualRemindersSent: number;
-}): boolean {
-  return !statement.remindersStopped || statement.manualRemindersSent < 1;
 }
 
 export type MailFailure =
@@ -265,7 +264,7 @@ export function summarize(items: readonly MailQueueItem[], now: number): QueueSu
   };
 }
 
-/** A Statement already queued (or sent) is not queued twice; a failed one can be retried instead. */
+/** A mail already queued (or sent) is not queued twice; a failed one can be retried instead. */
 export function isAlreadyQueued(
   items: readonly MailQueueItem[],
   statementId: string,

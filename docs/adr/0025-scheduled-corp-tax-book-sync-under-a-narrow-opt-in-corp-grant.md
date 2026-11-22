@@ -10,7 +10,7 @@ scope decision D25 ("no server-side scheduled sync in v1"). Builds on ADR 0020.
 ADR 0023 left the Corp Tax Book's sync to whichever officer opens the page. The
 book is only as fresh as the last visit, ESI's observer ledger keeps a short
 window of history (gaps are lost for good), and a miner's donation is not
-matched or a Statement settled until an officer happens to visit. ADR 0023
+matched or credited to the Miner's oldest days until an officer happens to visit. ADR 0023
 named the way out: "revisited only as a CEO opt-in narrow grant, as ADR 0020 did
 for alerts". The maintainer decided to build it (issue #4068), with any book
 editor able to opt in.
@@ -63,13 +63,13 @@ that syncs and settles each opted-in corporation's book every 6 hours.
   the same `syncBookAs`/`editBookAs` the callables use: ledger, Extractions and
   moon notifications (only if the holder is a Station Manager, as for a visit),
   donations into the selected divisions, monotonic upserts, gap detection,
-  re-matching of Unmatched donations, `allocatePayments` and
-  `settleStatements`. It writes the same `lastSync` ("Synced 2h ago by Scheduled
+  re-matching of Unmatched donations, and paying each Miner's oldest unpaid
+  days with what came in. It writes the same `lastSync` ("Synced 2h ago by Scheduled
   sync (<holder>)", `scheduled: true`) and audit entries (`via: scheduled
 sync`).
-- **What it may not do.** Issue a Statement or send mail. Those stay officer
-  actions; the run can ask for only two edits (`assignPayment`,
-  `settleStatements`), and issuing a Statement is not among the helpers it
+- **What it may not do.** Issue a Late notice or send mail. Those stay officer
+  actions; the run can ask for only two edits (re-match a donation, settle what
+  the donations now pay), and issuing a notice is not among the helpers it
   imports. It does not auto-group an officer's Characters (needs their device).
 - **Shared logic.** `functions/` cannot import `src/`. The pure half of the
   visit's pipeline (`observedRowsFromLedger`, `detectGaps`/`mergeGaps`,
@@ -95,7 +95,7 @@ sync`).
   `X-Ratelimit-Remaining`/`X-ESI-Error-Limit-Remain` run low; it skips, never
   retries. A 403 on the holder's own token is a refusal, not a budget problem.
 - **Cost.** One function invocation per 6 hours, plus Firestore reads of the
-  book (miners, Statements, payments, dismissals, Extractions) once or twice a
+  book (miners, Late notices, payments, dismissals, Extractions) once or twice a
   run and the sync's writes, which the same data costs when an officer syncs.
   Cloud Scheduler adds one job (about $0.10/month past the free jobs). The
   book's collections are small next to the contract snapshots that dominate the
@@ -114,8 +114,8 @@ sync`).
   the ledger, and the CEO can already revoke anyone's grant.
 - **One grant per officer, all syncing.** Rejected: duplicate ESI calls for the
   same corporation data and more tokens on the server for no more freshness.
-- **Let the run issue Statements and send the mail too.** Rejected: issuing
-  fixes amounts and mailing contacts players; both stay deliberate officer acts.
+- **Let the run issue Late notices and send the mail too.** Rejected: issuing
+  records what was asked and mailing contacts players; both stay deliberate officer acts.
 - **A second key secret.** Rejected for now: purpose-bound additional
   authenticated data keeps the two collections' blobs apart without provisioning
   another secret; split the key if the grants ever need separate rotation.

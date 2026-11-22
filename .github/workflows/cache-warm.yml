@@ -75,8 +75,8 @@ jobs:
       - if: steps.firebase-tools.outputs.cache-hit != 'true'
         run: npx --yes firebase-tools@14.27.0 setup:emulators:firestore
 
-  # `e2e-shard` in ci.yml: same container image, so the same compression tool
-  # and therefore the same cache version.
+  # `e2e-shard` and `e2e-book` in ci.yml: same container image, so the same
+  # compression tool and therefore the same cache version.
   node-modules-container:
     runs-on: ubuntu-latest
     container:
@@ -99,3 +99,14 @@ jobs:
           key: node-modules-container-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+      # `e2e-book`: firebase-tools and the Firestore emulator jar under the
+      # container's home (its own key; see that job).
+      - uses: actions/cache@v4
+        id: firebase-tools
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/firebase
+          key: firebase-tools-container-14.27.0-${{ runner.os }}
+      - if: steps.firebase-tools.outputs.cache-hit != 'true'
+        run: npx --yes firebase-tools@14.27.0 setup:emulators:firestore

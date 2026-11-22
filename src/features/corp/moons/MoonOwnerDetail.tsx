@@ -37,7 +37,7 @@ import {
   startRemovalAndMail,
   type RemovalContext,
 } from './removalFlow';
-import { useCorporationName } from './statementMailing';
+import { useCorporationName } from './lateNoticeMailing';
 import { useBook } from './useBook';
 import { useMoonOwnersInput } from './useMoonOwners';
 

@@ -22,7 +22,7 @@ Today (`MoonOwnerPage`): ![](today-1440.png) ![](today-390.png)
 - **Archive control placement (real choice).**
   - **A (recommended): Archive lives on the refinery page header.** Ghost button normally, accent when the offer rule fires, with a hint strip saying why. The list row only carries the amber pill. One home, no extra control per row, and the confirm can name what stays.
   - B: also a text action "Archive" on the offered row. Faster for a clean-up pass over several gone refineries, but it adds a control to rows that mostly never need it, and a mis-tap hazard next to the pencil on a phone.
-- **Confirm is plain.** One dialog: "It leaves the list... Extractions, mining rows, labels and Statements stay. Restore any time." No typed confirmation: it is reversible.
+- **Confirm is plain.** One dialog: "It leaves the list... Extractions, mining rows, labels and Late notices stay. Restore any time." No typed confirmation: it is reversible.
 - **Archived section.** Collapsed by default when it has rows; officers who can edit always see it, even at 0, with one line of advice (so Restore has a home). A viewer who cannot edit sees it only when non-empty. Archived refinery page: banner + Restore replaces Archive.
 - **Archived refineries leave the default list and the Mined table's refinery filter, but their mining rows still count in every figure.** Archive hides; never deletes.
 

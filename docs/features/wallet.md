@@ -200,7 +200,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Corp wallet `/corp/wallet` (`routes/CorpWallet.tsx`, `features/corp/wallet.ts`): per-division balances/journal/transactions; reuses `JournalTable` and the same column setting. Gated by `canReadWallet` capability. Decision `20260929-131220-corp-wallet-moves-to-the-corp-section`.
 - LP Store pages `/wallet/lp-store[/:corporationId]` (`routes/LoyaltyStore.tsx`): offers ranked by ISK/LP. A Wallet tab since `20261010-200446` (#3527), which replaced the Market placement of `20261002-145653`.
 - Notification event `walletBalanceChanged` (feed-only default, scope `getCharacterWallet`, `features/notifications/events.ts:191`).
-- Moon Mining Tax payment linking (`features/miningTax/LinkWalletPaymentDialog.tsx`) reads wallet journal.
+- Moon Mining Tax payment linking (`features/miningTax/LinkPaymentDialog.tsx`) reads wallet journal.
 
 ## Observed gaps (facts from code)
 

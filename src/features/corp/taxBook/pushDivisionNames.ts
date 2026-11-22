@@ -7,11 +7,12 @@
  */
 import { divisionNamesToPush, type DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import { loadCorporationDivisions } from '../wallet';
-import { editBook, type BookSummary } from './bookClient';
+import { editBook, verifyOfficer, type BookSummary } from './bookClient';
 
 export interface PushDivisionNamesDeps {
   load: typeof loadCorporationDivisions;
   edit: typeof editBook;
+  verify: typeof verifyOfficer;
 }
 
 /**
@@ -39,7 +40,11 @@ export async function pushDivisionNames(
   characterId: number,
   corporationId: number,
   summary: Pick<BookSummary, 'divisions' | 'divisionNames'>,
-  deps: PushDivisionNamesDeps = { load: loadCorporationDivisions, edit: editBook }
+  deps: PushDivisionNamesDeps = {
+    load: loadCorporationDivisions,
+    edit: editBook,
+    verify: verifyOfficer,
+  }
 ): Promise<boolean> {
   const result = await deps.load(characterId, corporationId, true);
   const wallet = result.cached?.data.wallet;
@@ -47,6 +52,9 @@ export async function pushDivisionNames(
   if (!wallet) return false;
   const divisionNames = divisionNamesToPush(summary.divisions, summary.divisionNames, wallet);
   if (!divisionNames) return false;
+  // The write rides on the role the officer check caches; this runs beside the book's own load,
+  // so it may come first, and without the check the server answers 403.
+  await deps.verify(characterId, corporationId);
   await deps.edit(characterId, corporationId, {
     action: 'updateSettings',
     patch: { divisionNames },

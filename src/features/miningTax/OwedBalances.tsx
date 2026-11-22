@@ -2,23 +2,30 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
 import type { ConflictSummary } from './corpBook/conflictSummary';
+import { isCorpPayeeId } from './corpBook/corpRows';
 import { DAY_MS } from '@/lib/age';
+import { UnlinkedSentNote, type UnlinkedSent } from './UnlinkedSentNote';
 
-/** Whole EVE days between the oldest owed entry and today (UTC) — how long this Payee has been waiting. */
+/** Whole EVE days between the oldest unpaid day and today (UTC) — how long this Payee has been waiting. */
 function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
-  const oldest = balance.members.map((m) => m.assignment.date).sort()[0];
+  const oldest =
+    balance.book?.oldest ??
+    balance.account?.owes?.oldest ??
+    balance.members.map((m) => m.assignment.date).sort()[0];
   if (!oldest) return 0;
   const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Math.max(0, Math.round((todayUtc - Date.parse(`${oldest}T00:00:00Z`)) / DAY_MS));
 }
 
 interface OwedBalancesProps {
-  /** Every Payee balance; only the owed ones are drawn, as cards. */
+  /** Every Payee balance; the owed ones and those in credit are drawn, as cards. */
   balances: readonly PayeeBalance[];
   unassigned: UnassignedSummary;
   /** Wallet payments nothing here accounts for yet (paying backwards, #540). */
@@ -29,6 +36,8 @@ interface OwedBalancesProps {
   onFilterPayee: (payeeId: string) => void;
   onSettleUp: (balance: PayeeBalance) => void;
   onLinkPayment: (balance: PayeeBalance) => void;
+  /** Opens the Payee's ledger (`PayeeLedgerPanel`): its owed or credit figure is the way in. */
+  onOpenLedger?: (balance: PayeeBalance) => void;
   /**
    * A Corp Tax Book's balance credits itself from the corp's wallet journal, so there is no
    * payment of the member's own to link to it (#4065).
@@ -48,12 +57,14 @@ interface OwedBalancesProps {
    * the same reason an uncredited donation does: the owed figure is overstated until the
    * payment is linked, so paying it in full pays twice.
    */
-  unlinkedOf?: (balance: PayeeBalance) => { count: number; amount: number } | undefined;
+  unlinkedOf?: (balance: PayeeBalance) => UnlinkedSent | undefined;
   onAssignNext: () => void;
   onReviewPayments: () => void;
   /**
    * Corp Tax Book Conflicts still to fix. Not owed, so never in the total, but each turns into
-   * a bill on its day: shown at every width so the next Statement holds no surprise.
+   * a bill on its day: shown at every width so the next Late notice holds no surprise. The day is
+   * not counted on a personal Payee's card either (it waits until the pilot resolves it), and a
+   * book's own card, which reads the book's account, still bills it.
    */
   conflicts?: ConflictSummary | null;
   /** Opens the first Conflict to resolve. */
@@ -65,8 +76,9 @@ interface OwedBalancesProps {
  * pilot owes and how much, before any ledger row. A pilot rarely owes more
  * than three Payees, so each gets a compact card — the name on a line of its
  * own, because Payee names run long ("Bureau of Unified Harvesting") and
- * must never share a line with the figure that matters. Settled Payees
- * aren't listed: the Payee filter below already reaches their entries.
+ * must never share a line with the figure that matters. A Payee in credit
+ * keeps its card, figure in credit; a settled one isn't listed: Manage Payees
+ * opens its ledger, and the Payee filter below reaches its entries.
  */
 export function OwedBalances({
   balances,
@@ -77,6 +89,7 @@ export function OwedBalances({
   onFilterPayee,
   onSettleUp,
   onLinkPayment,
+  onOpenLedger,
   hideLinkPayment,
   uncreditedOf,
   unlinkedOf,
@@ -88,18 +101,20 @@ export function OwedBalances({
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
   const owedTotal = owed.reduce((sum, b) => sum + b.owed, 0);
+  // A Payee paid ahead keeps its card too: its credit is money the pilot has there.
+  const cards = balances.filter((b) => b.owed > 0 || b.credit > 0);
 
-  // One owed Payee and nothing else to show: a single full-width row (name,
+  // One Payee card and nothing else to show: a single full-width row (name,
   // figure, actions) rather than one card stranded in half the page.
   const cardCount =
-    owed.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
-  const wide = cardCount === 1 && owed.length === 1;
+    cards.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
+  const wide = cardCount === 1 && cards.length === 1;
 
-  // Nothing owed: the prompts are the page's next action, so they read as slim
+  // No Payee card: the prompts are the page's next action, so they read as slim
   // full-width rows rather than tiles stranded in one column of a grid. With
-  // owed cards present they stay tiles that share those cards' height — a
+  // cards present they stay tiles that share those cards' height — a
   // deliberate split (issue #3120).
-  const slimPrompts = owed.length === 0;
+  const slimPrompts = cards.length === 0;
 
   const nameButton = (balance: PayeeBalance) => (
     <button
@@ -117,7 +132,17 @@ export function OwedBalances({
     >
       {/* Two lines before an ellipsis: "Bureau of Unified Harvesting" is a
           name the pilot reads, not a label to clip. */}
-      <span className="line-clamp-2 min-w-0 break-words">{balance.payee.name}</span>
+      <span
+        className={cx(
+          'flex min-w-0 flex-col items-start gap-1',
+          // The button's -my-2 assumes a one-line name; the tag makes it taller.
+          isCorpPayeeId(balance.payee.id) && 'max-md:py-2'
+        )}
+      >
+        <span className="line-clamp-2 min-w-0 break-words">{balance.payee.name}</span>
+        {/* A stored Payee can carry the corporation's name too: this one is the book. */}
+        {isCorpPayeeId(balance.payee.id) && <Pill outlined>{t('miningTax.owed.corpBookTag')}</Pill>}
+      </span>
     </button>
   );
 
@@ -127,6 +152,34 @@ export function OwedBalances({
       <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
     </span>
   );
+
+  // The figure is the readout of the Payee's ledger, so it opens it (DESIGN §6c: a solid
+  // underline on a Payee's balance figure). What is owed, or else the credit. The name keeps
+  // the filter.
+  const figure = (balance: PayeeBalance) =>
+    balance.owed > 0 ? (
+      amount(balance.owed, 'text-isk-neg')
+    ) : (
+      <span className="shrink-0 text-xl font-semibold text-isk-pos tabular-nums">
+        {formatIsk(balance.credit, 0)}
+        <span className="ml-1 text-xs font-normal text-text-dim">
+          ISK {t('miningTax.owed.creditLabel')}
+        </span>
+      </span>
+    );
+  const owedFigure = (balance: PayeeBalance) =>
+    onOpenLedger ? (
+      <button
+        type="button"
+        onClick={() => onOpenLedger(balance)}
+        aria-label={t('miningTax.ledger.openFor', { payee: balance.payee.name })}
+        className={plainTextActionClassName('shrink-0')}
+      >
+        {figure(balance)}
+      </button>
+    ) : (
+      figure(balance)
+    );
 
   const promptRow = (
     key: string,
@@ -230,8 +283,9 @@ export function OwedBalances({
               </div>
             </Panel>
           )}
-          {owed.map((balance) => {
+          {cards.map((balance) => {
             const days = owedForDays(balance);
+            const inCredit = balance.owed <= 0;
             const characterName = characterNameOf?.(balance);
             const uncredited = uncreditedOf?.(balance);
             const warnUncredited = uncredited !== undefined && uncredited.amount > 0;
@@ -241,10 +295,17 @@ export function OwedBalances({
             // it in full pays twice. Settle up stays reachable — it is sometimes right — but it
             // stops being the card's loudest control.
             const warnBeforePaying = warnUncredited || warnUnlinked;
-            const meta = (
+            const meta = inCredit ? (
+              <p className="text-xs text-text-dim">
+                {t('miningTax.owed.creditHint')}
+                {characterName && ` · ${characterName}`}
+              </p>
+            ) : (
               <>
                 <p className="text-xs text-text-dim">
-                  {t('miningTax.owed.entriesFor', { count: balance.members.length })}
+                  {t('miningTax.owed.entriesFor', {
+                    count: balance.book?.days ?? balance.members.length,
+                  })}
                   {' · '}
                   {t('miningTax.owed.waitingDays', { count: days })}
                   {characterName && ` · ${characterName}`}
@@ -261,17 +322,11 @@ export function OwedBalances({
                         })}
                   </p>
                 )}
-                {warnUnlinked && (
-                  <p className="text-xs text-warning">
-                    {t('miningTax.owed.unlinkedNote', {
-                      count: unlinked.count,
-                      amount: formatIsk(unlinked.amount, 0),
-                    })}
-                  </p>
-                )}
+                {warnUnlinked && <UnlinkedSentNote unlinked={unlinked} />}
               </>
             );
-            const actions = (
+            // Nothing owed: nothing to settle; its ledger is its figure.
+            const actions = inCredit ? null : (
               <div className="flex gap-1.5">
                 <Button
                   variant={warnBeforePaying ? 'ghost' : 'primary'}
@@ -294,11 +349,11 @@ export function OwedBalances({
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         {nameButton(balance)}
-                        <span className="sm:hidden">{amount(balance.owed, 'text-isk-neg')}</span>
+                        <span className="sm:hidden">{owedFigure(balance)}</span>
                       </div>
                       {meta}
                     </div>
-                    <span className="max-sm:hidden">{amount(balance.owed, 'text-isk-neg')}</span>
+                    <span className="max-sm:hidden">{owedFigure(balance)}</span>
                     {actions}
                   </div>
                 ) : (
@@ -308,7 +363,7 @@ export function OwedBalances({
                   <div className="flex flex-1 flex-col gap-2 p-3">
                     <div className="flex items-start gap-2">
                       {nameButton(balance)}
-                      {amount(balance.owed, 'text-isk-neg')}
+                      {owedFigure(balance)}
                     </div>
                     <div className="mt-auto space-y-2">
                       {meta}
@@ -343,7 +398,7 @@ export function OwedBalances({
         </div>
       )}
       {/* After the owed cards: owed comes first (decision 20261004), and a Conflict is not owed
-          yet. Always a full-width row, since it is a warning about the next Statement, not a
+          yet. Always a full-width row, since it is a warning about what the book bills next, not a
           Payee balance to sit among the cards. */}
       {conflicts &&
         promptRow(

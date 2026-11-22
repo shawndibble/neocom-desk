@@ -14,6 +14,7 @@
 // that lands clears that, and 30 days stale disconnects it. Nothing here logs or
 // returns a token.
 
+import { DAY_MS } from './timeConstants.js';
 import { FieldPath, FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { BOOKS_COLLECTION, FEEDERS, REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
 import { isMissingIndex, isTopLevelChild } from './indexedSweep.js';
@@ -46,7 +47,7 @@ import {
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
 /** A refinery's name is re-read, or a refused lookup retried, after this long (#4654). */
-export const STRUCTURE_RECHECK_MS = 7 * 24 * 3_600_000;
+export const STRUCTURE_RECHECK_MS = 7 * DAY_MS;
 /** The most structure lookups one feeder's run makes; the rest wait for the next run. */
 export const MAX_STRUCTURE_LOOKUPS = 20;
 

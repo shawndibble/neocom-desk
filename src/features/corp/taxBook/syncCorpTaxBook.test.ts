@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Statement } from '@/engine/corpTaxBook/statements';
+import type { LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import {
   OBSERVED_PER_CALL,
   syncCorpTaxBook,
@@ -32,24 +32,26 @@ const emptyState = (over: Partial<BookState> = {}): BookState => ({
     structureExpiryHours: {},
   },
   miners: [],
-  statements: [],
+  notices: [],
   payments: [],
   dismissals: [],
   extractions: [],
-  paidStatementIds: new Set(),
   ...over,
 });
 
-/** An issued, unpaid Statement: its Miner has an open balance, so a code-less donation credits (#6207). */
-const owing = (minerId: string) =>
-  ({
-    id: `s-${minerId}`,
-    minerId,
-    code: `MT-${minerId}`,
-    issuedAt: '2026-07-01T00:00:00Z',
-    lines: [],
-    amount: 10_000_000,
-  }) as unknown as Statement;
+/** A late notice sent to a Miner: the code it printed is theirs. */
+const owing = (minerId: string): LateNotice => ({
+  id: `s-${minerId}`,
+  minerId,
+  characterIds: [],
+  kind: 'late',
+  code: `MT${minerId.replace(/\W/g, '').slice(-6).toUpperCase().padStart(6, '0')}`,
+  issuedAt: '2026-07-01T00:00:00Z',
+  uids: [],
+  lines: [],
+  listed: 10_000_000,
+  mail: { sent: 1, manualSent: 0, remindersStopped: false },
+});
 
 const row = (characterId: number, date = '2026-07-19') => ({
   structureId: 1001,
@@ -81,7 +83,6 @@ function deps(over: Partial<SyncDeps> = {}) {
       extractions: u.extractions?.length ?? 0,
       donationsAdded: u.donations?.length ?? 0,
     })),
-    settleStatements: vi.fn(async () => ({})),
     loadAccountCharacters: vi.fn(async () => []),
     declinedGrouping: vi.fn(async () => new Set<number>()),
     applyGrouping: vi.fn(async () => ({})),
@@ -136,7 +137,7 @@ describe('syncCorpTaxBook', () => {
 
   it('uploads the ledger, extractions and donations in one call, with the gaps', async () => {
     const d = deps({
-      readBookState: async () => emptyState({ statements: [owing('solo:7')] }),
+      readBookState: async () => emptyState({ notices: [owing('solo:7')] }),
       loadEsiExtractions: async () => [
         {
           structure_id: 1001,
@@ -156,7 +157,9 @@ describe('syncCorpTaxBook', () => {
     expect(upload.observed).toHaveLength(1);
     expect(upload.extractions).toHaveLength(1);
     // Known from the ledger, and its Miner owes, so the donation is credited to that Miner.
-    expect(upload.donations?.[0]).toMatchObject({ refId: 9, minerId: 'solo:7' });
+    expect(upload.donations?.[0]).toMatchObject({ refId: 9 });
+    // The server places the donation itself; a Miner this tab named would be ignored.
+    expect(upload.donations?.[0]?.minerId).toBeUndefined();
     expect(out).toMatchObject({
       kind: 'synced',
       observedRows: 1,
@@ -165,7 +168,7 @@ describe('syncCorpTaxBook', () => {
     });
   });
 
-  it('credits a known miner’s donation toward ore not yet on a Statement (#6207)', async () => {
+  it('leaves a known miner’s donation for the server to place (#6207)', async () => {
     // Character 7 mined on 2026-07-19 and has no Statement: miners often pay the day they mine.
     const d = deps({
       loadDonations: async () => [
@@ -174,16 +177,16 @@ describe('syncCorpTaxBook', () => {
     });
     await run(d);
     const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
-    expect(donation).toMatchObject({ minerId: 'solo:7' });
+    expect(donation.minerId).toBeUndefined();
   });
 
-  it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {
+  it('leaves a donation for the server to place even when its Miner owes nothing (#6300)', async () => {
     // Billed through the day they mined, and paid in full: nothing owed, no ore unbilled.
-    const billed = { ...owing('solo:7'), coversThrough: '2026-07-31' } as unknown as Statement;
+    const billed = owing('solo:7');
     const d = deps({
       readBookState: async () =>
         emptyState({
-          statements: [billed],
+          notices: [billed],
           payments: [
             {
               id: 'j1_1',
@@ -201,13 +204,13 @@ describe('syncCorpTaxBook', () => {
     });
     await run(d);
     const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
-    expect(donation.minerId).toBe('solo:7');
+    expect(donation.minerId).toBeUndefined();
     expect(donation.reviewReason).toBeUndefined();
   });
 
   it('notes tax paid into a division the book does not read, and never credits it (#6207)', async () => {
     const d = deps({
-      readBookState: async () => emptyState({ statements: [owing('solo:7')] }),
+      readBookState: async () => emptyState({ notices: [owing('solo:7')] }),
       loadDonations: vi.fn(async (_c: number, _corp: number, divisions: readonly number[]) =>
         divisions.includes(1)
           ? []
@@ -246,7 +249,7 @@ describe('syncCorpTaxBook', () => {
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
           // Billed through the day mined before the donation: nothing was unbilled when they paid.
-          statements: [{ ...owing('m1'), coversThrough: '2026-07-19' } as unknown as Statement],
+          notices: [owing('m1')],
           payments: [
             {
               id: 'j1_1',
@@ -268,7 +271,7 @@ describe('syncCorpTaxBook', () => {
       readBookState: async () =>
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
-          statements: [owing('m1')],
+          notices: [owing('m1')],
           payments: [
             {
               id: 'j1_1',
@@ -356,7 +359,7 @@ describe('syncCorpTaxBook', () => {
       expect(d.assignPayment).not.toHaveBeenCalled();
     });
 
-    it('credits a new donation to its Miner when their only unbilled ore is moon owner mining', async () => {
+    it('leaves a donation whose Miner mined only at a moon owner for the server to place', async () => {
       const d = onlyFed({
         readBookState: async () =>
           book([
@@ -375,7 +378,7 @@ describe('syncCorpTaxBook', () => {
       });
       await run(d);
       const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
-      expect(donation).toMatchObject({ minerId: 'solo:7' });
+      expect(donation.minerId).toBeUndefined();
     });
 
     it('reads no stored rows when nothing is held and nothing new came in', async () => {
@@ -412,7 +415,7 @@ describe('syncCorpTaxBook', () => {
       readBookState: async () =>
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
-          statements: [owing('m1')],
+          notices: [owing('m1')],
           payments: [
             {
               id: 'j1_1',
@@ -444,12 +447,35 @@ describe('syncCorpTaxBook', () => {
     expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
+  it('never assigns a donation held as ambiguous: the server re-resolves it (M8)', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          notices: [owing('m1')],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+              reviewReason: 'ambiguous',
+              ambiguousMinerIds: ['m1', 'm2'],
+            },
+          ],
+        }),
+    });
+    await run(d);
+    expect(d.assignPayment).not.toHaveBeenCalled();
+  });
+
   it('does not fail the sync when re-matching an Unmatched donation is refused, and says so', async () => {
     const d = deps({
       readBookState: async () =>
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
-          statements: [owing('m1')],
+          notices: [owing('m1')],
           payments: [
             {
               id: 'j1_1',
@@ -465,6 +491,40 @@ describe('syncCorpTaxBook', () => {
       }),
     });
     expect(await run(d)).toMatchObject({ kind: 'synced', reassignError: 'assign refused' });
+  });
+
+  it('keeps placing the rest when one assignment is refused, and skips locked and closed ones', async () => {
+    const pay = (id: string, characterId: number, at: string) => ({
+      id,
+      characterId,
+      amount: 5,
+      at,
+      source: 'donation' as const,
+    });
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [
+            { id: 'm1', mainCharacterId: 7, characterIds: [7, 8] },
+            { id: 'm2', mainCharacterId: 9, characterIds: [9], closedAt: '2026-07-10T00:00:00Z' },
+          ] as BookState['miners'],
+          notices: [owing('m1')],
+          payments: [
+            pay('j1_1', 8, '2026-07-01T00:00:00Z'),
+            pay('j1_2', 8, '2026-07-02T00:00:00Z'),
+            // Before the lock date on 2026-07-20 (2026-05-01): assigning it is refused for good.
+            pay('j1_0', 8, '2026-04-30T00:00:00Z'),
+            // Its Miner's account is closed.
+            pay('j1_3', 9, '2026-07-03T00:00:00Z'),
+          ],
+        }),
+      assignPayment: vi.fn(async (_c, _o, paymentId) => {
+        if (paymentId === 'j1_1') throw new Error('assign refused');
+        return {};
+      }),
+    });
+    expect(await run(d)).toMatchObject({ kind: 'synced', reassignError: 'assign refused' });
+    expect(vi.mocked(d.assignPayment).mock.calls.map((c) => c[2])).toEqual(['j1_1', 'j1_2']);
   });
 
   it('hands the wallet to moon owner payouts once it read, and a refusal never fails the sync', async () => {
@@ -574,47 +634,6 @@ describe('syncCorpTaxBook', () => {
     expect(calls[1].observed).toHaveLength(5);
     expect(calls[0].extractions).toBeDefined();
     expect(calls[1].extractions).toBeUndefined();
-  });
-
-  it('settles the Statements the new donation pays, and only those', async () => {
-    const statement = {
-      id: 's1',
-      minerId: 'solo:7',
-      code: 'MT-1',
-      issuedAt: '2026-07-01T00:00:00Z',
-      lines: [],
-      amount: 10_000_000,
-    } as unknown as Statement;
-    const stored = emptyState({ statements: [statement] });
-    const paid = emptyState({
-      statements: [statement],
-      payments: [
-        {
-          id: 'j1_9',
-          minerId: 'solo:7',
-          characterId: 7,
-          amount: 10_000_000,
-          at: '2026-07-19T00:00:00Z',
-          source: 'donation',
-        },
-      ],
-    });
-    const read = vi.fn().mockResolvedValueOnce(stored).mockResolvedValueOnce(paid);
-    const d = deps({
-      readBookState: read,
-      loadDonations: async () => [
-        {
-          refId: 9,
-          division: 1,
-          characterId: 7,
-          amount: 10_000_000,
-          at: '2026-07-19T00:00:00.000Z',
-        },
-      ],
-    });
-    const out = await run(d);
-    expect(d.settleStatements).toHaveBeenCalledWith(5, CORP, ['s1']);
-    expect(out).toMatchObject({ settled: ['s1'] });
   });
 
   it('groups the account’s own Characters in the corporation (D26)', async () => {

@@ -12,6 +12,7 @@
 // Failures carry a stable `reason` for the UI to map; no player-facing text lives here.
 // No token is logged or returned.
 
+import { utcDay } from './timeConstants.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
@@ -31,7 +32,6 @@ import {
   FEEDER_PREVIOUS_COLLECTION,
   REMOVAL_LINKS_COLLECTION,
   pctField,
-  utcDate,
 } from './corpTaxBook.js';
 import type { AuditAction } from './corpTaxBookKinds.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
@@ -280,10 +280,10 @@ async function reconnectCore(
     if (reopened) {
       // Back after a disconnect: a new coverage period from the day after the last covered one
       // (as far back as EVE still holds), so no ore is lost; balance and rate history carry on.
-      const today = utcDate(deps.now());
+      const today = utcDay(deps.now());
       coveragePeriods = reopenPeriod(
         rec.coveragePeriods,
-        reconnectCoverageFrom(rec.coveragePeriods, today, utcDate(rec.joinedAt))
+        reconnectCoverageFrom(rec.coveragePeriods, today, utcDay(rec.joinedAt))
       );
       patch.status = 'active';
       patch.coveragePeriods = coveragePeriods;
@@ -770,7 +770,7 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
     tx.update(recordRef, {
       status: input.finalStatus,
       leftAt: now,
-      coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(input.effectiveAt)),
+      coveragePeriods: closePeriod(rec.coveragePeriods, utcDay(input.effectiveAt)),
       removal: FieldValue.delete(),
       removalLinkId: FieldValue.delete(),
       // The feed's sync state and a dismissed history belong to this feed, not the next.
@@ -919,7 +919,7 @@ export async function getFeederStatus(
   ]);
   const name = book.get('corporationName');
   // Only an agreed rate is in effect; a request alone never is (#6209).
-  const effective = effectiveOwnerRatePct(deriveOwnerRateHistory(rec), utcDate(deps.now())) ?? null;
+  const effective = effectiveOwnerRatePct(deriveOwnerRateHistory(rec), utcDay(deps.now())) ?? null;
   const last = rec.lastSyncResult;
   return {
     status: 'feeder',

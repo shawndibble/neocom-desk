@@ -3,6 +3,7 @@
 // check as creating an invite. Either side sets the payee (#4653): see corpTaxBookPayee.ts.
 // Failures carry a stable `reason`; no player-facing text lives here.
 
+import { utcDay } from './timeConstants.js';
 import { fail, type Caller } from './actorAuth.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -12,7 +13,6 @@ import {
   parseFeederTarget,
   dateString,
   pctField,
-  utcDate,
   type BookCall,
   type FeederTargetCall,
 } from './corpTaxBook.js';
@@ -58,10 +58,10 @@ export function parseSetFeederRateInput(data: unknown): SetFeederRateInput {
  * server clock.
  */
 export function resolveAsOf(rec: FeederRecord, asOf: string | undefined, now: number): string {
-  const today = utcDate(now);
+  const today = utcDay(now);
   if (asOf === undefined) return today;
   const limit = shiftDate(today, -MAX_AS_OF_DAYS_BACK);
-  const joined = utcDate(rec.joinedAt);
+  const joined = utcDay(rec.joinedAt);
   const earliest = joined > limit ? joined : limit;
   if (asOf > today || asOf < earliest) {
     fail('invalid-argument', 'The as-of date is outside the allowed days', 'as-of-out-of-range');
@@ -99,10 +99,10 @@ export function appendAgreedRate(
   rec: FeederRecord,
   pct: number,
   now: number,
-  asOf: string = utcDate(now)
+  asOf: string = utcDay(now)
 ): OwnerRateEntry[] {
   const history = deriveOwnerRateHistory(rec);
-  const standing = latestOwnerRate(history, 'agreed', utcDate(now));
+  const standing = latestOwnerRate(history, 'agreed', utcDay(now));
   if (standing?.pct === pct && asOf >= standing.effectiveFrom) return history;
   return [
     ...history,
@@ -128,7 +128,7 @@ export function appendModeChange(
   const changes = deriveModeChanges(rec);
   const current = changes.at(-1)?.mode ?? 'normal';
   if (current === mode) return changes;
-  return [...changes, { from: utcDate(now), mode }];
+  return [...changes, { from: utcDay(now), mode }];
 }
 
 // --- Calls -----------------------------------------------------------------

@@ -6,21 +6,18 @@
 // that runs both copies on the same inputs. Change the engine first, then this
 // file. Dependency-free apart from its sibling mirror, so that test can import it.
 
+import { utcDay } from './timeConstants.js';
 import {
-  allocatePayments,
-  creditedLines,
-  dismissalCredits,
-  heldByStatement,
-  isDayCovered,
-  type CoveragePeriod,
-  type HoldingDispute,
   moonOnDay,
   shiftDate,
-  type AllocWriteOff,
-  type MirrorDismissal,
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
+
+import { UNCOUNTED_LIMIT, minerIdFor, type UncountedDonation } from './corpTaxBookDonationMatch.js';
+
+/** One copy each, in the shared donation matching (corpTaxBookDonationMatch.ts). */
+export { UNCOUNTED_LIMIT, minerIdFor, type UncountedDonation };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -76,8 +73,6 @@ export interface GapInput {
   oldestEsiDate: Readonly<Record<number, string | undefined>>;
   retentionDays?: number;
 }
-
-const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Engine `detectGaps`. */
 export function detectGaps(input: GapInput): SyncGap[] {
@@ -140,7 +135,6 @@ export interface JournalDonation {
   at: string;
   reason?: string;
   minerId?: string;
-  statementId?: string;
   /** Set when a known sender's Miner owed nothing, so it stays Unmatched for review (#6207). */
   reviewReason?: 'no-open-balance';
 }
@@ -174,146 +168,14 @@ export interface MinerLike {
   characterIds: number[];
 }
 
-export interface StatementLike {
-  id: string;
-  minerId: string;
-  code: string;
-}
-
-/** Engine `minerIdFor`. */
-export function minerIdFor(characterId: number, miners: readonly MinerLike[]): string {
-  return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
-}
-
-export type DonationMatch =
-  | { kind: 'statement'; statementId: string; minerId: string }
-  | { kind: 'miner'; minerId: string }
-  | { kind: 'unmatched' };
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function carriesCode(reason: string, code: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(code)}($|[^a-z0-9])`, 'i').test(reason);
-}
-
-/** Engine `matchDonation`. */
-export function matchDonation(
-  donation: { characterId: number; reason: string | undefined },
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly StatementLike[];
-    knownCharacterIds: ReadonlySet<number>;
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  }
-): DonationMatch {
-  const reason = donation.reason ?? '';
-  if (reason) {
-    const pinned = book.statements.find((s) => carriesCode(reason, s.code));
-    if (pinned) return { kind: 'statement', statementId: pinned.id, minerId: pinned.minerId };
-  }
-  const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
-  if (grouped || book.knownCharacterIds.has(donation.characterId)) {
-    const minerId = minerIdFor(donation.characterId, book.miners);
-    return { kind: 'miner', minerId };
-  }
-  return { kind: 'unmatched' };
-}
-
-/** Engine `resolveDonations`. */
-export function resolveDonations(
-  donations: readonly JournalDonation[],
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly StatementLike[];
-    knownCharacterIds: ReadonlySet<number>;
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  }
-): JournalDonation[] {
-  const balance = new Map(book.openBalance);
-  const resolved = new Map<JournalDonation, JournalDonation>();
-  const oldestFirst = [...donations].sort(
-    (a, b) => a.at.localeCompare(b.at) || a.division - b.division || a.refId - b.refId
-  );
-  for (const d of oldestFirst) {
-    const match = matchDonation(
-      { characterId: d.characterId, reason: d.reason },
-      { ...book, openBalance: balance }
-    );
-    if (match.kind === 'statement' || match.kind === 'miner')
-      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - d.amount);
-    resolved.set(
-      d,
-      match.kind === 'statement'
-        ? { ...d, minerId: match.minerId, statementId: match.statementId }
-        : match.kind === 'miner'
-          ? { ...d, minerId: match.minerId }
-          : d
-    );
-  }
-  return donations.map((d) => resolved.get(d)!);
-}
-
 // --- Donations into divisions the book does not read (#6207) --------------
 
 /** Engine `WALLET_DIVISIONS`. */
 export const WALLET_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
-/** Engine `UNCOUNTED_LIMIT`: also the sync callable's bound on `uncounted`. */
-export const UNCOUNTED_LIMIT = 20;
-
-export interface UncountedDonation {
-  id: string;
-  refId: number;
-  division: number;
-  characterId: number;
-  amount: number;
-  at: string;
-}
 
 /** Engine `otherDivisions`. */
 export function otherDivisions(divisions: readonly number[]): number[] {
   return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
-}
-
-/** Engine `noteUncounted`. */
-export function noteUncounted(
-  donations: readonly JournalDonation[],
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly StatementLike[];
-    knownCharacterIds: ReadonlySet<number>;
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  },
-  counted: readonly JournalDonation[] = []
-): UncountedDonation[] {
-  const openBalance = new Map(book.openBalance);
-  for (const c of counted)
-    if (c.minerId !== undefined)
-      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
-  return donations
-    .filter((d) => {
-      const match = matchDonation({ characterId: d.characterId, reason: d.reason }, book);
-      if (match.kind === 'statement') return true;
-      // A known sender's donation here is likely tax only while their Miner owes (#6207).
-      return (
-        match.kind === 'miner' &&
-        ((openBalance.get(match.minerId) ?? 0) > 0 || book.unbilled.has(match.minerId))
-      );
-    })
-    .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
-    .slice(0, UNCOUNTED_LIMIT)
-    .map((d) => ({
-      id: `j${d.division}_${d.refId}`,
-      refId: d.refId,
-      division: d.division,
-      characterId: d.characterId,
-      amount: d.amount,
-      at: d.at,
-    }));
 }
 
 // --- Notification payloads ------------------------------------------------
@@ -626,257 +488,15 @@ export function restampPlan(
   });
 }
 
-// --- Settlement -----------------------------------------------------------
-
-export interface SettleStatement {
-  id: string;
-  minerId: string;
-  amount: number;
-  issuedAt: string;
-  /** A running account's late notice (#6294): never settled, never an open balance. */
-  kind?: string;
-  lines: {
-    chargeKey?: string;
-    date?: string;
-    tax?: number;
-    structureId?: number;
-    /** Read by `heldByStatement` to price a disputed line as it was billed. */
-    kind?: string;
-    oreLines?: { typeId: number; quantity: number }[];
-    unitPrices?: Record<string, number>;
-    taxPct?: number;
-  }[];
-}
+// --- Payments -------------------------------------------------------------
 
 export interface SettlePayment {
   id: string;
   minerId?: string;
   amount: number;
   at: string;
-  statementId?: string;
   notTaxAmount?: number;
   source?: 'donation' | 'manual';
   /** Held for an officer's review (#6207): never re-matched by a sync. */
   reviewReason?: 'no-open-balance';
-}
-
-interface SettleInput {
-  statements: readonly SettleStatement[];
-  payments: readonly SettlePayment[];
-  dismissals: readonly MirrorDismissal[];
-  alreadyPaid: ReadonlySet<string>;
-  extractions: readonly MirrorExtraction[];
-  /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
-  writeOffs?: readonly (AllocWriteOff & { minerId: string })[];
-  startDate?: string;
-  /** Engine `SettleInput.disputes`: with `now`, an open one holds its amount out of what is due. */
-  disputes?: readonly (HoldingDispute & { minerId: string })[];
-  now?: string;
-}
-
-/** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
-export function planSettlements(input: SettleInput): string[] {
-  const settled: string[] = [];
-  for (const { statements, allocation } of allocateEachMiner(input)) {
-    for (const s of statements) {
-      const st = allocation.byStatement.get(s.id);
-      // Settled only because a dispute holds part of it: not for good (D22).
-      if (st?.settled && !st.held && !input.alreadyPaid.has(s.id)) {
-        settled.push(s.id);
-      }
-    }
-  }
-  return settled;
-}
-
-/** Engine `billsDays`: a running account's late notice (#6294) bills no days of its own. */
-export const billsDays = (s: { kind?: string }): boolean => s.kind !== 'notice';
-
-/** Engine `unbilledMinerIds`. */
-export function unbilledMinerIds(
-  rows: readonly { characterId: number; date: string; quantity: number }[],
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly { minerId: string; coversThrough?: string; kind?: string }[];
-    startDate: string;
-  }
-): Set<string> {
-  const billedThrough = new Map<string, string>();
-  for (const s of book.statements.filter(billsDays))
-    if (s.coversThrough && s.coversThrough > (billedThrough.get(s.minerId) ?? ''))
-      billedThrough.set(s.minerId, s.coversThrough);
-  const out = new Set<string>();
-  for (const r of rows) {
-    if (!(r.quantity > 0) || r.date < book.startDate) continue;
-    const minerId = minerIdFor(r.characterId, book.miners);
-    if (r.date > (billedThrough.get(minerId) ?? '')) out.add(minerId);
-  }
-  return out;
-}
-
-/**
- * Engine `unbilledWhenPaid`.
- * Whether a held donation's Miner had ore not yet on a Statement when they paid: a ledger row
- * dated on or before the payment's UTC day, after everything the Statements issued by then
- * covered. The ESI ledger lags the mining by about an hour, so a Miner who pays straight after
- * mining is held for review (`no-open-balance`) though they owed; a later sync that finds such a
- * row matches the donation as the first sync would have, had the ledger been current.
- */
-export function unbilledWhenPaid(
-  payment: { characterId: number; at: string },
-  rows: readonly { characterId: number; date: string; quantity: number }[],
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly {
-      minerId: string;
-      coversThrough?: string;
-      issuedAt?: string;
-      kind?: string;
-    }[];
-    startDate: string;
-  }
-): boolean {
-  const minerId = minerIdFor(payment.characterId, book.miners);
-  const paidDay = payment.at.slice(0, 10);
-  const billedThrough = billedThroughWhenPaid(payment, book);
-  return rows.some(
-    (r) =>
-      r.quantity > 0 &&
-      r.date >= book.startDate &&
-      r.date <= paidDay &&
-      r.date > billedThrough &&
-      minerIdFor(r.characterId, book.miners) === minerId
-  );
-}
-
-function billedThroughWhenPaid(
-  payment: { characterId: number; at: string },
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly {
-      minerId: string;
-      coversThrough?: string;
-      issuedAt?: string;
-      kind?: string;
-    }[];
-  }
-): string {
-  const minerId = minerIdFor(payment.characterId, book.miners);
-  let billedThrough = '';
-  for (const s of book.statements.filter(billsDays))
-    if (
-      s.minerId === minerId &&
-      s.coversThrough &&
-      s.issuedAt !== undefined &&
-      s.issuedAt <= payment.at &&
-      s.coversThrough > billedThrough
-    )
-      billedThrough = s.coversThrough;
-  return billedThrough;
-}
-
-/**
- * Engine `storedRowsWanted`: by Character, the first day of stored rows (moon owners' mining
- * the book bills, which this run's own ledger read never holds) to match donations against.
- */
-export function storedRowsWanted(input: {
-  held: readonly { characterId: number; at: string }[];
-  senders: readonly number[];
-  miners: readonly MinerLike[];
-  statements: readonly {
-    minerId: string;
-    coversThrough?: string;
-    issuedAt?: string;
-    kind?: string;
-  }[];
-  startDate: string;
-}): Map<number, string> {
-  const out = new Map<number, string>();
-  const want = (characterId: number, billedThrough: string, through?: string) => {
-    const after = billedThrough ? shiftDate(billedThrough, 1) : '';
-    const from = after > input.startDate ? after : input.startDate;
-    if (through !== undefined && from > through) return;
-    const minerId = minerIdFor(characterId, input.miners);
-    const characters = input.miners.find((m) => m.id === minerId)?.characterIds ?? [characterId];
-    for (const c of characters) {
-      const held = out.get(c);
-      if (held === undefined || from < held) out.set(c, from);
-    }
-  };
-  for (const p of input.held)
-    want(p.characterId, billedThroughWhenPaid(p, input), p.at.slice(0, 10));
-  for (const characterId of input.senders) {
-    const minerId = minerIdFor(characterId, input.miners);
-    let billedThrough = '';
-    for (const s of input.statements.filter(billsDays))
-      if (s.minerId === minerId && s.coversThrough && s.coversThrough > billedThrough)
-        billedThrough = s.coversThrough;
-    want(characterId, billedThrough);
-  }
-  return out;
-}
-
-/** Engine `billableStoredRows`. */
-export function billableStoredRows<
-  T extends { characterId: number; date: string; sourceCorporationId?: number },
->(
-  rows: readonly T[],
-  wanted: ReadonlyMap<number, string>,
-  bookCorporationId: number,
-  feeders: readonly { corporationId: number; coveragePeriods?: readonly CoveragePeriod[] }[]
-): T[] {
-  const periodsOf = new Map(feeders.map((f) => [f.corporationId, f.coveragePeriods]));
-  return rows.filter((r) => {
-    const from = wanted.get(r.characterId);
-    if (from === undefined || r.date < from) return false;
-    const source = r.sourceCorporationId;
-    const periods =
-      source === undefined || source === bookCorporationId ? undefined : periodsOf.get(source);
-    return periods === undefined || isDayCovered(periods, r.date);
-  });
-}
-
-/** Engine `openBalances`: what each Miner still owes on issued Statements. */
-export function openBalances(input: Omit<SettleInput, 'alreadyPaid'>): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const { minerId, allocation } of allocateEachMiner(input)) {
-    let owed = 0;
-    for (const s of allocation.byStatement.values()) if (!s.settled) owed += s.remaining;
-    if (owed > 0) out.set(minerId, owed);
-  }
-  return out;
-}
-
-function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
-  const billing = input.statements.filter(billsDays);
-  const minerIds = [...new Set(billing.map((s) => s.minerId))];
-  return minerIds.map((minerId) => {
-    const statements = billing.filter((s) => s.minerId === minerId);
-    const payments = input.payments.filter((p) => p.minerId === minerId);
-    const credits = dismissalCredits({
-      minerId,
-      statements,
-      dismissals: input.dismissals,
-      extractions: input.extractions,
-      expiryHours: {},
-    });
-    const held =
-      input.now !== undefined && input.disputes
-        ? heldByStatement(
-            statements,
-            input.disputes.filter((d) => d.minerId === minerId),
-            creditedLines(credits),
-            input.now
-          )
-        : new Map<string, number>();
-    const allocation = allocatePayments({
-      statements,
-      payments,
-      dismissalCredits: credits,
-      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
-      startDate: input.startDate,
-      ...(held.size > 0 ? { held } : {}),
-    });
-    return { minerId, statements, allocation };
-  });
 }

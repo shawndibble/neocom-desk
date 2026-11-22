@@ -6,7 +6,8 @@
 import { callRouted } from '@/sync/routedCallable';
 import type { VerifyPayload } from '@/engine/corpTaxBook/verifyView';
 
-export async function readVerifyStatement(token: string): Promise<VerifyPayload> {
+/** The Late notice a verify link names (the callable keeps its legacy name). */
+export async function readVerifyNotice(token: string): Promise<VerifyPayload> {
   return callRouted<{ token: string }, VerifyPayload>(
     'readCorpTaxBookStatementCallable',
     {
@@ -16,7 +17,7 @@ export async function readVerifyStatement(token: string): Promise<VerifyPayload>
   );
 }
 
-/** "Stop reminders": the monthly Statement still goes. Returns the stored state. */
+/** "Stop reminders": no more reminder mail for the notice. Returns the stored state. */
 export async function setVerifyRemindersStopped(token: string, stopped: boolean): Promise<boolean> {
   const result = await callRouted<{ token: string; stopped: boolean }, { stopped: boolean }>(
     'stopCorpTaxBookRemindersCallable',

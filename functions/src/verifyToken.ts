@@ -1,5 +1,5 @@
 /**
- * A Statement's verify token: random bytes as unpadded base64url. One file, so the client's
+ * A Late notice's verify token: random bytes as unpadded base64url. One file, so the client's
  * mail counter (`src/engine/corpTaxBook/verifyToken.ts` re-exports it) counts the real link.
  * Pure: the server draws the bytes with `randomBytes(VERIFY_TOKEN_BYTES)`.
  */

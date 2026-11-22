@@ -5,7 +5,7 @@ import { plainTextActionClassName } from '@/components/ui';
 const textAction = plainTextActionClassName('min-h-9 md:min-h-6');
 
 interface Props {
-  /** Days and Statements the member has told a corporation about, not yet answered. */
+  /** Days and Late notices the member has told a corporation about, not yet answered. */
   waiting: number;
   /** What the member chose not to pay, by key, with a label to read it by. */
   notPaying: readonly { key: string; label: string }[];

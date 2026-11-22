@@ -1,19 +1,19 @@
 import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import {
-  ACCOUNTS,
+  RUNNING_ACCOUNTS,
   ADJUSTMENTS,
   DECLARATIONS,
   DISMISSALS,
   disputeIdFor,
   DISPUTES,
+  LATE_NOTICES,
   MINER_PAID,
   PAYMENTS,
   REBILLS,
-  STATEMENTS,
   TOLERANCE_EXEMPTIONS,
   WRITE_OFFS,
 } from './corpTaxBook.js';
-import { MINER_TOTALS } from './corpTaxBookMinerTotals.js';
+import { soloMinerId } from './corpTaxBookDonationMatch.js';
 
 /**
  * Grouping Characters into one Miner (#6450): everything the absorbed Miners were billed, paid
@@ -40,7 +40,7 @@ export type RekeyWrite =
 
 /** Collections whose records carry `minerId`. */
 export const MINER_KEYED = [
-  STATEMENTS,
+  LATE_NOTICES,
   PAYMENTS,
   WRITE_OFFS,
   ADJUSTMENTS,
@@ -49,10 +49,11 @@ export const MINER_KEYED = [
   TOLERANCE_EXEMPTIONS,
 ];
 /**
- * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerTotals/{minerId}`,
- * `minerPaid/{minerId}`): only caches, rebuilt on the next read or record.
+ * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerPaid/{minerId}`): figures
+ * an officer's tab records again on its next load. A checkpoint is dropped by the caller with every
+ * Miner whose characters change, not here.
  */
-export const MINER_CACHES = [ACCOUNTS, MINER_TOTALS, MINER_PAID];
+export const MINER_CACHES = [RUNNING_ACCOUNTS, MINER_PAID];
 
 /** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(
@@ -60,7 +61,7 @@ export function absorbedMinerIds(
   characterIds: readonly number[],
   absorbMinerIds: readonly string[]
 ): string[] {
-  const ids = new Set([...absorbMinerIds, ...characterIds.map((c) => `solo:${c}`)]);
+  const ids = new Set([...absorbMinerIds, ...characterIds.map(soloMinerId)]);
   ids.delete(target);
   return [...ids];
 }
@@ -123,7 +124,8 @@ export function soloTargets(
   const out = new Map<string, string>();
   for (const m of miners)
     for (const c of m.characterIds)
-      if (`solo:${c}` !== m.id && !m.pendingConfirmation?.includes(c)) out.set(`solo:${c}`, m.id);
+      if (soloMinerId(c) !== m.id && !m.pendingConfirmation?.includes(c))
+        out.set(soloMinerId(c), m.id);
   return out;
 }
 

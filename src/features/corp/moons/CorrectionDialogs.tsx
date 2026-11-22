@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   IskInput,
@@ -14,18 +13,19 @@ import {
 } from '@/components/ui';
 import type { DayRow, MinerRow } from '@/engine/corpTaxBook/bookView';
 import { accountBalance, balanceAdjustment } from '@/engine/corpTaxBook/balanceAdjustment';
-import { canRebillFrom, type Adjustment } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { canOverrideDay } from './dayEligibility';
 import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
+import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 
 /** The chosen date the way the rest of the book writes it: the browser's date field shows the locale's format. */
 function DateReadback({ date }: { date: string }) {
   return <span className="block text-xs text-text-dim">{dateWithYear(date)}</span>;
 }
 
-/** Per-record rate override (D31): a logged officer correction on a day not yet on a Statement. */
+/** Per-record rate override (D31): a logged officer correction on one day. */
 export function RateOverrideDialog({
   open,
   onClose,
@@ -39,8 +39,8 @@ export function RateOverrideDialog({
   initialKey?: string;
 }) {
   const { t } = useTranslation();
-  const { edit, names } = useBook();
-  const eligible = days.filter(canOverrideDay);
+  const { edit, names, view } = useBook();
+  const eligible = days.filter((d) => canOverrideDay(d, view.input.now));
   const [key, setKey] = useState(initialKey);
   const [pct, setPct] = useState('');
   const [reason, setReason] = useState('');
@@ -95,7 +95,7 @@ export function RateOverrideDialog({
   );
 }
 
-/** A correction line (`addAdjustment`): billed on the next Statement as a labelled line. */
+/** A correction line (`addAdjustment`): billed on the Running account as a labelled line. */
 export function AdjustmentDialog({
   open,
   onClose,
@@ -113,7 +113,9 @@ export function AdjustmentDialog({
   openingDate?: string;
 }) {
   const { t } = useTranslation();
-  const { edit } = useBook();
+  const { edit, view } = useBook();
+  // A correction is dated on or after the lock date (decision 20261120-235011, "a lock date").
+  const lockDate = lockDateFor(view.input.now.slice(0, 10));
   const balanceText = (balance: number) =>
     balance > 0
       ? t('corpTaxBook.moons.corrections.adjust.owesAmount', { amount: isk(balance) })
@@ -143,7 +145,7 @@ export function AdjustmentDialog({
           ? t('corpTaxBook.moons.corrections.adjust.confirm', { amount: isk(value) })
           : t('corpTaxBook.moons.corrections.adjust.confirmEmpty')
       }
-      canConfirm={ready && date !== '' && reason.trim().length > 0}
+      canConfirm={ready && date >= lockDate && reason.trim().length > 0}
       run={async () => {
         await edit({
           action: 'addAdjustment',
@@ -231,7 +233,12 @@ export function AdjustmentDialog({
         </p>
       )}
       <Label text={t('corpTaxBook.moons.corrections.adjust.date')}>
-        <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <TextInput
+          type="date"
+          value={date}
+          min={lockDate}
+          onChange={(e) => setDate(e.target.value)}
+        />
         {date !== '' && <DateReadback date={date} />}
       </Label>
       <Label text={t('corpTaxBook.moons.corrections.adjust.label')}>
@@ -254,7 +261,8 @@ export function EditCorrectionDialog({
   minerName: string;
 }) {
   const { t } = useTranslation();
-  const { edit } = useBook();
+  const { edit, view } = useBook();
+  const lockDate = lockDateFor(view.input.now.slice(0, 10));
   const [kind, setKind] = useState<'charge' | 'credit'>(
     adjustment.amount < 0 ? 'credit' : 'charge'
   );
@@ -268,7 +276,7 @@ export function EditCorrectionDialog({
       onClose={onClose}
       title={t('corpTaxBook.moons.ledger.dialogs.editCorrection.title', { name: minerName })}
       confirmLabel={t('corpTaxBook.moons.ledger.dialogs.editCorrection.confirm')}
-      canConfirm={value > 0 && date !== '' && reason.trim().length > 0}
+      canConfirm={value > 0 && date >= lockDate && reason.trim().length > 0}
       run={async () => {
         await edit({
           action: 'editAdjustment',
@@ -300,7 +308,12 @@ export function EditCorrectionDialog({
         />
       </Label>
       <Label text={t('corpTaxBook.moons.corrections.adjust.date')}>
-        <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <TextInput
+          type="date"
+          value={date}
+          min={lockDate}
+          onChange={(e) => setDate(e.target.value)}
+        />
         {date !== '' && <DateReadback date={date} />}
       </Label>
       <Label text={t('corpTaxBook.moons.corrections.adjust.label')}>
@@ -364,56 +377,6 @@ export function MarketAdjustmentDialog({
       <Label text={t('corpTaxBook.moons.ledger.dialogs.reasonLabel')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
-    </DialogShell>
-  );
-}
-
-/** Rebill from date (D22): never reaches a paid Statement; for a member it needs a Director. */
-export function RebillDialog({
-  open,
-  onClose,
-  miner,
-  minerName,
-  statements,
-}: {
-  open: boolean;
-  onClose: () => void;
-  miner: MinerRow;
-  minerName: string;
-  statements: Parameters<typeof canRebillFrom>[1];
-}) {
-  const { t } = useTranslation();
-  const { edit, verdict, data } = useBook();
-  const [fromDate, setFromDate] = useState('');
-  const [reason, setReason] = useState('');
-  const open_ = fromDate !== '' && canRebillFrom(fromDate, statements, data.state.paidStatementIds);
-  const needsDirector = miner.standing !== 'guest' && !verdict.isDirector;
-  return (
-    <DialogShell
-      open={open}
-      onClose={onClose}
-      title={t('corpTaxBook.moons.corrections.rebill.title', { name: minerName })}
-      confirmLabel={t('corpTaxBook.moons.corrections.rebill.confirm')}
-      canConfirm={open_ && reason.trim().length > 0}
-      run={async () => {
-        await edit({ action: 'rebill', minerId: miner.id, fromDate, reason: reason.trim() });
-      }}
-    >
-      <p className="text-text-dim">{t('corpTaxBook.moons.corrections.rebill.intro')}</p>
-      <Label text={t('corpTaxBook.moons.corrections.rebill.from')}>
-        <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        {fromDate !== '' && <DateReadback date={fromDate} />}
-      </Label>
-      {fromDate !== '' && !open_ && (
-        <InlineError>{t('corpTaxBook.moons.corrections.rebill.paid')}</InlineError>
-      )}
-      <Label text={t('corpTaxBook.moons.corrections.reason')}>
-        <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
-      </Label>
-      <Effect>
-        {t('corpTaxBook.moons.corrections.rebill.effect')}
-        {needsDirector && ` ${t('corpTaxBook.moons.corrections.rebill.director')}`}
-      </Effect>
     </DialogShell>
   );
 }

@@ -1,0 +1,78 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import type { CorpBookView } from './corpBook/corpBookView';
+import type { TaxSnapshot } from './taxSnapshot';
+import type { PayeeRecord } from '@/db';
+
+const hoisted = vi.hoisted(() => ({ view: null as CorpBookView | null }));
+
+vi.mock('./useMadePayments', () => ({
+  useMadePayments: () => ({ madePayments: [], paymentSources: [] }),
+}));
+vi.mock('@/features/miningTax/useMadePayments', () => ({
+  useMadePayments: () => ({ madePayments: [], paymentSources: [] }),
+}));
+vi.mock('@/features/miningTax/corpBook/useAutoClaimDonations', () => ({
+  useAutoClaimDonations: () => ({ failed: [] }),
+}));
+vi.mock('@/features/miningTax/corpBook/useBookSystems', () => ({
+  useBookSystems: () => ({ names: new Map(), security: new Map() }),
+}));
+vi.mock('@/features/miningTax/corpBook/leftCorpAck', () => ({
+  useHiddenLeftCorps: () => ({ hidden: new Set(), hide: vi.fn(), show: vi.fn() }),
+}));
+vi.mock('@/features/miningTax/corpBook/useCorpBookView', () => ({
+  useCorpBookView: () => ({
+    view: hoisted.view,
+    booksRead: true,
+    reload: vi.fn(),
+    shownBooks: [],
+    corpNameOf: (id: number) => `Corp ${id}`,
+    hiddenLeft: [],
+  }),
+}));
+vi.mock('./paymentLinkStore', () => ({ saveBilledElsewhere: vi.fn(async () => true) }));
+
+import { useTaxCorpBooks } from './useTaxCorpBooks';
+
+const payee: PayeeRecord = {
+  id: 'p1',
+  characterId: 1,
+  name: 'Ashfall',
+  defaultTaxPct: 10,
+  updatedAt: 1,
+};
+const assignment = {
+  id: 'a1',
+  payeeId: 'p1',
+  date: '2026-10-17',
+  status: 'billed',
+  taxOwed: 3_000_000,
+};
+
+describe('useTaxCorpBooks billed elsewhere', () => {
+  beforeEach(() => {
+    // A book that took the day whole; the stored copy has not seen it yet.
+    hoisted.view = {
+      overlay: {
+        absorbed: new Map([['x', ['a1']]]),
+        trimmed: new Map(),
+        alsoBilled: new Map(),
+        conflicted: new Map(),
+      },
+    } as unknown as CorpBookView;
+  });
+
+  it('bills the overlay in the same render, not after the store settles', () => {
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
+    expect(result.current.accounts.of('p1')?.owes?.amount ?? 0).toBe(0);
+  });
+});

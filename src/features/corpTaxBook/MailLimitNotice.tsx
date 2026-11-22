@@ -5,7 +5,7 @@ import { Well } from '@/components/ui/Well';
 
 /**
  * D16's notice on Send: EVE's hidden mail limit (about 5 a minute), worked out
- * for this batch. The Statements tab shows it beside the Send button.
+ * for this batch. The Late notices tab shows it beside the Send button.
  */
 export function MailLimitNotice({ count, senderName }: { count: number; senderName?: string }) {
   const { t } = useTranslation();

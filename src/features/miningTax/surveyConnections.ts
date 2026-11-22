@@ -16,6 +16,8 @@
  */
 import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import {
   isConnectionLive,
   parseSurveyConnections,
@@ -132,10 +134,13 @@ export async function removeSurveyConnection(surveyId: string, characterId: numb
  */
 export async function applySurveyConnections(
   ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
+  accounts?: PayeeRunningAccounts
 ): Promise<MiningTaxAssignmentRecord[]> {
   const live = await liveConnections(nowMs);
   if (live.length === 0) return [];
+  const paid = accounts ?? (await loadPayeeRunningAccounts());
   const created: MiningTaxAssignmentRecord[] = [];
   for (const ledger of ledgers) {
     const connections = live.filter((c) => c.characterId === ledger.characterId);
@@ -144,7 +149,13 @@ export async function applySurveyConnections(
       db.miningTaxAssignments.where('characterId').equals(ledger.characterId).toArray(),
       loadPayees(ledger.characterId),
     ]);
-    const slices = planSurveyAutoAssign(ledger.entries, assignments, connections, nowMs);
+    // Read Paid off the Payees' accounts: a default's day is only taken over after its paid-through.
+    const slices = planSurveyAutoAssign(
+      ledger.entries,
+      assignments.map((a) => paid.view(a)),
+      connections,
+      nowMs
+    );
     if (slices.length === 0) continue;
     const compressed = await readCompressedOre();
     for (const slice of slices) {
@@ -160,7 +171,7 @@ export async function applySurveyConnections(
         const value = computeAssignmentValue(slice.oreLines, prices, slice.connection.taxPct);
         // Ore a Default System had assigned is the Survey's now: take those types off it first.
         // A failure here (or in the assign below) leaves the entry for the next load to redo.
-        if (!(await takeOverFromDefaults(slice.takeovers))) continue;
+        if (!(await takeOverFromDefaults(slice.takeovers, paid))) continue;
         const result = await assign({
           characterId: slice.characterId,
           date: slice.date,
@@ -171,9 +182,9 @@ export async function applySurveyConnections(
           taxPct: slice.connection.taxPct,
           estimatedValue: value.estimatedValue,
           taxOwed: value.taxOwed,
-          markPaid: false,
           takesGrowth: true,
           label: slice.label,
+          isPaid: (a) => paid.isPaid(a),
         });
         if (result.ok) created.push(result.value);
       } catch {
@@ -188,11 +199,14 @@ export async function applySurveyConnections(
  * Takes the Survey's ore types off the Assignments a Default System made (an Assignment is read
  * again first: an earlier slice may have changed it). Resolves false if any release failed.
  */
-async function takeOverFromDefaults(takeovers: readonly Takeover[]): Promise<boolean> {
+async function takeOverFromDefaults(
+  takeovers: readonly Takeover[],
+  paid: PayeeRunningAccounts
+): Promise<boolean> {
   const releases: { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[] = [];
   for (const takeover of takeovers) {
     const assignment = await db.miningTaxAssignments.get(takeover.assignmentId);
-    if (!assignment || !isUnpaidDefault(assignment)) {
+    if (!assignment || !isUnpaidDefault(paid.view(assignment))) {
       continue;
     }
     releases.push({

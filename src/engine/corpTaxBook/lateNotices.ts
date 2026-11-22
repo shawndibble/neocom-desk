@@ -1,28 +1,31 @@
 /**
- * Late notices on a running account (#6294, decision 20261117-033049). A Miner gets one when
- * they are behind — their oldest unpaid day is N days old, or the book's day of the month has
- * come round while they owe from before it — and owe at least the book's minimum; at most one
- * every `cooldownDays`, and none once paid up. An officer's tab issues and mails them (automatic
- * sync never does), through the same run that issued calendar Statements.
+ * Late notices (#6294, decision 20261120-235011): a Miner gets one when they are behind — their
+ * oldest unpaid day is N days old, or the book's day of the month has come round while they owe
+ * from before it — and owe at least the book's minimum; at most one every `cooldownDays`, and
+ * none once paid up. An officer's tab issues and mails them (automatic sync never does).
  *
- * A notice is a `statements` doc with `kind: 'notice'`. Its lines are only the unpaid days no
- * earlier notice listed, so the Statement math on the server and on older clients never counts a
- * day twice; what earlier notices (and Statements from before the switch-over) still owe is
- * `carried`. On this client a notice's days stay running days (`buildBookView`): money pays the
- * Miner's oldest day whatever code it carries, and a notice is settled once its days are.
+ * A notice is only a record of what was asked (`LateNotice`): its lines are the unpaid days no
+ * earlier notice listed, priced as they are billed. Money pays the Miner's oldest day whatever
+ * code it carries, and a notice is settled once its days are; what earlier notices still ask is
+ * `carried`.
  */
-import { newest, paymentCode, type BookView } from './bookView';
+import { bookMiner, newest, type BookView } from './bookView';
+import {
+  listedKeys,
+  noticeDocId,
+  minerPaymentCode,
+  type LateNotice,
+  type LateNoticeKind,
+} from '../../../functions/src/corpTaxBookLateNotice';
 import type { NoticeRules } from './notices';
-import { daysBetween, type Statement, type StatementLine } from './statements';
-import { utcDay } from '@/engine/localDay';
+import { utcDay, utcDayOf, utcDaysBetween } from '@/engine/localDay';
 
 export interface NoticePlan {
-  minerId: string;
   /** The notice to issue: the unpaid days no earlier notice listed, priced as they are billed. */
-  statement: Statement & { kind: 'notice'; characterIds: number[] };
+  notice: LateNotice;
   /** Everything the Miner owes now. */
   owed: number;
-  /** What of `owed` is not on this notice's lines: earlier notices' and Statements' days. */
+  /** What of `owed` is not on this notice's lines: days earlier notices listed. */
   carried: number;
 }
 
@@ -30,23 +33,19 @@ export interface NoticePlan {
 export interface OwedDay {
   date: string;
   owed: number;
+  /** An officer's charge on the day, owed as a line of its own: no place. */
+  correction?: true;
   structureId?: number;
   moonId?: number;
-  /** A Statement from before the switch-over, owed as one: its first day stands for it. */
-  statementId?: string;
 }
 
-const safeId = (id: string) => id.replace(/[^A-Za-z0-9_:-]/g, '_');
-const lineKey = (l: Pick<StatementLine, 'chargeKey' | 'adjustmentId' | 'date'>) =>
-  l.chargeKey ?? `adjustment:${l.adjustmentId ?? l.date}`;
-
-/** Every day a Miner owes, oldest first: running days by place, then any unpaid older Statement. */
+/** Every day a Miner owes, oldest first, by place. */
 export function owedDays(view: BookView, minerId: string): OwedDay[] {
   const inner = view.internals.byMiner.get(minerId);
   if (!inner) return [];
   const byPlace = new Map<string, OwedDay>();
   for (const d of inner.days) {
-    if (d.status !== 'unbilled' || (d.owed ?? 0) <= 0) continue;
+    if (d.status !== 'owed' || (d.owed ?? 0) <= 0) continue;
     const key = `${d.date}|${d.structureId}|${d.moonId ?? ''}`;
     const held = byPlace.get(key);
     if (held) held.owed += d.owed!;
@@ -58,73 +57,60 @@ export function owedDays(view: BookView, minerId: string): OwedDay[] {
         ...(d.moonId !== undefined ? { moonId: d.moonId } : {}),
       });
   }
-  const statements: OwedDay[] = inner.statements.flatMap((s) => {
-    if (s.kind === 'notice') return [];
-    const st = inner.allocation.byStatement.get(s.id);
-    return st && !st.settled && st.remaining > 0
-      ? [{ date: s.coversFrom, owed: st.remaining, statementId: s.id }]
-      : [];
-  });
-  return [...statements, ...byPlace.values()].sort(
+  // An officer's charge is owed like a mined line; a credit correction is in each line's share.
+  const charges = new Map<string, number>();
+  for (const l of inner.billable.lines)
+    if (l.kind === 'correction' && l.tax > 0)
+      charges.set(l.date, (charges.get(l.date) ?? 0) + inner.account.owedOf(l.date, l.tax));
+  const corrections = [...charges]
+    .filter(([, owed]) => owed > 0)
+    .map(([date, owed]): OwedDay => ({ date, owed, correction: true }));
+  return [...corrections, ...byPlace.values()].sort(
     (a, b) => a.date.localeCompare(b.date) || (a.structureId ?? 0) - (b.structureId ?? 0)
   );
 }
 
 /**
- * The notice a Miner would get now, whatever the rules say: undefined when the book is not a
- * running account or the Miner owes nothing. `id` names a final notice (closing an account).
+ * The notice a Miner would get now, whatever the rules say: undefined when the Miner owes
+ * nothing. A `final` notice (closing an account) is stored under `finalNoticeId`.
  */
 export function draftNotice(
   view: BookView,
   minerId: string,
-  opts: { now?: string; id?: string } = {}
+  opts: { now?: string; id?: string; kind?: LateNoticeKind } = {}
 ): NoticePlan | undefined {
-  const inner = view.internals.byMiner.get(minerId);
-  const row = view.miners.find((m) => m.id === minerId);
-  const running = inner?.running;
-  const owes = row?.account?.owes;
-  if (!inner || !row || !running || !owes) return undefined;
+  const miner = bookMiner(view, minerId);
+  const owes = miner?.account.owes;
+  if (!miner || !owes) return undefined;
+  const { row, settlement: inner, account } = miner;
   const now = opts.now ?? view.input.now;
 
-  const listed = new Set<string>();
-  for (const s of inner.statements)
-    if (s.kind === 'notice') for (const l of s.lines) listed.add(lineKey(l));
-  const draftLines = inner.draft.kind === 'nothing' ? [] : inner.draft.lines;
-  const lines = draftLines.filter((l) => {
-    const day = running.byDay.get(l.date);
-    return day !== undefined && !day.held && !day.settled && !listed.has(lineKey(l));
+  const listed = listedKeys(inner.notices);
+  const lines = inner.billable.lines.filter((l) => {
+    const day = account.day(l.date);
+    return day !== undefined && !day.held && !day.settled && !listed.has(l.key);
   });
 
-  // What the new lines still owe: each date's remainder, by the share of it they bill.
-  const taxByDate = new Map<string, number>();
-  for (const l of lines) taxByDate.set(l.date, (taxByDate.get(l.date) ?? 0) + l.tax);
-  let onLines = 0;
-  for (const [date, tax] of taxByDate) {
-    const day = running.byDay.get(date)!;
-    if (day.tax > 0 && tax > 0) onLines += day.remaining * Math.min(1, tax / day.tax);
-  }
+  // What the new lines still owe: each charging line's share of its date's remainder (a credit
+  // correction is in the remainder already, so it is no share of its own).
+  const onLines = lines.reduce((sum, l) => sum + account.owedOf(l.date, l.tax), 0);
 
-  const owing = owedDays(view, minerId);
   const first = lines[0]?.date ?? owes.oldest;
-  const last = lines.at(-1)?.date ?? owing.at(-1)?.date ?? first;
-  const id = safeId(opts.id ?? `notice_${first}_${minerId}_${now.slice(0, 10)}`);
+  const id = noticeDocId(opts.id ?? `notice_${first}_${minerId}_${now.slice(0, 10)}`);
   return {
-    minerId,
-    statement: {
+    notice: {
       id,
       minerId,
-      code: paymentCode(id),
-      kind: 'notice',
-      periodStart: first,
-      periodEnd: last,
-      coversFrom: first,
-      coversThrough: last,
-      issuedAt: now,
-      hubId: view.input.hubId,
-      oreForm: view.input.oreForm,
-      lines,
-      amount: lines.reduce((sum, l) => sum + l.tax, 0),
       characterIds: row.characterIds,
+      kind: opts.kind ?? 'late',
+      issuedAt: now,
+      // The Miner's one code, which the mail asks for: the server sets it as this, and refuses any other.
+      code: minerPaymentCode(minerId),
+      pricing: { hubId: view.input.hubId, oreForm: view.input.oreForm },
+      uids: row.characterIds.map((c) => `char:${c}`),
+      lines,
+      listed: lines.reduce((sum, l) => sum + l.tax, 0),
+      mail: { sent: 0, manualSent: 0, remindersStopped: false },
     },
     owed: owes.amount,
     carried: Math.max(0, owes.amount - onLines),
@@ -149,12 +135,12 @@ export function noticeDue(
   lastIssued: string | undefined,
   owed: number
 ): boolean {
-  if (lastIssued !== undefined && daysBetween(lastIssued.slice(0, 10), today) < rules.cooldownDays)
+  if (lastIssued !== undefined && utcDaysBetween(utcDayOf(lastIssued), today) < rules.cooldownDays)
     return false;
   if (rules.earlyAt !== undefined && owed >= rules.earlyAt) return true;
-  if (rules.after.kind === 'behind') return daysBetween(oldest, today) >= rules.after.days;
+  if (rules.after.kind === 'behind') return utcDaysBetween(oldest, today) >= rules.after.days;
   const anchor = lastAnchorDay(today, rules.after.day);
-  return oldest < anchor && (lastIssued === undefined || lastIssued.slice(0, 10) < anchor);
+  return oldest < anchor && (lastIssued === undefined || utcDayOf(lastIssued) < anchor);
 }
 
 /**
@@ -166,19 +152,20 @@ export function planNotices(
   rules: NoticeRules,
   now: string = view.input.now
 ): NoticePlan[] {
-  if (!view.input.runningAccountFrom) return [];
   const closed = new Set(view.input.miners.filter((m) => m.closedAt).map((m) => m.id));
   const today = now.slice(0, 10);
   const plans: NoticePlan[] = [];
   for (const row of view.miners) {
-    const owes = row.account?.owes;
+    const inner = view.internals.byMiner.get(row.id);
+    const owes = inner?.account.owes;
     if (closed.has(row.id) || !owes || owes.amount < rules.minimum) continue;
-    // The last bill of any kind: a Statement mailed just before the switch-over counts as the
-    // first reminder, so no notice follows it within the cooldown.
-    const bills = view.internals.byMiner.get(row.id)?.statements ?? [];
-    if (!noticeDue(rules, today, owes.oldest, newest(bills)?.issuedAt, owes.amount)) continue;
+    const notices = inner?.notices ?? [];
+    if (!noticeDue(rules, today, owes.oldest, newest(notices)?.issuedAt, owes.amount)) continue;
     const plan = draftNotice(view, row.id, { now });
     if (plan) plans.push(plan);
   }
   return plans;
 }
+
+/** The book's late notices from their `lateNotices` docs, read as the server reads them. */
+export { noticesOfDocs } from '../../../functions/src/corpTaxBookLateNotice';

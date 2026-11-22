@@ -1,10 +1,6 @@
-/**
- * A Miner's balance: positive is owed, negative is credit held (what the ledger's last row shows).
- * A Statement-era book's billable days not yet on a Statement (`unbilled`) are part of it; a
- * running account has none, as every billable day is owed already.
- */
-export function accountBalance(row: { owed: number; unbilled?: number; credit: number }): number {
-  return row.owed + (row.unbilled ?? 0) - row.credit;
+/** A Miner's balance: positive is owed, negative is credit held (what the ledger's last row shows). */
+export function accountBalance(row: { owed: number; credit: number }): number {
+  return row.owed - row.credit;
 }
 
 /**

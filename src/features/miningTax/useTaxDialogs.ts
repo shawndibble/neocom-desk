@@ -1,18 +1,25 @@
 import { useState, useSyncExternalStore } from 'react';
-import type { DisplayRow, GroupMember } from '@/features/miningTax/groupRows';
+import type { DisplayRow } from '@/features/miningTax/groupRows';
 import type { RowMenuAction } from '@/features/miningTax/rowMenu';
 import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 
 export interface SettleUpStart {
   payerId?: number;
-  focusIds?: ReadonlySet<string>;
 }
 
-/** Whose owed entries "Link a wallet payment" is choosing a payment for: a Payee's whole balance, or just the entries ticked or settling. */
-export interface LinkWalletTarget {
-  payeeId: string;
-  members?: readonly GroupMember[];
+/**
+ * What the link-payment dialog is for: one Payee (its card, a row, Settle up), or, with no
+ * `payeeId`, every Payee at once (the "Payments to link" card).
+ */
+export interface LinkPaymentTarget {
+  payeeId?: string;
 }
+
+/** The Payee ledger open: a personal Payee's, or a Corp Tax Book's. */
+export type LedgerTarget =
+  | { kind: 'personal'; payeeId: string }
+  /** A Corp Tax Book's ledger, on one of the member's Miners there (the active Character's by default). */
+  | { kind: 'book'; corporationId: number; minerId?: string };
 
 /** Which Mining Tax dialog is open, and on what. `null` / `false` keeps each one closed. */
 export interface TaxDialogState {
@@ -21,22 +28,22 @@ export interface TaxDialogState {
   detailConfirmUnassign: boolean;
   /** The entry whose edit form is open — single or combined, owed or paid (mockup F1). */
   editTarget: DisplayRow | null;
-  /** Kept apart from `detailTarget` so the manual picker can sit on top of the row detail (issue #540 follow-up). */
-  linkTransactionTarget: DisplayRow | null;
   joinTarget: DisplayRow | null;
   splitTarget: DisplayRow | null;
   /** Set only by the selection toolbar's Combine: pins the Join dialog to exactly the ticked rows and pre-ticks them. */
   joinCandidateOverride: DisplayRow[] | null;
-  /** What Settle up is settling: a balance card's whole balance, or the table's selection. */
+  /** The Payee Settle up pays: its Outstanding entries in view. */
   settleUpRows: SettleUpRow[] | null;
-  /** Who pays, and (from one entry) which entries start ticked — `SettleUpDialog`'s `payerId` / `focusIds`. */
+  /** Who pays — `SettleUpDialog`'s `payerId`. */
   settleUpStart: SettleUpStart;
-  linkWalletTarget: LinkWalletTarget | null;
+  /** The link-payment dialog, when open. */
+  linkPaymentTarget: LinkPaymentTarget | null;
   corpPayTarget: number | null;
-  /** Opened from one book row: that row (and its Character) starts ticked, the rest wait under "Also pay". */
+  /** Opened from one book row: that row's Character pays. */
   corpPayFocus: { rowId: string; characterId: number } | null;
+  /** The Payee ledger open, if any. */
+  ledgerTarget: LedgerTarget | null;
   bulkDismissOpen: boolean;
-  linkPaymentOpen: boolean;
   /** Whether a dialog's ledger action is writing; mirrored here so `TaxTab` can disable its own controls. */
   acting: boolean;
 }
@@ -45,17 +52,16 @@ const CLOSED: TaxDialogState = {
   detailTarget: null,
   detailConfirmUnassign: false,
   editTarget: null,
-  linkTransactionTarget: null,
   joinTarget: null,
   splitTarget: null,
   joinCandidateOverride: null,
   settleUpRows: null,
   settleUpStart: {},
-  linkWalletTarget: null,
+  linkPaymentTarget: null,
   corpPayTarget: null,
   corpPayFocus: null,
+  ledgerTarget: null,
   bulkDismissOpen: false,
-  linkPaymentOpen: false,
   acting: false,
 };
 
@@ -101,7 +107,6 @@ function createActions(patch: (next: Patch) => void) {
     openEdit: (dr: DisplayRow | null) => patch({ editTarget: dr }),
     /** Edit replaces the detail view it was opened from. */
     editFromDetail: (dr: DisplayRow) => patch({ editTarget: dr, detailTarget: null }),
-    openLinkTransaction: (dr: DisplayRow | null) => patch({ linkTransactionTarget: dr }),
     openJoin: (dr: DisplayRow | null) => patch({ joinTarget: dr }),
     joinFromDetail: (dr: DisplayRow) => patch({ joinTarget: dr, detailTarget: null }),
     /** The selection toolbar's Combine: `primary` plus exactly the other ticked rows. */
@@ -112,15 +117,16 @@ function createActions(patch: (next: Patch) => void) {
     splitFromDetail: (dr: DisplayRow) => patch({ splitTarget: dr, detailTarget: null }),
     openSettleUp: (rows: SettleUpRow[] | null, start: SettleUpStart = {}) =>
       patch({ settleUpRows: rows, settleUpStart: start }),
-    openLinkWallet: (target: LinkWalletTarget | null) => patch({ linkWalletTarget: target }),
-    linkWalletFromDetail: (target: LinkWalletTarget) =>
-      patch({ linkWalletTarget: target, detailTarget: null }),
+    openLinkPayment: (target: LinkPaymentTarget | null) => patch({ linkPaymentTarget: target }),
+    /** Link payment replaces the detail view it was opened from. */
+    linkPaymentFromDetail: (target: LinkPaymentTarget) =>
+      patch({ linkPaymentTarget: target, detailTarget: null }),
     openCorpPay: (corporationId: number | null) =>
       patch({ corpPayTarget: corporationId, corpPayFocus: null }),
     corpPayFromDetail: (corporationId: number, focus: { rowId: string; characterId: number }) =>
       patch({ corpPayTarget: corporationId, corpPayFocus: focus, detailTarget: null }),
+    openLedger: (target: LedgerTarget | null) => patch({ ledgerTarget: target }),
     openBulkDismiss: (open: boolean) => patch({ bulkDismissOpen: open }),
-    openLinkPayment: (open: boolean) => patch({ linkPaymentOpen: open }),
     setActing: (acting: boolean) => patch({ acting }),
   };
 }

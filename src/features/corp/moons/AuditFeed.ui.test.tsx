@@ -34,9 +34,9 @@ describe('AuditFeed subject (CX-47)', () => {
       />
     );
     expect(
-      screen.getByText(/issued a Statement to Dax Ferrin, 28,390,765 ISK/)
+      screen.getByText(/issued a late notice to Dax Ferrin, 28,390,765 ISK/)
     ).toBeInTheDocument();
-    expect(screen.getByText(/mailed a Statement to Dax Ferrin/)).toBeInTheDocument();
+    expect(screen.getByText(/mailed a late notice to Dax Ferrin/)).toBeInTheDocument();
     expect(screen.getByText(/sent a reminder to Dax Ferrin/)).toBeInTheDocument();
     expect(screen.getByText(/stopped reminders/)).toBeInTheDocument();
   });
@@ -66,7 +66,7 @@ describe('AuditFeed links the Miner an entry is about', () => {
       'href',
       '/corp/moons/miners/g1'
     );
-    expect(screen.getByText(/mailed a Statement to/)).toBeInTheDocument();
+    expect(screen.getByText(/mailed a late notice to/)).toBeInTheDocument();
     expect(screen.getByText(/recorded a payment/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Lysa Kestane' })).toHaveAttribute(
       'href',
@@ -95,5 +95,42 @@ describe('AuditFeed copy', () => {
       expect(said, AUDIT_ACTIONS[i]).not.toEqual([AUDIT_ACTIONS[i]]);
       expect(said?.length, AUDIT_ACTIONS[i]).toBeGreaterThan(1);
     });
+  });
+});
+
+describe('AuditFeed: what the pilot or officer wrote', () => {
+  it("words a dispute by its kind and shows the pilot's reason, a declaration's note and amount", () => {
+    render(
+      <AuditFeed
+        entries={[
+          {
+            id: 'd1',
+            at,
+            by: 5,
+            byName: 'Player dispute',
+            action: 'disputeConflict',
+            detail: { disputeId: 'q1', kind: 'notPaying' },
+          },
+          {
+            id: 'd2',
+            at,
+            by: 5,
+            byName: 'Player declaration',
+            action: 'declare',
+            detail: { declarationId: 'x1', amount: 2_000_000 },
+          },
+        ]}
+        words={(e) =>
+          e.action === 'disputeConflict'
+            ? { action: 'disputeKind.notPaying', said: 'That ore went to the buyback' }
+            : { said: 'Paid by contract', amount: 2_000_000 }
+        }
+      />
+    );
+    expect(screen.getByText(/said they won't pay a day/)).toBeInTheDocument();
+    expect(screen.getByText(/“That ore went to the buyback”/)).toBeInTheDocument();
+    expect(screen.getByText(/they say they paid 2,000,000/)).toBeInTheDocument();
+    expect(screen.getByText(/“Paid by contract”/)).toBeInTheDocument();
+    expect(screen.queryByText(/conflicts with a late notice/)).toBeNull();
   });
 });

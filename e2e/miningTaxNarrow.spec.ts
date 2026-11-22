@@ -279,58 +279,43 @@ test.describe('Balances strip Payee filter button — touch target', () => {
 });
 
 /**
- * Mining Tax dialog entry rows — touch target (issue #1144): the `<label>`
- * wrapping each include/exclude checkbox in Settle Up, Link Payment and Bulk
- * Dismiss is the row's whole tap target, and at `px-2 py-1.5 text-xs` it
- * measured 28px — a pointer-sized row reused verbatim on a phone, which
- * docs/DESIGN.md §3 rules out. The fix applies `tappableRowClassName`
- * (`min-h-9 md:min-h-7`, `controlStyles.ts`), so the row grows to the 36px
- * floor on a phone and reverts to exactly its old 28px above `md`. jsdom has
- * no layout engine, so only a real browser can tell 36 from 28 — hence a
- * Playwright spec rather than a unit test.
+ * Mining Tax dialog rows — touch target (issue #1144): a `<label>` that is a list row's whole tap
+ * target must reach the 36px floor on a phone (docs/DESIGN.md §3) through `tappableRowClassName`
+ * (`min-h-9 md:min-h-7`, `controlStyles.ts`), and revert to its old height above `md`. jsdom has
+ * no layout engine, so only a real browser can tell 36 from 28 — hence a Playwright spec.
  *
- * Each dialog needs different state, so `seedPayeeBalance` grew two opt-in
- * extras rather than a second seeding pattern:
+ * The rows: Bulk Dismiss's itemized entries, and since every Payee is paid oldest first
+ * (decision 20261120-235011) the payment lists of Link a payment you already made, opened from the
+ * Payee card's Link payment or the "Payments to link" card's Review (its
+ * suggestions). Settle up and the link dialog no longer list entries, so those rows are gone.
  *
- * - **Settle Up** needs only the Payee balance the block above already seeds.
- * - **Link Payment**'s "covered entries" sub-list renders only once a
- *   suggestion is selected — and `LinkPaymentDialog` pre-selects the first
- *   one, so seeding a single outgoing wallet-journal payment for exactly the
- *   balance owed is enough; no radio click is involved.
- * - **Bulk Dismiss** acts on Unassigned rows only, so a second ledger entry
- *   is seeded with no Assignment against it.
- *
- * Rows are ticked through the table's real checkbox column and the real
- * selection toolbar rather than by poking state, because "can this even be
- * opened at 390px?" is half of what the fix has to survive.
+ * Rows are ticked through the table's real checkbox column and the real selection toolbar rather
+ * than by poking state, because "can this even be opened at 390px?" is half of what the fix has
+ * to survive.
  */
-test.describe('Mining Tax dialog entry rows — touch target', () => {
+test.describe('Mining Tax dialog rows — touch target', () => {
   const INCLUDE_LABEL = (date: string) => `Include ${date}`;
 
-  /** The tap target is the `<label>`, not the checkbox the accessible name hangs off — so anchor on the input and measure its wrapper. */
-  function rowHeight(dialog: Locator, date: string): Promise<number> {
-    return dialog
-      .getByLabel(INCLUDE_LABEL(date))
-      .evaluate((el) => el.closest('label')!.getBoundingClientRect().height);
-  }
+  /** The tap target is the `<label>` around the control the accessible name hangs off. */
+  const labelHeight = (control: Locator): Promise<number> =>
+    control.evaluate((el) => el.closest('label')!.getBoundingClientRect().height);
 
-  async function openSettleUp(page: Page): Promise<Locator> {
-    // Exact: the selection toolbar's own action is "Settle up {{count}}".
-    await page.getByRole('button', { name: 'Settle up', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: `Settle up — ${PAYEE_NAME}` });
-    await expect(dialog).toBeVisible();
-    // A single entry starts folded into its summary line; the itemized row
-    // under test is one tap away.
-    await dialog.getByRole('button', { name: /^1 entry ·/ }).click();
-    return dialog;
-  }
-
-  async function openLinkPayment(page: Page): Promise<Locator> {
+  async function openReview(page: Page): Promise<Locator> {
     // The card appears only once `loadMadePayments` resolves — it is loaded
     // after the ledger on purpose, so this waits rather than clicking blind.
     const review = page.getByRole('button', { name: 'Review' });
     await expect(review).toBeVisible();
     await review.click();
+    const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  }
+
+  async function openLinkWallet(page: Page): Promise<Locator> {
+    await page
+      .getByRole('region', { name: 'You owe' })
+      .getByRole('button', { name: 'Link payment', exact: true })
+      .click();
     const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
     await expect(dialog).toBeVisible();
     return dialog;
@@ -354,24 +339,25 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     return dialog;
   }
 
-  test('Settle Up: itemized entry row reaches 36px on phone', async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    await signInAndGoto(page);
-    await seedPayeeBalance(page);
-    await page.goto('./mining/tax');
-
-    const dialog = await openSettleUp(page);
-    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(36);
-  });
-
-  test('Link Payment: covered-entry row reaches 36px on phone', async ({ page }) => {
+  test('Link a payment from a Payee card: payment row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });
     await page.goto('./mining/tax');
 
-    const dialog = await openLinkPayment(page);
-    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(36);
+    const dialog = await openLinkWallet(page);
+    // One row component serves the suggested matches and the hand-picked list.
+    expect(await labelHeight(dialog.getByRole('radio').first())).toBeGreaterThanOrEqual(36);
+  });
+
+  test('Link a payment from Review: suggested row reaches 36px on phone', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page);
+    await seedPayeeBalance(page, { withMadePayment: true });
+    await page.goto('./mining/tax');
+
+    const dialog = await openReview(page);
+    expect(await labelHeight(dialog.getByRole('radio').first())).toBeGreaterThanOrEqual(36);
   });
 
   test('Bulk Dismiss: itemized entry row reaches 36px on phone', async ({ page }) => {
@@ -381,35 +367,24 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.goto('./mining/tax');
 
     const dialog = await openBulkDismiss(page);
-    expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBeGreaterThanOrEqual(36);
+    expect(
+      await labelHeight(dialog.getByLabel(INCLUDE_LABEL(UNASSIGNED_DATE)))
+    ).toBeGreaterThanOrEqual(36);
   });
 
-  test('all three stay at their old height above md — desktop is unchanged', async ({ page }) => {
+  test('Bulk Dismiss stays at its old height above md — desktop is unchanged', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await signInAndGoto(page);
-    await seedPayeeBalance(page, { withUnassignedEntry: true, withMadePayment: true });
+    await seedPayeeBalance(page, { withUnassignedEntry: true });
     await page.goto('./mining/tax');
 
     // One line of `text-xs` (16px) inside `py-1.5` (2 x 6px) is 28px — what
     // `md:min-h-7` reverts to exactly. Pinned as a range rather than asserted
     // "under 36" so a row that quietly grew for some other reason still fails.
-    const expectUnchanged = (height: number) => {
-      expect(height).toBeGreaterThan(24);
-      expect(height).toBeLessThan(32);
-    };
-
-    const settleUp = await openSettleUp(page);
-    expectUnchanged(await rowHeight(settleUp, ENTRY_DATE));
-    await page.keyboard.press('Escape');
-    await expect(settleUp).toBeHidden();
-
-    const linkPayment = await openLinkPayment(page);
-    expectUnchanged(await rowHeight(linkPayment, ENTRY_DATE));
-    await page.keyboard.press('Escape');
-    await expect(linkPayment).toBeHidden();
-
     const bulkDismiss = await openBulkDismiss(page);
-    expectUnchanged(await rowHeight(bulkDismiss, UNASSIGNED_DATE));
+    const height = await labelHeight(bulkDismiss.getByLabel(INCLUDE_LABEL(UNASSIGNED_DATE)));
+    expect(height).toBeGreaterThan(24);
+    expect(height).toBeLessThan(32);
   });
 });
 

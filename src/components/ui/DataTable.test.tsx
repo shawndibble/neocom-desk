@@ -834,6 +834,52 @@ describe('DataTable', () => {
       expect(document.querySelector('.dt-lead-caret')).toHaveClass('mr-auto');
     });
 
+    describe('the chevron a stacked card shows for a leading caret', () => {
+      const disclosure = () => [...document.querySelectorAll('td.dt-disclosure')];
+      const drawn = () => disclosure().filter((td) => td.querySelector('svg'));
+
+      it('draws one on every card of a stacked table, and turns it when the card opens', async () => {
+        const user = userEvent.setup();
+        renderTable({ stacked: true, expandableRow: { ...expandableRow, leadingIcon: true } });
+        expect(drawn()).toHaveLength(rows.length);
+        const before = drawn()[0]!.innerHTML;
+        await user.click(screen.getAllByRole('cell')[0]!);
+        expect(drawn()[0]!.innerHTML).not.toBe(before);
+        // Only the open card's chevron turned.
+        expect(drawn()[1]!.innerHTML).toBe(before);
+      });
+
+      it('draws none in a table, where the leading caret is the cue', () => {
+        renderTable({ expandableRow: { ...expandableRow, leadingIcon: true } });
+        expect(drawn()).toHaveLength(0);
+        expect(document.querySelectorAll('.dt-lead-caret')).toHaveLength(rows.length);
+      });
+
+      it('draws none on a stacked card that cannot expand', () => {
+        renderTable({ stacked: true });
+        expect(disclosure()).toHaveLength(0);
+      });
+
+      it('draws none where the caret is its own button, or the caller hides the icon', () => {
+        const { unmount } = renderTable({
+          stacked: true,
+          expandableRow: {
+            ...expandableRow,
+            leadingIcon: true,
+            trigger: 'button',
+            toggleLabel: (row) => `Open ${row.item}`,
+          },
+        });
+        expect(drawn()).toHaveLength(0);
+        unmount();
+        renderTable({
+          stacked: true,
+          expandableRow: { ...expandableRow, leadingIcon: true, hideIcon: true },
+        });
+        expect(drawn()).toHaveLength(0);
+      });
+    });
+
     it('keeps at most one row open — opening a second row closes the first', async () => {
       const user = userEvent.setup();
       renderTable({ expandableRow });
@@ -1444,6 +1490,38 @@ describe('DataTable fullWidthRow', () => {
     await user.click(screen.getByText('Full width note'));
     expect(screen.queryByText('detail between')).toBeNull();
     expect(screen.getByText('Tritanium')).toBeInTheDocument();
+  });
+});
+
+describe('DataTable rowBoundary', () => {
+  it('draws one full-width row before the keyed row, outside the records', () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.id}
+        label="Items"
+        rowBoundary={{ beforeKey: rows[1]!.id, children: <span>Boundary note</span> }}
+      />
+    );
+    const tr = screen.getByText('Boundary note').closest('tr');
+    expect(tr).toHaveClass('dt-full-row');
+    expect(tr?.nextElementSibling).toHaveAttribute('data-row-key', String(rows[1]!.id));
+    expect(tr?.previousElementSibling).toHaveAttribute('data-row-key', String(rows[0]!.id));
+    expect(tr?.querySelector('td')).toHaveAttribute('colspan', String(columns.length));
+  });
+
+  it('draws nothing when no row has the key', () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.id}
+        label="Items"
+        rowBoundary={{ beforeKey: 'nope', children: <span>Boundary note</span> }}
+      />
+    );
+    expect(screen.queryByText('Boundary note')).toBeNull();
   });
 });
 

@@ -34,6 +34,7 @@ function renderSection(verdict: Partial<OfficerVerdict>, onSettingsClose?: () =>
         value={
           {
             characterId: ME,
+            view: { input: { now: '2026-10-20T00:00:00Z' } },
             corporationId: CORP,
             verdict: { isCeo: false, isDirector: false, canEdit: true, ...verdict },
             reload,

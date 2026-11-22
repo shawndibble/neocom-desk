@@ -38,9 +38,7 @@ export function bookViewInputOf(
     now,
     startDate: s.startDate,
     graceHours: s.graceHours,
-    minimumStatement: s.minimumStatement,
     overdueDays: s.overdueDays,
-    cadence: s.cadence,
     hubId: s.hubId,
     oreForm: s.oreForm,
     structureExpiryHours: s.structureExpiryHours,
@@ -49,7 +47,7 @@ export function bookViewInputOf(
     rates: s.rates,
     entries: groupObservedEntries(data.observed),
     miners: data.state.miners,
-    statements: data.state.statements,
+    notices: data.state.notices,
     payments: data.state.payments,
     dismissals: data.state.dismissals,
     declarations: data.declarations,
@@ -59,11 +57,11 @@ export function bookViewInputOf(
     ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
     feeders: data.feeders,
     extractions: data.state.extractions,
-    paidStatementIds: data.state.paidStatementIds,
     ...(data.state.minerPaidThrough ? { minerPaidThrough: data.state.minerPaidThrough } : {}),
-    ...(s.runningAccountFrom
-      ? { runningAccountFrom: s.runningAccountFrom, dayTolerancePct: s.dayTolerancePct }
+    ...(data.checkpoints?.length
+      ? { checkpoints: new Map(data.checkpoints.map((c) => [c.minerId, c])) }
       : {}),
+    dayTolerancePct: s.dayTolerancePct,
     pricesOn: prices.pricesOn,
     moonOwnerPricesOn: prices.moonOwnerPricesOn,
     memberIds: extra.memberIds,

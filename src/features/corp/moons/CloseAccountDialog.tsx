@@ -1,6 +1,6 @@
 /**
- * Close a guest's account (epic #4055, #4184): a final Statement over
- * everything Billable, then Statement mail stops. Credit is refunded unless the
+ * Close a guest's account (epic #4055, #4184): a final late notice of the unpaid days no notice
+ * listed, then late notice mail stops. Credit is refunded unless the
  * guest consented to forfeit it or went 90 days without replying. Its own file
  * so the Miner page carries only the button and this mount.
  */
@@ -14,10 +14,10 @@ import {
   planCloseAccount,
   type CreditDisposition,
 } from '@/engine/corpTaxBook/closeAccount';
-import { DialogShell, Effect, Label } from './BookDialogs';
+import { DialogShell, Effect, GroupLabel, Label } from './BookDialogs';
 import { dateWithYear, isk } from './moonsFormat';
 import { useBook } from './useBook';
-import { statementRefineryNames, useCorporationName } from './statementMailing';
+import { noticeRefineryNames, useCorporationName } from './lateNoticeMailing';
 
 type Basis = 'consent' | 'no-reply';
 /** What happens to what is still owed: a final late notice goes out, or the tax is waived. */
@@ -37,7 +37,7 @@ export function CloseAccountDialog({
   onClosed?: () => void;
 }) {
   const { t } = useTranslation();
-  const { view, names, edit } = useBook();
+  const { view, names, edit, characterId } = useBook();
   const corporationName = useCorporationName();
   const plan = useMemo(() => planCloseAccount(view, miner.id), [view, miner.id]);
   const [reason, setReason] = useState('');
@@ -48,7 +48,7 @@ export function CloseAccountDialog({
   const [askedAt, setAskedAt] = useState('');
 
   const today = view.input.now.slice(0, 10);
-  const waivable = miner.owed + miner.unbilled;
+  const waivable = miner.owed;
   const dismissing = settle === 'dismiss' && waivable > 0;
   const credit = dismissing ? miner.credit : (plan?.creditAfter ?? miner.credit);
   const disposition: CreditDisposition = !forfeit
@@ -68,19 +68,20 @@ export function CloseAccountDialog({
       canConfirm={
         reason.trim().length > 0 &&
         forfeitOk &&
-        (dismissing || !plan?.statement || corporationName !== null)
+        (dismissing || !plan?.notice || corporationName !== null)
       }
       run={async () => {
-        if (!dismissing && plan?.statement && corporationName === null) return;
-        const statement =
-          !dismissing && plan?.statement
+        if (!dismissing && plan?.notice && corporationName === null) return;
+        const notice =
+          !dismissing && plan?.notice && corporationName !== null
             ? {
-                ...plan.statement,
-                corporationName,
-                minerName,
-                refineryNames: statementRefineryNames(plan.statement, names),
-                // A running account issues only late notices (#6294); its final bill is one.
-                ...(view.input.runningAccountFrom ? { kind: 'notice' as const } : {}),
+                ...plan.notice,
+                issuedBy: characterId,
+                names: {
+                  corporationName,
+                  minerName,
+                  refineryNames: noticeRefineryNames(plan.notice, names),
+                },
               }
             : undefined;
         // Waive first, so the close finds nothing to bill; a failed close can be retried.
@@ -98,18 +99,16 @@ export function CloseAccountDialog({
           minerId: miner.id,
           reason: reason.trim(),
           credit: disposition,
-          ...(statement ? { statement } : {}),
-          // A running account's credit only this client can price (#6294).
-          ...(view.input.runningAccountFrom && plan
-            ? { runningCredit: Math.round(plan.creditAfter) }
-            : {}),
+          ...(notice ? { notice } : {}),
+          // The Running account's credit only this client can price (#6294).
+          ...(plan ? { runningCredit: Math.round(plan.creditAfter) } : {}),
         });
         onClosed?.();
       }}
     >
       <p className="text-text-dim">{t('corpTaxBook.moons.dialogs.close.intro')}</p>
       {waivable > 0 && (
-        <Label text={t('corpTaxBook.moons.dialogs.close.settleLabel')}>
+        <GroupLabel text={t('corpTaxBook.moons.dialogs.close.settleLabel')}>
           <SegmentedControl
             label={t('corpTaxBook.moons.dialogs.close.settleLabel')}
             value={settle}
@@ -120,17 +119,17 @@ export function CloseAccountDialog({
             ]}
             uppercase={false}
           />
-        </Label>
+        </GroupLabel>
       )}
       <Effect>
         {dismissing
           ? t('corpTaxBook.moons.dialogs.close.dismissing', { amount: isk(waivable) })
-          : plan?.statement
-            ? t('corpTaxBook.moons.dialogs.close.finalStatement', {
-                amount: isk(plan.statement.amount),
-                through: dateWithYear(plan.statement.coversThrough),
+          : plan?.notice
+            ? t('corpTaxBook.moons.dialogs.close.finalNotice', {
+                amount: isk(plan.notice.listed),
+                through: dateWithYear(plan.notice.lines.at(-1)?.date ?? today),
               })
-            : t('corpTaxBook.moons.dialogs.close.noStatement')}
+            : t('corpTaxBook.moons.dialogs.close.noNotice')}
         {!dismissing && (
           <>
             {' '}
@@ -149,7 +148,9 @@ export function CloseAccountDialog({
 
       {credit > 0 && (
         <>
-          <Label text={t('corpTaxBook.moons.dialogs.close.creditLabel', { amount: isk(credit) })}>
+          <GroupLabel
+            text={t('corpTaxBook.moons.dialogs.close.creditLabel', { amount: isk(credit) })}
+          >
             <SegmentedControl
               label={t('corpTaxBook.moons.dialogs.close.creditLabel', { amount: isk(credit) })}
               value={forfeit ? 'forfeit' : 'refund'}
@@ -160,7 +161,7 @@ export function CloseAccountDialog({
               ]}
               uppercase={false}
             />
-          </Label>
+          </GroupLabel>
           {forfeit ? (
             <>
               <SegmentedControl

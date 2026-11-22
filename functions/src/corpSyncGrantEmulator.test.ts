@@ -3,6 +3,8 @@
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
+import { minerPaymentCode } from './corpTaxBookLateNotice.js';
+import { lateNoticeFromStatementDoc } from './corpTaxBookLateNoticeBackfill.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -416,8 +418,11 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
   });
 
   describe('the scheduled run', () => {
-    it('syncs and settles a seeded book, rotates the token, and never issues or mails', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+    it('syncs a seeded book, rotates the token, and never issues, settles or mails', async () => {
+      await book()
+        .collection('lateNotices')
+        .doc('s1')
+        .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await optIn(ACCOUNTANT);
       now = T0 + 6 * 3_600_000;
       const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
@@ -433,10 +438,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       });
       expect((await book().collection('extractions').get()).size).toBe(1);
 
-      // The donation is matched to the Miner who mined (character 50) and settles the Statement.
+      // The donation is matched to the Miner who mined (character 50); nothing settles for good.
       const payment = (await book().collection('payments').doc('j1_1').get()).data();
       expect(payment).toMatchObject({ minerId: 'solo:50', amount: 10_000_000 });
-      expect((await book().collection('meta').doc('paid').get()).data()?.ids).toEqual(['s1']);
+      expect((await book().collection('meta').doc('paid').get()).data()?.ids).toBeUndefined();
 
       const lastSync = (await book().get()).data()?.lastSync;
       expect(lastSync).toMatchObject({
@@ -448,7 +453,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       const actions = (await audit())
         .filter((a) => a.via === 'scheduled sync')
         .map((a) => a.action);
-      expect(actions.sort()).toEqual(['settleStatements', 'sync']);
+      expect(actions.sort()).toEqual(['sync']);
 
       expect(await status()).toMatchObject({
         status: 'active',
@@ -457,13 +462,12 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           observedRows: 1,
           extractions: 1,
           donationsAdded: 1,
-          settled: 1,
         },
         systemIds: { '5000': 30000142 },
       });
-      // Nothing was issued, nothing mailed: the one Statement is the seeded one, no verify links.
-      expect((await book().collection('statements').get()).size).toBe(1);
-      expect((await book().collection('statementLinks').get()).size).toBe(0);
+      // Nothing was issued, nothing mailed: the one notice is the seeded one, no verify links.
+      expect((await book().collection('lateNotices').get()).size).toBe(1);
+      expect((await book().collection('lateNoticeLinks').get()).size).toBe(0);
       expect((await db.collection('corpTaxBookTokens').get()).size).toBe(0);
 
       // SSO rotated the token again on the run; the stored blob follows.
@@ -473,8 +477,11 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       );
     });
 
-    it('re-matches an Unmatched donation once its sender is known, then settles', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+    it('re-matches an Unmatched donation once its sender is known', async () => {
+      await book()
+        .collection('lateNotices')
+        .doc('s1')
+        .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await book().collection('payments').doc('j1_1').set({
         id: 'j1_1',
         source: 'donation',
@@ -490,18 +497,66 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect((await book().collection('payments').doc('j1_1').get()).data()?.minerId).toBe(
         'solo:50'
       );
-      expect((await book().collection('meta').doc('paid').get()).data()?.ids).toEqual(['s1']);
       expect(
         (await audit()).some((a) => a.action === 'assignPayment' && a.via === 'scheduled sync')
       ).toBe(true);
     });
 
+    it('matches a stranger’s donation by a Miner’s code or a notice’s, a known sender’s by who sent it', async () => {
+      const donation = (id: number, reason: string) => ({
+        id,
+        date: '2026-10-17T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: 1_000_000,
+        first_party_id: 777,
+        reason,
+      });
+      await book()
+        .collection('lateNotices')
+        .doc('n1')
+        .set({
+          id: 'n1',
+          minerId: 'solo:60',
+          characterIds: [60],
+          kind: 'late',
+          issuedAt: '2026-10-16T00:00:00.000Z',
+          code: 'MTOLD001',
+          lines: [],
+          listed: 0,
+          uids: ['char:60'],
+          mail: { sent: 1, manualSent: 0, remindersStopped: false },
+        });
+      esiState.journal = ok([
+        donation(2, `tax ${minerPaymentCode('solo:50')}`),
+        donation(3, 'for MTOLD001'),
+        // A sender the book knows pays their own Miner, whatever code they wrote.
+        { ...donation(4, 'for MTOLD001'), first_party_id: 50 },
+      ]);
+      await optIn(ACCOUNTANT);
+      expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
+      const payment = async (id: string) =>
+        (await book().collection('payments').doc(id).get()).data();
+      expect(await payment('j1_2')).toMatchObject({ minerId: 'solo:50' });
+      // A code only says whose money it is: no notice is pinned to it.
+      expect(await payment('j1_3')).toMatchObject({ minerId: 'solo:60' });
+      expect(await payment('j1_3')).not.toHaveProperty('statementId');
+      expect(await payment('j1_4')).toMatchObject({ minerId: 'solo:50' });
+    });
+
     it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {
       // Billed through the day character 50 mined, and paid in full: nothing owed, nothing unbilled.
       await book()
-        .collection('statements')
+        .collection('lateNotices')
         .doc('sPaid')
-        .set({ ...statement, id: 'sPaid', code: 'PAID01', coversThrough: '2026-10-31' });
+        .set(
+          lateNoticeFromStatementDoc({
+            ...statement,
+            kind: 'notice',
+            id: 'sPaid',
+            code: 'PAID01',
+            coversThrough: '2026-10-31',
+          })!
+        );
       await book().collection('payments').doc('j0').set({
         id: 'j0',
         source: 'manual',
@@ -509,7 +564,8 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         characterId: 50,
         uid: 'char:50',
         amount: 10_000_000,
-        at: '2026-10-16T12:00:00.000Z',
+        // Days before the donation below: another transfer, not a hand record of it (M8).
+        at: '2026-10-10T12:00:00.000Z',
       });
       await optIn(ACCOUNTANT);
       const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
@@ -631,7 +687,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
     });
 
     it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+      await book()
+        .collection('lateNotices')
+        .doc('s1')
+        .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await optIn(ACCOUNTANT);
       // The fake wallet answers the same journal for every division: division 2's copy is the
       // Miner who owes paying where the book does not look.
@@ -790,8 +849,21 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         );
       const run = () => versioned(() => runScheduledCorpSyncs(syncDeps(), fakeEsi()));
       const marker = async () => (await book().collection('meta').doc(QUIET_DOC).get()).data();
-      const paid = async () =>
-        ((await book().collection('meta').doc('paid').get()).data()?.ids as string[]) ?? [];
+      // An Unmatched donation from a Character the book knows: a full run places it, a quiet one
+      // never reads it.
+      const unmatched = () =>
+        book().collection('payments').doc('j1_77').set({
+          id: 'j1_77',
+          source: 'donation',
+          characterId: 50,
+          uid: 'char:50',
+          amount: 1,
+          at: '2026-10-17T12:00:00.000Z',
+          division: 1,
+        });
+      const placed = async () =>
+        (await book().collection('payments').doc('j1_77').get()).get('minerId') as
+          string | undefined;
       /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
       async function quietBook() {
         await optIn(ACCOUNTANT);
@@ -808,19 +880,19 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
       it('skips the full read while the book is unchanged, and reads again once a stamp moves', async () => {
         await quietBook();
-        // Written with no stamp: a quiet run cannot see it, which shows it did not read Statements.
-        await book().collection('statements').doc('s1').set(statement);
+        // Written with no stamp: a quiet run cannot see it, which shows it did not read payments.
+        await unmatched();
         now += 6 * H;
         expect((await run()).synced).toBe(1);
-        expect(await paid()).toEqual([]);
+        expect(await placed()).toBeUndefined();
         // The ledger and the sync record still land on the quiet path.
         expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
 
-        // Any server write to Statements moves the stamp: the next run reads in full and settles.
-        await versioned(() => book().collection('statements').doc('s1').set(statement));
+        // Any server write to payments moves the stamp: the next run reads in full and places it.
+        await versioned(() => unmatched());
         now += 6 * H;
         await run();
-        expect(await paid()).toEqual(['s1']);
+        expect(await placed()).toBe('solo:50');
         expect(await marker()).toBeUndefined();
       });
 
@@ -856,18 +928,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         expect((await book().collection('payments').doc('j1_2').get()).exists).toBe(true);
         // Nothing settled, but the run was not quiet: the old marker no longer vouches.
         expect(await marker()).toBeUndefined();
-      });
-
-      it('reads in full when the paid Statements are not the ones it saw', async () => {
-        await quietBook();
-        await book().collection('statements').doc('s1').set(statement);
-        await book()
-          .collection('meta')
-          .doc('paid')
-          .set({ ids: ['s0'] });
-        now += 6 * H;
-        await run();
-        expect(await paid()).toEqual(['s0', 's1']);
       });
 
       it('reads in full when a Character new to it mines, who may match an Unmatched donation', async () => {
@@ -926,10 +986,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
       it('reads in full once the marker is a day old, whatever the stamps say', async () => {
         await quietBook();
-        await book().collection('statements').doc('s1').set(statement);
+        await unmatched();
         now += 24 * H;
         await run();
-        expect(await paid()).toEqual(['s1']);
+        expect(await placed()).toBe('solo:50');
       });
     });
 

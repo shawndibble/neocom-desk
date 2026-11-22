@@ -75,7 +75,7 @@ import {
 } from './corpSyncStoppedAlert.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import { learnOwnRefineryNames, stampFailedRoleCheck } from './sharedPopsStore.js';
-import { HOUR_MS } from './timeConstants.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
 export { SCHEDULED_SYNC_DOC };
@@ -574,7 +574,7 @@ export const SYNC_REST_MS = HOUR_MS;
 const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';
 
 /** Rescan this often: a grant saved by not-yet-redeployed code has no `nextSyncAt` and would never match. */
-const GRANT_BACKFILL_EVERY_MS = 7 * 24 * 3_600_000;
+const GRANT_BACKFILL_EVERY_MS = 7 * DAY_MS;
 
 /**
  * Book grants whose `nextSyncAt` has come: a range query, so a run's reads scale with the due
@@ -992,7 +992,6 @@ async function recordRun(
           observedRows: result.observedRows,
           extractions: result.extractions,
           donationsAdded: result.donationsAdded,
-          settled: result.settled,
           missing: result.missing,
         }
       : { at: deps.now(), outcome: 'skipped', reason: result.reason };

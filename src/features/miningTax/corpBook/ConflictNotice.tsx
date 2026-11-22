@@ -39,9 +39,7 @@ interface Props {
   typeNames: ReadonlyMap<number, string>;
   busy?: boolean;
   error?: string | null;
-  /** Unmarks the paid entries, after which the ore can come off them. */
-  onUnmarkPaid: () => void;
-  /** Takes the contested ore off the unpaid entries, so the book alone bills it. */
+  /** Takes the contested ore off the entries, so the book alone bills it. */
   onTakeOver: () => void;
   /** #6206: "Tell {corp}" this day's ore went to the entry's Payee, or what was sent. */
   tell?: ReactNode;
@@ -69,13 +67,11 @@ export function ConflictNotice({
   typeNames,
   busy,
   error,
-  onUnmarkPaid,
   onTakeOver,
   tell,
   onResolve,
 }: Props) {
   const { t } = useTranslation();
-  const anyPaid = entries.some((e) => e.paid);
   const k = (key: string) => `miningTax.corpBook.conflict.${key}`;
 
   return (
@@ -131,35 +127,17 @@ export function ConflictNotice({
       <p className="font-semibold">{t(k('fixTitle'))}</p>
       <ul className="list-disc space-y-1.5 pl-4">
         <li className="space-y-1">
-          <p>
-            {t(
-              k(
-                others.length > 0
-                  ? anyPaid
-                    ? 'booksRightPaid'
-                    : 'booksRight'
-                  : anyPaid
-                    ? 'bookRightPaid'
-                    : 'bookRight'
-              )
-            )}
-          </p>
-          {entries.length > 0 &&
-            (anyPaid ? (
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" disabled={busy} onClick={onUnmarkPaid}>
-                  {t('miningTax.unmarkPaidAction')}
-                </Button>
-              </div>
-            ) : (
-              <TakeoverConfirm
-                previews={previews}
-                typeNames={typeNames}
-                busy={busy}
-                onTakeOver={onTakeOver}
-                {...(others.length > 0 && { label: t(k('letEachBill')) })}
-              />
-            ))}
+          <p>{t(k(others.length > 0 ? 'booksRight' : 'bookRight'))}</p>
+          {/* A paid day's ore can come off too: what its Payee was paid becomes credit there. */}
+          {entries.length > 0 && (
+            <TakeoverConfirm
+              previews={previews}
+              typeNames={typeNames}
+              busy={busy}
+              onTakeOver={onTakeOver}
+              {...(others.length > 0 && { label: t(k('letEachBill')) })}
+            />
+          )}
         </li>
         <li className="space-y-1">
           <p>{t(k('entryRight'), { corp: corpName })}</p>

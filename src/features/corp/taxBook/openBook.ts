@@ -38,8 +38,6 @@ export async function openBook(characterId: number, corporationId: number) {
       await forgetObservedCopy(characterId, corporationId).catch(() => {});
   });
   const store = bookPartStore(characterId, corporationId);
-  const paidStatementIds = async () =>
-    new Set(((await paid).data()?.ids as string[] | undefined) ?? []);
   /** Each Miner's stored paid-through day (`meta/paid.minerPaidThrough`): forward-only (D22). */
   const minerPaidThrough = async () =>
     new Map(
@@ -88,12 +86,12 @@ export async function openBook(characterId: number, corporationId: number) {
   const written = (name: string) => versions === null || versions.collections[name] !== undefined;
   return {
     db,
+    corporationId,
     data,
     part,
     read,
     list,
     observed,
-    paidStatementIds,
     minerPaidThrough,
     written,
   };

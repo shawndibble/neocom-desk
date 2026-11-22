@@ -14,6 +14,7 @@
  * is open: the book is then its window's rows plus the moon docs (#5716), or the whole book when a
  * doc is missing. `readBook` (taxBook/bookRead) decides which.
  */
+import { soloCharacterId } from '../../../../functions/src/corpTaxBookDonationMatch';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { bookViewInputOf, loadBookPrices, surveyTypeIdsOf, type BookPrices } from './bookViewOf';
@@ -38,7 +39,6 @@ import { loadStructureAccess, loadStructureName } from '@/features/character/str
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
-import { withMinerTotals } from '@/engine/corpTaxBook/minerScope';
 import { withMoonDocs } from '@/engine/corpTaxBook/pullFigures';
 import {
   verifyOfficer,
@@ -241,7 +241,7 @@ export function useCorpBook(
           return;
         }
         // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
-        // slice prices only its open window: a day on a Statement is frozen and needs no price.
+        // slice prices only its open window: a day before its checkpoint is closed and needs no price.
         const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, data.minerScope?.from);
         if (cancelled) return;
         setFetched({
@@ -378,9 +378,8 @@ export function useCorpBook(
         surveyMeasured,
       })
     );
-    const { moon, scopedMiner: minerId, minerScope } = fetched.data;
-    if (moon) return withMoonDocs(built, moon.docs, moon.fromDocs);
-    return minerId !== undefined ? withMinerTotals(built, minerId, minerScope?.totals) : built;
+    const { moon } = fetched.data;
+    return moon ? withMoonDocs(built, moon.docs, moon.fromDocs) : built;
   }, [fetched, now, corporationId, memberIds, survey, surveyOreLines, surveyMeasured]);
 
   // Names, resolved after the figures so the tables never wait on them.
@@ -399,8 +398,8 @@ export function useCorpBook(
       // A refinery page reads no ledger row, so a Miner in no grouping is known only by the id in a moon doc.
       for (const d of fetched.data.refinery?.docs.values() ?? [])
         for (const m of d.miners) {
-          const solo = /^solo:(\d+)$/.exec(m.minerId);
-          if (solo) characterIds.add(Number(solo[1]));
+          const solo = soloCharacterId(m.minerId);
+          if (solo !== undefined) characterIds.add(solo);
         }
       // Moon owners are corporations; the universe names lookup resolves both kinds.
       // A payee the moon owner named is a player or another corporation.

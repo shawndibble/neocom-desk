@@ -30,6 +30,20 @@ function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningT
   };
 }
 
+/** A payment linked to `payeeId` for `amount`: its oldest days read Paid. */
+const payLinked = (payeeId: string, amount: number) =>
+  db.miningTaxPaymentLinks.put({
+    id: `journal:${payeeId}`,
+    characterId: CHAR_A,
+    payeeId,
+    kind: 'journal',
+    refId: 1,
+    amount,
+    paidOn: '2026-09-10',
+    source: 'manual',
+    updatedAt: 0,
+  });
+
 beforeEach(async () => {
   vi.clearAllMocks();
   // A stand-in re-snapshot: what matters here is that reconcile writes
@@ -38,6 +52,7 @@ beforeEach(async () => {
     async (a: MiningTaxAssignmentRecord) => ({ ...a, estimatedValue: 1500, updatedAt: 2 })
   );
   await db.miningTaxAssignments.clear();
+  await db.miningTaxPaymentLinks.clear();
 });
 
 describe('reconcileAssignments', () => {
@@ -147,8 +162,9 @@ describe('reconcileAssignments', () => {
   });
 
   it('leaves a paid member of a combined entry paid when its day grows', async () => {
-    const member = assignment({ groupId: 'g1', status: 'paid', paidAt: 1 });
+    const member = assignment({ groupId: 'g1' });
     await db.miningTaxAssignments.put(member);
+    await payLinked('p', 100);
 
     await reconcileAssignments(CHAR_A, [
       {
@@ -164,8 +180,9 @@ describe('reconcileAssignments', () => {
   });
 
   it('leaves a paid assignment exactly as it was when its ore grows (paid stays paid, ADR 0024)', async () => {
-    const paid = assignment({ status: 'paid', paidAt: 5 });
+    const paid = assignment();
     await db.miningTaxAssignments.put(paid);
+    await payLinked('p', 100);
     const fresh: MiningLedgerEntry[] = [
       {
         characterId: CHAR_A,
@@ -294,8 +311,6 @@ describe('reconcileAssignments', () => {
     const kept = assignment({
       id: 'a1',
       payeeId: 'p1',
-      status: 'paid',
-      paidAt: 5,
       collectsGrowth: true,
     });
     const moved = assignment({
@@ -304,6 +319,7 @@ describe('reconcileAssignments', () => {
       oreLines: [{ typeId: TYPE_A, quantity: 40 }],
     });
     await db.miningTaxAssignments.bulkPut([kept, moved]);
+    await payLinked('p1', 100);
 
     await reconcileAssignments(CHAR_A, [
       {
@@ -326,7 +342,7 @@ describe('reconcileAssignments', () => {
   });
 
   it("flags growth on the unpaid entry made from a paid day's late ore instead of absorbing it", async () => {
-    const paid = assignment({ id: 'a1', status: 'paid', paidAt: 5 });
+    const paid = assignment({ id: 'a1' });
     const after = assignment({
       id: 'a2',
       oreLines: [{ typeId: TYPE_A, quantity: 50 }],
@@ -342,8 +358,8 @@ describe('reconcileAssignments', () => {
 
     await reconcileAssignments(CHAR_A, [entry]);
 
-    // Two Assignments on one day: the late ore may be the paid side's, so it
-    // is reviewed rather than grown silently. Paid stays paid (ADR 0024).
+    // Two Assignments on one day: the late ore may be the other side's, so it
+    // is reviewed rather than grown silently.
     expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
     const flagged = await db.miningTaxAssignments.get('a2');
     expect(flagged?.status).toBe('needs-review');
@@ -364,6 +380,7 @@ describe('reconcileAssignments', () => {
       collectsGrowth: true,
     });
     await db.miningTaxAssignments.bulkPut([kept, moved]);
+    await payLinked('p1', 100);
 
     await reconcileAssignments(CHAR_A, [
       {

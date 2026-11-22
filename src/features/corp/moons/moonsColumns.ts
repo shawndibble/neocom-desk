@@ -10,7 +10,7 @@ export const MINERS_COLUMN_IDS = [
   'standing',
   'owed',
   'overdue',
-  'unbilled',
+  'account',
   'credit',
   'paid',
 ] as const;

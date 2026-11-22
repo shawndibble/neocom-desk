@@ -76,7 +76,6 @@ function Story({
               others={twoBooks ? [{ corpName: 'Ashfall Prospecting', billAmount: 120_000 }] : []}
               previews={[]}
               typeNames={new Map()}
-              onUnmarkPaid={() => {}}
               onTakeOver={() => {}}
             />
           ) : undefined
@@ -108,7 +107,7 @@ export const Conflict: S = {
   },
 };
 
-/** @summary A Billable day not yet on a Statement: what bills it and when the book last synced. */
+/** @summary A Billable day no Late notice asked for yet: what bills it and when the book last synced. */
 export const Billed: S = { args: { view: base } };
 
 /** @summary A dismissed day: what was originally billed and the corporation's reason. */
@@ -118,23 +117,10 @@ export const Dismissed: S = {
   },
 };
 
-/** @summary A paid day: two book payments, a donation not credited yet, and credit from a correction. */
-export const PaidByMoney: S = {
+/** @summary A paid day: its payments are in the Payee ledger, not on the day. */
+export const Paid: S = {
   args: {
-    view: {
-      ...base,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'credit',
-      paidBy: {
-        payments: [
-          { paymentId: 'p1', amount: 200_000 },
-          { paymentId: 'p2', amount: 60_000 },
-        ],
-        inFlight: [{ amount: 50_000, at: '2026-10-29T13:10:00Z', refId: 5150 }],
-        corrections: 9_000,
-      },
-    },
+    view: { ...base, state: 'paid', taxOwed: 0 },
   },
 };
 

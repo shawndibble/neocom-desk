@@ -8,7 +8,7 @@ function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
     batchId: 'b',
     corporationId: 1,
     statementId: `s${n}`,
-    kind: 'statement',
+    kind: 'notice',
     senderCharacterId: 7,
     recipientId: 100 + n,
     recipientName: `Miner ${n}`,

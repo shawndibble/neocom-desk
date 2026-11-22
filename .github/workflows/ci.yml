@@ -19,7 +19,8 @@ jobs:
   # whole account (Free plan), and every job here counts against it. Parallel
   # PRs share that pool, so a job that saves no wall time is a slot another
   # PR's jobs queue for. The shard counts and job merges below are sized
-  # against it.
+  # against it. `e2e-book` (the Corp Tax Book specs) is one more runner, not a
+  # matrix: its suite runs inside the window `test-shard` already takes.
   #
   # Caches: a PR run can restore only caches its own PR saved or ones saved on
   # its base branch or the default branch (`main`), and this workflow never
@@ -176,10 +177,13 @@ jobs:
   # Decides whether the `test-shard` jobs run at all: a docs-only PR has
   # nothing for vitest to check (scripts/lib/testRelevance.mjs). Its own tiny
   # job rather than a step in `build`, so the shards do not wait on the bundle.
+  # It also decides `e2e-book` (scripts/lib/e2eRelevance.mjs, `needsBookE2e`),
+  # which uses no `dist/` and so need not wait on `build` either.
   tests-needed:
     runs-on: ubuntu-latest
     outputs:
       run_tests: ${{ steps.tests-needed.outputs.run_tests }}
+      run_book: ${{ steps.book-needed.outputs.run_book }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -188,6 +192,8 @@ jobs:
           fetch-depth: 2
       - id: tests-needed
         run: node scripts/needs-tests.mjs
+      - id: book-needed
+        run: node scripts/needs-e2e.mjs
 
   test-shard:
     needs: [tests-needed]
@@ -396,6 +402,75 @@ jobs:
             test-results
           if-no-files-found: error
 
+  # The Corp Tax Book specs (`e2e/*.book.spec.ts`, playwright.book.config.ts):
+  # the officer pages, the verify page and the member tab against the real
+  # callables and Firestore rules, run by the Firebase emulators. The config
+  # starts them (scripts/e2e-book/emulators.mjs builds functions/ first) and a
+  # Vite dev server pointed at them.
+  #
+  # The dev server, not `build`'s `dist/`: the app connects to the emulators
+  # only when `import.meta.env.DEV` is true (src/sync/firebaseCore.ts
+  # `emulatorsOn`), which is compile-time false in a build so production can
+  # never reach one, and `dist/` is built with Firebase blanked.
+  #
+  # One runner, one Playwright worker: every test wipes and seeds the one
+  # emulator database. ~37 tests run ~3.5 min, plus ~1.5 min to install,
+  # start the emulators and warm up, which fits the `test-shard` window; a
+  # second shard would buy nothing on the critical path (see "Runner budget").
+  # Backend changes run it, unlike the e2e shards (`needsBookE2e`).
+  e2e-book:
+    needs: [tests-needed]
+    if: needs.tests-needed.outputs.run_book == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The same image as `e2e-shard`, so the browser is the one the pinned
+    # @playwright/test expects (that job's "Check the image" step guards the
+    # tag) and node_modules shares its cache.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --init --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+      # Root over a runner-owned checkout; see `e2e-shard`.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The Firestore emulator is a JAR; the image has no JRE.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      # `e2e-shard`'s node_modules cache (see "Caches" at the top).
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-container-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # firebase-tools and the emulator jar, as `static` caches them, but its
+      # own key: in the container `~` is /github/home, and a cache's version
+      # hashes its path, so `static`'s entry would never match here.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/firebase
+          key: firebase-tools-container-14.27.0-${{ runner.os }}
+      - run: npm ci --prefix functions
+      - name: Run the Corp Tax Book specs
+        run: npx playwright test -c playwright.book.config.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-book
+          # The config writes its HTML report to playwright-report/book.
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: error
+
   # The `main` ruleset requires a status check named exactly `e2e`, and a
   # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — one context per shard,
   # none of them the required one. This job keeps that single name and turns
@@ -406,9 +481,12 @@ jobs:
   # shard still lets the rest finish, and this has to run and fail afterwards
   # instead of being skipped — a skipped required check never resolves and the
   # PR waits forever.
+  #
+  # It covers `e2e-book` too, the same way: skipped only when `tests-needed`
+  # decided nothing in the PR can affect the Corp Tax Book specs.
   e2e:
     if: ${{ !cancelled() }}
-    needs: [build, e2e-shard]
+    needs: [build, e2e-shard, tests-needed, e2e-book]
     runs-on: ubuntu-latest
     steps:
       # A matrix `needs` result is `success` only when every shard succeeded,
@@ -420,4 +498,9 @@ jobs:
         if: needs.e2e-shard.result != 'success' && !(needs.e2e-shard.result == 'skipped' && needs.build.result == 'success' && needs.build.outputs.run_e2e == 'false')
         run: |
           echo "::error::e2e shards did not all pass (shards: ${{ needs.e2e-shard.result }}, build: ${{ needs.build.result }})"
+          exit 1
+      - name: Fail unless the Corp Tax Book specs passed
+        if: needs.e2e-book.result != 'success' && !(needs.e2e-book.result == 'skipped' && needs.tests-needed.result == 'success' && needs.tests-needed.outputs.run_book == 'false')
+        run: |
+          echo "::error::the Corp Tax Book specs did not pass (e2e-book: ${{ needs.e2e-book.result }}, tests-needed: ${{ needs.tests-needed.result }})"
           exit 1

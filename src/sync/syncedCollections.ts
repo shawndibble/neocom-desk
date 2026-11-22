@@ -27,6 +27,7 @@ import type {
   CharacterAcceleratorRecord,
   FittingRecord,
   MiningTaxAssignmentRecord,
+  MiningTaxPaymentLinkRecord,
   NetWorthSnapshotRecord,
   PayeeRecord,
   PlanetRichnessRecord,
@@ -45,6 +46,7 @@ import type {
   RemoteDoc,
   RemoteFittingDoc,
   RemoteMiningTaxAssignmentDoc,
+  RemoteMiningTaxPaymentLinkDoc,
   RemotePayeeDoc,
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
@@ -100,6 +102,7 @@ export type SyncedCollectionName =
   | 'payees'
   | 'fittings'
   | 'miningTaxAssignments'
+  | 'miningTaxPaymentLinks'
   | 'notificationFeed'
   | 'settings';
 
@@ -145,6 +148,12 @@ export interface EditableCollection<
    * not follow a pattern (`plans` is plain `tombstones`).
    */
   tombstoneSegment: string;
+  /**
+   * A collection newer than the deployed rules may be: a pull or push the rules refuse
+   * (`permission-denied`) reads as "not ready yet", never as a sync error. Its rows stay in
+   * Dexie and the next pass tries again.
+   */
+  rulesMayLag?: true;
   /**
    * What removing a Character (features/character/removeCharacter.ts) does
    * to this table's local rows. A change of owner (planSync's
@@ -733,6 +742,46 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   }),
 });
 
+/** Made Payments linked to a Payee (decision 20261120-235011). */
+export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
+  MiningTaxPaymentLinkRecord,
+  RemoteMiningTaxPaymentLinkDoc
+>({
+  kind: 'editable',
+  remoteName: 'miningTaxPaymentLinks',
+  table: 'miningTaxPaymentLinks',
+  tombstoneSegment: 'miningTaxPaymentLinkTombstones',
+  rulesMayLag: true,
+  onRemoval: 'delete',
+  faqItem: 'miningTax',
+  toRemoteDoc: (l, ownerHash) => ({
+    id: l.id,
+    characterId: l.characterId,
+    payeeId: l.payeeId,
+    kind: l.kind,
+    refId: l.refId,
+    amount: l.amount,
+    paidOn: l.paidOn,
+    source: l.source,
+    ...(l.refs !== undefined ? { refs: l.refs } : {}),
+    updatedAt: l.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    payeeId: r.payeeId,
+    kind: r.kind,
+    refId: r.refId,
+    amount: r.amount,
+    paidOn: r.paidOn,
+    source: r.source,
+    ...(r.refs !== undefined ? { refs: r.refs } : {}),
+    updatedAt: r.updatedAt,
+  }),
+});
+
 /** One Character's net worth on one UTC day (issue #2865) — numbers only, one document per day. */
 const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   NetWorthSnapshotRecord,
@@ -823,6 +872,7 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   PAYEES,
   FITTINGS,
   MINING_TAX_ASSIGNMENTS,
+  MINING_TAX_PAYMENT_LINKS,
 ];
 
 /** The Notification Feed's remote copy (issue #362). Device-local archive, synced window only. */

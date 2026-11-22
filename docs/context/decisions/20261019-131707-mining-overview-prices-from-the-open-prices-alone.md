@@ -23,4 +23,4 @@ supersedes the Overview half of its "Tiers" bullet._
   whatever the book was at the last load. The Open Prices hold the day's close
   for every day, whoever was online. Mining Tax stops merging it too. Its
   `saved` / `historical` / `live` / `live-sell` tiers stay, because Corp Tax
-  Book Statements store those source values.
+  Book Late notices store those source values.

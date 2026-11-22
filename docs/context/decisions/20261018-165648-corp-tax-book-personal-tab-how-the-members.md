@@ -5,7 +5,7 @@ _Recorded 2026-10-18 · issue #4065._
 - **The book bills what it observed, not what the member's ledger holds.** The
   member's own ore only attributes (several books split by observed quantity,
   the book's share comes from ore given to no Payee, the rest is a conflict).
-  A member and the corp's Statement must show the same amount, so the owed
+  A member and the corp's book must show the same amount, so the owed
   quantity is the book's, even when the personal ledger is smaller; the diff
   modal shows the difference.
 - **A conflict is raised when its day closed, not when the member first saw
@@ -13,8 +13,8 @@ _Recorded 2026-10-18 · issue #4065._
   Deterministic and needs no stored timestamp; the row prints the resolve date
   as the notice. Ruled out: a per-device "first seen" record, which two
   devices would disagree on.
-- **A day on an issued Statement is never a conflict.** The Statement is the
-  corp's frozen decision; it is owed in full.
+- **A day an issued Late notice listed is never a conflict.** The notice is
+  the corp's frozen decision; it is owed in full.
 - **The corp Payee is virtual.** "<Corp>" (named for the corporation since 20261101-234443; it was "<Corp> (Corp Tax Book)") exists only in the
   tab, never in Dexie, and is excluded from every assign, split, join, continue
   and settle-up path, so no Assignment can point at it. Settle up for it is a

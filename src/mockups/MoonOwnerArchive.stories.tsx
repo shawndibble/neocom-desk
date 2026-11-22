@@ -106,7 +106,7 @@ export const ArchiveConfirm: Story = {
       <ConfirmDialog
         open
         title="Archive Kestrel Drill 04?"
-        body="It leaves the Refineries list and shows under Archived. Its Extractions, mining rows, labels and every Statement stay exactly as they are. You can restore it any time."
+        body="It leaves the Refineries list and shows under Archived. Its Extractions, mining rows, labels and every Late notice stay exactly as they are. You can restore it any time."
         actionLabel="Archive"
         onConfirm={async () => undefined}
         onClose={() => undefined}

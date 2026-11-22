@@ -42,7 +42,7 @@ const MOONS_TAB_PATHS = [
   '/corp/moons/extractions',
   '/corp/moons/refineries',
   '/corp/moons/miners',
-  '/corp/moons/statements',
+  '/corp/moons/late-notices',
   '/corp/moons/moon-owners',
 ];
 

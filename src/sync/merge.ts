@@ -28,6 +28,7 @@ import type {
   PayeeRecord,
   FittingRecord,
   MiningTaxAssignmentRecord,
+  MiningTaxPaymentLinkRecord,
   WhatIfImplantSelection,
 } from '@/db';
 import type { Attributes, PlanMilestone } from '@/engine/types';
@@ -81,6 +82,9 @@ export type RemoteFittingDoc = FittingRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/miningTaxAssignments/{id} (issue #523). */
 export type RemoteMiningTaxAssignmentDoc = MiningTaxAssignmentRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/miningTaxPaymentLinks/{id} (decision 20261120-235011). */
+export type RemoteMiningTaxPaymentLinkDoc = MiningTaxPaymentLinkRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/productionRuns/{id} (issue #525). */
 export type RemoteProductionRunDoc = ProductionRunRecord & RemoteDoc;

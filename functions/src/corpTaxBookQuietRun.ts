@@ -1,19 +1,18 @@
 // A scheduled run that skips reading the whole book (issue #5048). The first
-// thing a scheduled sync did was read every Miner, Statement, payment, dismissal
-// and write-off: O(book) reads every scheduled run (4 a day), also when nothing had changed.
+// thing a scheduled sync did was read every Miner and payment: O(book) reads every
+// scheduled run (4 a day), also when nothing had changed.
 //
-// What it reads them for: matching new donations, re-matching Unmatched ones, and
-// planning which Statements are settled. A run that found none of that to do
-// leaves a **quiet marker** on the book: the version stamps (#5047,
-// corpTaxBookVersionTracking.ts) of those collections as that run read them, and
-// what else its decisions rested on. A later run whose stamps still match, whose
+// What it reads them for: matching new donations and re-matching Unmatched ones.
+// A run that found none of that to do leaves a **quiet marker** on the book: the
+// version stamps (#5047, corpTaxBookVersionTracking.ts) of those collections as
+// that run read them, and what else its decisions rested on. A later run whose stamps still match, whose
 // ESI reads bring no new donation and no new Character, and whose extractions
 // read the same, would decide exactly what the quiet run decided — nothing — so
 // it skips those reads and those steps. It still merges the ledger and the
 // extractions, and records the sync.
 //
-// It never settles, assigns or adds a payment on the skipped path, so a stale
-// marker can only delay those, never make a wrong settle (D22). A delay is
+// It never assigns or adds a payment on the skipped path, so a stale marker can
+// only delay those, never place money wrongly (D22). A delay is
 // bounded: the marker expires after QUIET_MAX_AGE_MS, which forces a full run
 // whatever hid a change — a stamp that failed, one that landed before its
 // write committed (corpTaxBookVersionTracking.ts records at the call), or a
@@ -22,7 +21,8 @@
 
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { DISMISSALS, MINERS, PAYMENTS, STATEMENTS, WRITE_OFFS } from './corpTaxBook.js';
+import { MINERS, PAYMENTS } from './corpTaxBook.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { COLLECTION_VERSIONS_FIELD } from './corpTaxBookVersionKeys.js';
 
 /**
@@ -39,7 +39,7 @@ export const QUIET_DOC = 'scheduledQuiet';
  * the stored ones) never reaches a chunk older than that. The old ones are the
  * book's growth, and re-reading them every run bought nothing.
  */
-export const QUIET_EXTRACTION_WINDOW_MS = 60 * 24 * 3_600_000;
+export const QUIET_EXTRACTION_WINDOW_MS = 60 * DAY_MS;
 
 /** The cut-off a marker written by a run starting at `at` fixes for as long as it vouches (< QUIET_MAX_AGE_MS). */
 export const extractionsSinceOf = (at: number): string =>
@@ -50,15 +50,15 @@ export const inExtractionWindow = (x: { chunkArrivalTime?: unknown }, since: str
   typeof x.chunkArrivalTime === 'string' && x.chunkArrivalTime >= since;
 
 /** A marker older than this is ignored: at least one full run a day, whatever the stamps say. */
-export const QUIET_MAX_AGE_MS = 24 * 3_600_000;
+export const QUIET_MAX_AGE_MS = 24 * HOUR_MS;
 
 /**
  * What `readBookStateAdmin` reads that a quiet run does not. Not `meta`: every
- * run writes its status there, so its stamp always moves; a quiet run reads the
- * one meta doc that counts (`paid`) and compares it instead, as it does the
- * extractions.
+ * run writes its status there, so its stamp always moves, and a run reads none of it. A quiet run
+ * compares the extractions it reads instead. `lateNotices` is not listed: a book that never wrote
+ * one has no stamp for it, and a notice changes no donation's match (its code is its Miner's).
  */
-export const QUIET_COLLECTIONS = [MINERS, STATEMENTS, PAYMENTS, DISMISSALS, WRITE_OFFS] as const;
+export const QUIET_COLLECTIONS = [MINERS, PAYMENTS] as const;
 
 export interface QuietMarker {
   /** When the quiet run started. */
@@ -74,12 +74,10 @@ export interface QuietMarker {
   journalThrough: Record<string, number>;
   /** Every Character the quiet run knew: one new to it could match an Unmatched donation. */
   known: number[];
-  /** The extractions it read, which dismissal credits rest on (`fingerprintOf`), from `extractionsSince` on. */
+  /** The extractions it read (`fingerprintOf`), from `extractionsSince` on: a changed one ends quiet. */
   extractions: string;
   /** The `chunkArrivalTime` cut-off its extractions fingerprint, and later quiet reads, use (`extractionsSinceOf`). */
   extractionsSince: string;
-  /** The Statements it held as paid (`fingerprintOf`), which settling rests on. */
-  paid: string;
 }
 
 /** The quiet collections' stamps on a book doc, or null when any is missing (a book not versioned yet). */
@@ -110,8 +108,7 @@ export function readQuietMarker(raw: unknown): QuietMarker | null {
     m.journalThrough === null ||
     !numbers(m.known) ||
     typeof m.extractions !== 'string' ||
-    typeof m.extractionsSince !== 'string' ||
-    typeof m.paid !== 'string'
+    typeof m.extractionsSince !== 'string'
   ) {
     return null;
   }
@@ -193,7 +190,7 @@ function canonical(value: unknown): unknown {
   return value;
 }
 
-/** A fingerprint of a set of stored values (the extractions, the paid ids), whatever order they were read in. */
+/** A fingerprint of a set of stored values (the extractions), whatever order they were read in. */
 export function fingerprintOf(values: Iterable<unknown>): string {
   const docs = [...values].map((x) => JSON.stringify(canonical(x))).sort();
   return createHash('sha256').update(JSON.stringify(docs)).digest('hex');

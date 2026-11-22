@@ -46,6 +46,8 @@ export interface DataTableRowProps<T> {
   expanded: boolean;
   hideExpandIcon: boolean;
   leadingExpandIcon: boolean;
+  /** Draw the trailing chevron in a card too: a leading caret is hidden there. */
+  cardChevron: boolean;
   /** `expandableRow.trigger: 'button'`: the leading caret is a button with this label. */
   toggleLabel: string | undefined;
   /** Stable; flips this row's detail. */
@@ -110,6 +112,7 @@ function DataTableRowImpl<T>({
   expanded,
   hideExpandIcon,
   leadingExpandIcon,
+  cardChevron,
   toggleLabel,
   onToggle,
   renderDetail,
@@ -308,7 +311,7 @@ function DataTableRowImpl<T>({
           const Chevron = expanded ? Icon.Expanded : Icon.Descend;
           return (
             <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0 dt-disclosure')}>
-              {!hideExpandIcon && (
+              {(!hideExpandIcon || cardChevron) && (
                 <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
               )}
             </td>

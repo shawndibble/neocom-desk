@@ -10,7 +10,7 @@ const tr = (journalRef: number, amount: number) => ({
 });
 const base = {
   id: 'x',
-  statementId: 's',
+  noticeId: 's',
   kind: 'another-way',
   at: '2026-11-10T00:00:00Z',
 } as const;

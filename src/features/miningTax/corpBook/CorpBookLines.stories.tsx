@@ -75,6 +75,7 @@ const overlay: PersonalOverlay = {
   absorbed: new Map(),
   trimmed: new Map(),
   alsoBilled: new Map(),
+  conflicted: new Map(),
   labels: new Map(),
   books: [],
 };

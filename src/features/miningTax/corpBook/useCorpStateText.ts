@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
-import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
 import type { BookRowView, ConflictCause } from '@/engine/corpTaxBook/personal';
-import { formatIsk } from '@/lib/isk';
 import type { CorpRowInfo } from './corpRows';
 import { answeredByMember, isoDay } from './memberFlag';
 
@@ -13,7 +11,6 @@ export type PillState =
   | 'unattributed'
   | 'dismissed'
   | 'waived'
-  | 'markedPaid'
   | 'sent'
   | 'oreWaived'
   | 'notPaying';
@@ -25,7 +22,6 @@ export const PILL_KEY: Record<PillState, string> = {
   unattributed: 'unattributed',
   dismissed: 'dismissed',
   waived: 'waived',
-  markedPaid: 'markedPaid',
   sent: 'sent',
   oreWaived: 'oreWaived',
   notPaying: 'notPaying',
@@ -53,15 +49,13 @@ export function useCorpStateLabel() {
     (corp: CorpRowInfo): string =>
       corp.kind === 'label'
         ? t(`miningTax.corpBook.state.${PILL_KEY[corp.state]}`)
-        : corp.view.bookOwed !== undefined
-          ? t('miningTax.corpBook.state.markedPaid')
-          : corp.view.state === 'paid'
-            ? t('miningTax.status.paid')
-            : t(
-                `miningTax.corpBook.state.${
-                  PILL_KEY[flaggedPillState(corp.view) ?? (corp.view.state as PillState)]
-                }`
-              ),
+        : corp.view.state === 'paid'
+          ? t('miningTax.status.paid')
+          : t(
+              `miningTax.corpBook.state.${
+                PILL_KEY[flaggedPillState(corp.view) ?? (corp.view.state as PillState)]
+              }`
+            ),
     [t]
   );
 }
@@ -83,19 +77,6 @@ export function useCorpStateHint() {
         return t(`miningTax.corpBook.hint.${PILL_KEY[corp.state]}`, { corp: corp.corpName });
       }
       const { view, corpName } = corp;
-      // The member's mark is not the book's word: say what its Statement still shows (#6204).
-      if (view.bookOwed !== undefined) {
-        return t(
-          view.bookSpentOn
-            ? 'miningTax.corpBook.hint.markedPaidSpent'
-            : 'miningTax.corpBook.hint.markedPaid',
-          {
-            corp: corpName,
-            owed: formatIsk(view.bookOwed, 0),
-            days: formatList(view.bookSpentOn ?? []),
-          }
-        );
-      }
       const flagged = flaggedPillState(view);
       const key =
         flagged ??

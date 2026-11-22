@@ -178,9 +178,11 @@ export interface DataTableExpandableRow<T> {
   hideIcon?: boolean;
   /**
    * Draws the §6c expand-in-place cue instead: a leading rotating caret in
-   * the first cell, hidden in the stacked card layout (the card is the tap
-   * target). Implies `hideIcon`'s trailing chevron being dropped, so a row
-   * with a ⋮ keeps one trailing control.
+   * the first cell. A table keeps one cue per layout, so the trailing chevron
+   * is dropped from the table, and the stacked card, which hides the leading
+   * caret (the card is the tap target), shows that trailing chevron instead:
+   * it turns when the card is open. A `trigger: 'button'` caret stays a
+   * button in the card, so it gets no chevron.
    */
   leadingIcon?: boolean;
   /**
@@ -405,6 +407,13 @@ export interface DataTableProps<T> {
    * Not for a virtualized table: the row is not measured.
    */
   fullWidthRow?: (row: T) => ReactNode | null;
+  /**
+   * One thin, full-width row drawn just before the row whose key is `beforeKey`: a boundary in
+   * the list that explains what lies past it (the Corp Tax Book's lock date, §6c "Boundary
+   * row"). Not a record: it never expands, never activates `onRowClick`, is not exported and
+   * has no row menu. Drawn nothing when no row has that key. Not for a virtualized table.
+   */
+  rowBoundary?: { beforeKey: string | number; children: ReactNode };
   /**
    * Mounts only the rows near the viewport (TanStack Virtual, windowed
    * against the page the way `NotificationsPanel` is), so a list of tens of

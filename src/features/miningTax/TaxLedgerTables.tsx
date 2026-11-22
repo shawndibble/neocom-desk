@@ -105,7 +105,7 @@ export function TaxOpenLedger({
                   {...taxExport.tableProps}
                   columns={openColumns}
                   rows={openRows}
-                  className="dt-dense-lead dt-actions-pinned-only sm:table-fixed"
+                  className="dt-dense-lead dt-sep-trailing dt-actions-pinned-only sm:table-fixed"
                   rowKey={(dr) => dr.key}
                   label={t('miningTax.sections.openLabel')}
                   {...taxSort}
@@ -150,7 +150,7 @@ export function TaxHistoryLedger({
             rows={historyRows}
             // Months are sections here, not folded duplicates:
             // their entries line up with Open's, unindented.
-            className="dt-flat-groups dt-actions-pinned-only sm:table-fixed"
+            className="dt-flat-groups dt-sep-trailing dt-actions-pinned-only sm:table-fixed"
             rowKey={(dr) => dr.key}
             label={t('miningTax.sections.history')}
             {...historySort}

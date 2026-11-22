@@ -1,19 +1,32 @@
 /**
- * "Who do I owe, and how much" (issue #523's Balances strip): per Payee, the
- * sum of every currently-Outstanding Assignment's `taxOwed` — a balance to
- * settle now, deliberately not the running total across every status the
- * earlier stat panels showed. Pure, so the strip's figures are testable
+ * "Who do I owe, and how much" (issue #523's Balances strip): per Payee, what its account owes
+ * now, oldest day first (decision 20261120-235011). Pure, so the strip's figures are testable
  * without the route's snapshot loading.
  */
 import type { PayeeRecord } from '@/db';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
+import { isCorpPayeeId } from './corpBook/corpRows';
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 
 export interface PayeeBalance {
   payee: PayeeRecord;
-  /** Sum of `taxOwed` across `members`. 0 for a settled Payee. */
+  /** What its account owes now (a Corp Tax Book's: what its rows still owe). 0 for a settled Payee. */
   owed: number;
-  /** The Outstanding Assignments behind `owed` — exactly what "Settle up" pays. */
+  /** What its Running account holds beyond what it bills (a Corp Tax Book's: its Miners'). */
+  credit: number;
+  /** The Outstanding Assignments behind `owed`, in view. */
   members: GroupMember[];
+  /** A personal Payee's Running account; absent for a Corp Tax Book's and one nothing bills. */
+  account?: PayeeRunningAccount;
+  /** A Corp Tax Book's: the days its account owes and the oldest, whatever rows are in view. */
+  book?: BookOwedDays;
+}
+
+/** What a Corp Tax Book's account owes, as days: its entry count and where "owed since" starts. */
+export interface BookOwedDays {
+  days: number;
+  oldest: string;
 }
 
 export interface UnassignedSummary {
@@ -23,26 +36,29 @@ export interface UnassignedSummary {
 }
 
 /**
- * One balance per known Payee, owed-first then by name, settled Payees
- * included (owed 0) so the strip can offer to show them. An Assignment whose
- * Payee is no longer known is skipped rather than invented — the table still
- * shows it as "Unknown Payee".
- *
- * `alsoBilled` is the share of an Assignment's tax a Corp Tax Book bills too (#6204): that part
- * is owed to the corporation, so it is not owed to this Payee as well; an Assignment the book
- * bills whole drops out.
+ * One balance per known Payee, owed-first then by name, settled Payees included (owed 0) so the
+ * strip can offer to show them. Credit is the Payee's Running account's, for every Payee. A personal Payee owes what its Running account owes, oldest day
+ * first; a Corp Tax Book's owes the book's account total (`bookOwes`), else what its rows still owe.
+ * A Payee with nothing Outstanding in view owes nothing here. An Assignment whose Payee is no
+ * longer known is skipped rather than invented: the table still shows it as "Unknown Payee".
  */
 export function computePayeeBalances(
   rows: readonly DisplayRow[],
   payees: readonly PayeeRecord[],
-  alsoBilled: (member: GroupMember) => number = () => 0,
+  accounts: PayeeRunningAccounts,
   /** Payee ids that are another record of the same Payee (`payeeDuplicateAliases`): summed into it. */
-  aliases: ReadonlyMap<string, string> = new Map()
+  aliases: ReadonlyMap<string, string> = new Map(),
+  /** A Corp Tax Book Payee's credit, by its id: its Miners' accounts' (`BookSummary.credit`). */
+  bookCredits: ReadonlyMap<string, number> = new Map(),
+  /** A Corp Tax Book Payee's owed, by its id: the book's account total (`BookSummary.account.owes`). */
+  bookOwes: ReadonlyMap<string, number> = new Map(),
+  /** A Corp Tax Book Payee's owed days and oldest unpaid day, by its id (`BookSummary.account.owes`). */
+  bookDays: ReadonlyMap<string, BookOwedDays> = new Map()
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
     payees
       .filter((payee) => !aliases.has(payee.id))
-      .map((payee) => [payee.id, { payee, owed: 0, members: [] }])
+      .map((payee) => [payee.id, { payee, owed: 0, credit: 0, members: [] }])
   );
   for (const dr of rows) {
     for (const member of allMembers(dr)) {
@@ -50,16 +66,26 @@ export function computePayeeBalances(
       const balance = byPayee.get(
         aliases.get(member.assignment.payeeId) ?? member.assignment.payeeId
       );
-      if (!balance) continue;
-      const share = Math.min(1, alsoBilled(member));
-      const owed = member.assignment.taxOwed * (1 - share);
-      if (share > 0 && owed < 0.01) continue;
-      balance.owed += owed;
-      // Settle up pays what is left for this Payee, not what the book bills too.
-      balance.members.push(
-        share > 0 ? { ...member, assignment: { ...member.assignment, taxOwed: owed } } : member
-      );
+      balance?.members.push(member);
     }
+  }
+  for (const balance of byPayee.values()) {
+    if (isCorpPayeeId(balance.payee.id)) {
+      balance.credit = bookCredits.get(balance.payee.id) ?? 0;
+      const days = bookDays.get(balance.payee.id);
+      if (days) balance.book = days;
+      // The book's own figure (the whole Miner), so the Character filter doesn't move it.
+      balance.owed =
+        bookOwes.get(balance.payee.id) ??
+        balance.members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+      continue;
+    }
+    const account = accounts.of(balance.payee.id);
+    if (!account) continue;
+    // Credit is the account's whatever is in view; what is owed follows the Character filter.
+    balance.account = account;
+    balance.credit = account.credit;
+    if (balance.members.length > 0) balance.owed = account.owes?.amount ?? 0;
   }
   return [...byPayee.values()].sort(
     (a, b) => b.owed - a.owed || a.payee.name.localeCompare(b.payee.name)

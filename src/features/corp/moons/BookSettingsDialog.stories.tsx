@@ -8,7 +8,7 @@ import { seedPopSharing } from '../taxBook/popSharingCache';
 import { useEffect, useState } from 'react';
 import { installFixtureFetch } from '@/storybook/fixtureFetch';
 
-/** @summary The book's settings: dated rates (corp, Guest, Miner, moon, refinery), pricing, grace and Statements. */
+/** @summary The book's settings: dated rates (corp, Guest, Miner, moon, refinery), pricing, grace and late notices. */
 const meta = {
   title: 'corp/BookSettingsDialog',
   component: BookSettingsDialog,
@@ -29,7 +29,7 @@ type Story = StoryObj<typeof meta>;
 /** @summary A per-refinery rate on a moon owner's refinery, which has no moon to set a rate on. */
 export const RefineryRate: Story = {};
 
-/** @summary Billing tab: trade hub, Ore Form, cadence, minimum Statement, grace, overdue and divisions. */
+/** @summary Billing tab: trade hub, Ore Form, grace, late notice rules, overdue and divisions. */
 export const Billing: Story = { args: { initialTab: 'billing' } };
 
 /** @summary Extractions tab: the chunk-rate fallback and each refinery's measured rate and field expiry. */

@@ -42,6 +42,35 @@ describe('groupingAnswersFrom', () => {
     ]);
   });
 
+  it('reads the characters a declined grouping held besides the decliner', () => {
+    const [a] = groupingAnswersFrom({
+      answers: {
+        '61': {
+          minerId: 'm-a',
+          answer: 'declined',
+          at: '2026-10-18T10:00:00Z',
+          otherCharacterIds: [7, 'x', 9, 1.5],
+        },
+      },
+    });
+    expect(a?.otherCharacterIds).toEqual([7, 9]);
+  });
+
+  it('reads when an officer dismissed an answer from Needs you', () => {
+    expect(
+      groupingAnswersFrom({
+        answers: {
+          '61': {
+            minerId: 'm-a',
+            answer: 'declined',
+            at: '2026-10-18T10:00:00Z',
+            dismissedAt: '2026-10-19T10:00:00Z',
+          },
+        },
+      })[0]?.dismissedAt
+    ).toBe('2026-10-19T10:00:00Z');
+  });
+
   it('drops anything malformed, and a missing doc is no answers', () => {
     expect(groupingAnswersFrom(undefined)).toEqual([]);
     expect(

@@ -9,8 +9,6 @@
  * (`cachedBookPrices`): a recount loads the market only when none held cover the book's ores.
  */
 import { buildBookView } from '@/engine/corpTaxBook/bookView';
-import { tabsProjection } from '@/engine/corpTaxBook/readModels';
-import { READ_MODELS_SCHEMA } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { loadCurrentMemberIds } from '../currentMembers';
 import { bookPartsFor, readBook } from '../taxBook/bookRead';
 import { bookViewInputOf, cachedBookPrices } from './bookViewOf';
@@ -34,6 +32,5 @@ export async function loadNeedsYouCount(
   const view = buildBookView(
     bookViewInputOf(corporationId, new Date().toISOString(), data, prices, { memberIds })
   );
-  const { needsYou } = tabsProjection(view, data.readModels, READ_MODELS_SCHEMA);
-  return needsYouOf(view, data, data.settings.divisions, needsYou, data.settings.noticeRules).count;
+  return needsYouOf(view, data, data.settings.divisions, data.settings.noticeRules).count;
 }

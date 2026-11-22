@@ -4,6 +4,7 @@
  * Reversible, shown separately, and never deleted — a reversal is recorded on
  * the dismissal, so the audit trail keeps both.
  */
+import { dismissalWaives } from '../../../functions/src/corpTaxBookCheckpoint';
 
 export type DismissalScope = 'record' | 'miner' | 'moon' | 'extraction';
 
@@ -16,7 +17,13 @@ export interface Dismissal {
   by: number;
   at: string;
   reason: string;
-  reversed?: { by: number; at: string };
+  /**
+   * A Miner, moon or Extraction dismissal's lock date when it was made: it waives only days on or
+   * after it. Absent on one made before the lock date existed, which waives every day.
+   */
+  from?: string;
+  /** `from`: the lock date at the reversal, which ends the dismissal from that day on only. */
+  reversed?: { by: number; at: string; from?: string };
 }
 
 /** What a dismissal can match on one day's charge. */
@@ -47,12 +54,12 @@ function covers(d: Dismissal, charge: DismissableCharge): boolean {
   }
 }
 
-/** The first unreversed dismissal covering `charge`, if any. */
+/** The first dismissal that waives `charge`'s day and covers it, if any. */
 export function activeDismissalFor(
   charge: DismissableCharge,
   dismissals: readonly Dismissal[]
 ): Dismissal | undefined {
-  return dismissals.find((d) => !d.reversed && covers(d, charge));
+  return dismissals.find((d) => dismissalWaives(d, charge.date) && covers(d, charge));
 }
 
 /** The dismissal with its reversal recorded. Throws when it was already reversed. */

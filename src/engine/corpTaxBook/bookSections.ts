@@ -8,7 +8,7 @@ import type { BookView, DayRow, ExtractionRow, RunningAccountStatus } from './bo
 import type { OreLine } from './types';
 import { DAY_MS } from '@/lib/age';
 import { shiftUtcDate, utcDay } from '../localDay';
-import { netOf } from './paymentPreview';
+import { netPayment } from './payments';
 
 /** How far ahead the Overview looks for an Extracting moon's chunk to arrive. */
 export const POPS_WINDOW_DAYS = 7;
@@ -16,32 +16,19 @@ export const POPS_WINDOW_DAYS = 7;
 // --- Days ------------------------------------------------------------------
 
 /**
- * A Miner's days by where they stand: Today's mining (not Billable yet),
- * Next Statement (Billable, not on a Statement yet), and every earlier one (on a Statement, paid, dismissed,
- * written off). Order within each is the input's.
+ * A Miner's days by where they stand: owed (Billable, not paid yet), Today's mining (not
+ * Billable yet), and every earlier one (paid, dismissed). Order within each is the input's.
  */
-export function daysByPhase(days: readonly DayRow[], opts: { running?: boolean } = {}) {
-  const nextStatement: DayRow[] = [];
+export function daysByPhase(days: readonly DayRow[]) {
+  const owed: DayRow[] = [];
   const stillAccruing: DayRow[] = [];
   const earlier: DayRow[] = [];
   for (const d of days) {
-    // On a running account a day still on an unpaid older Statement is owed too.
-    if (d.status === 'unbilled' || (opts.running && d.status === 'on-statement'))
-      nextStatement.push(d);
+    if (d.status === 'owed') owed.push(d);
     else if (d.status === 'not-billable') stillAccruing.push(d);
     else earlier.push(d);
   }
-  return { nextStatement, stillAccruing, earlier };
-}
-
-/**
- * What the next Statement bills beyond (or below) its listed days' tax: correction lines add to
- * it, and a late-ore line bills only the growth of a day already on a Statement, which the
- * list still shows in full. Zero when the days say it all.
- */
-export function statementAdjustment(nextStatement: readonly DayRow[], row: { unbilled: number }) {
-  const delta = row.unbilled - nextStatement.reduce((s, d) => s + d.tax, 0);
-  return Math.abs(delta) < 0.5 ? 0 : delta;
+  return { owed, stillAccruing, earlier };
 }
 
 /** The ranges a Miner's page reads its days and payments in: every day, or the last N UTC days. */
@@ -59,25 +46,21 @@ export const inRange = (dateOrInstant: string, from: string | undefined): boolea
 
 /**
  * A range's figures on a Miner's page: the tax of the Billable days mined in it that were billed
- * to the Miner (not dismissed, not written off), and the tax payments received in it.
+ * to the Miner (not dismissed), and the tax payments received in it.
  */
 export function rangeFigures(
   days: readonly Pick<DayRow, 'date' | 'status' | 'tax'>[],
   payments: readonly { at: string; amount: number; notTaxAmount?: number }[],
   from: string | undefined
 ): { tax: number; paid: number } {
-  const billed = new Set<DayRow['status']>(['unbilled', 'paid', 'on-statement']);
+  const billed = new Set<DayRow['status']>(['owed', 'paid']);
   return {
     tax: days
       .filter((d) => billed.has(d.status) && inRange(d.date, from))
       .reduce((s, d) => s + d.tax, 0),
-    paid: payments.filter((p) => inRange(p.at, from)).reduce((s, p) => s + netOf(p), 0),
+    paid: payments.filter((p) => inRange(p.at, from)).reduce((s, p) => s + netPayment(p), 0),
   };
 }
-
-/** What a list of days still owes: a running day's remainder (`owed`), else its tax. */
-export const owedOf = (days: readonly Pick<DayRow, 'tax' | 'owed'>[]): number =>
-  days.reduce((s, d) => s + (d.owed ?? d.tax), 0);
 
 /** Sorts Miners by how far behind they are: the oldest unpaid day first, the paid-up after. */
 export const accountSortValue = (account: RunningAccountStatus | undefined): string =>
@@ -219,36 +202,15 @@ export function minersOnMoon(view: BookView, extractionId: string): MinerOnMoon[
 }
 
 /**
- * Whether an Extraction's tax is already billed: it has days, and none of them is Today's mining
- * or waiting for a Statement. `statementIds` are the Statements those days sit on.
+ * Whether an Extraction's tax is all paid: it has days, at least one paid, and none still owed or
+ * not Billable yet.
  */
-export function extractionBilling(
-  view: BookView,
-  extractionId: string
-): {
-  billed: boolean;
-  statementIds: string[];
-  /** Tax on days still waiting for a Statement while others are already on one. */ rollingOver: number;
-} {
+export function extractionBilling(view: BookView, extractionId: string): { paid: boolean } {
   const days = [...view.internals.byMiner.values()].flatMap((inner) =>
     inner.days.filter((d) => d.extractionId === extractionId)
   );
-  const open = days.some((d) => d.status === 'unbilled' || d.status === 'not-billable');
-  const statementIds = [
-    ...new Set(days.flatMap((d) => (d.statementId === undefined ? [] : [d.statementId]))),
-  ];
-  // A moon whose days were all dismissed was never billed: one day has to sit on a Statement.
-  const onStatement = days.some(
-    (d) => d.statementId !== undefined && (d.status === 'on-statement' || d.status === 'paid')
-  );
-  const waiting = days
-    .filter((d) => d.status === 'unbilled' || d.status === 'not-billable')
-    .reduce((sum, d) => sum + d.tax, 0);
-  return {
-    billed: onStatement && !open,
-    statementIds,
-    rollingOver: onStatement && open ? waiting : 0,
-  };
+  const open = days.some((d) => d.status === 'owed' || d.status === 'not-billable');
+  return { paid: !open && days.some((d) => d.status === 'paid') };
 }
 
 /**
@@ -262,52 +224,6 @@ export function moonByStructure(view: BookView): Map<number, number> {
     for (const d of inner.days)
       if (d.moonId !== undefined && !moons.has(d.structureId)) moons.set(d.structureId, d.moonId);
   return moons;
-}
-
-export interface MinerMoon {
-  /** The refinery: one row per moon, whether or not an Extraction was running on the day. */
-  key: string;
-  moonId?: number;
-  structureId: number;
-  /** The latest Extraction this Miner mined at the moon; what the moon link opens. */
-  extractionId?: string;
-  days: number;
-  lastDate: string;
-  lines: OreTaxLine[];
-  units: number;
-  value: number;
-  tax: number;
-}
-
-/** The moons one Miner mined at, newest first, each with that Miner's ore lines there. */
-export function minerMoons(view: BookView, minerId: string): MinerMoon[] {
-  const days = view.internals.byMiner.get(minerId)?.days ?? [];
-  const moonOf = moonByStructure(view);
-  const groups = new Map<string, DayRow[]>();
-  for (const d of days) {
-    const key = `s${d.structureId}`;
-    const held = groups.get(key);
-    if (held) held.push(d);
-    else groups.set(key, [d]);
-  }
-  return [...groups]
-    .map(([key, rows]): MinerMoon => {
-      const newestFirst = [...rows].sort((a, b) => b.date.localeCompare(a.date));
-      const newest = newestFirst[0];
-      const lines = oreTaxLines(rows);
-      const extractionId = newestFirst.find((d) => d.extractionId !== undefined)?.extractionId;
-      return {
-        key,
-        ...(moonOf.has(newest.structureId) ? { moonId: moonOf.get(newest.structureId) } : {}),
-        structureId: newest.structureId,
-        ...(extractionId !== undefined ? { extractionId } : {}),
-        days: rows.length,
-        lastDate: newest.date,
-        lines,
-        ...sum(lines),
-      };
-    })
-    .sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.key.localeCompare(b.key));
 }
 
 // --- The place line --------------------------------------------------------
@@ -335,36 +251,14 @@ export function splitPlace(
 
 // --- Merged ledgers --------------------------------------------------------
 
-export type LedgerRow<P extends { id: string; at: string }, A extends { id: string; at: string }> =
-  | { kind: 'payment'; id: string; at: string; payment: P }
-  | { kind: 'correction'; id: string; at: string; correction: A };
-
-/** A Miner's Payments ledger: payments and the correction lines given, newest first. */
-export function paymentLedger<
-  P extends { id: string; at: string },
-  A extends { id: string; at: string },
->(payments: readonly P[], corrections: readonly A[]): LedgerRow<P, A>[] {
-  const rows: LedgerRow<P, A>[] = [
-    ...payments.map((payment): LedgerRow<P, A> => ({
-      kind: 'payment',
-      id: payment.id,
-      at: payment.at,
-      payment,
-    })),
-    ...corrections.map((correction): LedgerRow<P, A> => ({
-      kind: 'correction',
-      id: correction.id,
-      at: correction.at,
-      correction,
-    })),
-  ];
-  return rows.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
-}
-
 export type ActivityKind = 'mail' | 'dismissed' | 'audit';
 
 /** Audit actions that are mail going out: the Mail chip counts them, not Audit. */
-const MAIL_AUDIT_ACTIONS: ReadonlySet<string> = new Set(['recordMail', 'recordReminder']);
+const MAIL_AUDIT_ACTIONS: ReadonlySet<string> = new Set([
+  'recordLateNoticeMail',
+  'recordMail',
+  'recordReminder',
+]);
 
 export interface ActivityItem<K extends ActivityKind, T> {
   kind: K;
@@ -422,14 +316,4 @@ export function activityFeed<
       })),
   ];
   return rows.sort((a, b) => b.at - a.at || a.id.localeCompare(b.id));
-}
-
-/** The oldest issued Statement that is not settled: the one an overdue Miner owes first. */
-export function oldestUnsettled<S extends { id: string; issuedAt: string }>(
-  statements: readonly S[],
-  isSettled: (id: string) => boolean
-): S | undefined {
-  return statements
-    .filter((s) => !isSettled(s.id))
-    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))[0];
 }

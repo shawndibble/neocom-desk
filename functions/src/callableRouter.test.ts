@@ -27,7 +27,7 @@ describe('createActionGroup', () => {
       const group = createActionGroup();
       group.register('a', () => 1);
       expect(() => group.route(req(body))).toThrow(
-        expect.objectContaining({ code: 'invalid-argument' })
+        expect.objectContaining({ code: 'invalid-argument', message: 'Unknown action' })
       );
     }
   );

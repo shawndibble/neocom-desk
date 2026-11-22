@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import type { DisplayRow } from './groupRows';
+import { allMembers, type DisplayRow } from './groupRows';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 import type { MoonMiningTaxRow } from './snapshot';
 import { computePayeeBalances, summarizeUnassigned } from './balances';
 
@@ -50,16 +51,32 @@ function displayRow(
   };
 }
 
+/** The accounts the balances read, from the same rows and some links. */
+const accountsOf = (rows: DisplayRow[], payees: PayeeRecord[], paid: [string, number][] = []) =>
+  PayeeRunningAccounts.build({
+    assignments: rows.flatMap((dr) => allMembers(dr).map((m) => m.assignment)),
+    payees,
+    links: paid.map(([payeeId, amount], i) => ({
+      payeeId,
+      kind: 'journal' as const,
+      refId: i + 1,
+      amount,
+      paidOn: '2026-09-10',
+      source: 'manual' as const,
+    })),
+  });
+
 describe('computePayeeBalances with duplicate Payees', () => {
   it('sums a duplicate record into its primary and lists the Payee once', () => {
     const rows = [
       displayRow(assignment({ id: 'a1', payeeId: 'p1', taxOwed: 100 })),
       displayRow(assignment({ id: 'a2', payeeId: 'p2', taxOwed: 40 })),
     ];
+    const payees = [payee('p1', 'Vega'), payee('p2', 'Vega')];
     const balances = computePayeeBalances(
       rows,
-      [payee('p1', 'Vega'), payee('p2', 'Vega')],
-      () => 0,
+      payees,
+      accountsOf(rows, payees),
       new Map([['p2', 'p1']])
     );
     expect(balances).toHaveLength(1);
@@ -72,43 +89,24 @@ describe('computePayeeBalances with duplicate Payees', () => {
 describe('computePayeeBalances', () => {
   const payees = [payee('p1', 'Vega'), payee('p2', 'Lunar'), payee('p3', 'Oren')];
 
-  it('sums only outstanding tax per Payee, owed-first, keeping settled Payees at zero', () => {
+  it("owes what each Payee's account owes, owed-first, keeping settled Payees at zero", () => {
     const rows = [
       displayRow(assignment({ id: 'a1', payeeId: 'p1', taxOwed: 100 })),
       displayRow(assignment({ id: 'a2', payeeId: 'p2', taxOwed: 500 })),
-      displayRow(assignment({ id: 'a3', payeeId: 'p1', taxOwed: 50, status: 'paid' })),
-      displayRow(assignment({ id: 'a4', payeeId: 'p1', taxOwed: 25 })),
+      displayRow(assignment({ id: 'a4', payeeId: 'p1', taxOwed: 25, date: '2026-09-05' })),
     ];
 
-    const balances = computePayeeBalances(rows, payees);
+    // 60 ISK linked to Vega pays its oldest day's first 60.
+    const balances = computePayeeBalances(rows, payees, accountsOf(rows, payees, [['p1', 60]]));
 
     expect(balances.map((b) => [b.payee.name, b.owed])).toEqual([
       ['Lunar', 500],
-      ['Vega', 125],
+      ['Vega', 65],
       ['Oren', 0],
     ]);
     expect(balances[1].members.map((m) => m.assignment.id)).toEqual(['a1', 'a4']);
+    expect(balances[1].account?.owes?.oldest).toBe('2026-09-04');
     expect(balances[2].members).toEqual([]);
-  });
-
-  it('leaves out what a Corp Tax Book bills too, and the Assignments it bills whole (#6204)', () => {
-    const rows = [
-      displayRow(assignment({ id: 'half', payeeId: 'p1', taxOwed: 100 })),
-      displayRow(assignment({ id: 'whole', payeeId: 'p1', taxOwed: 40 })),
-      displayRow(assignment({ id: 'mine', payeeId: 'p1', taxOwed: 25 })),
-    ];
-    const share = new Map([
-      ['half', 0.5],
-      ['whole', 1],
-    ]);
-
-    const [vega] = computePayeeBalances(rows, payees, (m) => share.get(m.assignment.id) ?? 0);
-
-    expect(vega.owed).toBeCloseTo(75, 6);
-    expect(vega.members.map((m) => [m.assignment.id, m.assignment.taxOwed])).toEqual([
-      ['half', 50],
-      ['mine', 25],
-    ]);
   });
 
   it('counts every outstanding member of a joined group, and skips an unknown Payee', () => {
@@ -120,11 +118,71 @@ describe('computePayeeBalances', () => {
       displayRow(orphan),
     ];
 
-    const balances = computePayeeBalances(rows, payees);
+    const balances = computePayeeBalances(rows, payees, accountsOf(rows, payees));
 
     expect(balances[0].payee.id).toBe('p2');
     expect(balances[0].owed).toBe(30);
     expect(balances.every((b) => b.payee.id !== 'gone')).toBe(true);
+  });
+
+  it("holds a Payee's credit off its account, even with nothing outstanding in view", () => {
+    const rows = [
+      displayRow(assignment({ id: 'a1', payeeId: 'p1', taxOwed: 100, status: 'paid' })),
+    ];
+    const balances = computePayeeBalances(rows, payees, accountsOf(rows, payees, [['p1', 150]]));
+    expect(balances.find((b) => b.payee.id === 'p1')).toMatchObject({ owed: 0, credit: 50 });
+  });
+
+  it("reads a Corp Tax Book Payee's credit off its Miners' accounts", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const [balance] = computePayeeBalances(
+      [],
+      [corp],
+      accountsOf([], []),
+      new Map(),
+      new Map([[corp.id, 2_000]])
+    );
+    expect(balance).toMatchObject({ owed: 0, credit: 2_000 });
+  });
+
+  it("owes a Corp Tax Book's Payee what its rows still owe", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const rows = [displayRow(assignment({ id: 'b1', payeeId: corp.id, taxOwed: 70 }))];
+    const [balance] = computePayeeBalances(rows, [corp], accountsOf([], []));
+    expect(balance).toMatchObject({ owed: 70 });
+    expect(balance.account).toBeUndefined();
+  });
+
+  it("owes a Corp Tax Book's Payee the book's account total, not the rows in view", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const rows = [displayRow(assignment({ id: 'b1', payeeId: corp.id, taxOwed: 70 }))];
+    const [balance] = computePayeeBalances(
+      rows,
+      [corp],
+      accountsOf([], []),
+      new Map(),
+      new Map(),
+      new Map([[corp.id, 250]])
+    );
+    expect(balance.owed).toBe(250);
+    expect(balance.members).toHaveLength(1);
+  });
+});
+
+describe('a Corp Tax Book Payee read off the book', () => {
+  it("carries the book's owed days and oldest unpaid day, not the rows in view", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const [balance] = computePayeeBalances(
+      [],
+      [corp],
+      accountsOf([], []),
+      new Map(),
+      new Map(),
+      new Map([[corp.id, 250]]),
+      new Map([[corp.id, { days: 3, oldest: '2026-11-01' }]])
+    );
+    expect(balance).toMatchObject({ owed: 250, book: { days: 3, oldest: '2026-11-01' } });
+    expect(balance.members).toHaveLength(0);
   });
 });
 
