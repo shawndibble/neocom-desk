@@ -412,7 +412,10 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
-    expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Hek');
+    // Waited on the text: the button is there at once, reading Jita, before the fold lands.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Hek')
+    );
     await waitFor(() =>
       expect(usePageHubs.getState().value).toEqual({ market: 'hek', appraisal: 'hek' })
     );
