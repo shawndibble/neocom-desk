@@ -9,6 +9,8 @@ interface EmptyStateProps {
   icon?: ReactNode;
   /** @summary The control that resolves the empty state, e.g. a `Button`; two only when they start different things. */
   action?: ReactNode;
+  /** @summary ARIA role for the wrapper; `alert` for a failed read. */
+  role?: 'alert';
   className?: string;
 }
 
@@ -17,9 +19,12 @@ interface EmptyStateProps {
  *
  * @summary Centred title, hint and optional action for a view with nothing to show.
  */
-export function EmptyState({ title, hint, icon, action, className = '' }: EmptyStateProps) {
+export function EmptyState({ title, hint, icon, action, role, className = '' }: EmptyStateProps) {
   return (
-    <div className={`flex flex-col items-center gap-2 px-4 py-10 text-center ${className}`}>
+    <div
+      role={role}
+      className={`flex flex-col items-center gap-2 px-4 py-10 text-center ${className}`}
+    >
       {icon && (
         <div aria-hidden="true" className="text-text-faint">
           {icon}

@@ -8,7 +8,7 @@ import {
   Button,
   DataAgeBadge,
   CachedEmptyState,
-  EmptyState,
+  LoadFailedState,
   IconButton,
   PageHeader,
   Panel,
@@ -465,7 +465,7 @@ export function Contracts() {
             <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContracts']} />
           )
         ) : error || (source === 'corporation' && active.data && view.corporationId === null) ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          <LoadFailedState title={t('common.loadFailed.contracts')} onRetry={refresh} />
         ) : !contractsResult || contracts.length === 0 ? (
           <CachedEmptyState
             result={contractsResult}

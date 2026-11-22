@@ -1,6 +1,13 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CachedNotice, EmptyState, Spinner, TabPanel, Toast } from '@/components/ui';
+import {
+  CachedNotice,
+  EmptyState,
+  LoadFailedState,
+  Spinner,
+  TabPanel,
+  Toast,
+} from '@/components/ui';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
 import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
@@ -483,7 +490,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         {loading && !data ? (
           <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          <LoadFailedState title={t('common.loadFailed.tax')} onRetry={refresh} />
         ) : (
           <>
             {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}

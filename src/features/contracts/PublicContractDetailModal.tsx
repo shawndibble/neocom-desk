@@ -45,6 +45,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   EmptyState,
+  LoadFailedState,
   RowMoreActions,
   SlideOver,
   Spinner,
@@ -193,6 +194,7 @@ export function PublicContractDetailModal({
     };
   }, [characterId, locationId]);
 
+  const [itemsAttempt, setItemsAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -215,7 +217,7 @@ export function PublicContractDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [contractId]);
+  }, [contractId, itemsAttempt]);
 
   // Merged before anything reads the lines, so the price check and the
   // rendered list are counting the same things.
@@ -391,7 +393,10 @@ export function PublicContractDetailModal({
         {items === undefined ? (
           <Spinner />
         ) : items === null ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          <LoadFailedState
+            title={t('common.loadFailed.publicContract')}
+            onRetry={() => setItemsAttempt((n) => n + 1)}
+          />
         ) : items.outcome.kind === 'not-found' ? (
           // ESI no longer recognizes this contract_id as public — it has
           // expired, been fulfilled, or was withdrawn since the snapshot

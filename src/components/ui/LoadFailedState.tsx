@@ -28,6 +28,7 @@ export function LoadFailedState({ title, hint, onRetry, className }: LoadFailedS
   const online = useOnline();
   return (
     <EmptyState
+      role="alert"
       className={className}
       title={title ?? t('common.couldntLoad')}
       hint={hint ?? (online ? t('common.loadFailedRetryHint') : t('common.connectOnceHint'))}

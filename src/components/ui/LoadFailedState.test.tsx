@@ -31,4 +31,9 @@ describe('LoadFailedState', () => {
     expect(screen.getByText("Couldn't reach the contract index")).toBeInTheDocument();
     expect(screen.getByText('Nothing cached yet.')).toBeInTheDocument();
   });
+
+  it('is announced as an alert', () => {
+    render(<LoadFailedState />);
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load");
+  });
 });
