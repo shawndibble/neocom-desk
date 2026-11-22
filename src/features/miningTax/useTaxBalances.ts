@@ -5,7 +5,7 @@ import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
 import { computeOwedByPayee } from './owedByPayee';
-import { computePayeeBalances } from './balances';
+import { computePayeeBalances, type BookOwedDays } from './balances';
 import { unassignedSummary } from './owedNow';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 
@@ -28,6 +28,8 @@ interface Args {
   bookCredits?: ReadonlyMap<string, number>;
   /** Each Corp Tax Book Payee's owed, by its id (`bookOwesOf`). */
   bookOwes?: ReadonlyMap<string, number>;
+  /** Each Corp Tax Book Payee's owed days and oldest unpaid day, by its id (`bookDaysOf`). */
+  bookDays?: ReadonlyMap<string, BookOwedDays>;
 }
 
 /**
@@ -47,6 +49,7 @@ export function useTaxBalances({
   bookCorporations,
   bookCredits,
   bookOwes,
+  bookDays,
 }: Args) {
   // The owed cards follow the Character filter (an alt's debts are still debts) but not the Payee
   // filter: narrowing the ledger to one Payee must not change a balance. The Overview's Mining
@@ -59,9 +62,10 @@ export function useTaxBalances({
         accounts,
         duplicateAliases,
         bookCredits,
-        bookOwes
+        bookOwes,
+        bookDays
       ),
-    [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits, bookOwes]
+    [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits, bookOwes, bookDays]
   );
   const unassigned = useMemo(
     () => unassignedSummary(characterFiltered, estimatedValueOf),

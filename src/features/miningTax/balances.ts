@@ -19,6 +19,14 @@ export interface PayeeBalance {
   members: GroupMember[];
   /** A personal Payee's Running account; absent for a Corp Tax Book's and one nothing bills. */
   account?: PayeeRunningAccount;
+  /** A Corp Tax Book's: the days its account owes and the oldest, whatever rows are in view. */
+  book?: BookOwedDays;
+}
+
+/** What a Corp Tax Book's account owes, as days: its entry count and where "owed since" starts. */
+export interface BookOwedDays {
+  days: number;
+  oldest: string;
 }
 
 export interface UnassignedSummary {
@@ -43,7 +51,9 @@ export function computePayeeBalances(
   /** A Corp Tax Book Payee's credit, by its id: its Miners' accounts' (`BookSummary.credit`). */
   bookCredits: ReadonlyMap<string, number> = new Map(),
   /** A Corp Tax Book Payee's owed, by its id: the book's account total (`BookSummary.account.owes`). */
-  bookOwes: ReadonlyMap<string, number> = new Map()
+  bookOwes: ReadonlyMap<string, number> = new Map(),
+  /** A Corp Tax Book Payee's owed days and oldest unpaid day, by its id (`BookSummary.account.owes`). */
+  bookDays: ReadonlyMap<string, BookOwedDays> = new Map()
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
     payees
@@ -62,6 +72,8 @@ export function computePayeeBalances(
   for (const balance of byPayee.values()) {
     if (isCorpPayeeId(balance.payee.id)) {
       balance.credit = bookCredits.get(balance.payee.id) ?? 0;
+      const days = bookDays.get(balance.payee.id);
+      if (days) balance.book = days;
       // The book's own figure (the whole Miner), so the Character filter doesn't move it.
       balance.owed =
         bookOwes.get(balance.payee.id) ??

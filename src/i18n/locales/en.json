@@ -8681,6 +8681,7 @@
       "waitingDays_one": "oldest unpaid day was yesterday",
       "waitingDays_other": "oldest unpaid day was {{count}} days ago",
       "linkPayment": "Link payment",
+      "corpBookTag": "Corp Tax Book",
       "creditLabel": "credit",
       "creditHint": "Paid ahead: new days of tax come out of this credit",
       "unassignedHint_one": "{{count}} entry has no Payee yet",

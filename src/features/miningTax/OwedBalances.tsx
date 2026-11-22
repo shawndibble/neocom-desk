@@ -2,18 +2,22 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
 import type { ConflictSummary } from './corpBook/conflictSummary';
+import { isCorpPayeeId } from './corpBook/corpRows';
 import { DAY_MS } from '@/lib/age';
 
 /** Whole EVE days between the oldest unpaid day and today (UTC) — how long this Payee has been waiting. */
 function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
   const oldest =
-    balance.account?.owes?.oldest ?? balance.members.map((m) => m.assignment.date).sort()[0];
+    balance.book?.oldest ??
+    balance.account?.owes?.oldest ??
+    balance.members.map((m) => m.assignment.date).sort()[0];
   if (!oldest) return 0;
   const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Math.max(0, Math.round((todayUtc - Date.parse(`${oldest}T00:00:00Z`)) / DAY_MS));
@@ -57,7 +61,9 @@ interface OwedBalancesProps {
   onReviewPayments: () => void;
   /**
    * Corp Tax Book Conflicts still to fix. Not owed, so never in the total, but each turns into
-   * a bill on its day: shown at every width so the next Late notice holds no surprise.
+   * a bill on its day: shown at every width so the next Late notice holds no surprise. The day is
+   * not counted on a personal Payee's card either (it waits until the pilot resolves it), and a
+   * book's own card, which reads the book's account, still bills it.
    */
   conflicts?: ConflictSummary | null;
   /** Opens the first Conflict to resolve. */
@@ -125,7 +131,17 @@ export function OwedBalances({
     >
       {/* Two lines before an ellipsis: "Bureau of Unified Harvesting" is a
           name the pilot reads, not a label to clip. */}
-      <span className="line-clamp-2 min-w-0 break-words">{balance.payee.name}</span>
+      <span
+        className={cx(
+          'flex min-w-0 flex-col items-start gap-1',
+          // The button's -my-2 assumes a one-line name; the tag makes it taller.
+          isCorpPayeeId(balance.payee.id) && 'max-md:py-2'
+        )}
+      >
+        <span className="line-clamp-2 min-w-0 break-words">{balance.payee.name}</span>
+        {/* A stored Payee can carry the corporation's name too: this one is the book. */}
+        {isCorpPayeeId(balance.payee.id) && <Pill outlined>{t('miningTax.owed.corpBookTag')}</Pill>}
+      </span>
     </button>
   );
 
@@ -286,7 +302,9 @@ export function OwedBalances({
             ) : (
               <>
                 <p className="text-xs text-text-dim">
-                  {t('miningTax.owed.entriesFor', { count: balance.members.length })}
+                  {t('miningTax.owed.entriesFor', {
+                    count: balance.book?.days ?? balance.members.length,
+                  })}
                   {' · '}
                   {t('miningTax.owed.waitingDays', { count: days })}
                   {characterName && ` · ${characterName}`}

@@ -56,7 +56,7 @@ import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useUnheldCharacterItems } from './corpBook/useUnheldCharacterItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
-import { bookCreditsOf, bookOwesOf } from './owedNow';
+import { bookCreditsOf, bookDaysOf, bookOwesOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -157,8 +157,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       })) ?? [],
     [corpView]
   );
-  const bookCredits = useMemo(() => bookCreditsOf(corpView), [corpView]);
-  const bookOwes = useMemo(() => bookOwesOf(corpView), [corpView]);
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -169,6 +167,20 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     corpView,
     characters,
     resolvedCharacterFilter
+  );
+  // A book's figures are its whole account whatever the selector says, but a book none of the
+  // selected Characters is in is not shown, and counts nowhere.
+  const bookCredits = useMemo(
+    () => bookCreditsOf(corpView, resolvedCharacterFilter),
+    [corpView, resolvedCharacterFilter]
+  );
+  const bookOwes = useMemo(
+    () => bookOwesOf(corpView, resolvedCharacterFilter),
+    [corpView, resolvedCharacterFilter]
+  );
+  const bookDays = useMemo(
+    () => bookDaysOf(corpView, resolvedCharacterFilter),
+    [corpView, resolvedCharacterFilter]
   );
   // Read by the Assign dialog when it opens, long after this has hydrated.
   useHydratedStore(useSurveyPayeeId);
@@ -279,6 +291,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     bookCorporations: bookCorporationIds,
     bookCredits,
     bookOwes,
+    bookDays,
   });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.

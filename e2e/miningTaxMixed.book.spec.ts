@@ -100,9 +100,12 @@ test('ore a Default System Payee was given and the book also recorded is a Confl
 }) => {
   const s = conflictScenario();
   await openMixed(page, s, book, esi);
-  // Rook keeps what the pilot gave him; the book's row stands beside it as a Conflict, and the
-  // Conflicts card says it is not owed yet.
-  await expect(ledgerButton(page, ROOK.name)).toContainText(isk(s.rookOwes));
+  // The book's row stands as a Conflict, and the Conflicts card says it is not owed yet. The
+  // pilot's own Payee waits on it (the corporation's card keeps the book's own figure), so the day
+  // is counted once: Rook has no card, and "You owe" has nothing to add up.
+  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(DAY_TAX));
+  await expect(ledgerButton(page, ROOK.name)).toHaveCount(0);
+  await expect(page.getByText(/across \d+ payees/)).toHaveCount(0);
   const conflicts = page.getByText('Conflicts', { exact: true }).locator('xpath=ancestor::*[3]');
   await expect(conflicts).toContainText(isk(DAY_TAX));
   await expect(conflicts).toContainText(/not owed yet/i);
@@ -401,6 +404,11 @@ test("a corporation's new book bills the days it recorded once; the pilot's olde
   const ownCard = cards.filter({ hasText: isk(oldOwes) });
   await expect(bookCard).toHaveCount(1);
   await expect(ownCard).toHaveCount(1);
+  // Two cards of one name: only the book's says it is the corporation's Corp Tax Book.
+  await expect(page.getByText('Corp Tax Book', { exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: `Show only ${CORP_NAME}'s entries` })).toHaveCount(
+    2
+  );
 
   await ownCard.click();
   const own = ledgerOf(page, CORP_NAME);
@@ -438,10 +446,14 @@ test('This character and All characters each show the rows of the books they cov
     .click();
   await page.getByRole('menuitemradio', { name: 'This character' }).click();
   await expect(page).toHaveURL(/tax\.character=current/);
-  // Only the active Character's book's rows; the main's book figure is its own, unmoved.
+  // Only the active Character's book's rows; the main's book figure is its own, unmoved. Other
+  // Corp's book has none of the selected Characters in it, so its card is not shown and does not
+  // count in the headline.
   await expect(openRows(page)).toHaveCount(3);
   await expect(openRows(page).filter({ hasText: 'Other Corp' })).toHaveCount(0);
   await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(s.ownerOwes));
+  await expect(ledgerButton(page, 'Other Corp')).toHaveCount(0);
+  await expect(page.getByText(/across \d+ payees/)).toHaveCount(0);
 
   await page
     .getByRole('button', { name: /^This character/ })

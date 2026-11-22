@@ -975,6 +975,18 @@
     white-space: pre;
   }
 
+  /* Opt-in (`dt-sep-trailing` on the table, Mining Tax): the `·` closes the cell before it
+     instead of opening the cell after it, so a meta line that wraps never begins a line with
+     one. The last meta cell closes nothing; a table that opts in has a last one that is never
+     omitted (`data-dense-omit`), since `:has` cannot nest to skip an omitted one. */
+  .dt-stacked.dt-stack-dense.dt-sep-trailing td.dt-meta::before {
+    content: attr(data-stack-before);
+  }
+
+  .dt-stacked.dt-stack-dense.dt-sep-trailing td.dt-meta:has(~ td.dt-meta)::after {
+    content: attr(data-stack-after) '\00a0\00b7';
+  }
+
   /* A cell holding only a value the card can do without (`data-dense-omit`):
      a "none" dash reads as "none" in a table column, but on the meta line it
      would print one more "· —" between real values, so the card leaves it

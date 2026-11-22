@@ -11,6 +11,7 @@ import i18n from '@/i18n';
 import {
   computePayeeBalances,
   summarizeUnassigned,
+  type BookOwedDays,
   type PayeeBalance,
   type UnassignedSummary,
 } from './balances';
@@ -28,10 +29,14 @@ import type { MoonMiningTaxSnapshot } from './snapshot';
  * By Assignment id, the share (0–1) of its tax the Payee is not owed because a Corp Tax Book bills
  * it: what a book took whole (`absorbed`: the book's row stands for it), what a book took part of
  * (`trimmed`: the Payee keeps `valueShare`), and what another Payee's book bills too
- * (`alsoBilled`, a share of what stays after that trim).
+ * (`alsoBilled`, a share of what stays after that trim). A Conflict day is held back the same way
+ * (`conflicted`): the corporation's row is its one bill until the pilot resolves it.
  */
 export function billedElsewhereOf(
-  overlay: Pick<PersonalOverlay, 'alsoBilled' | 'trimmed' | 'absorbed'> | undefined
+  overlay:
+    | (Pick<PersonalOverlay, 'alsoBilled' | 'trimmed' | 'absorbed'> &
+        Partial<Pick<PersonalOverlay, 'conflicted'>>)
+    | undefined
 ): Map<string, number> {
   const kept = new Map<string, number>();
   for (const ids of overlay?.absorbed.values() ?? []) for (const id of ids) kept.set(id, 0);
@@ -40,21 +45,57 @@ export function billedElsewhereOf(
   const also = new Map<string, number>();
   for (const byId of overlay?.alsoBilled.values() ?? [])
     for (const [id, share] of byId) also.set(id, share);
+  const waiting = new Map<string, number>();
+  for (const byId of overlay?.conflicted?.values() ?? [])
+    for (const [id, share] of byId) waiting.set(id, share);
   const out = new Map<string, number>();
-  for (const id of new Set([...kept.keys(), ...also.keys()]))
-    out.set(id, 1 - (kept.get(id) ?? 1) * (1 - (also.get(id) ?? 0)));
+  for (const id of new Set([...kept.keys(), ...also.keys(), ...waiting.keys()]))
+    out.set(id, 1 - (kept.get(id) ?? 1) * (1 - (also.get(id) ?? 0)) * (1 - (waiting.get(id) ?? 0)));
   return out;
 }
 
-/** Each Corp Tax Book Payee's credit, by its id: what its Miners' accounts hold over what they bill. */
-export function bookCreditsOf(corpView: CorpBookView | null | undefined): Map<string, number> {
-  return new Map(corpView?.books.map((b) => [b.payee.id, b.summary.credit]) ?? []);
+/** The Characters in view: the Tax tab's selector (`'all'` is no filter). */
+export type CharactersInView = ReadonlySet<number> | 'all';
+
+/**
+ * The books the selector shows: one with at least one selected Character in it. A book's figures
+ * are its whole account for the Miner whatever the selector says, but a book none of the selected
+ * Characters is in is not shown, so it counts nowhere.
+ */
+function booksInView(corpView: CorpBookView | null | undefined, inView: CharactersInView) {
+  return (corpView?.books ?? []).filter(
+    (b) => inView === 'all' || b.loaded.characterIds.some((id) => inView.has(id))
+  );
 }
 
-/** Each Corp Tax Book Payee's owed, by its id: the book's account total over the whole Miner. */
-export function bookOwesOf(corpView: CorpBookView | null | undefined): Map<string, number> {
+/** Each shown Corp Tax Book Payee's credit, by its id: what its Miners' accounts hold over what they bill. */
+export function bookCreditsOf(
+  corpView: CorpBookView | null | undefined,
+  inView: CharactersInView = 'all'
+): Map<string, number> {
+  return new Map(booksInView(corpView, inView).map((b) => [b.payee.id, b.summary.credit]));
+}
+
+/** Each shown Corp Tax Book Payee's owed, by its id: the book's account total over the whole Miner. */
+export function bookOwesOf(
+  corpView: CorpBookView | null | undefined,
+  inView: CharactersInView = 'all'
+): Map<string, number> {
   return new Map(
-    corpView?.books.map((b) => [b.payee.id, b.summary.account.owes?.amount ?? 0]) ?? []
+    booksInView(corpView, inView).map((b) => [b.payee.id, b.summary.account.owes?.amount ?? 0])
+  );
+}
+
+/** Each shown Corp Tax Book Payee's owed days and oldest unpaid day, by its id, off the book's account. */
+export function bookDaysOf(
+  corpView: CorpBookView | null | undefined,
+  inView: CharactersInView = 'all'
+): Map<string, BookOwedDays> {
+  return new Map(
+    booksInView(corpView, inView).flatMap((b): [string, BookOwedDays][] => {
+      const owes = b.summary.account.owes;
+      return owes ? [[b.payee.id, { days: owes.days, oldest: owes.oldest }]] : [];
+    })
   );
 }
 
@@ -153,7 +194,8 @@ export async function loadOwedBalances(
       accounts,
       payeeDuplicateAliases(groupPayees(payees)),
       bookCreditsOf(corpView),
-      bookOwesOf(corpView)
+      bookOwesOf(corpView),
+      bookDaysOf(corpView)
     ),
     unassignedCount: unassignedSummary(rows, () => 0).entryCount,
   };

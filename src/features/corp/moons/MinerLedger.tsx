@@ -108,7 +108,6 @@ export function MinerLedger({
             rows={shown}
             typeNames={typeNames}
             density="compact"
-            stackLayout="dense"
             lockDate={lockDate}
             lockDateLabel={dateWithYear(lockDate)}
             {...table}

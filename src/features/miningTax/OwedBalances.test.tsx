@@ -259,3 +259,21 @@ describe('OwedBalances credit', () => {
     expect(onOpenLedger).toHaveBeenCalledWith(expect.objectContaining({ credit: 500_000 }));
   });
 });
+
+describe('OwedBalances on a Corp Tax Book card', () => {
+  it("counts the book's owed days and its oldest unpaid day, whatever rows are in view", () => {
+    const book = {
+      payee: { id: 'corp-book:1', name: 'Test Corp' },
+      owed: 2_000_000,
+      credit: 0,
+      members: [],
+      book: { days: 2, oldest: '2026-10-01' },
+    } as unknown as PayeeBalance;
+    renderBalances([book]);
+    // Marked as the corporation's book, apart from a personal Payee of the same name.
+    expect(screen.getAllByText('Corp Tax Book').length).toBeGreaterThan(0);
+    expect(screen.getByText(/2 entries/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 entries/)).not.toBeInTheDocument();
+    expect(screen.getByText(/oldest unpaid day was \d+ days ago/)).toBeInTheDocument();
+  });
+});

@@ -72,6 +72,7 @@ const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   absorbed: new Map(),
   trimmed: new Map(),
   alsoBilled: new Map(),
+  conflicted: new Map(),
   labels: new Map(),
   books: [],
   ...over,

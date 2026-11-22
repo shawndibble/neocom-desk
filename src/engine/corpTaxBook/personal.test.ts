@@ -1955,6 +1955,23 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       expect(out.rows[0].state).toBe('conflict');
       expect(out.alsoBilled.size).toBe(0);
     });
+
+    // The personal Payee waits on a Conflict: the corporation's row is the day's one bill until the
+    // member resolves it, so it is named as the share the Payee is not billed meanwhile.
+    it('names the contested share as held back while the day is a Conflict', () => {
+      const out = overlay([toOther(43_050)], [book()]);
+      expect(out.conflicted.get(KEY)?.get('a-other')).toBeCloseTo(1, 6);
+    });
+
+    it('holds back only the contested part of the Assignment', () => {
+      const out = overlay([toOther(50_000)], [book()]);
+      expect(out.conflicted.get(KEY)?.get('a-other')).toBeCloseTo(43_050 / 50_000, 6);
+    });
+
+    it('holds nothing back once the Conflict ran its 14 days (the Payee is also-billed then)', () => {
+      const out = overlay([toOther(43_050)], [book()], LATE);
+      expect(out.conflicted.size).toBe(0);
+    });
   });
 
   describe('Late notices whose days are unpaid', () => {

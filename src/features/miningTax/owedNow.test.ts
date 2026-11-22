@@ -13,7 +13,8 @@ vi.mock('./corpBook/corpBookSources', () => ({
 }));
 vi.mock('./madePayments', () => ({ loadMadePaymentsWithStatus: mocks.made }));
 
-const { billedElsewhereOf, loadOwedBalances } = await import('./owedNow');
+const { billedElsewhereOf, bookCreditsOf, bookDaysOf, bookOwesOf, loadOwedBalances } =
+  await import('./owedNow');
 
 const CHAR = 90000001;
 const SYSTEM = 30000142;
@@ -121,6 +122,27 @@ describe('billedElsewhereOf', () => {
     expect(out.get('a1')).toBeCloseTo(0.6, 9);
   });
 
+  // A Conflict day: the personal Payee waits, so the book's row is the day's one bill.
+  it('reads a contested Assignment as the share the Payee waits on', () => {
+    const out = billedElsewhereOf({
+      alsoBilled: none,
+      trimmed: none,
+      absorbed: noneAbsorbed,
+      conflicted: new Map([['e1', new Map([['a1', 1]])]]),
+    });
+    expect(out.get('a1')).toBe(1);
+  });
+
+  it('adds a contested share to what a book bills too, never past all of it', () => {
+    const out = billedElsewhereOf({
+      alsoBilled: new Map([['e1', new Map([['a1', 0.5]])]]),
+      trimmed: none,
+      absorbed: noneAbsorbed,
+      conflicted: new Map([['e1', new Map([['a1', 0.25]])]]),
+    });
+    expect(out.get('a1')).toBeCloseTo(0.625, 9);
+  });
+
   it('composes both, the second relative to what the first left', () => {
     const out = billedElsewhereOf({
       alsoBilled: new Map([['e1', new Map([['a1', 0.5]])]]),
@@ -140,5 +162,36 @@ describe('billedElsewhereOf', () => {
       absorbed: new Map([['e1', new Set(['a1'])]]),
     });
     expect(out.get('a1')).toBe(1);
+  });
+});
+
+describe("a Corp Tax Book's figures by the selected Characters", () => {
+  const book = (id: string, characterIds: number[], amount: number, days: number) => ({
+    payee: { id },
+    loaded: { characterIds },
+    summary: { credit: amount / 10, account: { owes: { amount, days, oldest: '2026-11-03' } } },
+  });
+  const view = {
+    books: [book('corp-book:1', [1, 2], 1_000, 2), book('corp-book:2', [3], 2_000, 5)],
+  } as unknown as Parameters<typeof bookOwesOf>[0];
+
+  it('is every book with no Character selected out', () => {
+    expect([...bookOwesOf(view)]).toEqual([
+      ['corp-book:1', 1_000],
+      ['corp-book:2', 2_000],
+    ]);
+  });
+
+  // A book's figure is the book's whole account whatever the selector says, but the selector
+  // decides which books are shown at all.
+  it('leaves out a book none of the selected Characters is in, and keeps the others whole', () => {
+    expect([...bookOwesOf(view, new Set([2]))]).toEqual([['corp-book:1', 1_000]]);
+    expect([...bookCreditsOf(view, new Set([3]))]).toEqual([['corp-book:2', 200]]);
+  });
+
+  it("counts a book's entries and oldest unpaid day off its account, not the visible rows", () => {
+    expect([...bookDaysOf(view, new Set([3]))]).toEqual([
+      ['corp-book:2', { days: 5, oldest: '2026-11-03' }],
+    ]);
   });
 });

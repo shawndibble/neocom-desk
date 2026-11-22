@@ -19,7 +19,9 @@ Found by the mixed browser specs (`e2e/miningTaxMixed.book.spec.ts`); builds on 
   paid by exactly what is left would turn paid, stop being takeable, grow back to its whole bill,
   turn unpaid and be taken again, with no fixed point. The overlay's input is built without
   `billedElsewhere`; every other reader still sees the figure with it.
-- **Left as it is: a Conflict day counts on both cards until it resolves.** The book's card reads
-  the book's account (`bookOwes`), which bills a Conflict day regardless, while the Conflicts card
-  says it is not owed yet and the pilot's own Payee holds it too, so the headline sums it twice for
-  up to 14 days. Changing it moves the book's card off the book's own account; it is the owner's call.
+- **A Conflict day is the book's to bill; the pilot's own Payee waits.** The owner decided that the
+  book's card keeps the book's own figure (`bookOwes`, what the corporation bills), and that a
+  personal Payee does not bill a day while a book contests it (`PersonalOverlay.conflicted`, folded into
+  `billedElsewhereOf`). Once the pilot resolves the Conflict or it runs its 14 days, the day bills as
+  resolved (`alsoBilled`, or the Payee's own again). So the headline counts a Conflict day once, the
+  Conflicts card says it is not owed yet, and the Payee's card, ledger and Manage Payees agree.

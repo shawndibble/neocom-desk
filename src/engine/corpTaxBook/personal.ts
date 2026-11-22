@@ -448,6 +448,13 @@ export interface PersonalOverlay {
    * the tab shows it, that is not owed to that Payee as well.
    */
   alsoBilled: Map<string, Map<string, number>>;
+  /**
+   * Per Mining Ledger Entry key, the Assignments to another Payee whose ore a book also records
+   * while the day is still a Conflict, by id: the share of the Assignment's value (as the tab
+   * shows it) the Payee waits on. The corporation's row is the day's one bill until the member
+   * resolves it; the Payee bills it as resolved then (`alsoBilled`, or its own again).
+   */
+  conflicted: Map<string, Map<string, number>>;
   /** Per Mining Ledger Entry key, how its remaining free ore reads. */
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
@@ -854,6 +861,7 @@ export function overlayCorpBooks(input: {
   const absorbed: PersonalOverlay['absorbed'] = new Map();
   const trimmed: PersonalOverlay['trimmed'] = new Map();
   const alsoBilled: PersonalOverlay['alsoBilled'] = new Map();
+  const conflicted: PersonalOverlay['conflicted'] = new Map();
   // The book rows behind each `alsoBilled` share: a day an officer writes off bills nobody.
   const alsoBilledRows = new Map<string, Map<string, BookRowView[]>>();
   // The ore each personal entry still has free after the books, per entry key.
@@ -1025,6 +1033,8 @@ export function overlayCorpBooks(input: {
     const ownedBy = new Map<PoolItem, { p: Prepared; charge: PreparedCharge }>();
     // What a book bills of an allocation to another Payee that still lists it.
     const alsoBilledOf = new Map<PoolItem, { lines: OreLine[]; rows: BookRowView[] }>();
+    // What a book contests of an allocation to another Payee while the day is a Conflict.
+    const conflictedOf = new Map<PoolItem, OreLine[]>();
     const shareOf = (p: Prepared) => split.byBook.get(String(p.book.corporationId)) ?? [];
     // What the member listed under each corporation's own Payee is that book's to bill: every book
     // takes its own before any book names the Payees it contests, so book order changes nothing.
@@ -1122,6 +1132,12 @@ export function overlayCorpBooks(input: {
             });
           }
         }
+        if (overlap && contested) {
+          for (const [item, lines] of overlap.byItem) {
+            if (isOwnPayee(p.book.ownPayeeIds, item.allocation)) continue;
+            conflictedOf.set(item, sumLines(conflictedOf.get(item) ?? [], lines));
+          }
+        }
       }
     }
     // Each allocation the books took part of: the rest stays with its Payee, except what the member
@@ -1155,6 +1171,15 @@ export function overlayCorpBooks(input: {
         const rowsOf = alsoBilledRows.get(key) ?? new Map<string, BookRowView[]>();
         rowsOf.set(allocation.id, billedToo.rows);
         alsoBilledRows.set(key, rowsOf);
+      }
+      const contestedToo = conflictedOf.get(item);
+      if (contestedToo && quantityOf(kept) > 0) {
+        const base = worth(kept);
+        const share =
+          base > 0 ? worth(contestedToo) / base : quantityOf(contestedToo) / quantityOf(kept);
+        const ofEntry = conflicted.get(key) ?? new Map<string, number>();
+        ofEntry.set(allocation.id, Math.min(1, share));
+        conflicted.set(key, ofEntry);
       }
       if (gone.length === 0) continue;
       if (kept.length === 0) {
@@ -1273,7 +1298,16 @@ export function overlayCorpBooks(input: {
   }
 
   rows.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
-  return { rows, takenFromFree, absorbed, trimmed, alsoBilled, labels, books: summaries };
+  return {
+    rows,
+    takenFromFree,
+    absorbed,
+    trimmed,
+    alsoBilled,
+    conflicted,
+    labels,
+    books: summaries,
+  };
 }
 
 /** The hold an open dispute naming `recordKey` puts on it at `now`, if any. */

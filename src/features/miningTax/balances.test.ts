@@ -169,6 +169,23 @@ describe('computePayeeBalances', () => {
   });
 });
 
+describe('a Corp Tax Book Payee read off the book', () => {
+  it("carries the book's owed days and oldest unpaid day, not the rows in view", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const [balance] = computePayeeBalances(
+      [],
+      [corp],
+      accountsOf([], []),
+      new Map(),
+      new Map(),
+      new Map([[corp.id, 250]]),
+      new Map([[corp.id, { days: 3, oldest: '2026-11-01' }]])
+    );
+    expect(balance).toMatchObject({ owed: 250, book: { days: 3, oldest: '2026-11-01' } });
+    expect(balance.members).toHaveLength(0);
+  });
+});
+
 describe('summarizeUnassigned', () => {
   it('counts unassigned rows and sums their live value', () => {
     const rows = [
