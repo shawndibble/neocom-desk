@@ -14,6 +14,7 @@ import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { SyncErrorNote } from './SyncErrorNote';
+import { ShellStatusStrip } from './ShellStatusStrip';
 import { OfflineBanner } from './OfflineBanner';
 import { useSyncStatus } from './useSyncStatus';
 import {
@@ -411,9 +412,11 @@ export const Layout = memo(function Layout() {
               <MailQueueMount />
               <OfflineBanner />
               <AlertCharacterSwitch />
-              <AuthFailureNotice />
               <StandingsScopeNotice />
-              <SyncErrorBanner />
+              <ShellStatusStrip>
+                <AuthFailureNotice />
+                <SyncErrorBanner />
+              </ShellStatusStrip>
               <RouteOutlet />
             </PageHeaderSlotProvider>
           </main>
