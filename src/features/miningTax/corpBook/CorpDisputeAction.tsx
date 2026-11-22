@@ -143,7 +143,7 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
   return (
     <div className="space-y-1">
       <NeedsConnection>
-        <Button size="sm" disabled={busy} onClick={() => void send()}>
+        <Button size="sm" variant="warning" disabled={busy} onClick={() => void send()}>
           {t(k('tell'), { corp: view.corpName, payee: payeeName })}
         </Button>
       </NeedsConnection>
