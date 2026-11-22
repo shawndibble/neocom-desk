@@ -20906,7 +20906,7 @@
       },
       "bulk": {
         "selectAll": "Select all ({{count}})",
-        "selectAllOf": "Select all ({{count}} of {{total}} can be bulk approved)",
+        "selectAllOf": "Select all ({{count}} of {{total}} eligible)",
         "selectNone": "Select none",
         "selected": "{{count}} selected",
         "clear": "Clear",

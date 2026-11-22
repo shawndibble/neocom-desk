@@ -422,9 +422,7 @@ describe('OfficerQueue own claim in bulk', () => {
     expect(boxes[1]).not.toHaveAttribute('aria-disabled');
     await userEvent.click(boxes[0]!);
     expect(boxes[0]).not.toBeChecked();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Select all (1 of 3 can be bulk approved)' })
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (1 of 3 eligible)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (1)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' })
