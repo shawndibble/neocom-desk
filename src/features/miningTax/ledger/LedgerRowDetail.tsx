@@ -81,7 +81,7 @@ export function LedgerRowDetail({
             <>
               <p>{k('markedNoPayment')}</p>
               <p className="text-text-dim">{k('marked')}</p>
-              {onLinkWalletPayment && (
+              {onLinkWalletPayment && row.paid > 0 && (
                 <button
                   type="button"
                   className={textActionClassName()}
@@ -92,7 +92,7 @@ export function LedgerRowDetail({
               )}
             </>
           )}
-          {row.payment.via === 'recorded' && <p>{k('recordedWaits')}</p>}
+          {row.payment.via === 'recorded' && !row.payment.href && <p>{k('recordedWaits')}</p>}
           {(row.payment.via === 'journal' ||
             row.payment.via === 'contract' ||
             row.payment.via === 'legacy') &&
@@ -100,7 +100,7 @@ export function LedgerRowDetail({
               <p>
                 {k('sentTo', {
                   payee: row.payment.to,
-                  amount: isk(row.paid + row.credit),
+                  amount: isk(row.payment.amount ?? row.paid),
                   date: row.payment.at.slice(0, 10),
                 })}
               </p>

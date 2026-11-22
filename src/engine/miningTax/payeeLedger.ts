@@ -62,6 +62,8 @@ export interface LedgerPayment {
   to?: string;
   /** What an officer marked not tax: the account credits only the rest. */
   notTax?: number;
+  /** A personal payment's full transfer amount, before any not-tax part or write-off. */
+  amount?: number;
 }
 
 /** An officer's write-off, as the account was given it. */
