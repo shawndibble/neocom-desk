@@ -591,7 +591,6 @@ Summary
 | ----------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Item search tab         | `/contracts/search/items` (`CONTRACTS_TABS` id `search/items`, `src/app/pageTabs.ts`) | `ContractSearchPanel mode=items`; public item_exchange/auction lines, any item type                                                                                                             |
 | Courier tab             | `/contracts/search/courier`                                                           | `CourierResults` in same panel; public courier contracts as hauls                                                                                                                               |
-| Mode memory             | `contractSearchModePref.ts` key `contractSearchMode`                                  | Bare `/contracts` lands on last-used mode; Search/History choice not persisted                                                                                                                  |
 | Freshness + Refresh     | page header (`routes/Contracts.tsx`)                                                  | Status reported up via `onStatusChange`; Refresh reloads both snapshots                                                                                                                         |
 | Item filters            | `ContractSearchFilterBar`                                                             | type query, region, max price, min qty, sale kind, exclude auctions/PLEX, jump range, current system                                                                                            |
 | Type suggestions        | panel under bar                                                                       | click pins `items.type`; shows offer count + cheapest                                                                                                                                           |
@@ -608,8 +607,8 @@ Summary
 
 ### How tabs mount (`src/routes/Contracts.tsx`)
 
-- `CONTRACTS_TABS`: `search/items` (default), `search/courier`, `history` (skipped here). Tab ids are full path suffixes (`pageTabs.ts` comment). `/contracts/search` alone redirects to Item search.
-- Search is switched outside the history chain (`Contracts.tsx:601`): needs no character contracts or `contracts` scope; `/contracts` route is UNGATED (`routeScopes.ts:230`), History tab gates `getCharacterContracts` per tab with its own `GrantBanner` (decisions `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`, `20260912-200030-contracts-opens-on-search-not-history`).
+- `CONTRACTS_TABS`: `history` (default, skipped here), `search/items`, `search/courier`. Tab ids are full path suffixes (`pageTabs.ts` comment). `/contracts/search` alone redirects to My contracts.
+- Search is switched outside the history chain (`Contracts.tsx:601`): needs no character contracts or `contracts` scope; `/contracts` route is UNGATED (`routeScopes.ts:230`), History tab gates `getCharacterContracts` per tab with its own `GrantBanner` (decisions `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`, `20260912-200030-contracts-opens-on-search-not-history`, superseded: landing tab is now My contracts).
 - Selecting a search tab writes the mode pref (`Contracts.tsx:367`).
 
 ### Data source

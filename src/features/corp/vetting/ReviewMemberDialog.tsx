@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, Modal, TextInput, LiveNote } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
 import type { VettingReviewSummary } from '@/engine/vetting';
@@ -144,9 +144,7 @@ export function ReviewMemberDialog({
         }}
       >
         {roster.status === 'loading' ? (
-          <p className="text-xs text-text-dim" role="status">
-            {t('vetting.member.loading')}
-          </p>
+          <LiveNote className="text-xs text-text-dim">{t('vetting.member.loading')}</LiveNote>
         ) : roster.status === 'ready' ? (
           picked ? (
             <PickedMember member={picked} onChange={() => setPicked(null)} />

@@ -21,6 +21,7 @@ import {
   EmptyState,
   IconButton,
   LiveNote,
+  LiveStatus,
   Panel,
   SegmentedControl,
   Spinner,
@@ -433,7 +434,10 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           </p>
         )}
         {settled < checked.length && (
-          <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
+          <p className="flex items-center gap-2 text-xs text-text-dim">
+            <LiveStatus>
+              {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
+            </LiveStatus>
             <Spinner label={t('common.loading')} />
             {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
           </p>

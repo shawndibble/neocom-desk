@@ -22,6 +22,7 @@ import {
   Button,
   Field,
   Fields,
+  LiveNote,
   Panel,
   TextArea,
   TextInput,
@@ -70,9 +71,9 @@ function idOf(text: string): number | null {
 function StatusLine({ status, ok, failed }: { status: NameStatus; ok: string; failed: string }) {
   if (status === 'idle' || status === 'loading') return null;
   return (
-    <p role="status" className={status.ok ? 'text-xs text-text-dim' : 'text-xs text-warning'}>
+    <LiveNote className={status.ok ? 'text-xs text-text-dim' : 'text-xs text-warning'}>
       {status.ok ? ok : failed}
-    </p>
+    </LiveNote>
   );
 }
 

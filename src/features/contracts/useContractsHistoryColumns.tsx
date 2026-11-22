@@ -93,6 +93,15 @@ export function useContractsHistoryColumns({
   );
   const optionalColumns = useMemo<Record<ContractsHistoryColumnId, DataTableColumn<Contract>>>(
     () => ({
+      type: {
+        id: 'type',
+        header: t('contracts.type'),
+        width: '16ch',
+        className: 'whitespace-nowrap',
+        sortValue: (contract) => t(CONTRACT_TYPE_KEY[contract.type]),
+        // Off the phone card: an untitled contract's title line already says its type.
+        render: (contract) => <span data-dense-omit>{t(CONTRACT_TYPE_KEY[contract.type])}</span>,
+      },
       status: {
         id: 'status',
         header: t('contracts.status'),
@@ -218,8 +227,8 @@ export function useContractsHistoryColumns({
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
       {
-        id: 'type',
-        header: t('contracts.type'),
+        id: 'contract',
+        header: t('contracts.contract'),
         className: 'truncate',
         sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
         render: (contract) => {

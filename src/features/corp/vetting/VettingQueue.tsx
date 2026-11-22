@@ -108,7 +108,9 @@ export function VettingQueue({
         id: 'characters',
         header: t('vetting.queue.columns.characters'),
         align: 'right',
-        className: 'tabular-nums',
+        // Dropped from md to xl so the queue fits its panel at 1024 (#6643).
+        className: 'tabular-nums max-xl:md:hidden',
+        headerClassName: 'max-xl:md:hidden',
         // A bare count means nothing in a card's meta line; the report lists them.
         phoneHidden: true,
         render: (row) =>

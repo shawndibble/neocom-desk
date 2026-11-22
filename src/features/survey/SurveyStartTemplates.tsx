@@ -4,7 +4,7 @@
  * marks one; the Survey starts (and takes it) when the first scan is pasted.
  */
 import { useTranslation } from 'react-i18next';
-import { FilterChip } from '@/components/ui';
+import { FilterChip, LiveNote } from '@/components/ui';
 import type { InfoTemplate } from '@/engine/survey/infoTemplate';
 
 interface SurveyStartTemplatesProps {
@@ -37,9 +37,9 @@ export function SurveyStartTemplates({
         ))}
       </div>
       {selected !== undefined && (
-        <p role="status" className="text-xs text-text-dim">
+        <LiveNote className="text-xs text-text-dim">
           {t('survey.templates.startingWith', { name: selected.name })}
-        </p>
+        </LiveNote>
       )}
     </div>
   );

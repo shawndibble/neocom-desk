@@ -2,7 +2,7 @@ import { toggleInSet } from '@/lib/sets';
 import { useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel, Spinner } from '@/components/ui';
+import { EmptyState, LiveNote, Panel, Spinner } from '@/components/ui';
 import { enumParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import type { PlanetType } from '@/engine/pi/goalTypes';
@@ -194,13 +194,10 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
           }
           banner={
             best.alreadyBest && (
-              <p
-                role="status"
-                className="border border-line bg-panel/85 px-3 py-2 text-xs text-text"
-              >
+              <LiveNote className="border border-line bg-panel/85 px-3 py-2 text-xs text-text">
                 <b className="font-semibold text-success">{t('piPlan.find.alreadyBest')}</b>{' '}
                 {t('piPlan.find.alreadyBestHint')}
-              </p>
+              </LiveNote>
             )
           }
           renderOpen={(card, panelId) => (

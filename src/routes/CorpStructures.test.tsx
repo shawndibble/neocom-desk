@@ -249,6 +249,21 @@ describe('CorpStructures', () => {
       expect(screen.getByText(/which only a Director can see/)).toBeInTheDocument();
     });
 
+    it('states no total when no row’s bay is readable', async () => {
+      feed(
+        [ALPHA, GAMMA],
+        [
+          [10, 'ALP', 'Alpha Corp'],
+          [20, 'GAM', 'Gamma Corp'],
+        ]
+      );
+      mockedBays.mockResolvedValue(new Map());
+      renderPage();
+      await table();
+      await waitFor(() => expect(screen.getByTestId('fuel-total').textContent).toMatch(/unknown/));
+      expect(screen.getByTestId('fuel-total').textContent).not.toMatch(/Total/);
+    });
+
     it('totals the visible rows and copies the same list', async () => {
       const writes: string[] = [];
       configureClipboard(async (text) => {

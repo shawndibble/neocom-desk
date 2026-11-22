@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Caret, Checkbox, Toast, buttonClassName } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import {
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -146,11 +147,7 @@ export function ActiveHaulView({
         </div>
       )}
       {finished && <p className="m-0 text-sm">{t('assets.movePlan.haul.finished')}</p>}
-      {replanNote && (
-        <p role="status" className="m-0 text-sm text-warning">
-          {replanNote}
-        </p>
-      )}
+      {replanNote && <LiveNote className="m-0 text-sm text-warning">{replanNote}</LiveNote>}
       {plan.sections.map((section) => (
         <Section
           key={section.characterId}

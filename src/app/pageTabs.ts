@@ -118,16 +118,17 @@ export const WALLET_TABS = definePageTabs('/wallet', [
  * Search tab's sub-modes, so links copied then still open; each id is the full
  * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
  * `/contracts/search` alone names no tab and redirects like any unknown
- * segment, landing on Item search.
+ * segment, landing on the default tab (the Character's own contracts, whose
+ * id stays `history` so old links and alerts still open it).
  */
 export const CONTRACTS_TABS = definePageTabs(
   '/contracts',
   [
+    { id: 'history', labelKey: 'contracts.historyTab' },
     { id: 'search/items', labelKey: 'contracts.itemSearchTab' },
     { id: 'search/courier', labelKey: 'contracts.courierTab' },
-    { id: 'history', labelKey: 'contracts.historyTab' },
   ],
-  'search/items'
+  'history'
 );
 
 export const MARKET_TABS = definePageTabs('/market', [

@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
-import { Button, EmptyState, EveSsoButton, LogoMark, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  EveSsoButton,
+  LiveNote,
+  LogoMark,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import { db } from '@/db';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { useEntityName } from '@/features/character/useEntityName';
@@ -182,9 +190,7 @@ export function RemoveNowView({
             </div>
           </Panel>
         ) : screen === 'done' ? (
-          <p role="status" className="text-sm">
-            {t(k('done'), { accounting, owner })}
-          </p>
+          <LiveNote className="text-sm">{t(k('done'), { accounting, owner })}</LiveNote>
         ) : screen === 'unavailable' ? (
           <EmptyState title={t(k('unavailable'))} />
         ) : (

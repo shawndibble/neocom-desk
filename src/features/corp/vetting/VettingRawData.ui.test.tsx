@@ -192,6 +192,12 @@ describe('the data page', () => {
     expect(row.className).toMatch(/bg-warning/);
   });
 
+  it('links a resolved skill name to the skill info route', async () => {
+    await setup(dataPage('skills'));
+    const link = await screen.findByRole('link', { name: 'Cynosural Field Theory' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('?info=skill-21603'));
+  });
+
   it('says so when filters match nothing, and clears them', async () => {
     await setup(dataPage('skills'));
     await screen.findByText('All 31 rows read. Scroll for the rest.');

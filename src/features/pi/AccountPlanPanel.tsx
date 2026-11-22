@@ -10,7 +10,15 @@
 import { formatCount } from '@/lib/formatCount';
 import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, Panel, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
+import {
+  IskAmount,
+  LiveNote,
+  Panel,
+  Spinner,
+  StatChip,
+  StatChips,
+  TypeIcon,
+} from '@/components/ui';
 import { piTier } from '@/engine/pi/chain';
 import type { PiData } from '@/sde/types';
 import { EstimateBadge, TierChip } from './DirectiveRow';
@@ -185,12 +193,9 @@ export function AccountPlanPanel({
             </p>
           )}
           {pending && (
-            <p
-              role="status"
-              className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim"
-            >
+            <LiveNote className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
               {t('piPlan.account.pending')}
-            </p>
+            </LiveNote>
           )}
         </>
       )}

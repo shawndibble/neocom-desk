@@ -23,6 +23,6 @@ export const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   sharedMoonPop: Icon.SharedMoonPop,
   corpJob: Icon.Industry,
   skyhookRaid: Icon.PiSkyhook,
-  contractExpiry: Icon.Contracts,
+  contractExpiry: Icon.NavContracts,
   orderExpiry: Icon.Orders,
 };

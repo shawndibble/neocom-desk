@@ -375,6 +375,11 @@ describe('VerifyPage', () => {
     api.read.mockResolvedValue(payload({ accountClosed: true }));
     renderPage();
     expect(await screen.findByText(/account is closed/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('status').some((el) => /account is closed/.test(el.textContent ?? ''))
+      ).toBe(true)
+    );
   });
 
   it('explains a link that is not valid', async () => {

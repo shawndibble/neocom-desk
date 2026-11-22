@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, EmptyState, LiveStatus, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  LiveNote,
+  LiveStatus,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -165,9 +173,9 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
         <p className="text-xl font-semibold">{notice.minerName ?? t('corpTaxBook.verify.title')}</p>
       </header>
       {payload.accountClosed && (
-        <p className="rounded-xs border border-line p-3 text-sm" role="status">
+        <LiveNote className="rounded-xs border border-line p-3 text-sm">
           {t('corpTaxBook.verify.closed', { corp })}
-        </p>
+        </LiveNote>
       )}
       {payload.pendingCharacterIds.length > 0 && (
         <GroupingQuestions

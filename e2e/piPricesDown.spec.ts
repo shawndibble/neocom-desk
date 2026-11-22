@@ -32,7 +32,7 @@ for (const [label, viewport] of VIEWPORTS) {
     test.setTimeout(60_000);
     await page.setViewportSize(viewport);
     await openPricesDown(page, 'map');
-    await expect(page.getByText(NOTICE)).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('p', { hasText: NOTICE })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('group', { name: /^Planet map|^Planets$/ }).first()).toBeVisible();
     // The notice itself names ISK; nothing else may.
     await expect(
@@ -45,7 +45,7 @@ for (const [label, viewport] of VIEWPORTS) {
     test.setTimeout(60_000);
     await page.setViewportSize(viewport);
     await openPricesDown(page, 'plan');
-    await expect(page.getByText(NOTICE)).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('p', { hasText: NOTICE })).toBeVisible({ timeout: 30_000 });
     const panel = page.locator('section', {
       has: page.getByRole('heading', { name: /Quick wins/ }),
     });
@@ -58,7 +58,7 @@ for (const [label, viewport] of VIEWPORTS) {
     test.setTimeout(60_000);
     await page.setViewportSize(viewport);
     await openPricesDown(page, 'colonies');
-    await expect(page.getByText(NOTICE)).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('p', { hasText: NOTICE })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/still loading/)).toHaveCount(0);
     await shot(page, `prices-down-colonies-${label}`);
   });

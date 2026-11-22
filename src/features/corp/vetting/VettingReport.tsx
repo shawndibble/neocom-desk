@@ -217,12 +217,14 @@ function CharactersPanel({ characters }: { characters: readonly VettingReportCha
   ];
   return (
     <Panel title={t('vetting.report.characters.title')} padded={false} meta={characters.length}>
-      <DataTable
-        label={t('vetting.report.characters.title')}
-        columns={columns}
-        rows={characters}
-        rowKey={(row) => row.characterId}
-      />
+      <div className="overflow-x-auto">
+        <DataTable
+          label={t('vetting.report.characters.title')}
+          columns={columns}
+          rows={characters}
+          rowKey={(row) => row.characterId}
+        />
+      </div>
     </Panel>
   );
 }
