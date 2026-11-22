@@ -231,7 +231,9 @@ export function CorpRosterTable({
         {...tableProps}
         columns={shownColumns}
         rows={rows}
-        responsive="table"
+        responsive="stack"
+        stackLayout="dense"
+        mobileSort
         rowKey={rosterRowKey}
         highlightRowKey={highlightedMemberId}
         virtualize="auto"

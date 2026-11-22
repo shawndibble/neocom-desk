@@ -60,6 +60,7 @@ export function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'lastSeen',
         header: t('corp.members.columnLastSeen'),
+        cardCorner: true,
         align: 'right',
         width: '16ch',
         className: 'whitespace-nowrap tabular-nums',
@@ -124,6 +125,7 @@ export function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'joined',
         header: t('corp.members.columnJoined'),
+        stackAffix: { before: `${t('corp.members.columnJoined')} ` },
         // `formatDateOnly` on one line: "10/23/2026".
         width: '12ch',
         className: 'whitespace-nowrap tabular-nums text-text-dim',
