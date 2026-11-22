@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 
 /**
  * A Payee's name in a dialog's heading. With `onOpenLedger` it is the way into that Payee's
@@ -19,10 +20,9 @@ export function PayeeLedgerLink({
   return (
     <button
       type="button"
-      className={`${inlineLinkClassName} ${className ?? ''}`.trim()}
+      className={cx(inlineLinkClassName, className)}
       onClick={onOpenLedger}
       aria-label={t('miningTax.ledger.openFor', { payee: name })}
-      title={t('miningTax.ledger.openLedgerTip')}
     >
       {name}
     </button>

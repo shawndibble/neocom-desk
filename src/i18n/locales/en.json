@@ -8930,7 +8930,6 @@
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
-      "openLedgerTip": "Open this Payee's ledger",
       "reversedTag": "reversed",
       "minerPicker": "Whose account"
     }

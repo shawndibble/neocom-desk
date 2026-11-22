@@ -37,7 +37,7 @@ describe('PayeeLedgerPanel', () => {
     renderPanel(CORP_BOOK_LEDGER);
     expect(screen.getByText('Ledger, newest first')).toBeInTheDocument();
     expect(screen.getByText('Owes')).toBeInTheDocument();
-    expect(screen.getByText('10,595,000 ISK')).toBeInTheDocument();
+    expect(screen.getByText('−10,595,000 ISK')).toBeInTheDocument();
     const rows = bodyRows();
     expect(rows[0]).toHaveTextContent('10,595,000');
     expect(rows.at(-1)).toHaveTextContent('2026-10-03');

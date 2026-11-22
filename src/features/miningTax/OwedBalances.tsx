@@ -31,7 +31,7 @@ function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
 }
 
 interface OwedBalancesProps {
-  /** Every Payee balance; the owed ones and those in credit are drawn, as cards. */
+  /** Every Payee balance; the owed ones are drawn as cards, those in credit as one-line notes. */
   balances: readonly PayeeBalance[];
   unassigned: UnassignedSummary;
   /** Wallet payments nothing here accounts for yet (paying backwards, #540). */
@@ -109,22 +109,20 @@ export function OwedBalances({
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
   const owedTotal = owed.reduce((sum, b) => sum + b.owed, 0);
-  // A Payee paid ahead keeps its card too: its credit is money the pilot has there.
-  const cards = owed;
   // A credit has no action to take, so it is a line of text, not a card.
   const credits = balances.filter((b) => b.owed <= 0 && b.credit > 0);
 
   // One Payee card and nothing else to show: a single full-width row (name,
   // figure, actions) rather than one card stranded in half the page.
   const cardCount =
-    cards.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
-  const wide = cardCount === 1 && cards.length === 1;
+    owed.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
+  const wide = cardCount === 1 && owed.length === 1;
 
   // No Payee card: the prompts are the page's next action, so they read as slim
   // full-width rows rather than tiles stranded in one column of a grid. With
   // cards present they stay tiles that share those cards' height — a
   // deliberate split (issue #3120).
-  const slimPrompts = cards.length === 0;
+  const slimPrompts = owed.length === 0;
 
   const nameOf = (balance: PayeeBalance) => (
     <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-base font-semibold">
@@ -182,7 +180,7 @@ export function OwedBalances({
             {t('miningTax.balancesLabel')}
           </span>
           <span className="text-base font-semibold text-isk-neg tabular-nums">
-            {formatIsk(owedTotal)} ISK
+            −{formatIsk(owedTotal)} ISK
           </span>
           <span className="text-xs text-text-dim">
             {t('miningTax.owed.acrossPayees', { count: owed.length })}
@@ -250,7 +248,7 @@ export function OwedBalances({
               </div>
             </Panel>
           )}
-          {cards.map((balance) => {
+          {owed.map((balance) => {
             const days = owedForDays(balance);
             const characterName = characterNameOf?.(balance);
             const uncredited = uncreditedOf?.(balance);

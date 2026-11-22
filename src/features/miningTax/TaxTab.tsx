@@ -588,7 +588,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                               ?.characterName
                         : undefined
                     }
-
                     onSettleUp={(balance) =>
                       isCorpPayeeId(balance.payee.id)
                         ? actions.openCorpPay(corporationOfPayee(balance.payee.id))

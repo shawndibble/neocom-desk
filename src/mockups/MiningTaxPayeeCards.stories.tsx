@@ -76,7 +76,7 @@ const OTELA: CardPayee = {
 function SecondaryActions({ linkPayment }: { linkPayment: boolean }) {
   return (
     <>
-      <div className="hidden shrink-0 items-center divide-x divide-border sm:flex">
+      <div className="hidden shrink-0 items-center divide-x divide-line sm:flex">
         <button type="button" className={textActionClassName('px-3 first:pl-0 last:pr-0')}>
           Ledger
         </button>
@@ -248,7 +248,7 @@ function LedgerPhoneRow({ row }: { row: Row }) {
   const sign = row.amount.credit ? '' : '−';
   const value = row.amount.credit ?? row.amount.charge ?? '';
   return (
-    <li className="flex items-center gap-3 border-t border-border px-3 py-2 first:border-t-0">
+    <li className="flex items-center gap-3 border-t border-line px-3 py-2 first:border-t-0">
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm font-semibold">{row.what}</span>

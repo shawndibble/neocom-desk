@@ -168,7 +168,7 @@ function LedgerStatus({ ledger }: { ledger: PayeeLedger }) {
         <>
           <StatChip
             label={t('miningTax.ledger.status.owes')}
-            value={`${formatIsk(status.amount)} ISK`}
+            value={`−${formatIsk(status.amount)} ISK`}
             tone="danger"
             emphasis
           />
