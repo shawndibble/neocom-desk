@@ -39,5 +39,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [moons-settings-and-layout](moons-settings-and-layout/README.md) | Issue #6304 | Chosen by the agent: Sharing is a fifth Moon settings tab (scrolls in the modal, saves apart); Moons page keeps its layout, six tabs |
 | [payee-one-per-entity](payee-one-per-entity/README.md) | Issue #6308 | Chosen by the agent: one Manage Payees row per recipient with "Used by N characters"; differing terms shown as one "Use … for all" button per distinct terms |
 | [vetting-raw-data](vetting-raw-data/README.md) | Issue #6341 | Chosen by the agent: Data we read on the report (one row per source); a page per review with source tabs, a character switcher, filters and one windowed table (all rows, no cap); flagged rows and flags link both ways; empty and no-match are two states; consent says rows are kept after Send |
+| [phone-status-strip](phone-status-strip/README.md) | Issue #6560 | Chosen by the agent: re-login, role notice and sync error as rows of one shell strip; actions wrap under the words on a phone |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
