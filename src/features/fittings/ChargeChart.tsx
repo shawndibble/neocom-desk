@@ -217,7 +217,7 @@ export function ChargeChart({
             onKeyDown={(event) => onKey(event, c.typeId)}
             className="cursor-pointer outline-none focus-visible:[&>circle:first-child]:stroke-accent"
           >
-            <circle cx={markX(c)} cy={y(score(c))} r={8} className="fill-transparent" />
+            <circle cx={markX(c)} cy={y(score(c))} r={12} className="fill-transparent" />
             {mark(c)}
           </g>
         ))}
