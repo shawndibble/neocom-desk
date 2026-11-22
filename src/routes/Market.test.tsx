@@ -358,7 +358,7 @@ describe('Market Browser', () => {
 
     expect(await screen.findByText("Couldn't load the market catalogue")).toBeInTheDocument();
     const refresh = screen.getByRole('button', { name: 'Refresh' });
-    expect(refresh).not.toHaveAttribute('aria-disabled');
+    expect(refresh).toBeEnabled();
 
     await user.click(refresh);
 
