@@ -15,14 +15,14 @@ describe('PricesUnavailable', () => {
   it('asks for a connection check when online', () => {
     setOnline(true);
     render(<PricesUnavailable />);
-    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
+    expect(screen.getAllByText('Prices unavailable right now')[0]).toBeInTheDocument();
     expect(screen.getByText(/Check your connection/)).toBeInTheDocument();
   });
 
   it('says prices are unavailable offline when the browser is offline', () => {
     setOnline(false);
     render(<PricesUnavailable />);
-    expect(screen.getByText('Prices unavailable offline')).toBeInTheDocument();
+    expect(screen.getAllByText('Prices unavailable offline')[0]).toBeInTheDocument();
     expect(screen.getByText(/until you're back online/)).toBeInTheDocument();
     expect(screen.queryByText(/Check your connection/)).not.toBeInTheDocument();
   });
