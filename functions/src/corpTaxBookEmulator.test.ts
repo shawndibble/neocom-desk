@@ -2750,6 +2750,33 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(await stored()).toEqual({ 'solo:50': '2026-10-10' });
       });
 
+      it('is dropped when an officer charges a shortfall on a day it covers, and not for a later day', async () => {
+        await turnOn();
+        const minerPaid = async () =>
+          (await book().collection('minerPaid').doc('solo:50').get()).exists;
+        const exempt = (date: string) =>
+          edit(
+            ACCOUNTANT,
+            {
+              action: 'setToleranceExemption',
+              minerId: 'solo:50',
+              date,
+              forgive: 0,
+              reason: 'charge it',
+            },
+            true
+          );
+        await record('2026-10-10');
+        // A day after the recorded one is still open: nothing to reopen.
+        await exempt('2026-10-12');
+        expect(await stored()).toEqual({ 'solo:50': '2026-10-10' });
+        // A day the record closed: charging its shortfall raises what is owed, so the day reopens
+        // (the next officer load records the paid-through again, without it).
+        await exempt('2026-10-09');
+        expect(await stored()).toEqual({});
+        expect(await minerPaid()).toBe(false);
+      });
+
       it('copies each Miner’s paid-through day to a record that Miner can read', async () => {
         await turnOn();
         await record('2026-10-10');

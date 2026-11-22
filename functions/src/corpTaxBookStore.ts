@@ -1026,13 +1026,21 @@ interface EditOutcome {
  * the next officer load records it again without that money (decision 20261121-093000). Read in
  * the transaction before any write; a Miner with no day recorded writes nothing.
  */
-async function releasePaidThrough(c: EditCtx, minerId: string | null | undefined): Promise<void> {
+async function releasePaidThrough(
+  c: EditCtx,
+  minerId: string | null | undefined,
+  /** Only a recorded day that reaches this one is dropped: an act that touches one day, not the Miner's money. */
+  reaching?: string
+): Promise<void> {
   if (typeof minerId !== 'string') return;
   const held = (await c.tx.get(col(c, META).doc(PAID_DOC))).get(
     new FieldPath('minerPaidThrough', minerId)
   ) as unknown;
   const copy = await c.tx.get(col(c, MINER_PAID).doc(minerId));
-  if (held !== undefined || copy.exists) c.released.add(minerId);
+  if (held === undefined && !copy.exists) return;
+  const days = [held, copy.get('paidThrough')].filter((d): d is string => typeof d === 'string');
+  if (reaching !== undefined && days.every((d) => d < reaching)) return;
+  c.released.add(minerId);
 }
 
 /** Drops the paid-through days `releasePaidThrough` found: the edit's writes, after its reads. */
@@ -2398,6 +2406,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (action.forgive > 0) requireDirectorAbove(c, [action.forgive]);
       const uids = await minerUids(c, action.minerId);
       if (uids.length === 0) fail('not-found', 'Unknown Miner', 'unknown-miner');
+      // A day recorded paid stays closed whatever an exemption says (D22), so an exemption on one
+      // the Miner's record covers would do nothing: the record is dropped, and the next officer
+      // load works the day out again with the exemption and records what is still paid.
+      await releasePaidThrough(c, action.minerId, action.date);
       const id = `x${now}_${rand(4)}`;
       tx.create(col(c, TOLERANCE_EXEMPTIONS).doc(id), {
         id,
