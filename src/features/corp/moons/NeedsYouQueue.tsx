@@ -746,7 +746,7 @@ export function NeedsYouQueue() {
                 <>
                   <Button
                     size="sm"
-                    disabled={busy}
+                    aria-disabled={busy || undefined}
                     onClick={() => void answerUncounted(u, 'count')}
                   >
                     {t('corpTaxBook.moons.needs.uncounted.count', {

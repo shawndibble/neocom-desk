@@ -326,15 +326,23 @@ describe('LateNoticeRun (late notices, #6294)', () => {
     const first = renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     expect(screen.getByText('Loading corporation name…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Preview mail' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Preview mail' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(editBook).not.toHaveBeenCalled();
     first.unmount();
 
     corpName.value = 'Ore & Glory';
     renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send 2 late notices' })).not.toHaveAttribute(
+      'aria-disabled'
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
     expect(await screen.findByText(/Ore & Glory moon tax: late notice/)).toBeInTheDocument();
   });
