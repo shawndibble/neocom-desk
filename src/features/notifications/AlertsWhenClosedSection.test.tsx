@@ -96,8 +96,8 @@ describe('AlertsWhenClosedSection', () => {
       { open: false }
     );
     expect(await screen.findByRole('dialog', { name: 'Alerts when closed' })).toBeInTheDocument();
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Alerts when closed is on for Alpha'
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Alerts when closed is on for Alpha')
     );
   });
 
@@ -272,7 +272,9 @@ describe('AlertsWhenClosedSection', () => {
     queueAlertsWalk([{ characterId: 2, nearby: true, mail: false }]);
     await renderSection({ alertsGrant: { status: 'on', characterId: 1, name: 'Alpha' } });
     await waitFor(() => expect(login.begin).toHaveBeenCalledWith(2, { nearby: true, mail: false }));
-    expect(await screen.findByText(/Alerts when closed is on for Alpha/)).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText(/Alerts when closed is on for Alpha/)).length
+    ).toBeGreaterThan(0);
   });
 
   it('a mismatch names who was authorized and stops the walk', async () => {
@@ -285,17 +287,19 @@ describe('AlertsWhenClosedSection', () => {
         authorizedName: 'Beta',
       },
     });
-    expect(await screen.findByText(/You authorized Beta, not Alpha/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/You authorized Beta, not Alpha/)).length).toBeGreaterThan(
+      0
+    );
     expect(login.begin).not.toHaveBeenCalled();
     expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('Off');
   });
 
   it('says so on a cancel and on a failure', async () => {
     const { unmount } = await renderSection({ alertsGrant: { status: 'cancelled' } });
-    expect(await screen.findByText(/cancelled/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/cancelled/)).length).toBeGreaterThan(0);
     unmount();
     await renderSection({ alertsGrant: { status: 'failed', characterId: 2 } });
-    expect(await screen.findByText(/Could not turn on .* Beta/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Could not turn on .* Beta/)).length).toBeGreaterThan(0);
   });
 
   it('a grant missing only the mail shows On with what it needs, and Turn off stays', async () => {

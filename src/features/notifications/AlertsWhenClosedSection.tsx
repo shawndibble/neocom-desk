@@ -56,6 +56,7 @@ import { AlertsSignInConfirm } from './AlertsSignInConfirm';
 import { useNotificationPreferences } from './preferencesStore';
 import { QuietTimeRows } from './QuietTimeRows';
 import { DividedList } from '@/components/ui/DividedList';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { useGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 interface CharacterRef {
@@ -297,8 +298,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
               </NeedsConnection>
             )}
             {notice && (
-              <p
-                role="status"
+              <LiveNote
                 className={
                   notice.tone === 'warning'
                     ? 'rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning'
@@ -306,7 +306,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                 }
               >
                 {notice.text}
-              </p>
+              </LiveNote>
             )}
             <DividedList surface="none" as="ul">
               {characters.map((character) => {
