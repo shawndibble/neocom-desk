@@ -9,6 +9,12 @@ export interface CoveringAssignment {
   collectsGrowth?: boolean;
   /** `'paid'` freezes the Assignment at its own snapshot: it never grows (ADR 0024). Any other status, or none, can. */
   status?: string;
+  /**
+   * Ore types the pilot let a corporation's book take off this Assignment ("Let the corporation
+   * bill it"): the entry still reports them, but they are the book's, so they neither grow back
+   * into a collector nor show as unassigned.
+   */
+  releasedTypeIds?: readonly number[];
 }
 
 export interface Ownership {
@@ -95,8 +101,12 @@ export function computeOwnership(
     ownedByType.set(c.id, new Map(c.oreLines.map((line) => [line.typeId, line.quantity])));
   }
 
+  // Ore a book took is the book's whichever side let it go: nothing here owns or offers it.
+  const released = new Set(covering.flatMap((c) => c.releasedTypeIds ?? []));
+
   const unassigned: OreLine[] = [];
   for (const line of entryLines) {
+    if (released.has(line.typeId)) continue;
     const claimants = covering.filter((c) => ownedByType.get(c.id)!.has(line.typeId));
     const covered = claimants.reduce(
       (sum, c) => sum + (ownedByType.get(c.id)?.get(line.typeId) ?? 0),

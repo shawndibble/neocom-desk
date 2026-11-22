@@ -1411,6 +1411,41 @@ describe('releaseOreFromAssignment', () => {
     expect(out).toMatchObject({ estimatedValue: 400, taxOwed: 40 });
   });
 
+  it('remembers the ore types it let go, so the ledger never grows them back in', async () => {
+    const mixed: MiningTaxAssignmentRecord = {
+      ...base,
+      oreLines: [
+        { typeId: TYPE_A, quantity: 100 },
+        { typeId: TYPE_B, quantity: 100 },
+      ],
+      releasedTypeIds: [999],
+    };
+    await db.miningTaxAssignments.put(mixed);
+    const left = [{ typeId: TYPE_B, quantity: 100 }];
+    const out = await releaseOreFromAssignment(mixed, left, await loadReleasePrices(mixed, left));
+    expect(out?.releasedTypeIds).toEqual([999, TYPE_A]);
+    expect((await db.miningTaxAssignments.get('a1'))?.releasedTypeIds).toEqual([999, TYPE_A]);
+  });
+
+  it('remembers a type it only partly let go', async () => {
+    await db.miningTaxAssignments.put(base);
+    const left = [{ typeId: TYPE_A, quantity: 40 }];
+    const out = await releaseOreFromAssignment(base, left, await loadReleasePrices(base, left));
+    expect(out?.releasedTypeIds).toEqual([TYPE_A]);
+  });
+
+  it('remembers nothing when a Survey connection takes the ore over', async () => {
+    await db.miningTaxAssignments.put(base);
+    const left = [{ typeId: TYPE_A, quantity: 40 }];
+    const out = await releaseOreFromAssignment(
+      base,
+      left,
+      await loadReleasePrices(base, left),
+      true
+    );
+    expect(out?.releasedTypeIds).toBeUndefined();
+  });
+
   it('deletes the Assignment, with a tombstone, when nothing is left', async () => {
     await db.miningTaxAssignments.put(base);
     expect(

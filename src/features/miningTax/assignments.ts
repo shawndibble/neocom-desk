@@ -630,11 +630,21 @@ export async function releaseOreFromAssignment(
     priced.prices,
     assignment.taxPct
   );
+  // Remember what went, or the game's ledger, which still reports it, grows it straight back in.
+  // A Survey connection's takeover is not the book's: its ore is assigned elsewhere.
+  const keptBy = new Map(kept.map((l) => [l.typeId, l.quantity]));
+  const released = keepOverride
+    ? []
+    : assignment.oreLines
+        .filter((l) => (keptBy.get(l.typeId) ?? 0) < l.quantity)
+        .map((l) => l.typeId);
+  const releasedTypeIds = [...new Set([...(assignment.releasedTypeIds ?? []), ...released])];
   const next: MiningTaxAssignmentRecord = withOreFormMarker(
     { ...assignment, oreLines: kept, estimatedValue, taxOwed, updatedAt: Date.now() },
     priced.compressed
   );
   delete next.oreLineValues;
+  if (releasedTypeIds.length > 0) next.releasedTypeIds = releasedTypeIds;
   if (!keepOverride) asPilotAct(next);
   await putAssignments([next]);
   return next;
