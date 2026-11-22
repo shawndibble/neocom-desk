@@ -27,6 +27,8 @@ export interface Miner {
   paidThrough?: string;
   /** The Miner ids a regroup folded into this one: their codes and records are this Miner's now. */
   aliases?: string[];
+  /** Characters that left this grouping, by the day they left: it still bills them before it. */
+  leftOn?: Record<number, string>;
 }
 
 /** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */
@@ -122,7 +124,7 @@ export function buildDayCharges(
       continue;
     }
     const key = observedEntryKey(entry);
-    const minerId = minerIdFor(entry.characterId, book.miners);
+    const minerId = minerIdFor(entry.characterId, book.miners, entry.date);
     const place = book.placeOf(entry.structureId, entry.date);
     const isGuest = entry.recordedCorporationId !== book.corporationId;
     const rate = resolveRate(book.rates, {

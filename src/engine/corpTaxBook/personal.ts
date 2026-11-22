@@ -548,7 +548,7 @@ interface Prepared {
 function inFlightPayment(d: InFlightDonation, miners: readonly Miner[]): TaxPayment {
   return {
     id: `inFlight:${d.refId ?? `${d.characterId}@${d.at}`}`,
-    minerId: minerIdFor(d.characterId, miners),
+    minerId: minerIdFor(d.characterId, miners, d.at.slice(0, 10)),
     characterId: d.characterId,
     amount: d.amount,
     at: d.at,

@@ -145,6 +145,12 @@ describe('the small doc readers', () => {
       mainCharacterId: 4,
     });
   });
+  it('readMiner keeps the day each character left, and ignores a malformed map', () => {
+    expect(readMiner('m', { characterIds: [4], leftOn: { 7: '2026-11-10' } })).toMatchObject({
+      leftOn: { 7: '2026-11-10' },
+    });
+    expect(readMiner('m', { characterIds: [4], leftOn: 'x' })).not.toHaveProperty('leftOn');
+  });
   it('readAdjustment and readWriteOff default reason and actor', () => {
     expect(readAdjustment('a', { minerId: 'm', date: 'd' })).toBeNull();
     expect(readAdjustment('a', { minerId: 'm', date: 'd', amount: 1 })).toEqual({

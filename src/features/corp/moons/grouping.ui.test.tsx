@@ -164,11 +164,15 @@ describe('MinerCharacters', () => {
       mainCharacterId: 2,
     });
     await userEvent.click(screen.getAllByRole('button', { name: 'Unlink' })[1]);
+    // It asks the day the character left (today unless changed) before it unlinks.
+    const confirm = await screen.findByRole('dialog');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Unlink' }));
     await waitFor(() =>
       expect(editBook).toHaveBeenLastCalledWith(7, CORP, {
         action: 'unlink',
         minerId: 'g1',
         characterId: 2,
+        leftOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       })
     );
   });

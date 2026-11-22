@@ -1584,17 +1584,22 @@ async function removeFromMiner(
   tx: Transaction,
   ref: DocumentReference,
   miner: Data,
-  characterId: number
+  characterId: number,
+  /** The day it left: the grouping keeps billing it before then, so it is not deleted. */
+  leftOn?: string
 ): Promise<boolean> {
   const before = miner.characterIds as number[];
   const characterIds = before.filter((x) => x !== characterId);
   if (characterIds.length === before.length) return false;
   const accounts = ref.parent.parent!.collection(RUNNING_ACCOUNTS);
   // The snapshots that summed other characters go: the grouping's (unless it goes whole), the
-  // character's own, and a last one's left alone.
-  const changed = characterIds.length > 1 ? [ref.id] : characterIds.map(soloMinerId);
-  (await snapshotDropper(tx, accounts, [soloMinerId(characterId), ...changed]))();
-  if (characterIds.length <= 1) {
+  // character's own, and a last one's left alone. A dated leave (never before the lock date)
+  // changes no locked day, so every snapshot stands.
+  if (leftOn === undefined) {
+    const changed = characterIds.length > 1 ? [ref.id] : characterIds.map(soloMinerId);
+    (await snapshotDropper(tx, accounts, [soloMinerId(characterId), ...changed]))();
+  }
+  if (characterIds.length <= 1 && leftOn === undefined) {
     tx.delete(ref);
     // Its recorded account goes with it, so no list offers a Miner that is gone.
     tx.delete(accounts.doc(ref.id));
@@ -1615,6 +1620,7 @@ async function removeFromMiner(
         (x) => x !== characterId
       ),
       uids: readersAfterUnlink(miner, characterId),
+      ...(leftOn !== undefined ? { [`leftOn.${characterId}`]: leftOn } : {}),
     });
   }
   // D26: every officer's sync must leave this character out of an automatic group.
@@ -2308,7 +2314,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'unlink': {
       const ref = col(c, MINERS).doc(action.minerId);
       const miner = await mustGet(c, ref, 'Miner');
-      if (!(await removeFromMiner(c.tx, ref, miner, action.characterId)))
+      // A dated leave never reaches into locked history (a sale reported late is fixed by a
+      // correction dated on or after the lock date).
+      refuseLocked(now, action.leftOn);
+      if (!(await removeFromMiner(c.tx, ref, miner, action.characterId, action.leftOn)))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
       // The grouping the answer was about is gone, so the answer must not outlive it.
       clearAnswers(c, [action.characterId]);
