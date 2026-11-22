@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextInput, Tooltip } from '@/components/ui';
+import { Button, Panel, TextInput, Tooltip, LiveNote } from '@/components/ui';
 import { parseInviteInput } from '../taxBook/feederClient';
 
 export type SetupChoice = 'own' | 'consent' | 'collect';
@@ -32,9 +32,7 @@ export function MoonsChoices({
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       {left && (
-        <p role="status" className="text-center text-sm">
-          {t('corpTaxBook.moons.setup.left')}
-        </p>
+        <LiveNote className="text-center text-sm">{t('corpTaxBook.moons.setup.left')}</LiveNote>
       )}
       {error && (
         <p role="alert" className="text-center text-sm text-danger">

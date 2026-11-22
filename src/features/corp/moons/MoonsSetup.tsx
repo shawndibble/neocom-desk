@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LoadFailedState, Spinner } from '@/components/ui';
+import { LoadFailedState, Spinner, LiveNote } from '@/components/ui';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 import {
@@ -108,9 +108,9 @@ export function MoonsSetup({
     return (
       <>
         {grant?.status === 'on' && (
-          <p role="status" className="mb-3 text-center text-sm">
+          <LiveNote className="mb-3 text-center text-sm">
             {t('corpTaxBook.moons.setup.granted', { name: grant.name })}
-          </p>
+          </LiveNote>
         )}
         <MoonOwnerPanel
           owner={status}

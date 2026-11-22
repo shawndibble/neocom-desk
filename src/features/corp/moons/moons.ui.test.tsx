@@ -325,7 +325,7 @@ describe('LateNoticeRun (late notices, #6294)', () => {
     corpName.value = null;
     const first = renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    expect(screen.getByText('Loading corporation name…')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading corporation name…');
     expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toHaveAttribute(
       'aria-disabled',
       'true'
