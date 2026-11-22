@@ -65,7 +65,7 @@ function TargetCell({
   if (draft !== null) {
     // An unusable value keeps the field open with what was typed, and says so;
     // only Escape discards it. The same value as now is a quiet no-op.
-    const commit = () => {
+    const commit = (moveFocus = true) => {
       if (closed.current) return;
       const next = Math.floor(Number(draft));
       if (draft.trim() === '' || !Number.isFinite(next) || next <= 0) {
@@ -73,7 +73,12 @@ function TargetCell({
         return;
       }
       if (next !== row.target) onSetTarget(row.typeId, next);
-      close();
+      if (moveFocus) close();
+      else {
+        // Blur: focus is already where the user sent it.
+        closed.current = true;
+        setDraft(null);
+      }
     };
     const errorId = `stock-target-error-${row.typeId}`;
     return (
@@ -101,7 +106,7 @@ function TargetCell({
           onClick={(e) => e.stopPropagation()}
           onBlur={() => {
             // Blur that is not the field's own close saves, as leaving any edit field does.
-            commit();
+            commit(false);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') commit();

@@ -684,7 +684,7 @@ export function MinerDetail({ id }: { id: string }) {
         rows={shownFeed}
         count={feed.length}
         meta={
-          audit.failed ? (
+          audit.failed && feed.length > 0 ? (
             <InlineError>{t('corpTaxBook.moons.miner.activityLoadFailed')}</InlineError>
           ) : (
             <span className="text-xs text-text-dim">
