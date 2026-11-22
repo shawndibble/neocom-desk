@@ -149,7 +149,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     failedClaims,
     systemNames,
     systemSecurity,
-  } = useTaxCorpBooks(data, characters, activeCharacterId);
+  } = useTaxCorpBooks(data, characters, activeCharacterId, refresh);
   // Offered by Manage Payees as the link for a Payee named for one (#6205).
   const bookCorporations = useMemo(
     () =>

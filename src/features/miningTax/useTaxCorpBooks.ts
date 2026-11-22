@@ -18,7 +18,12 @@ const NO_SECURITY: ReadonlyMap<number, number> = new Map();
 export function useTaxCorpBooks(
   data: TaxSnapshot | null,
   characters: readonly TrackedCharacter[],
-  activeCharacterId: number | null
+  activeCharacterId: number | null,
+  /**
+   * Called when the stored book ownership changed (its first store included): the snapshot's load
+   * path holds Default Systems back until ownership is known, so it reads the snapshot again.
+   */
+  onOwnershipStored?: () => void
 ) {
   const { madePayments, paymentSources } = useMadePayments(
     characters.map((c) => c.characterId).join(',')
@@ -129,8 +134,12 @@ export function useTaxCorpBooks(
   useEffect(() => {
     if (!data || !booksKnown || storedOwned.current === bookOwned) return;
     storedOwned.current = bookOwned;
-    void saveBookOwned(bookOwned).catch(() => undefined);
-  }, [data, booksKnown, bookOwned]);
+    void saveBookOwned(bookOwned)
+      .then((changed) => {
+        if (changed) onOwnershipStored?.();
+      })
+      .catch(() => undefined);
+  }, [data, booksKnown, bookOwned, onOwnershipStored]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
   const { failed: failedClaims } = useAutoClaimDonations(

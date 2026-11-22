@@ -85,7 +85,7 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     expect(result.current.accounts.of('p1')?.owes?.amount ?? 0).toBe(0);
   });
 
-  it('stores the Payees a book owns, an unlinked one named as its corporation included', () => {
+  it('stores the Payees a book owns, an unlinked one named as its corporation included', async () => {
     hoisted.view = {
       ...hoisted.view,
       books: [{ left: false, corpName: 'Ashfall', loaded: { corporationId: 5 } }],
@@ -100,8 +100,11 @@ describe('useTaxCorpBooks billed elsewhere', () => {
       systemNames: new Map(),
       systemSecurity: new Map(),
     } as unknown as TaxSnapshot;
-    const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
+    const onOwnershipStored = vi.fn();
+    const { result } = renderHook(() => useTaxCorpBooks(data, [], null, onOwnershipStored));
     expect(result.current.accounts.isBookOwned('p1')).toBe(true);
     expect(saveBookOwned).toHaveBeenCalledWith(new Set(['p1']));
+    // The load path held Default Systems back until ownership was stored: read the snapshot again.
+    await vi.waitFor(() => expect(onOwnershipStored).toHaveBeenCalledTimes(1));
   });
 });
