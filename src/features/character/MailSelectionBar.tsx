@@ -28,13 +28,18 @@ export function MailSelectionBar({
       <span className="text-sm font-semibold text-text" aria-live="polite">
         {t('mail.selectedCount', { count })}
       </span>
-      <Button size="sm" onClick={onMarkRead} disabled={none || busy}>
+      <Button size="sm" onClick={onMarkRead} aria-disabled={none || busy || undefined}>
         {t('mail.markRead')}
       </Button>
-      <Button size="sm" onClick={onMarkUnread} disabled={none || busy}>
+      <Button size="sm" onClick={onMarkUnread} aria-disabled={none || busy || undefined}>
         {t('mail.markUnread')}
       </Button>
-      <Button size="sm" variant="danger" onClick={onDelete} disabled={none || busy}>
+      <Button
+        size="sm"
+        variant="danger"
+        onClick={onDelete}
+        aria-disabled={none || busy || undefined}
+      >
         {t('mail.delete')}
       </Button>
     </div>
