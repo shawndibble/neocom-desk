@@ -109,10 +109,8 @@ test("Settle up for the book shows the Miner's code and records nothing", async 
   esi,
 }) => {
   const member = await openTax(page, book, esi);
-  // The Settle up of the book's card: the first after its owed figure.
-  await ledgerButton(page, CORP_NAME)
-    .locator('xpath=following::button[normalize-space()="Settle up"][1]')
-    .click();
+  // The Settle up of the book's card.
+  await cardOf(page, CORP_NAME).getByRole('button', { name: 'Settle up' }).click();
   const dialog = page.getByRole('dialog', { name: `Settle up — ${CORP_NAME}` });
   await expect(dialog).toContainText(`Amount${isk(member.owed)} ISK`);
   await expect(dialog).toContainText(`Reason${minerPaymentCode(PILOT_MINER_ID)}`);

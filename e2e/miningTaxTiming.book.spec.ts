@@ -184,9 +184,7 @@ test('Settle up for the book records nothing on the device: the money counts onl
   const sent = { refId: 970_103, amount: DAY_TAX, back: 0, at: justNow() };
   await openPilot(page, book, esi, { seed: pilotBook([6, 5, 4]), mined: [6, 5, 4] });
   await expect(cardOf(page)).toContainText(isk(3 * DAY_TAX));
-  await ledgerButton(page)
-    .locator('xpath=following::button[normalize-space()="Settle up"][1]')
-    .click();
+  await cardOf(page).getByRole('button', { name: 'Settle up' }).click();
   const dialog = page.getByRole('dialog', { name: `Settle up — ${CORP_NAME}` });
   await expect(dialog).toContainText(`Amount${isk(3 * DAY_TAX)} ISK`);
   await expect(dialog).toContainText(`Reason${CODE}`);
