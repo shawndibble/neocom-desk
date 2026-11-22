@@ -162,22 +162,21 @@ describe('Moon page', () => {
     expect(screen.queryByText('Ore from')).not.toBeInTheDocument();
   });
 
-  it('a Miner row opens the miner; only its caret opens the ore lines', async () => {
+  it('a Miner row opens its ore lines; only the name goes to the miner', async () => {
     renderBook(
       <>
         <MoonDetail id={MOON_ID} />
         <Where />
       </>
     );
-    expect(
-      screen.queryByRole('table', { name: /Ore mined by Varro Kestane/ })
-    ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Ore mined by Varro Kestane/ }));
-    expect(screen.getByRole('table', { name: /Ore mined by Varro Kestane/ })).toBeInTheDocument();
+    const ore = { name: /Ore mined by Varro Kestane/ };
+    expect(screen.queryByRole('table', ore)).not.toBeInTheDocument();
+    // The row's own cells open it, so no pointing at the caret.
+    const row = screen.getByRole('link', { name: 'Varro Kestane' }).closest('tr')!;
+    await userEvent.click(within(row).getAllByRole('cell').at(-1)!);
+    expect(screen.getByRole('table', ore)).toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/corp/moons');
-    // The clicked row already carries the totals.
-    expect(screen.queryByText('Total')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText('Varro Kestane'));
+    await userEvent.click(screen.getByRole('link', { name: 'Varro Kestane' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/corp/moons/miners/');
   });
 });

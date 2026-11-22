@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, CollapsiblePanel } from '@/components/ui';
 import { appUrl } from '@/features/share/shareStore';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
@@ -25,6 +25,7 @@ const EXAMPLE_PATH = '/survey?place=Efa&payee=Bob%20Corp&rate=10&notes=Fleet%20a
 export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
   const { t } = useTranslation();
   const made = path !== START_LINK_PATH;
+  const [expanded, setExpanded] = useState(false);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   // The short link made for one path; any change to the details drops it.
   const [short, setShort] = useState<{ path: string; url: string } | null>(null);
@@ -46,11 +47,14 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
     }
   }
   return (
-    <details className="rounded-xs border border-line bg-panel/60 text-sm">
-      <summary className="cursor-pointer select-none px-3 py-2 text-text-dim touch:py-3">
-        {t('survey.start.help.title')}
-      </summary>
-      <div className="space-y-3 border-t border-line px-3 py-3">
+    <CollapsiblePanel
+      title={t('survey.start.help.title')}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+      labels={{ show: t('survey.start.help.title'), hide: t('survey.start.help.title') }}
+      className="text-sm"
+    >
+      <div className="space-y-3">
         <p className="text-text-dim">
           {made ? t('survey.start.help.yourLink') : t('survey.start.help.example')}
         </p>
@@ -122,6 +126,6 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
           {`{"id":"xk3p9q","path":"/s/xk3p9q","url":"https://neocomdesk.com/s/xk3p9q","expiresAt":"…"}`}
         </pre>
       </div>
-    </details>
+    </CollapsiblePanel>
   );
 }

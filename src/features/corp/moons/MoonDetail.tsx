@@ -79,7 +79,12 @@ export function MoonDetail({ id }: { id: string }) {
       id: 'miner',
       header: t('corpTaxBook.moons.cols.miner'),
       primary: true,
-      render: (m) => minerName(m),
+      // The name goes to the miner's page; the rest of the row opens their ore (DESIGN.md §6c).
+      render: (m) => (
+        <Link to={minerPath(m.minerId)} className={entityLinkClassName()}>
+          {minerName(m)}
+        </Link>
+      ),
       sortValue: (m) => minerName(m),
     },
     {
@@ -270,7 +275,6 @@ export function MoonDetail({ id }: { id: string }) {
             rowKey={(m) => m.minerId}
             expandableRow={{
               leadingIcon: true,
-              trigger: 'button',
               toggleLabel: (m) => t('corpTaxBook.moons.moon.oreOf', { name: minerName(m) }),
               renderDetail: (m) => (
                 <OreLinesTable
@@ -280,7 +284,6 @@ export function MoonDetail({ id }: { id: string }) {
                 />
               ),
             }}
-            onRowClick={(m) => navigate(minerPath(m.minerId))}
             density="compact"
             stackLayout="dense"
           />

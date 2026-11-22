@@ -59,6 +59,13 @@ interface PanelProps {
    * `max-md:order-last max-md:basis-full`. From `md` up the row is as before.
    */
   metaOwnRow?: boolean;
+  /**
+   * Makes the header itself a toggle (a collapsible panel, `CollapsiblePanel`): a press
+   * anywhere on the header runs this, except on a button, link or field inside it, which
+   * keep their own press. The caller supplies the caret button as `leading`, which is
+   * what a keyboard reaches.
+   */
+  onHeaderToggle?: () => void;
   children: ReactNode;
   /** @summary Set false for flush content like tables; the body then has no inner padding. */
   padded?: boolean;
@@ -76,6 +83,10 @@ interface PanelProps {
   /** Passthrough for values Tailwind can't express statically, e.g. a `top` offset measured at runtime for a `sticky` panel. */
   style?: CSSProperties;
 }
+
+/** What inside a header keeps its own press instead of toggling a collapsible panel. */
+const HEADER_CONTROLS =
+  'button, a, input, select, textarea, label, [role="button"], [role="tab"], [role="combobox"], [role="switch"], [role="checkbox"]';
 
 /**
  * Base surface. Everything lives in a Panel; don't nest them — use `panel-2`
@@ -105,6 +116,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
     meta,
     wrapMeta = false,
     metaOwnRow = false,
+    onHeaderToggle,
     children,
     padded = true,
     fill = false,
@@ -127,7 +139,18 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
         // own left inset would read as a double gap — drop it and let the
         // control sit against the edge, the way `Assets`' breadcrumb bar does.
         <header
-          className={`flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
+          onClick={
+            onHeaderToggle &&
+            ((event) => {
+              const target = event.target as Element;
+              // A menu or dialog portalled out of the header still bubbles its clicks here.
+              if (!event.currentTarget.contains(target)) return;
+              const hit = target.closest(HEADER_CONTROLS);
+              if (hit && hit !== event.currentTarget) return;
+              onHeaderToggle();
+            })
+          }
+          className={`${onHeaderToggle ? 'cursor-pointer hover:bg-panel-2/60 ' : ''}flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
         >
           <div
             className={`flex min-w-0 items-center gap-2 text-[0.6875rem] text-text-dim ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}
@@ -159,7 +182,8 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
           )}
         </header>
       )}
-      <div className={contentClassName}>{children}</div>
+      {/* A folded panel with nothing to show in its body leaves no padded gap under the header. */}
+      {children != null && children !== false && <div className={contentClassName}>{children}</div>}
     </section>
   );
 });
