@@ -35,6 +35,11 @@ export interface MoonMiningTaxRow {
   assignments: MiningTaxAssignmentRecord[];
   /** Ore this entry's assignments don't yet cover. */
   unassignedOreLines: MiningLedgerEntry['oreLines'];
+  /**
+   * Free ore the Corp Tax Books took off `unassignedOreLines` (`buildDisplayRows`): the ledger still
+   * reports it, so a new Assignment must remember it (`releasedTypeIds`) or it grows straight back in.
+   */
+  bookTakenOreLines?: MiningLedgerEntry['oreLines'];
   /** Assignments that look like one obligation stored twice over this entry — see `findDuplicateAssignmentIds`. Empty for a healthy row. */
   duplicateAssignmentIds?: string[];
 }
