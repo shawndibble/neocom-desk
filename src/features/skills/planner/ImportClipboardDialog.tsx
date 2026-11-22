@@ -253,7 +253,7 @@ export function ImportClipboardDialog({
                           >
                             {nameFor(entry.skillTypeID)} {romanLevel(entry.targetLevel)}
                             {alreadyTrained && (
-                              <span className="ml-2 text-[0.625rem] uppercase">
+                              <span className="ml-2 text-[0.6875rem] uppercase">
                                 {t('plans.alreadyTrained')}
                               </span>
                             )}

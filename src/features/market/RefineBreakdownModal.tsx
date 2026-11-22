@@ -151,7 +151,7 @@ export function RefineBreakdownModal({
             {basisName(row.key)}
             {/* The radio dot already marks it on a phone; screen readers keep the word. */}
             {row.key === activeBasis && (
-              <span className="text-[0.625rem] font-semibold tracking-widest text-accent uppercase max-sm:sr-only">
+              <span className="text-[0.6875rem] font-semibold tracking-widest text-accent uppercase max-sm:sr-only">
                 {t('market.appraisal.breakdown.selected')}
               </span>
             )}
@@ -699,7 +699,7 @@ export function RefineBreakdownModal({
   );
 }
 
-const SECTION_HEADING = 'text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase';
+const SECTION_HEADING = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /** One of the four setup readouts: a label, its explanation, and the figure (or the field that edits it). */
 function SetupBox({
@@ -716,7 +716,7 @@ function SetupBox({
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel px-2.5 py-1.5">
-      <span className="flex items-center gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
         <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
       </span>

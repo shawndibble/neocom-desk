@@ -19,7 +19,7 @@ import type { HubId } from './useCompareHubs';
 /** A best figure carries the word, not just the colour. */
 function BestTag({ children }: { children: string }) {
   return (
-    <span className="ml-1.5 text-[0.625rem] font-semibold tracking-wide text-success uppercase">
+    <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
       {children}
     </span>
   );

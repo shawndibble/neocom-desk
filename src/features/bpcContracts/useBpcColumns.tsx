@@ -140,7 +140,7 @@ export function useBpcColumns({
           return (
             <span className="inline-flex flex-wrap items-center gap-x-1.5">
               {place}
-              <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('bpcContracts.atTradeHub')}
               </span>
             </span>
@@ -309,7 +309,7 @@ export function useBpcColumns({
             // the title line's right-hand figure, not a labelled field.
             <span className="flex flex-col items-end">
               <span>{amount}</span>
-              <span className="text-[0.625rem] text-text-dim">
+              <span className="text-[0.6875rem] text-text-dim">
                 {t('bpcContracts.wholeContractMarker')}
               </span>
             </span>

@@ -176,12 +176,12 @@ function GalleryItem({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
             {title}
             {soon && (
-              <span className="rounded-xs border border-line-bright px-1.5 text-[0.5625rem] font-bold tracking-widest text-text-dim uppercase">
+              <span className="rounded-xs border border-line-bright px-1.5 text-[0.6875rem] font-bold tracking-widest text-text-dim uppercase">
                 {t('overview.gallery.comingSoon')}
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-[0.8125rem] text-text-dim">{t(kind.descKey)}</p>
+          <p className="mt-0.5 text-sm text-text-dim">{t(kind.descKey)}</p>
         </div>
         <div className="shrink-0">{action}</div>
       </div>
@@ -240,7 +240,7 @@ function PresetItem({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold">{title}</div>
-          <p className="mt-0.5 text-[0.8125rem] text-text-dim">
+          <p className="mt-0.5 text-sm text-text-dim">
             {t(`overview.gallery.presets.${preset.id}.desc`)}
           </p>
         </div>

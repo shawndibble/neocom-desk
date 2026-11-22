@@ -204,7 +204,7 @@ export function MobileMarketWideList({
                 />
                 <span
                   aria-hidden="true"
-                  className="absolute -bottom-1 -left-1 rounded-xs bg-bg px-1 text-[0.625rem] leading-4 font-semibold text-text-dim tabular-nums"
+                  className="absolute -bottom-1 -left-1 rounded-xs bg-bg px-1 text-[0.6875rem] leading-4 font-semibold text-text-dim tabular-nums"
                 >
                   {t('industry.marketOpportunitiesRankBadge', { rank: index + 1 })}
                 </span>
@@ -229,7 +229,7 @@ export function MobileMarketWideList({
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.6875rem] text-text-dim">
                   <span
                     className={cx(
-                      'text-[0.625rem] leading-4 font-semibold tracking-wider uppercase',
+                      'text-[0.6875rem] leading-4 font-semibold tracking-wider uppercase',
                       owned ? 'text-success' : 'text-text-dim'
                     )}
                   >

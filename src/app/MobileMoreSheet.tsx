@@ -41,7 +41,7 @@ const ALL_CORP_VIEWS = {
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
-const HEADING = 'text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase';
+const HEADING = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface MobileMoreSheetProps {
   open: boolean;

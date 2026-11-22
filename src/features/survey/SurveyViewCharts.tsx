@@ -475,7 +475,7 @@ export function PaceByOreChart({
             offset: 8,
             dy: -22,
             fill: 'var(--color-text-dim)',
-            fontSize: '0.625rem',
+            fontSize: '0.6875rem',
           },
         })}
         {/* One ReferenceArea per slice: about 8 ores x intervals SVG rects, by design. */}

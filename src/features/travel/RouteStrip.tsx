@@ -130,7 +130,7 @@ export function RouteStrip({
                 >
                   <span
                     data-testid={step.testId}
-                    className={`min-w-0 flex-1 overflow-hidden rounded-[1px] bg-panel-2 text-center text-[0.625rem] leading-[0.875rem] ${step.className}`}
+                    className={`min-w-0 flex-1 overflow-hidden rounded-[1px] bg-panel-2 text-center text-[0.6875rem] leading-[0.875rem] ${step.className}`}
                   >
                     {row.entry?.kind === 'jump' &&
                       t('travel.jumpDrive.stripDistance', {

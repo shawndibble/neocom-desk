@@ -105,7 +105,7 @@ export function MakeOrBuyMarker({
           'shrink-0',
           tone,
           badge &&
-            'rounded-xs border border-current px-1 text-[0.5625rem] leading-4 font-bold tracking-widest uppercase'
+            'rounded-xs border border-current px-1 text-[0.6875rem] leading-4 font-bold tracking-widest uppercase'
         )}
       >
         {badge ? (

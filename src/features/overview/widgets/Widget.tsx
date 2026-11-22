@@ -109,7 +109,7 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   return (
     <p
       className={cx(
-        'flex min-w-0 items-center gap-1 text-[0.8125rem]',
+        'flex min-w-0 items-center gap-1 text-sm',
         secondary.tone ? SECONDARY_TONE[secondary.tone] : 'text-text-dim'
       )}
     >
@@ -375,7 +375,7 @@ function WidgetFrame({
     body = <Skeleton minHeight={reserved()} />;
   } else if (state === 'needsPermission') {
     body = (
-      <div className="grid gap-2 p-3 text-[0.8125rem]">
+      <div className="grid gap-2 p-3 text-sm">
         {grantTarget !== null && endpoints.length > 0 ? (
           <GrantBanner
             variant="ghost"
@@ -393,7 +393,7 @@ function WidgetFrame({
     );
   } else if (state === 'failed') {
     body = (
-      <div role="alert" className="grid gap-2 p-3 text-[0.8125rem]">
+      <div role="alert" className="grid gap-2 p-3 text-sm">
         <b className="flex items-center gap-1.5 text-danger">
           <SeverityIcon severity="critical" />
           {t('overview.widgets.failed.title')}
@@ -417,7 +417,7 @@ function WidgetFrame({
     );
   } else if (state === 'empty') {
     body = (
-      <div className="grid gap-2 p-3 text-[0.8125rem]">
+      <div className="grid gap-2 p-3 text-sm">
         <b>{view.emptyMessage ?? t(keys.emptyMessageKey)}</b>
         {/* What the kind is for, so a new pilot's empty card explains itself. */}
         {!view.emptyHealthy && (

@@ -43,7 +43,7 @@ function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
 
   return (
     <div className="w-72 max-w-full space-y-1.5">
-      <label htmlFor={fieldId} className="block text-[0.8125rem] font-semibold">
+      <label htmlFor={fieldId} className="block text-sm font-semibold">
         {t('travel.note.label', { name })}
       </label>
       <TextArea
@@ -58,7 +58,7 @@ function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
           setDraft(event.target.value);
         }}
         onBlur={save}
-        className="text-[0.8125rem]"
+        className="text-sm"
       />
       <p className="flex justify-between gap-2 text-[0.75rem] text-text-dim tabular-nums">
         <span>

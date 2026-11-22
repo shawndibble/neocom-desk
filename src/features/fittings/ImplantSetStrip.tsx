@@ -85,7 +85,7 @@ export function SetStrip({
           >
             <span
               className={cx(
-                'text-[0.625rem] tracking-wider uppercase',
+                'text-[0.6875rem] tracking-wider uppercase',
                 picked ? 'text-accent' : 'text-text-dim',
                 id !== undefined && 'pr-5'
               )}

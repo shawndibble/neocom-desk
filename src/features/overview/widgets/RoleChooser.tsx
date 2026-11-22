@@ -54,7 +54,7 @@ export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) 
           />
         ))}
       </div>
-      <p className="text-[0.8125rem] text-text-dim">{t('overview.roles.always')}</p>
+      <p className="text-sm text-text-dim">{t('overview.roles.always')}</p>
       <span className="flex flex-wrap gap-2">
         <Button
           variant="primary"
