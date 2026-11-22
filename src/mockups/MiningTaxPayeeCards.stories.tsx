@@ -19,7 +19,8 @@ import { NewComponent } from './NewComponent';
  *    the table's Payee filter keeps filtering the entries.
  *
  * Money reads by colour and sign, never the word "credit": green is yours, red with a minus is
- * owed (cards, ledger balance and amounts alike).
+ * owed, on the cards and the ledger Balance. Ledger amounts stay uncoloured (as on desktop);
+ * a charge keeps its minus so it is told apart from a payment.
  *
  * The phone ledger drops the four-line label/value stack per row for a two-line row: what it was
  * and its signed amount, then the date and the running balance. Empty cells are not drawn.
@@ -43,54 +44,99 @@ const ISK = ({ children }: { children: string }) => (
   </span>
 );
 
-function PayeeActionCard({
-  name,
-  corpBook,
-  amount,
-  meta: metaLine,
-  linkPayment,
-  folded,
-}: {
+interface CardPayee {
   name: string;
   corpBook?: boolean;
   amount: string;
   meta: string;
   linkPayment: boolean;
-  /** Ledger and Link payment live in a ⋮ menu instead of on the row. */
-  folded?: boolean;
-}) {
+}
+
+const STAR_TAIL: CardPayee = {
+  name: 'Star Tail Industries',
+  amount: '5,342,548',
+  meta: '2 entries · oldest unpaid day was 2 days ago · Mero Otichoda',
+  linkPayment: true,
+};
+const BUREAU: CardPayee = {
+  name: 'Bureau of Unified Harvesting',
+  corpBook: true,
+  amount: '3,869,888',
+  meta: '1 entry · oldest unpaid day was yesterday · Mero Otichoda',
+  linkPayment: false,
+};
+const OTELA: CardPayee = {
+  name: 'Otela Mining Concern',
+  amount: '1,204,310',
+  meta: '3 entries · oldest unpaid day was 5 days ago · Mero Otichoda',
+  linkPayment: true,
+};
+
+/** Ledger and Link payment: text actions split by a hairline from `sm` up, one ⋮ menu below. */
+function SecondaryActions({ linkPayment }: { linkPayment: boolean }) {
+  return (
+    <>
+      <div className="hidden shrink-0 items-center divide-x divide-border sm:flex">
+        <button type="button" className={textActionClassName('px-3 first:pl-0 last:pr-0')}>
+          Ledger
+        </button>
+        {linkPayment && (
+          <button type="button" className={textActionClassName('px-3 first:pl-0 last:pr-0')}>
+            Link payment
+          </button>
+        )}
+      </div>
+      <Button className="shrink-0 sm:hidden" aria-label="More actions for this Payee">
+        ⋮
+      </Button>
+    </>
+  );
+}
+
+function PayeeActionCard({ payee, wide }: { payee: CardPayee; wide?: boolean }) {
+  const name = (
+    <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-base font-semibold">
+      <span className="line-clamp-2 break-words">{payee.name}</span>
+      {payee.corpBook && <Pill outlined>CORP TAX BOOK</Pill>}
+    </span>
+  );
+  const actions = (
+    <div className="flex items-center gap-3">
+      <Button variant="primary" className={wide ? 'flex-1 sm:flex-none sm:px-8' : 'flex-1'}>
+        Settle up
+      </Button>
+      <SecondaryActions linkPayment={payee.linkPayment} />
+    </div>
+  );
   return (
     <NewComponent name="PayeeActionCard">
       <Panel padded={false}>
-        <div className="flex flex-col gap-2 p-3">
-          <div className="flex items-start gap-2">
-            <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-base font-semibold">
-              <span className="line-clamp-2 break-words">{name}</span>
-              {corpBook && <Pill outlined>CORP TAX BOOK</Pill>}
+        {wide ? (
+          <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-start gap-2">
+                {name}
+                <span className="sm:hidden">
+                  <ISK>{payee.amount}</ISK>
+                </span>
+              </div>
+              <p className="text-xs text-text-dim">{payee.meta}</p>
+            </div>
+            <span className="max-sm:hidden">
+              <ISK>{payee.amount}</ISK>
             </span>
-            <ISK>{amount}</ISK>
+            {actions}
           </div>
-          <p className="text-xs text-text-dim">{metaLine}</p>
-          <div className="flex items-center gap-3">
-            <Button variant="primary" className="flex-1">
-              Settle up
-            </Button>
-            {folded ? (
-              <Button aria-label="More actions for this Payee">⋮</Button>
-            ) : (
-              <>
-                <button type="button" className={textActionClassName('shrink-0')}>
-                  Ledger
-                </button>
-                {linkPayment && (
-                  <button type="button" className={textActionClassName('shrink-0')}>
-                    Link payment
-                  </button>
-                )}
-              </>
-            )}
+        ) : (
+          <div className="flex flex-col gap-2 p-3">
+            <div className="flex items-start gap-2">
+              {name}
+              <ISK>{payee.amount}</ISK>
+            </div>
+            <p className="text-xs text-text-dim">{payee.meta}</p>
+            {actions}
           </div>
-        </div>
+        )}
       </Panel>
     </NewComponent>
   );
@@ -111,44 +157,57 @@ function CreditNote() {
   );
 }
 
-function Cards({ folded }: { folded?: boolean }) {
+function Cards({
+  payees,
+  total,
+  credit,
+}: {
+  payees: CardPayee[];
+  total?: string;
+  credit?: boolean;
+}) {
   return (
     <div className="space-y-3 p-4">
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-[0.6875rem] font-semibold text-text-dim">You owe</span>
-        <span className="text-base font-semibold text-isk-neg tabular-nums">9,212,437 ISK</span>
-        <span className="text-xs text-text-dim">across 2 payees</span>
-      </p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <PayeeActionCard
-          name="Star Tail Industries"
-          amount="5,342,548"
-          meta="2 entries · oldest unpaid day was 2 days ago · Mero Otichoda"
-          linkPayment
-          folded={folded}
-        />
-        <PayeeActionCard
-          name="Bureau of Unified Harvesting"
-          corpBook
-          amount="3,869,888"
-          meta="1 entry · oldest unpaid day was yesterday · Mero Otichoda"
-          linkPayment={false}
-          folded={folded}
-        />
+      {total && (
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-[0.6875rem] font-semibold text-text-dim">You owe</span>
+          <span className="text-base font-semibold text-isk-neg tabular-nums">{total} ISK</span>
+          <span className="text-xs text-text-dim">across {payees.length} payees</span>
+        </p>
+      )}
+      <div
+        className={cx(
+          'grid grid-cols-1 gap-2',
+          payees.length > 1 && 'sm:grid-cols-2 xl:grid-cols-3'
+        )}
+      >
+        {payees.map((p) => (
+          <PayeeActionCard key={p.name} payee={p} wide={payees.length === 1} />
+        ))}
       </div>
-      <CreditNote />
+      {credit && <CreditNote />}
     </div>
   );
 }
 
-/** @summary Desktop: one primary button, Ledger and Link payment as text actions on the row, the credit a one-line note. */
-export const Proposed: Story = { render: () => <Cards /> };
+/** @summary Desktop, two payees due plus a credit note: Ledger | Link payment split by a hairline. */
+export const Proposed: Story = {
+  render: () => <Cards payees={[STAR_TAIL, BUREAU]} total="9,212,437" credit />,
+};
 
-/** @summary Phone: the same row fits at 390px; the corp book's card has no Link payment. */
-export const ProposedPhone: Story = { ...phone, render: () => <Cards /> };
+/** @summary Desktop, three payees due: three columns, same row of actions in each. */
+export const ThreePayees: Story = {
+  render: () => <Cards payees={[STAR_TAIL, BUREAU, OTELA]} total="10,416,746" />,
+};
 
-/** @summary Fallback B: Ledger and Link payment folded into a ⋮ menu beside Settle up. */
-export const FoldedMenu: Story = { ...phone, render: () => <Cards folded /> };
+/** @summary Desktop, one payee due: a single full-width row, no total line. */
+export const SinglePayee: Story = { render: () => <Cards payees={[STAR_TAIL]} /> };
+
+/** @summary Phone: Settle up plus one ⋮ menu holding Ledger and Link payment. */
+export const ProposedPhone: Story = {
+  ...phone,
+  render: () => <Cards payees={[STAR_TAIL, BUREAU]} total="9,212,437" credit />,
+};
 
 interface Row {
   what: string;
@@ -194,19 +253,16 @@ function LedgerPhoneRow({ row }: { row: Row }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm font-semibold">{row.what}</span>
           {/* Charged and Credited were two labelled rows, one always blank: one signed figure. */}
-          <span
-            className={cx(
-              'shrink-0 text-sm tabular-nums',
-              row.amount.credit ? 'text-isk-pos' : 'text-isk-neg'
-            )}
-          >
+          <span className={cx('shrink-0 text-sm tabular-nums', 'text-text')}>
             {sign}
             {value}
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-2 text-xs text-text-dim">
           <span className="tabular-nums">{row.date}</span>
-          <span className={cx('tabular-nums', row.balance.credit ? 'text-isk-pos' : 'text-isk-neg')}>
+          <span
+            className={cx('tabular-nums', row.balance.credit ? 'text-isk-pos' : 'text-isk-neg')}
+          >
             Balance {row.balance.text}
           </span>
         </div>
