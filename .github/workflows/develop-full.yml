@@ -1,0 +1,68 @@
+name: Develop full CI
+
+# The other half of ci.yml's narrowed PR gate. A pull request runs the unit
+# tests its change can reach and the behaviour e2e specs, so a break the import
+# graph cannot see, or a layout regression, can land on `develop`. This runs the
+# whole suite there (`full: true`: every unit test, every e2e spec including the
+# layout ones, the Corp Tax Book specs) and opens an issue when it fails.
+#
+# It must not starve the PRs of runners, since the pool is 20 account-wide and
+# a full run holds ~17 of them. So: one run at a time, and a run waits until
+# 30 minutes after the previous one started. GitHub keeps one pending run per
+# concurrency group and replaces it with each newer push, so a burst of merges
+# produces one run that tests the newest commit rather than a queue.
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: develop-full
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Wait out the cooldown since the previous run started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          started=$(gh api "repos/${{ github.repository }}/actions/workflows/develop-full.yml/runs?branch=develop&per_page=5" \
+            --jq "[.workflow_runs[] | select(.id != ($RUN_ID | tonumber))][0].run_started_at // empty")
+          if [ -z "$started" ]; then echo "no earlier run"; exit 0; fi
+          wait=$(( $(date -d "$started" +%s) + 1800 - $(date +%s) ))
+          if [ "$wait" -gt 0 ]; then echo "sleeping ${wait}s"; sleep "$wait"; fi
+
+  ci:
+    needs: [settle]
+    uses: ./.github/workflows/ci.yml
+    with:
+      full: true
+
+  report:
+    needs: [ci]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open an issue for the failing run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Develop full CI is failing"
+          open=$(gh issue list --repo "${{ github.repository }}" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          body="The full suite failed on \`develop\` at ${{ github.sha }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          A PR runs only the tests its change reaches and skips the layout e2e specs, so this is where a break outside that set shows up. Fix it in its own PR."
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "${{ github.repository }}" --body "$body"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$title" --body "$body"
+          fi

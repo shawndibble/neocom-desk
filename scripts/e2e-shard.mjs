@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 /**
  * Prints the e2e spec files one CI shard should run, one per line:
- *   node scripts/e2e-shard.mjs --shard 3/6
+ *   node scripts/e2e-shard.mjs --shard 3/6 [--skip-layout]
+ *
+ * `--skip-layout` leaves out the geometry specs, which a pull request does not run
+ * (`scripts/lib/ciPlan.mjs`).
  *
  * Weights live in e2e/shard-weights.json (seconds of worker time per file).
  * Refresh them from a CI log with `node scripts/e2e-shard.mjs --weights <log>`;
  * a file missing from the table is treated as median, so a new spec needs no
  * edit here to be run.
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { listE2eSpecs } from './lib/e2eSpecs.mjs';
 import { parseListReporterLog, partitionByWeight } from './lib/e2eShards.mjs';
 
 const WEIGHTS_PATH = 'e2e/shard-weights.json';
@@ -33,11 +37,7 @@ if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || cur
   process.exit(2);
 }
 
-const files = readdirSync('e2e')
-  .filter((name) => name.endsWith('.spec.ts'))
-  // The Corp Tax Book specs run under playwright.book.config.ts (the Firebase emulators), not here.
-  .filter((name) => !name.endsWith('.book.spec.ts'))
-  .map((name) => `e2e/${name}`);
+const files = listE2eSpecs({ skipLayout: args.includes('--skip-layout') });
 const weights = JSON.parse(readFileSync(WEIGHTS_PATH, 'utf8'));
 const mine = partitionByWeight(files, weights, total)[current - 1];
 // Nothing at all for an empty shard: a bare newline would reach the caller as

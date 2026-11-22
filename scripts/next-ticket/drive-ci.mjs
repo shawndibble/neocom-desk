@@ -7,7 +7,7 @@
 //
 // An absent signal is not a negative signal: `gh pr checks --watch` only
 // blocks on checks that actually exist. If a required context (e.g.
-// `validate` or `e2e`) never gets a check run at all — the workflow didn't
+// `ci`) never gets a check run at all — the workflow didn't
 // trigger, a path filter skipped it, whatever — `--watch` sees nothing to
 // wait for and exits clean, and naively reporting "green" whenever nothing
 // is failing would call that PR mergeable when branch protection would
@@ -36,7 +36,7 @@
 //   {"status":"conflict"}                                     — run sync-main.mjs, then retry
 //   {"status":"green","mergeable":true}                       — proceed to finish.mjs
 //   {"status":"checks-failed","failedRunIds":[123456]}         — diagnose, fix, retry
-//   {"status":"missing-checks","missing":["validate","e2e"]}   — required context(s) never
+//   {"status":"missing-checks","missing":["ci"]}               — required context(s) never
 //                                                                 reported at all; wait and retry
 //   {"status":"pending"}                                       — a required context is still
 //                                                                 running, or hasn't registered
@@ -60,9 +60,9 @@ const REQUIRED_CONTEXT_POLL_INTERVAL_MS = 15_000;
 
 // Fallback only — used if the ruleset API call below fails (permissions,
 // API shape change, etc.). The real source of truth is the "Merging"
-// branch ruleset covering `develop` (and `main`) in this repo; keep this in sync with it
+// branch ruleset covering `develop` in this repo; keep this in sync with it
 // if that ruleset's required contexts ever change.
-const FALLBACK_REQUIRED_CONTEXTS = ['validate', 'test', 'e2e'];
+const FALLBACK_REQUIRED_CONTEXTS = ['ci'];
 
 function getRequiredContexts() {
   try {

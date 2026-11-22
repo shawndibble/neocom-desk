@@ -18,23 +18,49 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   fails worktree setup outright if the hook didn't really install. While
   iterating, use narrower checks: `npm run typecheck`
   and `npx vitest run <path>` for the file(s) you're touching. **Never run
-  the full suite (`npm run test:run`) or `npm run build` locally** — CI's
-  `validate` job runs `check:case`, `lint`, `format:check`, `typecheck`,
-  `build`, the Firestore rules tests and the `functions/`
-  typecheck and tests (all but `build` in the one `static` job) on every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes to `develop`/`main`, and `cache-warm.yml` saves CI's dependency caches on `develop` so a PR's first run hits them), the `test` job runs `test:run` across four shards, and the
-  `e2e` job runs Playwright across six (whole spec files dealt out by
-  `e2e/shard-weights.json`; a new spec needs no entry, and
-  `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside
-  Playwright's container image, whose tag in `ci.yml` (and `cache-warm.yml`) must match
-  `@playwright/test`, plus the Corp Tax Book specs in one `e2e-book` job against the Firebase
-  emulators (see "Running the app against the Firebase emulators" below); that's the gate, not a local
-  pre-PR run. Both sharded jobs report through a single aggregate check
-  (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. The `e2e` shards are skipped (and `e2e` still reports green) when every file a PR changes is on `scripts/lib/e2eRelevance.mjs`'s safe list (docs, `functions/`, workflows other than `ci.yml`, unit tests, and the like); any other or unlisted path runs them. The four `test-shard` jobs skip the same way (and `test` still reports green) when every changed file is prose on `scripts/lib/testRelevance.mjs`'s narrower safe list (`docs/`, root and `.claude/` Markdown, `.out-of-scope/`). In ticket-loop work (`/next-ticket`, `/implement`),
-  see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
-  exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
-  as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
-  ticket loop calls it automatically. `/code-review` sub-agents are
-  read-only diff review and must never run tests, lint, typecheck, or build.
+  the full suite (`npm run test:run`) or `npm run build` locally** — CI is the gate,
+  not a local pre-PR run. On every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes
+  to `develop`/`main`, and `cache-warm.yml` saves CI's dependency caches on `develop` so
+  a PR's first run hits them) the `static` job runs `check:case`, `lint`, `format:check`,
+  `typecheck`, the Firestore rules tests and the `functions/` typecheck and tests, and
+  `build` builds the bundle.
+
+  **A PR runs what its change can reach; `develop` runs everything.** The ruleset
+  requires one check, `ci` (the aggregate job at the bottom of `ci.yml`, which fails
+  unless every job it needs passed or was legitimately skipped):
+  - **Unit tests:** `select-tests` runs `vitest list --changed` and the `test-shard`
+    jobs (one to four, sized by the weight of the files picked) run only the tests
+    whose import graph holds a changed file. The whole suite runs instead when the
+    change can move any test: a lockfile, `vite.config.ts`, `vitest.*`, `tsconfig*`,
+    `src/test/`, the CI planning scripts or `ci.yml` itself (`needsFullUnitRun` in
+    `scripts/lib/ciPlan.mjs`). Docs-only PRs skip them
+    (`scripts/lib/testRelevance.mjs`'s narrow safe list).
+  - **E2E:** a PR runs the behaviour specs (`e2e-shard`, one to six shards, whole spec
+    files dealt out by `e2e/shard-weights.json`; a new spec needs no entry, and
+    `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside
+    Playwright's container image, whose tag in `ci.yml` (and `cache-warm.yml`) must match
+    `@playwright/test`. The layout specs (`isLayoutSpec`: names with `Narrow`, `Wide`,
+    `Heights`, `Overflow`, `Clearance`, `Fit`, ... , i.e. geometry at a phone or desktop
+    size) do not run on a PR; a spec whose name matches none counts as behaviour and
+    does. The shards skip when every changed file is on
+    `scripts/lib/e2eRelevance.mjs`'s safe list (docs, `functions/`, workflows other than
+    `ci.yml`, unit tests, and the like).
+  - **Corp Tax Book specs** (`e2e-book`, against the Firebase emulators, see "Running the
+    app against the Firebase emulators" below, ~11 minutes) run on a PR only when its
+    change can reach them: `functions/`, the rules, their harness and specs, or code under
+    `src/` whose path names tax, mining, moons, sync or db (`needsBookE2eOnPr`).
+  - **`develop-full.yml`** calls `ci.yml` with `full: true` on every push to `develop`
+    (one run at a time, at least 30 minutes after the previous one started, so it does not
+    starve PRs of runners): every unit test, every e2e spec including the layout ones, and
+    the Corp Tax Book specs. When it fails it opens (or comments on) an issue titled
+    "Develop full CI is failing": **fix that in its own PR, before other work**, like any
+    flake. To run it on a branch by hand: `gh workflow run ci.yml --ref <branch> -f full=true`.
+    In ticket-loop work (`/next-ticket`, `/implement`),
+    see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
+    exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
+    as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
+    ticket loop calls it automatically. `/code-review` sub-agents are
+    read-only diff review and must never run tests, lint, typecheck, or build.
 - **Lint, format and typecheck results are cached.** `npm run lint` and
   `npm run format:check` run with `--cache --cache-strategy content` (into
   `.cache/eslint`, `.cache/prettier`), and `tsc -b` keeps `.cache/tsc`, so a
