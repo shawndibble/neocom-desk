@@ -19,6 +19,7 @@ import {
   type MinerOnMoon,
 } from '@/engine/corpTaxBook/bookSections';
 import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookView';
+import { extractionId as extractionIdOf } from '@/engine/corpTaxBook/sync';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
@@ -56,6 +57,7 @@ export function MoonDetail({ id }: { id: string }) {
     );
   }
   const { row } = detail;
+  const surveyId = view.input.extractions.find((x) => extractionIdOf(x) === row.id)?.surveyId;
   const place = splitPlace(names.refinery(row.structureId), names.moon(row.moonId));
   const mined = miners.reduce((s, m) => s + m.value, 0);
   const left =
@@ -192,6 +194,12 @@ export function MoonDetail({ id }: { id: string }) {
         note={
           <>
             <OreLine row={row} {...(canEdit ? { onLink: () => setLinking(true) } : {})} />
+            {/* A linked Survey opens on its own page (its share link, kept 7 days). */}
+            {surveyId !== undefined && (
+              <Link to={`/s/${surveyId}`} className={entityLinkClassName('ml-2')}>
+                {t('corpTaxBook.moons.moon.link.view')}
+              </Link>
+            )}
             {/* Ore known from a Survey: the link to change it. An unknown one has OreLine's own. */}
             {canEdit && row.oreLines.length > 0 && row.oreSource === 'survey' && (
               <button

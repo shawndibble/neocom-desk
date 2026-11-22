@@ -61,3 +61,23 @@ describe('moonLoss', () => {
     expect(loss?.rows[0]?.mined).toBe(150);
   });
 });
+
+describe('moonLoss with moon ore variants', () => {
+  it('splits a notified base ore into the variants mined, each losing its share', () => {
+    const BITUMENS = 45492;
+    const BRIMFUL_BITUMENS = 46284;
+    const loss = moonLoss(
+      [{ typeId: BITUMENS, quantity: 1000 }],
+      [
+        { typeId: BITUMENS, quantity: 480 },
+        { typeId: BRIMFUL_BITUMENS, quantity: 320 },
+      ],
+      true
+    );
+    expect(loss?.rows).toEqual([
+      { typeId: BITUMENS, chunk: 600, mined: 480, lost: 120, pct: 20 },
+      { typeId: BRIMFUL_BITUMENS, chunk: 400, mined: 320, lost: 80, pct: 20 },
+    ]);
+    expect(loss?.totalPct).toBe(20);
+  });
+});

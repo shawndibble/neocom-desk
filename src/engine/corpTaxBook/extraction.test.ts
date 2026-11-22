@@ -12,6 +12,8 @@ import {
   minedVsLeft,
   minedDuringExtraction,
   surveyFractions,
+  snapshotSources,
+  surveySnapshotOf,
   type Extraction,
 } from './extraction';
 import type { ObservedMiningEntry } from './types';
@@ -262,6 +264,45 @@ describe('surveyFractions (D13)', () => {
 
   it('is empty for an empty scan', () => {
     expect(surveyFractions([], typeIdOf)).toEqual([]);
+  });
+});
+
+describe('a linked survey kept with the book', () => {
+  const typeIdOf = (name: string) => ({ Zeolites: ORE_A, Sylvite: ORE_B })[name];
+  const rocks = [
+    { ore: 'Zeolites', volume: 300 },
+    { ore: 'Sylvite', volume: 100 },
+    { ore: 'Mystery', volume: 50 },
+    { ore: 'Zeolites', volume: 100 },
+  ];
+
+  it('keeps each named ore’s volume, the scan’s whole volume and when it was taken', () => {
+    expect(surveySnapshotOf(rocks, typeIdOf, 1234)).toEqual({
+      at: 1234,
+      volumeM3: 550,
+      ores: [
+        { typeId: ORE_A, volumeM3: 400 },
+        { typeId: ORE_B, volumeM3: 100 },
+      ],
+    });
+  });
+
+  it('sizes a chunk the same as the scan it was kept from', () => {
+    const x = {
+      id: 'x',
+      structureId: 1,
+      moonId: 2,
+      startedAt: '2026-09-01T00:00:00Z',
+      chunkArrivalAt: '2026-09-02T00:00:00Z',
+      naturalDecayAt: '2026-09-02T03:00:00Z',
+    };
+    const at = Date.parse('2026-09-02T04:00:00Z');
+    const live = estimateChunk(x, {
+      survey: surveyFractions(rocks, typeIdOf),
+      surveyVolumeM3: 550,
+      surveyAt: at,
+    });
+    expect(estimateChunk(x, snapshotSources(surveySnapshotOf(rocks, typeIdOf, at)))).toEqual(live);
   });
 });
 

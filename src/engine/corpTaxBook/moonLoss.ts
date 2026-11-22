@@ -1,6 +1,9 @@
 // A moon's ore loss (issue #5257): what the chunk held that the ledger never shows delivered.
 // Flagged Fully Mined it is Residue; unflagged it is Residue plus ore never mined, and the
 // caller labels it so. Pure: the caller passes the chunk make-up and the ledger's mined ore.
+// A notified make-up names only base ores; each is split into the variants mined first.
+
+import { splitChunkVariants, sumByType } from './moonOreVariants';
 
 export interface OreQty {
   typeId: number;
@@ -25,16 +28,15 @@ export interface MoonLoss {
 
 const pctOf = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
-/** Null without a chunk source: no make-up means no figure. */
+/** Null without a chunk source: no make-up means no figure. A variant's loss is its share of its ore's. */
 export function moonLoss(
   chunk: readonly OreQty[],
   mined: readonly OreQty[],
   fullyMined: boolean
 ): MoonLoss | null {
   if (chunk.length === 0) return null;
-  const got = new Map<number, number>();
-  for (const l of mined) got.set(l.typeId, (got.get(l.typeId) ?? 0) + l.quantity);
-  const rows = chunk.map((l): OreLossRow => {
+  const got = sumByType(mined);
+  const rows = splitChunkVariants(chunk, mined).map((l): OreLossRow => {
     const m = got.get(l.typeId) ?? 0;
     const lost = Math.max(0, l.quantity - m);
     return { typeId: l.typeId, chunk: l.quantity, mined: m, lost, pct: pctOf(lost, l.quantity) };

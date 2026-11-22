@@ -2216,6 +2216,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // An officer's choice replaces a pilot's start-from-the-pop link (`popSurveyId`).
       tx.update(ref, {
         surveyId: action.surveyId ?? FieldValue.delete(),
+        // The linked Survey's first scan, kept so the make-up outlives the Survey's link.
+        surveyScan: action.surveyScan ?? FieldValue.delete(),
         popSurveyId: FieldValue.delete(),
       });
       return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };
