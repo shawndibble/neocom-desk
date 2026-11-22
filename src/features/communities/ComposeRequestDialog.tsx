@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
+  LiveNote,
   Button,
   FieldError,
   LiveStatus,
@@ -368,9 +369,9 @@ export function ComposeRequestDialog({
         {!standingMode && (
           <>
             {linesLocked && (
-              <p role="status" className="text-xs text-text-dim">
+              <LiveNote className="text-xs text-text-dim">
                 {t('communities.board.compose.linesLockedNote')}
-              </p>
+              </LiveNote>
             )}
             {!linesLocked && (
               <label className="block space-y-1">

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
-import { Button, NeedsConnection, TextArea } from '@/components/ui';
+import { LiveNote, Button, NeedsConnection, TextArea } from '@/components/ui';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { quoteIsCurrent, quoteIsHeld, type StandingRequest } from '@/engine/communities/buyback';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
@@ -162,9 +162,9 @@ export function SellToSection({
             </span>
           </p>
           {stillHeld && !current && (
-            <p role="status" className="text-xs text-warning">
+            <LiveNote className="text-xs text-warning">
               {t('communities.board.sellTo.stale')}
-            </p>
+            </LiveNote>
           )}
           {stillHeld && current && (
             <p className="text-xs text-text-dim">
@@ -204,9 +204,9 @@ export function SellToSection({
             </p>
           )}
           {linkState?.status === 'read-failed' && (
-            <p role="status" className="text-xs text-text-dim">
+            <LiveNote className="text-xs text-text-dim">
               {t('communities.board.buyback.contractReadFailed')}
-            </p>
+            </LiveNote>
           )}
         </div>
       )}
@@ -251,9 +251,9 @@ export function SellToSection({
         )}
       </div>
       {notes && notes.quote.lines.length === 0 && (
-        <p role="status" className="text-xs text-warning">
+        <LiveNote className="text-xs text-warning">
           {t('communities.board.sellTo.nothing')}
-        </p>
+        </LiveNote>
       )}
       {notes && notes.notBought.length > 0 && (
         <p className="text-xs text-text-dim">

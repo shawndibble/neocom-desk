@@ -12,6 +12,7 @@ import type { CommunityRequest, RequestPledge } from '@/engine/communities/reque
 import type { Contract } from '@/esi/endpoints';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { loadContracts } from '@/features/character/contracts';
+import { LiveNote } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { characterIdForUid } from '@/sync/uid';
@@ -192,9 +193,9 @@ export function BuyerQuotes({
         </p>
       )}
       {contracts.status === 'failed' && (
-        <p role="status" className="text-xs text-text-dim">
+        <LiveNote className="text-xs text-text-dim">
           {t('communities.board.buyback.contractReadFailed')}
-        </p>
+        </LiveNote>
       )}
     </section>
   );
