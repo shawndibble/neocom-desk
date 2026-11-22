@@ -120,7 +120,14 @@ describe('CorpStatusPanel', () => {
     const onGrantAgain = vi.fn();
     render(
       <CorpStatusPanel
-        items={[{ corporationId: 32, name: 'Sable Ridge Extraction', state: 'needs-ore' }]}
+        items={[
+          {
+            corporationId: 32,
+            name: 'Sable Ridge Extraction',
+            state: 'needs-ore',
+            ceoName: 'Mira Voss',
+          },
+        ]}
         onSignInAgain={() => {}}
         onGrantAgain={onGrantAgain}
         onRemove={() => Promise.resolve(true)}
@@ -129,6 +136,8 @@ describe('CorpStatusPanel', () => {
     expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
     expect(screen.getByText('No chunk ore')).toBeInTheDocument();
     expect(screen.getByText(/Each chunk's ore isn't shown/)).toBeInTheDocument();
+    // Names who to log in as, so a CEO of many corps knows which character each one needs.
+    expect(screen.getByText('CEO: Mira Voss')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'Grant again for Sable Ridge Extraction' })
     );

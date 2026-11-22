@@ -63,6 +63,8 @@ export interface NeedsYouItem {
   reason?: string;
   /** `needs-names` whose grant also reads no chunk ore: the one Grant again fixes both. */
   alsoOre?: true;
+  /** The CEO to log in as, when the fix is a login and the player's character leads the corp. */
+  ceoName?: string;
 }
 
 /** Whether a moon owner row of the player's own is no longer being read. */
@@ -91,7 +93,7 @@ export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'n
  * Corporations that need the player: run outcomes that did not connect, and the
  * player's own moon owners that stopped answering, and moon owners read without
  * refinery names: `needs-names` for one of the player's own that they can sign in
- * as the CEO of (`grantable`), `names-not-shared` for the rest. One of those own
+ * as the CEO of (`grantable`, each with its CEO's name), `names-not-shared` for the rest. One of those own
  * ones read without each chunk's ore is `needs-ore` (names, when both lack, since
  * the one Grant again fixes both). A corporation the book now reads well is never
  * listed, whatever the run once said about it.
@@ -100,8 +102,12 @@ export function needsYou(
   run: AddCorpsRun | null,
   rows: readonly OwnerRowLike[],
   name: (corporationId: number) => string,
-  grantable: ReadonlySet<number> = new Set()
+  grantable: ReadonlyMap<number, string> = new Map()
 ): NeedsYouItem[] {
+  const ceoOf = (id: number) => {
+    const ceoName = grantable.get(id);
+    return ceoName === undefined ? {} : { ceoName };
+  };
   const items = new Map<number, NeedsYouItem>();
   const reading = new Set(
     rows.filter((r) => !isGoneQuiet(r) && r.status === 'active').map((r) => r.corporationId)
@@ -115,6 +121,7 @@ export function needsYou(
         corporationId: c.corporationId,
         name: c.name,
         state: state as NeedsYouState,
+        ceoName: c.ceoName,
         ...(outcome?.kind === 'refused' && (state === 'needs-sign-in' || state === 'failed')
           ? { reason: outcome.reason }
           : {}),
@@ -139,6 +146,7 @@ export function needsYou(
         ...(lacksOre(r) && r.sameOwner === true && grantable.has(r.corporationId)
           ? { alsoOre: true as const }
           : {}),
+        ...(r.sameOwner === true ? ceoOf(r.corporationId) : {}),
       });
     } else if (
       lacksOre(r) &&
@@ -150,6 +158,7 @@ export function needsYou(
         corporationId: r.corporationId,
         name: name(r.corporationId),
         state: 'needs-ore',
+        ...ceoOf(r.corporationId),
       });
     }
   }
