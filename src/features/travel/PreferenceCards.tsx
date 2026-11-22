@@ -128,7 +128,7 @@ export function PreferenceCards({
     <div
       role="radiogroup"
       aria-label={t('travel.options.label')}
-      className="grid grid-cols-[repeat(3,minmax(15rem,1fr))] gap-2 max-md:-mx-4 max-md:overflow-x-auto max-md:px-4 max-md:pb-1 md:grid-cols-3"
+      className="grid grid-cols-[repeat(3,minmax(15rem,1fr))] gap-2 max-md:-mx-2 max-md:overflow-x-auto max-md:px-2 max-md:pb-1 md:grid-cols-3"
     >
       {cards.map((card, index) => (
         <button

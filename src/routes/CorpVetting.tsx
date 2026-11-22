@@ -20,7 +20,7 @@ export function CorpVetting() {
   }
   const content =
     gate.status === 'denied' ? (
-      <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('vetting.title')} />
         <CorpDenied
           reason={gate.reason}

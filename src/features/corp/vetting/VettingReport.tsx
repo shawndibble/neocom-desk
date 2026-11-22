@@ -388,7 +388,7 @@ export function VettingReport({
     </Link>
   );
   const frame = (body: ReactNode) => (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4">
       {crumb}
       {body}
     </div>
