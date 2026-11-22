@@ -69,6 +69,8 @@ interface OwedBalancesProps {
   conflicts?: ConflictSummary | null;
   /** Opens the first Conflict to resolve. */
   onReviewConflicts?: () => void;
+  /** One Conflict whose ore can come off the member's entry: "Let {corp} bill it", one click, with an Undo. */
+  onFixConflicts?: () => void;
 }
 
 /**
@@ -97,6 +99,7 @@ export function OwedBalances({
   onReviewPayments,
   conflicts,
   onReviewConflicts,
+  onFixConflicts,
 }: OwedBalancesProps) {
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
@@ -432,10 +435,19 @@ export function OwedBalances({
                 count: conflicts.days,
                 corp: conflicts.firstCorpName,
               }),
-          onReviewConflicts && (
-            <Button className="shrink-0" onClick={onReviewConflicts}>
-              {t('miningTax.conflictsReview')}
-            </Button>
+          (onFixConflicts || onReviewConflicts) && (
+            <span className="flex shrink-0 flex-wrap gap-2">
+              {onFixConflicts && (
+                <Button variant="primary" className="shrink-0" onClick={onFixConflicts}>
+                  {t('miningTax.conflictsFix', { corp: conflicts.firstCorpName })}
+                </Button>
+              )}
+              {onReviewConflicts && (
+                <Button className="shrink-0" onClick={onReviewConflicts}>
+                  {t('miningTax.conflictsReview')}
+                </Button>
+              )}
+            </span>
           )
         )}
     </section>
