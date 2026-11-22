@@ -26,6 +26,8 @@ import {
 } from '@/db';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { scheduleSync } from '@/sync';
+import { removeTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 import {
   AlreadyAssignedError,
   createAssignment,
@@ -330,6 +332,27 @@ export async function releaseOre(
   return commit(charactersOf(releases.map((r) => r.assignment)), async () => {
     for (const [i, r] of releases.entries())
       await releaseOreFromAssignment(r.assignment, r.after, priced[i]!, takeoverFromDefault);
+  });
+}
+
+/**
+ * Puts Assignments back exactly as they were (an Undo of "Let the corporation bill it"): changed
+ * ones are overwritten, deleted ones return and are no longer tombstoned.
+ */
+export function restoreAssignments(
+  records: readonly MiningTaxAssignmentRecord[]
+): Promise<LedgerActionResult> {
+  return commit(charactersOf(records), async () => {
+    const idsByCharacter = new Map<number, string[]>();
+    for (const r of records) {
+      const ids = idsByCharacter.get(r.characterId);
+      if (ids) ids.push(r.id);
+      else idsByCharacter.set(r.characterId, [r.id]);
+    }
+    for (const [characterId, ids] of idsByCharacter)
+      await removeTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
+    const now = Date.now();
+    await putAssignments(records.map((r) => ({ ...r, updatedAt: now })));
   });
 }
 

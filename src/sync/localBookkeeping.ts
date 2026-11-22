@@ -174,6 +174,18 @@ export async function appendTombstones(key: string, ids: readonly string[]): Pro
 }
 
 /**
+ * Forgets the tombstones of `ids` under one key: a deleted row is put back (an Undo), so the
+ * next sync must not delete it again. Same transaction rules as `appendTombstones`.
+ */
+export async function removeTombstones(key: string, ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const dropped = new Set(ids);
+  const held = await readTombstones(key);
+  const remaining = held.filter((t) => !dropped.has(t.id));
+  if (remaining.length !== held.length) await db.settings.put({ key, value: remaining });
+}
+
+/**
  * Drop every device-local sync bookkeeping key for one Character (owner-hash
  * bookmark + every collection's tombstone list). Called when a Character is
  * removed — its skillPlans/buildPlans/quickbars/etc. rows are already gone by

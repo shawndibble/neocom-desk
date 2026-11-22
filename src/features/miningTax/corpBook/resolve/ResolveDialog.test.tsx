@@ -270,14 +270,14 @@ describe('ResolveDialog', () => {
     expect(screen.queryByText(/until\s+while/)).not.toBeInTheDocument();
   });
 
-  it('opens the day to fix your own records on a Conflict', async () => {
+  it('fixes your own records on a Conflict in one click', async () => {
     const user = userEvent.setup();
     const onFixRecords = vi.fn();
     open(
       { ...base, kind: 'conflict', row: { ...row, state: 'conflict' } as BookRowView },
       { onFixRecords, payeeName: 'Rock Hound' }
     );
-    await user.click(screen.getByRole('button', { name: 'Open the day' }));
+    await user.click(screen.getByRole('button', { name: 'Fix it' }));
     expect(onFixRecords).toHaveBeenCalled();
   });
 });

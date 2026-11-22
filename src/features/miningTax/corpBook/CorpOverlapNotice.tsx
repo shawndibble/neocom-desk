@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import {
-  combineOverlaps,
-  previewTakeover,
-  type BookOverlap,
-  type BookRowView,
-} from '@/engine/corpTaxBook/personal';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { releaseOre } from '../ledgerActions';
 import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
+import { planTakeover } from './conflictTakeover';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import { CorpDisputeAction } from './CorpDisputeAction';
 import type { MailContext } from './resolve/resolveSubmit';
@@ -72,11 +68,6 @@ export function CorpOverlapNotice({
 }: Props) {
   const { t } = useTranslation();
   const conflict = view.state === 'conflict';
-  const overlap = useMemo(
-    () =>
-      conflict ? combineOverlaps([view.overlap, ...siblings.map((s) => s.overlap)]) : view.overlap,
-    [conflict, view.overlap, siblings]
-  );
   const { pending, error, run } = useLedgerAction();
   const [acked, setAcked] = useState<Set<string> | null>(null);
   const key = overlapAckKey(view.corporationId, view.characterId, view.date, view.solarSystemId);
@@ -89,64 +80,20 @@ export function CorpOverlapNotice({
     };
   }, []);
 
-  const mine = useMemo(
-    () =>
-      overlap
-        ? everyAssignment.filter(
-            (a) =>
-              a.characterId === view.characterId &&
-              a.date === view.date &&
-              a.solarSystemId === view.solarSystemId &&
-              a.status !== 'dismissed' &&
-              a.payeeId !== undefined &&
-              overlap.payeeIds.includes(a.payeeId)
-          )
-        : [],
-    [overlap, everyAssignment, view.characterId, view.date, view.solarSystemId]
+  const { mine, steps, overlap } = useMemo(
+    () => planTakeover(view, siblings, everyAssignment),
+    [view, siblings, everyAssignment]
   );
-  // Each book's line takes only from the Payees it names, one after another, so a day several
-  // corporations contest comes off the right Payee for each, not greedily off whichever is first.
-  const parts = useMemo(
-    () =>
-      (conflict ? [view.overlap, ...siblings.map((s) => s.overlap)] : [view.overlap]).filter(
-        (o): o is BookOverlap => o !== undefined
-      ),
-    [conflict, view.overlap, siblings]
-  );
-  const plan = useMemo(() => {
-    const current = mine.map((a) => ({
-      payeeId: a.payeeId ?? '',
-      taxPct: a.taxPct,
-      oreLines: a.oreLines,
-      status: a.status,
-    }));
-    const before = current.map((c) => c.oreLines);
-    for (const part of parts) {
-      const at = current.flatMap((c, i) => (part.payeeIds.includes(c.payeeId) ? [i] : []));
-      for (const step of previewTakeover(
-        at.map((i) => current[i]!),
-        part.ore
-      )) {
-        const i = at[step.index]!;
-        current[i] = { ...current[i]!, oreLines: step.after };
-      }
-    }
-    return current.flatMap((c, index) =>
-      c.oreLines === before[index]
-        ? []
-        : [{ index, payeeId: c.payeeId, before: before[index]!, after: c.oreLines }]
-    );
-  }, [parts, mine]);
 
   const nameOf = (payeeId: string) => payeeById.get(payeeId)?.name ?? payeeId;
-  const previews = plan.map((p) => ({
-    payeeName: nameOf(p.payeeId),
+  const previews = steps.map((p) => ({
+    payeeName: nameOf(p.assignment.payeeId ?? ''),
     before: p.before,
     after: p.after,
   }));
   const takeOver = () =>
     void run(
-      () => releaseOre(plan.map((p) => ({ assignment: mine[p.index], after: p.after }))),
+      () => releaseOre(steps.map((p) => ({ assignment: p.assignment, after: p.after }))),
       onChanged
     );
 
