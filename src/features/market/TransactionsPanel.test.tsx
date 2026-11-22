@@ -669,11 +669,13 @@ describe('TransactionsPanel — By station view', () => {
     expect(screen.getAllByRole('link', { name: 'Damage Control II' })).toHaveLength(2);
   });
 
-  it('turns the view on from the By station chip', async () => {
+  it('turns the view on from the By station segment', async () => {
     renderPanel();
     await screen.findAllByRole('link', { name: 'Damage Control II' });
     await userEvent.click(screen.getByRole('button', { name: 'By station' }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('txn.view=station');
     expect(headers()).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: 'All transactions' }));
+    expect(screen.getByTestId('location-search')).not.toHaveTextContent('txn.view=station');
   });
 });
