@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClaimDonations';
@@ -7,8 +7,8 @@ import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
-import { saveBilledElsewhere } from './paymentLinkStore';
-import { billedElsewhereOf } from './owedNow';
+import { saveBilledElsewhere, saveBookOwned } from './paymentLinkStore';
+import { billedElsewhereOf, bookOwnersOf } from './owedNow';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
@@ -18,7 +18,12 @@ const NO_SECURITY: ReadonlyMap<number, number> = new Map();
 export function useTaxCorpBooks(
   data: TaxSnapshot | null,
   characters: readonly TrackedCharacter[],
-  activeCharacterId: number | null
+  activeCharacterId: number | null,
+  /**
+   * Called when the stored book ownership changed (its first store included): the snapshot's load
+   * path holds Default Systems back until ownership is known, so it reads the snapshot again.
+   */
+  onOwnershipStored?: () => void
 ) {
   const { madePayments, paymentSources } = useMadePayments(
     characters.map((c) => c.characterId).join(',')
@@ -58,6 +63,7 @@ export function useTaxCorpBooks(
   const {
     view: corpView,
     booksRead,
+    booksKnown,
     reload: reloadCorpBooks,
     shownBooks,
     corpNameOf,
@@ -80,6 +86,13 @@ export function useTaxCorpBooks(
     () => (overlay ? billedElsewhereOf(overlay) : data?.billedElsewhere),
     [overlay, data?.billedElsewhere]
   );
+  // A Payee that is a book's corporation is the book's to answer for: its account counts nowhere.
+  // The one reading of it (with the corporation's name): the accounts and Manage Payees share it.
+  const bookOwners = useMemo(
+    () => bookOwnersOf(payees, shownBooks, corpNameOf),
+    [payees, shownBooks, corpNameOf]
+  );
+  const bookOwned = useMemo(() => new Set(bookOwners.keys()), [bookOwners]);
   // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
   const accounts = useMemo(
     () =>
@@ -88,8 +101,18 @@ export function useTaxCorpBooks(
         payees,
         links: data?.paymentLinks ?? [],
         ...(billed ? { billedElsewhere: billed } : {}),
+        bookOwned,
       }),
-    [data, payees, billed]
+    [data, payees, billed, bookOwned]
+  );
+  // The corporation's name a Payee is the book of, by any id of the merged Payee.
+  const bookOwnerOf = useCallback(
+    (payeeId: string): string | undefined => {
+      if (!accounts.isBookOwned(payeeId)) return undefined;
+      const primary = accounts.primaryIdOf(payeeId);
+      return [...bookOwners].find(([own]) => accounts.primaryIdOf(own) === primary)?.[1];
+    },
+    [accounts, bookOwners]
   );
   // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
   // day, oldest first (decision 20261120-235011), whatever mark it stores.
@@ -105,6 +128,26 @@ export function useTaxCorpBooks(
     stored.current = billed;
     void saveBilledElsewhere(billed).catch(() => undefined);
   }, [overlay, billed, data]);
+  // Likewise which Payees a book owns, once the books are known (never from a guess made before):
+  // the load path's safeguards and the wallet journal read the accounts with the same rule.
+  const hasDefaultSystems = useMemo(
+    () =>
+      [...(data?.payeesByCharacter.values() ?? [])].some((list) =>
+        list.some((p) => (p.defaultSystems?.length ?? 0) > 0)
+      ),
+    [data]
+  );
+  const storedOwned = useRef<ReadonlySet<string> | undefined>(undefined);
+  useEffect(() => {
+    if (!data || !booksKnown || storedOwned.current === bookOwned) return;
+    storedOwned.current = bookOwned;
+    void saveBookOwned(bookOwned)
+      .then((changed) => {
+        // Only a Payee with Default Systems was held back; with none there is nothing to re-read.
+        if (changed && hasDefaultSystems) onOwnershipStored?.();
+      })
+      .catch(() => undefined);
+  }, [data, booksKnown, bookOwned, hasDefaultSystems, onOwnershipStored]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
   const { failed: failedClaims } = useAutoClaimDonations(
@@ -122,6 +165,8 @@ export function useTaxCorpBooks(
     madePayments,
     paymentSources,
     corpView,
+    booksKnown,
+    bookOwnerOf,
     reloadCorpBooks,
     leftCorp: { shownBooks, corpNameOf, hiddenLeft, hide: leftAck.hide, show: leftAck.show },
     failedClaims,

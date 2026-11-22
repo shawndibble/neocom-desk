@@ -176,6 +176,7 @@ export const FULL_PAYEE: Required<PayeeRecord> = {
   hubId: 'amarr',
   entityId: 98000001,
   entityKind: 'corporation',
+  archivedAt: UPDATED_AT - 5000,
   updatedAt: UPDATED_AT,
 };
 

@@ -65,9 +65,10 @@ export function expandCombinedRows(rows: readonly DisplayRow[]): DisplayRow[] {
 const STATUS_PRIORITY: Record<MiningTaxRowStatus, number> = {
   'needs-review': 0,
   outstanding: 1,
-  paid: 2,
-  dismissed: 3,
-  unassigned: 4,
+  tracked: 2,
+  paid: 3,
+  dismissed: 4,
+  unassigned: 5,
 };
 
 /** "2026-09-04 – 2026-09-06" for a span of EVE dates (already sorted, earliest first), or the one date on its own. Shared by the table's Date column and the Settle-up dialog so both show a span the same way. */

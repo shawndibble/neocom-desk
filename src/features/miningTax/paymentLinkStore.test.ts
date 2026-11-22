@@ -7,10 +7,15 @@ import { pullCursorKey } from '@/sync/localBookkeeping';
 import {
   linksReady,
   loadBilledElsewhere,
+  loadBookOwned,
+  loadLinkedDays,
+  loadPayeeRunningAccounts,
   loadPaymentLinks,
   readLegacyPaidMarks,
   removePaymentLinks,
   saveBilledElsewhere,
+  saveBookOwned,
+  isBookOwnedKnown,
   savePaymentLink,
 } from './paymentLinkStore';
 
@@ -127,6 +132,48 @@ describe('a book share', () => {
     expect(await saveBilledElsewhere(new Map([['a1', 0.5]]))).toBe(false);
     expect(await saveBilledElsewhere(new Map([['a1', 1]]))).toBe(true);
     expect(await loadBilledElsewhere()).toEqual(new Map([['a1', 1]]));
+  });
+});
+
+describe('the Payees a book owns', () => {
+  it('is unknown until first stored, an empty set included', async () => {
+    expect(await isBookOwnedKnown()).toBe(false);
+    expect(await saveBookOwned(new Set())).toBe(true);
+    expect(await isBookOwnedKnown()).toBe(true);
+    expect(await saveBookOwned(new Set())).toBe(false);
+  });
+
+  it('is stored only when it changed, as the device last saw the books', async () => {
+    expect(await saveBookOwned(new Set(['p1']))).toBe(true);
+    expect(await saveBookOwned(new Set(['p1']))).toBe(false);
+    expect(await saveBookOwned(new Set())).toBe(true);
+    expect(await loadBookOwned()).toEqual(new Set());
+  });
+
+  it('is read by every accounts build: the stored Payee has no account that counts, only history', async () => {
+    await db.payees.put({
+      id: 'p1',
+      characterId: 7,
+      name: 'Bureau',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+    });
+    await db.miningTaxAssignments.put(
+      marked('a', { status: 'outstanding', paidAt: undefined, payment: undefined })
+    );
+    await savePaymentLink(link({ amount: 100_000 }), 7);
+    expect((await loadPayeeRunningAccounts()).of('p1')).toBeDefined();
+    expect([...(await loadLinkedDays()).keys()]).toEqual(['journal:41']);
+
+    await saveBookOwned(new Set(['p1']));
+    const accounts = await loadPayeeRunningAccounts();
+    expect(accounts.isBookOwned('p1')).toBe(true);
+    expect(accounts.of('p1')).toBeUndefined();
+    // Its old day still reads paid (a paid day is never unpaid), but pays nothing personal.
+    expect(accounts.isPaid({ payeeId: 'p1', status: 'outstanding', date: '2026-10-01' })).toBe(
+      true
+    );
+    expect((await loadLinkedDays()).size).toBe(0);
   });
 });
 

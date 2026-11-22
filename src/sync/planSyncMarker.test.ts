@@ -7,7 +7,14 @@ import { db } from '@/db';
 import { syncEditableCollection } from './collectionSync';
 import { syncFeed } from './feedSync';
 import { syncSettings } from './settingsSync';
-import { getSyncStatus, haltSync, resetSyncHalt, scheduleSync, triggerSync } from './planSync';
+import {
+  getSyncStatus,
+  haltSync,
+  resetSyncHalt,
+  scheduleSync,
+  subscribeSyncStatus,
+  triggerSync,
+} from './planSync';
 import { readSeenSyncMarker, writeSeenSyncMarker } from './localBookkeeping';
 import { SAFETY_RECONCILE_INTERVAL_MS, bumpRemoteMarker, readRemoteMarker } from './syncMarker';
 import { EDITABLE_COLLECTIONS } from './syncedCollections';
@@ -62,14 +69,27 @@ function resetPassCounts(): void {
 /** One background sweep pass, awaited to the end. */
 async function backgroundPass(): Promise<void> {
   const reads = vi.mocked(readRemoteMarker).mock.calls.length;
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  scheduleSync(1, { priority: 'background', debounceMs: 0 });
-  await vi.advanceTimersByTimeAsync(0);
-  vi.useRealTimers();
-  await vi.waitFor(() => {
-    expect(vi.mocked(readRemoteMarker).mock.calls.length).toBeGreaterThan(reads);
-    expect(getSyncStatus(1).state).toBe('idle');
+  // Wait for this pass to settle, not just for its marker read: the marker is read mid-pass, and
+  // the status still says idle from the last pass until this one records itself.
+  let started = false;
+  let settled = false;
+  const stop = subscribeSyncStatus((status) => {
+    if (status.characterId !== 1) return;
+    if (status.state === 'syncing') started = true;
+    else if (started) settled = true;
   });
+  try {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    scheduleSync(1, { priority: 'background', debounceMs: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+    await vi.waitFor(() => {
+      expect(vi.mocked(readRemoteMarker).mock.calls.length).toBeGreaterThan(reads);
+      expect(settled).toBe(true);
+    });
+  } finally {
+    stop();
+  }
 }
 
 beforeEach(async () => {

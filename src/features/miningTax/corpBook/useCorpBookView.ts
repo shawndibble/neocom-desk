@@ -69,6 +69,12 @@ export function useCorpBookView({
   view: CorpBookView | null;
   /** This mount's own read of the books has landed; until then `view` is built from the last good copy. */
   booksRead: boolean;
+  /**
+   * Whether which Corp Tax Books the member is in, and their corporations' names, are known: this
+   * mount's read, or the last good copy. A Payee that is a book's corporation can only be told
+   * once they are, so a card for it must not show before.
+   */
+  booksKnown: boolean;
   reload: () => void;
   /** The loaded books still in view (hidden left ones removed), and each corporation's name. */
   shownBooks: readonly LoadedCorpBook[];
@@ -206,5 +212,17 @@ export function useCorpBookView({
     [rows, shownBooks, pricesByCorp, corpNames, payees, madePayments, linked, characters, nowMs, t]
   );
   const reload = useCallback(() => setVersion((v) => v + 1), []);
-  return { view, booksRead: freshLoaded !== undefined, reload, shownBooks, corpNameOf, hiddenLeft };
+  // Names that failed to resolve are settled too (`loadCorpNames` is empty then): never a wait forever.
+  const booksKnown =
+    (freshLoaded !== undefined || retained?.loaded !== undefined) &&
+    (fresh?.corpNames !== undefined || loaded.every((book) => corpNames.has(book.corporationId)));
+  return {
+    view,
+    booksRead: freshLoaded !== undefined,
+    booksKnown,
+    reload,
+    shownBooks,
+    corpNameOf,
+    hiddenLeft,
+  };
 }

@@ -106,3 +106,26 @@ test('a Payee in credit still opens its ledger, with the credit as its balance',
     .getByRole('row', { name: /Payment/ });
   await expect(payment.getByRole('cell').nth(4)).toHaveText(new RegExp(isk(0.5 * DAY_TAX)));
 });
+
+test('an archived Payee in credit has no card, and comes back with Unarchive', async ({ page }) => {
+  await openTaxTab(page);
+  await settleUp(page, 3.5 * DAY_TAX);
+  const card = page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` });
+  await expect(card).toBeVisible();
+
+  await page.getByRole('button', { name: 'Payees', exact: true }).click();
+  const manage = page.getByRole('dialog', { name: 'Manage Payees' });
+  await manage.getByRole('button', { name: `Archive ${ROOK.name}` }).click();
+  // Archived: listed under "Archived" with its credit, and gone from the tab behind.
+  await expect(manage.getByRole('region', { name: 'Archived' })).toContainText(ROOK.name);
+  await page.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Payees', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Manage Payees' })
+    .getByRole('button', { name: `Unarchive ${ROOK.name}` })
+    .click();
+  await page.keyboard.press('Escape');
+  await expect(card).toBeVisible();
+});
