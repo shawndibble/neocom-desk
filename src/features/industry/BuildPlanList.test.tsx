@@ -317,7 +317,7 @@ describe('BuildPlanList: compare mode (#453)', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Astero to compare' })).not.toBeChecked();
 
     const compareButton = screen.getByRole('button', { name: 'Compare (1)' });
-    expect(compareButton).toBeDisabled();
+    expect(compareButton).toHaveAttribute('aria-disabled', 'true');
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Astero to compare' }));
     expect(onToggleCompareSelected).toHaveBeenCalledWith('b');

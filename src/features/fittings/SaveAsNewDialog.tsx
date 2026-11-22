@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -20,6 +21,8 @@ export function SaveAsNewDialog({
   onConfirm,
 }: SaveAsNewDialogProps) {
   const { t } = useTranslation();
+  const reasonId = useId();
+  const nameMissing = name.trim() === '';
   return (
     <Modal open={open} onClose={onClose} title={t('fittings.myFittings.saveAsNewTitle')}>
       <form
@@ -43,7 +46,17 @@ export function SaveAsNewDialog({
         />
         <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
-          <Button type="submit" variant="primary" disabled={name.trim() === ''}>
+          {nameMissing && (
+            <span id={reasonId} className="mr-auto text-[0.6875rem] text-text-dim">
+              {t('fittings.myFittings.saveAsNewNeedsName')}
+            </span>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            aria-disabled={nameMissing || undefined}
+            aria-describedby={nameMissing ? reasonId : undefined}
+          >
             {t('fittings.myFittings.saveAsNewConfirm')}
           </Button>
         </DialogFooter>

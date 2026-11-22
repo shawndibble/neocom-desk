@@ -4,6 +4,7 @@ import {
   ColumnPickerMenu,
   IconButton,
   LiveNote,
+  DisabledMenuItem,
   MenuItem,
   useOpenAfterMenu,
 } from '@/components/ui';
@@ -115,25 +116,39 @@ export function AppraisalResultActions({
         tableExport={tableExport}
         onCloseAutoFocus={openAfterMenu.onCloseAutoFocus}
       >
-        {COPY_LISTS.map((list) => (
-          <MenuItem
-            key={list}
-            disabled={copyLists[list].count === 0 || pending !== null}
-            onSelect={() => void handleCopy(list)}
-          >
-            {t(`market.appraisal.copyList.${list}`)}
-            {copyLists[list].count > 0 && (
+        {COPY_LISTS.map((list) =>
+          copyLists[list].count === 0 || pending !== null ? (
+            <DisabledMenuItem
+              key={list}
+              reason={
+                copyLists[list].count === 0
+                  ? t('market.appraisal.copyNothing')
+                  : t('market.appraisal.copyBusy')
+              }
+            >
+              {t(`market.appraisal.copyList.${list}`)}
+            </DisabledMenuItem>
+          ) : (
+            <MenuItem key={list} onSelect={() => void handleCopy(list)}>
+              {t(`market.appraisal.copyList.${list}`)}
               <span className="ml-auto pl-3 text-text-dim">{copyLists[list].count}</span>
-            )}
+            </MenuItem>
+          )
+        )}
+        {canOpen ? (
+          <MenuItem onSelect={() => void handleOpenInJanice()}>
+            {t('market.appraisal.openInJanice')}
+            <ExternalMark />
+            <span className="ml-auto pl-4 text-text-dim">
+              {altChordDisplayKey(isApplePlatform(), 'J')}
+            </span>
           </MenuItem>
-        ))}
-        <MenuItem disabled={!canOpen} onSelect={() => void handleOpenInJanice()}>
-          {t('market.appraisal.openInJanice')}
-          <ExternalMark />
-          <span className="ml-auto pl-4 text-text-dim">
-            {altChordDisplayKey(isApplePlatform(), 'J')}
-          </span>
-        </MenuItem>
+        ) : (
+          <DisabledMenuItem reason={t('market.appraisal.janiceNeedsText')}>
+            {t('market.appraisal.openInJanice')}
+            <ExternalMark />
+          </DisabledMenuItem>
+        )}
       </TableActionsMenu>
     </>
   );

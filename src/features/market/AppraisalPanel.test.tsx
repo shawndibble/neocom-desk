@@ -1762,7 +1762,10 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(await screen.findByText('This character: grant Assets')).toBeInTheDocument();
     expect(screen.getByText('Owned stock needs the Assets permission')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('shows Need with owned beneath, dims covered lines, and copies net quantities', async () => {

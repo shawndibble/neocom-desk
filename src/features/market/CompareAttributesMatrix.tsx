@@ -158,11 +158,15 @@ export function CompareAttributesMatrix({
     >
       <div className="sticky left-0 flex w-fit max-w-full flex-wrap items-center gap-x-3 gap-y-1">
         <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
-          <Checkbox
-            checked={differencesOnly}
-            disabled={rows.length < 2}
-            onChange={() => setDifferencesOnly((v) => !v)}
-          />
+          <Tooltip content={rows.length < 2 ? t('market.compare.differencesNeedsTwo') : null}>
+            <Checkbox
+              checked={differencesOnly}
+              aria-disabled={rows.length < 2 || undefined}
+              onChange={() => {
+                if (rows.length >= 2) setDifferencesOnly((v) => !v);
+              }}
+            />
+          </Tooltip>
           {t('market.compare.differencesOnly')}
         </label>
         {hiddenCount > 0 && (

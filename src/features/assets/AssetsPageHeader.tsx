@@ -1,5 +1,6 @@
 import {
   DataAgeBadge,
+  DisabledMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -111,15 +112,22 @@ export function AssetsPageHeader({
                   {t('assets.select.toggle')}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={loading} onSelect={refresh}>
-                  {t('assets.refresh')}
-                  {assetsResult && (
-                    <span className="ml-auto pl-3 text-text-dim">
-                      {/* eslint-disable-next-line react-hooks/purity -- age label of cached data; a render-time clock read is the intent */}
-                      {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
-                    </span>
-                  )}
-                </DropdownMenuItem>
+                {/* While a refresh runs it stays focusable and says so, rather than going native-disabled. */}
+                {loading ? (
+                  <DisabledMenuItem reason={t('assets.refreshing')}>
+                    {t('assets.refresh')}
+                  </DisabledMenuItem>
+                ) : (
+                  <DropdownMenuItem onSelect={refresh}>
+                    {t('assets.refresh')}
+                    {assetsResult && (
+                      <span className="ml-auto pl-3 text-text-dim">
+                        {/* eslint-disable-next-line react-hooks/purity -- age label of cached data; a render-time clock read is the intent */}
+                        {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                )}
               </TableActionsMenu>
             </div>
           )}
