@@ -51,9 +51,22 @@ interface QuickbarRowProps {
   selected: boolean;
   onSelect: (typeId: number) => void;
   onRemove: (typeId: number) => void;
+  /** The neighbours it can swap with: the drag's single-pointer alternative (WCAG 2.5.7). */
+  previousTypeId?: number;
+  nextTypeId?: number;
+  onReorder: (activeTypeId: number, overTypeId: number) => void;
 }
 
-function QuickbarRow({ item, vsPaid, selected, onSelect, onRemove }: QuickbarRowProps) {
+function QuickbarRow({
+  item,
+  vsPaid,
+  selected,
+  onSelect,
+  onRemove,
+  previousTypeId,
+  nextTypeId,
+  onReorder,
+}: QuickbarRowProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.typeId,
@@ -67,6 +80,16 @@ function QuickbarRow({ item, vsPaid, selected, onSelect, onRemove }: QuickbarRow
       items={
         <>
           <ShowInfoMenuItem typeId={item.typeId} itemName={item.name} />
+          {previousTypeId !== undefined && (
+            <MenuItem onSelect={() => onReorder(item.typeId, previousTypeId)}>
+              {t('market.quickbar.moveUp')}
+            </MenuItem>
+          )}
+          {nextTypeId !== undefined && (
+            <MenuItem onSelect={() => onReorder(item.typeId, nextTypeId)}>
+              {t('market.quickbar.moveDown')}
+            </MenuItem>
+          )}
           <MenuItem className="text-danger" onSelect={() => onRemove(item.typeId)}>
             {t('market.quickbar.removeMenu')}
           </MenuItem>
@@ -208,7 +231,7 @@ export function QuickbarList({
             strategy={verticalListSortingStrategy}
           >
             <ul className="@container max-h-80 overflow-y-auto rounded-xs border border-line">
-              {items.map((item) => (
+              {items.map((item, index) => (
                 <QuickbarRow
                   key={item.typeId}
                   item={item}
@@ -216,6 +239,9 @@ export function QuickbarList({
                   selected={item.typeId === selectedTypeId}
                   onSelect={onSelect}
                   onRemove={onRemove}
+                  previousTypeId={items[index - 1]?.typeId}
+                  nextTypeId={items[index + 1]?.typeId}
+                  onReorder={onReorder}
                 />
               ))}
             </ul>

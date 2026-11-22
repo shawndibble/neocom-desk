@@ -63,6 +63,26 @@ describe('QuickbarList row controls', () => {
     expect(props.onRemove).toHaveBeenCalledWith(34);
   });
 
+  it('Move up / Move down swap with the neighbours, absent at the ends', async () => {
+    const user = userEvent.setup();
+    const three = [34, 35, 36].map((typeId, position) => ({
+      typeId,
+      name: `Item ${typeId}`,
+      characterId: 1,
+      position,
+    }));
+    const props = renderList({ items: three });
+    await user.click(screen.getByRole('button', { name: 'More actions for Item 35' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move up' }));
+    expect(props.onReorder).toHaveBeenCalledWith(35, 34);
+    await user.click(screen.getByRole('button', { name: 'More actions for Item 35' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move down' }));
+    expect(props.onReorder).toHaveBeenCalledWith(35, 36);
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'More actions for Item 34' }));
+    expect(screen.queryByRole('menuitem', { name: 'Move up' })).not.toBeInTheDocument();
+  });
+
   it('keeps the target text on the row', () => {
     renderList({
       items: [{ ...items[0], targetPrice: 5_000_000, targetDirection: 'above' }],
