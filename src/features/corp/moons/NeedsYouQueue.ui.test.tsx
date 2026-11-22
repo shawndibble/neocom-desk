@@ -336,7 +336,10 @@ describe('NeedsYouQueue (#6207)', () => {
     await user.click(screen.getByRole('button', { name: 'Waive their ore' }));
     await user.type(screen.getByRole('textbox'), 'Their ore');
     expect(screen.getByText(/cannot price that day/)).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /^Waive/ }).at(-1)).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: /^Waive/ }).at(-1)).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('rejects a dispute with a note (#6206)', async () => {
@@ -347,7 +350,7 @@ describe('NeedsYouQueue (#6207)', () => {
     await user.type(reason!, 'Our moon');
     // The next step is required: Confirm stays disabled until it is filled.
     const confirm = screen.getAllByRole('button', { name: 'Keep the bill' }).at(-1)!;
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
     expect(
       screen.getByText(/Required\. Pilot 7 sees this exactly as written, beside the bill/)
     ).toBeInTheDocument();
@@ -618,7 +621,7 @@ describe('NeedsYouQueue (#6207)', () => {
       const [reason, nextStep] = screen.getAllByRole('textbox');
       await user.type(reason!, 'Not found');
       const confirm = screen.getAllByRole('button', { name: 'Keep the bill' }).at(-1)!;
-      expect(confirm).toBeDisabled();
+      expect(confirm).toHaveAttribute('aria-disabled', 'true');
       await user.type(nextStep!, 'Send a screenshot');
       await user.click(confirm);
       expect(editBook).toHaveBeenLastCalledWith(9, 98000001, {

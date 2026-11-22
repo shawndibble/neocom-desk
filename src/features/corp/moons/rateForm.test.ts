@@ -8,6 +8,9 @@ describe('datedRateReady', () => {
     expect(datedRateReady('100', '2026-11-17', '2026-11-17')).toBe(true);
     expect(datedRateReady('0', '2026-10-18', '2026-11-17')).toBe(true);
   });
+  it('reads a comma decimal like a period one', () => {
+    expect(datedRateReady('7,5', '2026-11-17', '2026-11-17')).toBe(true);
+  });
   it('refuses empty, out of range, or backdated past 30 days', () => {
     expect(datedRateReady('', '2026-11-17', '2026-11-17')).toBe(false);
     expect(datedRateReady('101', '2026-11-17', '2026-11-17')).toBe(false);

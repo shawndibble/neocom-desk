@@ -152,12 +152,12 @@ describe('RecordPaymentDialog', () => {
     await userEvent.clear(date);
     await userEvent.type(date, '2026-10-21');
     expect(within(dialog).getByRole('alert')).toHaveTextContent(/after today/);
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
 
     await userEvent.clear(date);
     await userEvent.type(date, '2026-07-31');
     expect(within(dialog).getByRole('alert')).toHaveTextContent(/book starts 1 Aug/);
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
 
     await userEvent.clear(date);
     await userEvent.type(date, '2026-09-05');
@@ -235,7 +235,7 @@ describe('RecordPaymentDialog', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Wallet donation (1)' }));
     expect(within(dialog).queryByRole('textbox', { name: 'Amount' })).not.toBeInTheDocument();
     const confirm = within(dialog).getByRole('button', { name: /^Assign / });
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(within(dialog).getByRole('radio', { name: /12,000,000 from Pilot 99/ }));
     expect(outcome(dialog)).toHaveTextContent('Pilot 1 still owes 4,000,000');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Assign 12,000,000' }));

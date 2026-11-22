@@ -112,7 +112,7 @@ describe('CloseAccountDialog', () => {
       screen.getByText(/A final late notice lists 200,000 through 11 Aug( 2026)?\./)
     ).toBeInTheDocument();
     const confirm = screen.getByRole('button', { name: 'Close account' });
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
     await userEvent.type(screen.getByLabelText(/Reason/), 'Left the area');
     await userEvent.click(confirm);
     expect(editBook).toHaveBeenCalledTimes(1);
@@ -154,7 +154,10 @@ describe('CloseAccountDialog', () => {
     });
     await userEvent.type(screen.getByLabelText(/Reason/), 'Left');
     await userEvent.click(screen.getByRole('button', { name: 'Forfeit' }));
-    expect(screen.getByRole('button', { name: 'Close account' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Close account' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await userEvent.type(screen.getByLabelText(/Where and when/), 'Agreed in a corp mail');
     expect(screen.getByRole('button', { name: 'Close account' })).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Close account' }));

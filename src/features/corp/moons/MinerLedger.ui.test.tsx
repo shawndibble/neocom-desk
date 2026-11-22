@@ -354,7 +354,7 @@ describe('the correction dialogs', () => {
       />
     );
     const confirm = screen.getByRole('button', { name: 'Save' });
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
     const amount = screen.getByLabelText('Forgive up to');
     await userEvent.clear(amount);
     await userEvent.type(amount, '400');

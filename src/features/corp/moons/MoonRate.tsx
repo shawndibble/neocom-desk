@@ -1,3 +1,4 @@
+import { parsePercent } from '@/lib/parsePercent';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui';
@@ -137,7 +138,7 @@ function ChangeRateDialog({
       canConfirm={ready}
       showLogged="plain"
       run={async () => {
-        const base = { pct: Number(pct), effectiveFrom: from };
+        const base = { pct: parsePercent(pct) ?? 0, effectiveFrom: from };
         await edit({
           action: 'addRate',
           rate:
@@ -168,7 +169,7 @@ function ChangeRateDialog({
       {ready && (
         <Effect>
           {current !== null && `${current}% → `}
-          <strong>{Number(pct)}%</strong>
+          <strong>{parsePercent(pct)}%</strong>
           {' · '}
           {t('corpTaxBook.moons.rate.effect', { date: dateWithYear(from) })}
         </Effect>
