@@ -100,7 +100,7 @@ export function LedgerRowDetail({
               <p>
                 {k('sentTo', {
                   payee: row.payment.to,
-                  amount: isk(row.paid + row.credit),
+                  amount: isk(row.payment.amount ?? row.paid),
                   date: row.payment.at.slice(0, 10),
                 })}
               </p>

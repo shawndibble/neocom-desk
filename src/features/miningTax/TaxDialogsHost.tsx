@@ -666,6 +666,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               id: paymentLinkKey(l),
               at: linkAt(l),
               via: l.kind,
+              amount: l.amount,
               to: payeeById.get(accounts.primaryIdOf(ledgerTarget.payeeId))?.name ?? '',
               ...(payer ? { from: payer } : {}),
               ...(href ? { href } : {}),

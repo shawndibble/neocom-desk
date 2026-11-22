@@ -54,6 +54,16 @@ describe('LedgerRowDetail: a payment row', () => {
     expect(screen.queryByRole('button', { name: /link the wallet payment/i })).toBeNull();
   });
 
+  it("shows the transfer's full amount, not only what the account counted", () => {
+    renderDetail(
+      paymentRow(
+        { via: 'journal', to: 'Plenitude', amount: 5_000_000, notTax: 1_000_000 },
+        4_000_000
+      )
+    );
+    expect(screen.getByText(/Sent to Plenitude/)).toHaveTextContent('5,000,000 ISK on');
+  });
+
   it('offers to link a wallet payment on a mark only when the mark settled something', () => {
     renderDetail(paymentRow({ via: 'marked' }, 250_000), vi.fn());
     expect(screen.getByRole('button', { name: /link the wallet payment/i })).toBeInTheDocument();
