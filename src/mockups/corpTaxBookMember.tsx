@@ -445,8 +445,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
         unassigned={{ entryCount: 0, estimatedValue: 0 }}
         unlinkedPaymentCount={0}
         characterNameOf={() => ME_NAME}
-        isSoleFilter={() => false}
-        onFilterPayee={() => {}}
         onSettleUp={() => {}}
         onLinkPayment={() => {}}
         onAssignNext={() => {}}

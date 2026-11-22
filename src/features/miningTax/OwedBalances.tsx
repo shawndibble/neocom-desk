@@ -1,10 +1,16 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import {
+  Button,
+  Panel,
+  RowActionsMenu,
+  RowMoreActions,
+  MenuItem,
+  useOpenAfterMenu,
+} from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
-import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
@@ -25,18 +31,16 @@ function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
 }
 
 interface OwedBalancesProps {
-  /** Every Payee balance; the owed ones and those in credit are drawn, as cards. */
+  /** Every Payee balance; the owed ones are drawn as cards, those in credit as one-line notes. */
   balances: readonly PayeeBalance[];
   unassigned: UnassignedSummary;
   /** Wallet payments nothing here accounts for yet (paying backwards, #540). */
   unlinkedPaymentCount: number;
   /** Each card's owning character, shown only when more than one is tracked. */
   characterNameOf?: (balance: PayeeBalance) => string | undefined;
-  isSoleFilter: (payeeId: string) => boolean;
-  onFilterPayee: (payeeId: string) => void;
   onSettleUp: (balance: PayeeBalance) => void;
   onLinkPayment: (balance: PayeeBalance) => void;
-  /** Opens the Payee's ledger (`PayeeLedgerPanel`): its owed or credit figure is the way in. */
+  /** Opens the Payee's ledger (`PayeeLedgerPanel`): the card's Ledger action and a credit note's. */
   onOpenLedger?: (balance: PayeeBalance) => void;
   /**
    * A Corp Tax Book's balance credits itself from the corp's wallet journal, so there is no
@@ -78,17 +82,18 @@ interface OwedBalancesProps {
  * pilot owes and how much, before any ledger row. A pilot rarely owes more
  * than three Payees, so each gets a compact card — the name on a line of its
  * own, because Payee names run long ("Bureau of Unified Harvesting") and
- * must never share a line with the figure that matters. A Payee in credit
- * keeps its card, figure in credit; a settled one isn't listed: Manage Payees
- * opens its ledger, and the Payee filter below reaches its entries.
+ * must never share a line with the figure that matters. A card is for an
+ * action, so only a Payee with something owed gets one: Settle up is its one
+ * primary button, Ledger and Link payment sit beside it (one ⋮ on a phone). A
+ * Payee in credit is a one-line note with its Ledger link, and a settled one
+ * isn't listed: Manage Payees opens its ledger, and the table's Payee filter
+ * reaches its entries.
  */
 export function OwedBalances({
   balances,
   unassigned,
   unlinkedPaymentCount,
   characterNameOf,
-  isSoleFilter,
-  onFilterPayee,
   onSettleUp,
   onLinkPayment,
   onOpenLedger,
@@ -104,85 +109,40 @@ export function OwedBalances({
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
   const owedTotal = owed.reduce((sum, b) => sum + b.owed, 0);
-  // A Payee paid ahead keeps its card too: its credit is money the pilot has there.
-  const cards = balances.filter((b) => b.owed > 0 || b.credit > 0);
+  // A credit has no action to take, so it is a line of text, not a card.
+  const credits = balances.filter((b) => b.owed <= 0 && b.credit > 0);
 
   // One Payee card and nothing else to show: a single full-width row (name,
   // figure, actions) rather than one card stranded in half the page.
   const cardCount =
-    cards.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
-  const wide = cardCount === 1 && cards.length === 1;
+    owed.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
+  const wide = cardCount === 1 && owed.length === 1;
 
   // No Payee card: the prompts are the page's next action, so they read as slim
   // full-width rows rather than tiles stranded in one column of a grid. With
   // cards present they stay tiles that share those cards' height — a
   // deliberate split (issue #3120).
-  const slimPrompts = cards.length === 0;
+  const slimPrompts = owed.length === 0;
 
-  const nameButton = (balance: PayeeBalance) => (
-    <button
-      type="button"
-      onClick={() => onFilterPayee(balance.payee.id)}
-      aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
-      aria-pressed={isSoleFilter(balance.payee.id)}
-      className={cx(
-        // -my-2 cancels min-h-9's height so the card doesn't grow: the 36px
-        // is invisible hit area on a phone (issue #1055); md: reverts both.
-        '-my-2 flex min-h-9 min-w-0 flex-1 items-center rounded-xs text-left text-base font-semibold hover:text-accent active:text-accent/75 aria-pressed:text-accent md:my-0 md:min-h-0',
-        interactiveClassName,
-        focusRingClassName
-      )}
-    >
+  const nameOf = (balance: PayeeBalance) => (
+    <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-base font-semibold">
       {/* Two lines before an ellipsis: "Bureau of Unified Harvesting" is a
           name the pilot reads, not a label to clip. */}
-      <span
-        className={cx(
-          'flex min-w-0 flex-col items-start gap-1',
-          // The button's -my-2 assumes a one-line name; the tag makes it taller.
-          isCorpPayeeId(balance.payee.id) && 'max-md:py-2'
-        )}
-      >
-        <span className="line-clamp-2 min-w-0 break-words">{balance.payee.name}</span>
-        {/* A stored Payee can carry the corporation's name too: this one is the book. */}
-        {isCorpPayeeId(balance.payee.id) && <Pill outlined>{t('miningTax.owed.corpBookTag')}</Pill>}
-      </span>
-    </button>
+      <span className="line-clamp-2 min-w-0 break-words">{balance.payee.name}</span>
+      {/* A stored Payee can carry the corporation's name too: this one is the book. */}
+      {isCorpPayeeId(balance.payee.id) && <Pill outlined>{t('miningTax.owed.corpBookTag')}</Pill>}
+    </span>
   );
 
   const amount = (value: number, tone?: string) => (
     <span className={cx('shrink-0 text-xl font-semibold tabular-nums', tone)}>
-      {formatIsk(value, 0)}
+      {value < 0 ? `−${formatIsk(-value, 0)}` : formatIsk(value, 0)}
       <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
     </span>
   );
 
-  // The figure is the readout of the Payee's ledger, so it opens it (DESIGN §6c: a solid
-  // underline on a Payee's balance figure). What is owed, or else the credit. The name keeps
-  // the filter.
-  const figure = (balance: PayeeBalance) =>
-    balance.owed > 0 ? (
-      amount(balance.owed, 'text-isk-neg')
-    ) : (
-      <span className="shrink-0 text-xl font-semibold text-isk-pos tabular-nums">
-        {formatIsk(balance.credit, 0)}
-        <span className="ml-1 text-xs font-normal text-text-dim">
-          ISK {t('miningTax.owed.creditLabel')}
-        </span>
-      </span>
-    );
-  const owedFigure = (balance: PayeeBalance) =>
-    onOpenLedger ? (
-      <button
-        type="button"
-        onClick={() => onOpenLedger(balance)}
-        aria-label={t('miningTax.ledger.openFor', { payee: balance.payee.name })}
-        className={plainTextActionClassName('shrink-0')}
-      >
-        {figure(balance)}
-      </button>
-    ) : (
-      figure(balance)
-    );
+  // What is owed reads red with a minus, the same sign the ledger's balance uses.
+  const owedFigure = (balance: PayeeBalance) => amount(-balance.owed, 'text-isk-neg');
 
   const promptRow = (
     key: string,
@@ -220,7 +180,7 @@ export function OwedBalances({
             {t('miningTax.balancesLabel')}
           </span>
           <span className="text-base font-semibold text-isk-neg tabular-nums">
-            {formatIsk(owedTotal)} ISK
+            −{formatIsk(owedTotal)} ISK
           </span>
           <span className="text-xs text-text-dim">
             {t('miningTax.owed.acrossPayees', { count: owed.length })}
@@ -288,9 +248,8 @@ export function OwedBalances({
               </div>
             </Panel>
           )}
-          {cards.map((balance) => {
+          {owed.map((balance) => {
             const days = owedForDays(balance);
-            const inCredit = balance.owed <= 0;
             const characterName = characterNameOf?.(balance);
             const uncredited = uncreditedOf?.(balance);
             const warnUncredited = uncredited !== undefined && uncredited.amount > 0;
@@ -300,12 +259,7 @@ export function OwedBalances({
             // it in full pays twice. Settle up stays reachable — it is sometimes right — but it
             // stops being the card's loudest control.
             const warnBeforePaying = warnUncredited || warnUnlinked;
-            const meta = inCredit ? (
-              <p className="text-xs text-text-dim">
-                {t('miningTax.owed.creditHint')}
-                {characterName && ` · ${characterName}`}
-              </p>
-            ) : (
+            const meta = (
               <>
                 <p className="text-xs text-text-dim">
                   {t('miningTax.owed.entriesFor', {
@@ -330,30 +284,27 @@ export function OwedBalances({
                 {warnUnlinked && <UnlinkedSentNote unlinked={unlinked} />}
               </>
             );
-            // Nothing owed: nothing to settle; its ledger is its figure.
-            const actions = inCredit ? null : (
-              <div className="flex gap-1.5">
-                <Button
-                  variant={warnBeforePaying ? 'ghost' : 'primary'}
-                  className={wide ? 'flex-1 sm:flex-none' : 'flex-1'}
-                  onClick={() => onSettleUp(balance)}
-                >
-                  {t('miningTax.settleUpAction')}
-                </Button>
-                {!hideLinkPayment?.(balance) && (
-                  <Button onClick={() => onLinkPayment(balance)}>
-                    {t('miningTax.owed.linkPayment')}
-                  </Button>
-                )}
-              </div>
+            const actions = (
+              <PayeeActions
+                balance={balance}
+                wide={wide}
+                warnBeforePaying={warnBeforePaying}
+                onSettleUp={onSettleUp}
+                onLinkPayment={hideLinkPayment?.(balance) ? undefined : onLinkPayment}
+                onOpenLedger={onOpenLedger}
+              />
             );
             return (
               <Panel key={balance.payee.id} padded={false} fill className="flex flex-col">
                 {wide ? (
-                  <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4">
+                  <div
+                    role="group"
+                    aria-label={balance.payee.name}
+                    className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4"
+                  >
                     <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        {nameButton(balance)}
+                      <div className="flex items-start gap-2">
+                        {nameOf(balance)}
                         <span className="sm:hidden">{owedFigure(balance)}</span>
                       </div>
                       {meta}
@@ -365,9 +316,13 @@ export function OwedBalances({
                   // Cards in a row share its height; the meta line and buttons
                   // sit at the bottom, so they line up across cards whether a
                   // Payee's name takes one line or two.
-                  <div className="flex flex-1 flex-col gap-2 p-3">
+                  <div
+                    role="group"
+                    aria-label={balance.payee.name}
+                    className="flex flex-1 flex-col gap-2 p-3"
+                  >
                     <div className="flex items-start gap-2">
-                      {nameButton(balance)}
+                      {nameOf(balance)}
                       {owedFigure(balance)}
                     </div>
                     <div className="mt-auto space-y-2">
@@ -402,6 +357,29 @@ export function OwedBalances({
           )}
         </div>
       )}
+      {credits.map((balance) => (
+        <p
+          key={balance.payee.id}
+          className="flex flex-wrap items-baseline gap-x-2 text-xs text-text-dim"
+        >
+          <span className="font-semibold text-text">{balance.payee.name}</span>
+          <span className="text-isk-pos tabular-nums">{formatIsk(balance.credit, 0)} ISK</span>
+          <span>
+            {t('miningTax.owed.creditHint')}
+            {characterNameOf?.(balance) && ` · ${characterNameOf(balance)}`}
+          </span>
+          {onOpenLedger && (
+            <button
+              type="button"
+              className={textActionClassName('inline-flex')}
+              onClick={() => onOpenLedger(balance)}
+              aria-label={t('miningTax.ledger.openFor', { payee: balance.payee.name })}
+            >
+              {t('miningTax.owed.ledgerAction')}
+            </button>
+          )}
+        </p>
+      ))}
       {/* After the owed cards: owed comes first (decision 20261004), and a Conflict is not owed
           yet. Always a full-width row, since it is a warning about what the book bills next, not a
           Payee balance to sit among the cards. */}
@@ -453,5 +431,93 @@ export function OwedBalances({
           )
         )}
     </section>
+  );
+}
+
+/**
+ * Settle up plus the card's secondary actions. Ledger and Link payment are text actions split by
+ * a hairline; on a phone they fold into one ⋮ menu beside Settle up. A card with only Ledger
+ * (a Corp Tax Book's, which has no payment of the pilot's own to link) keeps that one text
+ * action at every width: a menu of one is a click for nothing (DESIGN §6c).
+ */
+function PayeeActions({
+  balance,
+  wide,
+  warnBeforePaying,
+  onSettleUp,
+  onLinkPayment,
+  onOpenLedger,
+}: {
+  balance: PayeeBalance;
+  wide: boolean;
+  warnBeforePaying: boolean;
+  onSettleUp: (balance: PayeeBalance) => void;
+  onLinkPayment?: ((balance: PayeeBalance) => void) | undefined;
+  onOpenLedger?: ((balance: PayeeBalance) => void) | undefined;
+}) {
+  const { t } = useTranslation();
+  const openAfterMenu = useOpenAfterMenu();
+  const textAction = (label: string, run: () => void, ariaLabel?: string) => (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      className={textActionClassName('px-3 first:pl-0 last:pr-0')}
+      onClick={run}
+    >
+      {label}
+    </button>
+  );
+  const both = onOpenLedger !== undefined && onLinkPayment !== undefined;
+  const row = (
+    <div className="flex items-center gap-3">
+      <Button
+        variant={warnBeforePaying ? 'ghost' : 'primary'}
+        className={wide ? 'flex-1 sm:flex-none' : 'flex-1'}
+        onClick={() => onSettleUp(balance)}
+      >
+        {t('miningTax.settleUpAction')}
+      </Button>
+      <div
+        className={cx(
+          'shrink-0 items-center divide-x divide-line',
+          both ? 'hidden sm:flex' : 'flex'
+        )}
+      >
+        {onOpenLedger &&
+          textAction(
+            t('miningTax.owed.ledgerAction'),
+            () => onOpenLedger(balance),
+            t('miningTax.ledger.openFor', { payee: balance.payee.name })
+          )}
+        {onLinkPayment && textAction(t('miningTax.owed.linkPayment'), () => onLinkPayment(balance))}
+      </div>
+      {both && (
+        <RowMoreActions
+          className="sm:hidden"
+          variant="ghost"
+          label={t('miningTax.owed.moreActions', { payee: balance.payee.name })}
+          hints={false}
+        />
+      )}
+    </div>
+  );
+  if (!both) return row;
+  return (
+    <RowActionsMenu
+      name={balance.payee.name}
+      onCloseAutoFocus={openAfterMenu.onCloseAutoFocus}
+      items={
+        <>
+          <MenuItem onSelect={() => openAfterMenu.run(() => onOpenLedger(balance))}>
+            {t('miningTax.owed.ledgerAction')}
+          </MenuItem>
+          <MenuItem onSelect={() => openAfterMenu.run(() => onLinkPayment(balance))}>
+            {t('miningTax.owed.linkPayment')}
+          </MenuItem>
+        </>
+      }
+    >
+      {row}
+    </RowActionsMenu>
   );
 }

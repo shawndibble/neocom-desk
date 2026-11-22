@@ -81,7 +81,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ onOpenLedger });
     expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Open Brass Meridian Logistics ledger' })
+      screen.getByRole('button', { name: 'Open the ledger of Brass Meridian Logistics' })
     );
     expect(onOpenLedger).toHaveBeenCalledOnce();
   });

@@ -128,10 +128,9 @@ describe('Miner page on a running account', () => {
     const owed = screen.getByRole('table', { name: /^Owed days/ });
     expect(within(owed).getAllByRole('row').length).toBeGreaterThan(1);
     expect(screen.getAllByText(/^Payment from /).length).toBeGreaterThan(0);
-    // The one Payee ledger: owed reads positive, never as a minus.
+    // The one Payee ledger: owed reads with a minus, the same on every page that shows it.
     const ledger = screen.getByRole('table', { name: 'Ledger' });
-    expect(within(ledger).queryAllByText(/^\u2212[\d,]+/)).toHaveLength(0);
-    expect(within(ledger).getAllByText(/^[\d,]+$/).length).toBeGreaterThan(0);
+    expect(within(ledger).getAllByText(/^\u2212[\d,]+/).length).toBeGreaterThan(0);
   });
 
   it('reads the past days and payments of the last 7 days', async () => {
