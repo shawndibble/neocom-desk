@@ -78,7 +78,11 @@ export function ShareShell({
   const loginControls = (
     <div className="flex flex-col items-end gap-1">
       <EveSsoButton size="small" pending={loggingIn} onClick={logIn} label={t('share.logIn')} />
-      <button type="button" className={plainTextActionClassName()} onClick={choosePermissions}>
+      <button
+        type="button"
+        className={plainTextActionClassName('-my-1 py-1')}
+        onClick={choosePermissions}
+      >
         {t('share.choosePermissions')}
       </button>
       <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
