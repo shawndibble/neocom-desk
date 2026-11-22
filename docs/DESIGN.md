@@ -15,6 +15,8 @@ system's tokens rather than a component library's own defaults — `Select`,
 Radix primitive before hand-rolling focus/keyboard/portal behavior for a new
 composite control; icons (§5) are built to compose with it directly.
 
+Keyboard: Tab inside an open `DropdownMenu` dismisses it (focus returns to the trigger) rather than being swallowed. A popover's search field (`MultiSelect`, `RegionSelect`) is not autofocused on a coarse pointer, so a phone keyboard doesn't cover the list.
+
 **Prefer the Radix wrapper over the platform control.** For a select that
 means `Select`, always, unless you can say why this one needs the OS picker —
 `NativeSelect` is the documented exception, not a peer. The rule used to run

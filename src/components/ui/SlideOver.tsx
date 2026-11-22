@@ -90,7 +90,7 @@ export function SlideOver({
   return (
     <DialogPrimitive.Root
       open={open}
-      // Full-screen on a phone, so nothing behind it is reachable: trap focus there.
+      // Near full-screen on a phone, so the page behind is not usable: trap focus there.
       modal={isPhone}
       onOpenChange={(next) => {
         if (!next) onClose();
