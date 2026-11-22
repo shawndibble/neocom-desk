@@ -111,7 +111,7 @@ export function CorpAssetLocationTable({
       stackAffix: { before: t('corp.assets.stackAffix.largest') },
       cellClassName: dim,
       sortValue: sinkDeliveries((r) => r.cell.topStacks[0]?.estimatedValue),
-      render: (r) => (r.cell.itemCount === 0 ? '—' : largestText(r)),
+      render: (r) => (r.cell.itemCount === 0 ? <span data-dense-omit>—</span> : largestText(r)),
     },
     value: {
       id: 'value',

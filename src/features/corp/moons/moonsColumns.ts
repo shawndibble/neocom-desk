@@ -17,8 +17,8 @@ export const MINERS_COLUMN_IDS = [
 
 export type MinersColumnId = (typeof MINERS_COLUMN_IDS)[number];
 
-/** Starts unticked on a phone: the compact default `credit` had as `phoneHidden`. */
-export const MINERS_PHONE_OFF: readonly MinersColumnId[] = ['credit'];
+/** Starts unticked on a phone: `credit` (the compact default), and `account`, whose "Owes" amount the card's Owed corner already shows. */
+export const MINERS_PHONE_OFF: readonly MinersColumnId[] = ['account', 'credit'];
 
 /** Starts unticked in a table pane between the narrow-table and card widths: only the columns that fit. */
 export const MINERS_NARROW_OFF: readonly MinersColumnId[] = ['standing', 'credit'];

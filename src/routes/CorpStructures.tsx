@@ -344,7 +344,7 @@ export function CorpStructures() {
           const fuel = fuelOf(row);
           if (!fuel || fuel.blocks === null)
             return (
-              <span className="text-xs text-text-dim">
+              <span data-dense-omit className="text-xs text-text-dim">
                 {t('corp.structures.fuelPlan.noBayAccess')}
               </span>
             );
@@ -385,7 +385,7 @@ export function CorpStructures() {
         render: (row) => {
           const needed = fuelOf(row)?.plan.needed ?? null;
           return needed === null ? (
-            DASH
+            <span data-dense-omit>{DASH}</span>
           ) : (
             <span className="tabular-nums">{formatCount(needed)}</span>
           );
@@ -412,7 +412,7 @@ export function CorpStructures() {
           row.timer ? (
             <span className={SEVERITY_TEXT[row.timer.severity]}>{structureWhen(row.timer, t)}</span>
           ) : (
-            DASH
+            <span data-dense-omit>{DASH}</span>
           ),
         sortValue: (row) => row.timer?.deadlineMs ?? undefined,
       },
