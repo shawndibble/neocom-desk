@@ -286,7 +286,7 @@ test.describe('Balances strip Payee filter button — touch target', () => {
  *
  * The rows: Bulk Dismiss's itemized entries, and since every Payee is paid oldest first
  * (decision 20261120-235011) the payment lists of Link a payment you already made, opened from the
- * Payee card's Link payment (its hand-picked list) or the "Payments to link" card's Review (its
+ * Payee card's Link payment or the "Payments to link" card's Review (its
  * suggestions). Settle up and the link dialog no longer list entries, so those rows are gone.
  *
  * Rows are ticked through the table's real checkbox column and the real selection toolbar rather
@@ -339,17 +339,15 @@ test.describe('Mining Tax dialog rows — touch target', () => {
     return dialog;
   }
 
-  test('Link a payment from a Payee card: hand-picked row reaches 36px on phone', async ({
-    page,
-  }) => {
+  test('Link a payment from a Payee card: payment row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });
     await page.goto('./mining/tax');
 
     const dialog = await openLinkWallet(page);
-    const row = dialog.getByRole('list', { name: 'Wallet payments' }).getByRole('radio');
-    expect(await labelHeight(row.first())).toBeGreaterThanOrEqual(36);
+    // One row component serves the suggested matches and the hand-picked list.
+    expect(await labelHeight(dialog.getByRole('radio').first())).toBeGreaterThanOrEqual(36);
   });
 
   test('Link a payment from Review: suggested row reaches 36px on phone', async ({ page }) => {
