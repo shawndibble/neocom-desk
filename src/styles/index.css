@@ -386,7 +386,7 @@
     left: 0;
     width: 6.5rem;
     overflow: hidden;
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     /* Pinned rather than inherited, so the `min-height` above is arithmetic
        and not a guess at each browser's `normal`. */
     line-height: 1rem;
@@ -640,7 +640,7 @@
     padding: 0;
     /* A size step above the meta line's 0.6875rem — this is the card's
        title, not just another field. */
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
   }
 
   /* Undoes the decorative corner's absolute pin: here it is content, and

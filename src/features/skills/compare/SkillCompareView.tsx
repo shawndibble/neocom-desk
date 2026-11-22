@@ -124,7 +124,7 @@ function ColumnHeader({
           {character.name}
         </span>
         {isBaseline && (
-          <span className="block text-[0.625rem] tracking-widest text-accent uppercase">
+          <span className="block text-[0.6875rem] tracking-widest text-accent uppercase">
             {t('skillCompare.baseline')}
           </span>
         )}

@@ -100,7 +100,7 @@ export function BelowMarketResults({
           <>
             <IskAmount value={row.market} decimals={0} />
             {row.pricedLines < row.lines && (
-              <span className="ml-1 text-[0.625rem] text-text-dim sm:ml-0 sm:block">
+              <span className="ml-1 text-[0.6875rem] text-text-dim sm:ml-0 sm:block">
                 {t('contractSearch.belowMarket.coverage', {
                   priced: row.pricedLines,
                   total: row.lines,

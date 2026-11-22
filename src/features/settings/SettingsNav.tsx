@@ -42,7 +42,7 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
         <div key={group.id} className="mb-3">
           <p
             id={`settings-nav-${group.id}`}
-            className="px-2 pb-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase"
+            className="px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
           >
             {t(group.labelKey)}
           </p>

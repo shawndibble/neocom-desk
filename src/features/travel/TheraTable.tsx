@@ -34,7 +34,7 @@ const DASH = '—';
 const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 
 const hubBadgeClassName =
-  'shrink-0 rounded-xs bg-panel-2 px-1 text-[0.625rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
+  'shrink-0 rounded-xs bg-panel-2 px-1 text-[0.6875rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
 
 function UseInRoute({
   row,

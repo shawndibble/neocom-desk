@@ -237,7 +237,7 @@ export function SurveyCharts({
                 position="top"
                 offset={8}
                 fill="var(--color-text)"
-                fontSize="0.625rem"
+                fontSize="0.6875rem"
                 formatter={(value: unknown) =>
                   typeof value === 'number' ? formatCompactNumber(value) : ''
                 }

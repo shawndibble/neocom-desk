@@ -59,7 +59,7 @@ export const FactionGrid = memo(function FactionGrid({
                 {emblem ? (
                   <img src={emblem} alt="" width={28} height={28} draggable={false} />
                 ) : (
-                  <span className="text-[0.625rem] font-bold">{f.name.slice(0, 3)}</span>
+                  <span className="text-[0.6875rem] font-bold">{f.name.slice(0, 3)}</span>
                 )}
               </button>
             </Tooltip>

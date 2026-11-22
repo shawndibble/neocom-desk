@@ -35,7 +35,7 @@ import type { RouteHolesState } from '@/features/route/useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
 import { formatNumber } from '@/lib/numberLocale';
 
-const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-text-dim uppercase';
+const badgeClassName = 'rounded-xs px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase';
 
 function Dot() {
   return (

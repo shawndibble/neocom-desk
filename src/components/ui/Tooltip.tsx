@@ -379,7 +379,7 @@ export function InfoTooltip({
       <button
         type="button"
         aria-label={label}
-        className={`group/info -m-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.625rem] leading-none hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
+        className={`group/info -m-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.6875rem] leading-none hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
       >
         <span
           aria-hidden="true"

@@ -1148,7 +1148,7 @@ function PhoneChipButton({ items }: { items: QueueItem[] }) {
         <span
           aria-hidden="true"
           className={cx(
-            'absolute -top-1.5 -right-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border bg-bg px-1 text-[0.625rem] font-semibold tabular-nums',
+            'absolute -top-1.5 -right-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border bg-bg px-1 text-[0.6875rem] font-semibold tabular-nums',
             done && !c.failed ? 'border-success text-success' : 'border-line-bright text-text'
           )}
         >
@@ -1157,7 +1157,7 @@ function PhoneChipButton({ items }: { items: QueueItem[] }) {
         {c.failed > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-1.5 -bottom-1.5 inline-flex h-5 min-w-5 items-center justify-center gap-0.5 rounded-full border border-warning bg-bg px-1 text-[0.625rem] font-semibold text-warning tabular-nums"
+            className="absolute -right-1.5 -bottom-1.5 inline-flex h-5 min-w-5 items-center justify-center gap-0.5 rounded-full border border-warning bg-bg px-1 text-[0.6875rem] font-semibold text-warning tabular-nums"
           >
             <Icon.Warn className="size-3" aria-hidden="true" />
             {c.failed}

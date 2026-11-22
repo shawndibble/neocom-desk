@@ -157,7 +157,7 @@ export function EntryList({
       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
         <div className="rounded-xs border border-line">
           {isDesktop && (columns.perLevelTime || columns.cumulativeTime) && (
-            <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               <span className="flex-1" />
               {columns.perLevelTime && <span className={TIME_CELL}>{t('plans.columnTakes')}</span>}
               {columns.cumulativeTime && (

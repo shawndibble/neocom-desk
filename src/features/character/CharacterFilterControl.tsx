@@ -341,7 +341,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
         FACE_BOX,
         FACE_RING,
         FACE_OVERLAP,
-        'flex shrink-0 items-center justify-center bg-panel text-[0.625rem] font-semibold text-text tabular-nums'
+        'flex shrink-0 items-center justify-center bg-panel text-[0.6875rem] font-semibold text-text tabular-nums'
       )}
     >
       +{extra}
@@ -468,7 +468,7 @@ function Initial({
     <span
       {...rest}
       className={cx(
-        'flex shrink-0 items-center justify-center border border-line bg-panel text-[0.625rem] font-semibold text-text-dim uppercase',
+        'flex shrink-0 items-center justify-center border border-line bg-panel text-[0.6875rem] font-semibold text-text-dim uppercase',
         FACE_BOX,
         FACE_RING,
         className

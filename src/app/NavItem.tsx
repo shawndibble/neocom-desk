@@ -29,7 +29,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 // width, so a long label truncates instead of pushing later tabs off-screen.
 // `min-h-11` (44px) meets the mobile touch-target minimum; the icon sits above
 // the label.
-export const MOBILE_NAV_ITEM = `relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 border-t-2 border-transparent px-1 py-1.5 text-[0.625rem] font-semibold uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
+export const MOBILE_NAV_ITEM = `relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 border-t-2 border-transparent px-1 py-1.5 text-[0.6875rem] font-semibold uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
 export const MOBILE_NAV_ACTIVE = 'border-accent bg-panel-2 text-accent';
 export const MOBILE_NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel';
 
