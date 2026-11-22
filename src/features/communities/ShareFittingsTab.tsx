@@ -3,6 +3,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  LiveNote,
   Button,
   Checkbox,
   EmptyState,
@@ -219,14 +220,14 @@ export function ShareFittingsTab({
           />
           {t('communities.fittings.shareAll')}
         </label>
-        <span role="status" className="text-xs text-text-dim">
+        <LiveNote as="span" className="text-xs text-text-dim">
           {all
             ? t('communities.fittings.allShared', { count: loaded.shared.size })
             : t('communities.fittings.count', {
                 count: loaded.shared.size,
                 total: fittings.length,
               })}
-        </span>
+        </LiveNote>
         <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
           {t('communities.fittings.add')}
         </Button>

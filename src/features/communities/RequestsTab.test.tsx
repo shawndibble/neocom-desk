@@ -300,7 +300,11 @@ describe('Request panel', () => {
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit request' });
     expect(within(dialog).getByLabelText(/^Location/)).toHaveValue('Efa');
-    expect(within(dialog).getByText(/Members have Pledged on this Request/)).toBeInTheDocument();
+    expect(
+      within(dialog)
+        .getAllByText(/Members have Pledged on this Request/)
+        .at(-1)
+    ).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: /^Remove / })).toBeNull();
   });
 
@@ -537,7 +541,7 @@ describe('distance', () => {
     expect(rowNames()).toHaveLength(3);
     await pick(user, 'Within 5 jumps');
     expect(
-      await screen.findByText("1 Request with no known location isn't listed.")
+      (await screen.findAllByText("1 Request with no known location isn't listed.")).at(-1)
     ).toBeInTheDocument();
     expect(rowNames()).toHaveLength(1);
     expect(rowNames()[0]).toContain('near one');

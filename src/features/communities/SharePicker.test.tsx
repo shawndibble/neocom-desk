@@ -32,16 +32,16 @@ beforeAll(async () => {
 describe('SharePicker', () => {
   it('shares nothing by default', () => {
     render(<Harness />);
-    expect(screen.getByText('0 of 4 blueprints shared')).toBeInTheDocument();
+    expect(screen.getAllByText('0 of 4 blueprints shared').at(-1)).toBeInTheDocument();
   });
 
   it('shares all, then none, with a live count', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: s.all }));
-    expect(screen.getByText('4 of 4 blueprints shared')).toBeInTheDocument();
+    expect(screen.getAllByText('4 of 4 blueprints shared').at(-1)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: s.none }));
-    expect(screen.getByText('0 of 4 blueprints shared')).toBeInTheDocument();
+    expect(screen.getAllByText('0 of 4 blueprints shared').at(-1)).toBeInTheDocument();
   });
 
   it('shows a category as partial and toggles all of it from its checkbox', async () => {
@@ -53,9 +53,9 @@ describe('SharePicker', () => {
     expect(frigates.indeterminate).toBe(true);
     expect(within(frigates.closest('label')!).getByText('1/2')).toBeInTheDocument();
     await user.click(frigates);
-    expect(screen.getByText('2 of 4 blueprints shared')).toBeInTheDocument();
+    expect(screen.getAllByText('2 of 4 blueprints shared').at(-1)).toBeInTheDocument();
     await user.click(frigates);
-    expect(screen.getByText('0 of 4 blueprints shared')).toBeInTheDocument();
+    expect(screen.getAllByText('0 of 4 blueprints shared').at(-1)).toBeInTheDocument();
   });
 
   it('opts a single blueprint out of a shared category', async () => {
@@ -64,7 +64,7 @@ describe('SharePicker', () => {
     await user.click(screen.getByRole('button', { name: 'Show Ships' }));
     await user.click(screen.getByRole('button', { name: 'Show Frigates' }));
     await user.click(screen.getByRole('checkbox', { name: /Merlin Blueprint/ }));
-    expect(screen.getByText('1 of 4 blueprints shared')).toBeInTheDocument();
+    expect(screen.getAllByText('1 of 4 blueprints shared').at(-1)).toBeInTheDocument();
   });
 
   it('searches by name, opening the matching categories', async () => {

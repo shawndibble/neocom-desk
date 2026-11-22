@@ -3,6 +3,7 @@ import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import {
+  LiveNote,
   Button,
   ColumnPickerMenu,
   DataTable,
@@ -546,9 +547,9 @@ export function RequestsTab({
           </p>
         )}
         {distance.status === 'ready' && limit !== null && unmeasured > 0 && (
-          <p role="status" className="mb-3 text-xs text-text-dim">
+          <LiveNote className="mb-3 text-xs text-text-dim">
             {t('communities.board.distance.unmeasured', { count: unmeasured })}
-          </p>
+          </LiveNote>
         )}
         {measuring ? (
           <Spinner size="sm" label={t('communities.board.distance.measuring')} />
