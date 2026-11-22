@@ -92,12 +92,12 @@ describe('PageHeader', () => {
       expect(names).toEqual(['All characters', 'Export', 'Refresh', 'Alerts, none waiting']);
     });
 
-    it('locks the title row to one line: the h1 truncates with its full name in title', () => {
+    it('locks the title row to one line: the h1 truncates with its full name in a Tooltip', () => {
       renderWithScope();
       const h1 = screen.getByRole('heading', { level: 1 });
       expect(h1).toHaveClass('truncate');
       expect(h1).not.toHaveClass('break-words');
-      expect(h1).toHaveAttribute('title', 'Market orders and history');
+      expect(h1).not.toHaveAttribute('title');
       const cluster = screen.getByRole('button', { name: 'All characters' }).parentElement;
       expect(cluster).toHaveClass('shrink-0', 'flex-nowrap');
       expect(cluster).not.toHaveClass('flex-wrap');
