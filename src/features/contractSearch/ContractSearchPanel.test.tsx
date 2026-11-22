@@ -1858,11 +1858,14 @@ describe('ContractSearchPanel — Courier going rate', () => {
     await user.click((await courierRows())[0]);
 
     const dialog = await screen.findByRole('dialog');
-    // The benchmark is named, not merely applied.
-    expect(within(dialog).getByText(/median reward per m³ per jump/)).toBeInTheDocument();
+    // The benchmark is named, not merely applied; the reasoning is in its tooltip.
+    expect(within(dialog).getByText('Pay vs going rate')).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'About Pay vs going rate' })
+    ).toBeInTheDocument();
     // The community floor, where collateral and distance are both known.
-    expect(within(dialog).getByText(/1M ISK for every 1B ISK of collateral/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Expires in/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Community minimum')).toBeInTheDocument();
+    expect(within(dialog).getByText('Expires')).toBeInTheDocument();
     // The bound the whole design rests on.
     expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/fraud|bad faith|dishonest/i)).not.toBeInTheDocument();
@@ -1883,7 +1886,7 @@ describe('ContractSearchPanel — Courier going rate', () => {
     expect(within(dialog).getByText(/Collateral is 1,111\.1× the reward/)).toBeInTheDocument();
     expect(within(dialog).getByText('Before you accept')).toBeInTheDocument();
     // Short of the floor, it says by how much: 45M of a 200M floor.
-    expect(within(dialog).getByText(/22\.5% of that minimum/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/paying 22\.5% of it/)).toBeInTheDocument();
     expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
   });
 
@@ -1896,7 +1899,7 @@ describe('ContractSearchPanel — Courier going rate', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText('High collateral')).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/of that minimum/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/of it$/)).not.toBeInTheDocument();
   });
 });
 
