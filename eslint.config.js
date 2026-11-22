@@ -243,6 +243,8 @@ export default tseslint.config(
       'playwright-report',
       'test-results',
       '.claude/worktrees',
+      // Tool caches (ci.yml restores `.cache/tsc`, whose emitted .d.ts files are not source).
+      '.cache',
     ],
   },
   {
