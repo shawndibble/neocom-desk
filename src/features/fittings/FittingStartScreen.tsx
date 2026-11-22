@@ -1,4 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
@@ -558,9 +559,7 @@ export function FittingStartScreen({
           editor's own workspace flags its open Fitting the same way, so the Open
           dialog never shows it. */}
         {importInline && workspace.tooLargeToShare && (
-          <p className="text-xs text-warning" role="status">
-            {t('fittings.load.tooLargeToShare')}
-          </p>
+          <LiveNote className="text-xs text-warning">{t('fittings.load.tooLargeToShare')}</LiveNote>
         )}
 
         {active.pending || (loading && !hasRows) ? (
