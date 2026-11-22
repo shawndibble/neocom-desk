@@ -11,6 +11,7 @@ import {
   ColumnPickerMenu,
   DataTable,
   EditableValue,
+  FieldError,
   IskAmount,
   MenuItem,
   MenuSeparator,
@@ -45,6 +46,7 @@ function TargetCell({
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   // Set once the field has closed, so the blur its own unmount fires cannot save an escaped value.
   const closed = useRef(false);
@@ -61,47 +63,60 @@ function TargetCell({
     );
   }
   if (draft !== null) {
+    // An unusable value keeps the field open with what was typed, and says so;
+    // only Escape discards it. The same value as now is a quiet no-op.
     const commit = () => {
       if (closed.current) return;
       const next = Math.floor(Number(draft));
-      if (Number.isFinite(next) && next > 0 && next !== row.target) onSetTarget(row.typeId, next);
+      if (draft.trim() === '' || !Number.isFinite(next) || next <= 0) {
+        setInvalid(true);
+        return;
+      }
+      if (next !== row.target) onSetTarget(row.typeId, next);
       close();
     };
+    const errorId = `stock-target-error-${row.typeId}`;
     return (
-      <TextInput
-        size="sm"
-        // Text with a numeric keypad, not type="number": a seeded digit needs
-        // the caret after it, and a number field can't place its caret.
-        inputMode="numeric"
-        autoFocus
-        aria-label={t('stockTargets.table.targetFor', { name })}
-        className="w-24 text-right"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={(e) => {
-          const field = e.currentTarget;
-          if (seeded.current) field.setSelectionRange(field.value.length, field.value.length);
-          else field.select();
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onBlur={() => {
-          // Blur that is not the field's own close saves, as leaving any edit field does.
-          if (closed.current) return;
-          const next = Math.floor(Number(draft));
-          if (Number.isFinite(next) && next > 0 && next !== row.target) {
-            onSetTarget(row.typeId, next);
-          }
-          closed.current = true;
-          setDraft(null);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') {
-            e.stopPropagation();
-            close();
-          }
-        }}
-      />
+      <span className="inline-flex flex-col items-end">
+        <TextInput
+          size="sm"
+          // Text with a numeric keypad, not type="number": a seeded digit needs
+          // the caret after it, and a number field can't place its caret.
+          inputMode="numeric"
+          autoFocus
+          aria-label={t('stockTargets.table.targetFor', { name })}
+          className="w-24 text-right"
+          value={draft}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? errorId : undefined}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setInvalid(false);
+          }}
+          onFocus={(e) => {
+            const field = e.currentTarget;
+            if (seeded.current) field.setSelectionRange(field.value.length, field.value.length);
+            else field.select();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={() => {
+            // Blur that is not the field's own close saves, as leaving any edit field does.
+            commit();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              close();
+            }
+          }}
+        />
+        {invalid && (
+          <FieldError id={errorId} className="text-xs">
+            {t('stockTargets.table.targetInvalid')}
+          </FieldError>
+        )}
+      </span>
     );
   }
   return (
@@ -111,6 +126,7 @@ function TargetCell({
       label={t('stockTargets.table.editTargetFor', { name })}
       onEdit={(seed) => {
         closed.current = false;
+        setInvalid(false);
         // A target is a whole number: only a digit seeds the field.
         const digit = seed !== undefined && /^\d$/.test(seed);
         seeded.current = digit;

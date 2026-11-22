@@ -20,6 +20,7 @@ import {
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { InlineError } from '@/components/ui/InlineError';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import {
@@ -675,11 +676,21 @@ export function MinerDetail({ id }: { id: string }) {
       <BookSection
         title={t('corpTaxBook.moons.miner.activity')}
         noun={noun('activity')}
-        empty={t('corpTaxBook.moons.miner.empty.activity')}
+        empty={
+          audit.failed
+            ? t('corpTaxBook.moons.miner.activityLoadFailed')
+            : t('corpTaxBook.moons.miner.empty.activity')
+        }
         rows={shownFeed}
         count={feed.length}
         meta={
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.activityHint')}</span>
+          audit.failed ? (
+            <InlineError>{t('corpTaxBook.moons.miner.activityLoadFailed')}</InlineError>
+          ) : (
+            <span className="text-xs text-text-dim">
+              {t('corpTaxBook.moons.miner.activityHint')}
+            </span>
+          )
         }
         toolbar={
           feed.length === 0 ? undefined : (

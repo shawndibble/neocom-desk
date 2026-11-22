@@ -59,4 +59,14 @@ describe('SurveyOwnerChange', () => {
     expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn't change the owner/);
     expect(onChanged).not.toHaveBeenCalled();
   });
+
+  it('says the search failed instead of "No character found", and keeps the typed name', async () => {
+    searchMailRecipients.mockRejectedValue(new Error('offline'));
+    render(<SurveyOwnerChange characterId={7} surveyId="abc123" onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Change owner' }));
+    fireEvent.change(screen.getByLabelText('New owner'), { target: { value: 'New Pil' } });
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn.t search/);
+    expect(screen.queryByText('No character found.')).toBeNull();
+    expect(screen.getByLabelText('New owner')).toHaveValue('New Pil');
+  });
 });

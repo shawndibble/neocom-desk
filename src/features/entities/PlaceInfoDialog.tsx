@@ -7,32 +7,34 @@
  * Character; one it cannot dock at has no name or system for it, and says so.
  * A solar system is not a target: systems open Route Safety (§6c).
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { EmptyState, Modal, Spinner } from '@/components/ui';
-import { loadSystemName } from '@/features/character/systemSecurity';
+import { EmptyState, LoadFailedState, Modal, Spinner } from '@/components/ui';
+import { loadSystemName, loadSystemSecurity } from '@/features/character/systemSecurity';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { SetDestinationButton } from '@/features/market/SetDestinationButton';
 import {
   classifyPlaceInfoId,
   loadRegionName,
   loadSystemRegionId,
-  placeKey,
-  usePlaceDetails,
+  resolvePlace,
 } from '@/features/places';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PlaceLink, SystemLink } from './EntityLink';
 
-/** One async read by id: `undefined` while pending, `null` for no id or no answer. */
+/**
+ * One async read by id: `value` is `undefined` while pending, `null` for no id
+ * or no answer. A read that threw is `failed`, never a `null` answer.
+ */
 function useLookup<T>(
   id: number | null | undefined,
   load: (id: number) => Promise<T | null>
-): T | null | undefined {
-  const loader = useCallback(() => load(id ?? 0).catch(() => null), [id, load]);
-  const { status, data } = useKeyedLoad(id == null ? null : String(id), loader);
-  if (id == null) return id;
-  return status === 'ready' ? data : undefined;
+): { value: T | null | undefined; failed: boolean; retry: () => void } {
+  const loader = useCallback(() => load(id ?? 0), [id, load]);
+  const { status, data, retry } = useKeyedLoad(id == null ? null : String(id), loader);
+  if (id == null) return { value: id, failed: false, retry };
+  return { value: status === 'ready' ? data : undefined, failed: status === 'failed', retry };
 }
 
 export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => void }) {
@@ -42,27 +44,31 @@ export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => vo
   const hydrated = useActiveCharacter((s) => s.hydrated);
   const scopeId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const isLocation = kind === 'station' || kind === 'structure';
-  const refs = useMemo(() => (isLocation ? [{ locationId: id }] : []), [id, isLocation]);
-  const details = usePlaceDetails(refs, {
-    scopeId,
-    enabled: hydrated && isLocation,
-    origin: null,
-    basis: null,
-  });
-  const detail = isLocation
-    ? details.get(placeKey({ locationId: id, characterId: scopeId }))
-    : undefined;
+  // Not `settle`d: a read that threw must show as a failed read, not as the
+  // `null` a structure the Character cannot dock at answers with.
+  const readPlace = useCallback(
+    () => resolvePlace({ locationId: id, characterId: scopeId }),
+    [id, scopeId]
+  );
+  const place = useKeyedLoad(hydrated && isLocation ? `${id}:${scopeId}` : null, readPlace);
+  const detail = place.status === 'ready' ? place.data : undefined;
 
   // `undefined` = still reading, `null` = none.
   const systemId = isLocation ? detail?.systemId : null;
-  const systemName = useLookup(systemId, loadSystemName);
-  const regionOfSystem = useLookup(systemId, loadSystemRegionId);
+  const systemName = useLookup(systemId, loadSystemName).value;
+  const security = useLookup(systemId, loadSystemSecurity).value;
+  const regionOfSystem = useLookup(systemId, loadSystemRegionId).value;
   const regionId = kind === 'region' ? id : regionOfSystem;
-  const regionName = useLookup(regionId, loadRegionName);
+  const regionLookup = useLookup(regionId, loadRegionName);
+  const regionName = regionLookup.value;
   const name = kind === 'region' ? regionName : detail?.name;
+  const readFailed = isLocation ? place.status === 'failed' : regionLookup.failed;
+  const retry = isLocation ? place.retry : regionLookup.retry;
 
   let body;
-  if (kind === null || name === null) {
+  if (kind !== null && readFailed) {
+    body = <LoadFailedState title={t('placeInfo.loadFailed')} onRetry={retry} />;
+  } else if (kind === null || name === null) {
     body =
       kind === 'structure' ? (
         <EmptyState
@@ -85,7 +91,7 @@ export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => vo
               <dt className="text-text-dim">{t('placeInfo.system')}</dt>
               <dd className="flex items-baseline gap-2">
                 <SystemLink systemId={systemId}>{systemName}</SystemLink>
-                {detail?.security != null && <SecurityStatus security={detail.security} />}
+                {security != null && <SecurityStatus security={security} />}
               </dd>
             </>
           )}
