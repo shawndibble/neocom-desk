@@ -157,14 +157,14 @@ describe('Travel › Route Safety › Stops', () => {
     ).toBeInTheDocument();
   });
 
-  it('removes a stop with its row button, and reorders only by the drag handle', async () => {
+  it('removes a stop from its row menu, which also holds Move up / Move down', async () => {
     const user = userEvent.setup({ delay: null });
     visit(`?from=${JITA}&stops=${UEDAMA},${SOBASEKI}`);
 
     expect(await screen.findByRole('button', { name: 'Reorder Sobaseki' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Move / })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Remove Uedama' }));
+    await user.click(screen.getByRole('button', { name: 'More actions for Uedama' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
     expect(stopsInLink()).toBe(String(SOBASEKI));
     // One stop is the page as it always was.
     expect(await screen.findByRole('table', { name: 'Systems on the route' })).toBeInTheDocument();
