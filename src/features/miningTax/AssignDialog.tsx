@@ -14,6 +14,7 @@ import {
   SelectValue,
   TextInput,
   Checkbox,
+  LiveNote,
   Tooltip,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
@@ -429,14 +430,14 @@ export function AssignDialog({
       <LabelField value={label} onChange={setLabel} />
 
       {warnUnpricedOffline && (
-        <p role="status" className="text-xs text-warning">
+        <LiveNote className="text-xs text-warning">
           {t('miningTax.assignUnpricedOfflineWarning', {
             types: typeLabels(
               unpricedOffline.map((line) => line.typeId),
               typeNames
             ),
           })}
-        </p>
+        </LiveNote>
       )}
       <LedgerActionError error={saveError} />
       <div className="flex flex-wrap gap-2 pt-1">

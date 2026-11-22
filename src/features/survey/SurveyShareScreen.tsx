@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { EmptyState, LoadFailedState, Spinner } from '@/components/ui';
+import { EmptyState, LiveNote, LoadFailedState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { ownsSurvey } from '@/engine/survey/owner';
@@ -174,9 +174,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
         <>
           <p className="text-xs text-text-dim">{t('survey.shareHint')}</p>
           {diverted && (
-            <p role="status" className="text-sm text-warning">
-              {t('survey.differentOnShare')}
-            </p>
+            <LiveNote className="text-sm text-warning">{t('survey.differentOnShare')}</LiveNote>
           )}
           {checking !== null && (
             <ExpandedCheck
