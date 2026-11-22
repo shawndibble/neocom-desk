@@ -860,7 +860,10 @@ describe('Characters', () => {
       'aria-busy',
       'true'
     );
-    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     finish();
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Remove' })).toBeNull());

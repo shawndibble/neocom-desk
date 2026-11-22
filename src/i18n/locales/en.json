@@ -13727,7 +13727,7 @@
       "shareReady": "Share Link — works for 7 days",
       "shareCopy": "Copy",
       "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
-      "shareUnavailable": "Sharing needs a signed-in character, a connection and at least one item.",
+      "shareUnavailable": "Sharing needs a logged-in character, a connection and at least one item.",
       "columnsButton": "Columns",
       "columnsMenuTitle": "Columns",
       "summaryBuy": "Buy",
