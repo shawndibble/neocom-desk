@@ -1,4 +1,4 @@
-import type { TFunction } from 'i18next';
+import i18n, { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Pill } from '@/components/ui/Pill';
 import type { SkillQueueEntry } from '@/esi/endpoints';
@@ -80,7 +80,7 @@ function periodLabel(t: TFunction, group: Group, nowMs: number, timeZone?: 'UTC'
   // current year is read on the chosen clock to match how the group was filed.
   const currentYear = Number(formatLocalDate(new Date(nowMs), timeZone).slice(0, 4));
   const sameYear = group.monthStart.getUTCFullYear() === currentYear;
-  return group.monthStart.toLocaleDateString('en-US', {
+  return group.monthStart.toLocaleDateString(i18n.language || 'en', {
     timeZone: 'UTC',
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
