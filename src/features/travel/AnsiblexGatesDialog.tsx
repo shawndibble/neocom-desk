@@ -14,6 +14,7 @@ import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import {
   Button,
+  LiveStatus,
   Modal,
   NeedsConnection,
   TextArea,
@@ -109,7 +110,8 @@ function CharacterSearchRow({
         </Tooltip>
       )}
       {lines.length > 0 && (
-        <span role="status" className="flex flex-wrap gap-x-1 text-text-dim">
+        <span className="flex flex-wrap gap-x-1 text-text-dim">
+          <LiveStatus>{lines.join(' ')}</LiveStatus>
           {lines.map((line) => (
             <span key={line}>{line}</span>
           ))}
@@ -255,8 +257,16 @@ export function AnsiblexGatesDialog({
             </Button>
           </Tooltip>
           {pasteResult && (
-            <div role="status" className="space-y-1">
-              <p>{t('travel.bridges.pasteAdded', { count: pasteResult.added })}</p>
+            <div className="space-y-1">
+              <p>
+                <LiveStatus>
+                  {[
+                    t('travel.bridges.pasteAdded', { count: pasteResult.added }),
+                    ...pasteResult.errors.map((error) => pasteErrorText(error, t)),
+                  ].join(' ')}
+                </LiveStatus>
+                {t('travel.bridges.pasteAdded', { count: pasteResult.added })}
+              </p>
               {pasteResult.errors.length > 0 && (
                 <ul className="list-disc space-y-0.5 pl-5 text-danger">
                   {pasteResult.errors.map((error) => (
