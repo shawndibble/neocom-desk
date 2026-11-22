@@ -192,7 +192,9 @@ export function OwedBalances({
     action: ReactNode
   ) => (
     <Panel key={key} padded={false} className="border-dashed">
-      <div className="flex items-center gap-3 px-3 py-2">
+      {/* Stacked on a phone: the text gets the full width and the action sits under it, instead of a
+          long label squeezing the text into a one-word column. */}
+      <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0 flex-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
           <div className="flex flex-wrap items-baseline gap-x-2">
             {title}
@@ -436,18 +438,18 @@ export function OwedBalances({
                 corp: conflicts.firstCorpName,
               }),
           (onFixConflicts || onReviewConflicts) && (
-            <span className="flex shrink-0 flex-wrap gap-2">
+            <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">
               {onFixConflicts && (
-                <Button variant="primary" className="shrink-0" onClick={onFixConflicts}>
+                <Button variant="primary" wrap className="sm:shrink-0" onClick={onFixConflicts}>
                   {t('miningTax.conflictsFix', { corp: conflicts.firstCorpName })}
                 </Button>
               )}
               {onReviewConflicts && (
-                <Button className="shrink-0" onClick={onReviewConflicts}>
+                <Button wrap className="sm:shrink-0" onClick={onReviewConflicts}>
                   {t('miningTax.conflictsReview')}
                 </Button>
               )}
-            </span>
+            </div>
           )
         )}
     </section>
