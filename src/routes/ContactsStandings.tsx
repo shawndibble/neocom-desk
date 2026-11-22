@@ -278,7 +278,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
         icon={<Icon.Refresh />}
         label={t('contacts.refresh')}
         onClick={refresh}
-        disabled={refreshing || !state || state.characterId !== characterId}
+        busy={refreshing || !state || state.characterId !== characterId}
       />
     </>
   );

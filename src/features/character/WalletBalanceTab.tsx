@@ -164,7 +164,7 @@ export function WalletBalanceTab({
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
               onClick={balances.refresh}
-              disabled={balances.loading}
+              busy={balances.loading}
             />
           }
         />

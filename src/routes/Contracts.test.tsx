@@ -1128,7 +1128,7 @@ describe('Contracts Search tab page header', () => {
       ).not.toBeNull()
     );
     // Enabled is the discriminating assertion: no reported status leaves it off.
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('picks Item search, Courier and History from one tab row, with no switch in the panel', async () => {

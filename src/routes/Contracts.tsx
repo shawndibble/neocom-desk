@@ -427,7 +427,7 @@ export function Contracts() {
                 icon={<Icon.Refresh />}
                 label={t('contracts.refresh')}
                 onClick={refresh}
-                disabled={loading}
+                busy={loading}
               />
             </>
           ) : (
@@ -501,7 +501,7 @@ export function Contracts() {
                     <IncompleteNotice
                       className="px-3 pt-2"
                       action={
-                        <Button size="sm" disabled={loading} onClick={refresh}>
+                        <Button size="sm" loading={loading} onClick={refresh}>
                           {t('contracts.fetchTruncatedRetry')}
                         </Button>
                       }

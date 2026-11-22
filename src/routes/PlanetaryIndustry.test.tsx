@@ -366,7 +366,9 @@ async function addAlt(characterId: number, name: string, scopes: string[]) {
 async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
   // The page's load has settled (its Refresh button re-enables): a row can draw
   // from the first, detail-less snapshot and then redraw as the pins arrive.
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled());
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveAttribute('aria-disabled')
+  );
   const heading = await screen.findByRole('heading', { name });
   const panel = heading.closest('[data-colony-status]');
   if (!(panel instanceof HTMLElement)) throw new Error(`no colony panel for ${String(name)}`);
