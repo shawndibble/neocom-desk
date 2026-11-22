@@ -34,7 +34,8 @@ export interface Miner {
 /** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */
 export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): number[] {
   const grouped = miners.find((m) => m.id === minerId);
-  if (grouped) return grouped.characterIds;
+  // A character that left still billed it before the day it left.
+  if (grouped) return [...grouped.characterIds, ...Object.keys(grouped.leftOn ?? {}).map(Number)];
   const solo = soloCharacterId(minerId);
   return solo === undefined ? [] : [solo];
 }

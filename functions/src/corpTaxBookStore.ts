@@ -1511,7 +1511,8 @@ function writeMiner(
   c: EditCtx,
   action: { minerId: string; characterIds: number[]; mainCharacterId: number },
   plan: GroupPlan,
-  aliases: readonly string[] = []
+  aliases: readonly string[] = [],
+  leftOn: Record<number, string> = {}
 ): void {
   // An officer asking again starts a fresh question: the old answer no longer stands.
   clearAnswers(c, plan.officerClaimed);
@@ -1529,7 +1530,26 @@ function writeMiner(
     uids: plan.readers.map((x) => `char:${x}`),
     // The Miner ids folded into it: a Reason code printed for one still names it.
     ...(aliases.length > 0 ? { aliases: [...aliases] } : {}),
+    // The days characters left it: kept, so a regroup never rewrites who billed what before.
+    ...(Object.keys(leftOn).length > 0 ? { leftOn } : {}),
   });
+}
+
+/**
+ * The `leftOn` days a regrouped Miner keeps: its own and each absorbed Miner's, minus a character
+ * the grouping holds again (it bills here from now on, so its old leave no longer applies).
+ */
+function leftOnAfter(
+  miners: readonly QueryDocumentSnapshot[],
+  minerIds: readonly string[],
+  characterIds: readonly number[]
+): Record<number, string> {
+  const kept: Record<number, string> = {};
+  for (const d of miners)
+    if (minerIds.includes(d.id))
+      for (const [id, day] of Object.entries((d.get('leftOn') as Record<string, string>) ?? {}))
+        if (!characterIds.includes(Number(id))) kept[Number(id)] = day;
+  return kept;
 }
 
 /**
@@ -1595,11 +1615,13 @@ async function removeFromMiner(
   // The snapshots that summed other characters go: the grouping's (unless it goes whole), the
   // character's own, and a last one's left alone. A dated leave (never before the lock date)
   // changes no locked day, so every snapshot stands.
-  if (leftOn === undefined) {
+  // The last character of a one-character grouping has nothing left to keep a doc for.
+  const dated = leftOn !== undefined && characterIds.length > 0;
+  if (!dated) {
     const changed = characterIds.length > 1 ? [ref.id] : characterIds.map(soloMinerId);
     (await snapshotDropper(tx, accounts, [soloMinerId(characterId), ...changed]))();
   }
-  if (characterIds.length <= 1 && leftOn === undefined) {
+  if (!dated && characterIds.length <= 1) {
     tx.delete(ref);
     // Its recorded account goes with it, so no list offers a Miner that is gone.
     tx.delete(accounts.doc(ref.id));
@@ -1620,7 +1642,7 @@ async function removeFromMiner(
         (x) => x !== characterId
       ),
       uids: readersAfterUnlink(miner, characterId),
-      ...(leftOn !== undefined ? { [`leftOn.${characterId}`]: leftOn } : {}),
+      ...(dated ? { [`leftOn.${characterId}`]: leftOn } : {}),
     });
   }
   // D26: every officer's sync must leave this character out of an automatic group.
@@ -2253,7 +2275,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         scope.absorbed
       );
       (await snapshotDropper(tx, col(c, RUNNING_ACCOUNTS), changed))();
-      writeMiner(c, action, out, aliasesAfter(miners.docs, action.minerId, []));
+      writeMiner(
+        c,
+        action,
+        out,
+        aliasesAfter(miners.docs, action.minerId, []),
+        leftOnAfter(miners.docs, [action.minerId], action.characterIds)
+      );
       rekey();
       keepInGroup(c, action.characterIds);
       return {
@@ -2293,7 +2321,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       );
       (await snapshotDropper(tx, col(c, RUNNING_ACCOUNTS), changed))();
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
-      writeMiner(c, action, out, aliasesAfter(miners.docs, action.minerId, action.absorbMinerIds));
+      writeMiner(
+        c,
+        action,
+        out,
+        aliasesAfter(miners.docs, action.minerId, action.absorbMinerIds),
+        leftOnAfter(miners.docs, [action.minerId, ...action.absorbMinerIds], action.characterIds)
+      );
       rekey();
       // A confirmation still stands for a character the Miner already held.
       clearAnswers(
@@ -2317,6 +2351,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // A dated leave never reaches into locked history (a sale reported late is fixed by a
       // correction dated on or after the lock date).
       refuseLocked(now, action.leftOn);
+      if (action.leftOn !== undefined && action.leftOn > utcDay(now))
+        fail('invalid-argument', 'A character cannot leave in the future', 'future-left-on');
       if (!(await removeFromMiner(c.tx, ref, miner, action.characterId, action.leftOn)))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
       // The grouping the answer was about is gone, so the answer must not outlive it.

@@ -3247,6 +3247,25 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           const miner = await book().collection('miners').doc('m-a').get();
           expect(miner.get('characterIds')).toEqual([50]);
           expect(miner.get('leftOn')).toEqual({ 52: '2026-10-18' });
+          // Another edit of the grouping (make main) keeps it; grouping the character again drops it.
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50],
+            mainCharacterId: 50,
+          });
+          expect((await book().collection('miners').doc('m-a').get()).get('leftOn')).toEqual({
+            52: '2026-10-18',
+          });
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50, 52],
+            mainCharacterId: 50,
+          });
+          expect(
+            (await book().collection('miners').doc('m-a').get()).get('leftOn')
+          ).toBeUndefined();
         });
 
         it('a fix dated today keeps it: a correction, a write-off, a payment', async () => {

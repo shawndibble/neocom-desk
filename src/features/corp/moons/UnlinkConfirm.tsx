@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Field, Fields } from '@/components/ui/Fields';
 import { TextInput } from '@/components/ui/TextInput';
-import { utcDay } from '../../../../functions/src/timeConstants';
+import { utcDay } from '@/engine/localDay';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 
 /**
@@ -44,20 +45,25 @@ export function UnlinkConfirm({
         await onUnlink(leftOn);
       }}
     >
-      <label className="mt-3 flex flex-col gap-1 text-xs">
-        {t('corpTaxBook.moons.grouping.leftOn')}
-        <TextInput
-          size="sm"
-          type="date"
-          value={leftOn}
-          min={min}
-          max={today}
-          onChange={(e) => setLeftOn(e.target.value)}
-        />
-        <span className="text-text-dim">
-          {t('corpTaxBook.moons.grouping.leftOnHint', { date: min })}
-        </span>
-      </label>
+      <div className="mt-3">
+        <Fields>
+          <Field
+            label={t('corpTaxBook.moons.grouping.leftOn')}
+            htmlFor="unlink-left-on"
+            note={t('corpTaxBook.moons.grouping.leftOnHint', { date: min })}
+          >
+            <TextInput
+              id="unlink-left-on"
+              size="sm"
+              type="date"
+              value={leftOn}
+              min={min}
+              max={today}
+              onChange={(e) => setLeftOn(e.target.value)}
+            />
+          </Field>
+        </Fields>
+      </div>
     </ConfirmDialog>
   );
 }

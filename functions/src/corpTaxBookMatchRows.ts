@@ -16,7 +16,7 @@ export function minedSinceStart(
 ): Set<string> {
   const out = new Set<string>();
   for (const r of rows)
-    if (r.quantity > 0 && r.date >= startDate) out.add(minerIdFor(r.characterId, miners));
+    if (r.quantity > 0 && r.date >= startDate) out.add(minerIdFor(r.characterId, miners, r.date));
   return out;
 }
 
@@ -34,7 +34,11 @@ export function storedRowsWanted(input: {
   const out = new Map<number, string>();
   const want = (characterId: number) => {
     const minerId = minerIdFor(characterId, input.miners);
-    const characters = input.miners.find((m) => m.id === minerId)?.characterIds ?? [characterId];
+    const miner = input.miners.find((m) => m.id === minerId);
+    // Characters that left it still billed it before they left: their rows are wanted too.
+    const characters = miner
+      ? [...miner.characterIds, ...Object.keys(miner.leftOn ?? {}).map(Number)]
+      : [characterId];
     for (const c of characters) out.set(c, input.startDate);
   };
   for (const p of input.held) if (utcDayOf(p.at) >= input.startDate) want(p.characterId);
