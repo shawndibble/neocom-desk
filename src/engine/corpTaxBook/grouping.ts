@@ -13,7 +13,7 @@ import type { ObservedMiningEntry } from './types';
 
 export type GroupingEdit =
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
-  | { action: 'unlink'; minerId: string; characterId: number };
+  | { action: 'unlink'; minerId: string; characterId: number; leftOn?: string };
 
 const isSolo = (id: string) => id.startsWith('solo:');
 

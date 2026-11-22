@@ -98,7 +98,7 @@ export async function reconcileMoonDocs(
   const rowsOf = await rowsOfPulls(db, corporationId, wanted);
   const plan = planMoonDocs(extractions, existing, scope, rowsOf, {
     expiryHours,
-    minerOf: (characterId) => minerIdFor(characterId, miners),
+    minerOf: (characterId, date) => minerIdFor(characterId, miners, date),
   });
   if (options.repair) {
     const ops: BatchOp[] = [

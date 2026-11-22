@@ -99,7 +99,7 @@ export interface MoonRules {
   /** @deprecated Ignored from schema 2: no tax is frozen. Accepted until the client's schema-1 tests go. */
   statements?: readonly Data[];
   /** A Character's Miner (grouping docs); a Character in none is `solo:<id>`. */
-  minerOf: (characterId: number) => string;
+  minerOf: (characterId: number, date: string) => string;
 }
 
 /**
@@ -119,7 +119,7 @@ export function computeMoonDoc(
       if (row.structureId !== x.structureId || row.date < window.from || row.date > window.to)
         continue;
       mined.set(row.typeId, (mined.get(row.typeId) ?? 0) + row.quantity);
-      const minerId = rules.minerOf(row.characterId);
+      const minerId = rules.minerOf(row.characterId, row.date);
       const own = perMiner.get(minerId) ?? new Map<number, number>();
       own.set(row.typeId, (own.get(row.typeId) ?? 0) + row.quantity);
       perMiner.set(minerId, own);

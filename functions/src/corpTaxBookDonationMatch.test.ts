@@ -37,6 +37,24 @@ describe('minerIdFor: the earliest grouping a Character is in wins', () => {
   });
 });
 
+describe('minerIdFor: a dated "left on" splits a Character between Miners', () => {
+  const sold = [
+    { id: 'seller', characterIds: [11, 12], leftOn: { 7: '2026-11-10' }, createdAt: '2026-10-01' },
+  ];
+  const both = [
+    { id: 'seller', characterIds: [12], leftOn: { 7: '2026-11-10' }, createdAt: '2026-10-01' },
+    { id: 'buyer', characterIds: [7, 30], createdAt: '2026-11-12' },
+  ];
+  it('keeps the day before the date with the old Miner, and moves the date itself on', () => {
+    expect(minerIdFor(7, both, '2026-11-09')).toBe('seller');
+    expect(minerIdFor(7, both, '2026-11-10')).toBe('buyer');
+    expect(minerIdFor(7, sold, '2026-11-10')).toBe('solo:7');
+  });
+  it('reads the current grouping when no date is given', () => {
+    expect(minerIdFor(7, both)).toBe('buyer');
+  });
+});
+
 describe('currentMinerOf: a stored Miner id read through the current grouping', () => {
   it('keeps a grouping, folds a grouped Character’s solo id and an absorbed id into it', () => {
     expect(currentMinerOf('g2', miners)).toBe('g2');

@@ -3,6 +3,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { UnlinkConfirm } from './UnlinkConfirm';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useCorporationName } from './lateNoticeMailing';
@@ -70,9 +71,8 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
         mainCharacterId: characterId,
       })
     );
-  const unlink = (characterId: number) =>
-    // The server records the unlink in the book, so no officer's sync puts it straight back (D26).
-    run(() => edit({ action: 'unlink', minerId: miner.id, characterId }));
+  // The server records the unlink in the book, so no officer's sync puts it straight back (D26).
+  const [unlinking, setUnlinking] = useState<number | null>(null);
 
   return (
     <>
@@ -135,7 +135,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                       <button
                         type="button"
                         className={entityLinkClassName('shrink-0 whitespace-nowrap')}
-                        onClick={() => void unlink(characterId)}
+                        onClick={() => setUnlinking(characterId)}
                       >
                         {t('corpTaxBook.moons.grouping.unlink')}
                       </button>
@@ -206,6 +206,18 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
             const { declineLink } = await import('@/features/corpTaxBook/playerApi');
             await declineLink(characterId, { corporationId, minerId: miner.id });
             setDeclining(false);
+          }}
+        />
+      )}
+      {unlinking !== null && (
+        <UnlinkConfirm
+          title={t('corpTaxBook.moons.grouping.unlinkTitle')}
+          body={t('corpTaxBook.moons.grouping.unlinkBody', { name: names.character(unlinking) })}
+          actionLabel={t('corpTaxBook.moons.grouping.unlink')}
+          failedLabel={t('corpTaxBook.moons.grouping.unlinkFailed')}
+          onClose={() => setUnlinking(null)}
+          onUnlink={async (leftOn) => {
+            await edit({ action: 'unlink', minerId: miner.id, characterId: unlinking, leftOn });
           }}
         />
       )}

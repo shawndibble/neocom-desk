@@ -548,7 +548,7 @@ interface Prepared {
 function inFlightPayment(d: InFlightDonation, miners: readonly Miner[]): TaxPayment {
   return {
     id: `inFlight:${d.refId ?? `${d.characterId}@${d.at}`}`,
-    minerId: minerIdFor(d.characterId, miners),
+    minerId: minerIdFor(d.characterId, miners, d.at.slice(0, 10)),
     characterId: d.characterId,
     amount: d.amount,
     at: d.at,
@@ -1391,8 +1391,8 @@ const byDateThenId = (a: BookRowView, b: BookRowView) =>
   a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
 
 /** The member's Miner a row bills. */
-const minerOfRow = (p: Prepared, row: Pick<BookRowView, 'minerId' | 'characterId'>) =>
-  row.minerId ?? minerIdFor(row.characterId, p.book.miners);
+const minerOfRow = (p: Prepared, row: Pick<BookRowView, 'minerId' | 'characterId' | 'date'>) =>
+  row.minerId ?? minerIdFor(row.characterId, p.book.miners, row.date);
 
 /**
  * Each Adjustment on its day's first billed line, the old figure kept beside the new; one with no

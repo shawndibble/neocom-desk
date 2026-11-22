@@ -21,6 +21,8 @@ export interface MatchMiner {
   createdAt?: string;
   /** Set once an officer closed the Miner's account: it takes no more money. */
   closedAt?: string | null;
+  /** Characters that left this grouping, by the day they left: it still bills them before it. */
+  leftOn?: Readonly<Record<number, string>>;
 }
 
 /** Whether the book holds this Miner as closed: money is never placed on one. */
@@ -53,14 +55,31 @@ export function soloCharacterId(minerId: string): number | undefined {
   return solo ? Number(solo[1]) : undefined;
 }
 
-/** The Miner a Character is billed under: its earliest grouping, else a Miner of its own. */
+const groupingHolds = (
+  m: Pick<MatchMiner, 'characterIds' | 'leftOn'>,
+  characterId: number,
+  date?: string
+): boolean => {
+  const left = m.leftOn?.[characterId];
+  return date !== undefined && left !== undefined
+    ? date < left
+    : m.characterIds.includes(characterId);
+};
+
+/**
+ * The Miner a Character is billed under: its earliest grouping, else a Miner of its own. With a
+ * `date`, a grouping the Character left on or before that day no longer holds it, and one it left
+ * after that day still does.
+ */
 export function minerIdFor(
   characterId: number,
-  miners: readonly Pick<MatchMiner, 'id' | 'characterIds' | 'createdAt'>[]
+  miners: readonly Pick<MatchMiner, 'id' | 'characterIds' | 'createdAt' | 'leftOn'>[],
+  date?: string
 ): string {
   let best: Pick<MatchMiner, 'id' | 'createdAt'> | undefined;
-  for (const m of miners)
-    if (m.characterIds.includes(characterId) && (!best || earlierGrouping(m, best) < 0)) best = m;
+  for (const m of miners) {
+    if (groupingHolds(m, characterId, date) && (!best || earlierGrouping(m, best) < 0)) best = m;
+  }
   return best?.id ?? soloMinerId(characterId);
 }
 
@@ -128,12 +147,18 @@ function ownerOfNamed(named: ReadonlySet<string>, by: 'code' | 'payer'): Donatio
 
 /** Whose money one donation is. */
 export function donationOwner(
-  donation: { characterId: number; reason?: string },
+  donation: { characterId: number; reason?: string; at?: string },
   book: MatchBook
 ): DonationOwner {
-  const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
+  // The donation's own day: a Character that left a grouping on a date still bills it before then.
+  const day = donation.at?.slice(0, 10);
+  const grouped = book.miners.some((m) => groupingHolds(m, donation.characterId, day));
   if (grouped || book.minedCharacterIds.has(donation.characterId))
-    return { kind: 'miner', minerId: minerIdFor(donation.characterId, book.miners), by: 'sender' };
+    return {
+      kind: 'miner',
+      minerId: minerIdFor(donation.characterId, book.miners, day),
+      by: 'sender',
+    };
   const coded = new Set(codesIn(donation.reason).flatMap((code) => book.codes.get(code) ?? []));
   const payer = new Set(
     (book.paidBefore?.get(donation.characterId) ?? []).map((id) => currentMinerOf(id, book.miners))
@@ -205,7 +230,10 @@ export function rematchUnmatched(
     )
     .sort((a, b) => a.at.localeCompare(b.at))
     .flatMap((p) => {
-      const owner = donationOwner({ characterId: p.characterId!, reason: p.reason }, book);
+      const owner = donationOwner(
+        { characterId: p.characterId!, reason: p.reason, at: p.at },
+        book
+      );
       return owner.kind === 'miner' && !isClosed(owner.minerId, book.miners)
         ? [{ paymentId: p.id, minerId: owner.minerId }]
         : [];
@@ -217,7 +245,7 @@ export function rematchUnmatched(
  * account is closed takes no money: the donation waits as `account-closed` for an officer.
  */
 export function ownerFields(
-  donation: { characterId: number; reason?: string },
+  donation: { characterId: number; reason?: string; at?: string },
   book: MatchBook
 ): ResolvedOwner {
   const owner = donationOwner(donation, book);

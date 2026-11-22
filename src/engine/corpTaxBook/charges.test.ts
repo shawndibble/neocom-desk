@@ -78,6 +78,19 @@ describe('minerIdFor', () => {
   });
 });
 
+describe('buildDayCharges: a character that left a Miner on a day', () => {
+  it('bills mining before that day to the old Miner, and on it to the new one', () => {
+    const left = [
+      { id: 'old', characterIds: [11], mainCharacterId: 11, leftOn: { 90000002: '2026-07-12' } },
+    ];
+    const split = { ...book, miners: left };
+    const by = (date: string) =>
+      buildDayCharges([entry({ characterId: 90000002, date })], split).charges[0]?.minerId;
+    expect(by('2026-07-11')).toBe('old');
+    expect(by('2026-07-12')).toBe('solo:90000002');
+  });
+});
+
 describe('buildDayCharges', () => {
   it('turns each Observed Mining Entry into a day charge for its Miner, valued at its date and rate', () => {
     const { charges } = buildDayCharges([entry({ characterId: 90000002 })], book);
