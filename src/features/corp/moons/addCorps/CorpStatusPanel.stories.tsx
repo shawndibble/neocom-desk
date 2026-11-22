@@ -10,7 +10,12 @@ const meta = {
     connected: 8,
     total: 12,
     items: [
-      { corporationId: 18, name: 'Sable Ridge Extraction', state: 'needs-sign-in' },
+      {
+        corporationId: 18,
+        name: 'Sable Ridge Extraction',
+        state: 'needs-sign-in',
+        ceoName: 'Mira Voss',
+      },
       { corporationId: 19, name: 'Emberlight Group', state: 'own-book' },
       { corporationId: 20, name: 'Gantry Point Mining', state: 'needs-role' },
       { corporationId: 21, name: 'Wren Hollow Corp', state: 'gone-quiet' },
@@ -46,16 +51,29 @@ export const Failed: Story = {
 export const RefineryNames: Story = {
   args: {
     items: [
-      { corporationId: 24, name: 'Sable Ridge Extraction', state: 'needs-names' },
+      {
+        corporationId: 24,
+        name: 'Sable Ridge Extraction',
+        state: 'needs-names',
+        ceoName: 'Mira Voss',
+      },
       { corporationId: 25, name: 'Brightwater Holdings', state: 'names-not-shared' },
     ],
   },
 };
 
-/** @summary Read without each chunk's ore (a grant from before the notifications): Grant again. */
+/** @summary Read without each chunk's ore (a grant from before the notifications): Grant again, naming the CEO to log in as. */
 export const ChunkOre: Story = {
   args: {
-    items: [{ corporationId: 26, name: 'Sable Ridge Extraction', state: 'needs-ore' }],
+    items: [
+      {
+        corporationId: 26,
+        name: 'Sable Ridge Extraction',
+        state: 'needs-ore',
+        ceoName: 'Mira Voss',
+      },
+      { corporationId: 27, name: 'Gantry Point Mining', state: 'needs-ore', ceoName: 'Tov Arkane' },
+    ],
   },
 };
 

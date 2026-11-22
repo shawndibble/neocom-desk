@@ -4,7 +4,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { Button, Panel } from '@/components/ui';
 import { addCorpsErrorText } from '../addCorpsErrorText';
 import { needsThePlayer, offersGrantAgain, type NeedsYouItem } from './addCorpsStatus';
-import { CorpStatePill } from './CorpRow';
+import { CorpCeo, CorpStatePill } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
 
@@ -15,7 +15,9 @@ const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
  * book has only the instruction, because moving a book is not built yet. A moon
  * owner read without refinery names offers Grant again when it is the player's
  * own, and otherwise only says whose officer can; that one is not counted. One of
- * the player's own read without each chunk's ore offers Grant again too.
+ * the player's own read without each chunk's ore offers Grant again too. A row whose
+ * fix is a login names the CEO to log in as, so a player leading many corps knows
+ * which character each one needs.
  * Renders nothing when the list is empty.
  */
 export function CorpStatusPanel({
@@ -63,6 +65,7 @@ export function CorpStatusPanel({
               <span className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
                 <span className="max-w-full truncate font-medium">{item.name}</span>
                 <CorpStatePill state={item.state} />
+                {item.ceoName && <CorpCeo name={item.ceoName} />}
               </span>
               {item.state === 'gone-quiet' ? (
                 <Button

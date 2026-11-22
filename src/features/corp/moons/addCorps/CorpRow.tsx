@@ -24,6 +24,16 @@ export function CorpStatePill({ state }: { state: CorpState }) {
   );
 }
 
+/** "CEO: <name>" as a dim line: who leads the corp, and so who to log in as. */
+export function CorpCeo({ name }: { name: string }) {
+  const { t } = useTranslation();
+  return (
+    <span className="block max-w-full truncate text-xs text-text-dim">
+      {t('corpTaxBook.moons.addCorps.pick.ceo', { name })}
+    </span>
+  );
+}
+
 /** A corporation and its CEO on one line, with whatever sits at the right. Used by the picker, the hidden list and the sign-in list. */
 export function CorpRow({
   name,
@@ -36,15 +46,12 @@ export function CorpRow({
   leading?: ReactNode;
   trailing?: ReactNode;
 }) {
-  const { t } = useTranslation();
   return (
     <li className="flex items-center gap-3 py-2">
       {leading}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{name}</p>
-        <p className="truncate text-xs text-text-dim">
-          {t('corpTaxBook.moons.addCorps.pick.ceo', { name: ceoName })}
-        </p>
+        <CorpCeo name={ceoName} />
       </div>
       {trailing}
     </li>
