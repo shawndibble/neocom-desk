@@ -8,9 +8,10 @@
  * fixtures), installed by importing those `/src` modules into the running app
  * — the e2e build has no Firebase.
  */
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { scrollerFit } from './support/overflow';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
 import type { setSrpBackendOverride } from '../src/features/corp/srpBackendOverride';
@@ -72,21 +73,6 @@ async function openQueue(page: Page): Promise<void> {
   );
   expect(seeded, 'pilot row seeded with a corporation').toBe(1);
 }
-
-/** Fit metrics of the table's own sideways scroller: its nearest ancestor that scrolls on x. */
-const scrollerFit = (table: Locator) =>
-  table.evaluate((el) => {
-    let node = el.parentElement;
-    while (node && !/auto|scroll/.test(getComputedStyle(node).overflowX)) {
-      node = node.parentElement;
-    }
-    if (!node) return null;
-    return {
-      scrollWidth: node.scrollWidth,
-      clientWidth: node.clientWidth,
-      right: node.getBoundingClientRect().right,
-    };
-  });
 
 for (const width of [1024, 1280]) {
   test(`SRP Queue Pending table fits its panel at ${width}px`, async ({ page }) => {
