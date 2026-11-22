@@ -184,7 +184,7 @@ describe('saveAlertGrant', () => {
     expect(JSON.stringify(logged)).not.toMatch(/ACCESS-SECRET|refresh-secret/);
   });
 
-  it('re-saving an active grant swaps the token, keeps progress, revokes the old token', async () => {
+  it('re-saving an active grant swaps the token and keeps progress, never revoking the old token', async () => {
     const { deps, docs } = makeDeps();
     await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
     docs.set(42, { ...docs.get(42)!, highWaterId: 99, etag: 'e', seenTypes: ['T'] });
@@ -195,7 +195,9 @@ describe('saveAlertGrant', () => {
     const doc = docs.get(42)!;
     expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe('second-token-rotated');
     expect(doc).toMatchObject({ enabledAt: 1_000, highWaterId: 99, etag: 'e', seenTypes: ['T'] });
-    expect(deps.revoke).toHaveBeenCalledWith('client-1', `${REFRESH}-rotated`);
+    // Same Character, same app: SSO's revoke would end the token just stored and the
+    // Character's device login too, so the old token is only dropped.
+    expect(deps.revoke).not.toHaveBeenCalled();
   });
 
   it('re-saving the token already stored does not revoke the live token', async () => {

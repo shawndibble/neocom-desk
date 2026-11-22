@@ -21,6 +21,7 @@ import type { RefreshedTokens } from './alertGrant.js';
 import {
   dropCorpSyncGrant,
   grantRef,
+  revokeReplaced,
   revokeStored,
   syncOneFeeder,
   type CorpSyncDeps,
@@ -484,8 +485,10 @@ export async function saveFeederGrant(
     await orphan();
     throw err;
   }
-  // The replaced token is orphaned: revoke it, unless SSO handed back that same one.
-  if (previousGrant) await revokeStored(deps, previousGrant, refreshed.refreshToken);
+  // The replaced token is orphaned: revoke it, unless the same Character holds both.
+  if (previousGrant) {
+    await revokeReplaced(deps, previousGrant, supplied.characterId, refreshed.refreshToken);
+  }
 
   if (input.requestedRatePct !== undefined) {
     // A blank rate is a complete grant, so a rate that fails to save never fails it.

@@ -197,11 +197,9 @@ export async function saveAlertGrant(
   };
   await deps.store.set(characterId, doc);
 
-  // The replaced token is now orphaned; revoke it, best effort. The refresh
-  // above usually rotated it already, so skip if it is the one just stored.
-  if (existing) {
-    await revokeStored(deps, characterId, existing, refreshed.refreshToken);
-  }
+  // The replaced token is the same Character's, so it is dropped, never revoked: SSO's
+  // revoke ends the Character's whole authorization of this app, which would take the
+  // token just stored and every device's login for them with it.
   return {
     characterId,
     enabledAt: doc.enabledAt,

@@ -313,6 +313,24 @@ emulatorSuite('add my other corps', () => {
     expect(revoked).toContain(`rt-${ALT}`);
   });
 
+  it('Grant again by the same CEO drops the old token without revoking it', async () => {
+    await add();
+    revoked.length = 0;
+    // SSO hands a new login its own token: the stored one is not the one just saved.
+    const rotating = {
+      ...deps(),
+      refresh: async (_c: string, refreshToken: string) => ({
+        accessToken: `mine-${ALT}`,
+        refreshToken: `${refreshToken}-2`,
+      }),
+    };
+    now = T0 + 86_400_000;
+    await add({}, rotating);
+    expect(await grant()).toMatchObject({ characterId: ALT });
+    // Revoking it would end the CEO's whole authorization: the new grant and their device login.
+    expect(revoked).toEqual([]);
+  });
+
   it('unwinds everything when the ledger is refused', async () => {
     ledger = 'forbidden';
     expect(await reason(add())).toBe('not-an-accountant');

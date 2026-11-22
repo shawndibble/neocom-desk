@@ -342,6 +342,15 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(await reason(optIn(ACCOUNTANT, 'rt-2-0', 98000555))).toBe('no-book');
     });
 
+    it('the same holder opting in again drops the old token without revoking it', async () => {
+      await optIn(ACCOUNTANT);
+      now = T0 + 1000;
+      await optIn(ACCOUNTANT, `rt-${ACCOUNTANT}-5`);
+      expect((await grantDoc())?.characterId).toBe(ACCOUNTANT);
+      // Revoking it would end the holder's whole authorization: the new grant and their device login.
+      expect(revokedAtSso).toEqual([]);
+    });
+
     it('replaces the previous holder and revokes their token', async () => {
       await optIn(ACCOUNTANT);
       // Audit ids sort by time, so the second opt-in must be later.

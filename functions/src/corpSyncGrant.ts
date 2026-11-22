@@ -301,11 +301,8 @@ export async function saveCorpSyncGrant(
     return held;
   });
 
-  // The replaced token is orphaned; revoke it, best effort. The refresh above
-  // usually rotated a same-Character token already, so skip if it is the one just stored.
-  if (previous) {
-    await revokeStored(deps, previous, refreshed.refreshToken);
-  }
+  // The replaced token is orphaned; revoke it, best effort, unless the same Character holds both.
+  if (previous) await revokeReplaced(deps, previous, doc.characterId, refreshed.refreshToken);
   return { corporationId: input.corporationId, characterId: doc.characterId, enabledAt: now };
 }
 
@@ -324,6 +321,21 @@ async function verifyGrantToken(deps: CorpSyncDeps, accessToken: string): Promis
     );
   }
   return claims;
+}
+
+/**
+ * Revoke a grant a new one replaced, unless the same Character holds both: SSO's revoke ends
+ * the Character's whole authorization of this app, so revoking their own earlier token would
+ * also end the token just stored and every device's login for them. That token is only dropped.
+ */
+export async function revokeReplaced(
+  deps: CorpSyncDeps,
+  previous: CorpSyncGrantDoc,
+  characterId: number,
+  keepToken: string
+): Promise<void> {
+  if (previous.characterId === characterId) return;
+  await revokeStored(deps, previous, keepToken);
 }
 
 /** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
