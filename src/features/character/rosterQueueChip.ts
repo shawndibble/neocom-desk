@@ -14,7 +14,8 @@ export const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
   endingSoon: 'warning',
   paused: 'danger',
   idle: 'warning',
-  unknown: 'default',
+  // A queue that could not be read is a cue, never a calm neutral chip.
+  unknown: 'warning',
 };
 
 // Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped

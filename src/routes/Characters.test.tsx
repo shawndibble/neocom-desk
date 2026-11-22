@@ -312,7 +312,7 @@ describe('Characters', () => {
     expect(pilotOneCard?.querySelectorAll('time')).toHaveLength(1);
 
     const pilotTwoCard = screen.getByText('Pilot Two').closest('li');
-    expect(pilotTwoCard).toHaveTextContent('Unknown');
+    expect(pilotTwoCard).toHaveTextContent("Couldn't read");
     expect(pilotTwoCard?.querySelector('time')).toBeNull();
   });
 

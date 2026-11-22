@@ -1307,4 +1307,13 @@ describe('orders widget', () => {
     expect(stateOf(view)).toBe('failed');
     expect(view.fetchedAt).toBeNull();
   });
+
+  it('stamps the data age with the real read, not the moment the view was built', () => {
+    const feeds = ordersFeed([order(90)]);
+    const read = feeds.orders as unknown as {
+      data: { openOrders: { entries: { fetchedAt: number }[] } };
+    };
+    read.data.openOrders.entries[0]!.fetchedAt = NOW - 3_600_000;
+    expect(buildView('orders', feeds, ctx()).fetchedAt).toEqual(new Date(NOW - 3_600_000));
+  });
 });
