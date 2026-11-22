@@ -804,7 +804,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     expect(dialog).toHaveTextContent('Pilot One');
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
@@ -825,7 +825,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     // findAll: Toast renders its message twice (visible span + live region), and
@@ -852,10 +852,10 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    expect(screen.getByRole('dialog', { name: 'Remove' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Remove Pilot One?' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Remove' })).toHaveAttribute(
       'aria-busy',
       'true'
@@ -863,7 +863,9 @@ describe('Characters', () => {
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
 
     finish();
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Remove' })).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Remove Pilot One?' })).toBeNull()
+    );
   });
 
   it('warns that unsynced edits are lost when removing offline with sync on', async () => {
@@ -878,7 +880,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
 
     expect(within(dialog).getByRole('alert')).toHaveTextContent(/offline.*will be lost/i);
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
@@ -895,7 +897,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
 
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -906,7 +908,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     expect(await db.characters.get(91)).toBeDefined();
@@ -920,7 +922,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
@@ -986,7 +988,7 @@ describe('Characters', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     await waitForSettingsValue(
@@ -1666,7 +1668,7 @@ describe('Characters table view', () => {
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'More actions for Pilot One' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Pilot One?' });
     expect(dialog).toHaveTextContent('Pilot One');
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 

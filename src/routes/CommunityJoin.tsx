@@ -9,6 +9,7 @@ import { grantCovers } from '@/app/grantCovers';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import {
   Button,
+  buttonClassName,
   Checkbox,
   CharacterAvatar,
   EmptyState,
@@ -197,7 +198,15 @@ export function CommunityJoin() {
 
         {state.status === 'loading' && <Spinner label={t('communities.loading')} />}
         {state.status === 'gone' && (
-          <EmptyState title={t('communities.join.gone')} hint={t('communities.join.goneHint')} />
+          <EmptyState
+            title={t('communities.join.gone')}
+            hint={t('communities.join.goneHint')}
+            action={
+              <Link to="/" className={buttonClassName({ variant: 'primary' })}>
+                {t('share.openInApp')}
+              </Link>
+            }
+          />
         )}
         {state.status === 'unavailable' && (
           <LoadFailedState

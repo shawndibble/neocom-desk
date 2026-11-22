@@ -47,7 +47,7 @@ export function CalendarDayTicker({
     <div
       role="group"
       aria-label={t('calendar.map.label')}
-      className="flex gap-1 overflow-x-auto overscroll-x-contain"
+      className="edge-fade-x flex gap-1 overflow-x-auto overscroll-x-contain"
     >
       {days.map((day) => {
         const dayStartMs = cellDayStart(day.date, zone);
