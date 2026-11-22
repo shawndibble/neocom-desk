@@ -242,6 +242,32 @@ export function dismiss(
   return commit(charactersOf(inputs), () => dismissEntries(inputs));
 }
 
+/**
+ * "Dismiss balance" (Settle up): the pilot won't pay what a personal Payee is owed. Each owed day
+ * becomes a dismissal of the same ore (no Payee, no tax), written in one transaction with the
+ * Assignment it replaces, which is tombstoned like an unassign. A Combined Entry's days come out
+ * of the group, since a dismissal belongs to none. A dismissal is undone from its row ("Undo").
+ */
+export async function dismissOwed(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): Promise<LedgerActionResult> {
+  const result = await commit(charactersOf(assignments), async () => {
+    await deleteAssignments(assignments);
+    await dismissEntries(
+      assignments.map((a) => ({
+        characterId: a.characterId,
+        date: a.date,
+        solarSystemId: a.solarSystemId,
+        oreLines: a.oreLines,
+        estimatedValue: a.estimatedValue,
+      }))
+    );
+  });
+  // Sticks like an unassign: a Payee's Default Systems must not assign the day again.
+  if (result.ok) await recordDefaultOptOuts(assignments).catch(() => undefined);
+  return result;
+}
+
 /** Saves an entry's edit form — one Payee and rate for every day of it. */
 export function editEntry(
   assignments: readonly MiningTaxAssignmentRecord[],
