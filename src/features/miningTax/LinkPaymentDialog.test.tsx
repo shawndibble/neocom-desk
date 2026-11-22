@@ -204,7 +204,9 @@ describe('LinkPaymentDialog for one Payee', () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
     await userEvent.click(
-      screen.getByRole('checkbox', { name: 'Remember Landlord Alt as who Moon Corp is paid' })
+      screen.getByRole('checkbox', {
+        name: 'Link future payments to Landlord Alt to Moon Corp automatically',
+      })
     );
     await userEvent.click(screen.getByRole('button', { name: 'Link to Moon Corp' }));
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
@@ -214,7 +216,9 @@ describe('LinkPaymentDialog for one Payee', () => {
   it("links a payment in kind at the pilot's figure for what was handed over", async () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('Paid in kind · 2026-09-11'));
-    expect(screen.queryByRole('checkbox', { name: /^Remember/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: /^Link future payments/ })
+    ).not.toBeInTheDocument();
     // Left blank it links nothing: a cargo is never assumed to be the whole balance (N4).
     expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toBeDisabled();
     const input = screen.getByRole('textbox', { name: 'Value handed over' });

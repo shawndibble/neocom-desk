@@ -386,7 +386,12 @@ export function LinkPaymentDialog({
           >
             <Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} />
             <span className="min-w-0">
-              {t('miningTax.linkWallet.remember', { name: counterpartyName, payee: target.name })}
+              {counterpartyName === target.name
+                ? t('miningTax.linkWallet.rememberSame', { payee: target.name })
+                : t('miningTax.linkWallet.remember', {
+                    name: counterpartyName,
+                    payee: target.name,
+                  })}
             </span>
           </label>
         )}
