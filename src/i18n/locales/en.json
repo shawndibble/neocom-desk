@@ -20972,6 +20972,7 @@
       },
       "audit": {
         "fileClaim": "Filed claim killmail {{id}} for {{isk}} ISK",
+        "noAmount": "no amount",
         "fileClaimNone": "Filed claim killmail {{id}}, no amount worked out",
         "refileClaim": "Re-filed claim killmail {{id}}",
         "approveClaim": "Approved killmail {{id}} for {{isk}} ISK",

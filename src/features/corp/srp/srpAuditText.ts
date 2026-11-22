@@ -10,9 +10,10 @@ import { MINUTE_MS } from '@/lib/age';
 
 const num = (value: unknown): number | null => (typeof value === 'number' ? value : null);
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
-const isk = (value: number | null): string => (value === null ? '?' : formatIsk(value));
 
 export function auditText(t: TFunction, entry: SrpAuditEntry): string {
+  const isk = (value: number | null): string =>
+    value === null ? t('srp.officer.audit.noAmount') : formatIsk(value);
   const d = entry.detail;
   const id = String(num(d.killmailId) ?? '');
   const amount = num(d.amount);
