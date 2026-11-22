@@ -1,3 +1,4 @@
+import { parsePercent } from '@/lib/parsePercent';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, InfoTooltip, Panel, TextInput } from '@/components/ui';
@@ -55,7 +56,7 @@ export function TurnOnBook({
       />
     );
   }
-  const pct = Number(rate);
+  const pct = parsePercent(rate) ?? NaN;
   const valid =
     startDate <= today &&
     (leaveDay === null || startDate >= leaveDay) &&

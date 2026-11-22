@@ -1,3 +1,4 @@
+import { parsePercent } from '@/lib/parsePercent';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -45,8 +46,8 @@ export function RateOverrideDialog({
   const [pct, setPct] = useState('');
   const [reason, setReason] = useState('');
   const day = eligible.find((d) => d.key === key);
-  const value = Number(pct);
-  const valid = pct.trim() !== '' && Number.isFinite(value) && value >= 0 && value <= 100;
+  const value = parsePercent(pct) ?? NaN;
+  const valid = value >= 0 && value <= 100;
   return (
     <DialogShell
       open={open}

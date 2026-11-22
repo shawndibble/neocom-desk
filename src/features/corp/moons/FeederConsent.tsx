@@ -1,3 +1,4 @@
+import { parsePercent } from '@/lib/parsePercent';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, TextInput } from '@/components/ui';
@@ -50,8 +51,8 @@ export function FeederConsent({
   const name = offer
     ? (offer.collectorName ?? publicName ?? `#${offer.collectorCorporationId}`)
     : null;
-  const pct = Number(rate);
-  const valid = rate.trim() === '' || (Number.isFinite(pct) && pct >= 0 && pct <= 100);
+  const pct = parsePercent(rate) ?? NaN;
+  const valid = rate.trim() === '' || (pct >= 0 && pct <= 100);
   const part = (key: 'sees' | 'cannot' | 'stop') => (
     <section className="space-y-1">
       <h3 className="text-xs font-medium uppercase tracking-wide text-text-dim">

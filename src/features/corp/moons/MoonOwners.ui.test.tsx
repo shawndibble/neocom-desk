@@ -380,7 +380,10 @@ describe('MoonOwnerDetail', () => {
     const day = screen.getByLabelText('Counts from');
     const min = day.getAttribute('min')!;
     fireEvent.change(day, { target: { value: '2000-01-01' } });
-    expect(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     fireEvent.change(day, { target: { value: min } });
     await userEvent.click(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)!);
     expect(setFeederRate).toHaveBeenCalledWith(7, BOOK, ASH, 9, min);
@@ -396,7 +399,10 @@ describe('MoonOwnerDetail', () => {
     const field = screen.getByLabelText('Rate (%)');
     await userEvent.clear(field);
     await userEvent.type(field, '101');
-    expect(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('settles otherwise with a note', async () => {
@@ -555,7 +561,10 @@ describe('Paying a moon owner', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Add a payment' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: "I've sent it" })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: "I've sent it" })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await userEvent.type(within(dialog).getByLabelText('Amount you sent'), '1234');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Other' }));
     await userEvent.click(within(dialog).getByRole('button', { name: "I've sent it" }));
