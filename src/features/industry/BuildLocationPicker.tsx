@@ -104,7 +104,8 @@ export function BuildLocationPicker({
   const [searching, setSearching] = useState(false);
   // Which result Arrow/Home/End has highlighted, without moving DOM focus off
   // the input — the input stays the list's one tab stop.
-  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  // Held by record id, so a list that reshuffles under it never moves the highlight.
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
   // Escape hides an already-fetched list without re-searching: the query is
   // untouched, so nothing in the effect below reruns until it changes.
   const [dismissed, setDismissed] = useState(false);
@@ -131,7 +132,7 @@ export function BuildLocationPicker({
     setResults(null);
     setFailed(false);
     setSearching(searchKey !== '');
-    setHighlightedIndex(null);
+    setHighlightedId(null);
     setDismissed(false);
   }
 
@@ -195,6 +196,12 @@ export function BuildLocationPicker({
     setPicked(optionLabel(option));
   }
 
+  const foundIndex =
+    openResults === null || highlightedId === null
+      ? -1
+      : openResults.findIndex((option) => option.structureId === highlightedId);
+  const highlightedIndex = foundIndex === -1 ? null : foundIndex;
+
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (openResults === null) return;
     switch (e.key) {
@@ -203,9 +210,10 @@ export function BuildLocationPicker({
       case 'Home':
       case 'End':
         e.preventDefault();
-        setHighlightedIndex((current) =>
-          moveHighlight(e.key as ComboboxNavKey, current, openResults.length)
-        );
+        {
+          const next = moveHighlight(e.key as ComboboxNavKey, highlightedIndex, openResults.length);
+          setHighlightedId(next === null ? null : openResults[next].structureId);
+        }
         break;
       case 'Enter':
         if (highlightedIndex !== null) {
@@ -216,7 +224,7 @@ export function BuildLocationPicker({
       case 'Escape':
         e.preventDefault();
         setDismissed(true);
-        setHighlightedIndex(null);
+        setHighlightedId(null);
         break;
     }
   }

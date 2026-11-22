@@ -1,7 +1,7 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
-import { suggestionOptionClassName } from '@/components/ui/controlStyles';
+import { suggestionListClassName, suggestionOptionClassName } from '@/components/ui/controlStyles';
 import { useCombobox } from '@/lib/useCombobox';
 import { resolvePlace, searchPlaces } from '@/engine/communities/requestPlaces';
 import { usePlaceIndex } from './usePlaceIndex';
@@ -84,7 +84,7 @@ export function LocationPicker({
         <ul
           {...combo.listboxProps}
           aria-label={t('communities.board.compose.places')}
-          className="overflow-hidden rounded-xs border border-line-bright bg-panel"
+          className={suggestionListClassName}
         >
           {suggestions.map((place, index) => (
             <li

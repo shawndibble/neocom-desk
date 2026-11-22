@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type Ref } from 'react';
 import { SearchInput } from '@/components/ui';
-import { suggestionOptionClassName } from '@/components/ui/controlStyles';
+import { suggestionListClassName, suggestionOptionClassName } from '@/components/ui/controlStyles';
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
 import { useCombobox } from '@/lib/useCombobox';
 import { namedLike, needleOf } from './shareLists';
@@ -75,11 +75,7 @@ export function ItemSearchPicker({
         onKeyDown={onKeyDown}
       />
       {open && (
-        <ul
-          {...combo.listboxProps}
-          aria-label={resultsLabel}
-          className="overflow-hidden rounded-xs border border-line-bright bg-panel"
-        >
+        <ul {...combo.listboxProps} aria-label={resultsLabel} className={suggestionListClassName}>
           {results.map((item, index) => (
             <li
               key={item.typeId}
