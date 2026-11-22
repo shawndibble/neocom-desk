@@ -104,7 +104,7 @@ test('the back-to-plan-list link is a full sm-tier control (36px) at 390px', asy
   expect(height).toBeGreaterThanOrEqual(36);
 });
 
-test('the header Import and Export buttons are labelled and fit at 390px without overflow', async ({
+test('the header holds Import and Export in one ⋮ menu at 390px, without overflow', async ({
   page,
 }) => {
   await signInAndGoto(page);
@@ -112,12 +112,14 @@ test('the header Import and Export buttons are labelled and fit at 390px without
   await page.goto(`./skills/plans/${PLAN_ID}`);
   await page.setViewportSize(PHONE);
 
-  for (const name of ['Import', 'Export']) {
-    const button = page.getByRole('button', { name, exact: true });
-    await expect(button).toBeVisible();
-    const height = await button.evaluate((el) => el.getBoundingClientRect().height);
-    expect(height).toBeGreaterThanOrEqual(36);
-  }
+  await expect(page.getByRole('button', { name: 'Import', exact: true })).toHaveCount(0);
+  const more = page.getByRole('button', { name: 'More actions' });
+  await expect(more).toBeVisible();
+  const height = await more.evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(36);
+  await more.click();
+  await expect(page.getByRole('menuitem', { name: 'Export to clipboard' })).toBeVisible();
+  await page.keyboard.press('Escape');
 
   const overflows = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth
