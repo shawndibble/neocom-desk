@@ -646,9 +646,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             ...(a ? { ore: a.oreLines } : {}),
           };
         }),
-        marked: account.marked.map((m) => {
-          const l = account.links.find((x) => paymentLinkKey(x) === m.id)!;
-          return { id: m.id, at: linkAt(l), date: m.date, amount: m.amount };
+        marked: account.marked.flatMap((m) => {
+          const l = account.links.find((x) => paymentLinkKey(x) === m.id);
+          return l ? [{ id: m.id, at: linkAt(l), date: m.date, amount: m.amount }] : [];
         }),
         payments: account.links
           .filter((l) => !isBareMark(l))

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
@@ -52,8 +51,17 @@ describe('LedgerRowDetail: a payment row', () => {
     renderDetail(paymentRow({ via: 'marked' }, 0), onLink);
     expect(screen.getByText(/no wallet payment recorded/i)).toBeInTheDocument();
     expect(screen.queryByRole('link')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /link the wallet payment/i }));
-    expect(onLink).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /link the wallet payment/i })).toBeNull();
+  });
+
+  it('offers to link a wallet payment on a mark only when the mark settled something', () => {
+    renderDetail(paymentRow({ via: 'marked' }, 250_000), vi.fn());
+    expect(screen.getByRole('button', { name: /link the wallet payment/i })).toBeInTheDocument();
+  });
+
+  it('does not say a recorded payment waits once a wallet entry is matched', () => {
+    renderDetail(paymentRow({ via: 'recorded', href: '/wallet/journal?highlight=7' }));
+    expect(screen.queryByText(/waits for its wallet entry/i)).toBeNull();
   });
 
   it('says a recorded Settle up payment waits for its wallet entry', () => {

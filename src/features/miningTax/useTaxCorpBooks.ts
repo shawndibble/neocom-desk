@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClaimDonations';
@@ -97,6 +97,15 @@ export function useTaxCorpBooks(
       }),
     [data, payees, billed, bookOwned]
   );
+  // The corporation's name a Payee is the book of, by any id of the merged Payee.
+  const bookOwnerOf = useCallback(
+    (payeeId: string): string | undefined => {
+      if (!accounts.isBookOwned(payeeId)) return undefined;
+      const primary = accounts.primaryIdOf(payeeId);
+      return [...bookOwners].find(([own]) => accounts.primaryIdOf(own) === primary)?.[1];
+    },
+    [accounts, bookOwners]
+  );
   // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
   // day, oldest first (decision 20261120-235011), whatever mark it stores.
   const ledger = useMemo(
@@ -137,7 +146,7 @@ export function useTaxCorpBooks(
     paymentSources,
     corpView,
     booksKnown,
-    bookOwners,
+    bookOwnerOf,
     reloadCorpBooks,
     leftCorp: { shownBooks, corpNameOf, hiddenLeft, hide: leftAck.hide, show: leftAck.show },
     failedClaims,

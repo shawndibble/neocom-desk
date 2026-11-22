@@ -143,7 +143,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     paymentSources,
     corpView,
     booksKnown,
-    bookOwners,
+    bookOwnerOf,
     reloadCorpBooks,
     leftCorp,
     failedClaims,
@@ -690,11 +690,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           bookCorporations={bookCorporations}
           accountOf={(id) => accounts.of(id)}
           isArchived={(id) => accounts.isArchived(id)}
-          bookOwnerOf={(id) => {
-            if (!accounts.isBookOwned(id)) return undefined;
-            const primary = accounts.primaryIdOf(id);
-            return [...bookOwners].find(([own]) => accounts.primaryIdOf(own) === primary)?.[1];
-          }}
+          bookOwnerOf={bookOwnerOf}
           onOpenLedger={(payeeId) => {
             closePayeeManager();
             actions.openLedger({ kind: 'personal', payeeId });
