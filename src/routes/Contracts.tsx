@@ -1,5 +1,4 @@
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -44,8 +43,7 @@ import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
 import { buybackCueText, useBuybackLinks } from '@/features/communities/buybackLinks';
 import { useCourierLocationNames } from '@/features/character/useCourierLocationNames';
-import { useRememberedPageTab } from '@/lib/usePageTab';
-import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
+import { usePageTab } from '@/lib/usePageTab';
 import { useRememberedUrlParams, useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { optionalEnumParam, textParam } from '@/lib/urlState';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -131,30 +129,13 @@ export function Contracts() {
    */
   const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
 
-  const rememberedMode = useContractSearchMode((state) => state.value);
-  const rememberedModeHydrated = useHydratedStore(useContractSearchMode);
-  const setRememberedMode = useContractSearchMode((state) => state.setValue);
-  /**
-   * A bare `/contracts` visit lands on whichever of Item search and Courier
-   * was last used (issue #1719), while a link naming a tab — even
-   * `search/items` itself — keeps it. The route/tab itself stays unpersisted
-   * (decision `20260912-141100`); only the mode is remembered, and only
-   * picking one of those two tabs stores it.
-   */
-  const rememberedTab = useMemo(
-    () => ({
-      value: `search/${rememberedMode}` as const,
-      hydrated: rememberedModeHydrated,
-    }),
-    [rememberedMode, rememberedModeHydrated]
-  );
   /**
    * The page's tab id is a full path suffix (`search/items`, `search/courier`,
    * `history`) — see `CONTRACTS_TABS`. Item search and Courier are one
    * public-contracts panel showing either corpus, so `tab` folds them together
    * for what the page header and body draw, and `mode` says which corpus.
    */
-  const [tabId, setTabId] = useRememberedPageTab(CONTRACTS_TABS, rememberedTab);
+  const [tabId, setTabId] = usePageTab(CONTRACTS_TABS);
   const tabsId = useTabsId();
   // Hide, don't lock: no Corp choice for a Character without the grant. ESI asks for no
   // in-game role on this read, so the scope alone is the gate (decision 20261020-215532).
@@ -227,20 +208,15 @@ export function Contracts() {
   );
   const selectTab = useCallback(
     (next: string) => {
-      if (next === 'search/items' || next === 'search/courier') {
-        setTabId(next);
-        void setRememberedMode(next === 'search/courier' ? 'courier' : 'items');
-      } else {
-        setTabId('history');
-      }
+      setTabId(next === 'search/items' || next === 'search/courier' ? next : 'history');
     },
-    [setTabId, setRememberedMode]
+    [setTabId]
   );
   const pageTabs = useMemo(
     () => [
+      { id: 'history', label: t('contracts.historyTab') },
       { id: 'search/items', label: t('contracts.itemSearchTab') },
       { id: 'search/courier', label: t('contracts.courierTab') },
-      { id: 'history', label: t('contracts.historyTab') },
     ],
     [t]
   );

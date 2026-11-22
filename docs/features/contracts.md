@@ -10,21 +10,20 @@ User goal by tab:
 
 ## Summary
 
-| Feature                                             | Where                                                                       | Notes                                                                              |
-| --------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Item search tab `/contracts/search/items` (default) | `ContractSearchPanel.tsx`                                                   | ranked name search over public offers, 8 filters, suggestions, stats, detail modal |
-| Courier tab `/contracts/search/courier`             | `CourierResults.tsx`                                                        | hauls as routes: filters, ISK/jump, risk markers, detail modal                     |
-| History tab `/contracts/history`                    | `Contracts.tsx:601-691`                                                     | Character's own contracts, filter chips, column picker, export, detail modal       |
-| Remembered landing tab                              | `contractSearchModePref.ts`                                                 | bare `/contracts` opens last of Items/Courier; History never remembered            |
-| Public contract detail modal                        | `features/contracts/PublicContractDetailModal.tsx`                          | merged lines, two-sided headings, market value per side                            |
-| Courier detail modal                                | `CourierContractDetailModal.tsx`                                            | rate hero, route + path, risks, going-rate benchmark, reverse lane                 |
-| Character contract detail modal                     | `features/character/ContractDetailModal.tsx`                                | everything the in-game window shows                                                |
-| Remembered courier filter                           | `courierFilterPref.ts`                                                      | all fields but text query and route preference                                     |
-| Column pickers (3 tables)                           | `contractsColumns.ts`, `contractSearchItemsColumns.ts`, `courierColumns.ts` | device-local                                                                       |
-| Exports                                             | `useTableExport`                                                            | surfaces `contracts`, `contract-search`, `courier-contracts`, `contract-items`     |
-| Jump Range filter + Current System picker           | Items tab filter bar                                                        | measured on the stargate graph under the Jump Basis                                |
-| PLEX-ask pricing                                    | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts`        | converts PLEX ask to ISK at the global-market sell price                           |
-| Notifications                                       | `features/notifications/events.ts:165-195`                                  | contract accepted/completed/failed, courier delivery due                           |
+| Feature                                         | Where                                                                       | Notes                                                                              |
+| ----------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Item search tab `/contracts/search/items`       | `ContractSearchPanel.tsx`                                                   | ranked name search over public offers, 8 filters, suggestions, stats, detail modal |
+| Courier tab `/contracts/search/courier`         | `CourierResults.tsx`                                                        | hauls as routes: filters, ISK/jump, risk markers, detail modal                     |
+| My contracts tab `/contracts/history` (default) | `Contracts.tsx:601-691`                                                     | Character's own contracts, filter chips, column picker, export, detail modal       |
+| Public contract detail modal                    | `features/contracts/PublicContractDetailModal.tsx`                          | merged lines, two-sided headings, market value per side                            |
+| Courier detail modal                            | `CourierContractDetailModal.tsx`                                            | rate hero, route + path, risks, going-rate benchmark, reverse lane                 |
+| Character contract detail modal                 | `features/character/ContractDetailModal.tsx`                                | everything the in-game window shows                                                |
+| Remembered courier filter                       | `courierFilterPref.ts`                                                      | all fields but text query and route preference                                     |
+| Column pickers (3 tables)                       | `contractsColumns.ts`, `contractSearchItemsColumns.ts`, `courierColumns.ts` | device-local                                                                       |
+| Exports                                         | `useTableExport`                                                            | surfaces `contracts`, `contract-search`, `courier-contracts`, `contract-items`     |
+| Jump Range filter + Current System picker       | Items tab filter bar                                                        | measured on the stargate graph under the Jump Basis                                |
+| PLEX-ask pricing                                | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts`        | converts PLEX ask to ISK at the global-market sell price                           |
+| Notifications                                   | `features/notifications/events.ts:165-195`                                  | contract accepted/completed/failed, courier delivery due                           |
 
 ## Purpose and user goal
 
@@ -222,7 +221,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 7. **What does "Hide risky routes" hide, and why not nullsec?** Player-structure drop-offs and ends no gate reaches; nullsec is ordinary paid work. `courierRisk.ts:133-140`, tooltip `contractSearch.hideUncompletableTooltip`.
 8. **Why is the player-structure risk delivery-only?** An inaccessible pickup is arguably the same trap but widening is left to a follow-up. `courierRisk.ts:82-103` comment.
 9. **How does "From my region" avoid an ESI burst or a re-auth banner?** One location read on first press, region from a local snapshot, every failure folds to "unavailable". `characterRegion.ts`, `CourierResults.tsx:297-358`.
-10. **What is remembered across visits vs in the URL?** Tab mode (Items/Courier), courier numeric/chip filters, columns, current-system picks: device-local; everything else URL; URL beats remembered. `courierFilterPref.ts`, `contractSearchModePref.ts`.
+10. **What is remembered across visits vs in the URL?** Courier numeric/chip filters, columns, current-system picks: device-local; everything else URL; URL beats remembered. `courierFilterPref.ts`.
 11. **Why does a History row show an untitled courier as a route?** Three in-progress hauls would all read "Courier" (#1706). `features/character/ContractIdentity.tsx`.
 12. **Why does an accepted courier's Expires show a countdown to delivery?** `date_expired` is the accept-by deadline; for a courier with status `in_progress` the delivery deadline is `date_accepted + days_to_complete × 86,400,000 ms` (null if days missing/≤0 or no accept date; `src/engine/contracts/courierDeadline.ts:22-29`). `Contracts.tsx:460-478`.
 13. **What is "stale" on History?** Status `outstanding` with `date_expired` in the past, re-evaluated each minute by a ticker (rows are memoized, so the clock lives in a cell component). `Contracts.tsx:117-152`.
