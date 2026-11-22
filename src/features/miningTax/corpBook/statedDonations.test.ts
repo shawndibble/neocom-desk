@@ -21,7 +21,7 @@ describe('statedDonationsOf', () => {
         characterId: 7,
         counterpartyId: 5,
         amount: 1_000_000,
-        date: '2026-11-20T12:00:00.000Z',
+        date: '2026-11-20T23:59:59.000Z',
         method: 'donation',
         stated: true,
       },

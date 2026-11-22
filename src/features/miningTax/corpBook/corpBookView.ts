@@ -56,7 +56,7 @@ export interface CorpClaim {
 
 /**
  * The payments a member recorded by hand in a book's Settle up (`recorded` links to the book's own
- * Payee), as the donations they said they sent: each dated to its day, never a wallet's minute.
+ * Payee), as the donations they said they sent: each dated to the end of its day, never a wallet's minute.
  */
 export function statedDonationsOf(
   links: readonly PayeePaymentLink[],
@@ -69,7 +69,8 @@ export function statedDonationsOf(
             characterId: l.characterId,
             counterpartyId: corporationId,
             amount: l.amount,
-            date: `${l.paidOn}T12:00:00.000Z`,
+            // The end of the day it names: a book read earlier that day cannot have seen it yet.
+            date: `${l.paidOn}T23:59:59.000Z`,
             method: 'donation',
             stated: true as const,
           },

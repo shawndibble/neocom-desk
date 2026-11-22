@@ -177,8 +177,8 @@ export interface InFlightDonation {
    */
   refId?: number;
   /**
-   * The member said they sent it (Settle up's "Record payment"), to the day: `at` is that day's
-   * noon, not a wallet's timestamp, so it is matched to the book's donation within days
+   * The member said they sent it (Settle up's "Record payment"), to the day: `at` is the end of that
+   * day, not a wallet's timestamp, so it is matched to the book's donation within days
    * (`matchesStatedTransfer`) rather than minutes.
    */
   stated?: true;
