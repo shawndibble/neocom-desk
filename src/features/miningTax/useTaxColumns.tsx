@@ -300,7 +300,8 @@ export function useTaxColumns({
         align: 'right',
         className: 'whitespace-nowrap',
         cardCorner: true,
-        // Owed is the figure the page is about; settled history recedes.
+        // Owed is the figure the page is about; settled history recedes, and so does a day the
+        // Payee's book now decides: there is nothing for the pilot to do on it.
         cellClassName: (dr) =>
           dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
             ? 'text-text-dim'
@@ -308,7 +309,7 @@ export function useTaxColumns({
               ? 'text-text-dim'
               : dr.status === 'outstanding'
                 ? 'text-isk-neg'
-                : dr.status === 'paid' || dr.status === 'dismissed'
+                : dr.status === 'paid' || dr.status === 'dismissed' || dr.status === 'tracked'
                   ? 'text-text-dim font-normal'
                   : undefined,
         render: (dr) =>

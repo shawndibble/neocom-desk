@@ -8387,7 +8387,7 @@
       "paid": "Paid",
       "dismissed": "Dismissed"
     },
-    "trackedHint": "This Payee is a Corp Tax Book's corporation now. The book is what you owe it, so this day is not owed or settled here.",
+    "trackedHint": "Nothing to do. This Payee is a Corp Tax Book's corporation now, so its book bills what you owe it. This older record is not owed or settled here.",
     "needsReviewHint": "More ore showed up for this entry. Open the row to review the new total.",
     "selectRow": "Select {{date}}, {{system}}",
     "selectionCount": "{{count}} selected",
