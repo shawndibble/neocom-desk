@@ -116,7 +116,7 @@ export function CharacterHeader({
         */}
         <p className="flex min-w-0 text-xs whitespace-nowrap text-text-dim">
           {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
-            <CorporationLink id={publicInfo.corporationId} className="min-w-0 truncate">
+            <CorporationLink id={publicInfo.corporationId} className="-my-1 min-w-0 truncate py-1">
               {publicInfo.corporationName}
             </CorporationLink>
           ) : (
@@ -128,7 +128,7 @@ export function CharacterHeader({
             <>
               <span className="shrink-0 whitespace-pre">{' / '}</span>
               {publicInfo.allianceId !== undefined ? (
-                <AllianceLink id={publicInfo.allianceId} className="min-w-0 truncate">
+                <AllianceLink id={publicInfo.allianceId} className="-my-1 min-w-0 truncate py-1">
                   {publicInfo.allianceName}
                 </AllianceLink>
               ) : (
