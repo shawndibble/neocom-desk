@@ -214,6 +214,6 @@ describe('MoonsSetup', () => {
     await user.click(screen.getAllByRole('button', { name: 'Leave' }).at(-1)!);
     await waitFor(() => expect(leaveFeeder).toHaveBeenCalledWith(7, 98));
     expect(await screen.findByText("Run your corporation's book")).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/You have left/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/You have left/));
   });
 });

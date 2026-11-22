@@ -14,6 +14,7 @@ import {
   StatChip,
   StatChips,
   Tooltip,
+  LiveNote,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
@@ -476,9 +477,9 @@ export function LateNoticeRun() {
                   </fieldset>
                   {!inline && minerPicker}
                   {corporationName === null && (
-                    <p role="status" className="text-text-dim">
+                    <LiveNote className="text-text-dim">
                       {t('corpTaxBook.moons.run.loadingCorporation')}
-                    </p>
+                    </LiveNote>
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Tooltip content={canEdit && total === 0 ? t('common.nothingToDo') : null}>
@@ -512,9 +513,9 @@ export function LateNoticeRun() {
                   </p>
                   <MailLimitNotice count={total} senderName={names.character(characterId)} />
                   {corporationName === null && (
-                    <p role="status" className="text-text-dim">
+                    <LiveNote className="text-text-dim">
                       {t('corpTaxBook.moons.run.loadingCorporation')}
-                    </p>
+                    </LiveNote>
                   )}
                   {error && (
                     <p role="alert" className="text-danger">
