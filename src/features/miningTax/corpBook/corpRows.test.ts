@@ -94,6 +94,8 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(partly[0].row.unassignedOreLines).toEqual([{ typeId: ZEO, quantity: 600 }]);
+    // What the books took is kept, for a new Assignment to remember (it grows back in otherwise).
+    expect(partly[0].row.bookTakenOreLines).toEqual([{ typeId: ZEO, quantity: 400 }]);
     const wholly = buildDisplayRows(
       [mined('2026-10-17')],
       overlay({ takenFromFree: new Map([[key, [{ typeId: ZEO, quantity: 1000 }]]]) }),

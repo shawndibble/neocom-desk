@@ -146,7 +146,13 @@ export function buildDisplayRows(
     const taken = overlay.takenFromFree.get(
       entryKey(row.characterId, row.entry.date, row.entry.solarSystemId)
     );
-    return taken ? { ...row, unassignedOreLines: minusLines(row.unassignedOreLines, taken) } : row;
+    return taken
+      ? {
+          ...row,
+          unassignedOreLines: minusLines(row.unassignedOreLines, taken),
+          bookTakenOreLines: taken,
+        }
+      : row;
   });
   // A Payee that is the corporation: its rows give way to the book's, which bills the same ore.
   const taken = (dr: DisplayRow) =>
