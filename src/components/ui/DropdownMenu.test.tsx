@@ -100,4 +100,11 @@ describe('DropdownMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it('closes on Tab instead of trapping focus', async () => {
+    const { user } = await openMenu();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    await user.keyboard('{Tab}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
 });

@@ -119,6 +119,16 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenLastCalledWith('history');
   });
 
+  it('jumps to the first and last tab with Home and End', async () => {
+    const onChange = vi.fn();
+    render(<Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={onChange} />);
+    screen.getByRole('tab', { name: 'Open' }).focus();
+    await userEvent.keyboard('{End}');
+    expect(onChange).toHaveBeenLastCalledWith(tabs[tabs.length - 1].id);
+    await userEvent.keyboard('{Home}');
+    expect(onChange).toHaveBeenLastCalledWith(tabs[0].id);
+  });
+
   /**
    * `activation="manual"` is for a caller whose `onChange` navigates to
    * another route (Industry's plan/group pages) rather than swapping content

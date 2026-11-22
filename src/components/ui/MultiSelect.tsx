@@ -2,6 +2,7 @@ import { eyebrowClassName } from './eyebrowClassName';
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
+import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import {
   filterMultiSelectGroups,
@@ -101,6 +102,8 @@ export function MultiSelect<Id>({
 }: MultiSelectProps<Id>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // A phone keyboard would cover the list; touch users tap the field themselves.
+  const coarse = useMediaQuery(COARSE_POINTER_QUERY);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
   const listId = useId();
@@ -185,7 +188,7 @@ export function MultiSelect<Id>({
         {typeof extraContent === 'function' ? extraContent(() => setOpen(false)) : extraContent}
         <div className="p-1">
           <SearchInput
-            autoFocus
+            autoFocus={!coarse}
             value={query}
             onChange={(event) => handleQueryChange(event.target.value)}
             onKeyDown={onKeyDown}
