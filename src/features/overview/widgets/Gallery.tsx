@@ -148,7 +148,7 @@ function GalleryItem({
   } else {
     action = (
       <Button
-        variant={count > 0 ? 'ghost' : 'primary'}
+        variant="ghost"
         size={isPhone ? 'md' : 'sm'}
         className={isPhone ? 'min-h-9 min-w-20' : undefined}
         aria-label={
@@ -244,7 +244,7 @@ function PresetItem({
             <span className="text-xs text-text-dim">{t('overview.gallery.limit')}</span>
           ) : (
             <Button
-              variant="primary"
+              variant="ghost"
               size={isPhone ? 'md' : 'sm'}
               className={isPhone ? 'min-h-9 min-w-20' : undefined}
               aria-label={t('overview.gallery.addLabel', { title })}
@@ -559,7 +559,6 @@ export function Gallery({ open, onClose }: GalleryProps) {
   const [browse, setBrowse] = useState(true);
   const title = t('overview.gallery.title');
   const subtitle = t(boardKey(board, 'gallery.subtitle'), {
-    total: board.kinds.filter(board.canDraw).length,
     onBoard: edit.layout.widgets.length,
   });
   if (isPhone) {
@@ -577,6 +576,12 @@ export function Gallery({ open, onClose }: GalleryProps) {
           searchRef={searchRef}
           subtitle={subtitle}
         />
+        {/* The sheet's one primary action: rows only add, this closes. */}
+        <div className="sticky -bottom-3 -mx-3 -mb-3 border-t border-line bg-panel p-3">
+          <Button variant="primary" size="md" className="w-full" onClick={onClose}>
+            {t('overview.gallery.done')}
+          </Button>
+        </div>
       </Modal>
     );
   }

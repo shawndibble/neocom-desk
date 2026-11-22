@@ -19,7 +19,7 @@ export interface CharacterRowContextMenuProps {
   name: string;
   /** Marked SP Farm; undefined hides the action (SP extraction monitoring is off). */
   spFarm?: boolean;
-  onToggleSpFarm: () => void;
+  onToggleSpFarm?: () => void;
   /** Opens the remove-confirm dialog: the menu's one danger item (decision 20261005-202754). */
   onRemove: () => void;
   /** The `<tr>` `DataTable`'s `rowContextMenu` hands back — the menu's trigger. */
@@ -61,13 +61,16 @@ export function CharacterRowContextMenu({
               {t(destination.labelKey)}
             </MenuItem>
           ))}
-          {spFarm !== undefined && (
+          {spFarm !== undefined && onToggleSpFarm && (
             <MenuItem onSelect={onToggleSpFarm}>
               {t(spFarm ? 'characters.unmarkSpFarmMenuLabel' : 'characters.markSpFarmMenuLabel')}
             </MenuItem>
           )}
           <MenuSeparator />
-          <MenuItem className="text-danger" onSelect={onRemove}>
+          <MenuItem
+            className="text-danger" // After the menu has closed and returned focus, so the dialog's own focus is not undone.
+            onSelect={() => setTimeout(onRemove, 0)}
+          >
             {t('characters.removeMenuLabel', { name })}
           </MenuItem>
         </>

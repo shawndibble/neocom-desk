@@ -86,7 +86,7 @@ async function enter(user: ReturnType<typeof userEvent.setup>, field: HTMLElemen
 const itemOf = (dialog: HTMLElement, title: string) =>
   within(dialog).getByText(title, { selector: 'div' }).closest('li') as HTMLElement;
 
-const SUBTITLE = `${OVERVIEW_KINDS.length} widgets · 3 on your Overview`;
+const SUBTITLE = '3 on your Overview';
 
 // The worker's first Gallery render is cold (lazy previews, i18n, React
 // warm-up) and would land on the first test; pay it once here.
