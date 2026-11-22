@@ -230,7 +230,7 @@ export function EventDetailModal({
                       size="md"
                       variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
                       aria-pressed={active}
-                      disabled={saving}
+                      aria-disabled={saving}
                       onClick={() => void respond(response)}
                     >
                       <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
