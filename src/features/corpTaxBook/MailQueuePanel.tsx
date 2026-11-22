@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Button, ProgressBar } from '@/components/ui';
+import { Button, LiveNote, ProgressBar } from '@/components/ui';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -174,9 +174,9 @@ export function MailQueueTable({
             </span>
             {detail && <span className="block text-xs text-text-dim">{detail}</span>}
             {notes[row.id] && (
-              <span role="status" className="block text-xs text-text-dim">
+              <LiveNote as="span" className="block text-xs text-text-dim">
                 {notes[row.id]}
-              </span>
+              </LiveNote>
             )}
           </span>
         );
