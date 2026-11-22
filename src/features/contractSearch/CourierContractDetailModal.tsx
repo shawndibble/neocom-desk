@@ -24,7 +24,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Link } from 'react-router-dom';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, SlideOver, Tooltip } from '@/components/ui';
+import { InfoTooltip, IskAmount, SlideOver, Tooltip, ValueList, ValueRow } from '@/components/ui';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { Caret } from '@/components/ui/Disclosure';
@@ -284,6 +284,42 @@ function EndpointPlace({
         </Fragment>
       ))}
     </span>
+  );
+}
+
+/**
+ * One row of the benchmark readout: a short value under a label, with the
+ * reasoning in the label's tooltip so it never has to be read to scan the row.
+ */
+function BenchmarkRow({
+  label,
+  tip,
+  tone = 'default',
+  children,
+}: {
+  label: string;
+  tip?: string;
+  tone?: 'default' | 'warning';
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ValueRow
+      label={
+        <span className="inline-flex items-center gap-1 text-text-dim">
+          {label}
+          {tip !== undefined && (
+            <InfoTooltip
+              label={t('contractSearch.benchmark.about', { label })}
+              content={tip}
+              glyph="info"
+            />
+          )}
+        </span>
+      }
+      value={children}
+      tone={tone}
+    />
   );
 }
 
@@ -605,76 +641,111 @@ export function CourierContractDetailModal({
           the snapshot: none of it says the contract is a scam, because nothing
           here can know that — the app cannot value a courier contract's cargo,
           which carries no item lines, or read anyone's intent.
+
+          Each row is a label and one short value; the reasoning behind it sits
+          in the label's tooltip (DESIGN.md §6c), so the section reads at a glance.
         */}
-        <Well size="lg" as="section" className="flex flex-col gap-1.5">
+        <Well size="lg" as="section" className="flex flex-col gap-2">
           <h3 className={eyebrowClassName}>{t('contractSearch.goingRateBenchmarkLabel')}</h3>
-          <ul className="flex flex-col gap-1.5 text-sm">
-            <li>
+          <ValueList variant="plain">
+            <BenchmarkRow
+              label={t('contractSearch.benchmark.rateLabel')}
+              tip={
+                measuring
+                  ? t('contractSearch.goingRateMeasuring')
+                  : goingRateMultiple === null
+                    ? t('contractSearch.goingRateUnavailable')
+                    : t('contractSearch.benchmark.rateTip')
+              }
+            >
               {measuring
-                ? t('contractSearch.goingRateMeasuring')
+                ? t('contractSearch.benchmark.measuring')
                 : goingRateMultiple === null
-                  ? t('contractSearch.goingRateUnavailable')
-                  : t('contractSearch.goingRateAgainstCorpus', {
+                  ? t('contractSearch.benchmark.unavailable')
+                  : t('contractSearch.benchmark.rateMultiple', {
                       multiple: formatMagnitude(goingRateMultiple),
                     })}
-            </li>
+            </BenchmarkRow>
             {floor !== null && (
-              <li>
-                {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}{' '}
-                {belowFloor
-                  ? t('contractSearch.communityFloorShare', {
-                      reward: formatIskAuto(row.reward),
+              <BenchmarkRow
+                label={t('contractSearch.benchmark.floorLabel')}
+                // A high multiple beside a short floor reads as a contradiction
+                // unless the two bases are named: one is cargo size, the other
+                // collateral.
+                tip={`${t('contractSearch.benchmark.floorTip')}${
+                  belowFloor && goingRateMultiple !== null
+                    ? ` ${t('contractSearch.communityFloorVsGoingRate')}`
+                    : ''
+                }`}
+              >
+                {formatIskAuto(floor)}
+                {/* Said as a share only when short of the floor — the case where
+                    two bare figures read as unrelated to the multiple above (#1720). */}
+                {belowFloor && (
+                  <span className="text-warning">
+                    {' · '}
+                    {t('contractSearch.benchmark.floorShare', {
                       percent: formatMagnitude(shareOfFloor * 100),
-                    })
-                  : t('contractSearch.communityFloorActual', { reward: formatIskAuto(row.reward) })}
-                {/*
-                  A high multiple beside a short floor reads as a contradiction
-                  unless the two bases are named: one is cargo size, the other
-                  collateral.
-                */}
-                {belowFloor &&
-                  goingRateMultiple !== null &&
-                  ` ${t('contractSearch.communityFloorVsGoingRate')}`}
-              </li>
+                    })}
+                  </span>
+                )}
+              </BenchmarkRow>
             )}
             {forcesFreighter(row.volume) && (
-              <li
+              <BenchmarkRow
+                label={t('contractSearch.benchmark.cargoLabel')}
+                tip={t('contractSearch.freighterVolumeNote', {
+                  volume: formatMagnitude(FREIGHTER_VOLUME_M3),
+                })}
                 // Warning-toned only where it is actually the ganking shape:
                 // the bait is an oversized load *on a lowsec route*. A 400,000
                 // m³ Jita-to-Perimeter haul is a freighter job, which is worth
                 // stating and is not a warning.
-                className={
-                  exposure?.kind === 'known' && exposure.exposedSystems > 0 ? 'text-warning' : ''
+                tone={
+                  exposure?.kind === 'known' && exposure.exposedSystems > 0 ? 'warning' : 'default'
                 }
               >
-                {t('contractSearch.freighterVolumeNote', {
-                  volume: formatMagnitude(FREIGHTER_VOLUME_M3),
-                })}
-              </li>
+                {t('contractSearch.benchmark.freighterOnly')}
+              </BenchmarkRow>
             )}
             {exposure?.kind === 'known' && exposure.chokepoints.length > 0 && (
-              <li className="text-warning">
-                {t('contractSearch.routeExposureChokepoints', {
-                  systems: exposure.chokepoints.join(', '),
-                })}
-              </li>
+              <BenchmarkRow
+                label={t('contractSearch.benchmark.chokepointLabel')}
+                tip={t('contractSearch.routeExposureChokepoints')}
+                tone="warning"
+              >
+                {exposure.chokepoints.join(', ')}
+              </BenchmarkRow>
             )}
             {/*
               Said either way: silence for a clean route reads the same as
               silence for a route we could not work out, and the rule on this
               surface is to state what is not in the figure.
             */}
-            <li>
-              {exposure === null
-                ? t('contractSearch.routeExposureMeasuring')
-                : exposure.kind === 'known'
-                  ? t('contractSearch.routeExposureCrossed', { count: exposure.exposedSystems })
+            <BenchmarkRow
+              label={t('contractSearch.benchmark.routeLabel')}
+              tip={
+                exposure === null || exposure.kind === 'known'
+                  ? t('contractSearch.benchmark.routeTip')
                   : exposure.kind === 'no-route'
                     ? t('contractSearch.routeExposureNoRoute')
-                    : t('contractSearch.routeExposureUnknown')}
-            </li>
-            <li>{t('contractSearch.expiresInHours', { hours: expiresIn })}</li>
-          </ul>
+                    : t('contractSearch.routeExposureUnknown')
+              }
+            >
+              {exposure === null
+                ? t('contractSearch.benchmark.measuring')
+                : exposure.kind === 'known'
+                  ? exposure.exposedSystems === 0
+                    ? t('contractSearch.benchmark.routeClear')
+                    : String(exposure.exposedSystems)
+                  : exposure.kind === 'no-route'
+                    ? t('contractSearch.benchmark.noRoute')
+                    : t('contractSearch.benchmark.routeUnknown')}
+            </BenchmarkRow>
+            <BenchmarkRow label={t('contractSearch.benchmark.expiresLabel')}>
+              {t('contractSearch.benchmark.expiresIn', { hours: expiresIn })}
+            </BenchmarkRow>
+          </ValueList>
         </Well>
 
         {/*

@@ -15,6 +15,8 @@ interface AttributesPaneProps {
   /** ESI's attributes read, carrying its own age; null when it could not be read. */
   result: CachedResult<CharacterAttributes> | null;
   implantBonuses: Implants;
+  /** The attributes are still being read (not unreadable): shows a spinner, not "unknown". */
+  loading?: boolean;
   /** How the base sheet was arrived at — null until ESI has been read at all. */
   attributeBaseline?: AttributeBaseline | null;
   /** Live remap availability, same source the plan editor costs against; null when unreadable. */
@@ -37,11 +39,13 @@ export function PlanAttributeChips({
   result,
   implantBonuses,
   attributeBaseline,
-}: Pick<AttributesPaneProps, 'result' | 'implantBonuses' | 'attributeBaseline'>) {
+  loading,
+}: Pick<AttributesPaneProps, 'result' | 'implantBonuses' | 'attributeBaseline' | 'loading'>) {
   return (
     <AttributeChips
       attributes={result?.data ?? null}
       implantBonuses={implantBonuses}
+      loading={loading}
       boosterBonus={acceleratorBonusOf(attributeBaseline)}
       dense
       short
@@ -68,6 +72,7 @@ export function PlanAttributeChips({
 export function AttributesPane({
   result,
   implantBonuses,
+  loading,
   attributeBaseline = null,
   remapInfo,
   onOptimizeQueue,
@@ -81,6 +86,7 @@ export function AttributesPane({
     <PlanAttributeChips
       result={result}
       implantBonuses={implantBonuses}
+      loading={loading}
       attributeBaseline={attributeBaseline}
     />
   );

@@ -90,7 +90,7 @@ describe('RichMailBodyEditor', () => {
     expect(seen).toHaveBeenLastCalledWith('ax<b>b</b> &lt; c');
     expect(screen.getByTestId('value')).toHaveTextContent('ax<b>b</b> &lt; c');
     await user.click(screen.getByRole('button', { name: 'Edit source' }));
-    expect(screen.getByRole('status')).toHaveTextContent("EVE can't show it");
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("EVE can't show it"));
   });
 
   it('wraps the Source selection in tags from the format bar', async () => {
@@ -161,7 +161,7 @@ describe('RichMailBodyEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     fireEvent.change(src, { target: { value: 'a<script>x</script>' } });
-    expect(screen.getByRole('status')).toHaveTextContent('will be removed');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('will be removed'));
   });
 
   it('converts a pasted markdown pipe table, and nothing else markdown', async () => {

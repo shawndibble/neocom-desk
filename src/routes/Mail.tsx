@@ -540,20 +540,24 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                   <div className="flex items-center gap-2">
                     {selectedRow !== null && composeKind === null && (
                       <>
-                        <IconButton
-                          ref={replyButtonRef}
-                          icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
-                          label={t('mail.reply')}
-                          size="row"
-                          onClick={() => openCompose('reply', selectedRow.key)}
-                        />
-                        <IconButton
-                          ref={forwardButtonRef}
-                          icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
-                          label={t('mail.forward')}
-                          size="row"
-                          onClick={() => openCompose('forward', selectedRow.key)}
-                        />
+                        {isDesktop && (
+                          <>
+                            <IconButton
+                              ref={replyButtonRef}
+                              icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
+                              label={t('mail.reply')}
+                              size="row"
+                              onClick={() => openCompose('reply', selectedRow.key)}
+                            />
+                            <IconButton
+                              ref={forwardButtonRef}
+                              icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
+                              label={t('mail.forward')}
+                              size="row"
+                              onClick={() => openCompose('forward', selectedRow.key)}
+                            />
+                          </>
+                        )}
                         {organize.canOrganize(selectedRow) && (
                           <MailRowMenu
                             variant="ghost"
@@ -591,6 +595,26 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
                 onCloseCompose={() => setComposeKind(null)}
                 onSent={handleSent}
               />
+              {!isDesktop && selectedRow !== null && composeKind === null && (
+                // Sticky above the bottom nav (5rem, as the Compose button) so Reply is always in reach.
+                <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 -mx-3 mt-4 -mb-3 flex gap-2 border-t border-line bg-panel p-3">
+                  <Button
+                    ref={replyButtonRef}
+                    variant="primary"
+                    className="flex-1"
+                    onClick={() => openCompose('reply', selectedRow.key)}
+                  >
+                    <Icon.MailReply size={Icon.ICON_SIZE.sm} /> {t('mail.reply')}
+                  </Button>
+                  <Button
+                    ref={forwardButtonRef}
+                    className="flex-1"
+                    onClick={() => openCompose('forward', selectedRow.key)}
+                  >
+                    <Icon.MailForward size={Icon.ICON_SIZE.sm} /> {t('mail.forward')}
+                  </Button>
+                </div>
+              )}
             </Panel>
           </div>
         </>
@@ -608,12 +632,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
       {!isDesktop && !newMailOpen && selectedKey === null && (
         // 5rem clears the bottom nav (Layout's `<nav>`, which has no shared height token).
         <div className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30">
-          <Button
-            ref={composeButtonRef}
-            variant="primary"
-            className="shadow-lg"
-            onClick={openNewMail}
-          >
+          <Button ref={composeButtonRef} variant="primary" size="sm" onClick={openNewMail}>
             <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
           </Button>
         </div>

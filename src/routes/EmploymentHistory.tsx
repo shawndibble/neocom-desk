@@ -124,7 +124,7 @@ export function EmploymentHistory() {
         trailing={
           historyResult && (
             <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
-              {t('employmentHistory.updated')}
+              <span className="max-md:hidden">{t('employmentHistory.updated')}</span>
               <DataAgeBadge
                 date={historyResult.fetchedAt}
                 expiresAt={historyResult.expiresAt}

@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Spinner } from '@/components/ui';
+import { LiveNote, Modal, Spinner } from '@/components/ui';
 import { matchLossToPayout } from '@/engine/losses/netLoss';
 import { KillmailBody, type Expanded } from '@/features/travel/KillmailBody';
 import { loadKillmailFit } from '@/features/travel/pilotKillmailFit';
@@ -64,9 +64,7 @@ export function InsuranceLossModal({ payoutDate, characterId, onClose }: Insuran
         <Spinner size="sm" delayMs={200} label={t('wallet.insuranceLoss.loading')} />
       )}
       {found.state === 'failed' && (
-        <p role="status" className="text-sm text-warning">
-          {t('wallet.insuranceLoss.failed')}
-        </p>
+        <LiveNote className="text-sm text-warning">{t('wallet.insuranceLoss.failed')}</LiveNote>
       )}
       {found.state === 'none' && (
         <p className="text-sm text-text-dim">
