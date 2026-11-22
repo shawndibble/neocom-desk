@@ -6,29 +6,28 @@ User goal by tab:
 
 - **Item search**: find the cheapest public item_exchange/auction listing of any item, anywhere in New Eden.
 - **Courier**: find hauls worth taking, ranked by pay per jump, with scam/strand risk stated.
-- **History**: see this Character's own issued/accepted contracts and open one for detail.
+- **My contracts** (URL `history`): see this Character's own issued/accepted contracts and open one for detail.
 
 ## Summary
 
-| Feature                                             | Where                                                                       | Notes                                                                              |
-| --------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Item search tab `/contracts/search/items` (default) | `ContractSearchPanel.tsx`                                                   | ranked name search over public offers, 8 filters, suggestions, stats, detail modal |
-| Courier tab `/contracts/search/courier`             | `CourierResults.tsx`                                                        | hauls as routes: filters, ISK/jump, risk markers, detail modal                     |
-| History tab `/contracts/history`                    | `Contracts.tsx:601-691`                                                     | Character's own contracts, filter chips, column picker, export, detail modal       |
-| Remembered landing tab                              | `contractSearchModePref.ts`                                                 | bare `/contracts` opens last of Items/Courier; History never remembered            |
-| Public contract detail modal                        | `features/contracts/PublicContractDetailModal.tsx`                          | merged lines, two-sided headings, market value per side                            |
-| Courier detail modal                                | `CourierContractDetailModal.tsx`                                            | rate hero, route + path, risks, going-rate benchmark, reverse lane                 |
-| Character contract detail modal                     | `features/character/ContractDetailModal.tsx`                                | everything the in-game window shows                                                |
-| Remembered courier filter                           | `courierFilterPref.ts`                                                      | all fields but text query and route preference                                     |
-| Column pickers (3 tables)                           | `contractsColumns.ts`, `contractSearchItemsColumns.ts`, `courierColumns.ts` | device-local                                                                       |
-| Exports                                             | `useTableExport`                                                            | surfaces `contracts`, `contract-search`, `courier-contracts`, `contract-items`     |
-| Jump Range filter + Current System picker           | Items tab filter bar                                                        | measured on the stargate graph under the Jump Basis                                |
-| PLEX-ask pricing                                    | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts`        | converts PLEX ask to ISK at the global-market sell price                           |
-| Notifications                                       | `features/notifications/events.ts:165-195`                                  | contract accepted/completed/failed, courier delivery due                           |
+| Feature                                         | Where                                                                       | Notes                                                                              |
+| ----------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Item search tab `/contracts/search/items`       | `ContractSearchPanel.tsx`                                                   | ranked name search over public offers, 8 filters, suggestions, stats, detail modal |
+| Courier tab `/contracts/search/courier`         | `CourierResults.tsx`                                                        | hauls as routes: filters, ISK/jump, risk markers, detail modal                     |
+| My contracts tab `/contracts/history` (default) | `Contracts.tsx:601-691`                                                     | Character's own contracts, filter chips, column picker, export, detail modal       |
+| Public contract detail modal                    | `features/contracts/PublicContractDetailModal.tsx`                          | merged lines, two-sided headings, market value per side                            |
+| Courier detail modal                            | `CourierContractDetailModal.tsx`                                            | rate hero, route + path, risks, going-rate benchmark, reverse lane                 |
+| Character contract detail modal                 | `features/character/ContractDetailModal.tsx`                                | everything the in-game window shows                                                |
+| Remembered courier filter                       | `courierFilterPref.ts`                                                      | all fields but text query and route preference                                     |
+| Column pickers (3 tables)                       | `contractsColumns.ts`, `contractSearchItemsColumns.ts`, `courierColumns.ts` | device-local                                                                       |
+| Exports                                         | `useTableExport`                                                            | surfaces `contracts`, `contract-search`, `courier-contracts`, `contract-items`     |
+| Jump Range filter + Current System picker       | Items tab filter bar                                                        | measured on the stargate graph under the Jump Basis                                |
+| PLEX-ask pricing                                | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts`        | converts PLEX ask to ISK at the global-market sell price                           |
+| Notifications                                   | `features/notifications/events.ts:165-195`                                  | contract accepted/completed/failed, courier delivery due                           |
 
 ## Purpose and user goal
 
-"Is anyone selling this on contract for less?" Courier hauls are a distant second (owner, 2026-10-11). The per-tab goals at the top of this file stand. Search is the landing tab because "the public corpus is the thing pilots open Contracts _to use_", while History is "a look-up-what-happened list consulted occasionally" (`20260912-200030`). Items opens on a search prompt, not a table (`20261007-161833`, #2921).
+"Is anyone selling this on contract for less?" Courier hauls are a distant second (owner, 2026-10-11). The per-tab goals at the top of this file stand. Search was the landing tab because "the public corpus is the thing pilots open Contracts _to use_", while History is "a look-up-what-happened list consulted occasionally" (`20260912-200030`), but the owner later made My contracts the landing tab (2026-11-22, see decision `Contracts opens on My contracts`). Items opens on a search prompt, not a table (`20261007-161833`, #2921).
 
 - **Top jobs (ranked):** 1. "Where is the cheapest public listing of this item?" (Item search; used far more than Courier, owner, 2026-10-11) 2. "What happened to my contract, and when must I deliver?" (History) 3. "Which courier contracts pay best per jump without a trap?" (Courier, `20260912-141100`, `20260912-172628`). Courier ranks low: the owner knows nobody using it and opens it only to verify features (owner, 2026-10-11).
 - **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11); the contract detail copies a contract id for the client. Phone parity: not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); search tabs have dense phone cards and a filter sheet (Mobile vs desktop summary below). Alerts land on History: `contractAccepted`, `courierDeliveryDue` → `/contracts/history` (`notificationOptions.ts`).
@@ -53,8 +52,8 @@ User goal by tab:
 ## Route, tabs, URL
 
 - Tab ids are full path suffixes: `search/items`, `search/courier`, `history`; `/contracts/search` alone names no tab and redirects to Items (`pageTabs.ts:96-110`). Old Search-tab links still open.
-- Bare `/contracts` lands on the last-used of Items/Courier (`useRememberedPageTab`, `Contracts.tsx:362`). Only picking Items or Courier stores it (`setRememberedMode`, `Contracts.tsx:365-375`); a link naming a tab, even `search/items`, wins. Decision `20260912-200030-contracts-opens-on-search-not-history`, `20260912-141100`.
-- Route `UNGATED` (`routeScopes.ts:230`): History needs a scope but Search does not, and Search is the landing tab, so a page gate would put a re-login wall in front of it. Decision `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`.
+- Bare `/contracts` lands on My contracts (`CONTRACTS_TABS` default); the old remembered Items/Courier landing was removed with it. Links naming a tab win.
+- Route `UNGATED` (`routeScopes.ts:230`): History needs a scope but Search does not, and a page gate would put a re-login wall in front of Search. Decision `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`.
 - No active Character → `/characters` (`Contracts.tsx:550`). Search tabs still require an active Character (they need a session and a location ACL identity).
 - URL state (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`):
   - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.hideExchanges`, `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
@@ -193,12 +192,12 @@ States: no rows "No public courier contracts synced yet"; filtered empty "No cou
 
 Hero: Reward (`IskAmount`, exact below) and ISK/jump (accent when a rate exists, with "over N jumps" span, "same-system" span for 0 jumps, "loading" while pending). Route section: Pick up name + place line ("Structure · System sec · Region"), jump count (clickable caret toggles the actual path when known and >1 system; path lists systems with security and chokepoint tags), Drop off likewise, then reverse-lane line (link with count, plain none/unresolved text). Risk list headed "Before you accept" (warning) or a note heading when only notes. Going-rate benchmark: multiple vs corpus, community floor line, freighter note, route exposure (chokepoints list, "crossed N systems at 0.5 or below", no-route/unknown/measuring), expiry in hours. Figures grid: Collateral (ratio note; "none asked" note), Volume (+ISK/m³), time to deliver (days, "once accepted"), listing expires, contract id. No network fetch of its own except one route path on open (`routeExposure`), measured under the board's Jump Basis (key changes while open reads "measuring").
 
-## History tab
+## My contracts tab (`history`)
 
 Purpose: the Character's own contracts.
 
 - Filter bar: search "Search issuer, receiver or title…" (resolved issuer or receiver name or title; `filterContracts`), Status chips (only statuses present, canonical order), Type chips (only types present), column picker, count badge counts status+type (text excluded). URL `history.*`.
-- Table: Type column is a button (accent) that opens the detail modal (row itself is not clickable); label = title, else type label; an untitled courier shows "Start → End" route names (resolved via `contractLocationName`) and a collateral meta line. Optional columns (device-local `contractsHistoryVisibleColumns.v3`): Status (tone by status; outstanding past `date_expired` shows a warning icon + tooltip "Outstanding and past its deadline — lapsed and unclaimed", flips live on a 60 s ticker), Issuer (+ standing tag), Received by (acceptor, else assignee with "(offered)" hint; null when it is you), Price/reward (`contractAmount`: courier = reward ?? price, else price ?? reward), Issued, Expires (accepted courier shows "Due <time> · in <countdown>" or red "Overdue", from `courierDeliveryDeadlineMs`, never `date_expired`).
+- Table: Contract column (id `contract`) is a button (accent) that opens the detail modal (row itself is not clickable); label = title, else type label; an untitled courier shows "Start → End" route names (resolved via `contractLocationName`) with its collateral inline after it. Optional columns (device-local `contractsHistoryVisibleColumns.v4`): Type (type label; off the phone card), Status (tone by status; outstanding past `date_expired` shows a warning icon + tooltip "Outstanding and past its deadline — lapsed and unclaimed", flips live on a 60 s ticker), Issuer (+ standing tag), Received by (acceptor, else assignee with "(offered)" hint; null when it is you), Price/reward (`contractAmount`: courier = reward ?? price, else price ?? reward), Issued, Expires (accepted courier shows "Due <time> · in <countdown>" or red "Overdue", from `courierDeliveryDeadlineMs`, never `date_expired`).
 - Sort default Issued desc; `virtualize="auto"`; `highlightRowKey`.
 - Banners/states: offline; truncated "Incomplete" + **Try again**; empty "No contracts cached/ No contracts"; filtered empty with **Reset filters** (only when a filter is on); needs-reauth `GrantBanner` for `getCharacterContracts`; error "Couldn't load".
 - Export (`contracts` surface): filtered rows sorted as on screen. Columns Type (title or raw slug), Status (raw slug), Issuer, Received by, Price, Expires (raw ISO).
@@ -213,7 +212,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 
 ## Interview Q&A
 
-1. **Why is `/contracts` ungated if it needs a scope?** Search needs none and is the landing tab; History gates itself with `GrantBanner`. `src/app/routeScopes.ts:230`, decision `20260912-200442`.
+1. **Why is `/contracts` ungated if it needs a scope?** Search needs none; My contracts gates itself with `GrantBanner`. `src/app/routeScopes.ts:230`, decision `20260912-200442`.
 2. **Where does Item search data come from, and how fresh is it?** R2 per-type objects, the only store since #4270 (R2 unreachable reads as "couldn't reach the contract index", never a Firestore read), republished every 30 min from EVE Ref's archive (ESI has no public contract search); client window 30 min, stale rows served while revalidating. `src/features/contractSearch/publicContractOffers.ts`, `r2OfferSnapshot.ts`, `r2Snapshot.ts`.
 3. **Why does a barter contract sort last, not first?** Its ISK price 0 is the absence of a price (issue #1080); a PLEX ask without a PLEX price is also unpriced. `src/engine/contracts/contractSearch.ts:84-96` (`isUnpricedOffer`), `ContractSearchPanel.tsx:203-219`.
 4. **How is a PLEX-asking offer priced and filtered?** ISK + PLEX×cheapest global sell; max-price ceiling lets it pass if PLEX price is unknown. `engine/contracts/contractSearch.ts:68-76,102-106`.
@@ -222,7 +221,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 7. **What does "Hide risky routes" hide, and why not nullsec?** Player-structure drop-offs and ends no gate reaches; nullsec is ordinary paid work. `courierRisk.ts:133-140`, tooltip `contractSearch.hideUncompletableTooltip`.
 8. **Why is the player-structure risk delivery-only?** An inaccessible pickup is arguably the same trap but widening is left to a follow-up. `courierRisk.ts:82-103` comment.
 9. **How does "From my region" avoid an ESI burst or a re-auth banner?** One location read on first press, region from a local snapshot, every failure folds to "unavailable". `characterRegion.ts`, `CourierResults.tsx:297-358`.
-10. **What is remembered across visits vs in the URL?** Tab mode (Items/Courier), courier numeric/chip filters, columns, current-system picks: device-local; everything else URL; URL beats remembered. `courierFilterPref.ts`, `contractSearchModePref.ts`.
+10. **What is remembered across visits vs in the URL?** Courier numeric/chip filters, columns, current-system picks: device-local; everything else URL; URL beats remembered. `courierFilterPref.ts`.
 11. **Why does a History row show an untitled courier as a route?** Three in-progress hauls would all read "Courier" (#1706). `features/character/ContractIdentity.tsx`.
 12. **Why does an accepted courier's Expires show a countdown to delivery?** `date_expired` is the accept-by deadline; for a courier with status `in_progress` the delivery deadline is `date_accepted + days_to_complete × 86,400,000 ms` (null if days missing/≤0 or no accept date; `src/engine/contracts/courierDeadline.ts:22-29`). `Contracts.tsx:460-478`.
 13. **What is "stale" on History?** Status `outstanding` with `date_expired` in the past, re-evaluated each minute by a ticker (rows are memoized, so the clock lives in a cell component). `Contracts.tsx:117-152`.
@@ -235,7 +234,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 - Public snapshot is ≤ 30 min old and can list a contract already gone; only discovered on modal open (404 → "no longer listed").
 - Courier player structures are named only from the device's structure cache on the board (no requests); the detail modal resolves the opened haul's structure once and shows "Unknown/Undockable" when ESI refuses. Uncached ones stay an id on the board and in the modal title; local snapshots hold NPC stations only; wormhole hauls always unplaced.
 - Courier region filter cannot match unplaced ends; Space chip row hides bands with no data (Wormhole never offered).
-- History rows are not clickable as a whole; only the Type button opens detail (and in dense Search cards the whole row does).
+- History rows are not clickable as a whole; only the Contract button opens detail (and in dense Search cards the whole row does).
 - History modal item lists exist only for item_exchange/auction; courier/loan show no contents.
 - Jump counts on Courier use local graph under Travel rules, not live ESI; "—" for unplaced ends or unreachable.
 - No saved searches or price alerts on contract searches; no notifications for new matching offers.

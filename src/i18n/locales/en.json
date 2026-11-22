@@ -11350,7 +11350,7 @@
   "contracts": {
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
-    "historyTab": "History",
+    "historyTab": "My contracts",
     "corpEmptyTitle": "No corp contracts saved yet",
     "corpEmptyHint": "Couldn't load your corporation's contracts yet. Try again shortly.",
     "corpEmptyFetchedTitle": "No corp contracts",
@@ -11365,6 +11365,7 @@
     "emptyFetchedHint": "Contracts you issue or accept show here: item trades, couriers and auctions.",
     "status": "Status",
     "type": "Type",
+    "contract": "Contract",
     "price": "Price / reward",
     "issued": "Issued",
     "expires": "Expires",

@@ -150,7 +150,7 @@ here — they go one per file in `docs/context/decisions/`.
   region, ME/TE, runs, price. Not per-Character: it reads the shared,
   read-only **Public Contract Offers snapshot**, narrowed to blueprint copies.
   Distinct from **Contract Search**, the Contracts page's own tab over the
-  same snapshot unnarrowed, and from the History tab, which is one
+  same snapshot unnarrowed, and from the My contracts tab, which is one
   Character's own contracts read straight from ESI.
 - **Offer** (BPC Contract Search): one for-sale row of that snapshot — in BPC Sourcing, a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
 - **Copy-only blueprint**: A blueprint that exists only as fixed-run copies (a few Trig capital components and Spatial Attunement Unit). A plan never assumes an original for one; with no copy owned or offered its Blueprint Acquisition line reads "copy-only, none owned" at ME 0.
