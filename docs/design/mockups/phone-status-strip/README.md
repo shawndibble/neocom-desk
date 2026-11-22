@@ -5,3 +5,5 @@ Re-login prompt, missing-role notice and "Sync error" are rows of one strip (`Sh
 | 1440 | 390 |
 |---|---|
 | ![](app-shellstatusstrip--relogin-and-sync-error-1440.png) | ![](app-shellstatusstrip--relogin-and-sync-error-390.png) |
+
+Not in this PR (left for review): stable header height across tabs. Employment's data age now drops its "Updated" word below `md`.
