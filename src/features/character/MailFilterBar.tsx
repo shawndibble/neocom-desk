@@ -1,6 +1,7 @@
 import type { Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FilterChip, SearchInput } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { TAB_LABEL_KEY } from '@/features/character/mailDisplay';
 import { MAIL_FOLDERS, type MailTab } from '@/engine/mail/mail';
 
@@ -61,6 +62,7 @@ export function MailFilterBar({
               count={unread > 0 ? unread : undefined}
               countLabel={unread > 0 ? t('mail.unreadCount', { count: unread }) : undefined}
               selected={folders.includes(folder)}
+              icon={folders.includes(folder) ? <Icon.Select size={Icon.ICON_SIZE.sm} /> : undefined}
               onToggle={() => onToggleFolder(folder)}
             />
           );

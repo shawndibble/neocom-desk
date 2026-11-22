@@ -9,6 +9,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow, panelRight, scrollerFit } from './support/overflow';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
 import type { setVettingBackendOverride } from '../src/features/corp/vetting/vettingBackend';
@@ -59,7 +60,7 @@ async function installAndOpen(page: Page, path: string, characterId?: number): P
   );
 }
 
-test('a Director opens a review from the vetting queue and sees its flags', async ({ page }) => {
+async function signInAsDirector(page: Page): Promise<void> {
   await page.route('https://esi.evetech.net/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     const json = (body: unknown) =>
@@ -72,6 +73,10 @@ test('a Director opens a review from the vetting queue and sees its flags', asyn
   });
   await signInAndGoto(page, './settings', [...SCOPES, ...scopesForGroup('corp')]);
   await expect(page.locator('main')).toBeVisible();
+}
+
+test('a Director opens a review from the vetting queue and sees its flags', async ({ page }) => {
+  await signInAsDirector(page);
   const seeded = await installAndOpen(page, '/corp/vetting/open', CHARACTER_ID);
   expect(seeded, 'pilot row seeded with a corporation').toBe(1);
 
@@ -109,3 +114,41 @@ test('the apply link shows its start page with nobody logged in', async ({ page 
   // No account: the app's rail is not drawn around a public page.
   await expect(page.getByRole('navigation')).toHaveCount(0);
 });
+
+for (const width of [1024, 1280]) {
+  test(`the vetting queue and a report's Declared characters fit their panels at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await signInAsDirector(page);
+    await installAndOpen(page, '/corp/vetting/open', CHARACTER_ID);
+
+    const table = page.getByRole('table', { name: 'Open vetting reviews' });
+    const row = table.getByRole('row', { name: /Tamsin Vell/ });
+    await expect(row).toContainText('3 flags');
+    const charactersHeader = table.getByRole('columnheader', { name: 'Characters' });
+    if (width === 1024) {
+      await expect(charactersHeader).toBeHidden();
+      const panel = await panelRight(table);
+      const tableBox = (await table.boundingBox())!;
+      expect(tableBox.x + tableBox.width, 'table inside its panel').toBeLessThanOrEqual(panel! + 1);
+      await expectNoPageOverflow(page);
+      // Two lines of 14px text plus padding; three lines would clear it.
+      expect((await row.boundingBox())!.height, 'queue row at most two lines').toBeLessThan(80);
+    } else {
+      await expect(charactersHeader).toBeVisible();
+    }
+
+    await row.click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Tamsin Vell' })).toBeVisible();
+    const declared = page.getByRole('table', { name: 'Declared characters' });
+    await expect(declared).toBeVisible();
+    const fit = await scrollerFit(declared);
+    expect(fit, 'Declared characters has its own scroller').not.toBeNull();
+    const box = (await declared.boundingBox())!;
+    // Inside its panel, or scrolling there: never past the border.
+    const edge = await panelRight(declared);
+    expect(fit!.right, 'scroller inside the panel').toBeLessThanOrEqual(edge! + 1);
+    if (box.x + box.width > edge! + 1) expect(fit!.scrollWidth).toBeGreaterThan(fit!.clientWidth);
+  });
+}

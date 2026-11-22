@@ -109,7 +109,7 @@ export function MailListPane({
         // screen instead of stopping at a fixed height.
         // Sticky date <h3>s, as in the Coming up rail; `scroll-pt-8`
         // keeps a focused row out from under one (WCAG 2.4.11).
-        <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
+        <div className="max-h-[36rem] scroll-pt-8 overflow-y-auto pb-14 lg:max-h-none lg:pb-0 lg:min-h-0 lg:flex-1">
           {rowSections.map((section) => (
             <div key={section.key}>
               <h3
