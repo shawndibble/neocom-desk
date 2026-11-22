@@ -13,21 +13,26 @@ export const UNIT_PRICE = 1_000;
 /** Far enough back for the oldest seeded book (`HISTORY_DAYS` in bookSeed.ts) and a margin. */
 const DAYS = 200;
 
-function entry() {
+/** `closeByBack`: the price of the day `back` days ago, where it is not `UNIT_PRICE`. */
+function entry(closeByBack: Readonly<Record<number, number>> = {}) {
   const dates = Array.from({ length: DAYS + 1 }, (_, d) =>
     utcDay(Date.now() - (DAYS - d) * DAY_MS)
   );
-  const flat = dates.map(() => UNIT_PRICE);
+  const prices = dates.map((_, d) => closeByBack[DAYS - d] ?? UNIT_PRICE);
   return {
     dates,
     stations: Object.fromEntries(
-      TRADE_HUBS.map((hub) => [String(hub.stationId), { buy: flat, sell: flat }])
+      TRADE_HUBS.map((hub) => [String(hub.stationId), { buy: prices, sell: prices }])
     ),
   };
 }
 
-export async function installFlatPrices(page: Page): Promise<void> {
-  const body = JSON.stringify(entry());
+export async function installFlatPrices(
+  page: Page,
+  /** Days whose saved close-of-day price is not `UNIT_PRICE`, by days back (`installDayPrices`). */
+  closeByBack: Readonly<Record<number, number>> = {}
+): Promise<void> {
+  const body = JSON.stringify(entry(closeByBack));
   await page.route('https://data.neocomdesk.com/open-prices/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     const headers = { 'access-control-allow-origin': '*' };
@@ -43,3 +48,10 @@ export async function installFlatPrices(page: Page): Promise<void> {
     return route.fulfill({ status: 200, headers, contentType: 'application/json', body });
   });
 }
+
+/**
+ * The hub's saved close-of-day price of some days, over the flat ones: a day the book prices at
+ * close that is not what the pilot's estimate was. Registered after the flat prices, so it answers
+ * first; call it again (and reload) to move a close price mid-test.
+ */
+export const installDayPrices = installFlatPrices;

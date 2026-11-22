@@ -63,10 +63,12 @@ export function donationSent(p: {
   back: number;
   reason?: string;
   now?: number;
+  /** The instant it was sent, instead of noon of `back` (a payment made today, before noon). */
+  at?: string;
 }) {
   return {
     id: p.refId,
-    date: noonOf(p.back, p.now),
+    date: p.at ?? noonOf(p.back, p.now),
     ref_type: 'player_donation',
     description: `${(p.from ?? PILOT).name} deposited cash into ${p.to}'s account`,
     amount: -p.amount,
@@ -131,6 +133,8 @@ export function creditedDonation(p: {
   back: number;
   minerId?: string;
   now?: number;
+  /** The instant it was sent, instead of noon of `back`. */
+  at?: string;
 }): SeedDoc {
   const id = `j1_${p.refId}`;
   return {
@@ -141,7 +145,7 @@ export function creditedDonation(p: {
       characterId: p.characterId,
       uid: `char:${p.characterId}`,
       amount: p.amount,
-      at: noonOf(p.back, p.now),
+      at: p.at ?? noonOf(p.back, p.now),
       division: 1,
       minerId: p.minerId ?? PILOT_MINER_ID,
     },
