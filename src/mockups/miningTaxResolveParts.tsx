@@ -360,7 +360,7 @@ export function ResolveConflict() {
             </li>
             <li>
               {BUH.name}: <span className="font-semibold">+{isk(CONFLICT.amount)}</span> on its next
-              Statement
+              Late notice
             </li>
           </ul>
         </Choice>
@@ -668,7 +668,7 @@ export function OfficerNeedsYou() {
         <QueueCard
           tone="neutral"
           title="Orsa Tellemar left the corp · owes 3,100,000 ISK"
-          body="No new Statement goes out unless they mine again. Send a reminder, or write it off once it is clear it will not be paid."
+          body="No new Late notice goes out unless they mine again. Send a reminder, or write it off once it is clear it will not be paid."
           primary="Send reminder"
           secondary="Write off"
         />
@@ -689,7 +689,7 @@ export function OfficerKeepBillDialog() {
       <div className="space-y-3 text-sm">
         <p>
           {PILOT} says they paid {isk(25_000_000)} on 2 Nov (journal ref 7788991). Keeping the bill
-          puts the 3 days it paid back on their next Statement.
+          puts the 3 days it paid back on their next Late notice.
         </p>
         <NewComponent name="RequiredNextStep">
           <label className="block space-y-1">

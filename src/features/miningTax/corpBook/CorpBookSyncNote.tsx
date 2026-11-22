@@ -19,7 +19,7 @@ function shortDate(date: string, language: string): string {
  * D12's "Safe to pay" wording under the corp's balance card: until a sync after
  * the grace period the corp's record is not final ("Safe to pay once <Corp>
  * syncs (last synced 2d ago)"), then "Safe to pay — 12 Jul is closed". Also
- * credit on the next Statement; on a running account, paid through a day or how far behind, and
+ * the account's credit; paid through a day or how far behind, and
  * only true overpayment as "ahead". A corporation the member left says so in its own notice
  * (`LeftCorpNotice`), with Pay and Stop showing beside it. A donation still waiting
  * for the corp to credit it is left unsaid: that is the corp's side to handle.

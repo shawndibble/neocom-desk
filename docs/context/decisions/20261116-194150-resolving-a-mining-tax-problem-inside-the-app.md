@@ -26,7 +26,7 @@ _Recorded 2026-11-16._ Mockups: `docs/design/mockups/mining-tax-resolve/`.
   with Resolve again.
 
 - **An open dispute holds its day, for at most 14 days.** While held, payments skip the
-  disputed amount (a Statement settles on the rest; the held amount stays open separately)
+  disputed amount (money passes over it to the next unpaid day; the held amount stays open separately)
   and a Conflict day does not resolve to the corporation. Unanswered after 14 days, the hold
   lapses and the amount is owed as before — the Overdue flow's pause budget, reused. This
   rules out an unbounded pause that lets a dispute stall a bill.

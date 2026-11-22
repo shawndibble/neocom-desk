@@ -1,10 +1,11 @@
 /**
  * What the member's Corp Tax Books need them to look at (#6204), as plain facts for the Tax
- * tab's attention strip: Overdue Statements, donations a book never credited, donations it holds
+ * tab's attention strip: Late notices whose days are unpaid, donations a book never credited, donations it holds
  * for review without counting them, and ore a book bills that the member's own list also owes
  * another Payee.
  */
-import type { OverdueStatementView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
+import { utcDayOf } from '../../../../functions/src/timeConstants';
+import type { MemberNoticeView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import type { CorpBookView } from './corpBookView';
 import type { InReviewPayment } from './corpBookStore';
@@ -16,15 +17,14 @@ interface OfBook {
 
 export interface CorpBookAttention {
   /**
-   * `declarerId`: the first tracked Character in view that the Statement bills — its sign-in is
-   * on the Statement, so it may declare (#6206). Absent when none is.
+   * Late notices whose days are unpaid. `declarerId`: the first tracked Character in view the
+   * notice asked — its sign-in is on the notice, so it may declare (#6206). Absent when none is.
    */
-  overdue: (OfBook & OverdueStatementView & { declarerId?: number })[];
+  overdue: (OfBook & MemberNoticeView & { declarerId?: number })[];
   uncredited: (OfBook & UncreditedDonation)[];
   /**
    * Per book: the member's donations it holds for an officer's review without counting them
-   * (#6207), oldest first, and the oldest open Statement of the first one's Miner, to send the
-   * proof on. Only those paid on or after the book's start: before it they paid no mining it bills.
+   * (#6207), oldest first. Only those paid on or after the book's start: before it they paid no mining it bills.
    */
   inReview: (OfBook & { donations: InReviewPayment[] })[];
   /** Per book: the Payees whose unpaid ore it bills too, and the first such row to open. */
@@ -33,8 +33,8 @@ export interface CorpBookAttention {
 
 /**
  * Only what the Characters in `characters` (the Tax tab's resolved Character filter) mined, paid
- * or are billed for: an Overdue Statement billing one of them, a donation one of them made, the
- * also-billed rows of their days. A Statement billing no tracked Character shows only for all
+ * or are billed for: a Late notice asking one of them, a donation one of them made, the
+ * also-billed rows of their days. A notice asking no tracked Character shows only for all
  * Characters.
  */
 export function corpBookAttention(
@@ -47,10 +47,10 @@ export function corpBookAttention(
   for (const book of view.books) {
     const { loaded } = book;
     const of: OfBook = { corporationId: loaded.corporationId, corpName: book.corpName };
-    for (const s of book.summary.overdue) {
-      const tracked = (loaded.statements.find((x) => x.id === s.statementId)?.lines ?? [])
-        .map((l) => l.characterId)
-        .filter((id): id is number => id !== undefined && loaded.characterIds.includes(id));
+    for (const s of book.summary.notices) {
+      const tracked = (loaded.notices.find((x) => x.id === s.noticeId)?.characterIds ?? []).filter(
+        (id) => loaded.characterIds.includes(id)
+      );
       const declarerId = tracked.find(inView);
       if (declarerId === undefined && characters !== 'all') continue;
       out.overdue.push({ ...of, ...s, ...(declarerId !== undefined && { declarerId }) });
@@ -59,10 +59,10 @@ export function corpBookAttention(
       if (inView(d.characterId)) out.uncredited.push({ ...of, ...d });
     }
     const held = (loaded.inReview ?? [])
-      .filter((p) => inView(p.characterId) && p.at.slice(0, 10) >= loaded.startDate)
+      .filter((p) => inView(p.characterId) && utcDayOf(p.at) >= loaded.startDate)
       .sort((a, b) => a.at.localeCompare(b.at));
     // Counted as tax at once, each to its own donor's Miner: the book already holds the ISK, so
-    // no Statement is needed (and none can be blocked by a declaration already waiting on it).
+    // no Late notice is needed (and none can be blocked by a declaration already waiting on it).
     if (held.length > 0) out.inReview.push({ ...of, donations: held });
     // A Conflict is not billed yet, and a paid listing owes nobody: only billed ore still owed
     // to another Payee is counted twice.

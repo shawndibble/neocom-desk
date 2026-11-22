@@ -11,7 +11,7 @@ import { overdueTarget, type ResolveTarget } from './resolve/targets';
 const k = (key: string) => `miningTax.corpBook.declare.${key}`;
 
 /**
- * What the member told the corporation about a Statement, and its answer (#6206). A rejection
+ * What the member told the corporation about a Late notice, and its answer (#6206). A rejection
  * reads the officer's reason and their next step word for word: the member is never left with
  * "ask someone" (decision 20261116-194150).
  */
@@ -45,8 +45,8 @@ export function CorpDeclarationStatus({
 
 /**
  * A book row's declaration slot (#6206): what the member told the corporation about the day's
- * Statement, and Resolve while they may say it (the same dialog as every other problem, so the
- * corporation's tax contact is mailed too). Nothing without a Statement.
+ * Late notice, and Resolve while they may say it (the same dialog as every other problem, so the
+ * corporation's tax contact is mailed too). Nothing without a Late notice.
  */
 export function CorpDeclareSlot({
   view,
@@ -54,13 +54,13 @@ export function CorpDeclareSlot({
 }: {
   view: Pick<
     BookRowView,
-    'corporationId' | 'corpName' | 'statementId' | 'characterId' | 'declaration' | 'date'
+    'corporationId' | 'corpName' | 'noticeId' | 'characterId' | 'declaration' | 'date'
   >;
   onResolve: (target: ResolveTarget) => void;
 }) {
   const { t } = useTranslation();
-  if (view.statementId === undefined) return null;
-  const statementId = view.statementId;
+  if (view.noticeId === undefined) return null;
+  const noticeId = view.noticeId;
   return (
     <div className="space-y-1.5">
       {view.declaration && (
@@ -75,7 +75,7 @@ export function CorpDeclareSlot({
                 overdueTarget({
                   corporationId: view.corporationId,
                   corpName: view.corpName,
-                  statementId,
+                  noticeId,
                   characterId: view.characterId,
                   periodStart: view.date,
                   period: view.date,

@@ -9,7 +9,7 @@ import {
 const ISSUED = '2026-08-01T00:00:00Z';
 
 function declaration(at: string, extra: Partial<Declaration> = {}): Declaration {
-  return { id: 'dc1', statementId: 's1', kind: 'contract', at, ...extra };
+  return { id: 'dc1', noticeId: 's1', kind: 'contract', at, ...extra };
 }
 
 describe('overdueStatus', () => {
@@ -48,7 +48,7 @@ describe('overdueStatus', () => {
     ).toBe('overdue');
   });
 
-  it('a settled Statement is never Overdue', () => {
+  it('a settled late notice is never Overdue', () => {
     expect(
       overdueStatus({
         issuedAt: ISSUED,
@@ -98,7 +98,7 @@ describe('overdueStatus', () => {
     ).toBe('overdue');
   });
 
-  it('caps the unanswered pause at 14 days per Statement — filing again does not extend it', () => {
+  it('caps the unanswered pause at 14 days per late notice — filing again does not extend it', () => {
     const status = overdueStatus({
       issuedAt: ISSUED,
       settled: false,

@@ -9,7 +9,7 @@ import {
   type RekeyWrite,
 } from './corpTaxBookRekey.js';
 import { DISPUTES, MINERS } from './corpTaxBook.js';
-import { invalidateMinerTotals } from './corpTaxBookMinerTotalsStore.js';
+import { soloCharacterId } from './corpTaxBookDonationMatch.js';
 import { invalidateReadModels } from './corpTaxBookReadModelsStore.js';
 
 const sub = (db: Firestore, corporationId: number, name: string) =>
@@ -64,7 +64,8 @@ export async function planRekeyBackfill(
   for (const collection of [...MINER_KEYED, DISPUTES])
     for (const d of (await sub(db, corporationId, collection).select('minerId').get()).docs) {
       const id = d.get('minerId');
-      if (typeof id === 'string' && !known.has(id) && !id.startsWith('solo:')) named.add(id);
+      if (typeof id === 'string' && !known.has(id) && soloCharacterId(id) === undefined)
+        named.add(id);
     }
   return { corporationId, writes, unresolved: [...named] };
 }
@@ -84,13 +85,5 @@ export async function applyRekeyBackfill(db: Firestore, plan: RekeyBackfillPlan)
   );
   await commitInBatches(db, ops);
   // The Miners and Overview docs were built from the old ids: drop them so the next read rebuilds.
-  const groups = [
-    ...new Set(
-      plan.writes.flatMap((w) =>
-        w.kind === 'update' && 'minerId' in w.fields ? [String(w.fields.minerId)] : []
-      )
-    ),
-  ];
-  await invalidateMinerTotals(db, plan.corporationId, groups);
   await invalidateReadModels(db, plan.corporationId);
 }

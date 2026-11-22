@@ -4,7 +4,7 @@
  * the sync run the same rules. Pure: no fetch/DOM/Dexie imports.
  *
  * A group keeps the id of the Miner it grows from (`solo:<id>` included), so
- * its Statements, payments and dismissals stay with it.
+ * its late notices, payments and dismissals stay with it.
  */
 import { standingOf, type MinerRow } from './bookView';
 import { latestRecordedCorp } from './bookDocs';

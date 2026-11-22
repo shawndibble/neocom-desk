@@ -85,6 +85,7 @@ export const CALLABLE_ACTIONS = {
     'reclaimCorpTaxBookCallable',
     'syncCorpTaxBookCallable',
     'editCorpTaxBookCallable',
+    'dismissGroupingAnswer',
     'verifySrpOfficerCallable',
     'getSrpStatusCallable',
     'fileSrpClaimCallable',

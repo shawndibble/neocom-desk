@@ -16,7 +16,7 @@ export async function nextOrder(): Promise<number> {
 }
 
 /**
- * Adds mail to the queue, minus any a queued Statement already covers.
+ * Adds mail to the queue, minus any a queued Late notice already covers.
  * Returns what was added and what was skipped.
  */
 export async function addToQueue(

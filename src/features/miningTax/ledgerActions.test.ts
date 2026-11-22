@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
-import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS, PAYEES } from '@/sync/syncedCollections';
@@ -17,13 +16,9 @@ import {
   continueSession,
   deletePayee,
   dismiss,
-  recordCorpPayment,
-  HeldElsewhereError,
-  settle,
   unassign,
   uncombine,
   undoContinue,
-  unsettleByIds,
 } from './ledgerActions';
 
 const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
@@ -125,7 +120,6 @@ describe('continueSession', () => {
     await db.miningTaxAssignments.put(previous);
 
     const result = await continueSession(continuation(previous), () => PRICES);
-
     expect(result.ok).toBe(true);
     const records = await stored();
     expect(records).toHaveLength(2);
@@ -330,7 +324,7 @@ describe('every action', () => {
     const theirs = assignment({ id: 'b1', characterId: 2 });
     await db.miningTaxAssignments.bulkPut([mine, theirs]);
 
-    await settle([mine, theirs]);
+    await unassign([mine, theirs]);
 
     expect(syncMock.scheduleSync).toHaveBeenCalledTimes(2);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
@@ -357,7 +351,6 @@ describe('every action', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     };
     expect((await assign(input)).ok).toBe(true);
     expect(await assign(input)).toMatchObject({ ok: false, reason: 'already-assigned' });
@@ -404,45 +397,69 @@ describe('deletePayee', () => {
     amount: 100,
   };
 
-  /** One Combined Entry under A: a day settled oldest-first, and a day still owed. */
+  /** One Combined Entry under A: a day its link paid (oldest first), and a day still owed. */
   const paidDay = assignment({ id: 'g1', groupId: 'g', status: 'paid', payment });
   const owedDay = assignment({ id: 'g2', groupId: 'g', date: '2026-09-05' });
+  /** A's link: pays 100 ISK, so the oldest 100-ISK day, whatever any stored mark says. */
+  const linkOfA = (payeeId = 'p1') => ({
+    id: 'journal:41',
+    characterId: CHAR,
+    payeeId,
+    kind: 'journal' as const,
+    refId: 41,
+    amount: 100,
+    paidOn: '2026-09-06',
+    source: 'manual' as const,
+    updatedAt: 1,
+  });
 
   beforeEach(async () => {
     await db.payees.bulkPut([payeeA, payeeB]);
+    await db.miningTaxPaymentLinks.clear();
   });
 
-  it('moves every day of a Combined Entry with an owed day, keeping each status, and coalesce leaves it whole', async () => {
+  it('moves every day of a Combined Entry with an owed day, and coalesce leaves it whole', async () => {
     await db.miningTaxAssignments.bulkPut([paidDay, owedDay]);
+    await db.miningTaxPaymentLinks.put(linkOfA());
 
     expect(await deletePayee(payeeA, 'p2')).toEqual({ ok: true, value: undefined });
 
     const after = await stored();
     expect(after.map((a) => [a.id, a.payeeId, a.status, a.groupId])).toEqual(
       expect.arrayContaining([
-        ['g1', 'p2', 'paid', 'g'],
+        ['g1', 'p2', 'outstanding', 'g'],
         ['g2', 'p2', 'outstanding', 'g'],
       ])
     );
-    expect(after.find((a) => a.id === 'g1')!.payment).toEqual(payment);
     expect(await db.payees.get('p1')).toBeUndefined();
     expect((await readTombstones(tombstoneKey(PAYEES, CHAR))).map((t) => t.id)).toEqual(['p1']);
-    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
       collections: ['miningTaxAssignments', 'payees'],
     });
+    // The link goes with the Payee, in the same write.
+    expect((await db.miningTaxPaymentLinks.get('journal:41'))?.payeeId).toBe('p2');
 
     await coalesceAssignments(CHAR);
     expect((await stored()).every((a) => a.groupId === 'g')).toBe(true);
   });
 
+  it("decides paid off the Payee's account, never a stored mark", async () => {
+    // Marked paid by an older client, but no link pays it: it is owed, and moves.
+    const markedOnly = assignment({ id: 'm1', date: '2026-09-01', status: 'paid', payment });
+    await db.miningTaxAssignments.bulkPut([markedOnly]);
+    expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
+    expect((await stored())[0].payeeId).toBe('p2');
+  });
+
   it('leaves standalone paid days, and Combined Entries with nothing owed, where they are', async () => {
-    const standalonePaid = assignment({ id: 's1', date: '2026-09-01', status: 'paid', payment });
+    const standalonePaid = assignment({ id: 's1', date: '2026-08-01' });
     const settledGroup = [
-      assignment({ id: 'h1', groupId: 'h', date: '2026-08-01', status: 'paid', payment }),
-      assignment({ id: 'h2', groupId: 'h', date: '2026-08-02', status: 'paid', payment }),
+      assignment({ id: 'h1', groupId: 'h', date: '2026-08-02' }),
+      assignment({ id: 'h2', groupId: 'h', date: '2026-08-03' }),
     ];
     await db.miningTaxAssignments.bulkPut([standalonePaid, ...settledGroup, owedDay]);
+    // 300 ISK pays the three oldest days; the owed day stays owed.
+    await db.miningTaxPaymentLinks.put({ ...linkOfA(), amount: 300 });
 
     expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
 
@@ -462,6 +479,18 @@ describe('deletePayee', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
+  it('re-points the links to the rest of a merged Payee when its primary record is deleted', async () => {
+    // The same recipient on two Characters: p1 is the group's primary, so links name it.
+    const alt: PayeeRecord = { ...payeeA, id: 'p9', characterId: 2 };
+    await db.payees.put(alt);
+    await db.miningTaxPaymentLinks.put(linkOfA());
+    expect((await deletePayee(payeeA)).ok).toBe(true);
+    expect((await db.miningTaxPaymentLinks.get('journal:41'))?.payeeId).toBe('p9');
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxPaymentLinks'],
+    });
+  });
+
   it('deletes only the Payee when there is nowhere to move its entries', async () => {
     await db.miningTaxAssignments.bulkPut([owedDay]);
 
@@ -477,370 +506,11 @@ describe('deletePayee', () => {
   it('counts what a move takes: owed days plus the rest of their Combined Entries', () => {
     const elsewhere = assignment({ id: 'x1', payeeId: 'p2', groupId: 'g' });
     expect(
-      assignmentsMovedWithPayee([paidDay, owedDay, elsewhere], 'p1')
+      assignmentsMovedWithPayee([paidDay, owedDay, elsewhere], 'p1', (a) =>
+        a.id === 'g1' ? 'paid' : 'outstanding'
+      )
         .map((a) => a.id)
         .sort()
     ).toEqual(['g1', 'g2']);
-  });
-});
-
-describe('unsettleByIds', () => {
-  it('reverts Paid Assignments the caller only knows by id', async () => {
-    await db.miningTaxAssignments.bulkPut([
-      assignment({ id: 'a1', status: 'paid', paidAt: 5 }),
-      assignment({ id: 'a2', status: 'paid', paidAt: 5 }),
-    ]);
-
-    const result = await unsettleByIds(['a1']);
-
-    expect(result.ok).toBe(true);
-    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
-    expect((await db.miningTaxAssignments.get('a2'))?.status).toBe('paid');
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, expect.anything());
-  });
-
-  it('fails when no id matches a stored Assignment', async () => {
-    const result = await unsettleByIds(['missing']);
-
-    expect(result.ok).toBe(false);
-  });
-});
-
-describe('recordCorpPayment', () => {
-  const CORP = { corporationId: 98000001, name: 'Bureau' };
-  function bookRow(overrides: Partial<BookRowView> = {}): BookRowView {
-    return {
-      id: 'book:1',
-      corporationId: CORP.corporationId,
-      corpName: CORP.name,
-      characterId: CHAR,
-      date: '2026-09-04',
-      solarSystemId: SYSTEM,
-      state: 'billed',
-      oreLines: [{ typeId: ORE, quantity: 100 }],
-      unitPrices: { [ORE]: 10 },
-      priceSources: {},
-      taxPct: 10,
-      rateScope: 'corp',
-      estimatedValue: 1000,
-      taxOwed: 100,
-      billed: 100,
-      hubId: 'jita',
-      oreForm: 'raw',
-      ...overrides,
-    };
-  }
-  const payee = (id: string): PayeeRecord => ({
-    id,
-    characterId: CHAR,
-    name: id,
-    defaultTaxPct: 10,
-    updatedAt: 1,
-  });
-  const PAYMENT = { paidOn: '2026-09-05', method: 'contract' as const, amount: 100 };
-
-  it('records the row paid under a new Payee verified as the corporation', async () => {
-    const result = await recordCorpPayment(CORP, [bookRow()], PAYMENT);
-
-    expect(result.ok).toBe(true);
-    const [payee] = await db.payees.toArray();
-    expect(payee).toMatchObject({
-      characterId: CHAR,
-      name: 'Bureau',
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    });
-    const [paid] = await db.miningTaxAssignments.toArray();
-    expect(paid).toMatchObject({
-      payeeId: payee.id,
-      date: '2026-09-04',
-      solarSystemId: SYSTEM,
-      oreLines: [{ typeId: ORE, quantity: 100 }],
-      taxOwed: 100,
-      status: 'paid',
-      payment: expect.objectContaining({ method: 'contract', paidOn: '2026-09-05' }),
-    });
-  });
-
-  it('reuses the verified corporation Payee, never one that only shares its name', async () => {
-    const sameName: PayeeRecord = { ...payee('p1'), name: 'Bureau' };
-    const verified: PayeeRecord = {
-      ...payee('p2'),
-      name: 'Bureau',
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    };
-    await db.payees.bulkPut([sameName, verified]);
-
-    await recordCorpPayment(CORP, [bookRow()]);
-
-    expect(await db.payees.count()).toBe(2);
-    const [paid] = await db.miningTaxAssignments.toArray();
-    expect(paid).toMatchObject({ payeeId: 'p2', status: 'paid' });
-    expect(paid.payment).toBeUndefined();
-  });
-
-  it('records only the ore the member has not already marked paid', async () => {
-    const verified: PayeeRecord = {
-      ...payee('p2'),
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    };
-    await db.payees.put(verified);
-    await db.miningTaxAssignments.put(
-      assignment({
-        id: 'mark',
-        payeeId: 'p2',
-        status: 'paid',
-        oreLines: [{ typeId: ORE, quantity: 40 }],
-      })
-    );
-
-    await recordCorpPayment(CORP, [
-      bookRow({
-        markedPaidIds: ['mark'],
-        taxOwed: 60,
-        personalOreLines: [{ typeId: ORE, quantity: 100 }],
-      }),
-    ]);
-
-    const added = (await db.miningTaxAssignments.toArray()).find((a) => a.id !== 'mark');
-    expect(added).toMatchObject({ oreLines: [{ typeId: ORE, quantity: 60 }], taxOwed: 60 });
-  });
-
-  it("marks the member's own owed Assignment under the corporation paid, not a second claim", async () => {
-    await db.payees.put({
-      ...payee('p2'),
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    });
-    await db.miningTaxAssignments.put(assignment({ id: 'own', payeeId: 'p2' }));
-
-    const result = await recordCorpPayment(
-      CORP,
-      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
-      PAYMENT
-    );
-
-    expect(result.ok).toBe(true);
-    const all = await db.miningTaxAssignments.toArray();
-    expect(all).toHaveLength(1);
-    expect(all[0]).toMatchObject({ id: 'own', status: 'paid', payment: expect.anything() });
-  });
-
-  it('pays every owed day of a Combined Entry one ticked row reaches, under one payment', async () => {
-    await db.payees.put({
-      ...payee('p2'),
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    });
-    await db.miningTaxAssignments.bulkPut([
-      assignment({ id: 'day1', payeeId: 'p2', groupId: 'g' }),
-      assignment({ id: 'day2', payeeId: 'p2', groupId: 'g', date: '2026-09-05' }),
-      assignment({ id: 'other', payeeId: 'p2', groupId: 'h', date: '2026-09-06' }),
-      assignment({ id: 'stale', payeeId: 'p1', groupId: 'g', date: '2026-09-03' }),
-    ]);
-
-    // The ISK sent covers the ticked row and the Combined Entry's other day.
-    const result = await recordCorpPayment(
-      CORP,
-      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
-      { ...PAYMENT, amount: 200 }
-    );
-
-    expect(result.ok).toBe(true);
-    const byId = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.id, a]));
-    expect(byId.size).toBe(4);
-    expect(byId.get('day1')?.status).toBe('paid');
-    expect(byId.get('day2')?.status).toBe('paid');
-    expect(byId.get('day2')?.payment?.paymentId).toBe(byId.get('day1')?.payment?.paymentId);
-    expect(byId.get('other')?.status).toBe('outstanding');
-    expect(byId.get('stale')?.status).toBe('outstanding');
-  });
-
-  // The Bureau report: a payment never marks a day its amount does not cover.
-  it('leaves owed a Combined Entry day the ISK sent does not reach', async () => {
-    await db.payees.put({
-      ...payee('p2'),
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    });
-    await db.miningTaxAssignments.bulkPut([
-      assignment({ id: 'day1', payeeId: 'p2', groupId: 'g' }),
-      assignment({ id: 'day2', payeeId: 'p2', groupId: 'g', date: '2026-09-05' }),
-    ]);
-
-    const result = await recordCorpPayment(
-      CORP,
-      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
-      PAYMENT
-    );
-
-    expect(result.ok).toBe(true);
-    const byId = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.id, a]));
-    expect(byId.get('day1')?.status).toBe('paid');
-    expect(byId.get('day2')?.status).toBe('outstanding');
-  });
-
-  it('marks only the ticked rows the amount covers, oldest first', async () => {
-    const result = await recordCorpPayment(
-      CORP,
-      [
-        bookRow({ id: 'book:2', date: '2026-09-05', taxOwed: 100 }),
-        bookRow({ id: 'book:1', date: '2026-09-04', taxOwed: 100 }),
-      ],
-      PAYMENT
-    );
-
-    expect(result.ok).toBe(true);
-    const paid = await db.miningTaxAssignments.toArray();
-    expect(paid.map((a) => [a.date, a.status])).toEqual([['2026-09-04', 'paid']]);
-  });
-
-  it('records only the share of the day a short payment pays, so the rest stays owed', async () => {
-    const result = await recordCorpPayment(CORP, [bookRow()], { ...PAYMENT, amount: 60 });
-
-    expect(result.ok).toBe(true);
-    const [part] = await db.miningTaxAssignments.toArray();
-    expect(part).toMatchObject({
-      status: 'paid',
-      oreLines: [{ typeId: ORE, quantity: 60 }],
-      taxOwed: 60,
-    });
-  });
-
-  it("counts a payment within the book's day tolerance as paying the whole day", async () => {
-    const row = bookRow({ taxOwed: 1_000_000, billed: 1_000_000 });
-    await recordCorpPayment(CORP, [row], { ...PAYMENT, amount: 999_900 });
-
-    const [paid] = await db.miningTaxAssignments.toArray();
-    expect(paid).toMatchObject({ status: 'paid', oreLines: [{ typeId: ORE, quantity: 100 }] });
-  });
-
-  it('spends no payment on a row that never lined up with a ledger entry', async () => {
-    await recordCorpPayment(
-      CORP,
-      [
-        bookRow({ id: 'book:0', date: '2026-09-03', solarSystemId: 0 }),
-        bookRow({ id: 'book:1', date: '2026-09-04' }),
-      ],
-      { ...PAYMENT, amount: 100 }
-    );
-
-    const all = await db.miningTaxAssignments.toArray();
-    expect(all).toHaveLength(1);
-    expect(all[0]).toMatchObject({ date: '2026-09-04', taxOwed: 100, status: 'paid' });
-  });
-
-  it('pays the covered days whole and part-pays the next one with what is left', async () => {
-    await recordCorpPayment(
-      CORP,
-      [
-        bookRow({ id: 'book:1', date: '2026-09-04' }),
-        bookRow({ id: 'book:2', date: '2026-09-05' }),
-      ],
-      { ...PAYMENT, amount: 130 }
-    );
-
-    const byDate = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.date, a]));
-    expect(byDate.get('2026-09-04')).toMatchObject({ taxOwed: 100, status: 'paid' });
-    expect(byDate.get('2026-09-05')).toMatchObject({ taxOwed: 30, status: 'paid' });
-  });
-
-  it('records two rows on one entry (two refineries, same ore) in full, each once', async () => {
-    const result = await recordCorpPayment(CORP, [
-      bookRow({
-        id: 'book:a',
-        oreLines: [{ typeId: ORE, quantity: 60 }],
-        personalOreLines: [{ typeId: ORE, quantity: 100 }],
-      }),
-      bookRow({
-        id: 'book:b',
-        oreLines: [{ typeId: ORE, quantity: 40 }],
-        personalOreLines: [{ typeId: ORE, quantity: 100 }],
-      }),
-    ]);
-
-    expect(result.ok).toBe(true);
-    const all = await db.miningTaxAssignments.toArray();
-    expect(all.map((a) => a.oreLines[0].quantity).sort()).toEqual([40, 60]);
-    expect(all.every((a) => a.status === 'paid')).toBe(true);
-  });
-
-  it("splits the member's own owed corp Assignment across two rows on its entry, marking it once", async () => {
-    await db.payees.put({
-      ...payee('p2'),
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    });
-    await db.miningTaxAssignments.put(
-      assignment({ id: 'own', payeeId: 'p2', oreLines: [{ typeId: ORE, quantity: 70 }] })
-    );
-    const markSpy = vi.spyOn(db.miningTaxAssignments, 'bulkPut');
-
-    const result = await recordCorpPayment(CORP, [
-      bookRow({
-        id: 'book:a',
-        oreLines: [{ typeId: ORE, quantity: 60 }],
-        personalOreLines: [{ typeId: ORE, quantity: 100 }],
-      }),
-      bookRow({
-        id: 'book:b',
-        oreLines: [{ typeId: ORE, quantity: 40 }],
-        personalOreLines: [{ typeId: ORE, quantity: 100 }],
-      }),
-    ]);
-
-    expect(result.ok).toBe(true);
-    const all = await db.miningTaxAssignments.toArray();
-    expect(all.find((a) => a.id === 'own')?.status).toBe('paid');
-    const added = all.filter((a) => a.id !== 'own');
-    expect(added.map((a) => a.oreLines)).toEqual([[{ typeId: ORE, quantity: 30 }]]);
-    const marked = markSpy.mock.calls.at(-1)?.[0] as MiningTaxAssignmentRecord[];
-    expect(marked.filter((a) => a.id === 'own')).toHaveLength(1);
-    markSpy.mockRestore();
-  });
-
-  it('refuses, naming the row, when another Payee already holds its ore (an overlap)', async () => {
-    await db.miningTaxAssignments.put(assignment({ id: 'personal', payeeId: 'p1' }));
-
-    const result = await recordCorpPayment(CORP, [
-      bookRow({ id: 'book:a', personalOreLines: [{ typeId: ORE, quantity: 100 }] }),
-    ]);
-
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.reason).toBe('held-elsewhere');
-    expect(!result.ok && (result.cause as HeldElsewhereError).rows).toEqual([
-      { id: 'book:a', date: '2026-09-04' },
-    ]);
-    expect(await db.miningTaxAssignments.toArray()).toEqual([
-      expect.objectContaining({ id: 'personal', status: 'outstanding' }),
-    ]);
-  });
-
-  it("refuses a row whose ore the member's own corp Assignment holds for Needs review", async () => {
-    await db.payees.put({
-      ...payee('p2'),
-      entityId: CORP.corporationId,
-      entityKind: 'corporation',
-    });
-    await db.miningTaxAssignments.put(
-      assignment({ id: 'review', payeeId: 'p2', status: 'needs-review' })
-    );
-
-    const result = await recordCorpPayment(CORP, [
-      bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] }),
-    ]);
-
-    expect(!result.ok && result.reason).toBe('held-elsewhere');
-    expect((await db.miningTaxAssignments.get('review'))?.status).toBe('needs-review');
-    expect(await db.miningTaxAssignments.count()).toBe(1);
-  });
-
-  it('skips a row that never lined up with a ledger entry', async () => {
-    const result = await recordCorpPayment(CORP, [bookRow({ solarSystemId: 0 })]);
-
-    expect(result.ok).toBe(true);
-    expect(await db.miningTaxAssignments.count()).toBe(0);
   });
 });

@@ -9,17 +9,17 @@ import type { Translate } from '@/lib/translate';
 import { paymentWalletHref } from '@/features/corp/moons/paymentWalletHref';
 import { minerPath } from '@/features/corp/moons/moonsPaths';
 
-export interface BookStatementFact {
+export interface BookNoticeFact {
   id: string;
   /** ISO instant. */
   issuedAt: string;
-  periodStart: string;
-  periodEnd: string;
-  amount: number;
-  /** A running account's late notice. */
-  notice: boolean;
+  /** The first and last day it listed (`YYYY-MM-DD`). */
+  from: string;
+  to: string;
+  /** What its lines asked for. */
+  listed: number;
   mailsSent: number;
-  /** The book's allocation says nothing more is owed on it. */
+  /** Every day it listed is paid on the Miner's Running account. */
   settled: boolean;
 }
 
@@ -28,8 +28,8 @@ export interface BookPaymentFact {
   /** ISO instant. */
   at: string;
   amount: number;
-  /** The Statement its code pinned it to, or the one the allocation put it on. */
-  statementId?: string;
+  /** It paid at least one day; else it is all credit. */
+  paidDays: boolean;
 }
 
 export interface BookAdjustmentFact {
@@ -46,7 +46,7 @@ export interface BookDayFact {
   /** `YYYY-MM-DD`. */
   date: string;
   tax: number;
-  /** Nothing more is owed on this day (paid, written off, or on a settled Statement). */
+  /** Nothing more is owed on this day. */
   settled: boolean;
 }
 
@@ -56,7 +56,7 @@ export interface BookFacts {
   standing: 'member' | 'guest' | 'left';
   /** What the Miner owes now. */
   owed: number;
-  statements: readonly BookStatementFact[];
+  notices: readonly BookNoticeFact[];
   payments: readonly BookPaymentFact[];
   adjustments: readonly BookAdjustmentFact[];
   days: readonly BookDayFact[];
@@ -93,28 +93,24 @@ export function bookInteractions(facts: BookFacts, t: Translate): Interaction[] 
     });
   }
 
-  const statementIds = new Set(facts.statements.map((s) => s.id));
-  for (const s of facts.statements) {
+  for (const n of facts.notices) {
     const mailed =
-      s.mailsSent > 0
-        ? t('interactions.corp.statement.mailed', { count: s.mailsSent })
-        : t('interactions.corp.statement.notMailed');
+      n.mailsSent > 0
+        ? t('interactions.corp.notice.mailed', { count: n.mailsSent })
+        : t('interactions.corp.notice.notMailed');
     out.push({
-      id: `book-statement-${s.id}`,
+      id: `book-notice-${n.id}`,
       kind: 'book',
-      at: ms(s.issuedAt),
-      type: s.notice ? 'interactions.type.lateNotice' : 'interactions.type.statement',
-      tone: s.notice ? 'warning' : 'accent',
-      title: t(s.notice ? 'interactions.corp.notice.title' : 'interactions.corp.statement.title', {
-        from: s.periodStart,
-        to: s.periodEnd,
-      }),
-      detail: t('interactions.corp.statement.detail', {
-        amount: formatIskCompact(s.amount),
+      at: ms(n.issuedAt),
+      type: 'interactions.type.lateNotice',
+      tone: 'warning',
+      title: t('interactions.corp.notice.title', { from: n.from, to: n.to }),
+      detail: t('interactions.corp.notice.detail', {
+        amount: formatIskCompact(n.listed),
         mailed,
       }),
-      state: s.settled ? 'interactions.state.settled' : 'interactions.state.unpaid',
-      stateTone: s.settled ? 'success' : 'warning',
+      state: n.settled ? 'interactions.state.settled' : 'interactions.state.unpaid',
+      stateTone: n.settled ? 'success' : 'warning',
       to,
     });
   }
@@ -128,9 +124,7 @@ export function bookInteractions(facts: BookFacts, t: Translate): Interaction[] 
       tone: 'success',
       title: t('interactions.corp.payment.title'),
       detail: t(
-        p.statementId !== undefined && statementIds.has(p.statementId)
-          ? 'interactions.corp.payment.matched'
-          : 'interactions.corp.payment.unmatched'
+        p.paidDays ? 'interactions.corp.payment.paidDays' : 'interactions.corp.payment.credit'
       ),
       isk: p.amount,
       to: paymentWalletHref(p.id) ?? to,

@@ -34,7 +34,7 @@ describe('overdueAging', () => {
     expect(overdueAging([]).every((b) => b.count === 0 && b.amount === 0)).toBe(true);
   });
 
-  it("counts each overdue Miner once, its whole debt in its oldest Statement's bucket", () => {
+  it("counts each overdue Miner once, its whole debt in its oldest late notice's bucket", () => {
     const aging = overdueAging([
       miner(100, 3),
       miner(250, 29),
@@ -64,12 +64,12 @@ describe('matchesMinerBalance', () => {
     expect(matchesMinerBalance(miner(0, null, 5), 'owing')).toBe(false);
   });
 
-  it('overdue: any Miner with an overdue Statement', () => {
+  it('overdue: any Miner with an overdue late notice', () => {
     expect(matchesMinerBalance(miner(10, 0), 'overdue')).toBe(true);
     expect(matchesMinerBalance(miner(10, null), 'overdue')).toBe(false);
   });
 
-  it('an age bucket: overdue Miners whose oldest Statement falls in it', () => {
+  it('an age bucket: overdue Miners whose oldest late notice falls in it', () => {
     expect(matchesMinerBalance(miner(10, 45), 'overdue-31-60')).toBe(true);
     expect(matchesMinerBalance(miner(10, 20), 'overdue-31-60')).toBe(false);
     expect(matchesMinerBalance(miner(10, null), 'overdue-0-30')).toBe(false);

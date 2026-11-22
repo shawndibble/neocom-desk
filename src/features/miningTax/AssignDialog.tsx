@@ -134,8 +134,9 @@ function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: Is
  * same ore is worth, because the hub belongs to the Payee (the figure is a
  * bill one player sends another, not a local viewing preference).
  *
- * "I already paid this" creates the Assignment already marked Paid, for ore
- * the pilot settled before recording it here.
+ * It never marks anything paid: what is paid is read off the Payee's account,
+ * so ore the pilot settled before recording it here is paid by linking that
+ * payment to the Payee.
  */
 export function AssignDialog({
   row,
@@ -169,7 +170,6 @@ export function AssignDialog({
   const [includedTypeIds, setIncludedTypeIds] = useState<ReadonlySet<number>>(
     new Set(oreLines.map((line) => line.typeId))
   );
-  const [markPaid, setMarkPaid] = useState(false);
   const [label, setLabel] = useState('');
   const { pending: saving, error: saveError, run } = useLedgerAction();
   // Empty means "track the computed default"; any other string is a pilot
@@ -275,7 +275,6 @@ export function AssignDialog({
           taxPct: pctValue,
           estimatedValue,
           taxOwed,
-          markPaid,
           label,
         }),
       onAssigned
@@ -425,11 +424,6 @@ export function AssignDialog({
       </div>
 
       <LabelField value={label} onChange={setLabel} />
-
-      <label className={`flex items-center gap-2 text-sm ${tappableRowClassName}`}>
-        <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
-        {t('miningTax.markPaidLabel')}
-      </label>
 
       {warnUnpricedOffline && (
         <p role="status" className="text-xs text-warning">

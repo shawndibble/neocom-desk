@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
-import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, Radio, TextArea } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
@@ -39,7 +38,7 @@ interface Props {
   /** Every payment the member made from their wallet: "Which payment was it?" lists the ones around the billed period. */
   payments?: readonly MadePayment[];
   /**
-   * The Characters whose payments the server accepts as proof for the Statement: the picker lists
+   * The Characters whose payments the server accepts as proof for the Late notice: the picker lists
    * only theirs. Absent: every payment given.
    */
   senderIds?: readonly number[];
@@ -104,7 +103,7 @@ export function ResolveDialog({
   const [choice, setChoice] = useState<OutcomeId>(offer.preselected);
   const [tell, setTell] = useState(false);
   const [text, setText] = useState('');
-  // The server only counts a payment from a Character on the Statement.
+  // The server only counts a payment from a Character the Late notice bills.
   const payments = senderIds
     ? allPayments?.filter((p) => senderIds.includes(p.characterId))
     : allPayments;
@@ -119,23 +118,20 @@ export function ResolveDialog({
   const picking = presetTransfers.length === 0 && payments !== undefined;
   const corp = problem.corpName;
   const row = problem.row;
-  const statementId =
-    problem.kind === 'uncredited' ||
-    problem.kind === 'kept' ||
-    problem.kind === 'overdue' ||
-    problem.kind === 'markedPaid'
-      ? problem.statementId
+  const noticeId =
+    problem.kind === 'uncredited' || problem.kind === 'kept' || problem.kind === 'overdue'
+      ? problem.noticeId
       : undefined;
-  // Donations the book holds for review: without a Statement to declare on, each is claimed.
+  // Donations the book holds for review: without a Late notice to declare on, each is claimed.
   const held = problem.kind === 'uncredited' ? problem.held : undefined;
-  const countsHeld = held !== undefined && statementId === undefined;
+  const countsHeld = held !== undefined && noticeId === undefined;
 
   const needsText =
     choice === 'notOwed' ? problem.kind !== 'conflict' : choice === 'notPaying' && tell;
   const blocked =
     busy ||
     (needsText && text.trim() === '') ||
-    (choice === 'paid' && (offer.noStatement || (statementId === undefined && !countsHeld))) ||
+    (choice === 'paid' && (offer.noNotice || (noticeId === undefined && !countsHeld))) ||
     (choice === 'fixRecords' && !onFixRecords);
 
   const holdsUntil = () => {
@@ -167,7 +163,7 @@ export function ResolveDialog({
         await countHeldDonations(mail, held);
         onSent();
         setDone({ kind: 'sent', confirmed: true, held: true });
-      } else if (choice === 'paid' && statementId) {
+      } else if (choice === 'paid' && noticeId) {
         // Every day the proof covers, not just the first: the officer reads what it paid.
         const days =
           problem.kind === 'uncredited' && problem.days
@@ -175,7 +171,7 @@ export function ResolveDialog({
             : problem.kind === 'overdue'
               ? problem.period
               : (row?.date ?? '');
-        const out = await sendProof(mail, statementId, transfers, text.trim(), days);
+        const out = await sendProof(mail, noticeId, transfers, text.trim(), days);
         onSent();
         setDone({ kind: 'sent', ...out, transfers });
       }
@@ -195,11 +191,9 @@ export function ResolveDialog({
           ? t(k('title.kept'), { corp })
           : problem.kind === 'overdue'
             ? t(k('title.overdue'), { corp, period: problem.period })
-            : problem.kind === 'markedPaid'
-              ? t(k('title.markedPaid'), { date: row?.date ?? '', corp })
-              : problem.kind === 'billed'
-                ? t(k('title.billed'), { date: row?.date ?? '', corp })
-                : t(k('title.figure'), { date: row?.date ?? '' });
+            : problem.kind === 'billed'
+              ? t(k('title.billed'), { date: row?.date ?? '', corp })
+              : t(k('title.figure'), { date: row?.date ?? '' });
 
   if (done) {
     return (
@@ -249,9 +243,7 @@ export function ResolveDialog({
                 amount: formatIsk(
                   problem.kind === 'uncredited'
                     ? problem.amount
-                    : problem.kind === 'markedPaid'
-                      ? (row?.bookOwed ?? 0)
-                      : (row?.taxOwed ?? row?.billed ?? 0),
+                    : (row?.taxOwed ?? row?.billed ?? 0),
                   0
                 ),
                 context: outcomeContext(problem.kind, id),
@@ -307,15 +299,8 @@ export function ResolveDialog({
           return (
             <span className="block text-xs text-text-dim">{t(k('countsHeld'), { corp })}</span>
           );
-        if (offer.noStatement || statementId === undefined)
-          return (
-            <span className="block text-xs text-text-dim">
-              {/* A marked day the book spent the payment past: it credited it, just elsewhere. */}
-              {row?.bookSpentOn
-                ? t(k('noStatementSpent'), { corp, days: formatList(row.bookSpentOn) })
-                : t(k('noStatement'), { corp })}
-            </span>
-          );
+        if (offer.noNotice || noticeId === undefined)
+          return <span className="block text-xs text-text-dim">{t(k('noNotice'), { corp })}</span>;
         return (
           <>
             {picking && (
@@ -429,7 +414,10 @@ function DoneView({ done, corp }: { done: Done; corp: string }) {
             ? t(k('result.sentProof'), { corp })
             : done.again
               ? t(k('result.sentAgain'), { corp })
-              : t(k('result.sent'), { corp, date: isoDay(done.holdsUntil) })}
+              : done.holdsUntil
+                ? t(k('result.sent'), { corp, date: isoDay(done.holdsUntil) })
+                : // "I already paid" holds no day: only a dispute does.
+                  t(k('result.sentPaid'), { corp })}
         </p>
       )}
       {done.checks && done.checks.length > 0 && (

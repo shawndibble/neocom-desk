@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   buildBookView,
   extractionDetail,
-  planStatementRun,
-  statementForLine,
   type BookView,
   type BookViewInput,
   type DayRow,
@@ -12,20 +10,15 @@ import {
 import {
   accountSortValue,
   inRange,
-  owedOf,
   rangeFigures,
   rangeStart,
   activityFeed,
   daysByPhase,
   extractionBilling,
-  oldestUnsettled,
-  statementAdjustment,
-  minerMoons,
   minersOnMoon,
   moonByStructure,
   moonSchedule,
   oreTaxLines,
-  paymentLedger,
   splitPlace,
 } from './bookSections';
 
@@ -42,38 +35,23 @@ const day = (over: Partial<DayRow> & { key: string }): DayRow => ({
   estimatedValue: 1000,
   taxPct: 10,
   tax: 100,
-  status: 'unbilled',
+  status: 'owed',
   ...over,
 });
 
 describe('daysByPhase', () => {
-  it("splits open days into Next Statement and Today's mining, leaving closed days out", () => {
+  it("splits open days into owed and Today's mining, leaving closed days out", () => {
     const days = [
-      day({ key: 'a', status: 'unbilled' }),
+      day({ key: 'a', status: 'owed' }),
       day({ key: 'b', status: 'not-billable' }),
       day({ key: 'c', status: 'paid' }),
-      day({ key: 'd', status: 'unbilled' }),
+      day({ key: 'd', status: 'owed' }),
       day({ key: 'e', status: 'dismissed' }),
-      day({ key: 'f', status: 'on-statement' }),
     ];
     const split = daysByPhase(days);
-    expect(split.nextStatement.map((d) => d.key)).toEqual(['a', 'd']);
+    expect(split.owed.map((d) => d.key)).toEqual(['a', 'd']);
     expect(split.stillAccruing.map((d) => d.key)).toEqual(['b']);
-    expect(split.earlier.map((d) => d.key)).toEqual(['c', 'e', 'f']);
-  });
-});
-
-describe('daysByPhase on a running account', () => {
-  it('lists a day still on an unpaid older Statement with the owed days, in order', () => {
-    const days = [
-      day({ key: 'a', status: 'unbilled' }),
-      day({ key: 'b', status: 'on-statement' }),
-      day({ key: 'c', status: 'paid' }),
-      day({ key: 'd', status: 'unbilled' }),
-    ];
-    const split = daysByPhase(days, { running: true });
-    expect(split.nextStatement.map((d) => d.key)).toEqual(['a', 'b', 'd']);
-    expect(split.earlier.map((d) => d.key)).toEqual(['c']);
+    expect(split.earlier.map((d) => d.key)).toEqual(['c', 'e']);
   });
 });
 
@@ -88,10 +66,10 @@ describe('rangeStart and inRange', () => {
   });
 });
 
-describe('rangeFigures and owedOf', () => {
+describe('rangeFigures', () => {
   it('sums billed days mined and tax paid in the range, net of not-tax', () => {
     const days = [
-      { date: '2026-11-15', status: 'unbilled' as const, tax: 10 },
+      { date: '2026-11-15', status: 'owed' as const, tax: 10 },
       { date: '2026-11-14', status: 'dismissed' as const, tax: 99 },
       { date: '2026-11-01', status: 'paid' as const, tax: 5 },
     ];
@@ -102,15 +80,14 @@ describe('rangeFigures and owedOf', () => {
     expect(rangeFigures(days, payments, '2026-11-11')).toEqual({ tax: 10, paid: 5 });
     expect(rangeFigures(days, payments, undefined)).toEqual({ tax: 15, paid: 55 });
   });
-
-  it('counts what a running day still owes, else its tax', () => {
-    expect(owedOf([{ tax: 10, owed: 4 }, { tax: 6 }, { tax: 9, owed: 0 }])).toBe(10);
-  });
 });
 
 describe('accountSortValue', () => {
   it('puts the oldest unpaid day first and paid-up Miners after', () => {
-    const owes = (oldest: string) => ({ paidThrough: null, owes: { amount: 1, days: 1, oldest } });
+    const owes = (oldest: string) => ({
+      paidThrough: null,
+      owes: { amount: 1, days: 1, oldest },
+    });
     const sorted = [
       { paidThrough: '2026-11-10', owes: null },
       owes('2026-11-05'),
@@ -262,23 +239,6 @@ describe('splitPlace', () => {
   });
 });
 
-describe('paymentLedger', () => {
-  it('merges payments and corrections newest first, tagged by kind', () => {
-    const rows = paymentLedger(
-      [{ id: 'p1', at: '2026-09-02T10:00:00Z' }],
-      [
-        { id: 'a1', at: '2026-09-05T10:00:00Z' },
-        { id: 'a0', at: '2026-08-01T10:00:00Z' },
-      ]
-    );
-    expect(rows.map((r) => [r.kind, r.id])).toEqual([
-      ['correction', 'a1'],
-      ['payment', 'p1'],
-      ['correction', 'a0'],
-    ]);
-  });
-});
-
 describe('activityFeed', () => {
   it('merges mail, dismissals and audit newest first and filters by kind', () => {
     const items = activityFeed({
@@ -324,46 +284,15 @@ describe('extractionBilling', () => {
         byMiner: new Map([['m', { days: days.map((d) => ({ extractionId: 'x', ...d })) }]]),
       },
     }) as unknown as BookView;
-  it("is billed once every day left Next Statement and Today's mining", () => {
-    const billed = extractionBilling(
-      viewOf([
-        { status: 'on-statement', statementId: 's1' },
-        { status: 'paid', statementId: 's1' },
-      ]),
-      'x'
+  it('is paid once every day is paid or dismissed, and one is paid', () => {
+    expect(extractionBilling(viewOf([{ status: 'paid' }, { status: 'dismissed' }]), 'x')).toEqual({
+      paid: true,
+    });
+    expect(extractionBilling(viewOf([{ status: 'paid' }, { status: 'owed' }]), 'x').paid).toBe(
+      false
     );
-    expect(billed).toEqual({ billed: true, statementIds: ['s1'], rollingOver: 0 });
-  });
-  it('is not billed while a day waits, or when there are no days', () => {
-    expect(
-      extractionBilling(viewOf([{ status: 'paid' }, { status: 'unbilled' }]), 'x').billed
-    ).toBe(false);
-    expect(extractionBilling(viewOf([]), 'x').billed).toBe(false);
-    expect(extractionBilling(viewOf([{ status: 'dismissed' }]), 'x').billed).toBe(false);
-  });
-  it('is partly billed when some days sit on a Statement and the rest roll over', () => {
-    expect(
-      extractionBilling(
-        viewOf([
-          { status: 'on-statement', statementId: 's1', tax: 500 },
-          { status: 'unbilled', tax: 100 },
-          { status: 'not-billable', tax: 30 },
-        ]),
-        'x'
-      )
-    ).toEqual({ billed: false, statementIds: ['s1'], rollingOver: 130 });
-  });
-});
-
-describe('oldestUnsettled', () => {
-  it('is the oldest issued Statement that is not settled, whatever the list order', () => {
-    const list = [
-      { id: 'sep', issuedAt: '2026-10-01T00:00:00Z' },
-      { id: 'aug', issuedAt: '2026-09-01T00:00:00Z' },
-      { id: 'jul', issuedAt: '2026-08-01T00:00:00Z' },
-    ];
-    expect(oldestUnsettled(list, (id) => id === 'jul')?.id).toBe('aug');
-    expect(oldestUnsettled(list, () => true)).toBeUndefined();
+    expect(extractionBilling(viewOf([]), 'x').paid).toBe(false);
+    expect(extractionBilling(viewOf([{ status: 'dismissed' }]), 'x').paid).toBe(false);
   });
 });
 
@@ -374,9 +303,7 @@ describe('per Miner and moon ore lines (against the book view)', () => {
     now: '2026-09-16T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 0,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -402,7 +329,7 @@ describe('per Miner and moon ore lines (against the book view)', () => {
       },
     ],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
@@ -417,7 +344,6 @@ describe('per Miner and moon ore lines (against the book view)', () => {
         oreLines: [{ typeId: ORE, quantity: 1000 }],
       },
     ],
-    paidStatementIds: new Set(),
     pricesOn: () => ({
       prices: new Map([
         [ORE, 1000],
@@ -442,7 +368,7 @@ describe('per Miner and moon ore lines (against the book view)', () => {
     }
   });
 
-  it('puts a refinery on one moon row, and knows its moon for a day outside any Extraction', () => {
+  it("knows a refinery's moon for a day outside any Extraction", () => {
     const outside = buildBookView({
       ...input,
       entries: [
@@ -457,16 +383,6 @@ describe('per Miner and moon ore lines (against the book view)', () => {
       ],
     });
     expect(moonByStructure(outside).get(1001)).toBe(7);
-    const moons = minerMoons(outside, 'solo:1');
-    expect(moons).toHaveLength(1);
-    expect(moons[0]).toMatchObject({ moonId: 7, days: 2 });
-  });
-
-  it("lists a Miner's moons with their ore lines", () => {
-    const moons = minerMoons(view, 'solo:1');
-    expect(moons).toHaveLength(1);
-    expect(moons[0]).toMatchObject({ moonId: 7, extractionId: extraction.id, days: 1 });
-    expect(moons[0].lines.map((l) => l.typeId).sort()).toEqual([ORE, ORE + 1]);
   });
 });
 
@@ -477,9 +393,7 @@ describe('day phases against the Miner row figures', () => {
     now: '2026-09-16T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 0,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -493,7 +407,7 @@ describe('day phases against the Miner row figures', () => {
       oreLines: [{ typeId: ORE, quantity: 100 }],
     })),
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
@@ -509,7 +423,6 @@ describe('day phases against the Miner row figures', () => {
       },
     ],
     extractions: [],
-    paidStatementIds: new Set(),
     pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
   };
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
@@ -520,30 +433,9 @@ describe('day phases against the Miner row figures', () => {
     const phases = daysByPhase(view.internals.byMiner.get('solo:1')!.days);
     expect(phases.stillAccruing.length).toBeGreaterThan(0);
     expect(sumTax(phases.stillAccruing)).toBeCloseTo(row.pending, 6);
-    const lines = view.internals.byMiner.get('solo:1')!.draft;
-    const correction =
-      lines.kind === 'nothing' ? 0 : lines.lines.filter((l) => !l.chargeKey).length;
-    expect(correction).toBeGreaterThan(0);
-    expect(
-      sumTax(phases.nextStatement) + statementAdjustment(phases.nextStatement, row)
-    ).toBeCloseTo(row.unbilled, 6);
-    expect(statementAdjustment(phases.nextStatement, row)).toBeCloseTo(25, 6);
-  });
-
-  it('the phase sums match the row figures when ore arrives late for a billed day', () => {
-    const solo = { ...base, adjustments: [], entries: [base.entries[0]] };
-    const first = buildBookView(solo);
-    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-09-15' });
-    const statement = statementForLine(first, plan, plan.lines[0]);
-    const grown = buildBookView({
-      ...solo,
-      statements: [statement],
-      entries: [{ ...base.entries[0], oreLines: [{ typeId: ORE, quantity: 150 }] }],
-    });
-    const row = grown.miners.find((m) => m.id === 'solo:1')!;
-    const phases = daysByPhase(grown.internals.byMiner.get('solo:1')!.days);
-    expect(row.unbilled).toBeGreaterThan(0);
-    // The day lists its full tax; the Statement bills only the growth.
-    expect(statementAdjustment(phases.nextStatement, row)).toBeCloseTo(-10_000, 6);
+    const lines = view.internals.byMiner.get('solo:1')!.billable.lines;
+    expect(lines.filter((l) => l.kind === 'correction')).toHaveLength(1);
+    // The owed days list their tax; the account owes them plus the 25 ISK correction.
+    expect(sumTax(phases.owed) + 25).toBeCloseTo(row.owed, 6);
   });
 });

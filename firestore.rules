@@ -114,6 +114,15 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // A Made Payment's link to one Payee (decision 20261120-235011): the pilot's own, like Assignments.
+      match /miningTaxPaymentLinks/{linkId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
       // Communities membership index (issue #3596): one doc per Community
       // this Character belongs to, written only by the Community callables
       // (admin SDK). The Character may read its own; it backs the
@@ -529,13 +538,22 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // The verify link for the mail: editors only, never the miner or a view-only officer.
-      match /statementLinks/{statementId} {
+      // Late notices (decision 20261120-235011): officers read every one, a Miner their own. The
+      // legacy `statements` / `statementLinks` docs have no rule: only the one-time copy reads them.
+      match /lateNotices/{noticeId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      // A Late notice's verify link: editors only, never the Miner or a view-only officer.
+      match /lateNoticeLinks/{noticeId} {
         allow get, list: if isOfficer() && get(officerPath()).data.canEdit == true;
         allow write: if false;
       }
 
-      match /statements/{statementId} {
+      // A Running account's figures and its lock-date snapshot: officers read every one, a Miner
+      // their own (its `uids`, stored with the snapshot).
+      match /accounts/{minerId} {
         allow get, list: if isOfficer() || isOnOwnLine();
         allow write: if false;
       }
@@ -644,7 +662,7 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
+        allow get, list: if officerOnly in ['extractions', 'rebills', 'meta', 'audit', 'feeders', 'moonDocs', 'readModels']
           && isOfficer();
         allow write: if false;
       }

@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClaimDonations';
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
-import { owedWhereUncovered, paymentCoverage } from './paymentLinks';
+import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
+import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
+import { saveBilledElsewhere } from './paymentLinkStore';
+import { billedElsewhereOf } from './owedNow';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
@@ -21,26 +24,34 @@ export function useTaxCorpBooks(
     characters.map((c) => c.characterId).join(',')
   );
 
-  // Every Assignment the ledger stores, the ones a book row stands in for included: whether a
-  // transaction is already linked is decided over all of them, or a donation two book days used
-  // up is offered again to link to a third.
-  const storedAssignments = useMemo(
-    () => (data?.entries ?? []).flatMap((row) => row.assignments),
-    [data?.entries]
-  );
-  // A paid day the ISK linked to it does not reach is still owed (`paymentCoverage`).
-  const ledger = useMemo((): TaxSnapshot | null => {
-    if (!data) return null;
-    const amounts = new Map(madePayments.map((m) => [m.key, m.amount]));
-    const { uncovered } = paymentCoverage(storedAssignments, (key) => amounts.get(key));
-    const entries = owedWhereUncovered(data.entries, uncovered);
-    return entries === data.entries ? data : { ...data, entries };
-  }, [data, madePayments, storedAssignments]);
-
   const payees = useMemo(
     () => [...(data?.payeesByCharacter.values() ?? [])].flat(),
     [data?.payeesByCharacter]
   );
+  // A payment a link holds pays its personal Payee, never a book as a donation in flight too.
+  const linked = useMemo(() => heldPaymentKeys(data?.paymentLinks ?? []), [data?.paymentLinks]);
+  // What the books read of the ledger is each Assignment as its Payee's account stands before any
+  // book takes ore off it (no `billedElsewhere`): a Default System's day is the book's to take only
+  // while unpaid, and reading it after the take (a trimmed day paid by exactly what is left) would
+  // flip it back and forth between taken and not.
+  const bookInput = useMemo(
+    (): TaxSnapshot | null =>
+      data
+        ? {
+            ...data,
+            entries: withPaidStatus(
+              data.entries,
+              PayeeRunningAccounts.build({
+                assignments: data.entries.flatMap((row) => row.assignments),
+                payees,
+                links: data.paymentLinks ?? [],
+              })
+            ),
+          }
+        : null,
+    [data, payees]
+  );
+
   // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
   // the tab is exactly what it was).
   const leftAck = useHiddenLeftCorps();
@@ -52,14 +63,48 @@ export function useTaxCorpBooks(
     corpNameOf,
     hiddenLeft,
   } = useCorpBookView({
-    rows: ledger?.entries,
+    rows: bookInput?.entries,
     characters,
     activeCharacterId,
     madePayments,
+    linked,
     payees,
     reloadKey: data?.fetchedAt?.getTime(),
     hiddenCorps: leftAck.hidden,
   });
+  // What the books bill too: derived from the overlay in this very render, so the accounts, the
+  // owed cards and the Payee cards never count a book's days twice while a stored copy catches up.
+  // Until a book is read, the copy the device last stored stands.
+  const overlay = corpView?.overlay;
+  const billed = useMemo(
+    () => (overlay ? billedElsewhereOf(overlay) : data?.billedElsewhere),
+    [overlay, data?.billedElsewhere]
+  );
+  // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
+  const accounts = useMemo(
+    () =>
+      PayeeRunningAccounts.build({
+        assignments: data?.entries.flatMap((row) => row.assignments) ?? [],
+        payees,
+        links: data?.paymentLinks ?? [],
+        ...(billed ? { billedElsewhere: billed } : {}),
+      }),
+    [data, payees, billed]
+  );
+  // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
+  // day, oldest first (decision 20261120-235011), whatever mark it stores.
+  const ledger = useMemo(
+    (): TaxSnapshot | null =>
+      data ? { ...data, entries: withPaidStatus(data.entries, accounts) } : null,
+    [data, accounts]
+  );
+  // Stored for the builds outside this page (the Overview's, the journal's), which read it back.
+  const stored = useRef<ReadonlyMap<string, number> | undefined>(data?.billedElsewhere);
+  useEffect(() => {
+    if (!data || !overlay || !billed || billed === stored.current) return;
+    stored.current = billed;
+    void saveBilledElsewhere(billed).catch(() => undefined);
+  }, [overlay, billed, data]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
   const { failed: failedClaims } = useAutoClaimDonations(
@@ -72,8 +117,8 @@ export function useTaxCorpBooks(
     security: data?.systemSecurity ?? NO_SECURITY,
   });
   return {
+    accounts,
     ledger,
-    storedAssignments,
     madePayments,
     paymentSources,
     corpView,

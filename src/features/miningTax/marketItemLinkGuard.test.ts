@@ -27,7 +27,7 @@ const sources = import.meta.glob<string>(['/src/features/miningTax/**/*.tsx'], {
 const BARE_NAME_FALLBACK = /\?\?\s*`#\$\{[^}]*typeId\}`/;
 // `OreLink` is MarketItemLink pointed at the Ore Form's type.
 const IMPORTS_MARKET_ITEM_LINK =
-  /from\s*'@\/features\/market\/MarketItemLink'|\bOreLink\b[^;]*from\s*'\.\/OreIcon'/;
+  /from\s*'@\/features\/market\/MarketItemLink'|\bOreLink\b[^;]*from\s*'(?:\.{1,2}\/|@\/features\/miningTax\/)OreIcon'/;
 
 describe('mining tax type names', () => {
   it('are wrapped in MarketItemLink, not rendered as bare text', () => {

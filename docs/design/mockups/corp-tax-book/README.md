@@ -1,10 +1,12 @@
 # Corp Tax Book: merged option (Final)
 
-Issue #4056 (epic #4055). Source: `src/mockups/CorpTaxBookFinal.stories.tsx` (data in `corpTaxBookFixtures.ts`, officer dialogs in `corpTaxBookDialogs.tsx`, the member's tab and the verify page in `corpTaxBookMember.tsx`). Story ids are `mockups-corptaxbookfinal--<step>`, with `-phone` for the 390 variant. Built on option A with C's timeline, Needs you cards and Statement run, B's mail preview (now a dialog) and B's verify layout. Sample data; the ticket text wins over the picture.
+Design history. The calendar bill drawn here (periods, a run per period, an amount due) was replaced by Late notices and each Miner's Running account (decision 20261120-235011).
 
-One story throughout: today is 18 Oct 2026 14:00 EVE and an officer synced the book at 12:00 (2h ago), so every day through 17 Oct is Billable (day end + 30 min grace passed, then a sync) and 18 Oct is not. The Aug 2026 Statements went out on 1 Sep (due 15 Sep); the Sep 2026 Statements are about to be sent; Oct is open. Figures that show in several places (Miners table, Needs you, mail, verify page) are derived from the same lines and payments.
+Issue #4056 (epic #4055). Source: `src/mockups/CorpTaxBookFinal.stories.tsx` (data in `corpTaxBookFixtures.ts`, officer dialogs in `corpTaxBookDialogs.tsx`, the member's tab and the verify page in `corpTaxBookMember.tsx`). Story ids are `mockups-corptaxbookfinal--<step>`, with `-phone` for the 390 variant. Built on option A with C's timeline, Needs you cards and bill run (now the late-notice run), B's mail preview (now a dialog) and B's verify layout. Sample data; the ticket text wins over the picture.
 
-New components (dashed, labelled): ExtractionTimeline, NeedsYouQueue, StatementRun, StatementMailPreview, MailQueueChip (with its phone percent badge), CorpBookDiff, CorpBookSyncNote. The personal tab is today's Tax tab (real `OwedBalances`, `PriceBreakdownCard` and `AttentionStrip`; Open and History tables; same columns and row detail) with new `StatusPill` values.
+One story throughout: today is 18 Oct 2026 14:00 EVE and an officer synced the book at 12:00 (2h ago), so every day through 17 Oct is Billable (day end + 30 min grace passed, then a sync) and 18 Oct is not. The Aug 2026 bills went out on 1 Sep (due 15 Sep); the Sep 2026 bills are about to be sent; Oct is open. Figures that show in several places (Miners table, Needs you, mail, verify page) are derived from the same lines and payments.
+
+New components (dashed, labelled): ExtractionTimeline, NeedsYouQueue, the bill run, the mail preview, MailQueueChip (with its phone percent badge), CorpBookDiff, CorpBookSyncNote. The personal tab is today's Tax tab (real `OwedBalances`, `PriceBreakdownCard` and `AttentionStrip`; Open and History tables; same columns and row detail) with new `StatusPill` values.
 
 | Step | 1440 | 390 |
 |---|---|---|
@@ -17,7 +19,7 @@ New components (dashed, labelled): ExtractionTimeline, NeedsYouQueue, StatementR
 | 7 · Mark not tax dialog (all or part of a donation; the debt reopens) | ![](f-07-mark-not-tax-1440.png) | ![](f-07-mark-not-tax-390.png) |
 | 8 · Reject declaration dialog (Needs you) | ![](f-08-reject-declaration-1440.png) | ![](f-08-reject-declaration-390.png) |
 | 9 · Assign a donation dialog (Needs you, Unmatched) | ![](f-09-assign-donation-1440.png) | ![](f-09-assign-donation-390.png) |
-| 10 · Statements: run at Check, periods and write-offs | ![](f-10-statements-1440.png) | ![](f-10-statements-390.png) |
+| 10 · Bills: run at Check, periods and write-offs | ![](f-10-bills-1440.png) | ![](f-10-bills-390.png) |
 | 11 · Preview mail (dialog): short table of lines, total, amount due, code, verify link | ![](f-11-preview-mail-1440.png) | ![](f-11-preview-mail-390.png) |
 | 12 · Send, mail-limit notice | ![](f-12-send-notice-1440.png) | ![](f-12-send-notice-390.png) |
 | 13 · Progress chip (phone: icon + % badge, warning badge for failures) | ![](f-13-progress-chip-1440.png) | ![](f-13-progress-chip-390.png) |

@@ -12,7 +12,7 @@ D-numbers are the decision numbers in epic #4055.
   mechanism is ADR 0023. In scope: the audit log is shown as an activity feed,
   and the CEO can always reclaim the book.
 - **Roles (D8).** View: CEO, Director, Accountant, Junior_Accountant. Edit
-  (rates, dismiss, mark paid, unlink, mail, the minimum Statement): CEO,
+  (rates, dismiss, mark paid, unlink, mail, the late-notice minimum): CEO,
   Director, Accountant. Extraction timers also need Station_Manager. Turning
   the book on needs a Director. Reading the observer ledger from ESI uses a
   new `canReadMiningLedger` capability (Accountant, Director, CEO); it gates

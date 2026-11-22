@@ -7,7 +7,6 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
 import { CorpRowDetailModal } from './CorpRowDetailModal';
 import type { CorpRowInfo } from './corpRows';
-import type { CorpBookViewBook } from './corpBookView';
 
 const ZEO = 45490;
 
@@ -77,69 +76,14 @@ function renderModal(over: Partial<Parameters<typeof CorpRowDetailModal>[0]> = {
 }
 
 describe('CorpRowDetailModal', () => {
-  it('lists what paid a day, and nothing for a day nothing has paid', () => {
-    renderModal();
+  it("opens the Payee's ledger from one link, and shows no paid-by list", async () => {
+    const onOpenLedger = vi.fn();
+    renderModal({ onOpenLedger });
     expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
-  });
-
-  it('links a paid day’s donation to the member’s own wallet entry for it', () => {
-    const paid = {
-      ...view,
-      state: 'paid' as const,
-      taxOwed: 0,
-      settledBy: 'credit' as const,
-      paidBy: { payments: [{ paymentId: 'j1_900', amount: 957_001 }], inFlight: [] },
-    };
-    const book = {
-      summary: {},
-      payee: { name: 'Brass Meridian Logistics' },
-      loaded: {
-        payments: [
-          {
-            id: 'j1_900',
-            minerId: 'solo:1',
-            characterId: 1,
-            amount: 957_001,
-            at: '2026-10-18T13:10:00Z',
-            source: 'donation',
-          },
-        ],
-      },
-    } as unknown as CorpBookViewBook;
-    const madePayments = [
-      {
-        key: 'journal:5150',
-        kind: 'journal',
-        refId: 5150,
-        characterId: 1,
-        date: '2026-10-18T13:09:00Z',
-        amount: 957_001,
-        method: 'donation',
-        counterpartyId: paid.corporationId,
-        label: '',
-      },
-    ] as const;
-    renderModal({ corp: { ...corp, view: paid }, book, madePayments });
-    expect(screen.getByRole('link', { name: 'Open in wallet' })).toHaveAttribute(
-      'href',
-      '/wallet/journal?highlight=5150'
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open Brass Meridian Logistics ledger' })
     );
-  });
-
-  it('lists the money that paid a paid day', () => {
-    const paid = {
-      ...view,
-      state: 'paid' as const,
-      taxOwed: 0,
-      settledBy: 'donation' as const,
-      paidBy: {
-        payments: [],
-        inFlight: [{ amount: 957_001, at: '2026-10-18T13:10:00Z', refId: 5150 }],
-      },
-    };
-    renderModal({ corp: { ...corp, view: paid } });
-    expect(screen.getByText('Paid by')).toBeInTheDocument();
-    expect(screen.getByText(/not credited by Brass Meridian Logistics yet/)).toBeInTheDocument();
+    expect(onOpenLedger).toHaveBeenCalledOnce();
   });
 
   it('shows what the book bills, with the book and your own quantity', () => {
@@ -232,7 +176,7 @@ describe('CorpRowDetailModal', () => {
     expect(
       screen.getByText("Not billed · Brass Meridian Logistics's book did not record this ore")
     ).toBeInTheDocument();
-    expect(screen.queryByText(/next Statement/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Late notice/)).not.toBeInTheDocument();
   });
 
   it('says why the day is locked and keeps the billed amount once it is paid', () => {
@@ -240,8 +184,7 @@ describe('CorpRowDetailModal', () => {
       ...view,
       state: 'paid',
       taxOwed: 0,
-      settledBy: 'statement',
-      statementId: 's1',
+      noticeId: 's1',
       dispute: undefined,
     };
     renderModal({ corp: { ...corp, view: paid } });
@@ -249,8 +192,7 @@ describe('CorpRowDetailModal', () => {
     expect(
       screen.getByText(/keeps these figures, so they can't be edited here\./)
     ).toBeInTheDocument();
-    expect(screen.getByText('Statement')).toBeInTheDocument();
-    expect(screen.getByText('Issued, final')).toBeInTheDocument();
+    expect(screen.getByText('Late notice')).toBeInTheDocument();
   });
 
   it('shows a dismissal as 0 ISK and says what the corporation originally billed', () => {
@@ -268,36 +210,6 @@ describe('CorpRowDetailModal', () => {
     expect(screen.getByText('Their reason: No tax on this moon')).toBeInTheDocument();
   });
 
-  it('lets the member unmark a payment they marked, and says it was theirs', async () => {
-    const user = userEvent.setup();
-    const onUnmarkPaid = vi.fn();
-    const paid: BookRowView = {
-      ...view,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'yourMark',
-      markedPaidIds: ['a1'],
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid });
-    expect(screen.getByText('Settled by')).toBeInTheDocument();
-    expect(screen.getByText('Your mark')).toBeInTheDocument();
-    expect(
-      screen.getByText('The corporation confirms your mark against its wallet.')
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /mark as unpaid/i }));
-    expect(onUnmarkPaid).toHaveBeenCalledOnce();
-  });
-
-  it('says a day was paid from credit the book already held', () => {
-    const paid: BookRowView = { ...view, state: 'paid', taxOwed: 0, settledBy: 'credit' };
-    renderModal({ corp: { ...corp, view: paid } });
-    expect(screen.getByText('Corp credit')).toBeInTheDocument();
-    expect(
-      screen.getByText(/already held credit from an earlier payment of yours/)
-    ).toBeInTheDocument();
-  });
-
   it('names the donation that paid a day until the corporation never credited it', () => {
     const unlinked: BookRowView = {
       ...view,
@@ -311,87 +223,7 @@ describe('CorpRowDetailModal', () => {
     ).toBeInTheDocument();
   });
 
-  it('says the book still bills a day the member marked paid while its Statement is open (#6204)', () => {
-    const marked: BookRowView = {
-      ...view,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'yourMark',
-      bookOwed: 900_000,
-      markedPaidIds: ['a1'],
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: marked } });
-    expect(
-      screen.getByText(
-        'Marked paid by you — Brass Meridian Logistics still shows 900,000 ISK owed. It confirms your mark against its wallet.'
-      )
-    ).toBeInTheDocument();
-  });
-
   // The Bureau report: the book holds the payment but spent it on an older day it still bills.
-  it('says where the book spent a marked day’s payment, and offers Resolve, off any Statement', async () => {
-    const onResolve = vi.fn();
-    const marked: BookRowView = {
-      ...view,
-      statementId: undefined,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'yourMark',
-      bookOwed: 10_242_021,
-      bookSpentOn: ['2026-11-01'],
-      markedPaidIds: ['a1'],
-      dispute: undefined,
-    };
-    renderModal({ onResolve, corp: { ...corp, view: marked } });
-    expect(
-      screen.getByText(
-        'Marked paid by you. Brass Meridian Logistics already has that payment, but it pays your oldest open days first and used it on 2026-11-01. So it still bills this day 10,242,021 ISK. Resolve shows what you can do.'
-      )
-    ).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);
-    expect(onResolve).toHaveBeenCalledWith(
-      expect.objectContaining({ problem: expect.objectContaining({ kind: 'markedPaid' }) })
-    );
-  });
-
-  it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {
-    const paid: BookRowView = {
-      ...view,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'statement',
-      markedPaidIds: ['a1'],
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid: vi.fn() });
-    expect(screen.getByText(/You also marked this day paid/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /mark as unpaid/i })).toBeInTheDocument();
-  });
-
-  it('offers no unmark when the corporation, not the member, settled the day', () => {
-    const paid: BookRowView = {
-      ...view,
-      state: 'paid',
-      taxOwed: 0,
-      settledBy: 'statement',
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: paid }, onUnmarkPaid: vi.fn() });
-    expect(screen.queryByRole('button', { name: /mark as unpaid/i })).not.toBeInTheDocument();
-  });
-
-  it('breaks a part-paid day into billed, paid and owes', () => {
-    renderModal({
-      corp: {
-        ...corp,
-        view: { ...view, billed: 222_000, paidIsk: 100_000, taxOwed: 122_000 },
-      },
-    });
-    expect(
-      screen.getByText('Billed 222,000 ISK · paid 100,000 ISK · owes 122,000 ISK.')
-    ).toBeInTheDocument();
-  });
 
   it('says what a Market adjustment forgave', () => {
     renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });
@@ -437,30 +269,30 @@ describe('CorpRowDetailModal', () => {
   });
 });
 
-describe('CorpRowDetailModal: Resolve on a Statement (#6206, resolving in the app)', () => {
-  const onStatement = (over: Partial<BookRowView> = {}) => {
-    const v = { ...view, dispute: undefined, statementId: 's1', ...over };
+describe('CorpRowDetailModal: Resolve on a Late notice (#6206, resolving in the app)', () => {
+  const onNotice = (over: Partial<BookRowView> = {}) => {
+    const v = { ...view, dispute: undefined, noticeId: 's1', ...over };
     return { corp: { ...corp, view: v }, dr: { ...dr, corp: { ...corp, view: v } } as DisplayRow };
   };
 
-  it('offers Resolve on a day a Statement bills, opening the Statement problem', async () => {
+  it('offers Resolve on a day a Late notice asked for', async () => {
     const onResolve = vi.fn();
-    renderModal({ ...onStatement(), onResolve });
+    renderModal({ ...onNotice(), onResolve });
     await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' })[0]);
     expect(onResolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        problem: expect.objectContaining({ kind: 'overdue', statementId: 's1' }),
+        problem: expect.objectContaining({ kind: 'overdue', noticeId: 's1' }),
       })
     );
   });
 
   it('offers nothing with nowhere to send it', () => {
-    renderModal({ ...onStatement() });
+    renderModal({ ...onNotice() });
     expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
   });
 
   // A plain billed day can still be paid, or said no to: pay / not paying.
-  it('offers a plain billed day Resolve even before it is on a Statement', async () => {
+  it('offers a plain billed day Resolve even before a Late notice asks for it', async () => {
     const onResolve = vi.fn();
     renderModal({ onResolve, corp: { ...corp, view: { ...view, dispute: undefined } } });
     await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' })[0]);
@@ -469,24 +301,9 @@ describe('CorpRowDetailModal: Resolve on a Statement (#6206, resolving in the ap
     );
   });
 
-  it('offers a day marked paid that the book still bills the proof, pay and not paying', async () => {
-    const onResolve = vi.fn();
-    const marked = {
-      ...view,
-      state: 'paid' as const,
-      settledBy: 'yourMark' as const,
-      bookOwed: 500,
-    };
-    renderModal({ onResolve, ...onStatement(marked) });
-    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);
-    expect(onResolve).toHaveBeenCalledWith(
-      expect.objectContaining({ problem: expect.objectContaining({ kind: 'markedPaid' }) })
-    );
-  });
-
   it('says it is waiting for the corporation, and does not offer it twice', () => {
     renderModal({
-      ...onStatement({
+      ...onNotice({
         declaration: { state: 'waiting', at: '2026-10-20T00:00:00Z', amount: 900_000 },
       }),
       onResolve: vi.fn(),
@@ -499,7 +316,7 @@ describe('CorpRowDetailModal: Resolve on a Statement (#6206, resolving in the ap
 
   it('shows a rejection with its reason and the next step word for word, and Resolve again', () => {
     renderModal({
-      ...onStatement({
+      ...onNotice({
         declaration: {
           state: 'rejected',
           at: '2026-10-21T00:00:00Z',
@@ -520,7 +337,7 @@ describe('CorpRowDetailModal: Resolve on a Statement (#6206, resolving in the ap
 
   it("shows an officer's kept bill on a billed day, with their next step, and Resolve again", () => {
     renderModal({
-      ...onStatement({
+      ...onNotice({
         flagged: {
           state: 'rejected',
           kind: 'quantity',

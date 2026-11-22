@@ -72,6 +72,7 @@ const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   absorbed: new Map(),
   trimmed: new Map(),
   alsoBilled: new Map(),
+  conflicted: new Map(),
   labels: new Map(),
   books: [],
   ...over,
@@ -311,29 +312,6 @@ describe('personalEntriesOf', () => {
         status: 'outstanding',
       },
     ]);
-  });
-
-  it('hands the engine the journal ids a paid Assignment records its payment with', () => {
-    const [entry] = personalEntriesOf([
-      mined('2026-10-17', {
-        assignments: [
-          {
-            ...assigned('bureau'),
-            status: 'paid',
-            payment: {
-              paymentId: 'p',
-              paidOn: '2026-11-09',
-              method: 'donation',
-              amount: 10_898_549,
-              journalLinks: [{ refId: 26251213375, source: 'auto' }],
-            },
-          },
-          assigned('other'),
-        ],
-      }),
-    ]);
-    expect(entry.allocations[0].paymentRefs).toEqual([26251213375]);
-    expect(entry.allocations[1]).not.toHaveProperty('paymentRefs');
   });
 
   it('marks an unpaid Assignment a Default System made as releasable, and nothing else', () => {

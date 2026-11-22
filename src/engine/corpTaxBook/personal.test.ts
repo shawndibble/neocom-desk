@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   combineOverlaps,
-  coverInFlight,
   inFlightDonations,
   overlayCorpBooks,
-  personalAccountStatus,
   previewTakeover,
-  type BookRowState,
   type PersonalBook,
   type PersonalEntry,
 } from './personal';
-import type { Statement } from './statements';
+import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { Declaration } from './overdue';
 import type { OreDispute } from './disputes';
 
@@ -21,6 +18,8 @@ const ZEO = 45490;
 const SYL = 45491;
 
 const NOW = '2026-10-18T14:00:00Z';
+/** Past a 2026-10-17 Conflict's 14 days: the book's share of it is owed. */
+const LATE = '2026-11-05T14:00:00Z';
 // Synced 2h ago: every day through 17 Oct is Billable (day end + 6h grace, then a sync).
 const SYNCED = '2026-10-18T12:00:00Z';
 
@@ -52,7 +51,7 @@ const book = (over: Partial<PersonalBook> = {}): PersonalBook => ({
     },
   ],
   dismissals: [],
-  statements: [],
+  notices: [],
   payments: [],
   hubId: 'jita',
   oreForm: 'compressed',
@@ -69,6 +68,38 @@ const book = (over: Partial<PersonalBook> = {}): PersonalBook => ({
   inFlight: [],
   ...over,
 });
+
+/** The book's tax on the default day: 43,050 Zeolites at 148 ISK and 15%. */
+const DAY = 43_050 * 148 * 0.15;
+
+/** A Late notice asking for `lines` (the default day's charge by default). */
+const noticeOf = (over: Partial<LateNotice> = {}): LateNotice => {
+  const lines = over.lines ?? [
+    {
+      kind: 'mined' as const,
+      date: '2026-10-17',
+      key: `${ME}:1000:2026-10-17`,
+      characterId: ME,
+      structureId: 1000,
+      oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+      estimatedValue: DAY / 0.15,
+      tax: DAY,
+    },
+  ];
+  return {
+    id: 'n1',
+    minerId: `solo:${ME}`,
+    characterIds: [ME],
+    kind: 'late',
+    issuedAt: '2026-10-18T00:00:00Z',
+    code: 'MTABCDEF',
+    uids: [],
+    listed: lines.reduce((sum, l) => sum + l.tax, 0),
+    mail: { sent: 1, manualSent: 0, remindersStopped: false },
+    ...over,
+    lines,
+  };
+};
 
 const overlay = (entries: PersonalEntry[], books: PersonalBook[], now = NOW) =>
   overlayCorpBooks({ entries, books, now });
@@ -447,27 +478,12 @@ describe('overlayCorpBooks', () => {
       expect(out.takenFromFree.size).toBe(0);
     });
 
-    it('reads Paid on the member side when they paid it; the corp confirms it from its wallet', () => {
+    it('reads what is paid off the book, never a mark of the member’s own', () => {
       const out = overlay([own({ status: 'paid' })], [book({ ownPayeeIds: ['bmw'] })]);
       expect(out.rows).toHaveLength(1);
-      expect(out.rows[0]).toMatchObject({ state: 'paid', taxOwed: 0 });
+      expect(out.rows[0]).toMatchObject({ state: 'billed' });
+      expect(out.rows[0].taxOwed).toBeCloseTo(DAY, 4);
       expect(out.absorbed.get(KEY)?.has('a-bmw')).toBe(true);
-    });
-
-    it("records the member's own mark as how the day was settled, with the ids to unmark", () => {
-      const out = overlay([own({ status: 'paid' })], [book({ ownPayeeIds: ['bmw'] })]);
-      expect(out.rows[0]).toMatchObject({ settledBy: 'yourMark', markedPaidIds: ['a-bmw'] });
-      // Paid keeps what the day was billed at: only the owed amount is zero.
-      expect(out.rows[0].billed).toBeGreaterThan(0);
-    });
-
-    it('owes only what a part payment did not cover', () => {
-      const half = own({ status: 'paid' });
-      half.allocations[0].oreLines = [{ typeId: ZEO, quantity: 20_000 }];
-      half.freeOreLines = [{ typeId: ZEO, quantity: 23_050 }];
-      const out = overlay([half], [book({ ownPayeeIds: ['bmw'] })]);
-      expect(out.rows[0].state).toBe('billed');
-      expect(out.rows[0].taxOwed).toBeCloseTo((43_050 - 20_000) * 148 * 0.15, 4);
     });
 
     it('takes a second allocation to the same Payee by quantity; its excess is the conflict', () => {
@@ -690,47 +706,23 @@ describe('overlayCorpBooks', () => {
     expect(out.rows[0].solarSystemId).toBe(SYSTEM);
   });
 
-  it('uses the issued Statement line, which never changes, and settles it from payments', () => {
-    const statement: Statement = {
-      id: 's1',
-      minerId: `solo:${ME}`,
-      code: 'ABC',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      coversFrom: '2026-10-01',
-      coversThrough: '2026-10-17',
-      issuedAt: '2026-10-18T00:00:00Z',
-      hubId: 'jita',
-      oreForm: 'compressed',
-      amount: 900_000,
-      lines: [
-        {
-          kind: 'mined',
-          date: '2026-10-17',
-          chargeKey: `${ME}:1000:2026-10-17`,
-          characterId: ME,
-          structureId: 1000,
-          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-          unitPrices: { [ZEO]: 140 },
-          taxPct: 15,
-          estimatedValue: 6_000_000,
-          tax: 900_000,
-        },
-      ],
-    };
-    const open = overlay([entry()], [book({ statements: [statement] })]);
-    expect(open.rows[0]).toMatchObject({ state: 'billed', taxOwed: 900_000, statementId: 's1' });
+  it('names the Late notice that asked for the day, and pays it oldest first like any day', () => {
+    const open = overlay([entry()], [book({ notices: [noticeOf()] })]);
+    expect(open.rows[0]).toMatchObject({ state: 'billed', noticeId: 'n1' });
+    expect(open.rows[0].taxOwed).toBeCloseTo(DAY, 4);
+    // A notice whose days are unpaid is the member's overdue one.
+    expect(open.books[0].notices).toMatchObject([{ noticeId: 'n1', code: 'MTABCDEF' }]);
     const paid = overlay(
       [entry()],
       [
         book({
-          statements: [statement],
+          notices: [noticeOf()],
           payments: [
             {
               id: 'p1',
               minerId: `solo:${ME}`,
               characterId: ME,
-              amount: 900_000,
+              amount: DAY,
               at: '2026-10-18T10:00:00Z',
               source: 'donation',
             },
@@ -739,37 +731,10 @@ describe('overlayCorpBooks', () => {
       ]
     );
     expect(paid.rows[0]).toMatchObject({ state: 'paid', taxOwed: 0 });
+    expect(paid.books[0].notices).toEqual([]);
   });
 
   describe('mixed-rate days', () => {
-    const billedLine = (
-      over: Partial<Statement['lines'][number]> & { structureId: number }
-    ): Statement['lines'][number] => ({
-      kind: 'mined',
-      date: '2026-10-17',
-      chargeKey: `${ME}:${over.structureId}:2026-10-17`,
-      characterId: ME,
-      oreLines: [{ typeId: ZEO, quantity: 1_000 }],
-      unitPrices: { [ZEO]: 100 },
-      taxPct: 10,
-      estimatedValue: 100_000,
-      tax: 10_000,
-      ...over,
-    });
-    const statementOf = (lines: Statement['lines']): Statement => ({
-      id: 's1',
-      minerId: `solo:${ME}`,
-      code: 'ABC',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      coversFrom: '2026-10-01',
-      coversThrough: '2026-10-17',
-      issuedAt: '2026-10-18T00:00:00Z',
-      hubId: 'jita',
-      oreForm: 'compressed',
-      amount: lines.reduce((sum, l) => sum + l.tax, 0),
-      lines,
-    });
     const observed = (structureId: number, quantity: number, sourceCorporationId?: number) => ({
       characterId: ME,
       recordedCorporationId: CORP,
@@ -804,131 +769,6 @@ describe('overlayCorpBooks', () => {
       expect(out.rows[0].taxOwed).toBeCloseTo(10_000, 6);
       expect(out.rows[1].taxOwed).toBeCloseTo(7_000, 6);
     });
-
-    it('a Statement day gives the same per-line tax as the open day', () => {
-      const lines = [
-        billedLine({ structureId: 1000 }),
-        billedLine({ structureId: 2000, taxPct: 7, tax: 7_000 }),
-      ];
-      const open = overlay(
-        [],
-        [
-          book({
-            rates,
-            pricesOn: pricesAt100,
-            observed: [observed(1000, 1_000), observed(2000, 1_000, FEEDER)],
-          }),
-        ]
-      );
-      const billed = overlay(
-        [],
-        [
-          book({
-            rates,
-            pricesOn: pricesAt100,
-            observed: [observed(1000, 1_000), observed(2000, 1_000, FEEDER)],
-            statements: [statementOf(lines)],
-          }),
-        ]
-      );
-      expect(billed.rows.map((r) => r.taxPct)).toEqual(open.rows.map((r) => r.taxPct));
-      billed.rows.forEach((r, i) => expect(r.taxOwed).toBeCloseTo(open.rows[i].taxOwed ?? 0, 6));
-    });
-
-    it('shows the effective rate when one charge was billed at two rates after a rate fix', () => {
-      const lines = [
-        billedLine({ structureId: 1000 }),
-        billedLine({
-          structureId: 1000,
-          kind: 'late-ore',
-          oreLines: [{ typeId: ZEO, quantity: 1_000 }],
-          taxPct: 20,
-          tax: 20_000,
-        }),
-      ];
-      const out = overlay(
-        [],
-        [
-          book({
-            pricesOn: pricesAt100,
-            observed: [observed(1000, 2_000)],
-            statements: [statementOf(lines)],
-          }),
-        ]
-      );
-      expect(out.rows).toHaveLength(1);
-      expect(out.rows[0]).toMatchObject({ taxOwed: 30_000, estimatedValue: 200_000, taxPct: 15 });
-    });
-  });
-
-  it('applies a part payment to the oldest days first', () => {
-    const mk = (date: string, tax: number) => ({
-      kind: 'mined' as const,
-      date,
-      chargeKey: `${ME}:1000:${date}`,
-      characterId: ME,
-      structureId: 1000,
-      oreLines: [{ typeId: ZEO, quantity: 1000 }],
-      unitPrices: { [ZEO]: 100 },
-      taxPct: 15,
-      estimatedValue: tax * 5,
-      tax,
-    });
-    const statement: Statement = {
-      id: 's1',
-      minerId: `solo:${ME}`,
-      code: 'ABC',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      coversFrom: '2026-10-01',
-      coversThrough: '2026-10-17',
-      issuedAt: '2026-10-18T00:00:00Z',
-      hubId: 'jita',
-      oreForm: 'compressed',
-      amount: 3_000_000,
-      lines: [mk('2026-10-16', 1_000_000), mk('2026-10-17', 2_000_000)],
-    };
-    const observed = ['2026-10-16', '2026-10-17'].map((date) => ({
-      characterId: ME,
-      recordedCorporationId: CORP,
-      structureId: 1000,
-      date,
-      solarSystemId: SYSTEM,
-      oreLines: [{ typeId: ZEO, quantity: 1000 }],
-    }));
-    const out = overlay(
-      [
-        entry({
-          date: '2026-10-16',
-          oreLines: [{ typeId: ZEO, quantity: 1000 }],
-          freeOreLines: [],
-        }),
-        entry({
-          date: '2026-10-17',
-          oreLines: [{ typeId: ZEO, quantity: 1000 }],
-          freeOreLines: [],
-        }),
-      ],
-      [
-        book({
-          statements: [statement],
-          observed,
-          payments: [
-            {
-              id: 'p1',
-              minerId: `solo:${ME}`,
-              characterId: ME,
-              amount: 1_500_000,
-              at: '2026-10-18T10:00:00Z',
-              source: 'donation',
-            },
-          ],
-        }),
-      ]
-    );
-    const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r]));
-    expect(byDate['2026-10-16']).toMatchObject({ state: 'paid', taxOwed: 0 });
-    expect(byDate['2026-10-17']).toMatchObject({ state: 'billed', taxOwed: 1_500_000 });
   });
 
   it('shows a corp dismissal with its reason and owes nothing', () => {
@@ -1070,80 +910,7 @@ describe('overlayCorpBooks', () => {
     });
   });
 
-  it('names the donation in flight that paid a day, and the amount it paid', () => {
-    const donation = {
-      characterId: ME,
-      amount: 1_000_000,
-      at: '2026-10-18T13:10:00Z',
-      refId: 5150,
-    };
-    const out = overlay([entry()], [book({ inFlight: [donation] })]);
-    const taxOwed = 43_050 * 148 * 0.15;
-    expect(out.rows[0].paidBy).toEqual({
-      payments: [],
-      inFlight: [{ amount: taxOwed, at: '2026-10-18T13:10:00Z', refId: 5150 }],
-    });
-  });
-
-  it('names the book payments that paid each day, one slice per day', () => {
-    const observed = ['2026-10-15', '2026-10-16'].map((date) => ({
-      characterId: ME,
-      recordedCorporationId: CORP,
-      structureId: 1000,
-      date,
-      solarSystemId: SYSTEM,
-      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
-    }));
-    const entries = ['2026-10-15', '2026-10-16'].map((date) =>
-      entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] })
-    );
-    const payment = (id: string, amount: number, at: string) => ({
-      id,
-      minerId: `solo:${ME}`,
-      characterId: ME,
-      amount,
-      at,
-      source: 'donation' as const,
-    });
-    const out = overlay(entries, [
-      book({
-        observed,
-        payments: [
-          payment('p1', 300_000, '2026-10-18T10:00:00Z'),
-          payment('p2', 144_000, '2026-10-18T11:00:00Z'),
-        ],
-      }),
-    ]);
-    const paidBy = Object.fromEntries(out.rows.map((r) => [r.date, r.paidBy]));
-    // A day is 222,000: p1 pays the first and 78,000 of the second, p2 the rest of the second.
-    expect(paidBy['2026-10-15']).toEqual({
-      payments: [{ paymentId: 'p1', amount: 222_000 }],
-      inFlight: [],
-    });
-    expect(paidBy['2026-10-16']).toEqual({
-      payments: [
-        { paymentId: 'p1', amount: 78_000 },
-        { paymentId: 'p2', amount: 144_000 },
-      ],
-      inFlight: [],
-    });
-  });
-
-  it('puts nothing on a day that is still billed', () => {
-    const out = overlay([entry()], [book()]);
-    expect(out.rows[0].paidBy).toBeUndefined();
-  });
-
-  it('records a donation as how the day was settled', () => {
-    const out = overlay(
-      [entry()],
-      [book({ inFlight: [{ characterId: ME, amount: 1_000_000, at: '2026-10-18T13:10:00Z' }] })]
-    );
-    expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
-    expect(out.rows[0].markedPaidIds).toBeUndefined();
-  });
-
-  it('keeps a day Paid once the book credits the donation, before any Statement bills it', () => {
+  it('keeps a day Paid once the book credits the donation', () => {
     const observed = ['2026-10-15', '2026-10-16'].map((date) => ({
       characterId: ME,
       recordedCorporationId: CORP,
@@ -1169,9 +936,42 @@ describe('overlayCorpBooks', () => {
       '2026-10-15': ['paid', 0],
       '2026-10-16': ['billed', 222_000],
     });
-    expect(out.books[0].credit).toBe(222_000);
-    // Money the book already holds is a credit, not a donation the member just sent.
-    expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('credit');
+    // Every ISK of it paid the oldest day: none is left as credit.
+    expect(out.books[0].credit).toBe(0);
+    expect(out.rows.find((r) => r.date === '2026-10-15')?.state).toBe('paid');
+  });
+
+  it('reads a day the book closed in its checkpoint as paid, and pays the next from its credit', () => {
+    const observed = ['2026-10-15', '2026-10-16'].map((date) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId: 1000,
+      date,
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+    }));
+    const entries = ['2026-10-15', '2026-10-16'].map((date) =>
+      entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] })
+    );
+    const checkpoint = {
+      minerId: `solo:${ME}`,
+      through: '2026-10-15',
+      owed: [],
+      credit: 100_000,
+      balance: -100_000,
+      paidThrough: '2026-10-15',
+      characterIds: [ME],
+      at: '2027-01-05T00:00:00Z',
+    };
+    const out = overlay(entries, [
+      book({ observed, checkpoints: new Map([[checkpoint.minerId, checkpoint]]) }),
+    ]);
+    const byDate = Object.fromEntries(out.rows.map((r) => [r.date, [r.state, r.taxOwed]]));
+    expect(byDate).toEqual({
+      '2026-10-15': ['paid', 0],
+      '2026-10-16': ['billed', 122_000],
+    });
+    expect(out.rows.find((r) => r.date === '2026-10-15')?.state).toBe('paid');
   });
 
   describe('on a running account', () => {
@@ -1195,9 +995,7 @@ describe('overlayCorpBooks', () => {
       source: 'donation' as const,
     });
     const running = (amount: number) =>
-      overlay(entries, [
-        book({ observed, payments: [paid(amount)], runningAccountFrom: '2026-10-01T00:00:00Z' }),
-      ]).books[0];
+      overlay(entries, [book({ observed, payments: [paid(amount)] })]).books[0];
 
     describe('with an officer correction, as the corp book counts it', () => {
       // Each day is 10,000 × 148 × 15% = 222,000.
@@ -1211,9 +1009,7 @@ describe('overlayCorpBooks', () => {
         at: '2026-10-18T13:00:00Z',
       });
       const withAdjustments = (...adjustments: ReturnType<typeof adjust>[]) =>
-        overlay(entries, [
-          book({ observed, adjustments, runningAccountFrom: '2026-10-01T00:00:00Z' }),
-        ]).books[0];
+        overlay(entries, [book({ observed, adjustments })]).books[0];
 
       it('explains a part-paid day, a forgiven shortfall and a reversed correction on its row', () => {
         const rowsOf = (payments: ReturnType<typeof withPayments>, adjustments = [] as never[]) =>
@@ -1222,7 +1018,6 @@ describe('overlayCorpBooks', () => {
               observed,
               payments,
               adjustments,
-              runningAccountFrom: '2026-10-01T00:00:00Z',
             }),
           ]).rows;
         const pay = (amount: number) => ({
@@ -1236,7 +1031,7 @@ describe('overlayCorpBooks', () => {
         const withPayments = (amount: number) => [pay(amount)];
         // 100,000 of the oldest 222,000 day: part paid.
         const part = rowsOf(withPayments(100_000)).find((r) => r.date === '2026-10-15')!;
-        expect(part).toMatchObject({ paidIsk: 100_000, taxOwed: 122_000, billed: 222_000 });
+        expect(part).toMatchObject({ taxOwed: 122_000, billed: 222_000 });
         // 221,500 pays it within tolerance: 500 forgiven.
         const closed = rowsOf(withPayments(221_500)).find((r) => r.date === '2026-10-15')!;
         expect(closed).toMatchObject({ state: 'paid', forgivenIsk: 500 });
@@ -1258,9 +1053,10 @@ describe('overlayCorpBooks', () => {
       });
 
       it('owes a charge dated on a day the member did not mine', () => {
+        // As the book counts it: the correction is a day of its own on the account.
         expect(withAdjustments(adjust('a', '2026-10-05', 1_000_000))).toMatchObject({
           credit: 0,
-          account: { owes: { amount: 1_444_000, days: 2, oldest: '2026-10-15' } },
+          account: { owes: { amount: 1_444_000, days: 3, oldest: '2026-10-05' } },
         });
       });
 
@@ -1289,54 +1085,28 @@ describe('overlayCorpBooks', () => {
       });
     });
 
-    it('leaves a day an open dispute holds out of what is owed and of paid through', () => {
-      const row = (date: string, state: BookRowState, taxOwed: number, held = false) => ({
+    it('pays a day a late notice listed like any running day, and lists the notice while it is unpaid', () => {
+      const line = (date: string) => ({
+        kind: 'mined' as const,
         date,
-        state,
-        taxOwed,
-        ...(held ? { held: { until: '2026-11-30', kind: 'quantity' as const } } : {}),
-      });
-      expect(
-        personalAccountStatus([
-          row('2026-10-14', 'paid', 0),
-          row('2026-10-15', 'billed', 50, true),
-          row('2026-10-16', 'billed', 70),
-        ])
-      ).toEqual({
-        paidThrough: '2026-10-14',
-        owes: { amount: 70, days: 1, oldest: '2026-10-16' },
-      });
-    });
-
-    it('pays a day a late notice listed like any running day, by the per-day rule', () => {
-      const notice: Statement = {
-        id: 'notice_2026-10-15_solo:1_2026-10-17',
-        kind: 'notice',
-        minerId: `solo:${ME}`,
-        code: 'NTX-ABCD',
-        periodStart: '2026-10-15',
-        periodEnd: '2026-10-16',
-        coversFrom: '2026-10-15',
-        coversThrough: '2026-10-16',
-        issuedAt: '2026-10-17T00:00:00Z',
-        hubId: 'jita',
-        oreForm: 'compressed',
+        key: `${ME}:1000:${date}`,
+        oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+        estimatedValue: 0,
         // Priced differently from the day itself: the day's own figure is what is owed.
-        amount: 999_999_999,
-        lines: [],
-      };
+        tax: 999_999,
+      });
+      const notice = noticeOf({
+        id: 'notice_2026-10-15',
+        issuedAt: '2026-10-17T00:00:00Z',
+        code: 'NTX-ABCD',
+        lines: [line('2026-10-15'), line('2026-10-16')],
+      });
       const out = overlay(entries, [
-        book({
-          observed,
-          statements: [notice],
-          payments: [{ ...paid(222_000), statementId: notice.id }],
-          runningAccountFrom: '2026-10-01T00:00:00Z',
-        }),
+        book({ observed, notices: [notice], payments: [paid(222_000)] }),
       ]).books[0];
       expect(out).toMatchObject({
         credit: 0,
-        // Only for its code, while the member owes.
-        openStatements: [{ statementId: notice.id, code: 'NTX-ABCD' }],
+        notices: [{ noticeId: notice.id, code: 'NTX-ABCD', remaining: 222_000 }],
         account: { paidThrough: '2026-10-15', owes: { amount: 222_000, days: 1 } },
       });
     });
@@ -1502,51 +1272,6 @@ describe('overlayCorpBooks: the miner side of a refinery book', () => {
     expect(out.rows).toEqual([]);
   });
 
-  it('does not call late ore a correction', () => {
-    const statement: Statement = {
-      id: 's1',
-      minerId: `solo:${ME}`,
-      code: 'ABC',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      coversFrom: '2026-10-01',
-      coversThrough: '2026-10-17',
-      issuedAt: '2026-10-18T00:00:00Z',
-      hubId: 'jita',
-      oreForm: 'compressed',
-      amount: 1_000_000,
-      lines: [
-        {
-          kind: 'mined',
-          date: '2026-10-17',
-          chargeKey: `${ME}:1000:2026-10-17`,
-          characterId: ME,
-          structureId: 1000,
-          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-          unitPrices: { [ZEO]: 140 },
-          taxPct: 15,
-          estimatedValue: 6_000_000,
-          tax: 900_000,
-        },
-        {
-          kind: 'late-ore',
-          date: '2026-10-17',
-          chargeKey: `${ME}:1000:2026-10-17`,
-          characterId: ME,
-          structureId: 1000,
-          oreLines: [{ typeId: ZEO, quantity: 1_000 }],
-          unitPrices: { [ZEO]: 140 },
-          taxPct: 15,
-          estimatedValue: 140_000,
-          tax: 21_000,
-        },
-      ],
-    };
-    const out = overlay([entry()], [book({ statements: [statement] })]);
-    expect(out.rows[0].correction).toBeUndefined();
-    expect(out.rows[0].taxOwed).toBe(921_000);
-  });
-
   it('shows no correction on a line billed once', () => {
     expect(overlay([entry()], [book()]).rows[0].correction).toBeUndefined();
   });
@@ -1656,6 +1381,46 @@ describe('inFlightDonations', () => {
     expect(inFlightDonations([made()], held, CORP, '2026-10-01')).toEqual([]);
   });
 
+  // Audit bug 5: one held 10M swallowed both of two 10M donations, hiding the second.
+  it('pairs one held payment with one donation only', () => {
+    const held = [{ characterId: ME, amount: 500_000, at: '2026-10-18T13:11:00Z' }];
+    const two = [made({ refId: 1 }), made({ refId: 2, date: '2026-10-18T13:14:00Z' })];
+    expect(inFlightDonations(two, held, CORP, '2026-10-01').map((d) => d.refId)).toEqual([2]);
+  });
+
+  // Audit bug 6: an officer's hand record is dated by them (noon), never the journal's minute.
+  it('pairs an officer’s hand record with the member’s donation within two days', () => {
+    const held = [
+      { characterId: ME, amount: 500_000, at: '2026-10-19T12:00:00Z', source: 'manual' as const },
+    ];
+    expect(inFlightDonations([made()], held, CORP, '2026-10-01')).toEqual([]);
+    // A donation the book holds is never matched with the same minute rule a day later.
+    expect(
+      inFlightDonations(
+        [made()],
+        [{ characterId: ME, amount: 500_000, at: '2026-10-19T12:00:00Z' }],
+        CORP,
+        '2026-10-01'
+      )
+    ).toHaveLength(1);
+  });
+
+  it("matches the wallet's own record first, then an officer's hand record, closest pairs first (M9)", () => {
+    // Two equal donations two hours apart. The book read the first from its wallet; an officer
+    // recorded one by hand at noon, nearer the first. One to one, both are held.
+    const two = [
+      made({ refId: 1, date: '2026-10-18T10:00:00Z' }),
+      made({ refId: 2, date: '2026-10-18T12:00:00Z' }),
+    ];
+    const held = [
+      { characterId: ME, amount: 500_000, at: '2026-10-18T10:01:00Z', source: 'donation' as const },
+      { characterId: ME, amount: 500_000, at: '2026-10-18T10:30:00Z', source: 'manual' as const },
+    ];
+    expect(inFlightDonations(two, held, CORP, '2026-10-01')).toEqual([]);
+    // Listed hand record first: still the wallet's match is made first.
+    expect(inFlightDonations(two, [held[1]!, held[0]!], CORP, '2026-10-01')).toEqual([]);
+  });
+
   it('skips other recipients, contracts and donations before the book started', () => {
     expect(
       inFlightDonations(
@@ -1669,20 +1434,6 @@ describe('inFlightDonations', () => {
         '2026-10-01'
       )
     ).toEqual([]);
-  });
-});
-
-describe('coverInFlight', () => {
-  it('covers whole rows oldest first, within the settle tolerance', () => {
-    const rows = [
-      { id: 'a', date: '2026-10-01', taxOwed: 1_000_000 },
-      { id: 'b', date: '2026-10-02', taxOwed: 1_000_000 },
-    ];
-    expect(coverInFlight(rows, 1_050_000)).toEqual(new Set(['a']));
-    expect(coverInFlight(rows, 2_000_000)).toEqual(new Set(['a', 'b']));
-    expect(coverInFlight(rows, 10)).toEqual(new Set());
-    // Nothing in flight covers nothing, even a day smaller than the tolerance.
-    expect(coverInFlight([{ id: 'c', date: '2026-10-03', taxOwed: 50_000 }], 0)).toEqual(new Set());
   });
 });
 
@@ -1744,57 +1495,24 @@ describe('overlayCorpBooks: a moon owner read clock (#4622)', () => {
 
 describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
   const MINER = `solo:${ME}`;
-  const KEY = `${ME}:1000:2026-10-17`;
-  const issued = (lines: Statement['lines']): Statement => ({
-    id: 's1',
-    minerId: MINER,
-    code: 'ABC',
-    periodStart: '2026-10-01',
-    periodEnd: '2026-10-31',
-    coversFrom: '2026-10-01',
-    coversThrough: '2026-10-17',
-    issuedAt: '2026-10-18T00:00:00Z',
-    hubId: 'jita',
-    oreForm: 'compressed',
-    amount: lines.reduce((sum, l) => sum + l.tax, 0),
-    lines,
-  });
-  const mined = {
-    kind: 'mined' as const,
-    date: '2026-10-17',
-    chargeKey: KEY,
-    characterId: ME,
-    structureId: 1000,
-    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-    unitPrices: { [ZEO]: 140 },
-    taxPct: 15,
-    estimatedValue: 6_000_000,
-    tax: 900_000,
-  };
-
-  it('shows a billed adjustment as before and after, with the reason', () => {
-    const statement = issued([
-      mined,
-      {
-        kind: 'correction',
-        date: '2026-10-17',
-        adjustmentId: 'a1',
-        oreLines: [],
-        estimatedValue: 0,
-        tax: -100_000,
-        reason: 'Wrong hub price',
-      },
-    ]);
-    const row = overlay([entry()], [book({ statements: [statement] })]).rows[0];
-    expect(row.correction).toEqual({
-      before: 900_000,
-      after: 800_000,
-      reasons: ['Wrong hub price'],
-    });
-    expect(row.taxOwed).toBe(800_000);
+  it('shows an adjustment as before and after, with the reason', () => {
+    const adjustment = {
+      id: 'a1',
+      minerId: MINER,
+      date: '2026-10-17',
+      amount: -100_000,
+      reason: 'Wrong hub price',
+      by: 1,
+      at: '2026-10-18T00:00:00Z',
+    };
+    const row = overlay([entry()], [book({ adjustments: [adjustment] })]).rows[0];
+    expect(row.correction?.before).toBeCloseTo(DAY, 4);
+    expect(row.correction?.after).toBeCloseTo(DAY - 100_000, 4);
+    expect(row.correction?.reasons).toEqual(['Wrong hub price']);
+    expect(row.taxOwed).toBeCloseTo(DAY - 100_000, 4);
   });
 
-  it('reads an adjustment not on a Statement yet', () => {
+  it('reads an adjustment the book recorded', () => {
     const row = overlay(
       [entry()],
       [
@@ -1819,34 +1537,7 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.correction?.reasons).toEqual(['Missed ore']);
   });
 
-  it('counts an adjustment once when it is both read and billed', () => {
-    const adjustment = {
-      id: 'a1',
-      minerId: MINER,
-      date: '2026-10-17',
-      amount: -100_000,
-      reason: 'Wrong hub price',
-      by: 1,
-      at: '2026-10-18T00:00:00Z',
-    };
-    const statement = issued([
-      mined,
-      {
-        kind: 'correction',
-        date: '2026-10-17',
-        adjustmentId: 'a1',
-        oreLines: [],
-        estimatedValue: 0,
-        tax: -100_000,
-        reason: 'Wrong hub price',
-      },
-    ]);
-    const row = overlay([entry()], [book({ statements: [statement], adjustments: [adjustment] })])
-      .rows[0];
-    expect(row.taxOwed).toBe(800_000);
-  });
-
-  const forgive = (amount: number, extra: { statementId?: string } = {}) => ({
+  const forgive = (amount: number, extra: Record<string, never> = {}) => ({
     id: 'w1',
     minerId: MINER,
     amount,
@@ -1855,209 +1546,11 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     ...extra,
   });
 
-  it('a write-off that forgives the whole day reads Waived, before and after kept (#4637)', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          writeOffs: [forgive(900_000, { statementId: 's1' })],
-        }),
-      ]
-    ).rows[0];
-    expect(row.state).toBe('waived');
-    expect(row.taxOwed).toBe(0);
-    expect(row.dismissalReason).toBe('Goodwill');
-    expect(row.correction).toEqual({ before: 900_000, after: 0, reasons: ['Goodwill'] });
-  });
-
-  it('a day written off in full is billed to nobody: its ore stays owed to the other Payee (#6204)', () => {
-    const toOther = entry({
-      freeOreLines: [],
-      oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-      allocations: [
-        {
-          id: 'a-other',
-          payeeId: 'other',
-          taxPct: 10,
-          oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-          status: 'outstanding',
-        },
-      ],
-    });
-    const out = overlay(
-      [toOther],
-      [
-        book({
-          statements: [issued([mined])],
-          writeOffs: [forgive(900_000, { statementId: 's1' })],
-        }),
-      ]
-    );
-    expect(out.rows[0].state).toBe('waived');
-    expect(out.alsoBilled.size).toBe(0);
-  });
-
-  it('a part write-off leaves the rest owed, and says so on the line (#4637)', () => {
-    const out = overlay(
-      [entry()],
-      [book({ statements: [issued([mined])], writeOffs: [forgive(400_000)] })]
-    );
-    const row = out.rows[0];
-    expect(row.state).toBe('billed');
-    expect(row.taxOwed).toBe(500_000);
-    expect(row.correction).toEqual({ before: 900_000, after: 500_000, reasons: ['Goodwill'] });
-    expect(out.books[0].credit).toBe(0);
-  });
-
-  it('a payment pays first; the write-off forgives what is left, and the day is Paid (#4637)', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          payments: [
-            {
-              id: 'p1',
-              minerId: MINER,
-              characterId: ME,
-              amount: 400_000,
-              at: '2026-10-21T00:00:00Z',
-              source: 'donation' as const,
-            },
-          ],
-          writeOffs: [forgive(900_000)],
-        }),
-      ]
-    ).rows[0];
-    expect(row.state).toBe('paid');
-    expect(row.taxOwed).toBe(0);
-    expect(row.correction).toEqual({ before: 900_000, after: 400_000, reasons: ['Goodwill'] });
-  });
-
-  it('still carries the mark to unmark when a Statement settled the day first', () => {
-    const marked = entry({
-      freeOreLines: [],
-      allocations: [
-        {
-          id: 'a-bmw',
-          payeeId: 'bmw',
-          taxPct: 10,
-          oreLines: [{ typeId: ZEO, quantity: 41_200 }],
-          status: 'paid',
-        },
-      ],
-    });
-    const row = overlay(
-      [marked],
-      [
-        book({
-          ownPayeeIds: ['bmw'],
-          statements: [issued([mined])],
-          payments: [
-            {
-              id: 'p1',
-              minerId: MINER,
-              characterId: ME,
-              amount: 900_000,
-              at: '2026-10-21T00:00:00Z',
-              source: 'donation' as const,
-            },
-          ],
-        }),
-      ]
-    ).rows[0];
-    expect(row).toMatchObject({ state: 'paid', settledBy: 'statement' });
-    expect(row.markedPaidIds).toEqual(['a-bmw']);
-  });
-
-  it('records the settled Statement as how the day was settled, and keeps what it billed', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          payments: [
-            {
-              id: 'p1',
-              minerId: MINER,
-              characterId: ME,
-              amount: 900_000,
-              at: '2026-10-21T00:00:00Z',
-              source: 'donation' as const,
-            },
-          ],
-        }),
-      ]
-    ).rows[0];
-    expect(row).toMatchObject({ state: 'paid', taxOwed: 0, settledBy: 'statement' });
-    expect(row.billed).toBe(900_000);
-  });
-
-  it('names the payments that settled a Statement’s day', () => {
-    const payment = (id: string, amount: number, at: string) => ({
-      id,
-      minerId: MINER,
-      characterId: ME,
-      amount,
-      at,
-      source: 'donation' as const,
-    });
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          payments: [
-            payment('p1', 500_000, '2026-10-21T00:00:00Z'),
-            payment('p2', 400_000, '2026-10-22T00:00:00Z'),
-          ],
-        }),
-      ]
-    ).rows[0];
-    expect(row.paidBy).toEqual({
-      payments: [
-        { paymentId: 'p1', amount: 500_000 },
-        { paymentId: 'p2', amount: 400_000 },
-      ],
-      inFlight: [],
-    });
-  });
-
-  it('lists what an officer forgave of a day apart from the payments that paid the rest', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          payments: [
-            {
-              id: 'p1',
-              minerId: MINER,
-              characterId: ME,
-              amount: 500_000,
-              at: '2026-10-21T00:00:00Z',
-              source: 'donation' as const,
-            },
-          ],
-          writeOffs: [forgive(400_000, { statementId: 's1' })],
-        }),
-      ]
-    ).rows[0];
-    expect(row.state).toBe('paid');
-    expect(row.paidBy).toEqual({
-      payments: [{ paymentId: 'p1', amount: 500_000 }],
-      inFlight: [],
-      writtenOff: 400_000,
-    });
-  });
-
   it("ignores another Miner's write-off (#4637)", () => {
     const row = overlay(
       [entry()],
       [
         book({
-          statements: [issued([mined])],
           writeOffs: [{ ...forgive(900_000), minerId: 'solo:1' }],
         }),
       ]
@@ -2083,68 +1576,17 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     by: 1,
     at: '2026-10-19T00:00:00Z',
   };
-  const later = (lines: Statement['lines']): Statement => ({
-    ...issued(lines),
-    id: 's2',
-    code: 'DEF',
-    coversFrom: '2026-10-18',
-    coversThrough: '2026-10-31',
-    issuedAt: '2026-11-01T00:00:00Z',
-  });
-  const raiseLine = {
-    kind: 'correction' as const,
-    date: '2026-10-17',
-    adjustmentId: 'a3',
-    oreLines: [],
-    estimatedValue: 0,
-    tax: 200_000,
-    reason: 'Missed ore',
-  };
 
-  it('never shows a raise on a paid day, which the book never bills', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          payments: [pay('p1', 900_000)],
-          adjustments: [raise],
-        }),
-      ]
-    ).rows[0];
-    expect(row.correction).toBeUndefined();
-    expect(row).toMatchObject({ state: 'paid', taxOwed: 0 });
-  });
-
-  it('keeps a raise billed on a later Statement owed after the first is paid', () => {
-    const statements = [issued([mined]), later([raiseLine])];
-    const row = overlay(
-      [entry()],
-      [book({ statements, payments: [pay('p1', 900_000)], adjustments: [raise] })]
-    ).rows[0];
-    expect(row.correction).toEqual({ before: 900_000, after: 1_100_000, reasons: ['Missed ore'] });
-    expect(row).toMatchObject({ state: 'billed', taxOwed: 200_000 });
-  });
-
-  it('marks the day paid once the later Statement is paid too', () => {
-    const statements = [issued([mined]), later([raiseLine])];
-    const row = overlay([entry()], [book({ statements, payments: [pay('p1', 1_100_000)] })])
+  it('marks the day paid once its raise is paid too', () => {
+    const owes = overlay([entry()], [book({ adjustments: [raise], payments: [pay('p1', DAY)] })])
       .rows[0];
-    expect(row).toMatchObject({ state: 'paid', taxOwed: 0 });
-  });
-
-  it('keeps a raise not billed yet owed beside a part-paid Statement', () => {
+    expect(owes).toMatchObject({ state: 'billed' });
+    expect(owes.taxOwed).toBeCloseTo(200_000, 4);
     const row = overlay(
       [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          payments: [pay('p1', 500_000)],
-          adjustments: [raise],
-        }),
-      ]
+      [book({ adjustments: [raise], payments: [pay('p1', DAY + 200_000)] })]
     ).rows[0];
-    expect(row).toMatchObject({ state: 'billed', taxOwed: 600_000 });
+    expect(row).toMatchObject({ state: 'paid', taxOwed: 0 });
   });
 
   it("ignores another miner's corrections", () => {
@@ -2266,7 +1708,7 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         conflictCause: 'overListed',
         oreLines: [{ typeId: ZEO, quantity: 6_950 }],
         taxOwed: null,
-        // The book never recorded it, so no Statement bills it and it never resolves to the corp.
+        // The book never recorded it, so nothing bills it and it never resolves to the corp.
         billed: 0,
         overlap: { payeeIds: ['bmw'], ore: [{ typeId: ZEO, quantity: 6_950 }], paid: false },
       });
@@ -2425,33 +1867,6 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
 describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
   const ALT = 90000002;
   const KEY = `${ME}:2026-10-17:${SYSTEM}`;
-  const line = (characterId: number, date: string, tax: number) => ({
-    kind: 'mined' as const,
-    date,
-    chargeKey: `${characterId}:1000:${date}`,
-    characterId,
-    structureId: 1000,
-    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-    unitPrices: { [ZEO]: 140 },
-    taxPct: 15,
-    estimatedValue: tax / 0.15,
-    tax,
-  });
-  const statementOf = (over: Partial<Statement> = {}): Statement => ({
-    id: 's1',
-    minerId: `solo:${ME}`,
-    code: 'ABC',
-    periodStart: '2026-10-01',
-    periodEnd: '2026-10-31',
-    coversFrom: '2026-10-01',
-    coversThrough: '2026-10-17',
-    issuedAt: '2026-10-18T00:00:00Z',
-    hubId: 'jita',
-    oreForm: 'compressed',
-    amount: 900_000,
-    lines: [line(ME, '2026-10-17', 900_000)],
-    ...over,
-  });
   const observedFor = (characterId: number, date = '2026-10-17') => ({
     characterId,
     recordedCorporationId: CORP,
@@ -2460,64 +1875,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     solarSystemId: SYSTEM,
     oreLines: [{ typeId: ZEO, quantity: 43_050 }],
   });
-  const paidToCorp = entry({
-    freeOreLines: [],
-    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-    allocations: [
-      {
-        id: 'a-bmw',
-        payeeId: 'bmw',
-        taxPct: 15,
-        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
-        status: 'paid',
-      },
-    ],
-  });
-
-  describe('a day the member marked paid', () => {
-    it("carries what the book's unsettled Statement still shows owed", () => {
-      const out = overlay(
-        [paidToCorp],
-        [book({ ownPayeeIds: ['bmw'], statements: [statementOf()] })]
-      );
-      expect(out.rows[0]).toMatchObject({
-        state: 'paid',
-        settledBy: 'yourMark',
-        bookOwed: 900_000,
-      });
-    });
-
-    it('says nothing more before a Statement bills the day', () => {
-      const out = overlay([paidToCorp], [book({ ownPayeeIds: ['bmw'] })]);
-      expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'yourMark' });
-      expect(out.rows[0].bookOwed).toBeUndefined();
-    });
-
-    it('reads plain Paid once the Statement is settled', () => {
-      const out = overlay(
-        [paidToCorp],
-        [
-          book({
-            ownPayeeIds: ['bmw'],
-            statements: [statementOf()],
-            payments: [
-              {
-                id: 'p1',
-                minerId: `solo:${ME}`,
-                characterId: ME,
-                amount: 900_000,
-                at: '2026-10-18T10:00:00Z',
-                source: 'donation',
-              },
-            ],
-          }),
-        ]
-      );
-      expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'statement' });
-      expect(out.rows[0].bookOwed).toBeUndefined();
-    });
-  });
-
   describe("a Miner's credit settles only its own days", () => {
     // 43,050 × 148 × 15% = 955,710 a day; each payment is enough for one day.
     const DAY = 43_050 * 148 * 0.15;
@@ -2582,14 +1939,14 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         ],
       });
 
-    it('names the share of the Assignment the book bills too, once a Statement bills it', () => {
-      const out = overlay([toOther(43_050)], [book({ statements: [statementOf()] })]);
+    it('names the share of the Assignment the book bills too, once the Conflict ran its 14 days', () => {
+      const out = overlay([toOther(43_050)], [book()], LATE);
       expect(out.rows[0].state).toBe('billed');
       expect(out.alsoBilled.get(KEY)?.get('a-other')).toBeCloseTo(1, 6);
     });
 
     it('is only the part the book recorded', () => {
-      const out = overlay([toOther(50_000)], [book({ statements: [statementOf()] })]);
+      const out = overlay([toOther(50_000)], [book()], LATE);
       expect(out.alsoBilled.get(KEY)?.get('a-other')).toBeCloseTo(43_050 / 50_000, 6);
     });
 
@@ -2598,38 +1955,31 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       expect(out.rows[0].state).toBe('conflict');
       expect(out.alsoBilled.size).toBe(0);
     });
+
+    // The personal Payee waits on a Conflict: the corporation's row is the day's one bill until the
+    // member resolves it, so it is named as the share the Payee is not billed meanwhile.
+    it('names the contested share as held back while the day is a Conflict', () => {
+      const out = overlay([toOther(43_050)], [book()]);
+      expect(out.conflicted.get(KEY)?.get('a-other')).toBeCloseTo(1, 6);
+    });
+
+    it('holds back only the contested part of the Assignment', () => {
+      const out = overlay([toOther(50_000)], [book()]);
+      expect(out.conflicted.get(KEY)?.get('a-other')).toBeCloseTo(43_050 / 50_000, 6);
+    });
+
+    it('holds nothing back once the Conflict ran its 14 days (the Payee is also-billed then)', () => {
+      const out = overlay([toOther(43_050)], [book()], LATE);
+      expect(out.conflicted.size).toBe(0);
+    });
   });
 
-  describe('Overdue Statements', () => {
-    const issued = statementOf({ issuedAt: '2026-10-01T00:00:00Z' });
-
-    it('names an unsettled Statement past its Overdue days', () => {
-      const out = overlay([entry()], [book({ statements: [issued] })]);
-      expect(out.books[0].overdue).toEqual([
-        {
-          statementId: 's1',
-          minerId: `solo:${ME}`,
-          code: 'ABC',
-          periodStart: '2026-10-01',
-          periodEnd: '2026-10-31',
-          overdueAt: '2026-10-15T00:00:00.000Z',
-        },
+  describe('Late notices whose days are unpaid', () => {
+    it('names an unpaid one, with its code', () => {
+      const out = overlay([entry()], [book({ notices: [noticeOf()] })]);
+      expect(out.books[0].notices).toMatchObject([
+        { noticeId: 'n1', minerId: `solo:${ME}`, code: 'MTABCDEF' },
       ]);
-    });
-
-    it('lists every unsettled Statement, oldest first, for the pay dialog', () => {
-      const newer = statementOf({ id: 's2', code: 'NEW', issuedAt: '2026-10-10T00:00:00Z' });
-      const out = overlay([entry()], [book({ statements: [newer, issued] })]);
-      expect(out.books[0].openStatements.map((s) => [s.statementId, s.code])).toEqual([
-        ['s1', 'ABC'],
-        ['s2', 'NEW'],
-      ]);
-      expect(out.books[0].overdue.map((s) => s.statementId)).toEqual(['s1']);
-    });
-
-    it("follows the book's own Overdue days", () => {
-      const out = overlay([entry()], [book({ statements: [issued], overdueDays: 30 })]);
-      expect(out.books[0].overdue).toEqual([]);
     });
 
     it('never names a settled one', () => {
@@ -2637,21 +1987,21 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         [entry()],
         [
           book({
-            statements: [issued],
+            notices: [noticeOf()],
             payments: [
               {
                 id: 'p1',
                 minerId: `solo:${ME}`,
                 characterId: ME,
-                amount: 900_000,
-                at: '2026-10-02T10:00:00Z',
+                amount: DAY,
+                at: '2026-10-19T10:00:00Z',
                 source: 'donation',
               },
             ],
           }),
         ]
       );
-      expect(out.books[0].overdue).toEqual([]);
+      expect(out.books[0].notices).toEqual([]);
     });
   });
 
@@ -2701,7 +2051,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         // The pooled money paid both days; without the lost one, the newer day is owed again.
         expect(out.books[0].uncredited).toEqual([{ ...lost, covered: ['2026-10-17'] }]);
         const byDate = new Map(out.rows.map((r) => [r.date, r]));
-        expect(byDate.get('2026-10-15')).toMatchObject({ state: 'paid', settledBy: 'donation' });
+        expect(byDate.get('2026-10-15')).toMatchObject({ state: 'paid' });
         expect(byDate.get('2026-10-15')).not.toHaveProperty('unlinkedDonation');
         expect(byDate.get('2026-10-17')).toMatchObject({ state: 'billed' });
       });
@@ -2717,7 +2067,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     it('waits for a sync that read the wallet, not just any sync', () => {
       // The book synced, but no sync since the donation could read the corp wallet.
       const unread = overlay([entry()], [book({ inFlight: [old], donationsCheckedAt: null })]);
-      expect(unread.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
+      expect(unread.rows[0]).toMatchObject({ state: 'paid' });
       expect(unread.books[0].uncredited).toEqual([]);
       // The last sync that did read it was too soon after the donation.
       const early = overlay(
@@ -2732,52 +2082,32 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     it('still counts while the book has not synced 3 days after it', () => {
       const recent = { ...old, at: '2026-10-16T10:00:00Z' };
       const out = overlay([entry()], [book({ inFlight: [recent] })]);
-      expect(out.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
+      expect(out.rows[0]).toMatchObject({ state: 'paid' });
       expect(out.books[0].uncredited).toEqual([]);
     });
   });
 
   describe("a Miner's own declaration and dispute (#6206)", () => {
-    const issued = statementOf({ issuedAt: '2026-10-01T00:00:00Z' });
     const declared = (over: Partial<Declaration> = {}): Declaration => ({
       id: 'x1',
-      statementId: 's1',
+      noticeId: 'n1',
       kind: 'another-way',
       at: '2026-10-14T00:00:00.000Z',
       amount: 500_000,
       ...over,
     });
 
-    it('marks a billed row and its Statement as declared, waiting for the corporation', () => {
-      const out = overlay(
-        [entry()],
-        [book({ statements: [statementOf()], declarations: [declared()] })]
-      );
+    it('marks a billed row and its Late notice as declared, waiting for the corporation', () => {
+      const out = overlay([entry()], [book({ notices: [noticeOf()], declarations: [declared()] })]);
       expect(out.rows[0]).toMatchObject({
         state: 'billed',
-        statementId: 's1',
+        noticeId: 'n1',
         declaration: { state: 'waiting', at: '2026-10-14T00:00:00.000Z', amount: 500_000 },
       });
-      expect(out.books[0].openStatements[0].declaration).toMatchObject({ state: 'waiting' });
+      expect(out.books[0].notices[0].declaration).toMatchObject({ state: 'waiting' });
     });
 
-    it('a waiting declaration pauses Overdue for the member as for the officers', () => {
-      const out = overlay([entry()], [book({ statements: [issued], declarations: [declared()] })]);
-      expect(out.books[0].overdue).toEqual([]);
-    });
-
-    it('a rejected one says so, with the reason, and Overdue counts again', () => {
-      const rejected = declared({
-        resolution: { kind: 'rejected', at: '2026-10-15T00:00:00.000Z', reason: 'No contract' },
-      });
-      const out = overlay([entry()], [book({ statements: [issued], declarations: [rejected] })]);
-      expect(out.books[0].overdue[0]).toMatchObject({
-        statementId: 's1',
-        declaration: { state: 'rejected', reason: 'No contract' },
-      });
-    });
-
-    it('reads only the latest declaration of a Statement', () => {
+    it('reads only the latest declaration of a Late notice', () => {
       const older = declared({
         id: 'x0',
         at: '2026-10-10T00:00:00.000Z',
@@ -2785,7 +2115,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       const out = overlay(
         [entry()],
-        [book({ statements: [statementOf()], declarations: [declared(), older] })]
+        [book({ notices: [noticeOf()], declarations: [declared(), older] })]
       );
       expect(out.rows[0].declaration?.state).toBe('waiting');
     });
@@ -2893,14 +2223,12 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         oreLines: [{ typeId: ZEO, quantity: 43_050 }],
         freeOreLines: [{ typeId: ZEO, quantity: 43_050 }],
       });
-      const statement = statementOf({ issuedAt: '2026-10-01T00:00:00Z' });
       const nothingToDo = (out: ReturnType<typeof overlay>) => {
-        expect(out.books[0].openStatements).toEqual([]);
-        expect(out.books[0].overdue).toEqual([]);
+        expect(out.books[0].notices).toEqual([]);
       };
 
       it('a waived dispute that credits the whole day leaves every open area and reads Waived', () => {
-        const day = 43_050 * 140 * 0.15;
+        const day = DAY;
         const waivedAll = answered({
           resolution: {
             kind: 'dismissed',
@@ -2914,13 +2242,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
           [owes],
           [
             book({
-              statements: [
-                statementOf({
-                  issuedAt: '2026-10-01T00:00:00Z',
-                  amount: day,
-                  lines: [{ ...line(ME, '2026-10-17', day), chargeKey: KEY }],
-                }),
-              ],
+              notices: [noticeOf({ issuedAt: '2026-10-01T00:00:00Z' })],
               adjustments: [
                 {
                   id: 'a9',
@@ -2937,42 +2259,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
           ]
         );
         expect(out.rows[0]).toMatchObject({ state: 'waived', taxOwed: 0 });
-        expect(out.rows[0].flagged?.state).toBe('dismissed');
-        nothingToDo(out);
-      });
-
-      it('a Statement written off in full leaves every open area and reads Waived', () => {
-        const out = overlay(
-          [owes],
-          [
-            book({
-              statements: [statement],
-              writeOffs: [
-                {
-                  id: 'w1',
-                  minerId: `solo:${ME}`,
-                  amount: 900_000,
-                  reason: 'Goodwill',
-                  at: '2026-10-20T00:00:00Z',
-                  statementId: 's1',
-                },
-              ],
-              disputes: [
-                answered({
-                  resolution: {
-                    kind: 'dismissed',
-                    at: '2026-10-20T00:00:00.000Z',
-                    by: 1,
-                    reason: 'Goodwill',
-                    amountIsk: 0,
-                  },
-                }),
-              ],
-            }),
-          ]
-        );
-        expect(out.rows[0].state).toBe('waived');
-        expect(out.rows[0].billed).toBe(900_000);
         expect(out.rows[0].flagged?.state).toBe('dismissed');
         nothingToDo(out);
       });
@@ -3107,188 +2393,9 @@ describe('resolving in the app: an open dispute holds its day', () => {
     expect(out.rows.find((r) => r.date === '2026-10-15')?.held).toBeUndefined();
   });
 
-  // The member's own record governs which days *they* paid: a mark pays the day it names. (Until
-  // the fix for the Bureau report, marks were pooled and spent on the oldest open days, so a
-  // member who marked 11-06 paid saw it stay Billed while an older day turned Paid.)
-  describe('marks under the corporation’s own Payee pay the days they name', () => {
-    const owned = (status: 'paid' | 'outstanding') =>
-      DAYS.map((date, i) =>
-        entry({
-          date,
-          oreLines: [{ typeId: ZEO, quantity: 10_000 }],
-          freeOreLines: [],
-          allocations: [
-            {
-              id: `a-${i}`,
-              payeeId: 'bmw',
-              taxPct: 15,
-              oreLines: [{ typeId: ZEO, quantity: 10_000 }],
-              // Only the newest day was marked paid.
-              status: i === 2 ? status : 'outstanding',
-            },
-          ],
-        })
-      );
-
-    it('pays the newest day a mark names, and leaves the older open days billed', () => {
-      const out = overlay(owned('paid'), [
-        book({ observed: observedOn(DAYS), ownPayeeIds: ['bmw'] }),
-      ]);
-      const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
-      expect(byDate).toEqual({
-        '2026-10-15': 'billed',
-        '2026-10-16': 'billed',
-        '2026-10-17': 'paid',
-      });
-      expect(out.rows.find((r) => r.date === '2026-10-17')).toMatchObject({
-        settledBy: 'yourMark',
-        taxOwed: 0,
-      });
-      expect(out.rows.find((r) => r.date === '2026-10-15')?.taxOwed).toBeCloseTo(222_000);
-    });
-
-    it('lets a donation in flight pay only what the mark did not: never the same ISK twice', () => {
-      // 444,000 sent for the 17th (marked) and one more day: the rest pays the oldest open day.
-      const out = overlay(owned('paid'), [
-        book({
-          observed: observedOn(DAYS),
-          ownPayeeIds: ['bmw'],
-          inFlight: [{ characterId: ME, amount: 444_000, at: '2026-10-18T13:10:00Z' }],
-        }),
-      ]);
-      const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
-      expect(byDate).toEqual({
-        '2026-10-15': 'paid',
-        '2026-10-16': 'billed',
-        '2026-10-17': 'paid',
-      });
-      expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('donation');
-    });
-  });
-
-  // The Bureau report (2026-11-16): one 10,898,549 ISK donation paid 11-06 and 11-07, which the
-  // member marked paid. The book's credit pays a Miner's oldest open day (11-01) first.
-  describe('a member who marked 11-06 and 11-07 paid with one donation', () => {
-    const REF = 26251213375;
-    const tax = { '2026-11-01': 17_378_825, '2026-11-06': 10_242_021, '2026-11-07': 656_528 };
-    const dates = Object.keys(tax) as (keyof typeof tax)[];
-    // Price 20 at 5%: one unit of ore is one ISK of tax.
-    const bureau = (over: Partial<PersonalBook> = {}, on = dates) =>
-      book({
-        rates: [{ scope: 'corp', pct: 5, effectiveFrom: '2026-10-01' }],
-        lastSyncedAt: '2026-11-16T09:00:00Z',
-        ownPayeeIds: ['bureau'],
-        observed: on.map((date) => ({
-          characterId: ME,
-          recordedCorporationId: CORP,
-          structureId: 1000,
-          date,
-          solarSystemId: SYSTEM,
-          oreLines: [{ typeId: ZEO, quantity: tax[date] }],
-        })),
-        pricesOn: () => ({ prices: new Map([[ZEO, 20]]), sources: new Map([[ZEO, 'saved']]) }),
-        ...over,
-      });
-    const entries = dates.map((date) =>
-      entry({
-        date,
-        oreLines: [{ typeId: ZEO, quantity: tax[date] }],
-        freeOreLines: [],
-        allocations: [
-          {
-            id: `a-${date}`,
-            payeeId: 'bureau',
-            taxPct: 5,
-            oreLines: [{ typeId: ZEO, quantity: tax[date] }],
-            ...(date === '2026-11-01'
-              ? { status: 'outstanding' }
-              : { status: 'paid', paymentRefs: [REF] }),
-          },
-        ],
-      })
-    );
-    const LATER = '2026-11-16T14:00:00Z';
-    const sent = { characterId: ME, amount: 10_898_549, at: '2026-11-09T15:40:00Z', refId: REF };
-
-    it('reads Paid on the days it names while the donation is in flight', () => {
-      const out = overlay(entries, [bureau({ inFlight: [sent] })], LATER);
-      const byDate = new Map(out.rows.map((r) => [r.date, r]));
-      for (const date of ['2026-11-06', '2026-11-07']) {
-        expect(byDate.get(date)).toMatchObject({ state: 'paid', settledBy: 'yourMark' });
-        expect(byDate.get(date)?.bookOwed).toBeUndefined();
-      }
-      // The donation is the marks' ISK: it pays nothing more.
-      expect(byDate.get('2026-11-01')).toMatchObject({ state: 'billed', taxOwed: 17_378_825 });
-    });
-
-    it('says the book spent the payment on an older day once it holds it, and still bills these', () => {
-      const credited = {
-        id: `j1_${REF}`,
-        minerId: `solo:${ME}`,
-        characterId: ME,
-        amount: 10_898_549,
-        at: sent.at,
-        source: 'donation' as const,
-      };
-      const out = overlay(entries, [bureau({ payments: [credited] })], LATER);
-      const byDate = new Map(out.rows.map((r) => [r.date, r]));
-      expect(byDate.get('2026-11-06')).toMatchObject({
-        state: 'paid',
-        settledBy: 'yourMark',
-        bookOwed: 10_242_021,
-        bookSpentOn: ['2026-11-01'],
-      });
-      expect(byDate.get('2026-11-07')).toMatchObject({
-        state: 'paid',
-        bookOwed: 656_528,
-        bookSpentOn: ['2026-11-01'],
-      });
-      // The book's credit is the marks' ISK: counted once, so 11-01 is still owed in full.
-      expect(byDate.get('2026-11-01')).toMatchObject({ state: 'billed', taxOwed: 17_378_825 });
-    });
-
-    // Held for review, the book holds the ISK without counting it: it has spent it on nothing.
-    it('says nothing about where the book spent a payment it holds for review', () => {
-      // The book counts another payment of the member's (spent on 11-01), not the marks' one.
-      const other = {
-        id: 'j1_1',
-        minerId: `solo:${ME}`,
-        characterId: ME,
-        amount: 10_898_549,
-        at: sent.at,
-        source: 'donation' as const,
-      };
-      const out = overlay(entries, [bureau({ payments: [other], inReviewRefs: [REF] })], LATER);
-      for (const date of ['2026-11-06', '2026-11-07']) {
-        const row = out.rows.find((r) => r.date === date);
-        expect(row).toMatchObject({ state: 'paid', settledBy: 'yourMark' });
-        expect(row?.bookSpentOn).toBeUndefined();
-        expect(row?.bookOwed).toBeUndefined();
-      }
-    });
-
-    it('says nothing more when the book holds the payment and it reached the marked days', () => {
-      const credited = {
-        id: `j1_${REF}`,
-        minerId: `solo:${ME}`,
-        characterId: ME,
-        amount: 10_898_549,
-        at: sent.at,
-        source: 'donation' as const,
-      };
-      const without = entries.filter((e) => e.date !== '2026-11-01');
-      const out = overlay(
-        without,
-        [bureau({ payments: [credited] }, ['2026-11-06', '2026-11-07'])],
-        LATER
-      );
-      for (const row of out.rows) {
-        expect(row.state).toBe('paid');
-        expect(row.bookOwed).toBeUndefined();
-        expect(row.bookSpentOn).toBeUndefined();
-      }
-    });
-  });
+  // The Bureau report (2026-11-16): one 10,898,549 ISK donation the member meant for 11-06 and
+  // 11-07. The book's credit pays a Miner's oldest open day (11-01) first, and so does the member's
+  // side: there are no marks of their own on a book.
 
   describe('a disputed Conflict day', () => {
     const assigned = () =>

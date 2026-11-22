@@ -8,6 +8,22 @@ const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
 
 const CHAR_A = 1;
+
+/** A payment linked to the Payee that covers every day stored: they read Paid. */
+async function payTheDays() {
+  const owed = (await db.miningTaxAssignments.toArray()).reduce((sum, a) => sum + a.taxOwed, 0);
+  await db.miningTaxPaymentLinks.put({
+    id: 'journal:1',
+    characterId: CHAR_A,
+    payeeId: 'p',
+    kind: 'journal',
+    refId: 1,
+    amount: owed,
+    paidOn: '2026-09-20',
+    source: 'manual',
+    updatedAt: 0,
+  });
+}
 const TYPE_A = 45490;
 const TYPE_B = 45491;
 
@@ -31,6 +47,7 @@ function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningT
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
+  await db.miningTaxPaymentLinks.clear();
   await db.settings.clear();
 });
 
@@ -149,11 +166,9 @@ describe('coalesceAssignments', () => {
     ]);
   });
 
-  it('never fuses a paid day, even on identical terms', async () => {
-    await db.miningTaxAssignments.bulkPut([
-      assignment({ id: 'a1', status: 'paid', paidAt: 5 }),
-      assignment({ id: 'a2', status: 'paid', paidAt: 5 }),
-    ]);
+  it('never fuses a day its Payee has paid, even on identical terms', async () => {
+    await db.miningTaxAssignments.bulkPut([assignment({ id: 'a1' }), assignment({ id: 'a2' })]);
+    await payTheDays();
 
     await coalesceAssignments(CHAR_A);
 
@@ -241,10 +256,8 @@ describe('coalesceAssignments — exact duplicates', () => {
   });
 
   it('never touches paid duplicates', async () => {
-    await db.miningTaxAssignments.bulkPut([
-      assignment({ id: 'a1', status: 'paid' }),
-      assignment({ id: 'a2', status: 'paid' }),
-    ]);
+    await db.miningTaxAssignments.bulkPut([assignment({ id: 'a1' }), assignment({ id: 'a2' })]);
+    await payTheDays();
 
     await coalesceAssignments(CHAR_A, [entry]);
 

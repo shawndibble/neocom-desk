@@ -10,7 +10,7 @@ import type { MinerSettlement, OpenSet, OpenSetInput } from './types';
  * records the reader holds. Coverage first, so a moon owner's day outside it owes nothing and
  * never holds a miner's day (#4618); a covered day its ledger was not read well after is not
  * Billable yet (#4622). Then each day's charge, the last Billable day, and each Miner's
- * payments against its Statements. The officer's view, the read-model tabs and the member's
+ * Running account. The officer's view and the member's
  * overlay all read this one settlement, so they cannot drift apart.
  */
 export function settleOpenSet(input: OpenSetInput): OpenSet {

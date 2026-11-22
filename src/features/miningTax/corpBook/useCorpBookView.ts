@@ -28,6 +28,8 @@ interface Args {
   characters: readonly TrackedCharacter[];
   activeCharacterId: number | null;
   madePayments: readonly MadePayment[];
+  /** The Made Payments links hold: never a donation in flight to a book too. */
+  linked?: ReadonlySet<string>;
   /** The member's stored Payees, to connect the one that is a book's corporation. */
   payees: readonly PayeeRecord[];
   /** Changes whenever the ledger was reloaded, so the books are read again with it. */
@@ -62,6 +64,7 @@ export function useCorpBookView({
   payees,
   reloadKey,
   hiddenCorps = NONE_HIDDEN,
+  linked,
 }: Args): {
   view: CorpBookView | null;
   /** This mount's own read of the books has landed; until then `view` is built from the last good copy. */
@@ -194,12 +197,13 @@ export function useCorpBookView({
               corpNames,
               payees,
               made: madePayments,
+              linked,
               characterNames: new Map(characters.map((c) => [c.characterId, c.characterName])),
               now: new Date(nowMs).toISOString(),
             },
             (corp) => t('miningTax.corpBook.payeeName', { corp })
           ),
-    [rows, shownBooks, pricesByCorp, corpNames, payees, madePayments, characters, nowMs, t]
+    [rows, shownBooks, pricesByCorp, corpNames, payees, madePayments, linked, characters, nowMs, t]
   );
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   return { view, booksRead: freshLoaded !== undefined, reload, shownBooks, corpNameOf, hiddenLeft };

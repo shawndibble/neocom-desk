@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import type { JournalRow } from '@/engine/journalNetting';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -9,8 +8,7 @@ import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { miningTaxEntryHref } from '@/features/miningTax/paymentDeepLink';
-import { autoLinkRecordedPaymentsFromJournals } from '@/features/miningTax/autoLinkFromJournal';
-import { linkedAssignmentsByRef, reachedByTransaction } from '@/features/miningTax/paymentLinks';
+import { loadLinkedDays } from '@/features/miningTax/paymentLinkStore';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { classifyJournal, journalCoverage, type JournalLine } from '@/engine/journalNetting';
 import {
@@ -147,37 +145,20 @@ export function useWalletJournalView({
   // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
   // to each tax entry they settled. Every character's Assignments, since the
   // journal can show any of them.
-  const taxLinks = useLiveQuery(
-    async () => {
-      const all = await db.miningTaxAssignments.toArray();
-      return { ...linkedAssignmentsByRef(all), all };
-    },
-    [],
-    undefined
-  );
+  const taxLinks = useLiveQuery(() => loadLinkedDays(), [], undefined);
   const miningTaxEntriesFor = useCallback(
     (entry: WalletJournalEntry): MiningTaxEntryLink[] | undefined => {
       if (!taxLinks) return undefined;
-      const byJournal = taxLinks.journal.get(entry.id);
-      const linked =
-        byJournal ??
+      // The days the entry's money paid on its Payee's account, oldest first.
+      const paid =
+        taxLinks.get(`journal:${entry.id}`) ??
         (entry.context_id_type === 'contract_id' && entry.context_id !== undefined
-          ? taxLinks.contract.get(entry.context_id)
+          ? taxLinks.get(`contract:${entry.context_id}`)
           : undefined);
-      // Only the days the entry's ISK reaches: a day linked past it is not paid by it.
-      const reached =
-        byJournal && entry.amount !== undefined
-          ? reachedByTransaction(
-              `journal:${entry.id}`,
-              Math.abs(entry.amount),
-              byJournal,
-              taxLinks.all
-            )
-          : linked;
-      return reached?.map((a) => ({
-        href: miningTaxEntryHref(a.id),
-        date: a.date,
-        taxOwed: a.taxOwed,
+      return paid?.map((d) => ({
+        href: miningTaxEntryHref(d.id),
+        date: d.date,
+        taxOwed: d.taxOwed,
       }));
     },
     [taxLinks]
@@ -238,17 +219,6 @@ export function useWalletJournalView({
           : journal,
     [allJournalsData, showingBeyondActive, journal, activeCharacterId]
   );
-  // A recorded tax payment links to its journal entry as soon as the journal
-  // shows it, without waiting for a visit to Moon Mining Tax.
-  useEffect(() => {
-    void autoLinkRecordedPaymentsFromJournals(
-      allJournalsData
-        ? allJournalsData.loaded.map((c) => ({ characterId: c.characterId, entries: c.journal }))
-        : activeCharacterId !== null && !showingBeyondActive
-          ? [{ characterId: activeCharacterId, entries: journal }]
-          : []
-    );
-  }, [allJournalsData, activeCharacterId, showingBeyondActive, journal]);
   const trackedIds = useMemo(() => {
     const ids = new Set(scopedCharacterIds ?? []);
     for (const c of allJournalsData?.loaded ?? []) ids.add(c.characterId);

@@ -22,6 +22,7 @@ const verdict = { canEdit: true, bookActive: true } as OfficerVerdict;
 function renderDialog() {
   const view = {
     miners: [miner('m1', 1), miner('m2', 2), miner('m3', 3), miner('m4', 4, [5])],
+    input: { now: '2026-10-20T00:00:00Z' },
   };
   render(
     <BookProvider

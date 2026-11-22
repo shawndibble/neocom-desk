@@ -33,7 +33,7 @@ type Owner = Extract<FeederSetupStatus, { status: 'feeder' }>;
 
 /**
  * A moon owner's Moons page once an accounting corporation handles its tax:
- * the owner page (statement, who mined, payments and rate) from the server-built
+ * the owner page (what is owed, who mined, payments and rate) from the server-built
  * view, the stale-ledger banner with Reconnect, and Leave. A member who is not
  * an officer of the corporation never reaches this (the status read is refused).
  * Leave shows what is still owed before it revokes anything.

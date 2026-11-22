@@ -3,12 +3,12 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
-import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
+import { composeLateNoticeMail } from '@/engine/corpTaxBook/lateNoticeMail';
 import { formatIsk } from '@/lib/isk';
 import { MailLimitNotice } from './MailLimitNotice';
 import { MailQueueChip } from './MailQueueChip';
 import { MailQueuePanel } from './MailQueuePanel';
-import { EditableMailPreview, StatementMailPreview } from './StatementMailPreview';
+import { EditableMailPreview, LateNoticeMailPreview } from './LateNoticeMailPreview';
 
 // The rich editor is its own chunk (Tiptap); a plain field stands in for it here.
 vi.mock('@/features/character/MailBodyEditor', async () => {
@@ -30,7 +30,7 @@ function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
     batchId: 'b',
     corporationId: 1,
     statementId: `s${n}`,
-    kind: 'statement',
+    kind: 'notice',
     senderCharacterId: 7,
     recipientId: 100 + n,
     recipientName: `Miner ${n}`,
@@ -133,11 +133,11 @@ describe('MailQueueChip', () => {
         {...actions}
       />
     );
-    const chip = screen.getByRole('button', { name: 'Statement mail: 50% sent, 1 failed' });
+    const chip = screen.getByRole('button', { name: 'Late notice mail: 50% sent, 1 failed' });
     // One badge: the failures come first, since they need someone.
     expect(within(chip).getByText('1')).toBeInTheDocument();
     await userEvent.click(chip);
-    expect(await screen.findByText('Statement mail queue')).toBeInTheDocument();
+    expect(await screen.findByText('Late notice mail queue')).toBeInTheDocument();
   });
 
   it('reads 100% sent when done', () => {
@@ -145,38 +145,27 @@ describe('MailQueueChip', () => {
       <MailQueueChip items={[item(1, { status: 'sent', logged: true })]} now={NOW} {...actions} />
     );
     expect(
-      screen.getByRole('button', { name: 'Statement mail: 100% sent, done' })
+      screen.getByRole('button', { name: 'Late notice mail: 100% sent, done' })
     ).toBeInTheDocument();
   });
 });
 
-describe('StatementMailPreview', () => {
+describe('LateNoticeMailPreview', () => {
   it('shows recipient, subject and the simple table, with no pricing columns', () => {
-    const mail = composeStatementMail({
-      kind: 'statement',
+    const mail = composeLateNoticeMail({
+      kind: 'notice',
       corporationName: 'Ore & Glory',
       recipientName: 'Varro',
-      periodLabel: 'Sep 2026',
       code: 'MT-1',
-      lines: [
-        {
-          kind: 'mined',
-          date: '2026-09-03',
-          structureId: 1,
-          estimatedValue: 12_000_000,
-          tax: 1_200_000,
-        },
-      ],
-      refineryName: () => 'Efa - Brass Anvil',
+      days: [{ date: '2026-09-03', place: 'Efa - Brass Anvil', tax: 1_200_000 }],
+      oldest: '2026-09-03',
       amountDue: 1_200_000,
-      carried: 0,
-      dueDate: '2026-10-15',
       verifyUrl: 'https://app.test/v/t',
     });
-    render(<StatementMailPreview to="Varro" subject={mail.subject} body={mail.body} />);
+    render(<LateNoticeMailPreview to="Varro" subject={mail.subject} body={mail.body} />);
     expect(screen.getByText('Subject:').parentElement).toHaveTextContent(mail.subject);
     expect(screen.getByText(/Efa - Brass Anvil/)).toBeInTheDocument();
-    expect(screen.getByText(/Total tax: 1,200,000 ISK/)).toBeInTheDocument();
+    expect(screen.getByText(/Total owed now: 1,200,000 ISK/)).toBeInTheDocument();
   });
 });
 

@@ -2,13 +2,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
 import { SlideOver } from '@/components/ui';
 import { minerDetail } from '@/engine/corpTaxBook/bookView';
-import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { AuditEntry } from '@/features/corp/taxBook/bookClient';
 import { AuditFeed } from './AuditFeed';
 import { BookProvider } from './BookContext';
 import { AssignDonationDialog, MarkNotTaxDialog, RecordPaymentDialog } from './BookDialogs';
 import { CloseAccountDialog } from './CloseAccountDialog';
-import { AdjustmentDialog, RateOverrideDialog, RebillDialog } from './CorrectionDialogs';
+import { AdjustmentDialog, RateOverrideDialog } from './CorrectionDialogs';
 import { DeleteBookDialog } from './DeleteBookSection';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { TurnOnBook } from './TurnOnBook';
@@ -52,8 +51,8 @@ const AUDIT: AuditEntry[] = [
     at: at('2026-09-01T10:00:00Z'),
     by: 1,
     byName: 'Varro Kestane',
-    action: 'issueStatement',
-    detail: { minerId: 'solo:3', amount: 12_500_000 },
+    action: 'issueLateNotice',
+    detail: { minerId: 'solo:3', listed: 12_500_000 },
   },
   {
     id: 'a4',
@@ -126,7 +125,7 @@ export const RateOverride: Story = {
   render: () => <RateOverrideDialog open onClose={noop} days={DETAIL.days} />,
 };
 
-/** @summary Charge or credit line on the next Statement (Corrections ⋮). */
+/** @summary Charge or credit line on the Miner's account (Corrections ⋮). */
 export const Adjustment: Story = {
   render: () => (
     <AdjustmentDialog
@@ -139,20 +138,7 @@ export const Adjustment: Story = {
   ),
 };
 
-/** @summary Rebill from a date (Corrections ⋮). */
-export const Rebill: Story = {
-  render: () => (
-    <RebillDialog
-      open
-      onClose={noop}
-      miner={MINER}
-      minerName={NAME}
-      statements={DETAIL.statements as Statement[]}
-    />
-  ),
-};
-
-/** @summary Close a Miner's account: final Statement and what is written off. */
+/** @summary Close a Miner's account: final late notice and what is written off. */
 export const CloseAccount: Story = {
   render: () => (
     <CloseAccountDialog

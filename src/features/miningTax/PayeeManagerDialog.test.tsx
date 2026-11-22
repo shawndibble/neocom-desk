@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import '@/i18n';
 import { db, type PayeeRecord } from '@/db';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeManagerDialog } from './PayeeManagerDialog';
 import { loadPayees } from './payees';
 
@@ -56,7 +57,12 @@ const characters = [{ characterId: CHAR, characterName: 'Miner Alt' }];
 
 type ExtraProps = Pick<
   ComponentProps<typeof PayeeManagerDialog>,
-  'owedByPayee' | 'systemsByPayee' | 'systemNames' | 'bookCorporations'
+  | 'owedByPayee'
+  | 'systemsByPayee'
+  | 'systemNames'
+  | 'bookCorporations'
+  | 'accountOf'
+  | 'onOpenLedger'
 >;
 
 function renderDialog(payees: PayeeRecord[] = [], extra: ExtraProps = {}) {
@@ -156,7 +162,7 @@ describe('PayeeManagerDialog — trade hub', () => {
     renderDialog([
       { id: 'p1', characterId: CHAR, name: 'Landlord', defaultTaxPct: 10, updatedAt: 1 },
     ]);
-    expect(screen.getByText('10% · Jita')).toBeInTheDocument();
+    expect(screen.getByText('10% · priced at Jita')).toBeInTheDocument();
   });
 
   it('keeps the Default Systems through an edit that only changes the hub', async () => {
@@ -342,6 +348,35 @@ describe('PayeeManagerDialog — list rows', () => {
     expect(screen.getByText('Settled')).toBeInTheDocument();
   });
 
+  it("reads a personal Payee's credit off its Running account", () => {
+    const account = { credit: 500_000 } as PayeeRunningAccount;
+    renderDialog([bureau, police], {
+      owedByPayee: new Map(),
+      accountOf: (id) => (id === 'p1' ? account : undefined),
+    });
+    expect(screen.getByText('500,000 ISK credit')).toHaveClass('text-isk-pos');
+    expect(screen.getByText('Settled')).toBeInTheDocument();
+  });
+
+  it("opens any Payee's ledger from its balance, settled or not, even with no account", async () => {
+    const onOpenLedger = vi.fn();
+    const account = { credit: 0 } as PayeeRunningAccount;
+    renderDialog([bureau, police], {
+      owedByPayee: new Map(),
+      accountOf: (id) => (id === 'p1' ? account : undefined),
+      onOpenLedger,
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: `Open the ledger of ${bureau.name}` })
+    );
+    expect(onOpenLedger).toHaveBeenCalledWith('p1');
+    // Nothing ever billed: no account, and "Settled" still opens its (empty) ledger.
+    await userEvent.click(
+      screen.getByRole('button', { name: `Open the ledger of ${police.name}` })
+    );
+    expect(onOpenLedger).toHaveBeenLastCalledWith(police.id);
+  });
+
   it('lists the systems mined for a Payee after its rate and hub', () => {
     renderDialog([bureau], {
       systemsByPayee: new Map([['p1', new Set([3, 1, 2])]]),
@@ -351,7 +386,9 @@ describe('PayeeManagerDialog — list rows', () => {
         [3, 'Ainsan'],
       ]),
     });
-    expect(screen.getByText('5% · Jita · Ainsan, Sabusi, Talidal')).toBeInTheDocument();
+    expect(
+      screen.getByText('5% · priced at Jita · mined in Ainsan, Sabusi, Talidal')
+    ).toBeInTheDocument();
   });
 
   it('keeps the add form hidden until Add Payee is pressed', async () => {

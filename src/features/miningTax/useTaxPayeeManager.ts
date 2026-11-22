@@ -21,12 +21,13 @@ export function useTaxPayeeManager(
     null;
 
   // A corp's book is something to owe on its own: a member with no Payee of their own yet still
-  // sees what the book billed.
+  // sees what the book billed, and the day it will bill (a first day in a book is Today's mining
+  // until it closes: nothing is billed, but the pending record and any payment ahead are theirs).
+  const bookHasTheirs =
+    corpView !== null &&
+    (corpView.overlay.rows.length > 0 || corpView.books.some((b) => b.pendingFrom !== undefined));
   const needsFirstPayee =
-    hasData &&
-    allPayees.length === 0 &&
-    !(corpView && corpView.overlay.rows.length > 0) &&
-    defaultCharacterId !== null;
+    hasData && allPayees.length === 0 && !bookHasTheirs && defaultCharacterId !== null;
 
   const onAddPayee = useMemo(
     () =>

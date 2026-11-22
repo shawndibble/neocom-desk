@@ -13,6 +13,48 @@ export const BOOK_VERSION_FIELD = 'bookVersion';
 /** Field on `corps/{id}`: subcollection name → a fresh random id on every write to it. */
 export const COLLECTION_VERSIONS_FIELD = 'collectionVersions';
 
+// --- The book's subcollections under `corps/{id}`, named once for the server and the client ---
+
+export const OBSERVED = 'observed';
+export const EXTRACTIONS = 'extractions';
+/** `payments/{id}`: read by its sender (`uid`) and its Miner's readers (`uids`). */
+export const PAYMENTS = 'payments';
+export const DISMISSALS = 'dismissals';
+export const DECLARATIONS = 'declarations';
+/** `disputes/{minerId_date}`: a Miner says a Conflict day's ore went to another Payee (#6206). */
+export const DISPUTES = 'disputes';
+export const ADJUSTMENTS = 'adjustments';
+export const WRITE_OFFS = 'writeOffs';
+/** `toleranceExemptions/{id}`: an officer's limit on what one Miner-day shortfall may forgive. */
+export const TOLERANCE_EXEMPTIONS = 'toleranceExemptions';
+/**
+ * `minerPaid/{minerId}`: a copy of the Miner's paid-through day from `meta/paid` (officer-only),
+ * readable by that Miner so their own Tax tab can close the same days the book does.
+ */
+export const MINER_PAID = 'minerPaid';
+export const REBILLS = 'rebills';
+/** `corpTaxBookTokens/{token}`: a verify link's token, naming its corporation and notice. */
+export const TOKENS_COLLECTION = 'corpTaxBookTokens';
+/** Legacy Late notices, read once by the one-time copy into `lateNotices`. */
+export const STATEMENTS = 'statements';
+/** `statementLinks/{statementId}`: the verify token, readable by editors only. */
+export const STATEMENT_LINKS = 'statementLinks';
+/**
+ * `lateNotices/{noticeId}`: a `LateNotice` and a server `updatedAt` (decision 20261120-235011).
+ * Officers read every one; a Miner reads their own (`uids`).
+ */
+export const LATE_NOTICES = 'lateNotices';
+/** `lateNoticeLinks/{noticeId}`: `{ token }`, the verify link's token. Editors only. */
+export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
+/**
+ * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
+ * them out (the server cannot price days), for the pay page, and its `snapshot` for the lock date
+ * with the Miner's readers (`uids`). Officers read every one; a Miner reads their own snapshot.
+ */
+export const RUNNING_ACCOUNTS = 'accounts';
+export const MINERS = 'miners';
+export const META = 'meta';
+
 /**
  * Subcollections whose writes never change what a client caches, so they move
  * no stamp: officer access records (rewritten on every officer check, which
@@ -36,8 +78,6 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
   'vettingThrottle',
   // A server-side mirror of `observed` (corpTaxBookFeederRollup.ts); no client reads it.
   'feederObserved',
-  // A running account's figures for the pay page (#6294); only the verify link reads them.
-  'accounts',
 ]);
 
 /**
@@ -47,26 +87,31 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
  * stamped only once written, and a client never trusts a missing stamp.
  */
 export const VERSIONED_COLLECTIONS = [
-  'miners',
-  'statements',
-  'payments',
-  'dismissals',
-  'extractions',
-  'observed',
-  'declarations',
-  'adjustments',
-  'writeOffs',
+  MINERS,
+  STATEMENTS,
+  // Late notices and their verify links, and each Running account with its snapshot
+  // (decision 20261120-235011).
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  RUNNING_ACCOUNTS,
+  PAYMENTS,
+  DISMISSALS,
+  EXTRACTIONS,
+  OBSERVED,
+  DECLARATIONS,
+  ADJUSTMENTS,
+  WRITE_OFFS,
   // An officer's per-day limit on forgiving a shortfall; a Miner reads their own.
-  'toleranceExemptions',
+  TOLERANCE_EXEMPTIONS,
   // A Miner's own copy of their paid-through day (`meta/paid` is officer-only).
-  'minerPaid',
+  MINER_PAID,
   'feeders',
-  'meta',
+  META,
   // Server-built running totals per Miner (#5255, ADR 0032); the Miner page reads one (#5258).
   'minerTotals',
   // Server-built per-pull moon docs (#5256, ADR 0032); the moon page reads them (#5716).
   'moonDocs',
-  // Server-built Overview and Miners tab docs (#5259, ADR 0032); the Overview and Miners tab read them.
+  // The server-built Overview and Miners list docs (#5259, ADR 0032).
   'readModels',
   // The member side (issue #5050) caches it too.
   'feederCoverage',
@@ -74,8 +119,12 @@ export const VERSIONED_COLLECTIONS = [
 
 export type VersionedCollection = (typeof VERSIONED_COLLECTIONS)[number];
 
-/** Bump when a field of a `readModels` doc changes meaning (#5259): the verifier then rewrites both docs and a client ignores the old ones. */
-export const READ_MODELS_SCHEMA = 1;
+/**
+ * Bump when a field of a `readModels` doc changes meaning (#5259): the verifier then rewrites it
+ * and a client ignores the old one. 2: built for Running accounts (decision 20261120-235011); the
+ * Overview holds only its Extractions, and the Miners list only the ids of recorded accounts.
+ */
+export const READ_MODELS_SCHEMA = 2;
 
 /**
  * Where a document or collection path lands in a book: its corporation id, and

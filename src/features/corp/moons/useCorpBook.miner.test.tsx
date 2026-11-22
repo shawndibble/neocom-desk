@@ -55,9 +55,7 @@ function book(): BookRead {
       active: true,
       startDate: '2026-10-01',
       graceHours: 24,
-      minimumStatement: 0,
       overdueDays: 14,
-      cadence: { kind: 'monthly' },
       hubId: 'jita',
       oreForm: 'raw',
       structureExpiryHours: {},
@@ -65,11 +63,10 @@ function book(): BookRead {
     } as never,
     state: {
       miners: [],
-      statements: [],
+      notices: [],
       payments: [],
       dismissals: [],
       extractions: [],
-      paidStatementIds: new Set(),
     } as never,
     observed: [
       // Frozen: before the window, priced by nobody.

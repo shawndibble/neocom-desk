@@ -2,7 +2,7 @@
  * The moon owner's read model, client side (#4512, spec #4504). The server
  * writes `corps/{collector}/feederViews/{feeder}/…`; the client reads it
  * under the viewer access record (`getFeederViewAccess`) and changes nothing
- * but through the callables. It holds no miner debts, statements, miner rate or
+ * but through the callables. It holds no miner debts, late notices, miner rate or
  * margin. Player-facing text never says feeder or Collector.
  */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';

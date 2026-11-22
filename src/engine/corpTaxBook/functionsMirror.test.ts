@@ -2,23 +2,15 @@ import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import * as calls from '../../../functions/src/corpTaxBookKinds';
-import { liveAccount } from '../../../functions/src/corpTaxBookAccounts';
-import { netOf } from './paymentPreview';
-import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
-import {
-  DISPUTE_HOLD_DAYS,
-  DISPUTE_KINDS,
-  disputeHold,
-  heldByStatement,
-  readDisputes,
-} from './disputes';
+import { liveRunningAccount } from '../../../functions/src/corpTaxBookRunningAccounts';
+import { netPayment } from './payments';
+import { DISPUTE_KINDS, disputeHold, readDisputes } from './disputes';
 import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
 import { TAX_CONTACT_MAX_CHARACTERS } from './bookDocs';
 import { DEFAULT_NOTICE_RULES, NOTICE_AFTER_KINDS } from './notices';
-import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
+import { DAY_SETTLE_TOLERANCE_PCT, daySettleTolerance } from './minerRunningAccount';
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
-import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';
 import {
   clampCoverageFrom,
@@ -65,14 +57,6 @@ import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DIVISION_NAME_MAX } from './divisionNames';
 import { mergeObservedRows, observedRowKey } from './observed';
 import { latestRecordedCorp } from './bookDocs';
-import { canOverrideRecordRate, rateStartRefusal } from './rates';
-import {
-  DEFAULT_MINIMUM_STATEMENT,
-  canRebillFrom,
-  daysOnStatements,
-  statementDays,
-  type Statement,
-} from './statements';
 import type { ObservedRow } from './types';
 import * as removal from './removal';
 import { effectiveOwnerRate } from './ownerRate';
@@ -91,19 +75,6 @@ const row = (quantity: number, cachedAt: string, over: Partial<ObservedRow> = {}
   cachedAt,
   ...over,
 });
-
-const statement = (id: string, from: string, through: string, lineDate?: string) =>
-  ({
-    id,
-    coversFrom: from,
-    coversThrough: through,
-    lines: lineDate
-      ? [
-          { kind: 'late-ore', date: lineDate },
-          { kind: 'correction', date: '2000-01-01' },
-        ]
-      : [],
-  }) as unknown as Statement;
 
 describe('functions mirror of the Corp Tax Book engine', () => {
   it('merges observed rows identically', () => {
@@ -135,73 +106,6 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(merged.rows.find((r) => r.structureId === 1)?.sourceCorporationId).toBe(5);
   });
 
-  it('agrees on dates and rate rules', () => {
-    for (const [from, last] of [
-      ['2026-06-12', null],
-      ['2026-06-11', null],
-      ['2026-07-12', null],
-      ['2026-07-05', '2026-07-05'],
-      ['2026-07-06', '2026-07-05'],
-    ] as const)
-      expect(mirror.rateStartRefusal(from, '2026-07-12', last)).toBe(
-        rateStartRefusal(from, '2026-07-12', last)
-      );
-    const statements = [
-      statement('a', '2026-07-01', '2026-07-31', '2026-06-20'),
-      statement('b', '2026-08-01', '2026-08-10'),
-    ];
-    for (const day of ['2026-06-20', '2026-06-21', '2026-07-31', '2026-08-05', '2026-08-11']) {
-      expect(mirror.canOverrideRecordRate(day, statements)).toBe(
-        canOverrideRecordRate(day, daysOnStatements(statements))
-      );
-    }
-    expect([...mirror.statementDays(statements[0])].sort()).toEqual(
-      [...statementDays(statements[0])].sort()
-    );
-  });
-
-  it('agrees on which days a paid Statement closes', () => {
-    const statements = [
-      statement('a', '2026-07-01', '2026-07-31'),
-      statement('b', '2026-08-01', '2026-08-31'),
-    ];
-    const paid = new Set(['a']);
-    for (const day of ['2026-07-31', '2026-08-01']) {
-      expect(mirror.canRebillFrom(day, statements, paid)).toBe(
-        canRebillFrom(day, statements, paid)
-      );
-    }
-  });
-
-  it('allocates payments to Statements identically, including per-payment credits', () => {
-    const statements = [
-      { id: 's2', amount: 8_000_000, issuedAt: '2026-07-31T00:00:00Z' },
-      { id: 's1', amount: 10_000_000, issuedAt: '2026-06-30T00:00:00Z' },
-    ];
-    const payments = [
-      { id: 'p1', amount: 12_000_000, at: '2026-08-01T00:00:00Z', notTaxAmount: 500_000 },
-      { id: 'p2', amount: 3_000_000, at: '2026-08-02T00:00:00Z', statementId: 's2' },
-      { id: 'p3', amount: 50_000_000, at: '2026-08-03T00:00:00Z' },
-    ];
-    const dismissalCredits = [{ statementId: 's1', amount: 1_000_000 }];
-    const shared = { statements, payments, dismissalCredits };
-    const theirs = mirror.allocatePayments(shared);
-    const ours = allocatePayments({
-      statements: statements.map((s) => ({ ...s, minerId: 'm', code: '', lines: [] }) as never),
-      payments: payments.map((p) => ({
-        ...p,
-        minerId: 'm',
-        characterId: 1,
-        source: 'donation' as const,
-      })),
-      dismissalCredits: dismissalCredits.map((d) => ({ ...d, dismissalId: 'd', chargeKey: 'k' })),
-    });
-    expect(theirs.paymentCredits).toEqual(ours.paymentCredits);
-    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
-    expect(theirs.credit).toBe(ours.credit);
-    expect(theirs.balance).toBe(ours.balance);
-  });
-
   it('keeps the dispute, transfer and tax contact vocabularies equal', () => {
     expect([...calls.DISPUTE_KINDS]).toEqual([...DISPUTE_KINDS]);
     expect([...calls.TRANSFER_RECIPIENTS]).toEqual([...TRANSFER_RECIPIENTS]);
@@ -215,11 +119,28 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       { amount: 7, notTaxAmount: 3 },
       { amount: 2, notTaxAmount: 9 },
     ];
-    const counted = payments.reduce((sum, p) => sum + netOf(p), 0);
-    expect(liveAccount({ owed: 100, paid: 0, days: 1, at: 'x' }, payments).owed).toBe(
+    const counted = payments.reduce((sum, p) => sum + netPayment(p), 0);
+    expect(liveRunningAccount({ owed: 100, paid: 0, days: 1, at: 'x' }, payments).owed).toBe(
       100 - counted
     );
-    expect(liveAccount({ owed: 100, paid: counted, days: 1, at: 'x' }, payments).owed).toBe(100);
+    expect(liveRunningAccount({ owed: 100, paid: counted, days: 1, at: 'x' }, payments).owed).toBe(
+      100
+    );
+  });
+
+  it('counts a payment within the day tolerance as paying the day, as the client does', () => {
+    const recorded = {
+      owed: 1000,
+      paid: 0,
+      days: 1,
+      at: 'x',
+      unpaidDays: [{ date: '2026-11-01', owed: 1000, tax: 1000 }],
+    };
+    const within = 1000 - daySettleTolerance(1000);
+    expect(liveRunningAccount(recorded, [{ amount: within }]).days).toBe(0);
+    expect(liveRunningAccount(recorded, [{ amount: within }]).unpaidDays).toEqual([]);
+    expect(liveRunningAccount(recorded, [{ amount: within - 1 }]).unpaidDays).toHaveLength(1);
+    expect(calls.daySettleTolerance(1000, 1)).toBe(daySettleTolerance(1000, 1));
   });
 
   it('keeps the running account’s notice rules and day tolerance equal', () => {
@@ -277,174 +198,6 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(disputeHold(ours[1], '2026-10-20T00:00:00.000Z')).toBeUndefined();
   });
 
-  it('holds disputed amounts identically, and allocates around them the same way', () => {
-    expect(mirror.DISPUTE_HOLD_DAYS).toBe(DISPUTE_HOLD_DAYS);
-    const statements = [
-      {
-        id: 's1',
-        lines: [
-          {
-            kind: 'mined',
-            chargeKey: '60:1000:2026-11-01',
-            oreLines: [{ typeId: 45490, quantity: 400 }],
-            unitPrices: { '45490': 1000 },
-            taxPct: 12,
-            tax: 48_000,
-          },
-          {
-            kind: 'mined',
-            chargeKey: '60:1000:2026-11-02',
-            oreLines: [{ typeId: 45490, quantity: 100 }],
-            unitPrices: { '45490': 1000 },
-            taxPct: 12,
-            tax: 12_000,
-          },
-        ],
-      },
-    ];
-    const disputes = [
-      {
-        at: '2026-11-03T00:00:00.000Z',
-        kind: 'rate',
-        claimedPct: 10,
-        lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 400 }],
-      },
-      {
-        at: '2026-11-03T00:00:00.000Z',
-        lines: [{ recordKey: '60:1000:2026-11-02', typeId: 45490, quantity: 100 }],
-      },
-    ];
-    for (const now of ['2026-11-05T00:00:00.000Z', '2026-12-01T00:00:00.000Z']) {
-      for (const credited of [new Set<string>(), new Set(['s1|60:1000:2026-11-02'])]) {
-        const theirs = mirror.heldByStatement(statements, disputes, credited, now);
-        const ours = heldByStatement(
-          statements,
-          disputes.map((d) => ({
-            ...d,
-            lines: d.lines.map((l) => ({ ...l, payeeName: '' })),
-          })) as never,
-          credited,
-          now
-        );
-        expect([...theirs]).toEqual([...ours]);
-      }
-    }
-    const held = new Map([['s1', 20_000]]);
-    const theirs = mirror.allocatePayments({
-      statements: [{ id: 's1', amount: 60_000, issuedAt: '2026-11-30T00:00:00Z' }],
-      payments: [{ id: 'p1', amount: 40_000, at: '2026-12-01T00:00:00Z' }],
-      dismissalCredits: [],
-      held,
-    });
-    const ours = allocatePayments({
-      statements: [
-        {
-          id: 's1',
-          amount: 60_000,
-          issuedAt: '2026-11-30T00:00:00Z',
-          minerId: 'm',
-          code: '',
-          lines: [],
-        } as never,
-      ],
-      payments: [
-        {
-          id: 'p1',
-          amount: 40_000,
-          at: '2026-12-01T00:00:00Z',
-          minerId: 'm',
-          characterId: 1,
-          source: 'donation',
-        },
-      ],
-      dismissalCredits: [],
-      held,
-    });
-    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
-    expect(ours.byStatement.get('s1')).toMatchObject({ settled: true, held: 20_000 });
-  });
-
-  it('applies officer write-offs identically (#4637)', () => {
-    const statements = [
-      { id: 's2', amount: 8_000_000, issuedAt: '2026-07-31T00:00:00Z' },
-      { id: 's1', amount: 10_000_000, issuedAt: '2026-06-30T00:00:00Z' },
-      { id: 's3', amount: 4_000_000, issuedAt: '2026-08-31T00:00:00Z' },
-    ];
-    const payments = [{ id: 'p1', amount: 9_000_000, at: '2026-09-01T00:00:00Z' }];
-    const officerWriteOffs = [
-      { id: 'w2', amount: 20_000_000, at: '2026-09-03T00:00:00Z' },
-      { id: 'w1', amount: 5_000_000, at: '2026-09-02T00:00:00Z', statementId: 's3' },
-    ];
-    const theirs = mirror.allocatePayments({
-      statements,
-      payments,
-      dismissalCredits: [],
-      officerWriteOffs,
-    });
-    const ours = allocatePayments({
-      statements: statements.map((s) => ({ ...s, minerId: 'm', code: '', lines: [] }) as never),
-      payments: payments.map((p) => ({
-        ...p,
-        minerId: 'm',
-        characterId: 1,
-        source: 'donation' as const,
-      })),
-      dismissalCredits: [],
-      officerWriteOffs,
-    });
-    expect(theirs.writeOffCredits).toEqual(ours.writeOffCredits);
-    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
-    expect(theirs.credit).toBe(ours.credit);
-    expect(theirs.balance).toBe(ours.balance);
-    expect(ours.balance).toBe(0);
-    expect(
-      mirror.writeOffForAllocation({ id: 'w1', amount: 5, at: 'x', statementId: 's1', uids: [] })
-    ).toEqual({ id: 'w1', amount: 5, at: 'x', statementId: 's1' });
-    expect(mirror.writeOffForAllocation({ id: 'w1', amount: 5 })).toBeNull();
-    // A malformed stamp is not a reversal on either side.
-    expect(mirror.writeOffForAllocation({ id: 'w1', amount: 5, at: 'x', reversed: {} })).toEqual({
-      id: 'w1',
-      amount: 5,
-      at: 'x',
-    });
-    // An officer's reversal takes the write-off out of every allocation.
-    expect(
-      mirror.writeOffForAllocation({
-        id: 'w1',
-        amount: 5,
-        at: 'x',
-        reversed: { by: 1, at: 'y', reason: 'z' },
-      })
-    ).toBeNull();
-  });
-
-  it('allocatePayments drops a donation before the start date the same way (#4505)', () => {
-    const statements = [{ id: 's1', amount: 10_000_000, issuedAt: '2026-07-01T00:00:00Z' }];
-    for (const at of ['2026-05-31T23:59:59Z', '2026-06-01T00:00:00Z']) {
-      const payments = [{ id: 'p1', amount: 12_000_000, at }];
-      const theirs = mirror.allocatePayments({
-        statements,
-        payments: payments.map((p) => ({ ...p, source: 'donation' as const })),
-        dismissalCredits: [],
-        startDate: '2026-06-01',
-      });
-      const ours = allocatePayments({
-        statements: statements.map((s) => ({ ...s, minerId: 'm', code: '', lines: [] }) as never),
-        payments: payments.map((p) => ({
-          ...p,
-          minerId: 'm',
-          characterId: 1,
-          source: 'donation' as const,
-        })),
-        dismissalCredits: [],
-        startDate: '2026-06-01',
-      });
-      expect(theirs.paymentCredits).toEqual(ours.paymentCredits);
-      expect(theirs.credit).toBe(ours.credit);
-      expect(ours.credit).toBe(at.startsWith('2026-06') ? 2_000_000 : 0);
-    }
-  });
-
   describe('dismissals (#4184)', () => {
     // Fractured 17 Oct 03:00, expires 19 Oct 03:00; a second moon ran later at the same refinery.
     const extractions: SyncExtraction[] = [
@@ -493,75 +246,6 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       }
       expect(mirror.extractionIdOf(extractions[0])).toBe(extractionId(extractions[0]));
     });
-
-    it('credits the same Statement lines for record, Miner, moon and Extraction dismissals', () => {
-      const dismissal = (
-        id: string,
-        scope: Dismissal['scope'],
-        targetId: string,
-        reversed = false
-      ): Dismissal => ({
-        id,
-        scope,
-        targetId,
-        by: 1,
-        at: '2026-10-21T10:00:00Z',
-        reason: 'r',
-        ...(reversed ? { reversed: { by: 1, at: '2026-10-22T00:00:00Z' } } : {}),
-      });
-      const statements = [
-        {
-          id: 's1',
-          lines: days.map((date, i) => ({
-            chargeKey: `50:1000:${date}`,
-            date,
-            tax: 100 * (i + 1),
-            structureId: 1000,
-          })),
-        },
-        {
-          id: 's2',
-          lines: [{ chargeKey: 'a:2000', date: '2026-10-17', tax: 7, structureId: 2000 }],
-        },
-      ];
-      const sets: Dismissal[][] = [
-        [],
-        [dismissal('d', 'moon', '7')],
-        [dismissal('d', 'moon', '8')],
-        [dismissal('d', 'extraction', extractionId(extractions[0]))],
-        [dismissal('d', 'extraction', extractionId(extractions[1]))],
-        [dismissal('d', 'record', '50:1000:2026-10-17')],
-        [dismissal('d', 'miner', 'solo:50')],
-        [dismissal('d', 'moon', '7', true)],
-        [dismissal('a', 'moon', '7'), dismissal('b', 'extraction', extractionId(extractions[0]))],
-      ];
-      const place = placeOfFactory(extractions, {});
-      for (const dismissals of sets) {
-        const charges = statements.flatMap((s) =>
-          s.lines.map((l) => ({
-            key: l.chargeKey,
-            minerId: 'solo:50',
-            date: l.date,
-            ...place(l.structureId, l.date),
-          }))
-        );
-        const ours = dismissalCredits(
-          statements.map(
-            (s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, kind: 'mined' })) }) as never
-          ),
-          dismissals,
-          charges
-        ).map((c) => ({ statementId: c.statementId, amount: c.amount, chargeKey: c.chargeKey }));
-        const theirs = mirror.dismissalCredits({
-          minerId: 'solo:50',
-          statements,
-          dismissals,
-          extractions,
-          expiryHours: {},
-        });
-        expect(theirs).toEqual(ours);
-      }
-    });
   });
 
   it('agrees on when credit may be forfeited', () => {
@@ -579,7 +263,6 @@ describe('functions mirror of the Corp Tax Book engine', () => {
 
   it('keeps the book defaults equal to the engine constants', () => {
     expect(mirror.BOOK_DEFAULTS.graceHours).toBe(DEFAULT_GRACE_HOURS);
-    expect(mirror.BOOK_DEFAULTS.minimumStatement).toBe(DEFAULT_MINIMUM_STATEMENT);
     expect(mirror.BOOK_DEFAULTS.overdueDays).toBe(DEFAULT_OVERDUE_DAYS);
     expect(mirror.DIVISION_NAME_MAX).toBe(DIVISION_NAME_MAX);
   });
@@ -1058,12 +741,6 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
       [0, 0],
     ] as const) {
       expect(mirror.balanceAfter(balance, sent)).toEqual(balanceAfter(balance, sent));
-    }
-  });
-
-  it('isBeforeBook agrees', () => {
-    for (const at of ['2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z', '2026-10-02']) {
-      expect(mirror.isBeforeBook(at, '2026-10-01')).toBe(isBeforeBook(at, '2026-10-01'));
     }
   });
 });

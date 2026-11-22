@@ -61,7 +61,7 @@ export const focusRingInsetClassName =
 /**
  * A small dim label stacked over its field (a mail's Subject and Message). Plain stacked labels,
  * not the `Fields`/`Field` label-column primitive: a side label column would take width from the
- * message box in a narrow pane (the reading pane, the Statements run). Don't "fix" these to `Fields`.
+ * message box in a narrow pane (the reading pane, the late notice run). Don't "fix" these to `Fields`.
  */
 export const stackedLabelClassName = 'block text-[0.6875rem] text-text-dim';
 

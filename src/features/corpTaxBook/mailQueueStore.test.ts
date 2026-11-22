@@ -9,7 +9,7 @@ function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
     batchId: 'b',
     corporationId: 1,
     statementId: `s${n}`,
-    kind: 'statement',
+    kind: 'notice',
     senderCharacterId: 7,
     recipientId: 100 + n,
     recipientName: `Miner ${n}`,
@@ -45,7 +45,7 @@ describe('nextOrder', () => {
 });
 
 describe('addToQueue', () => {
-  it('skips a Statement already queued, in the DB or earlier in the same call', async () => {
+  it('skips a late notice already queued, in the DB or earlier in the same call', async () => {
     await db.corpMailQueue.put(item(1));
     const dupe = item(2, { statementId: 's3' });
     const { added, skipped } = await addToQueue([item(10, { statementId: 's1' }), item(3), dupe]);
@@ -62,7 +62,7 @@ describe('addToQueue', () => {
     expect(blocked.skipped).toHaveLength(1);
   });
 
-  it('queues a different kind for the same Statement', async () => {
+  it('queues a different kind for the same late notice', async () => {
     await db.corpMailQueue.put(item(1));
     const r = await addToQueue([item(2, { statementId: 's1', kind: 'reminder' })]);
     expect(r.added).toHaveLength(1);

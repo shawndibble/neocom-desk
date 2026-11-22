@@ -1,19 +1,17 @@
-import type {
-  Allocation,
-  AllocationInput,
-  DismissalCredit,
-  RecordedWriteOff,
-  TaxPayment,
-} from '../allocation';
+import type { LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
+import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
+import type { Adjustment } from '../adjustments';
+import type { BillableLines } from '../billableLines';
 import type { DayCharge, Miner, PlaceOf } from '../charges';
 import type { FeederCoverage } from '../coverage';
 import type { Dismissal } from '../dismissals';
 import type { OreDispute } from '../disputes';
 import type { FeederReadClock, StaleHold } from '../feederHealth';
-import type { Declaration, OverdueStatus } from '../overdue';
+import type { MinerRunningAccount } from '../minerRunningAccount';
+import type { RecordedWriteOff, TaxPayment } from '../payments';
 import type { TaxRate } from '../rates';
-import type { Statement } from '../statements';
 import type { SettlePayment, SyncExtraction } from '../sync';
+import type { ToleranceExemption } from '../toleranceExemptions';
 import type { ObservedMiningEntry } from '../types';
 import type { DayPrices } from '../valuation';
 
@@ -30,7 +28,7 @@ export type Placement =
     }
   | { kind: 'observed-rows' };
 
-/** One book's unbilled and unpaid side, as the reader can see it. */
+/** One book's open side, as the reader can see it. */
 export interface OpenSetInput {
   corporationId: number;
   /** ISO instant the set is read at. */
@@ -42,44 +40,50 @@ export interface OpenSetInput {
   rates: readonly TaxRate[];
   entries: readonly ObservedMiningEntry[];
   miners: readonly Miner[];
-  statements: readonly Statement[];
+  /** The book's late notices: what was asked, never money owed of its own. */
+  notices: readonly LateNotice[];
   payments: readonly SettlePayment[];
   dismissals: readonly Dismissal[];
+  adjustments?: readonly Adjustment[];
+  /** Officer write-offs (#4637): each forgives the Miner's oldest unpaid days. */
   writeOffs?: readonly RecordedWriteOff[];
-  declarations?: readonly Declaration[];
-  /** Members' disputes: an open one holds its disputed amount out of what is due (`heldByStatement`). */
+  /** Members' disputes: an open one holds its day out of what is due. */
   disputes?: readonly OreDispute[];
-  /** Days after issue an unsettled Statement goes Overdue; absent: the default. */
-  overdueDays?: number;
-  /** Moon owners' coverage and read clock; absent means none. */
+  /** Officers' per-day limits on what a shortfall may forgive (`toleranceExemptions`). */
+  toleranceExemptions?: readonly ToleranceExemption[];
+  /** The book's per-day tolerance, in percent. */
+  dayTolerancePct?: number;
+  /** Each Miner's stored paid-through day (`meta/paid`): it and every day before it stay paid (D22). */
+  minerPaidThrough?: ReadonlyMap<string, string>;
+  /** Each Miner's closed-through checkpoint, by Miner id. */
+  checkpoints?: ReadonlyMap<string, RunningAccountCheckpoint>;
+  /**
+   * Feeders' last good ledger reads. A feeder's refinery days are withheld until one lands after
+   * the day's grace (#4509), and a day outside its coverage owes nothing (#4618); absent means none.
+   */
   feeders?: readonly (FeederCoverage & FeederReadClock)[];
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   placement: Placement;
-  /**
-   * A book switched to a running account (#6294): its late notices are running days, not
-   * Statement debt, so payments and the Overdue clock here read the other Statements only.
-   */
-  runningAccount?: boolean;
 }
 
 /** One Miner's side of the open set. */
 export interface MinerSettlement {
   /** Its grouping's characters, or the one a `solo:` id names. */
   characterIds: number[];
-  /** Every Statement of its, late notices included. */
-  statements: Statement[];
+  /** Its late notices, oldest first. */
+  notices: LateNotice[];
   /** Its Tax Payments; a donation dated before the book is neither credited nor listed. */
   payments: TaxPayment[];
-  dismissalCredits: DismissalCredit[];
-  /** What `allocation` was computed from, so a payment can be previewed against it. */
-  allocationInput: AllocationInput;
-  allocation: Allocation;
-  /** Each unsettled Statement's Overdue clock, in Statement order. */
-  overdue: ReadonlyMap<string, OverdueStatus>;
   /** The book's `billableThrough`, stopped before a day of this Miner's that is held (#6209). */
   billableThrough: string | undefined;
   /** The earliest hold on one of its characters, naming the moon owner (#6210). */
   hold?: StaleHold;
+  /** What its account bills, and the days a dismissal keeps off it. */
+  billable: BillableLines;
+  /** Dates an open dispute holds. */
+  heldDays: ReadonlySet<string>;
+  /** Its Running account: what it owes, paid through, its credit. */
+  account: MinerRunningAccount;
 }
 
 export interface OpenSet {
@@ -96,7 +100,7 @@ export interface OpenSet {
   unread: ObservedMiningEntry[];
   /** The latest Billable day; undefined with no sync after the grace. */
   billableThrough: string | undefined;
-  /** Groupings, then the ids days, Statements and payments name, in that order. */
+  /** Groupings, then the ids days, notices and payments name, in that order. */
   minerIds: string[];
   miners: ReadonlyMap<string, MinerSettlement>;
 }

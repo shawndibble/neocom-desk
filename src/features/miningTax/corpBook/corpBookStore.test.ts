@@ -8,11 +8,9 @@ import {
   readMemberDeclaration,
   readMiner,
   readPayment,
-  readStatement,
   readToleranceExemption,
   readWriteOff,
 } from '@/engine/corpTaxBook/docShapes';
-import { RUNNING_ACCOUNTS_FROM } from '@/engine/corpTaxBook/bookDocs';
 
 describe('readBookSettings', () => {
   const book = {
@@ -36,7 +34,6 @@ describe('readBookSettings', () => {
       startDate: '2026-10-01',
       graceHours: 12,
       overdueDays: 14,
-      runningAccountFrom: RUNNING_ACCOUNTS_FROM,
       hubId: 'amarr',
       oreForm: 'raw',
       divisions: [2],
@@ -102,11 +99,27 @@ describe('readBookSettings', () => {
 describe('readPayment', () => {
   const base = { characterId: 5, amount: 100, at: '2026-10-18T00:00:00Z', source: 'donation' };
 
+  it("carries an officer's note on a payment recorded by hand", () => {
+    const read = readPayment('m1', {
+      ...base,
+      source: 'manual',
+      minerId: 'solo:5',
+      note: 'In person',
+    });
+    expect(read?.payment?.note).toBe('In person');
+  });
+
   it('credits a Miner when the payment has one', () => {
     const read = readPayment('j1_1', { ...base, minerId: 'solo:5', notTaxAmount: 10 });
     expect(read?.payment).toMatchObject({ id: 'j1_1', minerId: 'solo:5', notTaxAmount: 10 });
     expect(read?.claimable).toBeUndefined();
-    expect(read?.held).toEqual({ characterId: 5, amount: 100, at: base.at, notTaxAmount: 10 });
+    expect(read?.held).toEqual({
+      characterId: 5,
+      amount: 100,
+      at: base.at,
+      notTaxAmount: 10,
+      source: 'donation',
+    });
   });
 
   it('offers an Unmatched donation for the donor to claim', () => {
@@ -171,17 +184,7 @@ describe('the other readers', () => {
     expect(readDismissal('d2', { scope: 'galaxy', targetId: 'a', at: 'x' })).toBeNull();
   });
 
-  it('reads a Statement and a Miner, and skips malformed ones', () => {
-    expect(
-      readStatement('s1', {
-        minerId: 'solo:5',
-        amount: 10,
-        issuedAt: '2026-10-18T00:00:00Z',
-        lines: [],
-        code: 'AB',
-      })
-    ).toMatchObject({ id: 's1', amount: 10, code: 'AB' });
-    expect(readStatement('s2', { minerId: 'solo:5', amount: 10 })).toBeNull();
+  it('reads a Miner, and skips a malformed one', () => {
     expect(readMiner('m', { characterIds: [1, 2], mainCharacterId: 2 })).toEqual({
       id: 'm',
       characterIds: [1, 2],
@@ -205,7 +208,7 @@ describe('readMemberDeclaration (#6206)', () => {
       })
     ).toEqual({
       id: 'x1',
-      statementId: 's1',
+      noticeId: 's1',
       kind: 'another-way',
       at: '2026-11-01T00:00:00.000Z',
       amount: 5,
@@ -292,16 +295,15 @@ describe('the miner-side copies (#4622)', () => {
       amount: 5,
       reason: 'y',
       at: '2026-10-20T00:00:00Z',
-      statementId: 's1',
     });
     expect(readWriteOff('w2', { minerId: 'solo:1', amount: 5 })).toBeNull();
   });
 
-  it("names refineries from the Statements' own names, never a placeholder", () => {
+  it("names refineries from the Late notices' own names, never a placeholder", () => {
     expect(
       refineryNamesOf([
-        { refineryNames: { '1000': 'Ikao - Moon Drill', '2000': 'Refinery 2000' } },
-        { refineryNames: { '3000': 'Ikao - Second Drill' } },
+        { names: { refineryNames: { '1000': 'Ikao - Moon Drill', '2000': 'Refinery 2000' } } },
+        { names: { refineryNames: { '3000': 'Ikao - Second Drill' } } },
         {},
       ])
     ).toEqual({ 1000: 'Ikao - Moon Drill', 3000: 'Ikao - Second Drill' });

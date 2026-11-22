@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { legacyMoonsLocation, moonsDetail, refineryPath, sharingMoonPath } from './moonsPaths';
+import { tabBarTabs } from '@/lib/pageTabs';
+import {
+  MOONS_TABS,
+  lateNoticesTabPath,
+  legacyMoonsLocation,
+  moonsDetail,
+  refineryPath,
+  sharingMoonPath,
+} from './moonsPaths';
 
 describe('legacyMoonsLocation', () => {
   it('sends the retired Sharing tab to Moon settings on Sharing, keeping its query', () => {
@@ -47,9 +55,16 @@ describe('a refinery page', () => {
     });
   });
 
-  it('knows the retired Statements period URL, which redirects to the Late notices tab', () => {
+  it('knows the retired period URL, which redirects to the Late notices tab', () => {
     expect(moonsDetail('/corp/moons/statements/2026-08-01')).toEqual({
       kind: 'legacyStatementPeriod',
     });
+  });
+
+  it('names the Late notices tab for what it is, keeping its old URL off the tab bar', () => {
+    expect(lateNoticesTabPath).toBe('/corp/moons/late-notices');
+    const shown = tabBarTabs(MOONS_TABS).map((tab) => tab.id);
+    expect(shown).toContain('late-notices');
+    expect(shown).not.toContain('statements');
   });
 });

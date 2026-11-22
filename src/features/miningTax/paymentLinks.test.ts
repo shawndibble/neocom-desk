@@ -1,786 +1,236 @@
 import { describe, expect, it } from 'vitest';
-import type { TFunction } from 'i18next';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import type { PayeeBalance } from './balances';
-import type { DisplayRow, GroupMember } from './groupRows';
-import type { MoonMiningTaxRow } from './snapshot';
+import type { PayeeRecord } from '@/db';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import {
-  assignmentsForLinkTarget,
-  autoMatchRecordedPayments,
-  coPaidAssignments,
-  coPaidOutsideGroup,
-  exactAmountMatches,
-  labelForLinkedRef,
-  linkedAssignmentsByRef,
-  linkedTransactionsFor,
-  normalizePaymentInfo,
-  linkTargetsWithin,
-  owedWhereUncovered,
-  paymentCoverage,
-  reachedByTransaction,
+  autoMatchRecorded,
+  linkablePayments,
+  recipientOf,
   suggestLink,
-  unlinkedPayments,
-  unlinkedRecordedPayments,
-  withinLinkWindow,
+  unlinkedSentFor,
+  suggestLinks,
+  type LinkablePayee,
+  type LinkContext,
   type MadePayment,
 } from './paymentLinks';
 
-const CHAR_A = 1;
-const TYPE_A = 45490;
-const LANDLORD_ID = 90_000_001;
+const MAIN = 1;
+const ALT = 2;
+const LANDLORD = 90_000_001;
+const CORP = 98_000_001;
 
-function payee(overrides: Partial<PayeeRecord> = {}): PayeeRecord {
-  return {
-    id: 'payee-1',
-    characterId: CHAR_A,
-    name: 'Landlord Corp',
-    defaultTaxPct: 10,
-    updatedAt: 1,
-    ...overrides,
-  };
-}
-
-function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord {
-  return {
-    id: 'a1',
-    characterId: CHAR_A,
-    date: '2026-09-04',
-    solarSystemId: 1,
-    payeeId: 'payee-1',
-    oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-    taxPct: 10,
-    estimatedValue: 1000,
-    taxOwed: 100,
-    status: 'outstanding',
-    updatedAt: 1,
-    ...overrides,
-  };
-}
-
-function member(a: MiningTaxAssignmentRecord): GroupMember {
-  const row: MoonMiningTaxRow = {
-    characterId: a.characterId,
-    characterName: 'Pilot',
-    entry: {
-      characterId: a.characterId,
-      date: a.date,
-      solarSystemId: a.solarSystemId,
-      oreLines: [],
-    },
-    assignments: [a],
-    unassignedOreLines: [],
-  };
-  return { row, assignment: a };
-}
-
-function balance(p: PayeeRecord, assignments: MiningTaxAssignmentRecord[]): PayeeBalance {
-  return {
-    payee: p,
-    owed: assignments.reduce((sum, a) => sum + a.taxOwed, 0),
-    members: assignments.map(member),
-  };
-}
-
-function payment(overrides: Partial<MadePayment> = {}): MadePayment {
-  return {
-    key: 'journal:11',
-    kind: 'journal',
-    refId: 11,
-    characterId: CHAR_A,
-    date: '2026-09-06T20:00:00Z',
-    amount: 100,
-    method: 'donation',
-    counterpartyId: LANDLORD_ID,
-    label: 'Player donation',
-    ...overrides,
-  };
-}
-
-describe('withinLinkWindow', () => {
-  it('accepts an entry mined before the payment, inside the window', () => {
-    expect(withinLinkWindow('2026-09-04', '2026-09-06T20:00:00Z')).toBe(true);
-    expect(withinLinkWindow('2026-09-06', '2026-09-06T20:00:00Z')).toBe(true);
-  });
-
-  it('allows one day of grace for the EVE/UTC edge', () => {
-    // Mined on the 7th (UTC) but paid late on the 6th local-side — an entry a
-    // day "ahead" of its payment is still plausibly what it settled.
-    expect(withinLinkWindow('2026-09-07', '2026-09-06T20:00:00Z')).toBe(true);
-  });
-
-  it('rejects an entry mined well after the payment — you pay after you mine', () => {
-    expect(withinLinkWindow('2026-09-09', '2026-09-06T20:00:00Z')).toBe(false);
-  });
-
-  it('rejects an entry older than the window', () => {
-    expect(withinLinkWindow('2026-08-01', '2026-09-06T20:00:00Z')).toBe(false);
-  });
+const record = (over: Partial<PayeeRecord> = {}): PayeeRecord => ({
+  id: 'p1',
+  characterId: MAIN,
+  name: 'Landlord',
+  defaultTaxPct: 10,
+  updatedAt: 1,
+  ...over,
 });
 
-describe('unlinkedPayments', () => {
-  it('drops a journal payment an Assignment already references', () => {
-    const linked = assignment({
-      status: 'paid',
-      payment: {
-        paymentId: 'p1',
-        paidOn: '2026-09-06',
-        method: 'donation',
-        amount: 100,
-        journalLinks: [{ refId: 11, source: 'auto' }],
-      },
-    });
+const payeeOf = (members: PayeeRecord[], owed = 1_000_000): LinkablePayee => ({
+  id: members[0]!.id,
+  name: members[0]!.name,
+  members,
+  owed,
+  billed: true,
+});
 
-    const result = unlinkedPayments(
-      [payment({ refId: 11 }), payment({ key: 'journal:12', refId: 12 })],
-      [linked]
-    );
+const made = (over: Partial<MadePayment> = {}): MadePayment => ({
+  key: 'journal:10',
+  kind: 'journal',
+  refId: 10,
+  characterId: MAIN,
+  date: '2026-10-20T12:00:00Z',
+  amount: 1_000_000,
+  method: 'donation',
+  counterpartyId: LANDLORD,
+  counterpartyName: 'Landlord',
+  label: 'Player donation',
+  ...over,
+});
 
-    expect(result.map((p) => p.refId)).toEqual([12]);
+const ctx = (payees: LinkablePayee[], over: Partial<LinkContext> = {}): LinkContext => ({
+  payees,
+  linked: new Set(),
+  bookCorporations: new Set(),
+  ...over,
+});
+
+const recorded = (over: Partial<PayeePaymentLink> = {}): PayeePaymentLink => ({
+  payeeId: 'p1',
+  kind: 'recorded',
+  refId: 'r1',
+  amount: 1_000_000,
+  paidOn: '2026-10-20',
+  source: 'manual',
+  characterId: MAIN,
+  ...over,
+});
+
+describe('recipientOf', () => {
+  it('knows a Payee by the entity it learned, then by its name', () => {
+    const learned = payeeOf([record({ entityId: LANDLORD, entityKind: 'character' })]);
+    expect(recipientOf(made(), [learned])).toEqual({ payee: learned, confidence: 'entity' });
+    const named = payeeOf([record()]);
+    expect(recipientOf(made(), [named])).toEqual({ payee: named, confidence: 'name' });
   });
 
-  it('drops a contract payment an Assignment already references, without confusing it for a journal id', () => {
-    const linked = assignment({
-      status: 'paid',
-      payment: {
-        paymentId: 'p1',
-        paidOn: '2026-09-06',
-        method: 'contract',
-        amount: 100,
-        contractLinks: [{ refId: 11, source: 'auto' }],
-      },
-    });
+  it('never takes a name for a Payee that learned another entity', () => {
+    const other = payeeOf([record({ entityId: 5 })]);
+    expect(recipientOf(made(), [other])).toBeUndefined();
+  });
 
-    const journal = payment({ kind: 'journal', refId: 11, key: 'journal:11' });
-    const contract = payment({ kind: 'contract', refId: 11, key: 'contract:11', amount: null });
+  // Audit bug 2: an alt's payment is a merged Payee's even when its primary record is another
+  // Character's.
+  it("reads every record of a merged Payee, so an alt's payment is its own", () => {
+    const merged = payeeOf([
+      record({ id: 'p1', characterId: MAIN }),
+      record({ id: 'p2', characterId: ALT, entityId: LANDLORD }),
+    ]);
+    expect(recipientOf(made({ characterId: ALT }), [merged])?.payee.id).toBe('p1');
+  });
 
-    const result = unlinkedPayments([journal, contract], [linked]);
-
-    // Same numeric id, different namespace — only the contract is linked.
-    expect(result.map((p) => p.key)).toEqual(['journal:11']);
+  it('is nobody when two Payees answer to the same name', () => {
+    const a = payeeOf([record({ id: 'a' })]);
+    const b = payeeOf([record({ id: 'b' })]);
+    expect(recipientOf(made(), [a, b])).toBeUndefined();
   });
 });
 
 describe('suggestLink', () => {
-  it('pins the Payee by learned entityId and pre-ticks the whole in-window balance', () => {
-    const p = payee({ entityId: LANDLORD_ID });
-    const b = balance(p, [assignment({ id: 'a1' }), assignment({ id: 'a2', date: '2026-09-05' })]);
-
-    const result = suggestLink(payment({ amount: 200 }), [b]);
-
-    expect(result?.balance.payee.id).toBe('payee-1');
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
-    expect(result?.confidence).toBe('identity-and-amount');
+  it('suggests the recipient whatever the amount, with no day window: back taxes too', () => {
+    const p = payeeOf([record()]);
+    const old = made({ amount: 123, date: '2026-06-01T00:00:00Z' });
+    expect(suggestLink(old, ctx([p]))).toMatchObject({ payee: { id: 'p1' }, confidence: 'name' });
   });
 
-  it('bootstraps on a case-insensitive name match, but says so rather than claiming identity', () => {
-    const b = balance(payee(), [assignment()]);
-
-    const result = suggestLink(
-      payment({ counterpartyId: undefined, counterpartyName: 'landlord corp' }),
-      [b]
-    );
-
-    expect(result?.balance.payee.id).toBe('payee-1');
-    // Not `identity-and-amount`: a Payee name is a free-text label that need
-    // not equal any ESI name, so it must never be reported as knowing who was paid.
-    expect(result?.confidence).toBe('name-and-amount');
+  it('never suggests by amount a payment to a known recipient who is none of the Payees (N5)', () => {
+    const toSomeoneElse = made({ counterpartyId: 77, counterpartyName: 'Someone' });
+    const p = payeeOf([record({ id: 'p1', entityId: 5 })], 1_000_000);
+    expect(suggestLink(toSomeoneElse, ctx([p]))).toBeNull();
   });
 
-  it('offers a name match with no amount agreement — the round-number donation that bootstraps entityId', () => {
-    const b = balance(payee(), [assignment({ taxOwed: 47_300_000 })]);
-
-    const result = suggestLink(
-      payment({ counterpartyId: undefined, counterpartyName: 'Landlord Corp', amount: 50_000_000 }),
-      [b]
-    );
-
-    expect(result?.confidence).toBe('name');
+  it('falls back on an amount only when exactly one Payee owes it, its recipient unknown', () => {
+    const anon = made({ counterpartyId: undefined, counterpartyName: undefined });
+    const p = payeeOf([record({ id: 'p1', entityId: 5 })], 1_000_000);
+    const q = payeeOf([record({ id: 'q1', name: 'Other', entityId: 6 })], 2_000_000);
+    expect(suggestLink(anon, ctx([p, q]))).toMatchObject({
+      payee: { id: 'p1' },
+      confidence: 'amount',
+    });
+    const twin = payeeOf([record({ id: 'q2', name: 'Twin', entityId: 7 })], 1_000_000);
+    expect(suggestLink(anon, ctx([p, twin]))).toBeNull();
   });
 
-  it('prefers a learned entityId over a name match on a different Payee', () => {
-    const learned = payee({ id: 'payee-1', name: 'Rentals Inc', entityId: LANDLORD_ID });
-    const namesake = payee({ id: 'payee-2', name: 'Landlord Corp' });
-    const b1 = balance(learned, [assignment({ id: 'a1', payeeId: 'payee-1', taxOwed: 100 })]);
-    const b2 = balance(namesake, [assignment({ id: 'a2', payeeId: 'payee-2', taxOwed: 100 })]);
-
-    const result = suggestLink(payment({ counterpartyName: 'Landlord Corp' }), [b2, b1]);
-
-    expect(result?.balance.payee.id).toBe('payee-1');
-    expect(result?.confidence).toBe('identity-and-amount');
+  // Audit bug 4: a donation the corporation's book holds (or has in flight) was offered to a
+  // personal Payee by amount, counted twice and re-pointed the Payee at the corporation.
+  it('never offers a donation to a corporation whose book counts it', () => {
+    const p = payeeOf([record({ entityId: 5 })], 1_000_000);
+    const toCorp = made({ counterpartyId: CORP, counterpartyName: 'Brass Meridian' });
+    expect(suggestLink(toCorp, ctx([p], { bookCorporations: new Set([CORP]) }))).toBeNull();
   });
 
-  it('picks the single Assignment whose tax matches when the whole balance does not', () => {
-    const p = payee({ entityId: LANDLORD_ID });
-    const b = balance(p, [
-      assignment({ id: 'a1', taxOwed: 100 }),
-      assignment({ id: 'a2', date: '2026-09-05', taxOwed: 250 }),
+  // Audit bug 1: a suggestion aimed at a Corp Tax Book's Payee wrote Assignments for the book.
+  it('never suggests a payment for a Corp Tax Book Payee: only personal Payees are linkable', () => {
+    const corpPayee = payeeOf([
+      record({ id: 'corp-book:98000001', name: 'Brass Meridian', entityId: CORP }),
     ]);
-
-    const result = suggestLink(payment({ amount: 250 }), [b]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a2']);
-    expect(result?.confidence).toBe('identity-and-amount');
+    const toCorp = made({ counterpartyId: CORP, counterpartyName: 'Brass Meridian' });
+    expect(suggestLink(toCorp, ctx([corpPayee], { bookCorporations: new Set([CORP]) }))).toBeNull();
   });
 
-  it('matches on amount alone when nothing identifies the recipient', () => {
-    const b = balance(payee(), [assignment({ taxOwed: 100 })]);
-
-    const result = suggestLink(payment({ counterpartyId: 999, amount: 100 }), [b]);
-
-    expect(result?.confidence).toBe('amount');
+  it('skips a payment already linked', () => {
+    const p = payeeOf([record()]);
+    expect(suggestLink(made(), ctx([p], { linked: new Set(['journal:10']) }))).toBeNull();
   });
 
-  it('offers an identified Payee even when no amount agrees — payment in kind has no ISK figure', () => {
-    const p = payee({ entityId: LANDLORD_ID });
-    const b = balance(p, [assignment({ taxOwed: 100 })]);
-
-    const result = suggestLink(
-      payment({ kind: 'contract', key: 'contract:5', refId: 5, amount: null }),
-      [b]
-    );
-
-    expect(result?.confidence).toBe('identity');
-    expect(result?.members).toHaveLength(1);
-  });
-
-  it('offers nothing when neither identity nor amount agrees — the no-nag rule', () => {
-    const b = balance(payee(), [assignment({ taxOwed: 100 })]);
-
-    expect(suggestLink(payment({ counterpartyId: 999, amount: 987_654 }), [b])).toBeNull();
-  });
-
-  it('ignores Assignments outside the date window even for an identified Payee', () => {
-    const p = payee({ entityId: LANDLORD_ID });
-    const b = balance(p, [assignment({ date: '2026-06-01' })]);
-
-    expect(suggestLink(payment({ amount: null, kind: 'contract' }), [b])).toBeNull();
-  });
-
-  it('prefers the identified Payee over a different one whose amount happens to match', () => {
-    const identified = payee({ id: 'payee-1', name: 'Landlord', entityId: LANDLORD_ID });
-    const coincidence = payee({ id: 'payee-2', name: 'Someone Else' });
-    const b1 = balance(identified, [assignment({ id: 'a1', payeeId: 'payee-1', taxOwed: 999 })]);
-    const b2 = balance(coincidence, [assignment({ id: 'a2', payeeId: 'payee-2', taxOwed: 100 })]);
-
-    const result = suggestLink(payment({ amount: 100 }), [b2, b1]);
-
-    expect(result?.balance.payee.id).toBe('payee-1');
-    expect(result?.confidence).toBe('identity');
-  });
-
-  it('skips a settled Payee — there is nothing for a payment to have covered', () => {
-    const p = payee({ entityId: LANDLORD_ID });
-    const b = balance(p, [assignment({ status: 'paid', taxOwed: 0 })]);
-    b.members = [];
-    b.owed = 0;
-
-    expect(suggestLink(payment(), [b])).toBeNull();
-  });
-});
-
-function recorded(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord {
-  return assignment({
-    status: 'paid',
-    payment: {
-      paymentId: 'p1',
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 100,
-    },
-    ...overrides,
-  });
-}
-
-describe('unlinkedRecordedPayments', () => {
-  it('groups Settle-up-recorded, still-unlinked Assignments by paymentId', () => {
-    const a1 = recorded({ id: 'a1' });
-    const a2 = recorded({ id: 'a2', date: '2026-09-05' });
-
-    const [group] = unlinkedRecordedPayments([a1, a2]);
-
-    expect(group.paymentId).toBe('p1');
-    expect(group.amount).toBe(100);
-    expect(group.paidOn).toBe('2026-09-06');
-    expect(group.characterIds).toEqual(new Set([CHAR_A]));
-    expect(group.assignments.map((a) => a.id)).toEqual(['a1', 'a2']);
-  });
-
-  it('excludes an Assignment already linked to a journal entry or contract', () => {
-    const linked = recorded({
-      payment: { ...recorded().payment!, journalLinks: [{ refId: 11, source: 'auto' }] },
-    });
-    expect(unlinkedRecordedPayments([linked])).toEqual([]);
-  });
-
-  it('excludes an Assignment linked via the legacy single-ref shape (pre-migration data)', () => {
-    const linked = recorded({
-      payment: { ...recorded().payment!, journalRefId: 11 } as never,
-    });
-    expect(unlinkedRecordedPayments([linked])).toEqual([]);
-  });
-
-  it('excludes a bare "just mark paid" Assignment with no payment recorded at all', () => {
-    expect(unlinkedRecordedPayments([assignment({ status: 'paid' })])).toEqual([]);
-  });
-
-  it('excludes an outstanding Assignment', () => {
-    expect(unlinkedRecordedPayments([assignment({ status: 'outstanding' })])).toEqual([]);
-  });
-});
-
-describe('autoMatchRecordedPayments', () => {
-  it('auto-links an exact amount from the paying character, near the recorded date', () => {
-    const [group] = unlinkedRecordedPayments([recorded()]);
-
-    const result = autoMatchRecordedPayments([payment({ amount: 100 })], [group]);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].group.paymentId).toBe('p1');
-    expect(result[0].payment.key).toBe('journal:11');
-  });
-
-  it('never guesses between two equally plausible transactions', () => {
-    const [group] = unlinkedRecordedPayments([recorded()]);
-
-    const result = autoMatchRecordedPayments(
+  it('ranks a learned entity before a name and an amount, newest first', () => {
+    const learned = payeeOf([record({ id: 'p1', entityId: LANDLORD })]);
+    const named = payeeOf([record({ id: 'p2', name: 'Moon Lord', entityId: undefined })], 5);
+    const list = suggestLinks(
       [
-        payment({ amount: 100, key: 'journal:11' }),
-        payment({ amount: 100, key: 'journal:12', refId: 12 }),
+        made({ key: 'journal:1', refId: 1, counterpartyId: 42, counterpartyName: 'Moon Lord' }),
+        made({ key: 'journal:2', refId: 2 }),
       ],
-      [group]
+      ctx([learned, named])
     );
+    expect(list.map((s) => [s.payment.refId, s.confidence])).toEqual([
+      [2, 'entity'],
+      [1, 'name'],
+    ]);
+  });
+});
 
-    expect(result).toEqual([]);
+describe('linkablePayments', () => {
+  it('leaves out what a link holds and what a book counts', () => {
+    const payments = [
+      made({ key: 'journal:1', refId: 1 }),
+      made({ key: 'journal:2', refId: 2, counterpartyId: CORP }),
+      made({ key: 'journal:3', refId: 3 }),
+    ];
+    const out = linkablePayments(
+      payments,
+      ctx([], { linked: new Set(['journal:3']), bookCorporations: new Set([CORP]) })
+    );
+    expect(out.map((p) => p.refId)).toEqual([1]);
+  });
+});
+
+describe('autoMatchRecorded', () => {
+  const p = payeeOf([record({ entityId: LANDLORD })]);
+
+  it('links a recorded payment to the one transaction to its recipient of that amount and date', () => {
+    expect(autoMatchRecorded([made()], [recorded()], ctx([p]))).toEqual([
+      { link: recorded(), payment: made() },
+    ]);
   });
 
-  it('rejects a mismatched amount', () => {
-    const [group] = unlinkedRecordedPayments([recorded()]);
-    expect(autoMatchRecordedPayments([payment({ amount: 150 })], [group])).toEqual([]);
+  // Audit bug 3: the recipient was never checked.
+  it('never links a transaction to someone else', () => {
+    expect(autoMatchRecorded([made({ counterpartyId: 77 })], [recorded()], ctx([p]))).toEqual([]);
   });
 
-  it('rejects a transaction from a character not covered by the recorded payment', () => {
-    const [group] = unlinkedRecordedPayments([recorded()]);
+  // Audit bug 3: two recorded payments of one amount could both claim one transaction.
+  it('is one to one or nothing', () => {
+    const two = [recorded({ refId: 'r1' }), recorded({ refId: 'r2' })];
+    expect(autoMatchRecorded([made()], two, ctx([p]))).toEqual([]);
+    const twins = [made({ key: 'journal:10' }), made({ key: 'journal:11', refId: 11 })];
+    expect(autoMatchRecorded(twins, [recorded()], ctx([p]))).toEqual([]);
+  });
+
+  it('is the shared stated-transfer rule: its payer, its amount, within two days', () => {
     expect(
-      autoMatchRecordedPayments([payment({ amount: 100, characterId: 999 })], [group])
+      autoMatchRecorded([made({ date: '2026-10-22T12:00:00Z' })], [recorded()], ctx([p]))
+    ).toHaveLength(1);
+    expect(
+      autoMatchRecorded([made({ date: '2026-10-23T12:00:01Z' })], [recorded()], ctx([p]))
     ).toEqual([]);
-  });
-
-  it('rejects a transaction too far from the recorded paid-on date', () => {
-    const [group] = unlinkedRecordedPayments([recorded()]);
-    expect(
-      autoMatchRecordedPayments([payment({ amount: 100, date: '2026-10-01T00:00:00Z' })], [group])
-    ).toEqual([]);
-  });
-
-  it('never auto-links a payment-in-kind contract, which carries no ISK figure', () => {
-    const [group] = unlinkedRecordedPayments([recorded()]);
-    expect(
-      autoMatchRecordedPayments(
-        [payment({ kind: 'contract', key: 'contract:5', refId: 5, amount: null })],
-        [group]
-      )
-    ).toEqual([]);
-  });
-});
-
-describe('suggestLink — paying back taxes', () => {
-  /** Three months of unpaid tax, oldest first, each worth its own round figure. */
-  function backlog() {
-    return balance(payee({ entityId: LANDLORD_ID }), [
-      assignment({ id: 'a1', date: '2026-09-01', taxOwed: 5_000_000 }),
-      assignment({ id: 'a2', date: '2026-09-02', taxOwed: 4_000_000 }),
-      assignment({ id: 'a3', date: '2026-09-03', taxOwed: 3_000_000 }),
-    ]);
-  }
-
-  it('ticks only the oldest entries the payment can actually cover', () => {
-    const result = suggestLink(payment({ amount: 9_000_000 }), [backlog()]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
-  });
-
-  it('stops before the entry that would overshoot, rather than ticking the lot', () => {
-    // 5M + 4M fits inside 10M; adding a3 would claim 12M was paid.
-    const result = suggestLink(payment({ amount: 10_000_000 }), [backlog()]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
-    expect(result?.confidence).toBe('identity');
-  });
-
-  it('offers the oldest entry alone when the payment cannot even cover that', () => {
-    const result = suggestLink(payment({ amount: 1_000_000 }), [backlog()]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1']);
-  });
-
-  it('still ticks the whole balance when that is exactly what was paid', () => {
-    const result = suggestLink(payment({ amount: 12_000_000 }), [backlog()]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2', 'a3']);
-    expect(result?.confidence).toBe('identity-and-amount');
-  });
-
-  it('orders oldest-first regardless of how the balance listed its members', () => {
-    const b = balance(payee({ entityId: LANDLORD_ID }), [
-      assignment({ id: 'a3', date: '2026-09-03', taxOwed: 3_000_000 }),
-      assignment({ id: 'a1', date: '2026-09-01', taxOwed: 5_000_000 }),
-      assignment({ id: 'a2', date: '2026-09-02', taxOwed: 4_000_000 }),
-    ]);
-
-    const result = suggestLink(payment({ amount: 9_000_000 }), [b]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
-  });
-
-  it('leaves a payment in kind ticking the whole in-window balance — its cargo carries no ISK figure', () => {
-    const result = suggestLink(payment({ kind: 'contract', key: 'contract:11', amount: null }), [
-      backlog(),
-    ]);
-
-    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2', 'a3']);
-    expect(result?.confidence).toBe('identity');
-  });
-
-  it('never guesses a partial cover for a Payee it cannot identify', () => {
-    const anonymous = balance(payee(), [
-      assignment({ id: 'a1', date: '2026-09-01', taxOwed: 5_000_000 }),
-      assignment({ id: 'a2', date: '2026-09-02', taxOwed: 4_000_000 }),
-    ]);
-
-    const result = suggestLink(
-      payment({ counterpartyId: undefined, counterpartyName: 'Someone Else', amount: 5_500_000 }),
-      [anonymous]
-    );
-
-    expect(result).toBeNull();
-  });
-});
-
-describe('normalizePaymentInfo', () => {
-  it('leaves a payment with the current shape untouched', () => {
-    const p = recorded().payment!;
-    expect(normalizePaymentInfo(p)).toEqual(p);
-  });
-
-  it('reads a legacy single journalRefId as one auto-sourced link', () => {
-    const legacy = { ...recorded().payment!, journalRefId: 11 };
-    expect(normalizePaymentInfo(legacy)).toEqual({
-      paymentId: 'p1',
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 100,
-      journalLinks: [{ refId: 11, source: 'auto' }],
-      contractLinks: undefined,
-    });
-  });
-
-  it('reads a legacy single contractId as one auto-sourced link', () => {
-    const legacy = { ...recorded().payment!, contractId: 7 };
-    expect(normalizePaymentInfo(legacy).contractLinks).toEqual([{ refId: 7, source: 'auto' }]);
-  });
-});
-
-describe('exactAmountMatches', () => {
-  it('keeps only payments whose ISK figure equals the target exactly', () => {
-    const exact = payment({ key: 'journal:1', refId: 1, amount: 100 });
-    const close = payment({ key: 'journal:2', refId: 2, amount: 101 });
-
-    expect(exactAmountMatches([exact, close], 100)).toEqual([exact]);
-  });
-
-  it('never matches a payment in kind, which carries no ISK figure', () => {
-    const inKind = payment({ kind: 'contract', key: 'contract:1', amount: null });
-    expect(exactAmountMatches([inKind], 0)).toEqual([]);
-  });
-});
-
-// Echoes the key so the assertions read the branch taken, not a locale string.
-const t = ((key: string) => key) as unknown as TFunction;
-
-describe('labelForLinkedRef', () => {
-  it('is null once the payment has left the cached journal', () => {
-    expect(labelForLinkedRef([], t, 'journal', 11)).toBeNull();
-  });
-
-  it('joins amount, date and label', () => {
-    expect(labelForLinkedRef([payment()], t, 'journal', 11)).toBe(
-      '100 ISK · 2026-09-06 — Player donation'
-    );
-  });
-
-  it('names a payment in kind and an untitled contract by key', () => {
-    const inKind = payment({
-      key: 'contract:5',
-      kind: 'contract',
-      refId: 5,
-      amount: null,
-      label: '',
-    });
-    expect(labelForLinkedRef([inKind], t, 'contract', 5)).toBe(
-      'miningTax.linkPaymentInKind · 2026-09-06 — miningTax.linkPaymentUntitledContract'
+    expect(autoMatchRecorded([made({ amount: 1_000_002 })], [recorded()], ctx([p]))).toEqual([]);
+    expect(autoMatchRecorded([made()], [recorded({ characterId: MAIN + 1 })], ctx([p]))).toEqual(
+      []
     );
   });
 });
 
-describe('linkedTransactionsFor', () => {
-  const info = (journalRefIds: number[], contractIds: number[] = []) => ({
-    paymentId: 'p1',
-    paidOn: '2026-09-06',
-    method: 'donation' as const,
-    amount: 100,
-    journalLinks: journalRefIds.map((refId) => ({ refId, source: 'manual' as const })),
-    contractLinks: contractIds.map((refId) => ({ refId, source: 'auto' as const })),
+describe('unlinkedSentFor', () => {
+  const landlord = payeeOf([record({ id: 'p1', name: 'Landlord', entityId: LANDLORD })]);
+  const other = payeeOf([record({ id: 'p2', name: 'Other', entityId: 90_000_002 })]);
+  const suggestion = (payee: LinkablePayee, amount: number | null, key: string) => ({
+    payment: made({ key, amount }),
+    payee,
+    confidence: 'entity' as const,
   });
 
-  it('lists each linked ref once across assignments sharing a payment', () => {
-    const a = assignment({ id: 'a', payment: info([11]) });
-    const b = assignment({ id: 'b', payment: info([11], [5]) });
-    const out = linkedTransactionsFor([a, b], [payment()], t);
-    expect(out.map((l) => `${l.kind}:${l.refId}`)).toEqual(['journal:11', 'contract:5']);
-    expect(out[0]?.label).toBe('100 ISK · 2026-09-06 — Player donation');
-    expect(out[1]?.label).toBeNull();
+  it("counts and sums only the Payee's own suggestions", () => {
+    const all = [
+      suggestion(landlord, 400_000, 'journal:1'),
+      suggestion(landlord, 100_000, 'journal:2'),
+      suggestion(other, 999, 'journal:3'),
+    ];
+    expect(unlinkedSentFor(all, landlord.id)).toEqual({ count: 2, amount: 500_000 });
   });
 
-  it('skips an assignment with no payment', () => {
-    expect(linkedTransactionsFor([assignment()], [], t)).toEqual([]);
-  });
-});
-
-describe('assignmentsForLinkTarget', () => {
-  function displayRow(a: MiningTaxAssignmentRecord | null, groupMembers?: GroupMember[]) {
-    const first = member(a ?? assignment());
-    return {
-      key: a?.id ?? 'residual',
-      row: first.row,
-      assignment: a,
-      status: 'outstanding',
-      groupMembers,
-    } as DisplayRow;
-  }
-
-  it('is every member of a joined group', () => {
-    const a = assignment({ id: 'a' });
-    const b = assignment({ id: 'b' });
-    const dr = displayRow(a, [member(b)]);
-    expect(assignmentsForLinkTarget(dr, [a, b]).map((x) => x.id)).toEqual(['a', 'b']);
-  });
-
-  it('is the shared-payment group for a single row', () => {
-    const a = assignment({ id: 'a', payment: { ...recorded().payment!, paymentId: 'p1' } });
-    const b = assignment({ id: 'b', payment: { ...recorded().payment!, paymentId: 'p1' } });
-    const c = assignment({ id: 'c' });
-    expect(assignmentsForLinkTarget(displayRow(a), [a, b, c]).map((x) => x.id)).toEqual(['a', 'b']);
-  });
-
-  it('is empty for an unassigned residual', () => {
-    expect(assignmentsForLinkTarget(displayRow(null), [])).toEqual([]);
-  });
-});
-
-describe('coPaidAssignments', () => {
-  const pay = (paymentId: string) => ({
-    paymentId,
-    paidOn: '2026-09-06',
-    method: 'donation' as const,
-    amount: 300,
-  });
-
-  it('lists the other entries settled by the same payment, oldest first', () => {
-    const self = assignment({ id: 'a', date: '2026-09-05', payment: pay('p1') });
-    const early = assignment({ id: 'b', date: '2026-09-01', payment: pay('p1') });
-    const late = assignment({ id: 'c', date: '2026-09-04', payment: pay('p1') });
-    const other = assignment({ id: 'd', date: '2026-09-02', payment: pay('p2') });
-    expect(coPaidAssignments(self, [self, late, other, early]).map((a) => a.id)).toEqual([
-      'b',
-      'c',
-    ]);
-  });
-
-  it('is empty for an entry with no payment record', () => {
-    const self = assignment({ id: 'a' });
-    expect(coPaidAssignments(self, [self, assignment({ id: 'b' })])).toEqual([]);
-  });
-});
-
-describe('linkedAssignmentsByRef', () => {
-  const pay = (journal: number[], contract: number[] = []) => ({
-    paymentId: 'p1',
-    paidOn: '2026-09-06',
-    method: 'donation' as const,
-    amount: 300,
-    journalLinks: journal.map((refId) => ({ refId, source: 'manual' as const })),
-    contractLinks: contract.map((refId) => ({ refId, source: 'manual' as const })),
-  });
-
-  it('groups every entry a transaction settled, oldest first, keeping journal and contract apart', () => {
-    const late = assignment({ id: 'late', date: '2026-09-05', payment: pay([7]) });
-    const early = assignment({ id: 'early', date: '2026-09-01', payment: pay([7], [7]) });
-    const unpaid = assignment({ id: 'none' });
-    const out = linkedAssignmentsByRef([late, unpaid, early]);
-    expect(out.journal.get(7)?.map((a) => a.id)).toEqual(['early', 'late']);
-    expect(out.contract.get(7)?.map((a) => a.id)).toEqual(['early']);
-    expect(out.journal.get(8)).toBeUndefined();
-  });
-});
-
-describe('coPaidOutsideGroup', () => {
-  const pay = { paymentId: 'p1', paidOn: '2026-09-06', method: 'donation' as const, amount: 300 };
-
-  it("lists a joined group's co-paid entries that are not in the group, once each", () => {
-    const m1 = assignment({ id: 'm1', date: '2026-09-02', payment: pay });
-    const m2 = assignment({ id: 'm2', date: '2026-09-03', payment: pay });
-    const out1 = assignment({ id: 'o1', date: '2026-09-05', payment: pay });
-    const out2 = assignment({ id: 'o2', date: '2026-09-01', payment: pay });
-    const elsewhere = assignment({ id: 'x', payment: { ...pay, paymentId: 'p2' } });
-    expect(coPaidOutsideGroup([m1, m2], [m1, m2, out1, out2, elsewhere]).map((a) => a.id)).toEqual([
-      'o2',
-      'o1',
-    ]);
-  });
-});
-
-// The Bureau report (2026-11-16): one 10,898,549 ISK donation (journal 26251213375) paid 11-06 and
-// 11-07 under one Settle up; five days later a manual link reused it for 11-09 as a second payment.
-describe('paymentCoverage', () => {
-  const REF = 26251213375;
-  const paid = (
-    id: string,
-    date: string,
-    taxOwed: number,
-    paymentId: string,
-    refs: number[],
-    amount = 10_898_549
-  ) =>
-    assignment({
-      id,
-      date,
-      taxOwed,
-      status: 'paid',
-      payment: {
-        paymentId,
-        paidOn: '2026-11-09',
-        method: 'donation',
-        amount,
-        journalLinks: refs.map((refId) => ({ refId, source: 'auto' as const })),
-      },
-    });
-  const nov06 = paid('nov06', '2026-11-06', 10_242_020.95, 'aed69be7', [REF]);
-  const nov07 = paid('nov07', '2026-11-07', 656_528.4, 'aed69be7', [REF]);
-  const nov09 = paid('nov09', '2026-11-09', 6_540_106.7, '8f691da6', [REF]);
-  const amounts = new Map([[`journal:${REF}`, 10_898_549]]);
-  const amountOf = (key: string) => amounts.get(key);
-
-  it('leaves a day the linked ISK is used up before as not paid by it', () => {
-    const out = paymentCoverage([nov09, nov07, nov06], amountOf);
-    expect([...out.uncovered]).toEqual(['nov09']);
-    expect([...(out.reaches.get(`journal:${REF}`) ?? [])].sort()).toEqual(['nov06', 'nov07']);
-  });
-
-  it('judges nothing when a linked amount is unknown', () => {
-    const out = paymentCoverage([nov06, nov07, nov09], () => undefined);
-    expect(out.uncovered.size).toBe(0);
-    expect(out.reaches.get(`journal:${REF}`)?.size).toBe(3);
-  });
-
-  it('adds up a payment paid in installments', () => {
-    const a = paid('a', '2026-11-01', 600, 'p', [1, 2], 1_000);
-    const b = paid('b', '2026-11-02', 400, 'p', [1, 2], 1_000);
-    const out = paymentCoverage([a, b], (key) => (key === 'journal:1' ? 600 : 400));
-    expect(out.uncovered.size).toBe(0);
-    expect([...(out.reaches.get('journal:1') ?? [])]).toEqual(['a']);
-    expect([...(out.reaches.get('journal:2') ?? [])]).toEqual(['b']);
-  });
-
-  // As `linkTargetsWithin` records it: a short payment linked to one day part-pays it, so that
-  // day stays paid with its payment, and only days after it are left owed.
-  it('keeps the oldest day paid when the ISK finishes no day', () => {
-    const short = paid('short', '2026-11-06', 10_242_020.95, 'p', [7], 5_000_000);
-    const later = paid('later', '2026-11-07', 656_528.4, 'p', [7], 5_000_000);
-    const out = paymentCoverage([later, short], (key) => (key === 'journal:7' ? 5_000_000 : null));
-    expect([...out.uncovered]).toEqual(['later']);
-    expect(paymentCoverage([short], () => 5_000_000).uncovered.size).toBe(0);
-  });
-
-  it('ignores an owed Assignment and a paid one with no link', () => {
-    const bare = assignment({ id: 'bare', status: 'paid' });
-    const out = paymentCoverage([bare, assignment({ id: 'owed' })], amountOf);
-    expect(out.uncovered.size).toBe(0);
-  });
-});
-
-describe('owedWhereUncovered', () => {
-  it('reads an uncovered Assignment as owed, its payment record off, and leaves the rest', () => {
-    const covered = assignment({ id: 'ok', status: 'paid', paidAt: 5 });
-    const short = assignment({
-      id: 'short',
-      status: 'paid',
-      paidAt: 5,
-      payment: { paymentId: 'x', paidOn: '2026-11-09', method: 'donation', amount: 1 },
-    });
-    const row = { ...member(covered).row, assignments: [covered, short] };
-    const [out] = owedWhereUncovered([row], new Set(['short']));
-    expect(out.assignments[0]).toBe(covered);
-    expect(out.assignments[1]).toMatchObject({ id: 'short', status: 'outstanding' });
-    expect(out.assignments[1]).not.toHaveProperty('payment');
-    expect(out.assignments[1]).not.toHaveProperty('paidAt');
-    expect(owedWhereUncovered([row], new Set())[0]).toBe(row);
-  });
-});
-
-describe('linkTargetsWithin', () => {
-  const day = (id: string, date: string, taxOwed: number) => assignment({ id, date, taxOwed });
-  const days = [
-    day('nov09', '2026-11-09', 6_540_106.7),
-    day('nov06', '2026-11-06', 10_242_020.95),
-    day('nov07', '2026-11-07', 656_528.4),
-  ];
-
-  it('keeps only the oldest days the ISK sent covers', () => {
-    expect(linkTargetsWithin(days, 10_898_549).map((a) => a.id)).toEqual(['nov06', 'nov07']);
-  });
-
-  it('keeps every day an amount covers, and all of them for a payment in kind', () => {
-    expect(linkTargetsWithin(days, 17_438_656)).toHaveLength(3);
-    expect(linkTargetsWithin(days, null)).toHaveLength(3);
-  });
-
-  it('keeps the oldest day alone when the ISK cannot finish even that one', () => {
-    expect(linkTargetsWithin(days, 1_000).map((a) => a.id)).toEqual(['nov06']);
-  });
-});
-
-describe('reachedByTransaction', () => {
-  const REF = 26251213375;
-  const paid = (id: string, date: string, taxOwed: number, paymentId: string) =>
-    assignment({
-      id,
-      date,
-      taxOwed,
-      status: 'paid',
-      payment: {
-        paymentId,
-        paidOn: '2026-11-09',
-        method: 'donation',
-        amount: 10_898_549,
-        journalLinks: [{ refId: REF, source: 'manual' as const }],
-      },
-    });
-  const all = [
-    paid('nov09', '2026-11-09', 6_540_106.7, '8f691da6'),
-    paid('nov06', '2026-11-06', 10_242_020.95, 'aed69be7'),
-    paid('nov07', '2026-11-07', 656_528.4, 'aed69be7'),
-    assignment({ id: 'other' }),
-  ];
-
-  it('lists only the days the journal entry’s ISK reaches, oldest first', () => {
-    const linked = linkedAssignmentsByRef(all).journal.get(REF) ?? [];
-    expect(
-      reachedByTransaction(`journal:${REF}`, 10_898_549, linked, all).map((a) => a.id)
-    ).toEqual(['nov06', 'nov07']);
-  });
-
-  it('lists every linked day when the amount is unknown', () => {
-    const linked = linkedAssignmentsByRef(all).journal.get(REF) ?? [];
-    expect(reachedByTransaction(`journal:${REF}`, null, linked, all)).toHaveLength(3);
+  it('is undefined when nothing was sent to it', () => {
+    expect(unlinkedSentFor([suggestion(other, 5, 'journal:3')], landlord.id)).toBeUndefined();
   });
 });

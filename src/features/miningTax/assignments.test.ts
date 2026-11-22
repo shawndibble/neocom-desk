@@ -7,20 +7,17 @@ import {
   deleteAssignments,
   dismissEntries,
   joinAssignments,
-  linkPaymentTransaction,
-  linkRecordedPayment,
-  markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
   loadReleasePrices,
   releaseOreFromAssignment,
   splitAssignment,
   uncombineAssignments,
-  unmarkAssignmentsPaid,
-  unlinkPaymentTransaction,
   updateCombinedAssignments,
 } from './assignments';
 import { useMiningTaxCompressedOre } from './oreForm';
+import { readLegacyPaidMarks } from './paymentLinkStore';
+import { putAssignments } from './storedAssignments';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 
@@ -34,6 +31,8 @@ vi.mock('./pricing', async (importOriginal) => ({
 }));
 
 const CHAR_A = 1;
+/** Paid as the test's stored record says: the account's reading, stood in for. */
+const byStatus = (a: MiningTaxAssignmentRecord) => a.status === 'paid';
 const TYPE_A = 45490;
 const TYPE_B = 45491;
 
@@ -41,6 +40,7 @@ beforeEach(async () => {
   useMiningTaxCompressedOre.setState({ value: true, hydrated: true });
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
+  await db.miningTaxPaymentLinks.clear();
   await db.payees.clear();
   await db.settings.clear();
   pricingMock.loadUnitPricesOnDate.mockResolvedValue({
@@ -55,6 +55,7 @@ beforeEach(async () => {
 describe('createAssignment', () => {
   it('persists exactly the value/tax the caller supplies, without recomputing them', async () => {
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 30000142,
@@ -63,7 +64,6 @@ describe('createAssignment', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     });
 
     expect(assignment.estimatedValue).toBe(1000);
@@ -80,6 +80,7 @@ describe('createAssignment', () => {
     useMiningTaxCompressedOre.setState({ value: false, hydrated: true });
 
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 30000142,
@@ -88,7 +89,6 @@ describe('createAssignment', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     });
 
     expect(assignment.rawOrePriced).toBe(true);
@@ -96,6 +96,7 @@ describe('createAssignment', () => {
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 30000142,
@@ -104,28 +105,10 @@ describe('createAssignment', () => {
       taxPct: 10,
       estimatedValue: 4200, // not what TYPE_A's price would compute to
       taxOwed: 420,
-      markPaid: false,
     });
 
     expect(assignment.estimatedValue).toBe(4200);
     expect(assignment.taxOwed).toBe(420);
-  });
-
-  it('marks paid immediately when markPaid is true, stamping paidAt', async () => {
-    const assignment = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 30000142,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: true,
-    });
-
-    expect(assignment.status).toBe('paid');
-    expect(assignment.paidAt).toBeDefined();
   });
 });
 
@@ -157,14 +140,13 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     taxPct: 10,
     estimatedValue: 500,
     taxOwed: 50,
-    markPaid: false,
   };
 
   it("makes the new entry the collector, so the day's later ore folds into it rather than the paid one", async () => {
     const paid = paidDay();
     await db.miningTaxAssignments.put(paid);
 
-    const created = await createAssignment(lateOre);
+    const created = await createAssignment({ ...lateOre, isPaid: byStatus });
 
     expect(created.collectsGrowth).toBe(true);
     expect(await db.miningTaxAssignments.get('paid')).toEqual(paid);
@@ -183,15 +165,13 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
       }),
     ]);
 
-    const created = await createAssignment(lateOre);
+    const created = await createAssignment({ ...lateOre, isPaid: byStatus });
 
     expect(created.collectsGrowth).toBe(true);
-    // Only the flag moves; the paid record's status, ore and tax stay as paid.
+    // Only the flag moves; the paid record's ore and tax stay as they were (an old mark goes).
     const stored = await db.miningTaxAssignments.get('paid');
     expect(stored?.collectsGrowth).toBeUndefined();
     expect(stored).toMatchObject({
-      status: 'paid',
-      paidAt: paid.paidAt,
       oreLines: paid.oreLines,
       estimatedValue: paid.estimatedValue,
       taxOwed: paid.taxOwed,
@@ -212,6 +192,7 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     );
 
     const created = await createAssignment({
+      isPaid: byStatus,
       ...lateOre,
       entryOreLines: [
         { typeId: TYPE_A, quantity: 150 },
@@ -223,7 +204,7 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
   });
 
   it('leaves the flag off on an entry nobody has assigned yet', async () => {
-    const created = await createAssignment(lateOre);
+    const created = await createAssignment({ ...lateOre, isPaid: byStatus });
     expect(created.collectsGrowth).toBeUndefined();
   });
 
@@ -232,14 +213,23 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
       paidDay({ status: 'outstanding', paidAt: undefined, collectsGrowth: true })
     );
 
-    const created = await createAssignment({ ...lateOre, payeeId: 'payee-2', takesGrowth: true });
+    const created = await createAssignment({
+      isPaid: byStatus,
+      ...lateOre,
+      payeeId: 'payee-2',
+      takesGrowth: true,
+    });
 
     expect(created.collectsGrowth).toBe(true);
     expect((await db.miningTaxAssignments.get('paid'))?.collectsGrowth).toBeUndefined();
   });
 
   it('takesGrowth leaves the flag off on an entry nobody has assigned yet', async () => {
-    const created = await createAssignment({ ...lateOre, takesGrowth: true });
+    const created = await createAssignment({
+      isPaid: byStatus,
+      ...lateOre,
+      takesGrowth: true,
+    });
     expect(created.collectsGrowth).toBeUndefined();
   });
 
@@ -263,7 +253,8 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
         new Map([
           [TYPE_A, 10],
           [TYPE_B, 4],
-        ])
+        ]),
+      byStatus
     );
 
     expect(late.collectsGrowth).toBe(true);
@@ -282,12 +273,19 @@ describe('Moon / structure label', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     };
-    const labelled = await createAssignment({ ...base, label: '  Athanor  ' });
+    const labelled = await createAssignment({
+      isPaid: byStatus,
+      ...base,
+      label: '  Athanor  ',
+    });
     expect(labelled.label).toBe('Athanor');
     await db.miningTaxAssignments.clear();
-    const blank = await createAssignment({ ...base, label: '   ' });
+    const blank = await createAssignment({
+      isPaid: byStatus,
+      ...base,
+      label: '   ',
+    });
     expect('label' in blank).toBe(false);
   });
 
@@ -378,342 +376,10 @@ describe('dismissEntries', () => {
   });
 });
 
-describe('markAssignmentsPaid', () => {
-  it('marks every given assignment paid and schedules a sync per distinct character', async () => {
-    const a = await createAssignment({
-      characterId: 1,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: false,
-    });
-    const b = await createAssignment({
-      characterId: 2,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: false,
-    });
-    vi.clearAllMocks();
-
-    await markAssignmentsPaid([a, b]);
-
-    expect((await db.miningTaxAssignments.get(a.id))?.status).toBe('paid');
-    expect((await db.miningTaxAssignments.get(b.id))?.status).toBe('paid');
-  });
-
-  it('is a no-op for an empty list', async () => {
-    await markAssignmentsPaid([]);
-  });
-});
-
-describe('linkRecordedPayment', () => {
-  it('attaches a journal ref to a recorded payment, leaving every other field alone', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: false,
-    });
-    await markAssignmentsPaid([a], {
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 10,
-    });
-    const recorded = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-    vi.clearAllMocks();
-
-    await linkRecordedPayment([recorded], { journalRefId: 42 });
-
-    const updated = await db.miningTaxAssignments.get(a.id);
-    expect(updated?.payment?.journalLinks).toEqual([{ refId: 42, source: 'auto' }]);
-    expect(updated?.payment?.paidOn).toBe('2026-09-06');
-    expect(updated?.payment?.method).toBe('donation');
-    expect(updated?.payment?.amount).toBe(10);
-  });
-
-  it('appends a second link rather than replacing the first — a lump sum paid in installments', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: false,
-    });
-    await markAssignmentsPaid([a], { paidOn: '2026-09-06', method: 'donation', amount: 10 });
-    const recorded = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-    await linkRecordedPayment([recorded], { journalRefId: 42 });
-    const onceLinked = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-
-    await linkRecordedPayment([onceLinked], { journalRefId: 43 });
-
-    const updated = await db.miningTaxAssignments.get(a.id);
-    expect(updated?.payment?.journalLinks).toEqual([
-      { refId: 42, source: 'auto' },
-      { refId: 43, source: 'auto' },
-    ]);
-  });
-
-  it('leaves an Assignment with no recorded payment untouched', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: true,
-    });
-
-    await linkRecordedPayment([a], { journalRefId: 42 });
-
-    expect((await db.miningTaxAssignments.get(a.id))?.payment).toBeUndefined();
-  });
-
-  it('is a no-op for an empty list', async () => {
-    await linkRecordedPayment([], { journalRefId: 1 });
-  });
-});
-
-describe('linkPaymentTransaction', () => {
-  async function paidAssignment(
-    payment?: Parameters<typeof markAssignmentsPaid>[1],
-    date = '2026-09-04'
-  ) {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date,
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: false,
-    });
-    await markAssignmentsPaid([a], payment);
-    return (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-  }
-
-  it('attaches a manually-picked transaction to an already-recorded payment', async () => {
-    const recorded = await paidAssignment({ paidOn: '2026-09-06', method: 'donation', amount: 10 });
-
-    await linkPaymentTransaction([recorded], { journalRefId: 42 }, 'manual', {
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 10,
-    });
-
-    const updated = await db.miningTaxAssignments.get(recorded.id);
-    expect(updated?.payment?.journalLinks).toEqual([{ refId: 42, source: 'manual' }]);
-    expect(updated?.payment?.paymentId).toBe(recorded.payment?.paymentId);
-  });
-
-  it('creates a minimal payment from the fallback when the row was just marked paid, no Settle-up record', async () => {
-    const bare = await paidAssignment();
-    expect(bare.payment).toBeUndefined();
-
-    await linkPaymentTransaction([bare], { journalRefId: 99 }, 'auto', {
-      paidOn: '2026-09-07',
-      method: 'donation',
-      amount: 500,
-    });
-
-    const updated = await db.miningTaxAssignments.get(bare.id);
-    expect(updated?.payment?.paidOn).toBe('2026-09-07');
-    expect(updated?.payment?.amount).toBe(500);
-    expect(updated?.payment?.journalLinks).toEqual([{ refId: 99, source: 'auto' }]);
-  });
-
-  it('shares one freshly-minted paymentId across several bare-paid assignments (a joined group), not one each', async () => {
-    const first = await paidAssignment(undefined, '2026-09-04');
-    const second = await paidAssignment(undefined, '2026-09-05');
-    expect(first.payment).toBeUndefined();
-    expect(second.payment).toBeUndefined();
-
-    await linkPaymentTransaction([first, second], { journalRefId: 7 }, 'manual', {
-      paidOn: '2026-09-08',
-      method: 'donation',
-      amount: 20,
-    });
-
-    const [updatedFirst, updatedSecond] = await Promise.all([
-      db.miningTaxAssignments.get(first.id),
-      db.miningTaxAssignments.get(second.id),
-    ]);
-    expect(updatedFirst?.payment?.paymentId).toBeDefined();
-    expect(updatedFirst?.payment?.paymentId).toBe(updatedSecond?.payment?.paymentId);
-    expect(updatedSecond?.payment?.journalLinks).toEqual([{ refId: 7, source: 'manual' }]);
-  });
-
-  it('leaves an assignment that already had its own payment on its own paymentId, not the newly-minted shared one', async () => {
-    const alreadyPaid = await paidAssignment(
-      { paidOn: '2026-09-05', method: 'donation', amount: 5 },
-      '2026-09-04'
-    );
-    const bare = await paidAssignment(undefined, '2026-09-05');
-
-    await linkPaymentTransaction([alreadyPaid, bare], { journalRefId: 8 }, 'manual', {
-      paidOn: '2026-09-08',
-      method: 'donation',
-      amount: 20,
-    });
-
-    const [updatedFirst, updatedSecond] = await Promise.all([
-      db.miningTaxAssignments.get(alreadyPaid.id),
-      db.miningTaxAssignments.get(bare.id),
-    ]);
-    expect(updatedFirst?.payment?.paymentId).toBe(alreadyPaid.payment?.paymentId);
-    expect(updatedSecond?.payment?.paymentId).not.toBe(alreadyPaid.payment?.paymentId);
-  });
-
-  it('never recomputes amount/paidOn when a payment already exists', async () => {
-    const recorded = await paidAssignment({ paidOn: '2026-09-06', method: 'donation', amount: 10 });
-
-    await linkPaymentTransaction([recorded], { journalRefId: 42 }, 'manual', {
-      paidOn: '2099-01-01',
-      method: 'other',
-      amount: 999_999,
-    });
-
-    const updated = await db.miningTaxAssignments.get(recorded.id);
-    expect(updated?.payment?.paidOn).toBe('2026-09-06');
-    expect(updated?.payment?.amount).toBe(10);
-  });
-
-  it('is a no-op for an empty list', async () => {
-    await linkPaymentTransaction([], { journalRefId: 1 }, 'manual', {
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 1,
-    });
-  });
-});
-
-describe('unmarkAssignmentsPaid', () => {
-  const base = {
-    characterId: CHAR_A,
-    solarSystemId: 1,
-    payeeId: 'p',
-    oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-    taxPct: 10,
-    estimatedValue: 100,
-    taxOwed: 10,
-    markPaid: false,
-  };
-
-  it('puts a Paid Assignment back to outstanding and drops its payment and paidAt', async () => {
-    const a = await createAssignment({ ...base, date: '2026-09-04' });
-    await markAssignmentsPaid([a], { paidOn: '2026-09-06', method: 'donation', amount: 20 });
-    await linkRecordedPayment([(await db.miningTaxAssignments.get(a.id))!], { journalRefId: 42 });
-    const paid = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-
-    await unmarkAssignmentsPaid([paid]);
-
-    const after = await db.miningTaxAssignments.get(a.id);
-    expect(after?.status).toBe('outstanding');
-    expect(after?.paidAt).toBeUndefined();
-    expect(after?.payment).toBeUndefined();
-  });
-
-  it('leaves the other Assignments of a shared payment paid', async () => {
-    const a = await createAssignment({ ...base, date: '2026-09-04' });
-    const b = await createAssignment({ ...base, date: '2026-09-05' });
-    await markAssignmentsPaid([a, b], { paidOn: '2026-09-06', method: 'donation', amount: 20 });
-    const [paidA] = (await db.miningTaxAssignments.bulkGet([a.id])) as MiningTaxAssignmentRecord[];
-
-    await unmarkAssignmentsPaid([paidA]);
-
-    expect((await db.miningTaxAssignments.get(b.id))?.status).toBe('paid');
-    expect((await db.miningTaxAssignments.get(b.id))?.payment?.amount).toBe(20);
-  });
-
-  it('leaves a non-paid Assignment alone', async () => {
-    const a = await createAssignment({ ...base, date: '2026-09-04' });
-    await unmarkAssignmentsPaid([a]);
-    expect((await db.miningTaxAssignments.get(a.id))?.status).toBe('outstanding');
-  });
-
-  it('is a no-op for an empty list', async () => {
-    await unmarkAssignmentsPaid([]);
-  });
-});
-
-describe('unlinkPaymentTransaction', () => {
-  it('removes one linked transaction, leaving the rest of the payment intact', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: false,
-    });
-    await markAssignmentsPaid([a], { paidOn: '2026-09-06', method: 'donation', amount: 10 });
-    const recorded = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-    await linkRecordedPayment([recorded], { journalRefId: 42 });
-    const linked = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-    await linkPaymentTransaction([linked], { journalRefId: 43 }, 'manual', {
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 10,
-    });
-    const bothLinked = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
-
-    await unlinkPaymentTransaction([bothLinked], { journalRefId: 42 });
-
-    const updated = await db.miningTaxAssignments.get(a.id);
-    expect(updated?.payment?.journalLinks).toEqual([{ refId: 43, source: 'manual' }]);
-  });
-
-  it('is a no-op for an Assignment with no payment', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'p',
-      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
-      taxPct: 10,
-      estimatedValue: 100,
-      taxOwed: 10,
-      markPaid: true,
-    });
-
-    await unlinkPaymentTransaction([a], { journalRefId: 1 });
-
-    expect((await db.miningTaxAssignments.get(a.id))?.payment).toBeUndefined();
-  });
-
-  it('is a no-op for an empty list', async () => {
-    await unlinkPaymentTransaction([], { journalRefId: 1 });
-  });
-});
-
 describe('deleteAssignments', () => {
   it('deletes the row and tombstones it so the deletion syncs', async () => {
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -722,7 +388,6 @@ describe('deleteAssignments', () => {
       taxPct: 10,
       estimatedValue: 100,
       taxOwed: 10,
-      markPaid: false,
     });
     await deleteAssignments([assignment]);
     expect(await db.miningTaxAssignments.get(assignment.id)).toBeUndefined();
@@ -782,7 +447,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(a.groupId).toBeDefined();
@@ -823,7 +489,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      pricesOn
+      pricesOn,
+      byStatus
     );
 
     expect(pricesOn).toHaveBeenCalledWith('2026-09-04');
@@ -836,6 +503,7 @@ describe('joinAssignments', () => {
 
   it('tags an already-assigned member with the shared groupId, leaving its own fields untouched', async () => {
     const existing = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -844,7 +512,6 @@ describe('joinAssignments', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     });
 
     const [taggedExisting, created] = await joinAssignments(
@@ -860,7 +527,8 @@ describe('joinAssignments', () => {
       ],
       existing.payeeId as string,
       existing.taxPct,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(taggedExisting.groupId).toBeDefined();
@@ -874,6 +542,7 @@ describe('joinAssignments', () => {
 
   it('reuses an already-set groupId instead of minting a second one', async () => {
     const existing = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -882,7 +551,6 @@ describe('joinAssignments', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     });
     await db.miningTaxAssignments.put({ ...existing, groupId: 'existing-group' });
 
@@ -904,7 +572,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(created.groupId).toBe('existing-group');
@@ -912,6 +581,7 @@ describe('joinAssignments', () => {
 
   it('merges two already-assigned members onto one shared groupId without recomputing their values', async () => {
     const first = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -920,9 +590,9 @@ describe('joinAssignments', () => {
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     });
     const second = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-05',
       solarSystemId: 1,
@@ -931,7 +601,6 @@ describe('joinAssignments', () => {
       taxPct: 10,
       estimatedValue: 200,
       taxOwed: 20,
-      markPaid: false,
     });
 
     const [a, b] = await joinAssignments(
@@ -941,7 +610,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(a.groupId).toBe(b.groupId);
@@ -957,7 +627,7 @@ describe('planNeedsReviewResolution', () => {
   async function planAndWrite(
     ...args: Parameters<typeof planNeedsReviewResolution>
   ): Promise<void> {
-    await db.miningTaxAssignments.put(await planNeedsReviewResolution(...args));
+    await putAssignments([await planNeedsReviewResolution(...args)]);
   }
 
   const freshEntry: MiningLedgerEntry = {
@@ -1153,70 +823,6 @@ describe('planNeedsReviewResolution', () => {
   });
 });
 
-describe('markAssignmentsPaid with a payment', () => {
-  it('stamps one shared paymentId and the lump-sum amount on every assignment', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: false,
-    });
-    const b = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-05',
-      solarSystemId: 1,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 50 }],
-      taxPct: 10,
-      estimatedValue: 500,
-      taxOwed: 50,
-      markPaid: false,
-    });
-
-    await markAssignmentsPaid([a, b], {
-      paidOn: '2026-09-06',
-      method: 'donation',
-      amount: 150,
-      journalLinks: [{ refId: 987, source: 'manual' }],
-    });
-
-    const [ua, ub] = await Promise.all([
-      db.miningTaxAssignments.get(a.id),
-      db.miningTaxAssignments.get(b.id),
-    ]);
-    expect(ua?.status).toBe('paid');
-    expect(ua?.payment?.amount).toBe(150);
-    expect(ua?.payment?.method).toBe('donation');
-    expect(ua?.payment?.paidOn).toBe('2026-09-06');
-    expect(ua?.payment?.journalLinks).toEqual([{ refId: 987, source: 'manual' }]);
-    expect(ua?.payment?.contractLinks).toBeUndefined();
-    expect(ub?.payment?.paymentId).toBe(ua?.payment?.paymentId);
-  });
-
-  it('records nothing about a payment when none is given', async () => {
-    const a = await createAssignment({
-      characterId: CHAR_A,
-      date: '2026-09-04',
-      solarSystemId: 1,
-      payeeId: 'payee-1',
-      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      markPaid: false,
-    });
-    await markAssignmentsPaid([a]);
-    const updated = await db.miningTaxAssignments.get(a.id);
-    expect(updated?.status).toBe('paid');
-    expect(updated?.payment).toBeUndefined();
-  });
-});
-
 describe('splitAssignment', () => {
   const prices = new Map([
     [TYPE_A, 10],
@@ -1406,7 +1012,6 @@ describe('splitAssignment', () => {
     );
     expect(kept.status).toBe('outstanding');
     expect(kept.reviewDiff).toBeUndefined();
-    expect(kept.paidAt).toBeUndefined();
     expect(created.status).toBe('outstanding');
     expect((await db.miningTaxAssignments.get('orig'))?.reviewDiff).toBeUndefined();
   });
@@ -1515,21 +1120,27 @@ describe('double-assignment guard', () => {
     taxPct: 5,
     estimatedValue: 1000,
     taxOwed: 50,
-    markPaid: false,
   };
 
   it('createAssignment refuses ore an existing Assignment on the entry already claims', async () => {
-    await createAssignment(base);
+    await createAssignment({ ...base, isPaid: byStatus });
 
-    await expect(createAssignment({ ...base, markPaid: true })).rejects.toBeInstanceOf(
-      AlreadyAssignedError
-    );
+    await expect(
+      createAssignment({
+        isPaid: byStatus,
+        ...base,
+      })
+    ).rejects.toBeInstanceOf(AlreadyAssignedError);
     expect(await db.miningTaxAssignments.count()).toBe(1);
   });
 
   it('createAssignment still allows a different ore type on the same entry', async () => {
-    await createAssignment(base);
-    await createAssignment({ ...base, oreLines: [{ typeId: TYPE_B, quantity: 5 }] });
+    await createAssignment({ ...base, isPaid: byStatus });
+    await createAssignment({
+      isPaid: byStatus,
+      ...base,
+      oreLines: [{ typeId: TYPE_B, quantity: 5 }],
+    });
     expect(await db.miningTaxAssignments.count()).toBe(2);
   });
 
@@ -1543,11 +1154,13 @@ describe('double-assignment guard', () => {
         estimatedValue: 1000,
       },
     ]);
-    await expect(createAssignment(base)).rejects.toBeInstanceOf(AlreadyAssignedError);
+    await expect(createAssignment({ ...base, isPaid: byStatus })).rejects.toBeInstanceOf(
+      AlreadyAssignedError
+    );
   });
 
   it('joinAssignments refuses to create a member whose ore is already claimed', async () => {
-    await createAssignment(base);
+    await createAssignment({ ...base, isPaid: byStatus });
 
     await expect(
       joinAssignments(
@@ -1562,7 +1175,8 @@ describe('double-assignment guard', () => {
         ],
         'payee-1',
         5,
-        () => new Map([[TYPE_A, 10]])
+        () => new Map([[TYPE_A, 10]]),
+        byStatus
       )
     ).rejects.toBeInstanceOf(AlreadyAssignedError);
     expect(await db.miningTaxAssignments.count()).toBe(1);
@@ -1570,17 +1184,21 @@ describe('double-assignment guard', () => {
 
   it('refuses a twin when the entry holds no more than the first claim, even across a stale view', async () => {
     const withEntry = { ...base, entryOreLines: [{ typeId: TYPE_A, quantity: 100 }] };
-    await createAssignment(withEntry);
-    await expect(createAssignment(withEntry)).rejects.toBeInstanceOf(AlreadyAssignedError);
+    await createAssignment({ ...withEntry, isPaid: byStatus });
+    await expect(createAssignment({ ...withEntry, isPaid: byStatus })).rejects.toBeInstanceOf(
+      AlreadyAssignedError
+    );
   });
 
   it('still allows a claim on growth another Assignment on that type has not covered', async () => {
     await createAssignment({
+      isPaid: byStatus,
       ...base,
       oreLines: [{ typeId: TYPE_A, quantity: 60 }],
       entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
     });
     await createAssignment({
+      isPaid: byStatus,
       ...base,
       payeeId: 'payee-2',
       oreLines: [{ typeId: TYPE_A, quantity: 40 }],
@@ -1588,6 +1206,7 @@ describe('double-assignment guard', () => {
     });
     // 60 + 40 claimed of 130: the 30 residual is still assignable.
     await createAssignment({
+      isPaid: byStatus,
       ...base,
       payeeId: 'payee-3',
       oreLines: [{ typeId: TYPE_A, quantity: 30 }],
@@ -1644,7 +1263,7 @@ describe('updateCombinedAssignments', () => {
     expect(s4?.oreLineValues).toBeUndefined();
   });
 
-  it('leaves status and payment alone', async () => {
+  it('keeps no old paid mark: Paid is read off the account', async () => {
     const paid = member('d3', '2026-10-03', {
       status: 'paid',
       paidAt: 5,
@@ -1659,8 +1278,8 @@ describe('updateCombinedAssignments', () => {
     });
 
     const stored = await db.miningTaxAssignments.get('d3');
-    expect(stored?.status).toBe('paid');
-    expect(stored?.payment?.paymentId).toBe('p1');
+    expect(stored?.status).toBe('outstanding');
+    expect(stored?.payment).toBeUndefined();
   });
 });
 
@@ -1683,7 +1302,7 @@ describe('updateCombinedAssignments label', () => {
       db.miningTaxAssignments.get('d3'),
       db.miningTaxAssignments.get('d4'),
     ]);
-    expect(s3).toMatchObject({ label: 'Athanor in Q-S', status: 'paid', paidAt: 5, groupId: 'g1' });
+    expect(s3).toMatchObject({ label: 'Athanor in Q-S', groupId: 'g1' });
     expect(s4?.label).toBe('Athanor in Q-S');
   });
 
@@ -1835,11 +1454,18 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
       taxPct: 10,
       estimatedValue: 1000,
       taxOwed: 100,
-      markPaid: false,
     };
-    expect((await createAssignment({ ...input, byDefault: true })).override).toBe(false);
+    expect(
+      (
+        await createAssignment({
+          isPaid: byStatus,
+          ...input,
+          byDefault: true,
+        })
+      ).override
+    ).toBe(false);
     await db.miningTaxAssignments.clear();
-    expect('override' in (await createAssignment(input))).toBe(false);
+    expect('override' in (await createAssignment({ ...input, isPaid: byStatus }))).toBe(false);
   });
 
   it('is cleared when the pilot edits the entry', async () => {
@@ -1888,7 +1514,8 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
       [{ characterId: CHAR_A, date: row.date, solarSystemId: 1, assignment: row }],
       'landlord',
       5,
-      () => new Map()
+      () => new Map(),
+      byStatus
     );
     expect('override' in joined).toBe(false);
   });
@@ -1913,11 +1540,41 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
     const next = await releaseOreFromAssignment(row, [{ typeId: TYPE_B, quantity: 50 }], priced);
     expect(next && 'override' in next).toBe(false);
   });
+});
 
-  it('is cleared when the pilot marks it paid', async () => {
-    const row = made();
-    await db.miningTaxAssignments.put(row);
-    await markAssignmentsPaid([row]);
-    expect('override' in (await db.miningTaxAssignments.get('dm'))!).toBe(false);
+describe('a view never reaches a write (B1)', () => {
+  const record = (over: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord => ({
+    id: 'a1',
+    characterId: 7,
+    date: '2026-10-01',
+    solarSystemId: 30000142,
+    payeeId: 'p1',
+    oreLines: [{ typeId: 45490, quantity: 100 }],
+    taxPct: 10,
+    estimatedValue: 1_000_000,
+    taxOwed: 100_000,
+    status: 'outstanding',
+    updatedAt: 0,
+    ...over,
+  });
+
+  it('editing, uncombining or splitting a day its link paid writes no mark, so no link is read from it', async () => {
+    await putAssignments([record({ groupId: 'g' })]);
+    // The row on screen: paid by a link, so its view says Paid.
+    const view = { ...record({ groupId: 'g' }), status: 'paid' as const };
+    await updateCombinedAssignments([view], { payeeId: 'p1', taxPct: 12, members: {} });
+    await uncombineAssignments([{ ...view, taxPct: 12 }]);
+    const prices = { kept: new Map([[45490, 10_000]]), moved: new Map([[45490, 10_000]]) };
+    await splitAssignment(
+      { ...view, taxPct: 12 },
+      { moves: [{ typeId: 45490, quantity: 40 }], payeeId: 'p2', taxPct: 5 },
+      prices
+    );
+    expect((await db.miningTaxAssignments.toArray()).map((a) => a.status)).toEqual([
+      'outstanding',
+      'outstanding',
+    ]);
+    await readLegacyPaidMarks();
+    expect(await db.miningTaxPaymentLinks.count()).toBe(0);
   });
 });

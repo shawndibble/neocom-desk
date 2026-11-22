@@ -48,9 +48,9 @@ describe('what an officer kept', () => {
     });
   });
 
-  it('reads a rejected declaration with its next step, keyed to its Statement', () => {
+  it('reads a rejected declaration with its next step, keyed to its Late notice', () => {
     const r = row({
-      statementId: 's1',
+      noticeId: 's1',
       declaration: { state: 'rejected', at: 'x', reason: 'No contract', nextStep: 'Send the ref' },
     });
     expect(keptBy(r)).toBe('declaration');
@@ -58,7 +58,7 @@ describe('what an officer kept', () => {
     expect(t.problem).toMatchObject({
       by: 'declaration',
       nextStep: 'Send the ref',
-      statementId: 's1',
+      noticeId: 's1',
     });
     // Keyed on the officer's answer, so a later answer is a new problem.
     expect(t.hideKey).toBe('keptStatement:1:s1:x');
@@ -81,8 +81,8 @@ describe('what an officer kept', () => {
     expect(notPayingHides(hidden, row({ flagged: rejectedFlag }))).toBe(false);
   });
 
-  it('reads Not paying the same for an Overdue Statement day and an uncredited donation day', () => {
-    expect(notPayingHides(new Set(['statement:1:s1']), row({ statementId: 's1' }))).toBe(true);
+  it('reads Not paying the same for a Late notice day and an uncredited donation day', () => {
+    expect(notPayingHides(new Set(['statement:1:s1']), row({ noticeId: 's1' }))).toBe(true);
     const donated = row({ unlinkedDonation: { amount: 5, at: '2026-11-08T00:00:00Z' } });
     expect(
       notPayingHides(
@@ -95,11 +95,11 @@ describe('what an officer kept', () => {
     );
   });
 
-  it('an Overdue Statement hides its rejected declaration by the answer, not the Statement', () => {
+  it('a Late notice whose days are unpaid hides its rejected declaration by the answer, not the notice', () => {
     const o = {
       corporationId: 1,
       corpName: 'Bureau',
-      statementId: 's1',
+      noticeId: 's1',
       characterId: 7,
       periodStart: '2026-10-01',
       period: 'Oct',
@@ -111,9 +111,8 @@ describe('what an officer kept', () => {
   });
 
   // The kept warning must go once the member pays the day.
-  it('is gone once the kept day is paid, but not while a mark leaves the book owing', () => {
+  it('is gone once the kept day is paid', () => {
     expect(keptBy(row({ state: 'paid', flagged: rejectedFlag }))).toBeUndefined();
-    expect(keptBy(row({ state: 'paid', bookOwed: 50, flagged: rejectedFlag }))).toBe('dispute');
   });
 });
 
@@ -134,7 +133,7 @@ describe('figure items', () => {
 });
 
 describe('targets', () => {
-  it('an uncredited group is answered once a declaration waits on its Statement, and names every day', () => {
+  it('an uncredited group is answered once a declaration waits on its Late notice, and names every day', () => {
     const donation = {
       characterId: 7,
       corporationId: 1,
@@ -145,7 +144,7 @@ describe('targets', () => {
       covered: ['2026-11-07', '2026-11-06'],
     };
     const days = ['2026-11-06', '2026-11-07'].map((date) =>
-      row({ date, statementId: 's1', declaration: { state: 'waiting', at: 'x' } })
+      row({ date, noticeId: 's1', declaration: { state: 'waiting', at: 'x' } })
     );
     const t = uncreditedTarget([donation], days);
     expect(t.answered).toBe(true);
@@ -157,12 +156,12 @@ describe('targets', () => {
     expect(fresh.answered).toBe(false);
   });
 
-  it('an Overdue Statement carries its rejected declaration', () => {
+  it('a Late notice whose days are unpaid carries its rejected declaration', () => {
     const declaration = { state: 'rejected' as const, at: 'x', nextStep: 'Send the ref' };
     const t = overdueTarget({
       corporationId: 1,
       corpName: 'Bureau',
-      statementId: 's1',
+      noticeId: 's1',
       characterId: 7,
       periodStart: '2026-10-01',
       period: 'Oct',
@@ -183,25 +182,23 @@ describe('targets', () => {
       covered: ['2026-11-06'],
     };
     const rejected = row({
-      statementId: 's1',
+      noticeId: 's1',
       declaration: { state: 'rejected', at: 'y', nextStep: 'Send it' },
     });
     expect(uncreditedTarget([donation], [rejected]).answered).toBe(true);
   });
 
-  it('a plain billed day, and a day marked paid that the book still bills, have a Resolve', () => {
+  it('a plain billed day has a Resolve, a paid one none', () => {
     expect(rowTarget(row())?.problem.kind).toBe('billed');
-    const marked = rowTarget(row({ state: 'paid', bookOwed: 40, statementId: 's1' }));
-    expect(marked?.problem).toMatchObject({ kind: 'markedPaid', statementId: 's1' });
     expect(rowTarget(row({ state: 'paid' }))).toBeUndefined();
   });
 
-  it("only a Statement's own Characters can be the senders of its proof", () => {
+  it("only a Late notice's own Characters can be the senders of its proof", () => {
     const book = {
-      statements: [{ id: 's1', minerId: 'm1' }] as never,
+      notices: [{ id: 's1', minerId: 'm1' }] as never,
       miners: [{ id: 'm1', characterIds: [7, 8], mainCharacterId: 7 }],
     };
-    expect(proofSenders(book, { characterId: 7, statementId: 's1' })).toEqual([7, 8]);
+    expect(proofSenders(book, { characterId: 7, noticeId: 's1' })).toEqual([7, 8]);
     expect(proofSenders(book, { characterId: 9 })).toEqual([9]);
   });
 
@@ -229,14 +226,14 @@ describe('inReviewTarget (donations the book holds for review)', () => {
   };
 
   it('asks the corporation to count them, naming each held payment and its donor', () => {
-    const t = inReviewTarget({ ...group, statementId: 's1' });
+    const t = inReviewTarget({ ...group, noticeId: 's1' });
     expect(t.problem).toEqual({
       kind: 'uncredited',
       corporationId: 1,
       corpName: 'Bureau',
       characterId: 7,
       amount: 26_952_549 + 10_976_509,
-      statementId: 's1',
+      noticeId: 's1',
       held: [
         { id: 'j5_26226487580', characterId: 7 },
         { id: 'j5_x', characterId: 8 },
@@ -257,7 +254,7 @@ describe('inReviewTarget (donations the book holds for review)', () => {
     expect(t.donations?.map((d) => d.amount)).toEqual([26_952_549, 10_976_509]);
   });
 
-  it('has no Statement when the Miner has none open', () => {
-    expect('statementId' in inReviewTarget(group).problem).toBe(false);
+  it('has no Late notice when the Miner has none unpaid', () => {
+    expect('noticeId' in inReviewTarget(group).problem).toBe(false);
   });
 });

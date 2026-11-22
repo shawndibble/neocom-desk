@@ -12,11 +12,13 @@
 // request, leave and dismissal (and later payouts and agreed rates: call
 // `rebuildFeederView` / `tryRebuildFeederView` from those writers).
 
+import { utcDay } from './timeConstants.js';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
 import { commitInBatches } from './commitInBatches.js';
-import { FEEDER_VIEWS, STATEMENTS, utcDate } from './corpTaxBook.js';
+import { FEEDER_VIEWS } from './corpTaxBook.js';
+import { dbReader, readNotices } from './corpTaxBookLateNoticeStore.js';
 import {
   BOOK_DEFAULTS,
   accrueValuedDays,
@@ -303,10 +305,7 @@ export function appendRequestedRate(
   const lastRequest = [...history].reverse().find((e) => e.kind === 'requested');
   // Re-sending the standing request adds nothing to the history.
   if (lastRequest?.pct === pct) return history;
-  return [
-    ...history,
-    { kind: 'requested', pct, effectiveFrom: utcDate(now), recordedAt: iso(now) },
-  ];
+  return [...history, { kind: 'requested', pct, effectiveFrom: utcDay(now), recordedAt: iso(now) }];
 }
 
 export interface FeederViewRow {
@@ -332,7 +331,7 @@ export interface FeederViewInput {
   /** The hub station's end-of-day prices, by `priceKey(oreFormTypeId, date)`. */
   prices: ReadonlyMap<string, SidePrices>;
   /**
-   * The unit prices an issued Statement billed each miner's line at, by the line's `chargeKey`
+   * The unit prices an issued Late notice listed each miner's line at, by the line's `chargeKey`
    * (`characterId:structureId:date`) then raw type id: what an unsaved day falls back to (#6209).
    */
   billedPrices?: ReadonlyMap<string, Readonly<Record<string, number>>>;
@@ -353,13 +352,13 @@ const latestPct = (
   today: string
 ) => latestOwnerRate(history, kind, today)?.pct ?? null;
 
-/** A row's Statement line key (engine `observedEntryKey`): character, refinery and day. */
+/** A row's notice line key (engine `observedEntryKey`): character, refinery and day. */
 const chargeKeyOf = (r: Pick<FeederViewRow, 'characterId' | 'structureId' | 'date'>) =>
   `${r.characterId}:${r.structureId}:${r.date}`;
 
 export function buildFeederView(input: FeederViewInput): FeederView {
   const { record, now } = input;
-  const today = utcDate(now);
+  const today = utcDay(now);
   const history = deriveOwnerRateHistory(record);
   const modeChanges = deriveModeChanges(record);
   const compressed = input.oreForm === 'compressed';
@@ -584,9 +583,9 @@ async function loadPrices(
 }
 
 /**
- * What issued Statements billed the miners' lines at, for the covered rows with no saved price
- * (#6209). Reads nothing when every row is priced; else only the Statements that reach the
- * earliest such day.
+ * What the Late notices listed the miners' lines at, for the covered rows with no saved price
+ * (#6209). Reads nothing when every row is priced; else only the notices that can list the
+ * earliest such day (issued on or after it).
  */
 async function readBilledPrices(
   book: FirebaseFirestore.DocumentReference,
@@ -606,15 +605,14 @@ async function readBilledPrices(
     if (earliest === undefined || r.date < earliest) earliest = r.date;
   }
   if (earliest === undefined) return out;
-  const snap = await book.collection(STATEMENTS).where('coversThrough', '>=', earliest).get();
-  for (const doc of snap.docs) {
-    const lines = doc.get('lines') as unknown;
-    if (!Array.isArray(lines)) continue;
-    for (const line of lines as { chargeKey?: unknown; unitPrices?: unknown }[]) {
-      if (typeof line.chargeKey !== 'string' || !keys.has(line.chargeKey)) continue;
-      if (out.has(line.chargeKey) || typeof line.unitPrices !== 'object' || !line.unitPrices)
-        continue;
-      out.set(line.chargeKey, line.unitPrices as Record<string, number>);
+  const since = earliest;
+  const notices = await readNotices(dbReader(book.firestore), book, (collection) =>
+    collection.where('issuedAt', '>=', since)
+  );
+  for (const notice of notices) {
+    for (const line of notice.lines) {
+      if (!keys.has(line.key) || out.has(line.key) || !line.unitPrices) continue;
+      out.set(line.key, line.unitPrices);
     }
   }
   return out;

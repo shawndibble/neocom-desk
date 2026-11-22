@@ -27,9 +27,7 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     now: '2026-09-18T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 5_000_000,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -45,13 +43,12 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
       },
     ],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [],
-    paidStatementIds: new Set(),
     pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
     ...overrides,
   };
@@ -112,7 +109,7 @@ describe('CloseAccountDialog', () => {
   it('shows the final late notice and closes the account with the reason', async () => {
     const { onClose } = renderDialog();
     expect(
-      screen.getByText(/A final late notice lists .* through 17 Sep( 2026)?\./)
+      screen.getByText(/A final late notice lists 200,000 through 11 Aug( 2026)?\./)
     ).toBeInTheDocument();
     const confirm = screen.getByRole('button', { name: 'Close account' });
     expect(confirm).toBeDisabled();
@@ -125,13 +122,15 @@ describe('CloseAccountDialog', () => {
       minerId: 'solo:2',
       reason: 'Left the area',
       credit: { kind: 'refund' },
-      statement: { id: 'final_solo:2', minerId: 'solo:2', amount: 200_000, characterIds: [2] },
+      notice: { id: 'final_solo:2', minerId: 'solo:2', kind: 'final', listed: 200_000 },
     });
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it('can dismiss the tax instead of sending a final notice', async () => {
     renderDialog();
+    // Each option is named once: the group's caption is not read into its first button.
+    expect(screen.getByRole('button', { name: 'Send a final notice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss the tax' }));
     await userEvent.type(screen.getByLabelText(/Reason/), 'Left the area');
     await userEvent.click(screen.getByRole('button', { name: 'Close account' }));
@@ -144,7 +143,7 @@ describe('CloseAccountDialog', () => {
     });
     const close = editBook.mock.calls[1][2];
     expect(close).toMatchObject({ action: 'closeAccount', minerId: 'solo:2' });
-    expect(close).not.toHaveProperty('statement');
+    expect(close).not.toHaveProperty('notice');
   });
 
   it('offers a forfeit only when there is credit, and holds it until the basis is valid', async () => {

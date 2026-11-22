@@ -2,15 +2,12 @@
  * What the moon page reads from the per-pull moon docs instead of the whole ledger (#5716,
  * ADR 0032). Pure: no fetch, DOM or Dexie.
  *
- * A pull's window is at most 5 dates at one refinery. The page reads the shown pull's rows
- * in full, so its figures come from the engine exactly as the whole-book path computes them.
- * An earlier cycle of the same moon needs a ledger row only while one of the Miners in its
- * doc has a window day after the last day its Statements took in; every other cycle prints the doc's figures
- * (mined ore, Miner count, the tax its Statements froze). One doc missing or on another
- * schema sends the page back to the whole-book path: mixing saves no reads.
- *
- * Known gap, the Miner page's (`minerScope.ts`): a day dismissed or never billed older than
- * a Miner's newest Statement is not looked for in a cycle whose rows are not read.
+ * A pull's window is at most 5 dates at one refinery. The page reads the window rows of the
+ * shown pull and of the moon's other cycles, so every figure, tax included, comes from the
+ * engine exactly as the whole-book path computes it: a moon doc carries no tax (its frozen tax
+ * counted the retired calendar bills, and is 0 since schema 2). The docs still give a refinery page
+ * that reads no row its mined share and Miner count. One doc missing or on another schema sends
+ * the moon page back to the whole-book path.
  */
 import {
   MOON_DOC_SCHEMA,
@@ -18,7 +15,6 @@ import {
   type MoonDoc,
 } from '../../../functions/src/corpTaxBookMoonDocs';
 import type { BookView, ExtractionRow } from './bookView';
-import type { Statement } from './statements';
 import { extractionId, type SyncExtraction } from './sync';
 
 /** A doc this client can read: current schema and the fields the page takes. */
@@ -49,7 +45,7 @@ export type MoonScope =
       ok: true;
       /** Pulls whose rows are read; their figures come from the engine. */
       rows: PullRows[];
-      /** The shown pull's moon's other cycles, whose figures come from their docs. */
+      /** Cycles whose mined share and Miner count come from their docs (none on a moon page). */
       fromDocs: ReadonlySet<string>;
     };
 
@@ -58,52 +54,35 @@ export interface MoonScopeInput {
   extractions: readonly SyncExtraction[];
   /** Docs read for the shown pull's refinery, by extraction id. */
   docs: ReadonlyMap<string, MoonDoc>;
-  statements: readonly Statement[];
-  startDate: string;
   expiryHours: Readonly<Record<string, number>>;
 }
 
-/** Which pulls need ledger rows to print the moon page, and which print their doc's figures. */
+/** The pulls whose ledger rows print the moon page: the shown one and the moon's other cycles. */
 export function planMoonScope(input: MoonScopeInput): MoonScope {
   const shown = input.extractions.find((x) => extractionId(x) === input.extractionId);
   // Not a pull of this book: the page says so without any row.
   if (!shown) return { ok: true, rows: [], fromDocs: new Set() };
   if (!moonDocUsable(input.docs.get(input.extractionId))) return { ok: false };
 
-  // The last day each Miner's Statements took in: a day on or before it is billed (frozen).
-  const billedThrough = new Map<string, string>();
-  for (const s of input.statements)
-    if (s.coversThrough > (billedThrough.get(s.minerId) ?? ''))
-      billedThrough.set(s.minerId, s.coversThrough);
-  const canBeOpen = (minerId: string, date: string) => {
-    const through = billedThrough.get(minerId);
-    return through === undefined ? date >= input.startDate : date > through;
-  };
   const rows: PullRows[] = [];
-  const fromDocs = new Set<string>();
   const cycles = input.extractions.filter(
     (x) => x.structureId === shown.structureId && x.moonId === shown.moonId
   );
   for (const x of cycles) {
     const id = extractionId(x);
     const window = pullWindow(x, input.expiryHours);
-    const doc = input.docs.get(id);
-    const own = id === input.extractionId;
-    if (!own && !moonDocUsable(doc)) return { ok: false };
-    // A window that does not parse covers no day: the engine's answer is already the doc's.
+    if (id !== input.extractionId && !moonDocUsable(input.docs.get(id))) return { ok: false };
+    // A window that does not parse covers no day.
     if (!window) continue;
-    const open = own || (doc as MoonDoc).miners.some((m) => canBeOpen(m.minerId, window.to));
-    if (open)
-      rows.push({ extractionId: id, structureId: x.structureId, from: window.from, to: window.to });
-    else fromDocs.add(id);
+    rows.push({ extractionId: id, structureId: x.structureId, from: window.from, to: window.to });
   }
-  return { ok: true, rows, fromDocs };
+  return { ok: true, rows, fromDocs: new Set() };
 }
 
 /**
- * The view with each doc-backed cycle's mined share, Miner count and tax taken from its doc.
- * The share reads the doc's mined ore against the row's make-up, so a survey-sourced chunk
- * agrees with the whole-book view; tax is what the cycle's Statements froze.
+ * The view with each doc-backed cycle's mined share and Miner count taken from its doc. The share
+ * reads the doc's mined ore against the row's make-up, so a survey-sourced chunk agrees with the
+ * whole-book view. Its tax stays the view's: a doc carries none.
  */
 export function withMoonDocs(
   view: BookView,
@@ -122,7 +101,7 @@ export function withMoonDocs(
       );
       minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
     }
-    return { ...row, minedPct, minerCount: doc.minerCount, tax: doc.frozenTax };
+    return { ...row, minedPct, minerCount: doc.minerCount };
   };
   return {
     ...view,

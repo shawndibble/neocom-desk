@@ -89,6 +89,7 @@ import {
   parseConfirmGroupingInput,
   parseDeclineByTokenInput,
   parseEditAction,
+  parseGroupingAnswerInput,
   parseStopReminders,
   parseSyncInput,
   parseToken,
@@ -187,7 +188,7 @@ import {
   startFeederRemoval,
 } from './corpTaxBookFeederRemoval.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
-import { verifyAllMinerTotals } from './corpTaxBookMinerTotalsStore.js';
+import { verifyAllBooks } from './corpTaxBookNightlyVerify.js';
 import {
   claimPayment,
   declareOwnPayment,
@@ -199,6 +200,7 @@ import {
   declineGroupingByToken,
   listPendingGroupings,
   editBook,
+  dismissGroupingAnswer,
   readStatementByToken,
   deleteBook,
   reclaimBook,
@@ -1321,6 +1323,15 @@ corpTaxBookAction('editCorpTaxBookCallable', (request) =>
   )
 );
 
+// An officer takes a Character's answer to a grouping out of Needs you.
+corpTaxBookAction('dismissGroupingAnswer', (request) =>
+  dismissGroupingAnswer(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseGroupingAnswerInput(request.data)
+  )
+);
+
 // SRP (ADR 0026): data under corps/{id}, written only by these callables. Router-only: each is
 // an action of `corpTaxBookCall`, never its own deployed function (a deploy has a per-minute
 // mutation quota). Clients call it through `callRouted`.
@@ -1737,21 +1748,22 @@ export const dailyHousekeeping = onSchedule(
           },
         },
         {
-          // Shadow-mode verifier for the Miner running totals (#5255, ADR 0032): recomputes each
-          // book's totals, flags and repairs any drift. Inside the daily job, not a new function.
-          name: 'verifyMinerTotals',
+          // The nightly pass over each book's server-built docs (ADR 0032, decision
+          // 20261120-235011): moon docs that can still change and the tab read models, rebuilt
+          // and repaired; the retired Miner totals deleted. Inside the daily job, not a new function.
+          name: 'verifyBookDocs',
           run: async () => {
             const { books, failed, truncated } = await bookVersioned(() =>
-              verifyAllMinerTotals(firestore(), Date.now)
+              verifyAllBooks(firestore(), Date.now)
             );
             if (failed > 0 || truncated) {
-              logWarn('Miner totals verifier incomplete, continues next run', {
+              logWarn('Book docs verifier incomplete, continues next run', {
                 books,
                 failed,
                 truncated,
               });
             } else {
-              logInfo('Miner totals verifier done', { books, failed, truncated });
+              logInfo('Book docs verifier done', { books, failed, truncated });
             }
           },
         },

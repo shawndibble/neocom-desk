@@ -124,23 +124,22 @@ export interface MoonOwnersInput {
   /** The day's unit prices, by raw type id. */
   pricesOn: (date: string) => ReadonlyMap<number, number>;
   /**
-   * What issued Statements billed each miner's line at (`billedPricesOf`), by `chargeKey` then raw
+   * What late notices priced each miner's line at (`billedPricesOf`), by day charge key then raw
    * type id: an ore with no saved price takes it, as the moon owner's page does (#6209).
    */
   billedPrices?: ReadonlyMap<string, Readonly<Record<number, number>>>;
 }
 
-/** Each Statement line's billed unit prices by its `chargeKey`; the first Statement to bill a line wins. */
+/** Each late notice line's unit prices by its key; the first notice to list a line wins. */
 export function billedPricesOf(
-  statements: readonly {
-    lines: readonly { chargeKey?: string; unitPrices?: Readonly<Record<number, number>> }[];
+  notices: readonly {
+    lines: readonly { key: string; unitPrices?: Readonly<Record<number, number>> }[];
   }[]
 ): Map<string, Readonly<Record<number, number>>> {
   const out = new Map<string, Readonly<Record<number, number>>>();
-  for (const s of statements)
-    for (const line of s.lines)
-      if (line.chargeKey && line.unitPrices && !out.has(line.chargeKey))
-        out.set(line.chargeKey, line.unitPrices);
+  for (const n of notices)
+    for (const line of n.lines)
+      if (line.unitPrices && !out.has(line.key)) out.set(line.key, line.unitPrices);
   return out;
 }
 

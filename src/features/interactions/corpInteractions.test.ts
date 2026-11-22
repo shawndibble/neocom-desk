@@ -18,31 +18,29 @@ const book: BookFacts = {
   minerId: 'solo:7',
   standing: 'member',
   owed: 5_000_000,
-  statements: [
+  notices: [
     {
-      id: 's1',
+      id: 'n0',
       issuedAt: '2026-10-05T00:00:00Z',
-      periodStart: '2026-09-28',
-      periodEnd: '2026-10-04',
-      amount: 9_000_000,
-      notice: false,
+      from: '2026-09-28',
+      to: '2026-10-04',
+      listed: 9_000_000,
       mailsSent: 2,
       settled: true,
     },
     {
       id: 'n1',
       issuedAt: '2026-11-02T00:00:00Z',
-      periodStart: '2026-10-26',
-      periodEnd: '2026-11-01',
-      amount: 5_000_000,
-      notice: true,
+      from: '2026-10-26',
+      to: '2026-11-01',
+      listed: 5_000_000,
       mailsSent: 0,
       settled: false,
     },
   ],
   payments: [
-    { id: 'j1_900', at: '2026-10-06T10:00:00Z', amount: 9_000_000, statementId: 's1' },
-    { id: 'manual-1', at: '2026-10-08T10:00:00Z', amount: 1_000_000 },
+    { id: 'j1_900', at: '2026-10-06T10:00:00Z', amount: 9_000_000, paidDays: true },
+    { id: 'manual-1', at: '2026-10-08T10:00:00Z', amount: 1_000_000, paidDays: false },
   ],
   adjustments: [
     {
@@ -71,9 +69,11 @@ describe('bookInteractions', () => {
     expect(mining[0].to).toBe('/corp/moons/miners/solo%3A7');
   });
 
-  it('maps statements, late notices, payments and adjustments', () => {
-    expect(types('interactions.type.statement')[0].state).toBe('interactions.state.settled');
-    expect(types('interactions.type.lateNotice')[0].state).toBe('interactions.state.unpaid');
+  it('maps late notices, payments and adjustments', () => {
+    expect(types('interactions.type.lateNotice').map((n) => n.state)).toEqual([
+      'interactions.state.settled',
+      'interactions.state.unpaid',
+    ]);
     const payments = types('interactions.type.payment');
     expect(payments.map((p) => p.isk)).toEqual([9_000_000, 1_000_000]);
     expect(types('interactions.type.adjustment')).toHaveLength(1);
@@ -192,20 +192,18 @@ describe('summarizeCorpInteractions', () => {
     expect(s.member).toEqual({
       owedNow: 5_000_000,
       taxPaid: 10_000_000,
-      statements: 1,
-      lateNotices: 1,
+      lateNotices: 2,
       memberSince: Date.parse('2026-10-01'),
     });
   });
 
   it('hides member chips with nothing to say', () => {
-    const empty: BookFacts = { ...book, owed: 0, statements: [], payments: [], days: [] };
+    const empty: BookFacts = { ...book, owed: 0, notices: [], payments: [], days: [] };
     expect(
       summarizeCorpInteractions({ book: empty, kills: [], isMember: true, now }).member
     ).toEqual({
       owedNow: null,
       taxPaid: null,
-      statements: null,
       lateNotices: null,
       memberSince: null,
     });
