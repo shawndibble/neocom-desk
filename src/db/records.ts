@@ -655,8 +655,8 @@ export interface PayeeRecord {
   /**
    * Epoch ms the pilot archived this Payee (GLOSSARY.md, Archived Payee): it has no card and its
    * credit counts nowhere, though its history stays. Read, never acted on: a Payee is archived
-   * only while nothing is owed and nothing was billed after that UTC day (`isArchivedPayee`), so a
-   * new bill shows it again without any write. Not indexed, so no Dexie version bump.
+   * only while nothing is owed and none of its Assignments was written after this stamp
+   * (`isArchivedPayee`), so a new or backfilled bill shows it again without any write. Not indexed, so no Dexie version bump.
    */
   archivedAt?: number;
   /** Epoch ms of the last edit. */

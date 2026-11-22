@@ -230,15 +230,28 @@ describe('PayeeRunningAccounts', () => {
       ).toEqual(['q']);
     });
 
-    it('shows again, by itself, once a day after it was archived is billed', () => {
+    it('shows again, by itself, once an Assignment is billed after it was archived', () => {
       const accounts = PayeeRunningAccounts.build({
         assignments: [
           assignment('a', 'p1', '2026-10-01', 100),
-          assignment('b', 'p1', '2026-10-11', 100),
+          assignment('b', 'p1', '2026-10-11', 100, { updatedAt: ARCHIVED + 1 }),
         ],
         payees: [archivedPayee('p1', 1)],
         links: [link('p1', 100, 3)],
       });
+      expect(accounts.isArchived('p1')).toBe(false);
+    });
+
+    it('shows again for a backfilled or same-day entry, though it is covered by credit', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [
+          // Mined long ago, entered after the Payee was archived, and paid for by what was held.
+          assignment('late', 'p1', '2026-09-01', 50, { updatedAt: ARCHIVED + 1000 }),
+        ],
+        payees: [archivedPayee('p1', 1)],
+        links: [link('p1', 500, 3)],
+      });
+      expect(accounts.of('p1')?.owes).toBeNull();
       expect(accounts.isArchived('p1')).toBe(false);
     });
 

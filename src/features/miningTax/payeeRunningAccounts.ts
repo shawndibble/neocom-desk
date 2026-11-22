@@ -23,7 +23,7 @@ import type { MoonMiningTaxRow } from './snapshot';
 /** The Assignment fields an account reads. */
 export type BilledAssignment = Pick<
   MiningTaxAssignmentRecord,
-  'id' | 'payeeId' | 'date' | 'status' | 'taxOwed'
+  'id' | 'payeeId' | 'date' | 'status' | 'taxOwed' | 'updatedAt'
 >;
 
 /** Whether an Assignment bills its Payee: it has one, and is neither dismissed nor unassigned. */
@@ -72,12 +72,15 @@ export class PayeeRunningAccounts {
     // A Payee no longer stored keeps its own id: its Assignments are still owed somewhere.
     const keyOf = (payeeId: string) => primaryOf.get(payeeId) ?? payeeId;
     const charges = new Map<string, { id: string; date: string; tax: number }[]>();
+    // When each Payee's billed Assignments were last written, for the archive rule.
+    const written = new Map<string, { updatedAt: number }[]>();
     for (const a of input.assignments) {
       if (!isBilled(a)) continue;
       // A day a book bills whole is the book's, not this Payee's: no charge, not a zero line.
       if ((input.billedElsewhere?.get(a.id) ?? 0) >= 1) continue;
       const key = keyOf(a.payeeId!);
       charges.set(key, [...(charges.get(key) ?? []), { id: a.id, date: a.date, tax: taxOf(a) }]);
+      written.set(key, [...(written.get(key) ?? []), { updatedAt: a.updatedAt }]);
     }
     const links = new Map<string, PayeePaymentLink[]>();
     for (const l of input.links) {
@@ -106,7 +109,7 @@ export class PayeeRunningAccounts {
       const account = byPrimary.get(group.primary.id);
       if (
         isArchivedPayee(Math.max(...(stamps as number[])), account?.owes ?? null, [
-          ...(charges.get(group.primary.id) ?? []),
+          ...(written.get(group.primary.id) ?? []),
         ])
       )
         archived.add(group.primary.id);
