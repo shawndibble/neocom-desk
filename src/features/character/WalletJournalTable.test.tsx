@@ -86,7 +86,8 @@ function Harness({
         keyByCharacter={keyByCharacter}
         highlightRowKey={highlightRowKey}
         panel={{
-          open: true,
+          // On a phone the open panel is modal and the table behind it inert.
+          open: !phone.value,
           onOpenChange: () => {},
           scopeLabel: 'All characters',
           coverage: netted ? { loaded: 2, total: 2, missing: [] } : undefined,
