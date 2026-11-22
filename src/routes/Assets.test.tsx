@@ -534,7 +534,7 @@ describe('Assets', () => {
     // The notice shows with the rows, before names and values finish; the
     // button is disabled until that load settles.
     const retry = screen.getByRole('button', { name: 'Try again' });
-    await waitFor(() => expect(retry).toBeEnabled());
+    await waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled'));
     const requestsBeforeRetry = requestCount;
 
     await user.click(retry);

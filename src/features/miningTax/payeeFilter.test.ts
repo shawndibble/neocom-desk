@@ -3,7 +3,6 @@ import type { DisplayRow } from '@/features/miningTax/groupRows';
 import {
   canonicalizePayeeFilter,
   filterRowsByPayee,
-  isSolePayeeFilter,
   payeeFilterParam,
   resolvePayeeFilter,
   togglePayeeFilter,
@@ -80,14 +79,5 @@ describe('togglePayeeFilter', () => {
   it('ticking every Payee reads as all', () => {
     expect(togglePayeeFilter(new Set(['a']), ['a', 'b'], 'b')).toBe('all');
     expect(togglePayeeFilter('none', ['a'], 'a')).toBe('all');
-  });
-});
-
-describe('isSolePayeeFilter', () => {
-  it('is true only for exactly that one Payee', () => {
-    expect(isSolePayeeFilter(new Set(['a']), 'a')).toBe(true);
-    expect(isSolePayeeFilter(new Set(['a', 'b']), 'a')).toBe(false);
-    expect(isSolePayeeFilter('all', 'a')).toBe(false);
-    expect(isSolePayeeFilter('none', 'a')).toBe(false);
   });
 });

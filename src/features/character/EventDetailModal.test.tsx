@@ -267,12 +267,18 @@ describe('EventDetailModal', () => {
       const user = userEvent.setup();
       await user.click(acceptButton);
 
-      expect(acceptButton).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Tentative' })).toBeDisabled();
+      expect(acceptButton).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.getByRole('button', { name: 'Decline' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
+      expect(screen.getByRole('button', { name: 'Tentative' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
 
       resolvePut();
-      await vi.waitFor(() => expect(acceptButton).not.toBeDisabled());
+      await vi.waitFor(() => expect(acceptButton).not.toHaveAttribute('aria-disabled'));
     });
 
     it('does not throw when the write fails, and shows a failure message', async () => {
@@ -287,7 +293,7 @@ describe('EventDetailModal', () => {
       const declineButton = await screen.findByRole('button', { name: 'Decline' });
       await userEvent.setup().click(declineButton);
 
-      await vi.waitFor(() => expect(declineButton).not.toBeDisabled());
+      await vi.waitFor(() => expect(declineButton).not.toHaveAttribute('aria-disabled'));
       expect(await screen.findByText(/couldn't save your response/i)).toBeInTheDocument();
     });
 

@@ -47,6 +47,15 @@ export function DropdownMenuContent({
         collisionPadding={collisionPadding}
         className={cx(menuContentClassName, menuScrollClassName, className)}
         {...props}
+        onKeyDown={(event) => {
+          props.onKeyDown?.(event);
+          // Radix swallows Tab inside a menu, trapping keyboard users. Tab
+          // dismisses it instead (focus returns to the trigger).
+          if (event.key === 'Tab' && !event.defaultPrevented) {
+            event.preventDefault();
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          }
+        }}
       />
     </DropdownMenuPrimitive.Portal>
   );

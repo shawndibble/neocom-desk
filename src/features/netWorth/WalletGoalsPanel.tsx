@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -79,6 +79,12 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const amountOk = amount !== null && amount > 0 && amount <= GOAL_MAX_TARGET;
   const byFitting = draft?.mode === 'fitting';
   const canSave = draft !== null && (byFitting ? draft.fittingId !== '' : amountOk);
+  const saveReasonId = useId();
+  const saveBlockedReason = canSave
+    ? null
+    : byFitting
+      ? t('wallet.goal.needsFitting')
+      : t('wallet.goal.needsAmount');
 
   const save = () => {
     if (!draft || !canSave) return;
@@ -153,7 +159,17 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
             <Button variant="ghost" onClick={() => setDraft(null)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="primary" onClick={save} disabled={!canSave}>
+            {draft && saveBlockedReason !== null && (
+              <span id={saveReasonId} className="text-[0.6875rem] text-text-dim">
+                {saveBlockedReason}
+              </span>
+            )}
+            <Button
+              variant="primary"
+              onClick={save}
+              aria-disabled={!canSave || undefined}
+              aria-describedby={saveBlockedReason !== null ? saveReasonId : undefined}
+            >
               {t('common.save')}
             </Button>
           </>

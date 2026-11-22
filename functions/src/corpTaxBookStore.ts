@@ -1890,6 +1890,16 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         }
         update.divisions = divisions;
       }
+      // The primary is one of the divisions the book reads once this edit lands.
+      if (rest.primaryDivision !== undefined) {
+        const reads = (update.divisions as number[] | undefined) ?? storedDivisions;
+        if (!reads.includes(rest.primaryDivision)) {
+          throw new HttpsError(
+            'invalid-argument',
+            'primaryDivision must be a division the book reads'
+          );
+        }
+      }
       // Any officer who can edit sets it (not a Director-only setting); null deletes the field.
       if (taxContact !== undefined) {
         update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
@@ -2206,6 +2216,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // An officer's choice replaces a pilot's start-from-the-pop link (`popSurveyId`).
       tx.update(ref, {
         surveyId: action.surveyId ?? FieldValue.delete(),
+        // The linked Survey's first scan, kept so the make-up outlives the Survey's link.
+        surveyScan: action.surveyScan ?? FieldValue.delete(),
         popSurveyId: FieldValue.delete(),
       });
       return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };

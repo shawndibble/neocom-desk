@@ -12,6 +12,7 @@ import {
   type PersonalOverlay,
 } from '@/engine/corpTaxBook/personal';
 import type { PayeeRecord } from '@/db';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import {
   pricesAtHubOnDate,
   sourcesAtHubOnDate,
@@ -21,7 +22,7 @@ import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow } from '../snapshot';
 import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
-import { corpPayee, personalEntriesOf } from './corpRows';
+import { corpPayee, corpPayeeId, personalEntriesOf } from './corpRows';
 
 /** A payment the member made, as the book's overlay reads it; only a journal entry carries a `refId`. */
 export function madeDonationOf(m: MadePayment): MadeDonation {
@@ -53,6 +54,31 @@ export interface CorpClaim {
   payment: ClaimablePayment;
 }
 
+/**
+ * The payments a member recorded by hand in a book's Settle up (`recorded` links to the book's own
+ * Payee), as the donations they said they sent: each dated to the end of its day, never a wallet's minute.
+ */
+export function statedDonationsOf(
+  links: readonly PayeePaymentLink[],
+  corporationId: number
+): MadeDonation[] {
+  return links.flatMap((l) =>
+    l.kind === 'recorded' && l.payeeId === corpPayeeId(corporationId) && l.characterId !== undefined
+      ? [
+          {
+            characterId: l.characterId,
+            counterpartyId: corporationId,
+            amount: l.amount,
+            // The end of the day it names: a book read earlier that day cannot have seen it yet.
+            date: `${l.paidOn}T23:59:59.000Z`,
+            method: 'donation',
+            stated: true as const,
+          },
+        ]
+      : []
+  );
+}
+
 export interface CorpBookView {
   overlay: PersonalOverlay;
   books: CorpBookViewBook[];
@@ -75,6 +101,8 @@ export interface CorpBookViewInput {
    * to, so none counts as a donation in flight to a book as well.
    */
   linked?: ReadonlySet<string>;
+  /** Every stored payment link: the ones recorded to a book's Payee are donations the member sent. */
+  recorded?: readonly PayeePaymentLink[];
   characterNames: ReadonlyMap<number, string>;
   now: string;
 }
@@ -137,7 +165,10 @@ export function buildCorpBookView(
       }),
       inReviewRefs: (book.inReview ?? []).flatMap((d) => (d.refId === undefined ? [] : [d.refId])),
       inFlight: inFlightDonations(
-        input.made.filter((p) => !input.linked?.has(p.key)).map(madeDonationOf),
+        [
+          ...input.made.filter((p) => !input.linked?.has(p.key)).map(madeDonationOf),
+          ...statedDonationsOf(input.recorded ?? [], book.corporationId),
+        ],
         book.held,
         book.corporationId,
         book.startDate

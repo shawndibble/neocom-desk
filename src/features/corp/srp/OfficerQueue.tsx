@@ -273,6 +273,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
         ? (phone ? phoneOwedColumns : owedColumns)(ctx)
         : (phone ? phoneHistoryColumns : historyColumns)(ctx);
 
+  const [confirmingBulk, setConfirmingBulk] = useState(false);
+
   const bulk = () => {
     const chosen = selectable.filter((c) => ticked.includes(c.killmailId));
     void run(async () => {
@@ -378,6 +380,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
             <SrpBulkBar
               selected={ticked.length}
               selectable={selectable.length}
+              listed={rows.length}
               total={tickedTotal}
               onSelectAll={() => setSelection(selectable.map((c) => c.killmailId))}
               onSelectNone={() => setSelection([])}
@@ -385,7 +388,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
               <Button
                 variant={tab === 'pending' ? 'success' : 'primary'}
                 aria-disabled={busy || undefined}
-                onClick={busy ? undefined : bulk}
+                onClick={busy ? undefined : () => setConfirmingBulk(true)}
               >
                 {t(tab === 'pending' ? 'srp.officer.bulk.approve' : 'srp.officer.bulk.markPaid', {
                   count: ticked.length,
@@ -503,6 +506,31 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
         returnFocusFallback={() =>
           document.querySelector<HTMLElement>('[data-tab-id="owed"]') ?? panelRef.current
         }
+      />
+      <ConfirmDialog
+        open={confirmingBulk}
+        title={t(
+          tab === 'pending'
+            ? 'srp.officer.bulk.confirmApproveTitle'
+            : 'srp.officer.bulk.confirmPaidTitle'
+        )}
+        body={t(
+          tab === 'pending'
+            ? 'srp.officer.bulk.confirmApproveBody'
+            : 'srp.officer.bulk.confirmPaidBody',
+          {
+            count: ticked.length,
+            isk: formatIsk(tickedTotal),
+          }
+        )}
+        actionLabel={t(
+          tab === 'pending' ? 'srp.officer.actions.approve' : 'srp.officer.actions.markPaid'
+        )}
+        danger={false}
+        cancelLabel={t('common.cancel')}
+        onConfirm={async () => bulk()}
+        onClose={() => setConfirmingBulk(false)}
+        returnFocusFallback={() => panelRef.current}
       />
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>

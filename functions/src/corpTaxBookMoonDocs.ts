@@ -12,6 +12,7 @@
 // mined totals equal the client engine's `minedDuringExtraction`.
 
 import {
+  chunkMinedPct,
   DEFAULT_EXPIRY_HOURS,
   MAX_EXPIRY_HOURS,
   extractionIdOf,
@@ -127,16 +128,12 @@ export function computeMoonDoc(
 
   const notified = (x.oreLines ?? []).map((l) => ({ typeId: l.typeId, quantity: l.quantity }));
   const surveyId = typeof x.surveyId === 'string' ? x.surveyId : null;
-  // Source order (D13): the ExtractionStarted notification, then a linked survey.
+  // Source order (D13): a moon drill notification (started, else finished or fractured), then a linked survey.
   const source: ChunkSource =
     notified.length > 0 ? 'notification' : surveyId !== null ? 'survey' : 'unknown';
 
-  let minedPct: number | null = null;
-  if (notified.length > 0) {
-    const total = notified.reduce((s, l) => s + l.quantity, 0);
-    const got = notified.reduce((s, l) => s + Math.min(l.quantity, mined.get(l.typeId) ?? 0), 0);
-    minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
-  }
+  // A notification names only base ores: a variant mined counts against its base ore's line.
+  const minedPct = notified.length > 0 ? chunkMinedPct(notified, sorted(mined)) : null;
 
   return {
     schema: MOON_DOC_SCHEMA,

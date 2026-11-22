@@ -181,13 +181,19 @@ describe('WalletWaitingGoal', () => {
     const user = userEvent.setup();
     renderPanels();
     await user.click(await screen.findByRole('button', { name: 'Add goal' }));
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAccessibleDescription(
+      'Enter an amount'
+    );
     expect(screen.getByLabelText('Amount')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Fitting' })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Amount'), '5');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
     await user.click(screen.getByRole('button', { name: 'Fitting price' }));
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAccessibleDescription(
+      'Pick a fitting'
+    );
     expect(screen.getByRole('combobox', { name: 'Fitting' })).toBeInTheDocument();
   });
 

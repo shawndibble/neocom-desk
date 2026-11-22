@@ -21,6 +21,7 @@ import {
   FilterChip,
   FilterField,
   IconButton,
+  LiveStatus,
   PageHeader,
   Panel,
   SearchInput,
@@ -289,9 +290,12 @@ export function CorpStructures() {
         id: 'type',
         header: t(`${C}.type`),
         phoneHidden: true,
-        render: (row) =>
-          (row.source.typeId !== undefined && snapshot.data?.typeNames.get(row.source.typeId)) ||
-          DASH,
+        render: (row) => (
+          <span data-dense-omit>
+            {(row.source.typeId !== undefined && snapshot.data?.typeNames.get(row.source.typeId)) ||
+              DASH}
+          </span>
+        ),
         sortValue: (row) =>
           row.source.typeId === undefined
             ? undefined
@@ -315,12 +319,13 @@ export function CorpStructures() {
         id: 'fuel',
         header: t(`${C}.fuel`),
         align: 'right',
+        cardCorner: true,
         render: (row) =>
           row.fuel ? (
             <span className="flex flex-col items-end">
               <span className={SEVERITY_TEXT[row.fuel.severity]}>{structureWhen(row.fuel, t)}</span>
               {row.fuel.deadlineMs !== null && (
-                <span className="text-xs text-text-dim">
+                <span className="text-xs text-text-dim max-sm:hidden">
                   {formatEveDateTime(new Date(row.fuel.deadlineMs))}
                 </span>
               )}
@@ -334,12 +339,13 @@ export function CorpStructures() {
         id: 'blocks',
         header: t(`${C}.blocks`),
         align: 'right',
+        stackAffix: { after: t('corp.structures.stackAffix.blocks') },
         headerTooltip: t('corp.structures.fuelPlan.blocksHint'),
         render: (row) => {
           const fuel = fuelOf(row);
           if (!fuel || fuel.blocks === null)
             return (
-              <span className="text-xs text-text-dim">
+              <span data-dense-omit className="text-xs text-text-dim">
                 {t('corp.structures.fuelPlan.noBayAccess')}
               </span>
             );
@@ -375,11 +381,12 @@ export function CorpStructures() {
         id: 'needed',
         header: t(`${C}.needed`),
         align: 'right',
+        stackAffix: { after: t('corp.structures.stackAffix.needed') },
         headerTooltip: t('corp.structures.fuelPlan.neededHint'),
         render: (row) => {
           const needed = fuelOf(row)?.plan.needed ?? null;
           return needed === null ? (
-            DASH
+            <span data-dense-omit>{DASH}</span>
           ) : (
             <span className="tabular-nums">{formatCount(needed)}</span>
           );
@@ -390,18 +397,23 @@ export function CorpStructures() {
         id: 'state',
         header: t(`${C}.state`),
         phoneHidden: true,
-        render: (row) => (row.source.state ? structureStateLabel(row.source.state) : DASH),
+        render: (row) => (
+          <span data-dense-omit>
+            {row.source.state ? structureStateLabel(row.source.state) : DASH}
+          </span>
+        ),
         sortValue: (row) => row.source.state ?? undefined,
       },
       {
         id: 'timer',
         header: t(`${C}.timer`),
         align: 'right',
+        stackAffix: { before: t('corp.structures.stackAffix.timer') },
         render: (row) =>
           row.timer ? (
             <span className={SEVERITY_TEXT[row.timer.severity]}>{structureWhen(row.timer, t)}</span>
           ) : (
-            DASH
+            <span data-dense-omit>{DASH}</span>
           ),
         sortValue: (row) => row.timer?.deadlineMs ?? undefined,
       },
@@ -411,9 +423,10 @@ export function CorpStructures() {
         phoneHidden: true,
         render: (row) => {
           const online = row.source.services.filter((service) => service.state === 'online');
-          if (row.source.services.length === 0) return t('corp.structures.servicesNone');
+          if (row.source.services.length === 0)
+            return <span data-dense-omit>{t('corp.structures.servicesNone')}</span>;
           return (
-            <span>
+            <span data-dense-omit>
               {t('corp.structures.servicesOnline', { count: online.length })}
               {row.offline.length > 0 && (
                 <span className="text-danger">
@@ -431,7 +444,9 @@ export function CorpStructures() {
         header: t(`${C}.unanchoring`),
         align: 'right',
         phoneHidden: true,
-        render: (row) => (row.unanchor ? structureWhen(row.unanchor, t) : DASH),
+        render: (row) => (
+          <span data-dense-omit>{row.unanchor ? structureWhen(row.unanchor, t) : DASH}</span>
+        ),
         sortValue: (row) => row.unanchor?.deadlineMs ?? undefined,
       },
     ];
@@ -513,7 +528,7 @@ export function CorpStructures() {
             icon={<Icon.Refresh />}
             label={t('corp.structures.refresh')}
             onClick={snapshot.refresh}
-            disabled={snapshot.loading}
+            busy={snapshot.loading}
           />
         }
       />
@@ -631,6 +646,7 @@ export function CorpStructures() {
                   // Opening pushes, so Back closes the panel; closing replaces.
                   onRowClick={(row) => setOpenId(row.source.structureId, { push: true })}
                   selectedRowKey={openId}
+                  stackLayout="dense"
                   mobileSort
                 />
               )}
@@ -662,6 +678,10 @@ export function CorpStructures() {
                         </span>
                       )}
                     </span>
+                    <LiveStatus>
+                      {copied === 'copied' && t('corp.structures.fuelPlan.copied')}
+                      {copied === 'failed' && t('corp.structures.fuelPlan.copyFailed')}
+                    </LiveStatus>
                     {shoppingList.length > 0 && (
                       <button
                         type="button"

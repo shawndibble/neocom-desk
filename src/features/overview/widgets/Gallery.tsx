@@ -100,7 +100,6 @@ function Preview({ kind, preset }: { kind: WidgetKindDef; preset?: GalleryPreset
       <div className={cx('mx-auto max-w-full', PREVIEW_WIDTH[size])}>
         <Widget widget={widget} previewView={view} hideHeader />
       </div>
-      <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg to-transparent" />
     </div>
   );
 }
@@ -165,11 +164,7 @@ function GalleryItem({
   }
   return (
     <li
-      className={cx(
-        'grid gap-2 rounded-xs border border-line bg-panel-2 p-3',
-        soon && 'opacity-60',
-        dim && 'opacity-75'
-      )}
+      className={cx('grid gap-2 rounded-xs border border-line bg-panel-2 p-3', dim && 'opacity-75')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

@@ -25,9 +25,7 @@ async function openTaxTab(page: Page) {
     characterId: CHARACTER_ID,
     mining: personalLedger([6, 5, 4]),
   });
-  await expect(page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` })).toContainText(
-    isk(OWED)
-  );
+  await expect(page.getByRole('group', { name: ROOK.name })).toContainText(isk(OWED));
 }
 
 /** Settle up on Rook's card, recording `amount` (the amount owed when omitted). */
@@ -65,16 +63,15 @@ test('a short settle up part-pays the newest day, and the ledger shows the rest'
   await openTaxTab(page);
   await settleUp(page, 2.5 * DAY_TAX);
   const owedNow = OWED - 2.5 * DAY_TAX;
-  const ledgerButton = page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` });
-  await expect(ledgerButton).toContainText(isk(owedNow));
-  await ledgerButton.click();
+  await expect(page.getByRole('group', { name: ROOK.name })).toContainText(isk(owedNow));
+  await page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` }).click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
-  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(owedNow)} ISK`));
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(owedNow)} ISK`));
   const payment = ledger
     .getByRole('table', { name: 'Ledger' })
     .getByRole('row', { name: /Payment/ });
   await expect(payment.getByRole('cell').nth(3)).toHaveText(isk(2.5 * DAY_TAX));
-  await expect(payment.getByRole('cell').nth(4)).toHaveText(isk(owedNow));
+  await expect(payment.getByRole('cell').nth(4)).toHaveText(`\u2212${isk(owedNow)}`);
 });
 
 test('an over settle up pays every day, and the link holds all of it', async ({ page }) => {

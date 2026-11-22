@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
 import { useFadeOnChange } from '@/lib/useFadeOnChange';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { IconButton } from './IconButton';
 import { Close } from './icons';
@@ -75,6 +76,7 @@ export function SlideOver({
   contentKey,
 }: SlideOverProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   // Back closes it, like every other overlay (§6c).
   useOverlayHistory(open, onClose, closeOnBack);
   // Radix has no Trigger here, so it cannot return focus on close: remember
@@ -88,7 +90,8 @@ export function SlideOver({
   return (
     <DialogPrimitive.Root
       open={open}
-      modal={false}
+      // Near full-screen on a phone, so the page behind is not usable: trap focus there.
+      modal={isPhone}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}

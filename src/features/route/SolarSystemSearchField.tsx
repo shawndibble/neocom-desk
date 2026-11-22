@@ -12,7 +12,11 @@ import { useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, LiveStatus, SearchInput } from '@/components/ui';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import {
+  suggestionOptionClassName,
+  suggestionPopupClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
@@ -106,24 +110,27 @@ export function SolarSystemSearchField({
           </Button>
         </div>
       )}
-      {matches.length > 0 && (
-        <ul
-          {...combo.listboxProps}
-          aria-label={ariaLabel}
-          className="absolute inset-x-0 top-full z-20 mt-1 flex flex-col rounded-xs border border-line-bright bg-panel p-1 shadow-lg"
+      {!systemsFailed && trimmed !== '' && matches.length === 0 && (
+        <p
+          className={cx(
+            'absolute inset-x-0 top-full z-20 mt-1 flex items-center rounded-xs border border-line-bright bg-panel px-3 text-text-dim shadow-lg',
+            tappableRowClassName
+          )}
         >
+          {systems === null ? t('jumpRange.searching') : t('jumpRange.noMatch')}
+        </p>
+      )}
+      {matches.length > 0 && (
+        <ul {...combo.listboxProps} aria-label={ariaLabel} className={suggestionPopupClassName}>
           {matches.map((option, index) => (
             <li
               key={option.key}
               {...combo.optionProps(index)}
-              className={cx(
-                'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2 touch:flex touch:min-h-9 touch:items-center',
-                index === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
-              )}
+              className={suggestionOptionClassName(index === combo.activeIndex)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(option)}
             >
-              {option.name}
+              <span className="min-w-0 truncate">{option.name}</span>
               {option.security !== null && (
                 <SecurityStatus security={option.security} className="ml-1" />
               )}

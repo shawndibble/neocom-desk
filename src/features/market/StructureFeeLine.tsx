@@ -1,5 +1,5 @@
 import { fixed2 } from '@/lib/fixedFormat';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Popover, PopoverContent, PopoverTrigger, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -43,6 +43,7 @@ export function StructureFeeLine({ structureId, gross, accountingLevel }: Struct
   const ownerPct = fees[structureId];
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const reasonId = useId();
 
   const openEditor = () => {
     setDraft(ownerPct === undefined ? '' : pctText(ownerPct));
@@ -104,9 +105,19 @@ export function StructureFeeLine({ structureId, gross, accountingLevel }: Struct
             })}
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={!valid}>
+        <Button
+          type="submit"
+          size="sm"
+          aria-disabled={!valid || undefined}
+          aria-describedby={!valid ? reasonId : undefined}
+        >
           {t('common.save')}
         </Button>
+        {!valid && (
+          <span id={reasonId} className="self-center text-[0.6875rem] text-text-dim">
+            {t('market.structureFee.percentInvalid')}
+          </span>
+        )}
         {ownerPct !== undefined && (
           <Button type="button" size="sm" variant="ghost" onClick={clear}>
             {t('market.structureFee.useNpc')}

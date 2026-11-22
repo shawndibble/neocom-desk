@@ -69,6 +69,7 @@ export function ImproveResults({
 }: Props) {
   const { t } = useTranslation();
   const sortLabelId = useId();
+  const applyReasonId = useId();
   const { result } = state;
   const { chosen, setTicked } = selection;
   const lead = { goal, hold: settings.value.hold, target };
@@ -225,10 +226,18 @@ export function ImproveResults({
               seconds: (state.elapsedMs / 1000).toFixed(1),
             })}
           </p>
+          {!check.canApply && (
+            <span id={applyReasonId} className="text-[0.6875rem] text-text-dim">
+              {chosen.length === 0
+                ? t('fittings.improve.applyNeedsPick')
+                : t('fittings.improve.applyBlocked')}
+            </span>
+          )}
           <Button
             variant="primary"
             size="sm"
-            disabled={!check.canApply}
+            aria-disabled={!check.canApply || undefined}
+            aria-describedby={!check.canApply ? applyReasonId : undefined}
             onClick={() => {
               onApply(chosen);
               setTicked(new Map());

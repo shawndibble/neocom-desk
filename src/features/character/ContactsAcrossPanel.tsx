@@ -239,7 +239,7 @@ export function AcrossCharactersPanel({
           variant="ghost"
           size="sm"
           onClick={() => void fetchEveryCharacter()}
-          disabled={fetching}
+          loading={fetching}
         >
           {t('contacts.acrossFetchAll')}
         </Button>

@@ -83,7 +83,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
         canEdit &&
         !flagged &&
         row.state !== 'extracting' && (
-          <Button size="sm" disabled={busy} onClick={() => void setMark(true)}>
+          <Button size="sm" aria-disabled={busy || undefined} onClick={() => void setMark(true)}>
             {t('corpTaxBook.moons.fullyMined.mark')}
           </Button>
         )

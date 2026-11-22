@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, Checkbox, EmptyState, LiveStatus, Panel, Spinner } from '@/components/ui';
 import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -315,23 +315,29 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     return () => clearTimeout(timer);
   }, [outcome]);
   return (
-    <Button
-      size="sm"
-      aria-label={`${t('corpTaxBook.verify.copy')} ${label}`}
-      onClick={() =>
-        writeToClipboard(text).then(
-          () => setOutcome('copied'),
-          () => setOutcome('failed')
-        )
-      }
-    >
-      {outcome === null && <Icon.CopyToClipboard aria-hidden />}
-      {outcome === 'copied'
-        ? t('corpTaxBook.verify.copied')
-        : outcome === 'failed'
-          ? t('corpTaxBook.verify.copyFailed')
-          : t('corpTaxBook.verify.copy')}
-    </Button>
+    <>
+      <LiveStatus>
+        {outcome === 'copied' && t('corpTaxBook.verify.copiedAnnounce', { label })}
+        {outcome === 'failed' && t('corpTaxBook.verify.copyFailed')}
+      </LiveStatus>
+      <Button
+        size="sm"
+        aria-label={`${t('corpTaxBook.verify.copy')} ${label}`}
+        onClick={() =>
+          writeToClipboard(text).then(
+            () => setOutcome('copied'),
+            () => setOutcome('failed')
+          )
+        }
+      >
+        {outcome === null && <Icon.CopyToClipboard aria-hidden />}
+        {outcome === 'copied'
+          ? t('corpTaxBook.verify.copied')
+          : outcome === 'failed'
+            ? t('corpTaxBook.verify.copyFailed')
+            : t('corpTaxBook.verify.copy')}
+      </Button>
+    </>
   );
 }
 

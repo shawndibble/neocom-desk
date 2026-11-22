@@ -20,7 +20,7 @@ import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { PayeeLedgerLink } from './PayeeLedgerLink';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
@@ -158,7 +158,7 @@ export function GroupSummaryModal({
       <div className="space-y-3 text-sm">
         <div className="flex items-baseline justify-between gap-3">
           <span className="min-w-0 text-text-dim">
-            {payeeDisplayName}
+            <PayeeLedgerLink name={payeeDisplayName} onOpenLedger={onOpenLedger} />
             {taxPct !== undefined && ` · ${taxPct}%`}
             {' · '}
             {t('miningTax.combined.days', { count: members.length })}
@@ -167,12 +167,6 @@ export function GroupSummaryModal({
             {formatIsk(totalTaxOwed)} ISK
           </span>
         </div>
-
-        {onOpenLedger && (
-          <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
-            {t('miningTax.openLedger', { payee: payeeDisplayName })}
-          </button>
-        )}
 
         <ul className="space-y-2">
           {sorted.map((member) => (
@@ -220,7 +214,12 @@ export function GroupSummaryModal({
           >
             <p>{t('miningTax.combined.unassignConfirm', { count: members.length })}</p>
             <div className="flex gap-2">
-              <Button size="sm" variant="danger" disabled={busy} onClick={onUnassignAll}>
+              <Button
+                size="sm"
+                variant="danger"
+                aria-disabled={busy || undefined}
+                onClick={onUnassignAll}
+              >
                 {t('miningTax.unassignAction')}
               </Button>
               <Button size="sm" onClick={() => setConfirmUnassign(false)}>
@@ -233,19 +232,19 @@ export function GroupSummaryModal({
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           {anyGrown ? (
-            <Button variant="primary" disabled={busy} onClick={onResolve}>
+            <Button variant="primary" aria-disabled={busy || undefined} onClick={onResolve}>
               {t('miningTax.resolveConfirm')}
             </Button>
           ) : (
             anyOutstanding &&
             onSettleUp && (
-              <Button variant="primary" disabled={busy} onClick={onSettleUp}>
+              <Button variant="primary" aria-disabled={busy || undefined} onClick={onSettleUp}>
                 {t('miningTax.settleUpAction')}
               </Button>
             )
           )}
           <div className="flex">
-            <Button disabled={busy} onClick={onEdit} className="rounded-r-none">
+            <Button aria-disabled={busy || undefined} onClick={onEdit} className="rounded-r-none">
               {t('miningTax.combined.edit')}
             </Button>
             {moreMenu}

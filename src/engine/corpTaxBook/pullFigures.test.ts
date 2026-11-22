@@ -194,3 +194,50 @@ describe('the moon page from the moon docs', () => {
     expect(moonDocUsable(docs.get(ids[0]!))).toBe(true);
   });
 });
+
+describe('moon ore variants from the moon docs (no ledger rows read)', () => {
+  const BRIMFUL = 46280; // Brimful Zeolites: the notification names only Zeolites (ORE).
+  const input = (prices: Map<number, number>): BookViewInput => ({
+    ...book(),
+    extractions: [FROZEN],
+    entries: [entry(1, '2026-08-05', 300), entry(2, '2026-08-05', 500, BRIMFUL)],
+    pricesOn: () => ({ prices, sources: new Map() }),
+    // A survey scanned part-way through mining: 75/25, where the ledger shows 3/5.
+    surveyOreLines: new Map([
+      [
+        extractionId(FROZEN),
+        [
+          { typeId: ORE, quantity: 75 },
+          { typeId: BRIMFUL, quantity: 25 },
+        ],
+      ],
+    ]),
+  });
+  const viaDocs = (i: BookViewInput) =>
+    withMoonDocs(buildBookView({ ...i, entries: [] }), docsOf(i), new Set([extractionId(FROZEN)]))
+      .extractions[0];
+
+  it('splits by the doc’s mined ore over the survey, and reads the same as the whole book', () => {
+    const i = input(
+      new Map([
+        [ORE, 1000],
+        [BRIMFUL, 2000],
+      ])
+    );
+    const docRow = viaDocs(i);
+    const whole = buildBookView(i).extractions[0];
+    expect(docRow.oreLines).toEqual([
+      { typeId: ORE, quantity: 3750 },
+      { typeId: BRIMFUL, quantity: 6250 },
+    ]);
+    expect(docRow.oreLines).toEqual(whole.oreLines);
+    expect(docRow.minedPct).toBe(whole.minedPct);
+    expect(docRow.estimatedValue).toBe(3750 * 1000 + 6250 * 2000);
+  });
+
+  it('keeps the row’s value when a variant it splits into has no price on this read', () => {
+    const i = input(new Map([[ORE, 1000]]));
+    const before = buildBookView({ ...i, entries: [] }).extractions[0].estimatedValue;
+    expect(viaDocs(i).estimatedValue).toBe(before);
+  });
+});

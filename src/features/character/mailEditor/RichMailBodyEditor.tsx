@@ -313,7 +313,12 @@ export default function RichMailBodyEditor({
       {/* One card: the bar is its top strip, then the surface. */}
       <div
         data-mail-card
-        className={cx(EVE_MAIL_SURFACE_FRAME_CLASS, 'flex min-h-0 flex-1 flex-col', className)}
+        className={cx(
+          EVE_MAIL_SURFACE_FRAME_CLASS,
+          // The editable has no outline of its own, so the card carries the focus ring.
+          'flex min-h-0 flex-1 flex-col focus-within:outline-2 focus-within:outline-accent',
+          className
+        )}
       >
         <MailFormatBar
           commands={inSource ? sourceCommands : previewCommands}

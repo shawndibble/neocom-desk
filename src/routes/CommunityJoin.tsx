@@ -332,7 +332,7 @@ export function CommunityJoin() {
                     </Button>
                   </NeedsConnection>
                   <NeedsConnection>
-                    <Button onClick={logIn} disabled={loggingIn || working}>
+                    <Button onClick={logIn} loading={loggingIn || working}>
                       {t('communities.join.another')}
                     </Button>
                   </NeedsConnection>

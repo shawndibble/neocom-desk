@@ -47,6 +47,11 @@ export interface BookSettings {
   /** Empty when the doc has none. */
   startDate: string;
   divisions: number[];
+  /**
+   * The division members are asked to pay into first (`primaryDivisionOf`); the book still reads
+   * donations from every division in `divisions`. Absent on a book that never chose one.
+   */
+  primaryDivision?: number;
   /** The corp's own names for those divisions (#6161); `parseBookSettings` always fills it. */
   divisionNames?: DivisionNames;
   lastSync: LastSync | null;
@@ -110,12 +115,14 @@ export function parseBookSettings(d: Data): BookSettings {
   const expiry = isRecord(d.structureExpiryHours) ? d.structureExpiryHours : {};
   const membersSeeFrom = num(d.membersSeeFrom);
   const taxContact = parseTaxContact(d.taxContact);
+  const primaryDivision = num(d.primaryDivision);
   return {
     active: d.active === true,
     startDate: str(d.startDate) ?? '',
     divisions: Array.isArray(d.divisions)
       ? d.divisions.filter((x): x is number => num(x) !== undefined)
       : [1],
+    ...(primaryDivision !== undefined ? { primaryDivision } : {}),
     divisionNames: readDivisionNames(d.divisionNames),
     lastSync: isRecord(d.lastSync) ? (d.lastSync as unknown as LastSync) : null,
     structureExpiryHours: Object.fromEntries(

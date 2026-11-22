@@ -282,6 +282,7 @@
   "fittings": {
     "editTitle": "Editor",
     "myFittings": {
+      "saveAsNewNeedsName": "Enter a name",
       "title": "My Fittings",
       "save": "Save",
       "update": "Update",
@@ -368,7 +369,6 @@
       "overwriteConfirm": "This deletes \"{{name}}\" from your in-game Fittings and replaces it with this one. This can't be undone.",
       "saveAction": "Save",
       "overwriteAction": "Replace",
-      "saving": "Saving…",
       "cancel": "Cancel",
       "errorTitle": "Couldn't save",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
@@ -565,6 +565,7 @@
       "chargeTakerLoaded": ", loaded: {{names}}",
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
+      "cargoQuantityInvalid": "Enter a whole number, 1 or more.",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}",
       "cargoAddMenu_one": "Add {{count}} to cargo",
@@ -1019,6 +1020,7 @@
       "downloadFailed": "Couldn't make the file."
     },
     "stats": {
+      "copyLoading": "Stats are still loading",
       "error": "Couldn't load ship data for this fit.",
       "errorSkills": "Couldn't load this Character's skills, so the stats can't be worked out.",
       "skillsUnknown": "Pilot skills unknown: stats assume no skills.",
@@ -1489,6 +1491,8 @@
       "costs": "Costs"
     },
     "improve": {
+      "applyNeedsPick": "Tick a change to apply",
+      "applyBlocked": "Fix the problems listed above first",
       "menuItem": "Improve Fit",
       "button": "Improve",
       "fixMenuItem": "Fix Fit",
@@ -2081,6 +2085,8 @@
       }
     },
     "compare": {
+      "slotsFull": "Compare holds up to {{count}} fittings",
+      "differencesNeedsTwo": "Add two fittings to compare differences",
       "entryButton": "Compare",
       "title": "Compare Fittings",
       "addFitting": "Compare with",
@@ -2259,6 +2265,7 @@
       "chargeToCargo": "Put {{name}} in cargo",
       "quantityTitle": "Quantity of {{name}}",
       "quantityConfirm": "Set quantity",
+      "quantityInvalid": "Enter a whole number, 0 or more.",
       "fitFirstFree": "Fit to first free slot",
       "addToBay": "Add to drone bay",
       "addCargo": "Add cargo",
@@ -2279,6 +2286,8 @@
       "noCharges": "No other charge fits this"
     },
     "libraryMenu": {
+      "saveToEveUnavailable": "Needs In-game Fittings access",
+      "needsCharacter": "Log in a character to save a copy",
       "open": "Open",
       "compare": "Compare with",
       "duplicate": "Duplicate",
@@ -3302,6 +3311,9 @@
     "differingOnlyEmptyHint": "No differences. These characters have the same skills at the same levels."
   },
   "industry": {
+    "compareNeedsTwo": "Check at least two plans to compare",
+    "logProductionNeedsProduct": "This plan has no product to log",
+    "copyShoppingListNothing": "Nothing to copy yet",
     "catalogUnavailable": "Blueprint data couldn't load",
     "catalogUnavailableOwnedHint": "Your blueprints loaded, but the blueprint list they need hasn't downloaded yet. Go online once to get it. We'll try again when you're back online.",
     "marketWideTreesUnavailable": "Market-wide build data hasn't been downloaded yet",
@@ -4582,6 +4594,9 @@
       "fill": "Fill the Have column",
       "withCorp": "{{scope}} + Corp Assets"
     },
+    "autoBuildGroupNothing": "Auto Build changed nothing: no plan in this group has a build or buy choice to change.",
+    "autoBuildGroupApplied_one": "Auto Build changed {{count}} plan in this group.",
+    "autoBuildGroupApplied_other": "Auto Build changed {{count}} plans in this group.",
     "strategyApplied_one": "Build strategy applied: {{count}} part built here.",
     "strategyApplied_other": "Build strategy applied: {{count}} parts built here.",
     "craftScopeReactionsIncluded": "incl. reactions",
@@ -7064,6 +7079,8 @@
       "undo": "Undo",
       "undoDismissed": "{{title}} dismissed",
       "undoDismissedMany": "{{title}} dismissed · {{count}} alerts",
+      "undoMarkedRead_one": "{{count}} alert marked read",
+      "undoMarkedRead_other": "{{count}} alerts marked read",
       "undoStopped": "{{title}} alerts off for all characters",
       "undoStoppedOne": "{{title}} alerts off",
       "showMore_one": "Show {{count}} more",
@@ -7471,6 +7488,8 @@
       "fixOrders": "Fix in Open Orders"
     },
     "goal": {
+      "needsAmount": "Enter an amount",
+      "needsFitting": "Pick a fitting",
       "title": "Goals",
       "add": "Add goal",
       "edit": "Edit",
@@ -8224,7 +8243,14 @@
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
-        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you."
+        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
+        "safeHere": "Safe to pay — {{date}} is closed (synced {{ago}}).",
+        "safeOnceHere": "Safe to pay once the book syncs (last synced {{ago}}).",
+        "neverSyncedHere": "Safe to pay once the book syncs (never synced).",
+        "openDayHere": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and the book's next sync.",
+        "creditHere": "{{amount}} ISK credit pays your next days.",
+        "openingOwesHere": "Opening balance from the old system: you owe {{amount}} ISK.",
+        "openingCreditHere": "Opening balance from the old system: {{amount}} ISK credit held for you."
       },
       "diff": {
         "fixRecords": "Fix my records",
@@ -8272,7 +8298,6 @@
         "factSynced": "Synced",
         "factNotice": "Late notice",
         "factNoticeSent": "Sent. A payment pays your oldest unpaid days first, this one among them.",
-        "openLedger": "Open {{payee}} ledger",
         "factOriginal": "Originally billed",
         "settled": {},
         "disputeHint": "Your own record differs from the corp's records.",
@@ -8342,7 +8367,8 @@
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
         "codeOf": "{{character}} · code:",
-        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first."
+        "alsoAccepted": "The book also counts a donation into: {{accounts}}.",
+        "codeInReason": "The Reason starts with your own code, which tells the book the money is yours, then the days this pays (month-day). A payment pays your oldest unpaid days first."
       },
       "attention": {
         "overdueTitle": "{{corp}} Late notice {{period}}, sent {{date}}, not paid yet",
@@ -8436,7 +8462,6 @@
     "conflictsWaitingHint_one": "You have told {{corp}}. It still bills on {{date}} unless an officer answers first, so check back.",
     "conflictsWaitingHint_other": "{{count}} days you have told their corporations about. The first still bills on {{date}} unless an officer answers first, so check back.",
     "settleUpAction": "Settle up",
-    "filterToPayee": "Show only {{payee}}'s entries",
     "unassignedCardTitle": "Unassigned",
     "assignNextAction": "Assign next",
     "unlinkedPaymentsCardTitle": "Payments to link",
@@ -8455,7 +8480,6 @@
     "linkPaymentAmountLabel": "Value handed over",
     "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what it was worth: that is what it pays.",
     "linkPaymentConfirmAction": "Link to {{payee}}",
-    "openLedger": "Open {{payee}} ledger",
     "unlinkTransactionAction": "Unlink",
     "characterColumn": "Character",
     "dateColumn": "Date",
@@ -8670,6 +8694,7 @@
       "toLabel": "To",
       "reasonLabel": "Reason",
       "copyNamed": "Copy {{what}}",
+      "aboutNamed": "About {{what}}",
       "differentAmountAction": "Sent a different amount?",
       "differentAmountHide": "Sent the full amount",
       "sentAmountLabel": "Amount you sent",
@@ -8733,8 +8758,9 @@
       "waitingDays_one": "oldest unpaid day was yesterday",
       "waitingDays_other": "oldest unpaid day was {{count}} days ago",
       "linkPayment": "Link payment",
+      "ledgerAction": "Ledger",
+      "moreActions": "More actions for {{payee}}",
       "corpBookTag": "Corp Tax Book",
-      "creditLabel": "credit",
       "creditHint": "Paid ahead: new days of tax come out of this credit",
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
@@ -8841,7 +8867,7 @@
         "days": "Days owed",
         "oldest": "Oldest unpaid",
         "paidThrough": "Paid through",
-        "credit": "Credit"
+        "credit": "Balance"
       },
       "column": {
         "date": "Date",
@@ -8849,6 +8875,7 @@
         "what": "What",
         "charged": "Charged",
         "credited": "Credited",
+        "amount": "Amount",
         "balance": "Balance"
       },
       "kind": {
@@ -8931,12 +8958,12 @@
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
-      "balanceCredit": "{{amount}} credit",
       "reversedTag": "reversed",
       "minerPicker": "Whose account"
     }
   },
   "assets": {
+    "refreshing": "Refreshing…",
     "tabs": {
       "items": "Items",
       "ships": "Ships",
@@ -11943,6 +11970,8 @@
         "notFound": "Typed name",
         "notFoundHint": "EVE doesn't know this name. It is paid as typed, with no Member link.",
         "weightOf": "{{name}} weight",
+        "weightInvalid": "{{name}}: weight is a whole number from 1 to 1000.",
+        "percentInvalid": "Price % is a number from 0 to 1000.",
         "loot": "Paste the loot",
         "hub": "Price at",
         "percent": "Price % of market",
@@ -12225,6 +12254,8 @@
         "over": "Over the {{max}}-line limit by {{count}}. Remove some lines to post.",
         "duplicate": "{{name}} is listed twice as the same kind. Change one or remove it.",
         "quantityOf": "{{name}} quantity",
+        "quantityInvalid": "{{name}}: quantity is a whole number, 1 or more.",
+        "specInvalid": "{{name}}: runs 1 to 1,000,000, ME 0 to 10, TE 0 to 20, whole numbers.",
         "removeLine": "Remove {{name}}",
         "remove": "Remove",
         "removed": "{{name}} removed",
@@ -13261,6 +13292,7 @@
     "columnsMenuTitle": "Columns",
     "unknownStructure": "Unknown Structure",
     "structureFee": {
+      "percentInvalid": "Enter a percent from 0 to 100",
       "assumed": "Assuming NPC station fees",
       "set": "Broker fee {{pct}}% (you set this)",
       "setFee": "Set fee",
@@ -13474,6 +13506,7 @@
         "books": "Reading the sell orders ({{done}} of {{total}})…"
       },
       "cargo": {
+        "needsSize": "Enter a cargo size above 0",
         "label": "Cargo space",
         "choose": "Your Ship",
         "chosenM3": " · {{m3}}",
@@ -13599,6 +13632,10 @@
       }
     },
     "appraisal": {
+      "minusOwnedNeedsCharacter": "Log in a character to subtract what they own.",
+      "janiceNeedsText": "Paste a list to open it in Janice",
+      "copyBusy": "Another copy is still running",
+      "copyNothing": "Nothing to copy",
       "live": {
         "barLabel": "Live prices checked",
         "checking": "Checking live prices {{done}} / {{total}}",
@@ -13928,6 +13965,7 @@
       "compareEmpty": "{{region}} · no trades in this range"
     },
     "compare": {
+      "differencesNeedsTwo": "Needs two or more items",
       "unitColumn": "Unit",
       "categoryColumn": "Category",
       "handle": "Compare ({{count}})",
@@ -13993,6 +14031,8 @@
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeFromQuickbar": "Remove from Quickbar",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
       "removeMenu": "Remove",
       "removed": "Quickbar item {{name}} removed.",
       "undo": "Undo",
@@ -15829,6 +15869,11 @@
           "offline": "Offline",
           "cleanup": "Going offline"
         }
+      },
+      "stackAffix": {
+        "blocks": " blocks",
+        "needed": " needed",
+        "timer": "Timer "
       }
     },
     "rolesUnavailable": "Can't check your corporation roles right now",
@@ -16115,7 +16160,12 @@
       "belowTargetCount_one": "{{count}} item type below target",
       "belowTargetCount_other": "{{count}} item types below target",
       "belowTargetNone": "Set a stock target first.",
-      "stockTargetsButton": "Stock targets"
+      "stockTargetsButton": "Stock targets",
+      "stackAffix": {
+        "quantity": "×",
+        "items": " items",
+        "largest": "largest "
+      }
     },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so Neocom Desk can show your corporation's data?",
@@ -16716,6 +16766,8 @@
   },
   "jumpRange": {
     "systemsFailed": "System list couldn't load",
+    "searching": "Loading systems…",
+    "noMatch": "No system matches.",
     "label": "Distance",
     "currentSystemLabel": "Current system",
     "option": {
@@ -17391,6 +17443,9 @@
       "full_other": "Up to {{count}} stops.",
       "remove": "Remove {{name}}",
       "reorder": "Reorder {{name}}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "removeMenu": "Remove",
       "dragInstructions": "Press space to pick up a stop. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel.",
       "dragStart": "Picked up {{name}}.",
       "dragOver": "{{name}} is now stop {{position}} of {{total}}.",
@@ -18133,6 +18188,7 @@
       "payNoteNotice": "You can pay from any of your characters. The reason links the payment to you. It pays your oldest days first.",
       "copy": "Copy",
       "copied": "Copied",
+      "copiedAnnounce": "Copied {{label}}",
       "copyFailed": "Couldn't copy",
       "eyebrowNotice": "{{corp}} · Late notice · {{issued}}",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
@@ -18583,6 +18639,7 @@
         "link": {
           "open": "Link a Survey",
           "change": "Change survey",
+          "view": "Open survey",
           "title": "Link a Survey to this chunk",
           "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
           "field": "Survey link or id",
@@ -19639,6 +19696,8 @@
         "startLocked": "The start date ({{date}}) is before {{lock}}, in locked history, so it is locked.",
         "grace": "Grace after day end (hours)",
         "divisions": "Wallet divisions donations are read from",
+        "primaryDivision": "Preferred account to pay into",
+        "primaryDivisionHint": "Miners are asked to pay into this one first. A donation into any other division above is still counted.",
         "division": "Division {{n}}",
         "extractions": "Extractions",
         "chunk": "Chunk rate (m³ per hour)",
@@ -20860,11 +20919,18 @@
       },
       "bulk": {
         "selectAll": "Select all ({{count}})",
+        "selectAllOf": "Select all ({{count}} of {{total}} eligible)",
         "selectNone": "Select none",
         "selected": "{{count}} selected",
         "clear": "Clear",
         "approve": "Approve ({{count}})",
-        "markPaid": "Mark paid ({{count}})"
+        "markPaid": "Mark paid ({{count}})",
+        "confirmApproveTitle": "Approve claims",
+        "confirmApproveBody_one": "Approve {{count}} claim totalling {{isk}} ISK?",
+        "confirmApproveBody_other": "Approve {{count}} claims totalling {{isk}} ISK?",
+        "confirmPaidTitle": "Mark as paid",
+        "confirmPaidBody_one": "Mark {{count}} claim totalling {{isk}} ISK as paid?",
+        "confirmPaidBody_other": "Mark {{count}} claims totalling {{isk}} ISK as paid?"
       },
       "reject": {
         "title": "Reject {{pilot}}'s claim?",
@@ -20919,13 +20985,16 @@
       },
       "audit": {
         "fileClaim": "Filed claim killmail {{id}} for {{isk}} ISK",
+        "noAmount": "no amount",
         "fileClaimNone": "Filed claim killmail {{id}}, no amount worked out",
         "refileClaim": "Re-filed claim killmail {{id}}",
         "approveClaim": "Approved killmail {{id}} for {{isk}} ISK",
+        "approveClaimNone": "Approved killmail {{id}}, no amount recorded",
         "approveClaimOverride": "Approved killmail {{id}} for {{isk}} ISK (changed from {{from}}): {{reason}}",
         "rejectClaim": "Rejected killmail {{id}}: {{reason}}",
         "changeClaimAmount": "Changed amount of killmail {{id}} from {{from}} to {{isk}} ISK: {{reason}}",
         "markClaimPaid": "Marked killmail {{id}} paid, {{isk}} ISK",
+        "markClaimPaidNone": "Marked killmail {{id}} paid, no amount recorded",
         "turnOn": "Turned SRP on",
         "turnOff": "Turned SRP off",
         "saveSettings": "Saved SRP settings",
@@ -20983,6 +21052,7 @@
         "amount-unchanged": "That is already the amount.",
         "amount-changed": "The amount changed. Review it and try again.",
         "own-claim": "You cannot decide your own claim. Another officer must.",
+        "needs-amount": "Type an amount first: no price could be worked out for this claim.",
         "not-an-officer": "Your roles no longer allow SRP.",
         "wrong-corp": "That claim belongs to another corporation.",
         "role-required": "Your roles no longer allow that."

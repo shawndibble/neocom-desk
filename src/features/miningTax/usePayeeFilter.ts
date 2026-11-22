@@ -3,7 +3,6 @@ import type { PayeeRecord } from '@/db';
 import {
   canonicalizePayeeFilter,
   canonicalPayeeId,
-  isSolePayeeFilter,
   resolvePayeeFilter,
   togglePayeeFilter,
   type PayeeFilter,
@@ -38,12 +37,5 @@ export function usePayeeFilter(
     );
   }
 
-  const isSolePayee = (payeeId: string) => isSolePayeeFilter(resolvedPayeeFilter, canon(payeeId));
-
-  /** A balance's Payee name doubles as "show me just this Payee's entries" — the filter its own figure came from. */
-  function filterToPayee(payeeId: string) {
-    setPayeeFilter(isSolePayee(payeeId) ? 'all' : new Set([canon(payeeId)]));
-  }
-
-  return { resolvedPayeeFilter, togglePayee, isSolePayee, filterToPayee };
+  return { resolvedPayeeFilter, togglePayee };
 }

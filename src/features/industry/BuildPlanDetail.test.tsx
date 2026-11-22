@@ -355,7 +355,7 @@ describe('BuildPlanDetail shopping list', () => {
   it('is unavailable when every material is already owned — nothing left to order', () => {
     render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 1000 } } }} />);
 
-    expect(copyButton()).toBeDisabled();
+    expect(copyButton()).toHaveAttribute('aria-disabled', 'true');
   });
 });
 

@@ -1,13 +1,7 @@
 /**
- * Balances strip Payee filter button touch target (issue #1055): the button
- * wrapping a Payee's name in the Tax tab's Balances strip had zero
- * height/padding sizing — its hit area was just the text line box, well
- * under the app's 36px touch-target floor (docs/DESIGN.md §3). The fix grows
- * the button to `min-h-9` but cancels the added height with an equal
- * negative vertical margin (`-my-3`) so the row — and the card — don't grow;
- * jsdom has no real layout engine, so only a real browser can confirm the
- * net effect actually nets back to the original row height. `md:` reverts
- * both so desktop is pixel-identical to today.
+ * Mining Tax tab on narrow viewports: touch targets and layout checks that need a real browser,
+ * since jsdom has no layout engine. (The Payee name on a card is plain text now, so the old
+ * Payee filter button touch-target check of issue #1055 went with it.)
  *
  * A Payee balance is seeded directly into IndexedDB (payee + assignment +
  * a cached raw ESI mining-ledger row + a cached solar-system name/security
@@ -20,6 +14,7 @@
  */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
+import { pressCardAction } from './support/taxBook/payeeCard';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
@@ -236,48 +231,6 @@ async function seedPayeeBalanceNamed(page: Page, payeeName: string): Promise<voi
   );
 }
 
-test.describe('Balances strip Payee filter button — touch target', () => {
-  test.beforeEach(async ({ page }) => {
-    await signInAndGoto(page);
-    await seedPayeeBalance(page);
-  });
-
-  test('grows to 36px on phone without growing the row it sits in', async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    await page.goto('./mining/tax');
-
-    const button = page.getByRole('button', { name: `Show only ${PAYEE_NAME}'s entries` });
-    await expect(button).toBeVisible();
-
-    const { buttonHeight, rowHeight } = await button.evaluate((el) => ({
-      buttonHeight: el.getBoundingClientRect().height,
-      rowHeight: el.parentElement!.getBoundingClientRect().height,
-    }));
-
-    expect(buttonHeight).toBeGreaterThanOrEqual(36);
-    // Proves the extra height comes from the button's own box/negative-margin
-    // trick, not from the row (and thus the card) genuinely growing to fit
-    // it: pinned near the owed figure's own 28px (text-lg) line-height, the
-    // tallest thing the row holds besides the button, not just "under 36".
-    expect(rowHeight).toBeGreaterThan(20);
-    expect(rowHeight).toBeLessThan(32);
-  });
-
-  test('stays small above md — desktop is unchanged', async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-    await page.goto('./mining/tax');
-
-    const button = page.getByRole('button', { name: `Show only ${PAYEE_NAME}'s entries` });
-    await expect(button).toBeVisible();
-
-    const buttonHeight = await button.evaluate((el) => el.getBoundingClientRect().height);
-    // Same text-sm 20px line-height as the phone row height, +/- rendering
-    // slack — not just "small", pinned to what `md:my-0 md:min-h-0` reverts to.
-    expect(buttonHeight).toBeGreaterThan(15);
-    expect(buttonHeight).toBeLessThan(25);
-  });
-});
-
 /**
  * Mining Tax dialog rows — touch target (issue #1144): a `<label>` that is a list row's whole tap
  * target must reach the 36px floor on a phone (docs/DESIGN.md §3) through `tappableRowClassName`
@@ -312,10 +265,7 @@ test.describe('Mining Tax dialog rows — touch target', () => {
   }
 
   async function openLinkWallet(page: Page): Promise<Locator> {
-    await page
-      .getByRole('region', { name: 'You owe' })
-      .getByRole('button', { name: 'Link payment', exact: true })
-      .click();
+    await pressCardAction(page, 'Link payment');
     const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
     await expect(dialog).toBeVisible();
     return dialog;

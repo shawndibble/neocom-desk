@@ -686,7 +686,7 @@ export function Market() {
                   // item's order book, on Appraisal it re-prices the pasted
                   // list. Both are "refresh what is on screen", and neither has
                   // anything to do until there *is* something on screen.
-                  disabled={
+                  busy={
                     tab === 'appraisal'
                       ? appraisal.result === null || appraisal.loading || appraisal.live.checking
                       : !catalogueError && (selectedTypeId === null || orderBookLoading)
@@ -700,7 +700,7 @@ export function Market() {
                 icon={<Icon.Refresh />}
                 label={t('market.refresh')}
                 onClick={haulingRefresh.refresh}
-                disabled={haulingRefresh.disabled}
+                busy={haulingRefresh.disabled}
               />
             ) : undefined
           }

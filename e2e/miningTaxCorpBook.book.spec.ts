@@ -1,7 +1,7 @@
 /**
  * The pilot's Tax tab with two Payees (decision 20261120-235011): their corporation's Corp Tax
  * Book, whose figures are read off the book's Running account, and a personal Payee kept on the
- * device. Settle up for the book shows the Miner's one payment code and records nothing; a
+ * device. Settle up for the book shows the Miner's one payment code and can record the payment; a
  * donation counts while in flight and stays counted once the book credits it; an alt grouped with
  * the pilot but not added is named; a transfer to the book's corporation is never offered to a
  * personal Payee.
@@ -21,6 +21,7 @@ import {
   donationSent,
   memberBook,
 } from './support/taxBook/memberSeed';
+import { justNow } from './support/taxBook/timingScenarios';
 import {
   ROOK,
   assignment,
@@ -33,6 +34,7 @@ import type { EsiOverride } from './support/taxBook/bookTest';
 const CORP_NAME = 'Test Corp';
 const ledgerButton = (page: Page, name: string) =>
   page.getByRole('button', { name: `Open the ledger of ${name}` });
+const cardOf = (page: Page, name: string) => page.getByRole('group', { name });
 
 /**
  * The book (the pilot owes three days), Rook owed two personal days, and the pilot's journal.
@@ -72,8 +74,8 @@ test('a pilot sees what their corp book and their personal Payee are each owed',
   esi,
 }) => {
   const member = await openTax(page, book, esi);
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed));
-  await expect(ledgerButton(page, ROOK.name)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed));
+  await expect(cardOf(page, ROOK.name)).toContainText(isk(2 * DAY_TAX));
 
   await ledgerButton(page, CORP_NAME).click();
   const corp = page.getByRole('dialog', { name: CORP_NAME });
@@ -94,7 +96,7 @@ test("a book's credited payment pays its oldest days on the pilot's ledger", asy
   const member = await openTax(page, book, esi, {
     extra: [creditedDonation({ refId: 960_001, characterId: PILOT.id, amount: DAY_TAX, back: 2 })],
   });
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
   await ledgerButton(page, CORP_NAME).click();
   const corp = page.getByRole('dialog', { name: CORP_NAME });
   // The oldest day is paid: the next one is the oldest unpaid.
@@ -102,21 +104,19 @@ test("a book's credited payment pays its oldest days on the pilot's ledger", asy
   await expect(corp.getByRole('row', { name: /Payment/ })).toContainText(isk(DAY_TAX));
 });
 
-test("Settle up for the book shows the Miner's code and records nothing", async ({
+test("Settle up for the book shows the Miner's code and can record the payment", async ({
   page,
   book,
   esi,
 }) => {
   const member = await openTax(page, book, esi);
-  // The Settle up of the book's card: the first after its owed figure.
-  await ledgerButton(page, CORP_NAME)
-    .locator('xpath=following::button[normalize-space()="Settle up"][1]')
-    .click();
+  // The Settle up of the book's card.
+  await cardOf(page, CORP_NAME).getByRole('button', { name: 'Settle up' }).click();
   const dialog = page.getByRole('dialog', { name: `Settle up — ${CORP_NAME}` });
   await expect(dialog).toContainText(`Amount${isk(member.owed)} ISK`);
   await expect(dialog).toContainText(`Reason${minerPaymentCode(PILOT_MINER_ID)}`);
   await expect(dialog.getByRole('status').getByRole('listitem')).toHaveCount(3);
-  await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(1);
 });
 
 test('a donation in flight counts at once and stays counted once the book credits it', async ({
@@ -124,17 +124,17 @@ test('a donation in flight counts at once and stays counted once the book credit
   book,
   esi,
 }) => {
-  const sent = { refId: 960_002, amount: DAY_TAX, back: 1 };
+  const sent = { refId: 960_002, amount: DAY_TAX, back: 1, at: justNow(30) };
   const member = await openTax(page, book, esi, {
     journal: [donationSent({ ...sent, to: CORP, reason: minerPaymentCode(PILOT_MINER_ID) })],
     personal: false,
   });
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
 
   // The book's next sync stores it: the same transfer, now credited.
   await book.seed([creditedDonation({ ...sent, characterId: PILOT.id })]);
   await page.reload();
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
 });
 
 // The book groups the pilot with an alt this device does not hold, so the tab cannot read the
@@ -151,7 +151,7 @@ test('a grouped alt the pilot has not added is named, and can be declined', asyn
     personal: false,
   });
   // Read by each held Character's own lines: the alt's donation is not on this tab.
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed));
+  await expect(cardOf(page, CORP_NAME)).toContainText(isk(member.owed));
   await page.getByRole('button', { name: /needs? attention/ }).click();
   const warning = page.getByText(`${CORP_NAME} counts ${PILOT_ALT.name} as yours.`, {
     exact: false,

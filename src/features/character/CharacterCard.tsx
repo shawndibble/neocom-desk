@@ -142,7 +142,7 @@ export function CharacterCard({
                   data-character-select={character.characterId}
                   onClick={() => onSelect(character.characterId)}
                   className={cx(
-                    'max-w-full truncate rounded-xs text-left text-sm font-semibold',
+                    'inline-flex min-h-6 max-w-full items-center truncate rounded-xs text-left text-sm font-semibold',
                     interactiveClassName,
                     focusRingClassName
                   )}

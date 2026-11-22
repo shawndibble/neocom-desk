@@ -101,8 +101,17 @@ interface SettleUpDialogProps {
   arrivalCheck?: SettleUpRecheck;
   /** The Character paying; absent, the Character owing most. */
   payerId?: number;
-  /** The Reason to copy (a Miner's code for a book); a function follows the paying Character. */
-  reason: string | ((payerId: number | null) => string | undefined);
+  /**
+   * The Reason to copy. A function follows the paying Character and what the amount about to be
+   * sent pays (`outcome`, undefined while there is nothing to pay), so the Reason can name the
+   * days it covers.
+   */
+  reason:
+    string | ((payerId: number | null, outcome: PaymentOutcome | undefined) => string | undefined);
+  /** A note on the Reason, shown as an info tooltip beside it. */
+  reasonHint?: string;
+  /** The ways the payment may have been made; absent, a donation or a contract. */
+  methods?: readonly MiningTaxPaymentMethod[];
   /** Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent). */
   notice?: ReactNode | ((payerId: number | null, amount: number) => ReactNode);
 }
@@ -133,6 +142,8 @@ export function SettleUpDialog({
   arrivalCheck,
   payerId,
   reason: reasonOf,
+  reasonHint,
+  methods,
   notice,
 }: SettleUpDialogProps) {
   const { t } = useTranslation();
@@ -160,7 +171,7 @@ export function SettleUpDialog({
 
   const first = rows[0];
   const payeeName = first?.payeeName ?? '';
-  const reason = (typeof reasonOf === 'function' ? reasonOf(payer) : reasonOf) ?? '';
+  const reason = (typeof reasonOf === 'function' ? reasonOf(payer, outcome) : reasonOf) ?? '';
 
   function changePayer(next: number) {
     setPayer(next);
@@ -201,7 +212,14 @@ export function SettleUpDialog({
     });
   }
 
-  const copyRow = (key: string, label: string, value: string, copyText: string, dim = false) => (
+  const copyRow = (
+    key: string,
+    label: string,
+    value: string,
+    copyText: string,
+    dim = false,
+    hint?: string
+  ) => (
     <SettleCopyRow
       key={key}
       label={label}
@@ -209,6 +227,7 @@ export function SettleUpDialog({
       copied={copied === key}
       onCopy={() => void copy(key, copyText)}
       dim={dim}
+      {...(hint ? { hint } : {})}
     />
   );
 
@@ -284,7 +303,14 @@ export function SettleUpDialog({
             String(amountToSend)
           )}
           {reason !== '' &&
-            copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
+            copyRow(
+              'reason',
+              t('miningTax.settleUp.reasonLabel'),
+              reason,
+              reason,
+              true,
+              reasonHint
+            )}
         </DividedList>
         {unlinked && unlinked.count > 0 && (
           <div className="space-y-1">
@@ -330,6 +356,7 @@ export function SettleUpDialog({
             onPaidOn={setPaidOn}
             method={method}
             onMethod={setMethod}
+            {...(methods ? { methods } : {})}
             extra={
               method === 'contract' ? (
                 <div className="space-y-1 sm:w-32 sm:shrink-0">
@@ -386,7 +413,11 @@ export function SettleUpDialog({
               >
                 {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
               </Button>
-              <Button size="sm" disabled={saving} onClick={() => setConfirmingDismiss(false)}>
+              <Button
+                size="sm"
+                aria-disabled={saving || undefined}
+                onClick={() => setConfirmingDismiss(false)}
+              >
                 {t('common.cancel')}
               </Button>
             </div>
@@ -407,7 +438,11 @@ export function SettleUpDialog({
             </Button>
           )}
           {onDismissBalance && !confirmingDismiss && (
-            <Button variant="danger" disabled={saving} onClick={() => setConfirmingDismiss(true)}>
+            <Button
+              variant="danger"
+              aria-disabled={saving || undefined}
+              onClick={() => setConfirmingDismiss(true)}
+            >
               {t('miningTax.settleUp.dismiss.action')}
             </Button>
           )}

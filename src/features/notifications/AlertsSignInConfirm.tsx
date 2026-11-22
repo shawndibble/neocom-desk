@@ -86,7 +86,7 @@ export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }
       </DividedList>
       <p className="text-[0.6875rem] text-text-dim">{t(key('tokenNote'))}</p>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
+        <Button size="sm" variant="ghost" onClick={onCancel} aria-disabled={busy || undefined}>
           {t(key('back'))}
         </Button>
         <Button

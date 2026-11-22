@@ -89,6 +89,9 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     hubId: settings.hubId,
     oreForm: settings.oreForm,
     divisions: settings.divisions,
+    ...(settings.primaryDivision !== undefined
+      ? { primaryDivision: settings.primaryDivision }
+      : {}),
     ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
     ...(settings.taxContact ? { taxContact: settings.taxContact } : {}),
     rates: settings.rates,

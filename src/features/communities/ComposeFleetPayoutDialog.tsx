@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  FieldError,
   InfoTooltip,
   Modal,
   NativeSelect,
@@ -12,6 +13,7 @@ import {
   TextArea,
   TextInput,
 } from '@/components/ui';
+import { parsePercent } from '@/lib/parsePercent';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import {
@@ -100,7 +102,7 @@ export function ComposeFleetPayoutDialog({
   useHydratedStore(useMarketHub, useMarketPricePercent);
   const hub = getTradeHub(hubPick ?? savedHub) ?? TRADE_HUBS[0];
   const percentText = percentPick ?? String(savedPercent);
-  const percent = percentText.trim() === '' ? NaN : Number(percentText);
+  const percent = parsePercent(percentText) ?? NaN;
   const percentValid = isValidPricePercent(percent);
 
   // Roster: debounced and abortable; stale answers (another list since) are ignored by key.
@@ -340,13 +342,18 @@ export function ComposeFleetPayoutDialog({
             </span>
             <TextInput
               size="sm"
-              type="number"
               inputMode="decimal"
               aria-invalid={!percentValid || undefined}
-              className="field-no-spinner w-20 text-right"
+              aria-describedby={!percentValid ? `${id}-percent-error` : undefined}
+              className="w-20 text-right"
               value={percentText}
               onChange={(e) => setPercentPick(e.target.value)}
             />
+            {!percentValid && (
+              <FieldError id={`${id}-percent-error`} className="block text-xs">
+                {t('communities.payouts.compose.percentInvalid')}
+              </FieldError>
+            )}
           </label>
           <SegmentedControl
             size="sm"
@@ -459,6 +466,9 @@ export function ComposeFleetPayoutDialog({
                           name: pilot.pilotName,
                         })}
                         aria-invalid={parseWeight(weightText) === null || undefined}
+                        aria-describedby={
+                          parseWeight(weightText) === null ? `${id}-weight-${pilot.key}` : undefined
+                        }
                         className="w-16 text-right tabular-nums"
                         value={weightText}
                         onChange={(e) =>
@@ -477,6 +487,14 @@ export function ComposeFleetPayoutDialog({
                 );
               })}
             </ul>
+            {rule === 'weighted' &&
+              pilots
+                .filter((p) => !unticked.has(p.key) && parseWeight(weights[p.key]) === null)
+                .map((p) => (
+                  <FieldError key={p.key} id={`${id}-weight-${p.key}`} className="block text-xs">
+                    {t('communities.payouts.compose.weightInvalid', { name: p.pilotName })}
+                  </FieldError>
+                ))}
             <p className="text-xs text-text-dim tabular-nums">
               {t('communities.payouts.compose.heldBack', {
                 isk: formatIsk(holdBackIsk(pile, holdBackPct)),
@@ -487,7 +505,7 @@ export function ComposeFleetPayoutDialog({
 
         {error && <InlineError>{error}</InlineError>}
         <DialogFooter>
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>

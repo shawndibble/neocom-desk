@@ -86,6 +86,12 @@ describe('CorpBookSyncNote', () => {
     ).toBeInTheDocument();
   });
 
+  it('leaves the corporation out in a dialog that already names it', () => {
+    render(<CorpBookSyncNote book={book()} owedNow={957_001} now={NOW} inDialog />);
+    expect(screen.getByText('Safe to pay — 17 Oct is closed (synced 2h ago).')).toBeInTheDocument();
+    expect(screen.queryByText(/Brass Meridian/)).not.toBeInTheDocument();
+  });
+
   it('says Safe to pay once the corp syncs, with how long ago, until then', () => {
     render(
       <CorpBookSyncNote

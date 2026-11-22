@@ -300,7 +300,7 @@ export function NewMailComposer({
           icon={<Icon.Close />}
           label={t('mail.newMailClose')}
           onClick={() => void handleClose()}
-          disabled={sending}
+          busy={sending}
         />
       </header>
 

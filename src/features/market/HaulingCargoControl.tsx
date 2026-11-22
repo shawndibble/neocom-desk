@@ -7,7 +7,7 @@
  * The popover body mounts only when opened, so the catalogue and saved
  * Fittings it reads cost nothing to a visit that never picks a ship.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
@@ -325,6 +325,8 @@ function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
   const [text, setText] = useState('');
   const [kind, setKind] = useState<HoldKind>('general');
   const parsed = parseIskAmount(text);
+  const sizeReasonId = useId();
+  const sizeInvalid = parsed === null || parsed <= 0;
   const kindLabel = t('market.hauling.cargo.holdKindLabel');
   return (
     <form
@@ -361,9 +363,19 @@ function CustomTab({ onChoose }: { onChoose: (hold: CargoHold) => void }) {
           </SelectContent>
         </Select>
       </label>
-      <Button type="submit" size="sm" disabled={parsed === null || parsed <= 0}>
+      <Button
+        type="submit"
+        size="sm"
+        aria-disabled={sizeInvalid || undefined}
+        aria-describedby={sizeInvalid ? sizeReasonId : undefined}
+      >
         {t('market.hauling.cargo.use')}
       </Button>
+      {sizeInvalid && (
+        <span id={sizeReasonId} className="basis-full text-[0.6875rem] text-text-dim">
+          {t('market.hauling.cargo.needsSize')}
+        </span>
+      )}
     </form>
   );
 }

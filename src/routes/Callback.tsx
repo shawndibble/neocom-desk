@@ -1,64 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { addCharacter } from '@/features/character/addCharacter';
-import { offerFinishSetup } from '@/features/character/finishSetup/finishSetupStore';
-import {
-  LoginError,
-  completeVettingLogin,
-  loginIntentFor,
-  clearLoginIntent,
-  clearLoginRecovery,
-  clearRetryBudget,
-  type LoginFailureReason,
-} from '@/auth/session';
-import { takeLoginReturnTo } from '@/auth/loginReturnTo';
-import {
-  clearAlertsQueue,
-  completeAlertsGrant,
-  type AlertsCallbackState,
-  type AlertsGrantOutcome,
-} from '@/features/notifications/alertsGrant';
-import {
-  completeFeederGrant,
-  type FeederGrantCallbackState,
-  type FeederGrantOutcome,
-} from '@/features/corp/taxBook/feederGrant';
-import {
-  completeOwnCorpGrant,
-  type OwnCorpGrantCallbackState,
-  type OwnCorpGrantOutcome,
-} from '@/features/corp/taxBook/ownCorpGrant';
-import {
-  completeCorpSyncGrant,
-  type CorpSyncCallbackState,
-  type CorpSyncGrantOutcome,
-} from '@/features/corp/taxBook/syncGrant';
-import {
-  holdVettingLogin,
-  type VettingLoginOutcome,
-} from '@/features/corp/vetting/vettingLoginState';
-import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
+import { clearRetryBudget } from '@/auth/session';
+import { beginAddCharacterLogin, retryLastLogin } from '@/app/loginFlow';
 import { Button, NeedsConnection, Panel, Spinner } from '@/components/ui';
-import { isOfflineFailure } from '@/esi/client';
-import { callableErrorReason } from '@/lib/callableError';
-import { reportFailure } from '@/observability/reportFailure';
-import { useActiveCharacter } from '@/stores/activeCharacter';
-
-/**
- * SSO refused rather than the exchange failing — `?error=` on the callback.
- * Carried as a throw so it joins the one failure path, and marked terminal
- * there: the commonest cause is the user pressing Cancel.
- */
-class SsoRejection extends Error {
-  constructor(readonly code: string) {
-    super(`SSO returned ${code}`);
-    this.name = 'SsoRejection';
-  }
-}
-
-/** Which wording the panel shows; `null` while the callback is still working. */
-type ErrorKind = LoginFailureReason | 'denied' | 'offline' | 'generic' | null;
+import { callbackRun, type ErrorKind } from './callbackRun';
 
 const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
   'no-login-in-progress': 'callback.errorSpent',
@@ -70,8 +16,8 @@ const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
 
 /**
  * EVE SSO redirect target. Exchanges the code exactly once — the login inside
- * `addCharacter` consumes the one-time PKCE stash, so a ref guards against
- * React 19 StrictMode running the effect twice.
+ * `addCharacter` consumes the one-time PKCE stash, so every mount of this URL
+ * (StrictMode's second effect, or a remount of the route) shares one run.
  *
  * A failure restarts the sign-in once by itself before it is reported at all
  * (issue #649; the decision log has the why). Two rules that are not obvious
@@ -89,184 +35,15 @@ export function Callback() {
   const navigate = useNavigate();
   const { search } = useLocation();
   const [errorKind, setErrorKind] = useState<ErrorKind>(null);
-  const started = useRef(false);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const params = new URLSearchParams(search);
-    const code = params.get('code');
-    const state = params.get('state');
-    const ssoError = params.get('error');
-
-    // An Alerts Grant round trip (ADR 0020) is not a login: no Character is
-    // added, no token is stored on this device, and every outcome — including
-    // a cancel or a failure — goes back to the Settings row that was pressed
-    // rather than to an error panel that would offer to restart it as one.
-    const intent = state ? loginIntentFor(state) : undefined;
-    if (intent?.kind === 'alerts') {
-      const land = (alertsGrant: AlertsCallbackState['alertsGrant']) => {
-        if (alertsGrant.status !== 'on') clearAlertsQueue();
-        navigate(takeLoginReturnTo() ?? '/settings/notifications', {
-          replace: true,
-          state: { alertsGrant } satisfies AlertsCallbackState,
-        });
-      };
-      if (ssoError || !code || !state) {
-        land({ status: 'cancelled' });
-        return;
-      }
-      void completeAlertsGrant({ code, state })
-        .catch((): AlertsGrantOutcome => ({
-          status: 'failed',
-          characterId: intent.characterId,
-        }))
-        .then(land);
-      return;
-    }
-
-    // The Corp Tax Book's Automatic sync grant (ADR 0025) is the same kind of
-    // round trip: nothing is stored here, and every outcome goes back to the book.
-    if (intent?.kind === 'corpSync') {
-      const land = (corpSyncGrant: CorpSyncCallbackState['corpSyncGrant']) => {
-        navigate(takeLoginReturnTo() ?? '/corp/moons', {
-          replace: true,
-          state: { corpSyncGrant } satisfies CorpSyncCallbackState,
-        });
-      };
-      if (ssoError || !code || !state) {
-        land({ status: 'cancelled' });
-        return;
-      }
-      void completeCorpSyncGrant({ code, state })
-        .catch((): CorpSyncGrantOutcome => ({
-          status: 'failed',
-          characterId: intent.characterId,
-        }))
-        .then(land);
-      return;
-    }
-
-    // A moon owner's grant is the same kind of round trip, and lands back on the Moons page.
-    if (intent?.kind === 'feederGrant') {
-      const land = (feederGrant: FeederGrantCallbackState['feederGrant']) => {
-        navigate(takeLoginReturnTo() ?? '/corp/moons', {
-          replace: true,
-          state: { feederGrant } satisfies FeederGrantCallbackState,
-        });
-      };
-      if (ssoError || !code || !state) {
-        land({ status: 'cancelled' });
-        return;
-      }
-      void completeFeederGrant({ code, state })
-        .catch((): FeederGrantOutcome => ({ status: 'failed' }))
-        .then(land);
-      return;
-    }
-
-    // Connecting one of the player's own CEO corporations: the same kind of round trip.
-    if (intent?.kind === 'ownCorpGrant') {
-      const corporationId = intent.feederCorporationId;
-      const land = (ownCorpGrant: OwnCorpGrantOutcome) => {
-        navigate(takeLoginReturnTo() ?? '/corp/moons', {
-          replace: true,
-          state: { ownCorpGrant } satisfies OwnCorpGrantCallbackState,
-        });
-      };
-      if (ssoError || !code || !state) {
-        land({ status: 'cancelled', corporationId });
-        return;
-      }
-      void completeOwnCorpGrant({ code, state })
-        .catch((error: unknown): OwnCorpGrantOutcome => {
-          // Without this the real cause (a missing server action, a rejected token) was
-          // swallowed and read as "log in again".
-          reportFailure('auth', error);
-          return {
-            status: 'refused',
-            corporationId,
-            reason: callableErrorReason(error) ?? 'unknown',
-          };
-        })
-        .then(land);
-      return;
-    }
-
-    // A Vetting sign-in reads one character for a corp's report: no Character is added and
-    // nothing is stored. The access token is held in module memory for the page to take once
-    // (`vettingLoginState.ts`), never in router or history state, which outlives the page and is
-    // copied with the tab; `completeVettingLogin` has already dropped the refresh token.
-    if (intent?.kind === 'vetting') {
-      const land = (vettingLogin: VettingLoginOutcome) => {
-        holdVettingLogin(vettingLogin);
-        navigate(takeLoginReturnTo() ?? `/apply/${intent.corporationId}`, { replace: true });
-      };
-      if (ssoError || !code || !state) {
-        land({ status: 'cancelled' });
-        return;
-      }
-      void completeVettingLogin({ code, state })
-        .then(
-          ({ accessToken, characterId, name }): VettingLoginOutcome => ({
-            status: 'ok',
-            accessToken,
-            characterId,
-            name,
-          }),
-          (): VettingLoginOutcome => ({ status: 'failed' })
-        )
-        .then(land);
-      return;
-    }
-
-    Promise.resolve()
-      .then(() => {
-        if (ssoError) throw new SsoRejection(ssoError);
-        if (!code || !state) throw new Error('missing code or state param');
-        return addCharacter({ code, state });
-      })
-      .then(async ({ character, firstEver }) => {
-        clearLoginRecovery();
-        // The Character's other approvals at EVE, offered on the page this lands on (#6103).
-        offerFinishSetup(character.characterId);
-        // Past this point the Character and its token are in Dexie, so the
-        // login has happened; a throw from anything below must not put an
-        // error panel over it (`features/character/addCharacter` makes the
-        // same trade one layer down).
-        try {
-          // First login becomes the active character automatically.
-          const { activeCharacterId, setActiveCharacter } = useActiveCharacter.getState();
-          if (activeCharacterId === null) await setActiveCharacter(character.characterId);
-        } catch {
-          // A Character nobody has selected yet is worth far less than the
-          // session; /characters is where one is picked anyway.
-        }
-        // A Fitting Share Code's "Open in Neocom Desk" (#1544) stashed where
-        // to land before sending this login to SSO; every other entry point
-        // leaves nothing there, so this is the ordinary `/characters` most of
-        // the time. A first-ever login has exactly one Character, so the list
-        // has nothing to choose between and Overview is the useful landing
-        // (#1771); adding an alt still gets the list.
-        navigate(takeLoginReturnTo() ?? (firstEver ? '/overview' : '/characters'), {
-          replace: true,
-        });
-      })
-      .catch(async (err: unknown) => {
-        if (err instanceof SsoRejection) {
-          clearLoginIntent();
-          setErrorKind(err.code === 'access_denied' ? 'denied' : 'generic');
-          return;
-        }
-        // The exchange never reached SSO: nothing is wrong with the login, and
-        // restarting it would only navigate to the browser's offline page.
-        if (isOfflineFailure(err)) {
-          setErrorKind('offline');
-          return;
-        }
-        if (await retryLastLoginOnce().catch(() => false)) return;
-        setErrorKind(err instanceof LoginError ? err.reason : 'generic');
-      });
+    let live = true;
+    void callbackRun(search, navigate).then((kind) => {
+      if (live && kind !== null) setErrorKind(kind);
+    });
+    return () => {
+      live = false;
+    };
   }, [search, navigate]);
 
   return (

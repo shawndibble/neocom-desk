@@ -136,6 +136,15 @@ describe('parsers', () => {
     });
   });
 
+  it('takes a primary division of 1-7 and refuses any other', () => {
+    expect(parseSettingsPatch({ divisions: [1, 3], primaryDivision: 3 })).toEqual({
+      divisions: [1, 3],
+      primaryDivision: 3,
+    });
+    expect(() => parseSettingsPatch({ primaryDivision: 8 })).toThrow();
+    expect(() => parseSettingsPatch({ primaryDivision: 'x' })).toThrow();
+  });
+
   it('bounds the notice rules', () => {
     const rules = { after: { kind: 'dayOfMonth', day: 5 }, minimum: 10_000_000, cooldownDays: 7 };
     expect(parseSettingsPatch({ noticeRules: rules, dayTolerancePct: 0.5 })).toEqual({
@@ -876,6 +885,33 @@ describe('linkSurvey', () => {
     expect(() =>
       parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: '../s' })
     ).toThrow();
+  });
+
+  it('keeps the survey’s first scan with a link, never with an unlink, and refuses a bad one', () => {
+    const surveyScan = {
+      at: 1_790_000_000_000,
+      volumeM3: 550,
+      ores: [{ typeId: 45490, volumeM3: 400 }],
+    };
+    expect(
+      parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: 'abc', surveyScan })
+    ).toEqual({ action: 'linkSurvey', extractionId: 'x_1', surveyId: 'abc', surveyScan });
+    expect(
+      parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: null, surveyScan })
+    ).toEqual({ action: 'linkSurvey', extractionId: 'x_1', surveyId: null });
+    for (const bad of [
+      { ...surveyScan, volumeM3: -1 },
+      { ...surveyScan, ores: [{ typeId: 'x', volumeM3: 1 }] },
+      { ...surveyScan, ores: Array(51).fill({ typeId: 1, volumeM3: 1 }) },
+    ])
+      expect(() =>
+        parseEditAction({
+          action: 'linkSurvey',
+          extractionId: 'x_1',
+          surveyId: 'abc',
+          surveyScan: bad,
+        })
+      ).toThrow();
   });
 });
 

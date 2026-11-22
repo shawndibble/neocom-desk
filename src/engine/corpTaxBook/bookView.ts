@@ -23,6 +23,7 @@ import {
   type ExtractionState,
   type LearnedChunkRate,
 } from './extraction';
+import { chunkMinedPct, splitChunkVariants } from './moonOreVariants';
 import { overdueStatus, type Declaration, type OverdueState } from './overdue';
 import { isBeforeBook, netPayment, type TaxPayment } from './payments';
 import { toEngineExtraction, type SettlePayment, type SyncExtraction } from './sync';
@@ -53,7 +54,10 @@ export interface BookViewInput extends Omit<OpenSetInput, 'placement'> {
    * Absent: `pricesOn`.
    */
   moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;
-  /** Ore of chunks with no notification, estimated from a linked Moon Ore Survey (D13), by extraction id. */
+  /**
+   * Ore of chunks with a linked Moon Ore Survey (D13), by extraction id: the make-up of one with no
+   * notification, and for one with a notification the variant split until its ore is mined.
+   */
   surveyOreLines?: ReadonlyMap<string, readonly OreLine[]>;
   /** Extraction ids whose survey lines were sized by the survey's own measured volume, not a chunk rate. */
   surveyMeasured?: ReadonlySet<string>;
@@ -513,8 +517,9 @@ export function extractionRowBase(
     ...(x.fullyMined ? { fullyMinedAt: x.fullyMined.at } : {}),
   });
   const planned = fractureAndExpiry(ex, expiryHours);
-  // Source order (D13): the ExtractionStarted notification (exact, never corrected), then a
-  // linked Survey's first scan, then what was mined once the chunk has ended.
+  // Source order (D13): a moon drill notification (exact, never corrected; Extraction started,
+  // else finished or fractured), then a linked Survey's first scan, then what was mined once the
+  // chunk has ended.
   const notified = x.oreLines ?? [];
   const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
   let oreSource: ExtractionRow['oreSource'] =
@@ -524,6 +529,11 @@ export function extractionRowBase(
   const ended =
     status.state === 'expired' ||
     (status.state !== 'cancelled' && !!x.fullyMined && !!status.fracturedAt);
+  // A notification names only base ores: split each into the variants mined, else surveyed.
+  if (oreSource === 'notification') {
+    const mined = input.entries ? minedDuringExtraction(ex, input.entries, { expiryHours }) : [];
+    oreLines = splitChunkVariants(oreLines, mined, input.surveyOreLines?.get(ex.id));
+  }
   if (oreSource !== 'notification' && ended && input.entries) {
     const mined = minedDuringExtraction(ex, input.entries, { expiryHours });
     if (oreSource === 'survey') {
@@ -579,13 +589,7 @@ function buildExtractionRows(
       let minedPct: number | null = null;
       if (base.fracturedAt && base.oreLines.length) {
         const mined = minedDuringExtraction(ex, input.entries, { expiryHours });
-        const total = base.oreLines.reduce((s, l) => s + l.quantity, 0);
-        const got = base.oreLines.reduce(
-          (s, l) =>
-            s + Math.min(l.quantity, mined.find((m) => m.typeId === l.typeId)?.quantity ?? 0),
-          0
-        );
-        minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
+        minedPct = chunkMinedPct(base.oreLines, mined);
       }
       const mine = charges.filter((c) => c.extractionId === ex.id);
       return {

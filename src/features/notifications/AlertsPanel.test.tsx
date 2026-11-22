@@ -231,8 +231,22 @@ describe('AlertsPanel', () => {
     renderPanel();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Mark all read' }));
+    expect(screen.queryByText('New mail')).not.toBeInTheDocument();
+    await endUndoWindow();
     await waitFor(async () => expect(await liveIds()).toEqual(['attack']));
     expect(await screen.findByText('Structure Under Attack')).toBeInTheDocument();
+  });
+
+  it('Mark all read can be undone before anything is written', async () => {
+    await db.notificationFeed.bulkPut([ATTACK, MAIL, PRICE]);
+    renderPanel();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark all read' }));
+    expect(await screen.findAllByText('2 alerts marked read')).not.toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(await screen.findByText('New mail')).toBeInTheDocument();
+    await endUndoWindow();
+    expect(await liveIds()).toEqual(['attack', 'mail', 'price']);
   });
 
   it('filters the rows by chip', async () => {

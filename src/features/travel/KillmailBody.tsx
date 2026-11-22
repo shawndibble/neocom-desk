@@ -101,7 +101,7 @@ function FitView({ fitting, typeLabel }: { fitting: Fitting; typeLabel: TypeLabe
       ) : (
         <FittingModuleList fitting={fitting} typeName={typeLabel} linkNames />
       )}
-      <Button size="sm" disabled={busy} onClick={() => void openInFittings()}>
+      <Button size="sm" aria-disabled={busy || undefined} onClick={() => void openInFittings()}>
         {t('travel.pilot.recent.openInFittings')}
       </Button>
       {failed && <InlineError>{t('travel.pilot.recent.openFailed')}</InlineError>}

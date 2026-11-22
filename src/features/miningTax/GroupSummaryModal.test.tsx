@@ -73,7 +73,7 @@ describe('GroupSummaryModal ledger link', () => {
       onOpenLedger,
     });
     expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Open .* ledger$/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Open the ledger of / }));
     expect(onOpenLedger).toHaveBeenCalledOnce();
   });
 });

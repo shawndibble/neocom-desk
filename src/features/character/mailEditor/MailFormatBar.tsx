@@ -10,7 +10,7 @@
  * (Tiptap) and the Source textarea. Buttons never take focus from the writing
  * surface, or the keyboard would close under the pilot's thumb.
  */
-import { useState, type PointerEvent, type ReactNode } from 'react';
+import { useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -49,6 +49,27 @@ export function MailFormatBar({
   const { t } = useTranslation();
   const [sheet, setSheet] = useState<'color' | 'size' | 'link' | 'table' | null>(null);
   const { state } = commands;
+  // Roving tab stop (APG toolbar): one Tab stop for the bar, arrows move within it.
+  const [stop, setStop] = useState('bold');
+
+  const onBarKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const { key } = e;
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return;
+    const items = [
+      ...e.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-bar-key]:not(:disabled)'),
+    ];
+    const from = items.findIndex((el) => el === document.activeElement);
+    if (from < 0) return;
+    e.preventDefault();
+    const next =
+      key === 'Home'
+        ? items[0]
+        : key === 'End'
+          ? items[items.length - 1]
+          : items[(from + (key === 'ArrowRight' ? 1 : -1) + items.length) % items.length];
+    setStop(next.dataset.barKey ?? 'bold');
+    next.focus();
+  };
 
   const button = (
     key: string,
@@ -66,6 +87,9 @@ export function MailFormatBar({
       disabled={disabled}
       // `aria-disabled`, not native: a native-disabled button fires no hover/focus, so its reason would never show.
       aria-disabled={extra.unavailable || undefined}
+      data-bar-key={key}
+      tabIndex={key === stop ? 0 : -1}
+      onFocus={() => setStop(key)}
       onClick={onClick}
       onPointerDown={keepFocus}
       onMouseDown={(e) => e.preventDefault()}
@@ -96,6 +120,7 @@ export function MailFormatBar({
       <div
         role="toolbar"
         aria-label={t('mail.format.barLabel')}
+        onKeyDown={onBarKeyDown}
         className={cx('flex items-center border-b border-line px-1 py-0.5', className)}
       >
         <div

@@ -48,6 +48,7 @@ import { createNumberFormat } from '@/lib/numberLocale';
 import { useCorpAccess } from '../useCorpAccess';
 import { loadCorporationDivisions } from '../wallet';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
+import { primaryDivisionOf } from '@/engine/corpTaxBook/uncounted';
 import { utcDay } from '@/engine/localDay';
 import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 import {
@@ -197,6 +198,11 @@ export function BookSettingsDialog({
   // The list the dialog opened on: a save that changes the divisions sends it, so the server
   // refuses it rather than drop another officer's change made meanwhile.
   const divisionsBase = useRef(settings.divisions).current;
+  // The Account members are asked to pay into first; the book still reads every division above.
+  const [primaryPick, setPrimaryPick] = useState(
+    primaryDivisionOf(settings.divisions, settings.primaryDivision)
+  );
+  const primary = primaryDivisionOf(divisions, primaryPick);
   const [startDate, setStartDate] = useState(settings.startDate);
   const [chunk, setChunk] = useState(
     settings.chunkM3PerHour ? String(settings.chunkM3PerHour) : ''
@@ -411,6 +417,12 @@ export function BookSettingsDialog({
         patch.divisions = sortedDivisions;
         patch.divisionsBase = baseDivisions;
       }
+      // Only when it moved: the server checks it against the divisions the book reads.
+      if (
+        sortedDivisions.length > 1 &&
+        primary !== primaryDivisionOf(settings.divisions, settings.primaryDivision)
+      )
+        patch.primaryDivision = primary;
       // The names of the divisions it now reads go with them, so members see the corp's name for
       // a newly read division at once (#6161). Only with a divisions change: the base check then
       // guards them too, where names alone would replace the stored map from a stale list.
@@ -870,6 +882,32 @@ export function BookSettingsDialog({
                   ))}
                 </div>
               </Field>
+              {divisions.length > 1 && (
+                <Field
+                  label={t('corpTaxBook.moons.settings.primaryDivision')}
+                  note={t('corpTaxBook.moons.settings.primaryDivisionHint')}
+                >
+                  <Select value={String(primary)} onValueChange={(v) => setPrimaryPick(Number(v))}>
+                    <SelectTrigger aria-label={t('corpTaxBook.moons.settings.primaryDivision')}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...divisions]
+                        .sort((a, b) => a - b)
+                        .map((d) => (
+                          <SelectItem key={d} value={String(d)}>
+                            {divisionNames.has(d)
+                              ? t('corpTaxBook.moons.settings.divisionNamed', {
+                                  n: d,
+                                  name: divisionNames.get(d),
+                                })
+                              : t('corpTaxBook.moons.settings.division', { n: d })}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               <FieldsHeading>{t('corpTaxBook.moons.settings.running.heading')}</FieldsHeading>
               <Field label={t('corpTaxBook.moons.settings.running.billing')}>
                 <span>{t('corpTaxBook.moons.settings.running.summary')}</span>

@@ -241,7 +241,7 @@ export function PlayersView({
     CORP_ROSTER_DEFAULT_COLUMNS
   );
   const columns = useMemo<DataTableColumn<Line>[]>(() => {
-    const noData = <span className="text-text-faint">{t('corp.members.players.noData')}</span>;
+    const noData = <span className="text-text-dim">{t('corp.members.players.noData')}</span>;
     const member: DataTableColumn<Line> = {
       id: 'member',
       header: t('corp.members.columnMember'),
@@ -419,7 +419,7 @@ function MemberCell({ line }: { line: Line }) {
             ` · ${t('corp.members.players.outsideCount', { count: line.outsideCount })}`}
         </span>
         {line.unsignedCount > 0 && (
-          <span className="shrink-0 text-xs text-text-faint max-sm:hidden">
+          <span className="shrink-0 text-xs text-text-dim max-sm:hidden">
             · {t('corp.members.players.unsignedCount', { count: line.unsignedCount })}
           </span>
         )}

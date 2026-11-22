@@ -4,14 +4,16 @@ import { TextInput } from '@/components/ui';
 import { loadSurvey } from '@/features/survey/surveyStore';
 import { useCurrentSurveyId } from '@/features/survey/surveyPref';
 import { DialogShell, Effect, Label } from './BookDialogs';
+import { keptSurveyScan, loadMoonOreTypeIdByName } from './keptSurveyScan';
 import { refusal } from './feederErrorText';
 import { parseSurveyRef } from './surveyRef';
 import { useBook } from './useBook';
 
 /**
- * Link a Moon Ore Survey as a chunk's ore source (D13) when no ExtractionStarted
+ * Link a Moon Ore Survey as a chunk's ore source (D13) when no moon drill
  * notification gave one. The Survey is read first, so a link that opens nothing
- * is refused here instead of silently leaving the ore unknown.
+ * is refused here instead of silently leaving the ore unknown, and its first
+ * scan is kept with the link.
  */
 export function LinkSurveyDialog({
   open,
@@ -37,7 +39,14 @@ export function LinkSurveyDialog({
       run={async () => {
         const survey = await loadSurvey(id!);
         if (!survey.ok) throw refusal('survey-not-found');
-        await edit({ action: 'linkSurvey', extractionId, surveyId: id });
+        // Its first scan is kept with the link, so the make-up outlives the Survey's 7-day link.
+        const surveyScan = keptSurveyScan(survey, await loadMoonOreTypeIdByName());
+        await edit({
+          action: 'linkSurvey',
+          extractionId,
+          surveyId: id,
+          ...(surveyScan ? { surveyScan } : {}),
+        });
       }}
     >
       <p className="text-text-dim">{t('corpTaxBook.moons.moon.link.intro')}</p>

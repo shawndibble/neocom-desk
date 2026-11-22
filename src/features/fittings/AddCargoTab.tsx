@@ -1,12 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RowMoreActions, SearchInput, TextInput, TypeIcon } from '@/components/ui';
-import {
-  disabledClassName,
-  focusRingInsetClassName,
-  rowInteractiveClassName,
-} from '@/components/ui/controlStyles';
+import { FieldError, RowMoreActions, SearchInput, TextInput, TypeIcon } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 import { CANDIDATE_LIMIT } from '@/engine/fittings/candidates';
 import type { Fitting } from '@/engine/fittings/types';
 import { AddCargoMenuItems, FittingItemMenu } from './FittingItemMenu';
@@ -41,8 +38,11 @@ export function CargoTab({
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, CANDIDATE_LIMIT);
   }, [catalogue, trimmed]);
-  const count = Math.floor(Number(quantity));
-  const valid = Number.isFinite(count) && count >= 1;
+  const parsed = parseLocalizedNumber(quantity);
+  const valid = parsed !== null && Number.isInteger(parsed) && parsed >= 1;
+  const count = valid ? parsed : 0;
+  const errorId = useId();
+  const showError = !valid;
   return (
     <div className="space-y-2">
       <SearchInput
@@ -54,14 +54,16 @@ export function CargoTab({
       <label className="flex items-center gap-2 text-xs text-text-dim">
         {t('fittings.edit.quantity')}
         <TextInput
-          type="number"
-          min={1}
+          inputMode="numeric"
+          aria-invalid={showError || undefined}
+          aria-describedby={showError ? errorId : undefined}
           size="sm"
           className="w-24"
           value={quantity}
           onChange={(event) => setQuantity(event.target.value)}
         />
       </label>
+      {showError && <FieldError id={errorId}>{t('fittings.add.cargoQuantityInvalid')}</FieldError>}
       {catalogue === null ? (
         <CatalogueLoadingNote />
       ) : trimmed === '' ? null : results.length === 0 ? (
@@ -73,19 +75,19 @@ export function CargoTab({
               <li key={entry.typeId} className="flex items-center">
                 <button
                   type="button"
-                  disabled={!valid}
-                  onClick={() => onAddCargo(entry.typeId, count)}
+                  onClick={() => {
+                    if (valid) onAddCargo(entry.typeId, count);
+                  }}
                   className={cx(
                     'flex min-h-9 w-full items-center gap-2 px-2 text-left text-xs',
                     rowInteractiveClassName,
-                    focusRingInsetClassName,
-                    disabledClassName
+                    focusRingInsetClassName
                   )}
                 >
                   <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
                   <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                   <span className="shrink-0 text-text-dim tabular-nums">
-                    {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
+                    {t('fittings.add.cargoAddCount', { count })}
                   </span>
                 </button>
                 {actions && <RowMoreActions />}
@@ -98,7 +100,7 @@ export function CargoTab({
                 items={
                   <AddCargoMenuItems
                     typeId={entry.typeId}
-                    count={valid ? count : 0}
+                    count={count}
                     inHold={inHold.has(entry.typeId)}
                     onAddCargo={onAddCargo}
                   />

@@ -54,7 +54,7 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { DAY_MS } from '@/lib/age';
+import { HOUR_MS } from '@/lib/age';
 
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /**
@@ -176,6 +176,12 @@ export interface InFlightDonation {
    * hands an officer so they can find the ISK, instead of matching by amount and minute.
    */
   refId?: number;
+  /**
+   * The member said they sent it (Settle up's "Record payment"), to the day: `at` is the end of that
+   * day, not a wallet's timestamp, so it is matched to the book's donation within days
+   * (`matchesStatedTransfer`) rather than minutes.
+   */
+  stated?: true;
 }
 
 /** A donation the book no longer counts, with the days it paid while it did: what to dispute. */
@@ -188,10 +194,11 @@ export interface UncreditedDonation extends InFlightDonation {
 }
 
 /**
- * A donation stops counting as paid once the book synced this long after it and still had not
- * credited it: it most likely went to a wallet division the book does not read (#6204).
+ * A donation stops counting as paid once the book read its wallet this long after it and still had
+ * not credited it: the wallet journal is cached for an hour, so it most likely went to a division
+ * the book does not read (#6204).
  */
-export const UNCREDITED_AFTER_DAYS = 3;
+export const UNCREDITED_AFTER_HOURS = 2;
 
 /** The miner's own listing of ore the corporation also bills (issue #4517). */
 export interface BookOverlap {
@@ -421,7 +428,7 @@ export interface BookSummary {
   miners: BookMinerRunningAccount[];
   /** The member's Late notices whose days are still unpaid, oldest first. */
   notices: MemberNoticeView[];
-  /** Donations the book synced past without crediting (`UNCREDITED_AFTER_DAYS`): not counted as paid. */
+  /** Donations the book synced past without crediting (`UNCREDITED_AFTER_HOURS`): not counted as paid. */
   uncredited: UncreditedDonation[];
   hubId: string;
   oreForm: 'compressed' | 'raw';
@@ -550,7 +557,7 @@ function inFlightPayment(d: InFlightDonation, miners: readonly Miner[]): TaxPaym
 }
 
 function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: string): Prepared {
-  // A donation the book synced past without crediting no longer counts (`UNCREDITED_AFTER_DAYS`).
+  // A donation the book synced past without crediting no longer counts (`UNCREDITED_AFTER_HOURS`).
   const checkedAt = donationsCheckedAt(book);
   const counting = book.inFlight.filter((d) => !isUncredited(d, checkedAt));
   const lost = book.inFlight
@@ -1373,10 +1380,10 @@ const donationsCheckedAt = (book: Pick<PersonalBook, 'lastSyncedAt' | 'donations
     ? book.lastSyncedAt
     : (book.donationsCheckedAt ?? undefined);
 
-/** A sync that read the wallet came `UNCREDITED_AFTER_DAYS` after the donation, without it. */
+/** A sync that read the wallet came `UNCREDITED_AFTER_HOURS` after the donation, without it. */
 const isUncredited = (d: InFlightDonation, checkedAt: string | undefined) =>
   checkedAt !== undefined &&
-  Date.parse(checkedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
+  Date.parse(checkedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_HOURS * HOUR_MS;
 
 // --- What is paid, off each Miner's Running account ----------------------------
 
@@ -1645,6 +1652,8 @@ export interface MadeDonation {
   method: string;
   /** The wallet journal id, carried through as the evidence an officer can search on. */
   refId?: number;
+  /** Recorded by hand in Settle up, dated to the day (`InFlightDonation.stated`). */
+  stated?: true;
 }
 
 export type { HeldPayment };
@@ -1678,15 +1687,28 @@ export function inFlightDonations(
       amount: m.amount,
       at: m.date,
       ...(m.refId !== undefined ? { refId: m.refId } : {}),
+      ...(m.stated ? { stated: true as const } : {}),
     }))
     .sort((a, b) => a.at.localeCompare(b.at) || (a.refId ?? 0) - (b.refId ?? 0));
   const taken = new Set<InFlightDonation>();
+  // A stated donation the member's own wallet now shows is that donation: one counts, not both.
+  const seen = new Set<InFlightDonation>();
+  for (const stated of sent.filter((d) => d.stated)) {
+    const real = sent.find((d) => !d.stated && !seen.has(d) && matchesStatedTransfer(stated, d));
+    if (real) {
+      seen.add(real);
+      taken.add(stated);
+    }
+  }
   const gap = (a: { at: string }, b: { at: string }) =>
     Math.abs(Date.parse(a.at) - Date.parse(b.at));
   // One to one, the closest pairs first. The donations the book read from its wallet are matched
   // before an officer's hand records: those are the same journal transfer, to the minute, while a
   // hand record is dated by a person and may sit nearer a different donation.
-  const pairOff = (records: readonly HeldPayment[], same: typeof isSameJournalTransfer) => {
+  const pairOff = (
+    records: readonly HeldPayment[],
+    same: (held: HeldPayment, d: InFlightDonation) => boolean
+  ) => {
     const pairs = records
       .flatMap((h, i) => sent.filter((d) => same(h, d)).map((d) => ({ i, d, gap: gap(h, d) })))
       .sort((a, b) => a.gap - b.gap || a.d.at.localeCompare(b.d.at) || a.i - b.i);
@@ -1699,7 +1721,7 @@ export function inFlightDonations(
   };
   pairOff(
     held.filter((h) => h.source !== 'manual'),
-    isSameJournalTransfer
+    (h, d) => (d.stated ? matchesStatedTransfer(d, h) : isSameJournalTransfer(h, d))
   );
   pairOff(
     held.filter((h) => h.source === 'manual'),

@@ -519,7 +519,7 @@ describe('send-mail Permission', () => {
 });
 
 describe('Cancel', () => {
-  it('calls onClose without sending', async () => {
+  it('closes an untouched reply without asking or sending', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderBox('reply', vi.fn(), onClose);
@@ -529,15 +529,35 @@ describe('Cancel', () => {
 
     expect(onClose).toHaveBeenCalled();
     expect(sendMail).not.toHaveBeenCalled();
+    expect(drafts.clearDraft).toHaveBeenCalledWith(CHAR_ID, 7);
   });
 
-  it('discards the saved draft so the next Reply starts fresh', async () => {
+  it('asks before discarding an edited reply, and Keep editing keeps it', async () => {
+    const onClose = vi.fn();
     const user = userEvent.setup();
-    renderBox('reply');
+    renderBox('reply', vi.fn(), onClose);
     await screen.findByText('Sender Sal');
+    await user.type(screen.getByLabelText('Subject'), ' more');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(drafts.clearDraft).not.toHaveBeenCalled();
+  });
+
+  it('Discard on an edited reply clears the draft and closes', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderBox('reply', vi.fn(), onClose);
+    await screen.findByText('Sender Sal');
+    await user.type(screen.getByLabelText('Subject'), ' more');
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
 
     expect(drafts.clearDraft).toHaveBeenCalledWith(CHAR_ID, 7);
+    expect(onClose).toHaveBeenCalled();
   });
 });

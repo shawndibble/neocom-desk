@@ -254,15 +254,19 @@ export function PlanVerdictHero({
             {slotLine}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={onLogProduction}
-              disabled={logProductionDisabled}
+            <Tooltip
+              content={logProductionDisabled ? t('industry.logProductionNeedsProduct') : null}
             >
-              <Icon.AddToPlan size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-              {t('industry.logProduction')}
-            </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={onLogProduction}
+                aria-disabled={logProductionDisabled || undefined}
+              >
+                <Icon.AddToPlan size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                {t('industry.logProduction')}
+              </Button>
+            </Tooltip>
             {hasItemActions && itemActionsFor(productTypeID, true)}
           </div>
         </div>

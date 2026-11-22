@@ -1,11 +1,12 @@
 /**
- * The Payee ledger on a phone (390px, `PHONE`): opened from the owed figure on the Payee card, its
+ * The Payee ledger on a phone (390px, `PHONE`): opened from the Payee card's Ledger action (its ⋮ menu on a phone), its
  * status, rows and running balance fit the width, and the page never scrolls sideways.
  */
 import { test, expect, PHONE } from './support/testBase';
 import { expectNoPageOverflow } from './support/overflow';
 import { CHARACTER_ID } from './support/fixtureData';
 import { isk } from './support/taxBook/bookSeed';
+import { pressCardAction } from './support/taxBook/payeeCard';
 import {
   DAY_TAX,
   ROOK,
@@ -37,9 +38,9 @@ test('the Payee ledger fits a phone, its running balance on screen', async ({ pa
       journalDonation({ refId: 7301, from: CHARACTER_ID, to: ROOK.id, amount: DAY_TAX, back: 2 }),
     ],
   });
-  await page.getByRole('button', { name: `Open the ledger of ${ROOK.name}` }).click();
+  await pressCardAction(page, 'Ledger', ROOK.name);
   const ledger = page.getByRole('dialog', { name: ROOK.name });
-  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(2 * DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(2 * DAY_TAX)} ISK`));
   const width = page.viewportSize()!.width;
   const box = await ledger.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);

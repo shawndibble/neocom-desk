@@ -11,6 +11,7 @@ import {
   FieldError,
   IconButton,
   Modal,
+  Tooltip,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -286,9 +287,17 @@ export function ProductionRunsPanel({
                 />
               </>
             )}
-            <Button size="sm" onClick={openLogProduction} disabled={productTypeID === null}>
-              <Icon.AddToPlan /> {t('industry.logProduction')}
-            </Button>
+            <Tooltip
+              content={productTypeID === null ? t('industry.logProductionNeedsProduct') : null}
+            >
+              <Button
+                size="sm"
+                onClick={openLogProduction}
+                aria-disabled={productTypeID === null || undefined}
+              >
+                <Icon.AddToPlan /> {t('industry.logProduction')}
+              </Button>
+            </Tooltip>
           </span>
         }
       >

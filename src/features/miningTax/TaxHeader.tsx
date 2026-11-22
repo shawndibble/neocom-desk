@@ -81,7 +81,7 @@ export function TaxHeader({
             icon={<Icon.Refresh />}
             label={t('miningTax.refresh')}
             onClick={onRefresh}
-            disabled={loading}
+            busy={loading}
           />
           <HeaderMoreMenu>
             {canManagePayees && !payeesInline && (
