@@ -14024,6 +14024,8 @@
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeFromQuickbar": "Remove from Quickbar",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
       "removeMenu": "Remove",
       "removed": "Quickbar item {{name}} removed.",
       "undo": "Undo",
