@@ -118,7 +118,7 @@ export function VettingPage() {
   }
 
   const page = (body: React.ReactNode, actions?: React.ReactNode) => (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader title={t('vetting.title')} actions={actions} />
       {body}
     </div>

@@ -29,7 +29,7 @@ export function SrpPage({
   if (!view) return null;
   const View = view.component;
   return (
-    <div className="mx-auto grid max-w-page gap-4 px-4 py-4">
+    <div className="mx-auto grid max-w-page gap-4">
       <PageHeader title={t('srp.title')} />
       {tabbed && (
         <Tabs

@@ -143,7 +143,7 @@ export function SkillsToBuyPanel({
           ))}
         </ul>
         {loaded && !unreachable && (
-          <div className="flex items-center justify-between gap-2 border-t border-border pt-1">
+          <div className="flex items-center justify-between gap-2 border-t border-line pt-1">
             <span className="text-text-dim">{t('plans.skillsToBuy.total')}</span>
             <IskAmount value={facts.total} />
           </div>

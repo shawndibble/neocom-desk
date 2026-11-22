@@ -635,7 +635,7 @@ export function CorpStructures() {
                 />
               )}
               {visible.length > 0 && (
-                <div className="space-y-1 border-t border-border px-3 py-2 text-sm">
+                <div className="space-y-1 border-t border-line px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <label className="flex items-center gap-1 text-xs text-text-dim">
                       {t('corp.structures.fuelPlan.until')}
