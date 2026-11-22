@@ -64,7 +64,7 @@ export function AttributeChips({
   const { t } = useTranslation();
   return (
     <StatChips dense={dense}>
-      {loading ? (
+      {loading && !attributes ? (
         <Spinner size="sm" />
       ) : attributes ? (
         ATTRIBUTE_ORDER.map((name) => {
