@@ -20871,9 +20871,11 @@
         "approve": "Approve ({{count}})",
         "markPaid": "Mark paid ({{count}})",
         "confirmApproveTitle": "Approve claims",
-        "confirmApproveBody": "Approve {{count}} claims totalling {{isk}} ISK?",
+        "confirmApproveBody_one": "Approve {{count}} claim totalling {{isk}} ISK?",
+        "confirmApproveBody_other": "Approve {{count}} claims totalling {{isk}} ISK?",
         "confirmPaidTitle": "Mark as paid",
-        "confirmPaidBody": "Mark {{count}} claims totalling {{isk}} ISK as paid?"
+        "confirmPaidBody_one": "Mark {{count}} claim totalling {{isk}} ISK as paid?",
+        "confirmPaidBody_other": "Mark {{count}} claims totalling {{isk}} ISK as paid?"
       },
       "reject": {
         "title": "Reject {{pilot}}'s claim?",

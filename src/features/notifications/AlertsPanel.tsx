@@ -269,7 +269,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
           <button
             type="button"
             className={textActionClassName()}
-            disabled={readable.length === 0}
+            disabled={readable.length === 0 || hiddenIds.has(MARK_ALL_READ_ID)}
             onClick={() => {
               focusAfterCommit(heading);
               const swept = readable;

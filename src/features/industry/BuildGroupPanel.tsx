@@ -291,11 +291,11 @@ export function BuildGroupPanel({
         }}
       />
 
+      {autoBuildToast && <Toast message={autoBuildToast} onClose={() => setAutoBuildToast(null)} />}
+
       {/* Shown as a line rather than as the button's own label: the message
           is about the clipboard, not about which list, and it is a sentence
           long — it would not fit on any of the controls that can raise it. */}
-      {autoBuildToast && <Toast message={autoBuildToast} onClose={() => setAutoBuildToast(null)} />}
-
       {copyState?.status === 'failed' && (
         <InlineError>{t('industry.copyShoppingListFailed')}</InlineError>
       )}

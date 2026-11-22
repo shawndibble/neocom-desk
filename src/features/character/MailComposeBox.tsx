@@ -161,6 +161,8 @@ export function MailComposeBox({
         draft.subject.trim() === '' &&
         draft.body.trim() === '';
       if (draft && draft.kind === kind && !isBlank) {
+        // A saved draft is typed work: Cancel asks before throwing it away.
+        touchedRef.current = true;
         setRecipients(
           draft.recipients.map((r) => ({
             ...r,
