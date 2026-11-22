@@ -22,6 +22,7 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
     case 'fileClaim':
       return amount === null ? t(`${base}None`, { id }) : t(base, { id, isk: isk(amount) });
     case 'approveClaim':
+      if (amount === null) return t(`${base}None`, { id });
       return num(d.computedAmount) !== null || 'computedAmount' in d
         ? t(`${base}Override`, {
             id,
@@ -35,7 +36,7 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
     case 'changeClaimAmount':
       return t(base, { id, from: isk(num(d.from)), isk: isk(amount), reason: text(d.reason) });
     case 'markClaimPaid':
-      return t(base, { id, isk: isk(amount) });
+      return amount === null ? t(`${base}None`, { id }) : t(base, { id, isk: isk(amount) });
     case 'refileClaim':
     case 'turnOn':
     case 'turnOff':

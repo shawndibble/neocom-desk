@@ -14,6 +14,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 export function SrpBulkBar({
   selected,
   selectable,
+  listed,
   total,
   onSelectAll,
   onSelectNone,
@@ -22,6 +23,8 @@ export function SrpBulkBar({
   selected: number;
   /** Rows a tick can apply to. */
   selectable: number;
+  /** Rows in the list, so a smaller selectable count can say why. */
+  listed: number;
   /** ISK of the ticked rows, for the phone bar's second line. */
   total: number;
   onSelectAll: () => void;
@@ -32,12 +35,16 @@ export function SrpBulkBar({
   const { t } = useTranslation();
   const phone = useIsPhone();
   if (selectable === 0) return null;
+  const selectAll = t(
+    selectable < listed ? 'srp.officer.bulk.selectAllOf' : 'srp.officer.bulk.selectAll',
+    { count: selectable, total: listed }
+  );
   if (phone) {
     return (
       <div className="grid gap-2 pt-3">
         <div className="flex justify-end px-3">
           <button type="button" className={textActionClassName()} onClick={onSelectAll}>
-            {t('srp.officer.bulk.selectAll', { count: selectable })}
+            {selectAll}
           </button>
         </div>
         {selected > 0 && (
@@ -66,7 +73,7 @@ export function SrpBulkBar({
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3">
       <button type="button" className={textActionClassName()} onClick={onSelectAll}>
-        {t('srp.officer.bulk.selectAll', { count: selectable })}
+        {selectAll}
       </button>
       <button
         type="button"
