@@ -11,7 +11,7 @@
  * Pure: the caller loads the Assignments and the links.
  */
 import { MinerRunningAccount, type RunningAccountOwes } from '../corpTaxBook/minerRunningAccount';
-import { previewPayment, type PaymentOutcome } from '../corpTaxBook/paymentPreview';
+import type { PaymentOutcome } from '../corpTaxBook/paymentPreview';
 import type { TaxPayment } from '../corpTaxBook/payments';
 
 /**
@@ -200,16 +200,37 @@ export class PayeeRunningAccount {
 
   /** What one more payment of `amount` on `paidOn` (a UTC day) would do, before it is recorded. */
   preview(amount: number, paidOn: string): PaymentOutcome {
-    return previewPayment(
-      this.account.input,
-      taxPaymentOf(this.payeeId, {
-        payeeId: this.payeeId,
-        kind: 'recorded',
-        refId: '\u0000preview',
-        amount,
-        paidOn,
-        source: 'manual',
-      })
-    );
+    // Built as recording builds it (real money first, then the marks), never from the settled
+    // input: a mark's credit line would make the preview skip a day the payment really pays.
+    const link: PayeePaymentLink = {
+      payeeId: this.payeeId,
+      kind: 'recorded',
+      refId: '\u0000preview',
+      amount,
+      paidOn,
+      source: 'manual',
+    };
+    const after = PayeeRunningAccount.build({
+      payeeId: this.payeeId,
+      charges: this.charges,
+      links: [...this.links, link],
+    }).account;
+    const mine = after.applications.payments.find((p) => p.paymentId === paymentLinkKey(link));
+    const lines = (mine?.days ?? []).map((d) => {
+      const day = after.day(d.date);
+      return {
+        date: d.date,
+        applied: d.amount,
+        remainingAfter: day?.settled ? 0 : (day?.remaining ?? 0),
+        settled: day?.settled ?? false,
+      };
+    });
+    return {
+      lines,
+      owedBefore: this.account.owes?.amount ?? 0,
+      owedAfter: after.owes?.amount ?? 0,
+      creditAfter: after.credit,
+      creditAdded: Math.max(0, after.credit - this.account.credit),
+    };
   }
 }

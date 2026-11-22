@@ -134,10 +134,14 @@ describe('PayeeRunningAccount', () => {
       expect(account.marked).toEqual([{ id: 'legacy:mark:gone', date: null, amount: 0 }]);
     });
 
-    it('previews a payment against the days the marks settled', () => {
+    it('previews a payment the way recording it would pay: real money first', () => {
       const account = buildMarked([mark('m1')]);
       const preview = account.preview(1_000, '2026-10-05');
-      expect(preview.lines.map((l) => [l.date, l.applied])).toEqual([['2026-10-02', 1_000]]);
+      expect(preview.lines.map((l) => [l.date, l.applied])).toEqual([['2026-10-01', 1_000]]);
+      const recorded = buildMarked([mark('m1'), link(9, 1_000, '2026-10-05')]);
+      expect(preview.owedAfter).toBe(recorded.owes?.amount ?? 0);
+      expect(preview.owedAfter).toBe(1_000);
+      expect(preview.creditAfter).toBe(recorded.credit);
     });
 
     it('still counts a legacy link carrying a real payment as money', () => {
