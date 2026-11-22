@@ -145,7 +145,7 @@ describe('limits', () => {
     await user.click(body);
     await user.paste('x'.repeat(10_001));
     expect(screen.getByText('10001 / 10000')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send' })).toHaveAttribute('aria-disabled', 'true');
   });
 });
 

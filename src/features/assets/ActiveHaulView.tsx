@@ -210,7 +210,7 @@ export function ActiveHaulView({
       )}
       <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex flex-wrap justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
         {done.length > 0 && !finished && (
-          <Button variant="ghost" disabled={replanning} onClick={() => void replan()}>
+          <Button variant="ghost" loading={replanning} onClick={() => void replan()}>
             {t('assets.movePlan.haul.replan')}
           </Button>
         )}

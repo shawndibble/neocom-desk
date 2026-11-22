@@ -147,7 +147,12 @@ export function TurnOnBook({
               {t('corpTaxBook.moons.setup.back')}
             </Button>
           )}
-          <Button variant="primary" onClick={() => void submit()} disabled={!valid || busy}>
+          <Button
+            variant="primary"
+            onClick={() => void submit()}
+            loading={busy}
+            aria-disabled={!valid || undefined}
+          >
             {t('corpTaxBook.moons.off.confirm')}
           </Button>
         </div>

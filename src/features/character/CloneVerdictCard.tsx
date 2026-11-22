@@ -108,7 +108,7 @@ function RouteButton({
   const { resolving, failed, view } = useViewRoute(locationId);
   return (
     <div className="space-y-1">
-      <Button variant="primary" className="w-full md:w-auto" disabled={resolving} onClick={view}>
+      <Button variant="primary" className="w-full md:w-auto" loading={resolving} onClick={view}>
         {t('clones.verdict.route', { place: placeName, count: jumps })}
       </Button>
       {failed && <InlineError>{t('travel.waypoints.viewRouteUnavailable')}</InlineError>}

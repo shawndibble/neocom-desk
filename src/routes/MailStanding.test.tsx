@@ -399,7 +399,10 @@ describe('Mail', () => {
     });
     await screen.findByText('Second pilot mail');
     // Same page instance, still waiting on the first Character's older page.
-    expect(screen.getByRole('button', { name: 'Loading' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Loading' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     await act(async () => {
       resolveOlderPage?.();

@@ -21,7 +21,12 @@ function MailSendButton({ size, sending, blocked, onSend }: MailSendButtonProps)
   const { t } = useTranslation();
   return (
     <NeedsConnection>
-      <Button variant="primary" size={size} onClick={onSend} disabled={sending || blocked}>
+      <Button
+        variant="primary"
+        size={size}
+        onClick={onSend}
+        aria-disabled={sending || blocked || undefined}
+      >
         {sending ? (
           <span className="flex items-center gap-1.5">
             <Spinner size="sm" /> {t('mail.sending')}

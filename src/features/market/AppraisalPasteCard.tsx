@@ -255,7 +255,8 @@ export function AppraisalPasteCard({
             variant="primary"
             className="max-sm:w-full"
             onClick={() => appraiseFromForm(controller.appraise)}
-            disabled={!controller.canAppraise || loading}
+            loading={loading}
+            aria-disabled={!controller.canAppraise || undefined}
           >
             {t('market.appraisal.appraise')}
           </Button>

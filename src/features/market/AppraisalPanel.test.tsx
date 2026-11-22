@@ -1113,7 +1113,10 @@ describe('AppraisalPanel', () => {
 
   it('disables Appraise with an empty box', () => {
     renderPanel();
-    expect(screen.getByRole('button', { name: 'Appraise' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Appraise' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('says so when nothing in the paste named a real item', () => {
