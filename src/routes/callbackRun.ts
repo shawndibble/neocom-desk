@@ -66,9 +66,18 @@ export type ErrorKind = LoginFailureReason | 'denied' | 'offline' | 'generic' | 
  */
 const runs = new Map<string, Promise<ErrorKind>>();
 
+/**
+ * The newest mount's `navigate`. A run outlives the mount that started it, so it navigates
+ * through whichever mount is current rather than relying on an unmounted one's still working.
+ */
+let currentNavigate: NavigateFunction | undefined;
+const navigateCurrent = ((...args: Parameters<NavigateFunction>) =>
+  currentNavigate?.(...args)) as NavigateFunction;
+
 /** Forgets every run: each test renders a callback as a fresh page load. */
-export function forgetCallbackRuns(): void {
+export function resetCallbackRunsForTests(): void {
   runs.clear();
+  currentNavigate = undefined;
 }
 
 /** Handles one callback URL: navigates away and resolves null, or resolves the error to show. */
@@ -247,9 +256,10 @@ function runCallback(search: string, navigate: NavigateFunction): Promise<ErrorK
 
 /** The one run of callback URL `search`, started by its first mount and shared by every later one. */
 export function callbackRun(search: string, navigate: NavigateFunction): Promise<ErrorKind> {
+  currentNavigate = navigate;
   let run = runs.get(search);
   if (run === undefined) {
-    run = runCallback(search, navigate);
+    run = runCallback(search, navigateCurrent);
     runs.set(search, run);
   }
   return run;
