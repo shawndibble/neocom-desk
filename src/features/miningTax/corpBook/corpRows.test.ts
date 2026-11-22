@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import type { BookRowView, PersonalOverlay } from '@/engine/corpTaxBook/personal';
+import {
+  overlayCorpBooks,
+  type BookRowView,
+  type PersonalBook,
+  type PersonalOverlay,
+} from '@/engine/corpTaxBook/personal';
 import { flatten } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
 import {
@@ -341,6 +346,89 @@ describe('personalEntriesOf', () => {
       ['made', true],
       ['paid', false],
       ['mine', false],
+    ]);
+  });
+});
+
+describe('ore a Corp Tax Book took off an entry (releasedTypeIds)', () => {
+  const SYL = 45491;
+  const COE = 45492;
+  const CORP = 98000001;
+  const SYSTEM = 30003838;
+  const book = {
+    corporationId: CORP,
+    corpName: 'BUH',
+    startDate: '2026-10-01',
+    lastSyncedAt: '2026-10-18T12:00:00Z',
+    rates: [{ scope: 'corp', pct: 15, effectiveFrom: '2026-10-01' }],
+    miners: [],
+    observed: [
+      {
+        characterId: ME,
+        recordedCorporationId: CORP,
+        structureId: 1000,
+        date: '2026-10-17',
+        solarSystemId: SYSTEM,
+        oreLines: [{ typeId: ZEO, quantity: 51189 }],
+      },
+    ],
+    dismissals: [],
+    notices: [],
+    payments: [],
+    hubId: 'jita',
+    oreForm: 'compressed',
+    pricesOn: () => ({
+      prices: new Map([
+        [ZEO, 148],
+        [SYL, 100],
+        [COE, 100],
+      ]),
+      sources: new Map(),
+    }),
+    inFlight: [],
+  } as unknown as PersonalBook;
+  const entryLines = [
+    { typeId: ZEO, quantity: 51189 },
+    { typeId: SYL, quantity: 41809 },
+    { typeId: COE, quantity: 7274 },
+  ];
+  const released: MiningTaxAssignmentRecord = {
+    id: 'a1',
+    characterId: ME,
+    date: '2026-10-17',
+    solarSystemId: SYSTEM,
+    payeeId: 'star',
+    taxPct: 10,
+    oreLines: [
+      { typeId: SYL, quantity: 41809 },
+      { typeId: COE, quantity: 7274 },
+    ],
+    releasedTypeIds: [ZEO],
+    status: 'outstanding',
+    estimatedValue: 0,
+    taxOwed: 0,
+    updatedAt: 0,
+  };
+
+  it('hands the book the released ore as free, so it bills it instead of calling it a Conflict', () => {
+    const row = mined('2026-10-17', {
+      entry: { characterId: ME, date: '2026-10-17', solarSystemId: SYSTEM, oreLines: entryLines },
+      assignments: [released],
+      unassignedOreLines: [],
+      releasedOreLines: [{ typeId: ZEO, quantity: 51189 }],
+    });
+    const [entry] = personalEntriesOf([row]);
+    expect(entry.freeOreLines).toEqual([{ typeId: ZEO, quantity: 51189 }]);
+
+    const out = overlayCorpBooks({
+      now: '2026-10-18T14:00:00Z',
+      books: [book],
+      entries: [entry!],
+    });
+    expect(out.rows.map((r) => r.state)).not.toContain('conflict');
+    expect(out.rows).toHaveLength(1);
+    expect(out.takenFromFree.get(`${ME}:2026-10-17:${SYSTEM}`)).toEqual([
+      { typeId: ZEO, quantity: 51189 },
     ]);
   });
 });

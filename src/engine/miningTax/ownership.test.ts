@@ -91,6 +91,39 @@ describe('computeOwnership — ore released to a corporation book stays released
   });
 });
 
+describe('computeOwnership — released ore is reported as released, not lost', () => {
+  const entry: OreLine[] = [
+    { typeId: A, quantity: 100 },
+    { typeId: B, quantity: 50 },
+  ];
+
+  it('returns what the entry still reports of a released type, which nothing owns', () => {
+    const result = computeOwnership(entry, [
+      { id: 'a', oreLines: [{ typeId: A, quantity: 100 }], releasedTypeIds: [B] },
+    ]);
+    expect(result.unassigned).toEqual([]);
+    expect(result.released).toEqual([{ typeId: B, quantity: 50 }]);
+  });
+
+  it('counts only the part of a released type no Assignment holds', () => {
+    const result = computeOwnership(entry, [
+      {
+        id: 'a',
+        oreLines: [
+          { typeId: A, quantity: 100 },
+          { typeId: B, quantity: 20 },
+        ],
+        releasedTypeIds: [B],
+      },
+    ]);
+    expect(result.released).toEqual([{ typeId: B, quantity: 30 }]);
+  });
+
+  it('is empty when nothing was released', () => {
+    expect(computeOwnership(entry, []).released).toEqual([]);
+  });
+});
+
 describe('computeOwnership — quantity split with a flagged collector', () => {
   it('splits one type by quantity between two Assignments with no residual', () => {
     const entry: OreLine[] = [{ typeId: A, quantity: 100 }];

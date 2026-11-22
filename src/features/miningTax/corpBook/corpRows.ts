@@ -15,7 +15,7 @@ import type {
 } from '@/engine/corpTaxBook/personal';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
-import { minusLines } from '@/engine/miningTax/oreLines';
+import { addLines, minusLines } from '@/engine/miningTax/oreLines';
 import { entryKey } from '@/engine/miningTax/types';
 import { flatten, type DisplayRow } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
@@ -215,7 +215,8 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
     date: row.entry.date,
     solarSystemId: row.entry.solarSystemId,
     oreLines: row.entry.oreLines,
-    freeOreLines: row.unassignedOreLines,
+    // Ore a book took off an Assignment is free to the book: it still bills it, never as a Conflict.
+    freeOreLines: addLines(row.unassignedOreLines, row.releasedOreLines),
     // A dismissed Assignment ("I don't pay tax on this") has no rate to compare.
     allocations: row.assignments
       .filter((a) => a.status !== 'dismissed')
