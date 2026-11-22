@@ -24,9 +24,10 @@ export function SkipLink() {
       href={`#${ROUTE_OUTLET_ID}`}
       onClick={onClick}
       className={buttonClassName({
+        variant: 'primary',
         size: 'sm',
         className:
-          'sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:bg-panel focus-visible:shadow-lg',
+          'sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:shadow-lg',
       })}
     >
       {t('nav.skipToContent')}
