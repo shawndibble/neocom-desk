@@ -99,13 +99,30 @@ describe('splitChunkVariants', () => {
     expect(splitChunkVariants(chunk, [])).toEqual(chunk);
   });
 
-  it('leaves a make-up that already names its variants as it is', () => {
+  it('keeps a make-up that already names its variants while nothing of that ore is mined', () => {
     const named = [
       { typeId: BITUMENS, quantity: 600 },
       { typeId: BRIMFUL_BITUMENS, quantity: 400 },
     ];
-    const mined = [{ typeId: BRIMFUL_BITUMENS, quantity: 900 }];
-    expect(splitChunkVariants(named, mined)).toEqual(named);
+    const survey = [{ typeId: BRIMFUL_BITUMENS, quantity: 1 }];
+    expect(splitChunkVariants(named, [], survey)).toEqual(named);
+  });
+
+  it('re-splits a make-up already split (by a survey) by what was then mined', () => {
+    const named = [
+      { typeId: BITUMENS, quantity: 750 },
+      { typeId: BRIMFUL_BITUMENS, quantity: 250 },
+    ];
+    const mined = [
+      { typeId: BITUMENS, quantity: 300 },
+      { typeId: BRIMFUL_BITUMENS, quantity: 500 },
+    ];
+    expect(splitChunkVariants(named, mined)).toEqual([
+      { typeId: BITUMENS, quantity: 375 },
+      { typeId: BRIMFUL_BITUMENS, quantity: 625 },
+    ]);
+    // So a page that split by the survey before the ledger rows came still reads 80% mined.
+    expect(chunkMinedPct(named, mined)).toBe(80);
   });
 });
 

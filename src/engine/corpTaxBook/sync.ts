@@ -18,7 +18,12 @@ import {
 import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { TaxPayment } from './payments';
 import type { Miner } from './charges';
-import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
+import {
+  MOON_ORE_M3_PER_UNIT,
+  extractionStatus,
+  type Extraction,
+  type SurveyScanSnapshot,
+} from './extraction';
 import type { ObservedRow } from './types';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { utcDay } from '@/engine/localDay';
@@ -271,6 +276,8 @@ export interface SyncExtraction {
   oreLines?: { typeId: number; quantity: number }[];
   /** A Moon Ore Survey (Share Link id) an officer linked as the ore source when there is no notification (D13). */
   surveyId?: string;
+  /** That Survey's first scan, kept with the link so the make-up outlives the Survey's 7-day link. */
+  surveyScan?: SurveyScanSnapshot;
   /** Set by an officer once the chunk is mined out (#5257); absent when not flagged. */
   fullyMined?: { by: number; byName: string; at: string };
   /** The moon owner whose grant read it (#6097); absent means the book's own corporation. */
@@ -520,8 +527,9 @@ export function reconcileExtractions(
       const arrival = Date.parse(out.chunkArrivalTime);
       const start = Date.parse(out.extractionStartTime);
       const decay = Date.parse(out.naturalDecayTime);
-      // The started notification's ore, once read, is never replaced by a later one.
-      let exact = (keep?.oreLines?.length ?? 0) > 0;
+      // Ore the book already holds (stored by an earlier sync), or the started notification's once
+      // read here, is never replaced by a later notification's: they name the same chunk.
+      let oreHeld = (keep?.oreLines?.length ?? 0) > 0;
       for (const n of notifications) {
         if (n.payload.structureId !== out.structureId || n.payload.moonId !== out.moonId) continue;
         const at = Date.parse(n.timestamp);
@@ -531,7 +539,7 @@ export function reconcileExtractions(
             continue;
           if (oreVolumes?.length) {
             out.oreLines = unitsOf(oreVolumes);
-            exact = true;
+            oreHeld = true;
           }
           continue;
         }
@@ -542,7 +550,7 @@ export function reconcileExtractions(
         } else if (n.type === 'MoonminingExtractionCancelled') {
           if (at >= start - WINDOW_SLACK_MS && at <= arrival) out.cancelledAt = iso(at);
         }
-        if (!exact && namesOre(n, out, decay)) out.oreLines = unitsOf(n.payload.oreVolumes!);
+        if (!oreHeld && namesOre(n, out, decay)) out.oreLines = unitsOf(n.payload.oreVolumes!);
       }
       return out;
     })

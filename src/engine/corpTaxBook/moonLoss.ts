@@ -3,7 +3,7 @@
 // caller labels it so. Pure: the caller passes the chunk make-up and the ledger's mined ore.
 // A notified make-up names only base ores; each is split into the variants mined first.
 
-import { splitChunkVariants } from './moonOreVariants';
+import { splitChunkVariants, sumByType } from './moonOreVariants';
 
 export interface OreQty {
   typeId: number;
@@ -35,8 +35,7 @@ export function moonLoss(
   fullyMined: boolean
 ): MoonLoss | null {
   if (chunk.length === 0) return null;
-  const got = new Map<number, number>();
-  for (const l of mined) got.set(l.typeId, (got.get(l.typeId) ?? 0) + l.quantity);
+  const got = sumByType(mined);
   const rows = splitChunkVariants(chunk, mined).map((l): OreLossRow => {
     const m = got.get(l.typeId) ?? 0;
     const lost = Math.max(0, l.quantity - m);

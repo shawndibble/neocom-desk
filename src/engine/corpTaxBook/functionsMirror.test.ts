@@ -799,6 +799,20 @@ describe('moon ore variants mirror', () => {
     expect([...mirror.MOON_ORE_VARIANTS]).toEqual([...variants.MOON_ORE_VARIANTS]);
   });
 
+  it('re-splits an already split make-up the same', () => {
+    const split = [
+      { typeId: BITUMENS, quantity: 750 },
+      { typeId: BRIMFUL, quantity: 250 },
+    ];
+    expect(mirror.splitChunkVariants(split, mined)).toEqual(
+      variants.splitChunkVariants(split, mined)
+    );
+    expect(mirror.splitChunkVariants(split, [], survey)).toEqual(
+      variants.splitChunkVariants(split, [], survey)
+    );
+    expect(mirror.chunkMinedPct(split, mined)).toBe(variants.chunkMinedPct(split, mined));
+  });
+
   it('splits and counts a chunk the same', () => {
     expect(mirror.splitChunkVariants(chunk, mined, survey)).toEqual(
       variants.splitChunkVariants(chunk, mined, survey)

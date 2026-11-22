@@ -262,6 +262,40 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       const reconciled = reconcileExtractions(esi, ours, stored);
       expect(reconciled.map((x) => x.oreLines?.length)).toEqual([2, 2]);
       expect(mirror.reconcileExtractions(esi, theirs, stored)).toEqual(reconciled);
+
+      // Laser fired's ore; the started one winning in either order; ore the book already holds.
+      const both = (type: string, at: string, text: string) => ({
+        ours: { type, timestamp: at, payload: parseEveNotificationPayload(text) },
+        theirs: { type, timestamp: at, payload: mirror.parseMoonPayload(text) },
+      });
+      const fired = both('MoonminingLaserFired', '2026-10-17T01:00:00Z', finished(2000, 9, 0));
+      const startedNote = both(
+        'MoonminingExtractionStarted',
+        '2026-10-12T00:00:00Z',
+        started(2000, 9, arrival, decay)
+      );
+      const held = [
+        { ...stored[0], structureId: 2000, moonId: 9, oreLines: [{ typeId: 1, quantity: 1 }] },
+      ];
+      for (const [notes, kept] of [
+        [[fired], []],
+        [[fired, startedNote], []],
+        [[startedNote, fired], []],
+        [[fired], held],
+      ] as const) {
+        const mine = reconcileExtractions(
+          esi,
+          notes.map((n) => n.ours),
+          kept
+        );
+        expect(
+          mirror.reconcileExtractions(
+            esi,
+            notes.map((n) => n.theirs),
+            kept
+          )
+        ).toEqual(mine);
+      }
     });
 
     it('places observed rows on a system and a moon the same way', () => {

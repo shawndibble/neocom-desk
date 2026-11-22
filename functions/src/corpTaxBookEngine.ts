@@ -1089,18 +1089,31 @@ const VARIANT_BASE = new Map(
 /** Engine `moonOreBaseOf`. */
 export const moonOreBaseOf = (typeId: number): number => VARIANT_BASE.get(typeId) ?? typeId;
 
+// A private shape, not `corpTaxBookMoonDocs.ts`'s `OreQty`: that module imports this one.
 interface OreQty {
   typeId: number;
   quantity: number;
 }
 
-function familyWeights(base: number, lines: readonly OreQty[]): Map<number, number> {
-  const family = new Map<number, number>();
-  for (const l of lines) {
-    if (l.quantity > 0 && moonOreBaseOf(l.typeId) === base)
-      family.set(l.typeId, (family.get(l.typeId) ?? 0) + l.quantity);
-  }
-  return family;
+/** Engine `sumByType`. */
+function sumByType(lines: readonly OreQty[]): Map<number, number> {
+  const sums = new Map<number, number>();
+  for (const l of lines) sums.set(l.typeId, (sums.get(l.typeId) ?? 0) + l.quantity);
+  return sums;
+}
+
+const familyOf = (base: number, lines: readonly OreQty[]): Map<number, number> =>
+  sumByType(lines.filter((l) => l.quantity > 0 && moonOreBaseOf(l.typeId) === base));
+
+/** Engine `shareOut`. */
+function shareOut(total: number, weights: ReadonlyMap<number, number>): OreQty[] {
+  const sum = [...weights.values()].reduce((s, w) => s + w, 0);
+  const parts = [...weights]
+    .sort(([a], [b]) => a - b)
+    .map(([typeId, w]) => ({ typeId, quantity: Math.floor((total * w) / sum), w }));
+  const largest = parts.reduce((best, p) => (p.w > best.w ? p : best));
+  largest.quantity += total - parts.reduce((s, p) => s + p.quantity, 0);
+  return parts.map(({ typeId, quantity }) => ({ typeId, quantity }));
 }
 
 /** Engine `splitChunkVariants`. */
@@ -1109,28 +1122,37 @@ export function splitChunkVariants(
   mined: readonly OreQty[],
   survey: readonly OreQty[] = []
 ): OreQty[] {
-  const named = new Set(
-    chunk.filter((l) => VARIANT_BASE.has(l.typeId)).map((l) => moonOreBaseOf(l.typeId))
-  );
-  return chunk.flatMap((line): OreQty[] => {
-    if (!MOON_ORE_VARIANTS.has(line.typeId) || named.has(line.typeId)) return [line];
-    let weights = familyWeights(line.typeId, mined);
-    if (weights.size === 0) weights = familyWeights(line.typeId, survey);
-    if (weights.size === 0 || (weights.size === 1 && weights.has(line.typeId))) return [line];
-    const total = [...weights.values()].reduce((s, w) => s + w, 0);
-    const parts = [...weights]
-      .sort(([a], [b]) => a - b)
-      .map(([typeId, w]) => ({ typeId, quantity: Math.floor((line.quantity * w) / total), w }));
-    const largest = parts.reduce((best, p) => (p.w > best.w ? p : best));
-    largest.quantity += line.quantity - parts.reduce((s, p) => s + p.quantity, 0);
-    return parts.map(({ typeId, quantity }) => ({ typeId, quantity }));
-  });
+  const out: OreQty[] = [];
+  const done = new Set<number>();
+  for (const line of chunk) {
+    const base = moonOreBaseOf(line.typeId);
+    if (!MOON_ORE_VARIANTS.has(base)) {
+      out.push(line);
+      continue;
+    }
+    if (done.has(base)) continue;
+    done.add(base);
+    const family = chunk.filter((l) => moonOreBaseOf(l.typeId) === base);
+    const alreadySplit = family.some((l) => l.typeId !== base);
+    let weights = familyOf(base, mined);
+    if (weights.size === 0 && !alreadySplit) weights = familyOf(base, survey);
+    if (weights.size === 0) {
+      out.push(...family);
+      continue;
+    }
+    out.push(
+      ...shareOut(
+        family.reduce((s, l) => s + l.quantity, 0),
+        weights
+      )
+    );
+  }
+  return out;
 }
 
 /** Engine `chunkMinedPct`. */
 export function chunkMinedPct(chunk: readonly OreQty[], mined: readonly OreQty[]): number | null {
-  const got = new Map<number, number>();
-  for (const m of mined) got.set(m.typeId, (got.get(m.typeId) ?? 0) + m.quantity);
+  const got = sumByType(mined);
   const lines = splitChunkVariants(chunk, mined);
   const total = lines.reduce((s, l) => s + l.quantity, 0);
   if (total <= 0) return null;

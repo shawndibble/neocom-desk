@@ -18626,6 +18626,7 @@
         "link": {
           "open": "Link a Survey",
           "change": "Change survey",
+          "view": "Open survey",
           "title": "Link a Survey to this chunk",
           "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
           "field": "Survey link or id",

@@ -442,6 +442,21 @@ describe('reconcileExtractions', () => {
         ]);
     });
 
+    it('leaves ore the book already holds for a chunk ESI still lists', () => {
+      const stored = [
+        {
+          structureId: 1001,
+          moonId: 40,
+          extractionStartTime: '2026-07-01T12:00:00.000Z',
+          chunkArrivalTime: '2026-07-10T12:00:00.000Z',
+          naturalDecayTime: '2026-07-10T15:00:00.000Z',
+          oreLines: [{ typeId: 45492, quantity: 1 }],
+        },
+      ];
+      // Nothing to upload for the ore: the book's merge keeps what it holds.
+      expect(reconcileExtractions([esi], [finished], stored)[0].oreLines).toBeUndefined();
+    });
+
     it('ignores one for another chunk of the same moon', () => {
       const later = note('MoonminingExtractionFinished', '2026-08-10T12:00:00Z', {
         autoTimeMs: at('2026-08-10T15:00:00Z'),

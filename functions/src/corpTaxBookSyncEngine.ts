@@ -466,7 +466,8 @@ export function reconcileExtractions(
       const arrival = Date.parse(out.chunkArrivalTime);
       const start = Date.parse(out.extractionStartTime);
       const decay = Date.parse(out.naturalDecayTime);
-      let exact = (keep?.oreLines?.length ?? 0) > 0;
+      // Ore the book already holds, or the started notification's once read, is never replaced.
+      let oreHeld = (keep?.oreLines?.length ?? 0) > 0;
       for (const n of notifications) {
         if (n.payload.structureId !== out.structureId || n.payload.moonId !== out.moonId) continue;
         const at = Date.parse(n.timestamp);
@@ -476,7 +477,7 @@ export function reconcileExtractions(
             continue;
           if (volumes?.length) {
             out.oreLines = unitsOf(volumes);
-            exact = true;
+            oreHeld = true;
           }
           continue;
         }
@@ -487,7 +488,7 @@ export function reconcileExtractions(
         } else if (n.type === 'MoonminingExtractionCancelled') {
           if (at >= start - WINDOW_SLACK_MS && at <= arrival) out.cancelledAt = iso(at);
         }
-        if (!exact && namesOre(n, out, decay)) out.oreLines = unitsOf(n.payload.oreVolumes!);
+        if (!oreHeld && namesOre(n, out, decay)) out.oreLines = unitsOf(n.payload.oreVolumes!);
       }
       return out;
     })

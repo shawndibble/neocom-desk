@@ -26,14 +26,13 @@ import {
   refineryLabeler,
   type RefineryLabelSources,
 } from '@/engine/corpTaxBook/refinery';
-import { surveyFractions, estimateChunk, learnChunkRates } from '@/engine/corpTaxBook/extraction';
+import { estimateChunk, learnChunkRates, snapshotSources } from '@/engine/corpTaxBook/extraction';
 import { measurable } from '@/engine/corpTaxBook/bookView';
 import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
-import { firstCountedScan, scanVolume } from '@/engine/survey/series';
 import { loadCurrentMemberIds } from '../currentMembers';
 import { loadMoonNames } from '@/features/character/moonNames';
 import { loadSurvey } from '@/features/survey/surveyStore';
-import { loadMoonOreTypeIds, loadTypes } from '@/sde/loadSde';
+import { keptSurveyScan, loadMoonOreTypeIdByName } from './keptSurveyScan';
 import { resolveNames } from '@/features/character/names';
 import { loadStructureAccess, loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -322,23 +321,18 @@ export function useCorpBook(
       const found = new Map<string, { typeId: number; quantity: number }[]>();
       const measuredIds = new Set<string>();
       if (wanted.length > 0) {
-        const [moonIds, types] = await Promise.all([loadMoonOreTypeIds(), loadTypes()]);
-        const typeIdByName = new Map<string, number>();
-        for (const id of moonIds) {
-          const name = types[String(id)]?.name;
-          if (name) typeIdByName.set(name, id);
-        }
+        // Only a link made before the book kept its scan reads the Survey itself (7-day link).
+        const typeIdByName = wanted.every((x) => x.surveyScan)
+          ? new Map<string, number>()
+          : await loadMoonOreTypeIdByName();
         await Promise.all(
           wanted.map(async (x) => {
-            const survey = await loadSurvey(x.surveyId!);
-            if (!survey.ok) return;
-            const first = firstCountedScan(survey.scans, survey.ignored);
-            if (!first) return;
+            const scan =
+              x.surveyScan ?? keptSurveyScan(await loadSurvey(x.surveyId!), typeIdByName);
+            if (!scan) return;
             const ex = toEngineExtraction(x);
             const estimate = estimateChunk(ex, {
-              survey: surveyFractions(first.rocks, (ore) => typeIdByName.get(ore)),
-              surveyVolumeM3: scanVolume(first.rocks),
-              surveyAt: first.at,
+              ...snapshotSources(scan),
               expiryHours: data.settings.structureExpiryHours[String(ex.structureId)],
               chunkM3PerHour: data.settings.chunkM3PerHour ?? undefined,
               measured: measured.get(ex.structureId),
