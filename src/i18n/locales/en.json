@@ -390,6 +390,7 @@
       "tooltip": "{{name}} Mastery — the skills its tiers ask for and how long they take",
       "title": "{{name}} Mastery",
       "hideCompleted": "Hide completed",
+      "tierLabel": "Mastery tier",
       "empty": "Nothing to show — every skill here is trained.",
       "suggestedNote": "Suggested, not required. CCP's bundles include some skills you can skip.",
       "total": "Total {{time}}"
