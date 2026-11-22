@@ -9,6 +9,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow, panelRight, scrollerFit } from './support/overflow';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
 import type { setVettingBackendOverride } from '../src/features/corp/vetting/vettingBackend';
@@ -59,7 +60,7 @@ async function installAndOpen(page: Page, path: string, characterId?: number): P
   );
 }
 
-test('a Director opens a review from the vetting queue and sees its flags', async ({ page }) => {
+async function signInAsDirector(page: Page): Promise<void> {
   await page.route('https://esi.evetech.net/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     const json = (body: unknown) =>
@@ -72,6 +73,10 @@ test('a Director opens a review from the vetting queue and sees its flags', asyn
   });
   await signInAndGoto(page, './settings', [...SCOPES, ...scopesForGroup('corp')]);
   await expect(page.locator('main')).toBeVisible();
+}
+
+test('a Director opens a review from the vetting queue and sees its flags', async ({ page }) => {
+  await signInAsDirector(page);
   const seeded = await installAndOpen(page, '/corp/vetting/open', CHARACTER_ID);
   expect(seeded, 'pilot row seeded with a corporation').toBe(1);
 
@@ -110,34 +115,6 @@ test('the apply link shows its start page with nobody logged in', async ({ page 
   await expect(page.getByRole('navigation')).toHaveCount(0);
 });
 
-/** The nearest ancestor of `el` that scrolls on x, or null: its fit metrics. */
-const scrollerFit = (el: import('@playwright/test').Locator) =>
-  el.evaluate((node) => {
-    let n = node.parentElement;
-    while (n && !/auto|scroll/.test(getComputedStyle(n).overflowX)) n = n.parentElement;
-    if (!n) return null;
-    return {
-      scrollWidth: n.scrollWidth,
-      clientWidth: n.clientWidth,
-      right: n.getBoundingClientRect().right,
-    };
-  });
-
-async function signInAsDirector(page: Page): Promise<void> {
-  await page.route('https://esi.evetech.net/**', async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    const json = (body: unknown) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-    if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Director'] });
-    if (path === `/corporations/${CORPORATION_ID}/`)
-      return json({ name: 'Sample Corp', ceo_id: 1, member_count: 40, tax_rate: 0.1 });
-    if (path.startsWith(`/corporations/${CORPORATION_ID}/`)) return json([]);
-    await route.fallback();
-  });
-  await signInAndGoto(page, './settings', [...SCOPES, ...scopesForGroup('corp')]);
-  await expect(page.locator('main')).toBeVisible();
-}
-
 for (const width of [1024, 1280]) {
   test(`the vetting queue and a report's Declared characters fit their panels at ${width}px`, async ({
     page,
@@ -152,21 +129,12 @@ for (const width of [1024, 1280]) {
     const charactersHeader = table.getByRole('columnheader', { name: 'Characters' });
     if (width === 1024) {
       await expect(charactersHeader).toBeHidden();
-      const panel = (await table.evaluate((el) => {
-        const box = el.closest('section, [data-panel], div')!.getBoundingClientRect();
-        return box.right;
-      })) as number;
+      const panel = await panelRight(table);
       const tableBox = (await table.boundingBox())!;
-      expect(tableBox.x + tableBox.width, 'table inside its panel').toBeLessThanOrEqual(panel + 1);
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
-        ),
-        'page scrolls sideways'
-      ).toBe(true);
-      const forCell = row.getByText(/Promotion|Application|Accountant/).first();
+      expect(tableBox.x + tableBox.width, 'table inside its panel').toBeLessThanOrEqual(panel! + 1);
+      await expectNoPageOverflow(page);
+      // Two lines of 14px text plus padding; three lines would clear it.
       expect((await row.boundingBox())!.height, 'queue row at most two lines').toBeLessThan(80);
-      await expect(forCell).toBeVisible();
     } else {
       await expect(charactersHeader).toBeVisible();
     }
@@ -178,9 +146,9 @@ for (const width of [1024, 1280]) {
     const fit = await scrollerFit(declared);
     expect(fit, 'Declared characters has its own scroller').not.toBeNull();
     const box = (await declared.boundingBox())!;
-    if (box.x + box.width > fit!.right + 1) {
-      // Wider than the panel: it scrolls inside, never past the border.
-      expect(fit!.scrollWidth).toBeGreaterThan(fit!.clientWidth);
-    }
+    // Inside its panel, or scrolling there: never past the border.
+    const edge = await panelRight(declared);
+    expect(fit!.right, 'scroller inside the panel').toBeLessThanOrEqual(edge! + 1);
+    if (box.x + box.width > edge! + 1) expect(fit!.scrollWidth).toBeGreaterThan(fit!.clientWidth);
   });
 }
