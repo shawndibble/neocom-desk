@@ -76,7 +76,11 @@ export function DataAgePopover({
           </button>
         </PopoverTrigger>
       </Tooltip>
-      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
+      <PopoverContent
+        align="start"
+        aria-label={t('overview.header.updated')}
+        className="w-80 max-w-[calc(100vw-2rem)] p-0"
+      >
         <table className="w-full text-xs">
           <caption className="sr-only">{t(boardKey(board, 'header.breakdownCaption'))}</caption>
           <thead>

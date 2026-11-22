@@ -283,7 +283,11 @@ export function MasteryChip({
               tooltip={t('fittings.mastery.tooltip', { name: hullName })}
             />
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
+          <PopoverContent
+            align="start"
+            aria-label={t('fittings.mastery.title', { name: hullName })}
+            className="w-96 max-w-[calc(100vw-2rem)] p-3"
+          >
             {body}
           </PopoverContent>
         </Popover>

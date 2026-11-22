@@ -207,7 +207,7 @@ describe('AlertsPanel', () => {
         <MemoryRouter initialEntries={['/overview']}>
           <Popover open onOpenChange={onOpenChange}>
             <PopoverTrigger>bell</PopoverTrigger>
-            <PopoverContent>
+            <PopoverContent aria-label="Alerts">
               <AlertsPanel variant="popover" onClose={vi.fn()} />
             </PopoverContent>
           </Popover>

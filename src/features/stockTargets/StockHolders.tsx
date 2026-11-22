@@ -59,7 +59,7 @@ export function StockHolders({
               </span>
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end">
+          <PopoverContent align="end" aria-label={heading}>
             {/* A portalled popover still bubbles React events to the row (Show Info). */}
             <div
               className="flex min-w-48 flex-col gap-1 text-xs"

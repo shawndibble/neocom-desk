@@ -224,6 +224,7 @@ export function SavedComparisonsMenu({
         </PopoverTrigger>
         <PopoverContent
           align="end"
+          aria-label={t('skillCompare.saved')}
           className="w-80 p-2"
           // The delete confirm is a dialog over this popover: moving into it is not a dismissal.
           onInteractOutside={(event) => {

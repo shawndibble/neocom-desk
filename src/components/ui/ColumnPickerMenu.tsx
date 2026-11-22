@@ -86,6 +86,7 @@ export function ColumnPickerMenu<Id extends string, Row>({
         </PopoverAnchor>
         <PopoverContent
           align="end"
+          aria-label={buttonLabel}
           className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
           // A hint never takes focus from where the pilot is working.
           onOpenAutoFocus={(event) => event.preventDefault()}

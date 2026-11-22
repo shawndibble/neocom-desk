@@ -81,7 +81,11 @@ export function HaulingCargoPopover({
       <PopoverTrigger className={triggerClassName} aria-label={triggerLabel}>
         {children}
       </PopoverTrigger>
-      <PopoverContent align={align} className="w-[min(24rem,calc(100vw-2rem))] p-3">
+      <PopoverContent
+        align={align}
+        aria-label={triggerLabel}
+        className="w-[min(24rem,calc(100vw-2rem))] p-3"
+      >
         {open && (
           <CargoPickerBody
             characterId={characterId}

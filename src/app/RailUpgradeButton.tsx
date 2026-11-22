@@ -44,6 +44,7 @@ export function RailUpgradeButton() {
           side="right"
           sideOffset={8}
           arrow
+          aria-label={t('nav.upgrade')}
           // Called out against the rail: larger bold text in an accent border,
           // its arrow outlined to match (the arrow's own stroke is `line`).
           className="max-w-64 border-accent! px-3 py-2 text-sm font-semibold [&_svg]:stroke-accent"

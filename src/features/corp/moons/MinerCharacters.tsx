@@ -84,6 +84,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
         </PopoverTrigger>
         <PopoverContent
           align="start"
+          aria-label={t('corpTaxBook.moons.grouping.count', { count: miner.characterIds.length })}
           className="w-80 max-w-[calc(100vw-2rem)] space-y-2 p-3"
           // The dialog takes focus itself when Group opens it.
           onCloseAutoFocus={(e) => grouping && e.preventDefault()}
