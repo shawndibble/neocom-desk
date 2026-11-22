@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import type { SrpClaim } from '../srpClaimTypes';
+import { approveAmount } from './srpQueue';
 import type { SrpClaimNames } from './useSrpClaimNames';
 
 export interface ClaimColumnsContext {
@@ -28,4 +29,17 @@ export function ownClaimReason(claim: SrpClaim, ctx: ClaimColumnsContext): strin
   return ctx.selfCharacterId != null && claim.characterId === ctx.selfCharacterId
     ? ctx.t('srp.officer.failed.own-claim')
     : undefined;
+}
+
+/** Why Approve is inert for this claim (its own, or no amount yet), or undefined. */
+export function approveBlockedReason(
+  claim: SrpClaim,
+  ctx: ClaimColumnsContext
+): string | undefined {
+  return (
+    ownClaimReason(claim, ctx) ??
+    (approveAmount(claim, ctx.typed[claim.killmailId]) === null
+      ? ctx.t('srp.officer.failed.needs-amount')
+      : undefined)
+  );
 }

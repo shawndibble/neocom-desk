@@ -7,9 +7,12 @@ import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import type { SrpClaim } from '../srpClaimTypes';
-import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
+import {
+  approveBlockedReason,
+  ownClaimReason,
+  type ClaimColumnsContext,
+} from './claimColumnsContext';
 import { claimBasisLine } from './srpClaimText';
-import { approveAmount } from './srpQueue';
 
 const STATE_TONE = {
   pending: 'warning',
@@ -153,11 +156,11 @@ export function ApproveReject({
   className?: string;
 }) {
   const own = ownClaimReason(claim, ctx);
-  const blocked =
-    ctx.busy || own !== undefined || approveAmount(claim, ctx.typed[claim.killmailId]) === null;
+  const approveReason = approveBlockedReason(claim, ctx);
+  const blocked = ctx.busy || approveReason !== undefined;
   return (
     <>
-      <DecideTip reason={own}>
+      <DecideTip reason={approveReason}>
         <Button
           size="sm"
           variant="success"

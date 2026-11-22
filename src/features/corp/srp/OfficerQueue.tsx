@@ -380,6 +380,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
             <SrpBulkBar
               selected={ticked.length}
               selectable={selectable.length}
+              listed={rows.length}
               total={tickedTotal}
               onSelectAll={() => setSelection(selectable.map((c) => c.killmailId))}
               onSelectNone={() => setSelection([])}
