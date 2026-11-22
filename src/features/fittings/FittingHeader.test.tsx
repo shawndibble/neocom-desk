@@ -105,7 +105,8 @@ describe('FittingHeader on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Fitting actions' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Copy stats' }));
     expect(written).toEqual(['STATS TEXT']);
-    expect(await screen.findAllByText('Stats copied')).toHaveLength(2);
+    // Waited on the count: `findAllByText` settles on the first match, before the second renders.
+    await waitFor(() => expect(screen.getAllByText('Stats copied')).toHaveLength(2));
   });
 
   it('gives Open and Export the quiet look, leaving Save the one primary', () => {
