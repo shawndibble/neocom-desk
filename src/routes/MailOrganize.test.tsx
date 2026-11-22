@@ -108,7 +108,7 @@ describe('Mail organize', () => {
 
   it('Select mode: marks only the mail that would change, then deletes the selection once', async () => {
     const { puts, deletes } = trackWrites();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     renderMailRoute();
     await screen.findByText('Market report');
 
@@ -123,7 +123,8 @@ describe('Mail organize', () => {
     await user.click(screen.getByRole('button', { name: 'Mark read' }));
     await waitFor(() => expect(puts).toEqual([{ id: '1', body: { read: true } }]));
 
-    // The bar is disabled while the writes finish.
+    // The bar is disabled while the writes finish; the toast marks the batch fully settled.
+    await screen.findByText('Marked 1 mail read');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('Delete 2 mails?')).toBeInTheDocument();
