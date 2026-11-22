@@ -122,12 +122,12 @@ function Board({ characterId, layout }: BoardProps) {
       <WarBanner characterId={characterId} />
       <OverviewCachedNotice summary={summary} />
       {editing && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" />}>
           <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
         </Suspense>
       )}
       {editing && isPhone && layout.widgets.length > 0 ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" />}>
           <PhoneCustomizeList />
         </Suspense>
       ) : (

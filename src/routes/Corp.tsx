@@ -102,12 +102,12 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
       {characterId !== null && <WarBanner characterId={characterId} />}
       <OverviewCachedNotice summary={summary} />
       {editing && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
           <CustomizeBar onAdd={() => setGalleryOpen(true)} />
         </Suspense>
       )}
       {editing && isPhone && layout.widgets.length > 0 ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
           <PhoneCustomizeList />
         </Suspense>
       ) : (

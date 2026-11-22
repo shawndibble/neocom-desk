@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PageHeader, TabPanel } from '@/components/ui';
+import { PageHeader, Spinner, TabPanel } from '@/components/ui';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS, SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { usePageTab } from '@/lib/usePageTab';
@@ -30,7 +30,7 @@ export function Ships() {
       <PageHeader title={t('nav.ships')} />
       <ShipsTabBar />
       <TabPanel tabsId={SHIPS_TABS_ID} tabId={tab}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
           <ShipTreeTab />
         </Suspense>
       </TabPanel>

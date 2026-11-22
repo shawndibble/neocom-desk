@@ -716,7 +716,7 @@ export function Market() {
         />
 
         <TabPanel tabsId={viewsTabsId} tabId={tab}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
             {tab === 'orders' && <OrdersTab headerSlots={headerSlots} />}
             {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
