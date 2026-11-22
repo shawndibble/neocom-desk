@@ -52,6 +52,7 @@ import {
   StatChips,
   TextInput,
   IskAmount,
+  LiveNote,
   LiveStatus,
   CachedNotice,
   boundText,
@@ -996,9 +997,9 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
             // cycle's and this cycle's are already on the way. Said beside
             // the Data Age badge's own reading, not instead of it — the badge
             // says how old, this says something is being done about it.
-            <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
+            <LiveNote className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
               {t('contractSearch.refreshingInBackground')}
-            </p>
+            </LiveNote>
           )}
           {mode === 'courier' && modeLoading && modeRowCount === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16">
@@ -1118,9 +1119,9 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
               {hiddenOverpriced > 0 && (
                 // Said, not silent: Hide overpriced never makes the board's rows quietly shorter (§6c).
-                <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim">
+                <LiveNote className="px-3 pt-2 text-[0.6875rem] text-text-dim">
                   {t('contractSearch.overpricedHidden', { count: hiddenOverpriced })}
-                </p>
+                </LiveNote>
               )}
 
               <LiveStatus>

@@ -161,7 +161,7 @@ describe('RichMailBodyEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Edit source' }));
     const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
     fireEvent.change(src, { target: { value: 'a<script>x</script>' } });
-    expect(screen.getByRole('status')).toHaveTextContent('will be removed');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('will be removed'));
   });
 
   it('converts a pasted markdown pipe table, and nothing else markdown', async () => {
