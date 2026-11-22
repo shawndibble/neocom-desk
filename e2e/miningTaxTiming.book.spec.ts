@@ -467,9 +467,7 @@ for (const close of [
     ]);
 
     // Paying that figure pays the day: no remainder, no credit, whatever the close was.
-    await ledgerButton(page, ROOK.name)
-      .locator('xpath=following::button[normalize-space()="Settle up"][1]')
-      .click();
+    await cardOf(page, ROOK.name).getByRole('button', { name: 'Settle up' }).click();
     const dialog = page.getByRole('dialog', { name: `Settle up — ${ROOK.name}` });
     await expect(dialog).toContainText(`Amount${isk(ESTIMATE)} ISK`);
     await dialog.getByRole('button', { name: 'Record payment' }).click();
