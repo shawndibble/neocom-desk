@@ -114,9 +114,12 @@ test.describe('PI Colonies, the daily check', () => {
       row.getByRole('button', { name: /^More actions for / }),
       row.locator('button', { hasText: /Restart|Haul|Fix|Add|Details/ }).first(),
     ]) {
-      // boundingBox() doesn't wait: a control still rendering reads as null.
+      // boundingBox() doesn't wait: a control still rendering, or re-rendered between the
+      // visibility check and the read, reads as null. Polled, so a re-render is retried.
       await expect(control).toBeVisible();
-      expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(36);
+      await expect
+        .poll(async () => (await control.boundingBox())?.height ?? 0)
+        .toBeGreaterThanOrEqual(36);
     }
     await shot(page, 'colonies-phone');
     await row.getByRole('button', { name: /^Show details for / }).click();
