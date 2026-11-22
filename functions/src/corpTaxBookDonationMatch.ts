@@ -55,6 +55,17 @@ export function soloCharacterId(minerId: string): number | undefined {
   return solo ? Number(solo[1]) : undefined;
 }
 
+const groupingHolds = (
+  m: Pick<MatchMiner, 'characterIds' | 'leftOn'>,
+  characterId: number,
+  date?: string
+): boolean => {
+  const left = m.leftOn?.[characterId];
+  return date !== undefined && left !== undefined
+    ? date < left
+    : m.characterIds.includes(characterId);
+};
+
 /**
  * The Miner a Character is billed under: its earliest grouping, else a Miner of its own. With a
  * `date`, a grouping the Character left on or before that day no longer holds it, and one it left
@@ -67,10 +78,7 @@ export function minerIdFor(
 ): string {
   let best: Pick<MatchMiner, 'id' | 'createdAt'> | undefined;
   for (const m of miners) {
-    const left = m.leftOn?.[characterId];
-    const holds =
-      date !== undefined && left !== undefined ? date < left : m.characterIds.includes(characterId);
-    if (holds && (!best || earlierGrouping(m, best) < 0)) best = m;
+    if (groupingHolds(m, characterId, date) && (!best || earlierGrouping(m, best) < 0)) best = m;
   }
   return best?.id ?? soloMinerId(characterId);
 }
@@ -144,12 +152,13 @@ export function donationOwner(
 ): DonationOwner {
   // The donation's own day: a Character that left a grouping on a date still bills it before then.
   const day = donation.at?.slice(0, 10);
-  const minerId = minerIdFor(donation.characterId, book.miners, day);
-  if (
-    minerId !== soloMinerId(donation.characterId) ||
-    book.minedCharacterIds.has(donation.characterId)
-  )
-    return { kind: 'miner', minerId, by: 'sender' };
+  const grouped = book.miners.some((m) => groupingHolds(m, donation.characterId, day));
+  if (grouped || book.minedCharacterIds.has(donation.characterId))
+    return {
+      kind: 'miner',
+      minerId: minerIdFor(donation.characterId, book.miners, day),
+      by: 'sender',
+    };
   const coded = new Set(codesIn(donation.reason).flatMap((code) => book.codes.get(code) ?? []));
   const payer = new Set(
     (book.paidBefore?.get(donation.characterId) ?? []).map((id) => currentMinerOf(id, book.miners))
