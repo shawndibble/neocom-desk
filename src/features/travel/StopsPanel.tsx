@@ -96,6 +96,8 @@ function StopRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: systemId,
   });
+  // With neighbours the row's menu carries Move and Remove (no ✕, as Quickbar); alone, a ✕.
+  const hasMenu = count > 1;
   const li = (
     <li
       ref={setNodeRef}
@@ -123,16 +125,19 @@ function StopRow({
         {systemName !== null && <span className="ml-1 text-text-dim">· {systemName}</span>}
         {security !== null && <SecurityStatus security={security} className="ml-1" />}
       </span>
-      <IconButton
-        size="sm"
-        icon={<Icon.Close />}
-        label={t('travel.stops.remove', { name })}
-        onClick={() => onRemove(index)}
-      />
-      {count > 1 && <RowMoreActions />}
+      {hasMenu ? (
+        <RowMoreActions />
+      ) : (
+        <IconButton
+          size="sm"
+          icon={<Icon.Close />}
+          label={t('travel.stops.remove', { name })}
+          onClick={() => onRemove(index)}
+        />
+      )}
     </li>
   );
-  if (count < 2) return li;
+  if (!hasMenu) return li;
   return (
     <RowActionsMenu
       name={name}

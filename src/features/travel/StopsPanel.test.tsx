@@ -46,5 +46,8 @@ describe('StopsPanel reorder without dragging', () => {
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'More actions for Sys 1' }));
     expect(screen.queryByRole('menuitem', { name: 'Move up' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Move down' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
+    expect(onStopsChange).toHaveBeenLastCalledWith([stops[1], stops[2]]);
   });
 });
