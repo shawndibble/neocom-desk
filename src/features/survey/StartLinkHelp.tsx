@@ -51,7 +51,6 @@ export function StartLinkHelp({ path = START_LINK_PATH }: { path?: string }) {
       title={t('survey.start.help.title')}
       expanded={expanded}
       onToggle={() => setExpanded((v) => !v)}
-      labels={{ show: t('survey.start.help.title'), hide: t('survey.start.help.title') }}
       className="text-sm"
     >
       <div className="space-y-3">

@@ -5,7 +5,7 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret, IconButton } from '@/components/ui';
+import { Caret, IconButton, isRowOwnEvent } from '@/components/ui';
 import {
   groupByOrganization,
   type CorporationGroup,
@@ -116,15 +116,7 @@ function OrgSectionView({
       <h3
         className={cx(SECTION_TITLE, isPhone && 'cursor-pointer')}
         // A phone folds the section from anywhere on its heading, bar the links in it.
-        onClick={
-          isPhone
-            ? (event) => {
-                const target = event.target as Element;
-                if (event.currentTarget.contains(target) && !target.closest('a, button'))
-                  onToggle();
-              }
-            : undefined
-        }
+        onClick={isPhone ? (event) => isRowOwnEvent(event) && onToggle() : undefined}
       >
         {isPhone && (
           <IconButton

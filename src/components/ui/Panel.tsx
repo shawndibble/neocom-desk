@@ -1,4 +1,5 @@
 import { eyebrowClassName } from './eyebrowClassName';
+import { isRowOwnEvent } from './rowEvents';
 import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
@@ -84,10 +85,6 @@ interface PanelProps {
   style?: CSSProperties;
 }
 
-/** What inside a header keeps its own press instead of toggling a collapsible panel. */
-const HEADER_CONTROLS =
-  'button, a, input, select, textarea, label, [role="button"], [role="tab"], [role="combobox"], [role="switch"], [role="checkbox"]';
-
 /**
  * Base surface. Everything lives in a Panel; don't nest them — use `panel-2`
  * fills inside.
@@ -139,17 +136,8 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
         // own left inset would read as a double gap — drop it and let the
         // control sit against the edge, the way `Assets`' breadcrumb bar does.
         <header
-          onClick={
-            onHeaderToggle &&
-            ((event) => {
-              const target = event.target as Element;
-              // A menu or dialog portalled out of the header still bubbles its clicks here.
-              if (!event.currentTarget.contains(target)) return;
-              const hit = target.closest(HEADER_CONTROLS);
-              if (hit && hit !== event.currentTarget) return;
-              onHeaderToggle();
-            })
-          }
+          // A press on the header's own buttons and links (or a menu portalled out of it) keeps its meaning.
+          onClick={onHeaderToggle && ((event) => isRowOwnEvent(event) && onHeaderToggle())}
           className={`${onHeaderToggle ? 'cursor-pointer hover:bg-panel-2/60 ' : ''}flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
         >
           <div

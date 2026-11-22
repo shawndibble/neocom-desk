@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, Tooltip } from '@/components/ui';
+import { Button, Caret, Tooltip, isRowOwnEvent } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
@@ -123,11 +123,7 @@ export function CertificateRow({
     <li className="border-t border-line text-xs">
       <div
         // The whole row opens its detail, bar the buttons and links inside it.
-        onClick={(event) => {
-          const target = event.target as Element;
-          // Not a portalled dialog's click, nor a button or link in the row.
-          if (event.currentTarget.contains(target) && !target.closest('button, a')) onToggle();
-        }}
+        onClick={(event) => isRowOwnEvent(event) && onToggle()}
         className="cursor-pointer grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]"
       >
         {/* Every row opens, Elite included: the description is there for all. */}

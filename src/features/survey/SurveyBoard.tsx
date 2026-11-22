@@ -206,7 +206,6 @@ export function SurveyBoard({
           title={t('survey.start.howToCopy')}
           expanded={howToOpen}
           onToggle={() => setHowToOpen((v) => !v)}
-          labels={{ show: t('survey.start.howToCopy'), hide: t('survey.start.howToCopy') }}
         >
           <SurveyHowTo heading={false} />
         </CollapsiblePanel>

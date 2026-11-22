@@ -18,8 +18,8 @@ interface CollapsiblePanelProps {
   expanded: boolean;
   /** @summary Called when the caret is pressed. */
   onToggle: () => void;
-  /** Accessible names for the caret in each state. */
-  labels: { show: string; hide: string };
+  /** Accessible names for the caret in each state; defaults to the title, with `aria-expanded` saying which. */
+  labels?: { show: string; hide: string };
   /** Set false for flush content like tables. */
   padded?: boolean;
   /**
@@ -101,7 +101,7 @@ export function CollapsiblePanel({
             ref={toggleRef}
             size={caretSize}
             icon={<Caret expanded={open} />}
-            label={open ? labels.hide : labels.show}
+            label={(open ? labels?.hide : labels?.show) ?? title}
             aria-expanded={open}
             onClick={onToggle}
           />

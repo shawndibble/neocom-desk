@@ -751,7 +751,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   /**
    * Last-updated, Export and Refresh. With a list to fold they live inside the
    * accordion body, on the filter row's far right, so the title bar stays just
-   * the summary, the slot readout. With no list (idle, loading,
+   * the summary and the slot readout. With no list (idle, loading,
    * re-auth, nothing cached) there is no body to hold them, so they fall back
    * to the header — an idle panel must still be refreshable.
    */
