@@ -47,8 +47,7 @@
  *   the what-if planet, if one is ticked.
  */
 
-import { LiveStatus } from '@/components/ui/LiveStatus';
-import { Panel } from '@/components/ui';
+import { LiveStatus, Panel } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';

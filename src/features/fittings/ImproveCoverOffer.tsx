@@ -2,10 +2,9 @@
  * The ticked set overruns: the covers added so far, each with its own tick,
  * the swaps on offer that would cover it, and the implant alternative.
  */
-import { LiveNote } from '@/components/ui/LiveStatus';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox } from '@/components/ui';
+import { Checkbox, LiveNote } from '@/components/ui';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,

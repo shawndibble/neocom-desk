@@ -1,4 +1,4 @@
-import { useEffect, useState, type ElementType, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 interface LiveStatusProps {
   /** The message. `null`, `false` or `''` is silent. */
@@ -57,7 +57,7 @@ export function LiveStatus({ children, announceKey, id, 'data-testid': testId }:
 
 interface LiveNoteProps {
   /** The visible element: `p` (default) or `span`. */
-  as?: ElementType;
+  as?: 'p' | 'span';
   className?: string;
   children: ReactNode;
 }

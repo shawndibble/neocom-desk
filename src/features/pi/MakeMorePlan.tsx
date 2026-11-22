@@ -1,8 +1,7 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
+import { EmptyState, IskFigureGroup, LiveStatus, Spinner } from '@/components/ui';
 import { clampIskZero, formatIskCompact } from '@/lib/isk';
 import { AssumedCustomsNote } from './AssumedCustomsNote';
 import { BiggerChainsPanel } from './BiggerChainsPanel';

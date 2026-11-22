@@ -1,7 +1,6 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, LiveStatus } from '@/components/ui';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';

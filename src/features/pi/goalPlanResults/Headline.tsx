@@ -2,15 +2,15 @@
  * Is it worth it: the **Lift** over the **Baseline** (never a gross margin),
  * whether every goal is met, and the caveats behind the numbers.
  */
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
   DataAgeBadge,
   EmptyState,
-  IskAmount,
   InfoTooltip,
+  IskAmount,
+  LiveStatus,
   Panel,
   StatChip,
   StatChips,

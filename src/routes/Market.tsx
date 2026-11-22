@@ -1,4 +1,3 @@
-import { LiveNote } from '@/components/ui/LiveStatus';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -12,23 +11,24 @@ import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/Hauling
 import {
   Button,
   DataAgeBadge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   FilterChip,
   IconButton,
+  LiveNote,
+  LiveStatus,
   PageHeader,
   Panel,
-  SearchInput,
   RegionSelect,
-  LiveStatus,
-  DropdownMenuItem,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  useOpenAfterMenu,
+  SearchInput,
   Spinner,
   TabPanel,
   Tabs,
   Toast,
+  useOpenAfterMenu,
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';

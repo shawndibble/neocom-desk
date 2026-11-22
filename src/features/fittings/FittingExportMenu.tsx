@@ -1,4 +1,3 @@
-import { LiveNote } from '@/components/ui/LiveStatus';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  LiveNote,
 } from '@/components/ui';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';

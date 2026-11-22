@@ -6,12 +6,13 @@
  * Neither is stored until it differs from the default: no hubs picked is the
  * Overview page hub, no items picked is the Quickbar.
  */
-import { LiveNote, LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   IconButton,
+  LiveNote,
+  LiveStatus,
   MenuCheckboxItem,
   MenuLabel,
   Modal,

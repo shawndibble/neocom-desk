@@ -11,11 +11,10 @@
  * hub, and the hub it is quoted at reads as selected. The system name is the
  * card's title button, not a SystemLink, so the card has one action.
  */
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { LiveStatus, Tooltip } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,

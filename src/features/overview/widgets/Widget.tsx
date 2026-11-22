@@ -15,7 +15,6 @@
  * No view-cyclers in the header: view switching lives in the settings menu, so
  * a stray click changes nothing.
  */
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -23,12 +22,13 @@ import { useRosterNames } from './useRosterNames';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
+  entityLinkClassName,
   IskAmount,
+  LiveStatus,
   RowMoreActions,
   SEVERITY_TEXT,
   SeverityIcon,
   Tooltip,
-  entityLinkClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';

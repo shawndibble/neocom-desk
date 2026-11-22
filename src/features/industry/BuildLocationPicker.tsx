@@ -1,7 +1,13 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, NeedsConnection, SearchInput, Spinner } from '@/components/ui';
+import {
+  Button,
+  Disclosure,
+  LiveStatus,
+  NeedsConnection,
+  SearchInput,
+  Spinner,
+} from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';

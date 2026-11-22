@@ -1,7 +1,6 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Spinner } from '@/components/ui';
+import { Button, LiveStatus, Spinner } from '@/components/ui';
 import type { SkilledAttributesState } from '@/features/fittings/useSkilledAttributes';
 
 /**

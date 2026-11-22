@@ -5,10 +5,9 @@
  * Colour never carries the meaning alone: the mark is an icon with a spoken
  * and hover label.
  */
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { priceMarkKey } from './priceStateLabel';
 import { useTranslation } from 'react-i18next';
-import { ProgressBar, Tooltip } from '@/components/ui';
+import { LiveStatus, ProgressBar, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PriceState } from '@/engine/market/appraisal';
 import { cx } from '@/lib/cx';

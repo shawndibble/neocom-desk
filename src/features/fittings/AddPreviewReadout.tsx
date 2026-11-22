@@ -1,6 +1,5 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useTranslation } from 'react-i18next';
-import { StatChange } from '@/components/ui';
+import { LiveStatus, StatChange } from '@/components/ui';
 import type { AddPreview } from './useModuleAddPreview';
 import { fixed1 } from '@/lib/fixedFormat';
 

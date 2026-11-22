@@ -7,13 +7,13 @@
  * the pilot their original — a failed *delete* after a successful save
  * leaves both, which this dialog reports rather than hiding.
  */
-import { LiveNote } from '@/components/ui/LiveStatus';
 import { useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  LiveNote,
   Modal,
   Select,
   SelectContent,

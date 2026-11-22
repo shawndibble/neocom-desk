@@ -1,4 +1,3 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { formatCount } from '@/lib/formatCount';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -15,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
-import { EmptyState, Modal, SearchInput, Spinner } from '@/components/ui';
+import { EmptyState, LiveStatus, Modal, SearchInput, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   activeOptionClassName,

@@ -1,7 +1,12 @@
 /** The Appraisal result Panel's header actions: Compare Hubs, columns, Share and the copy/export menu. */
-import { LiveNote } from '@/components/ui/LiveStatus';
 import { useTranslation } from 'react-i18next';
-import { ColumnPickerMenu, IconButton, MenuItem, useOpenAfterMenu } from '@/components/ui';
+import {
+  ColumnPickerMenu,
+  IconButton,
+  LiveNote,
+  MenuItem,
+  useOpenAfterMenu,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { TableActionsMenu } from '@/components/ui/TableExport';

@@ -1,7 +1,6 @@
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
+import { IconButton, LiveStatus, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useApplyUpdate } from '@/features/settings/useUpdateState';
 import { useUpdateStatus } from './updateAvailable';

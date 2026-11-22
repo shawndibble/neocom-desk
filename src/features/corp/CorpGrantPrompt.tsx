@@ -17,12 +17,11 @@
  * prompt is eligible again — the Settings Corporation Permission row is the durable path
  * back regardless.
  */
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useRef } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, NeedsConnection } from '@/components/ui';
+import { Button, LiveStatus, NeedsConnection } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';

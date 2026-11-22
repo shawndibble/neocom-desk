@@ -4,12 +4,11 @@
  * picks (Forward's contacts) and ESI search hits for characters,
  * corporations and alliances.
  */
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { IconButton, TextInput } from '@/components/ui';
+import { IconButton, LiveStatus, TextInput } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { isOfflineFailure } from '@/esi/client';

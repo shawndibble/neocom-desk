@@ -2,9 +2,8 @@
  * Warnings about weapons and miners that hold nothing: damage goals can't
  * score an empty weapon, and Mine more compares on the best crystals.
  */
-import { LiveNote } from '@/components/ui/LiveStatus';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, LiveNote } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improve';
 import { crystalParts } from '@/engine/fittings/improve';
 import { crystalBasisOf } from './improveCrystalBasis';
