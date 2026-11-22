@@ -261,14 +261,14 @@ test('a wallet payment to a corporation with no book is suggested for that Payee
     .getByRole('button', { name: 'Link payment', exact: true })
     .first()
     .click();
-  const dialog = page.getByRole('dialog', { name: 'Link a wallet payment' });
+  const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
   // Only Cinder's transfer: the one to the book's corporation is the book's money.
   await expect(dialog).toContainText(`${CINDER.name}`);
   const payments = dialog.getByRole('radio');
   await expect(payments).toHaveCount(1);
   await expect(dialog).toContainText(`${isk(DAY_TAX)} ISK`);
   await payments.check();
-  await dialog.getByRole('button', { name: /^Link payment/ }).click();
+  await dialog.getByRole('button', { name: /^Link to / }).click();
   await expect(dialog).toBeHidden();
 
   // Cinder's oldest day is paid; the book's figure is only what its own donation moved.
