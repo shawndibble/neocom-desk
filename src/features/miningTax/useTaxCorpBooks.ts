@@ -130,16 +130,24 @@ export function useTaxCorpBooks(
   }, [overlay, billed, data]);
   // Likewise which Payees a book owns, once the books are known (never from a guess made before):
   // the load path's safeguards and the wallet journal read the accounts with the same rule.
+  const hasDefaultSystems = useMemo(
+    () =>
+      [...(data?.payeesByCharacter.values() ?? [])].some((list) =>
+        list.some((p) => (p.defaultSystems?.length ?? 0) > 0)
+      ),
+    [data]
+  );
   const storedOwned = useRef<ReadonlySet<string> | undefined>(undefined);
   useEffect(() => {
     if (!data || !booksKnown || storedOwned.current === bookOwned) return;
     storedOwned.current = bookOwned;
     void saveBookOwned(bookOwned)
       .then((changed) => {
-        if (changed) onOwnershipStored?.();
+        // Only a Payee with Default Systems was held back; with none there is nothing to re-read.
+        if (changed && hasDefaultSystems) onOwnershipStored?.();
       })
       .catch(() => undefined);
-  }, [data, booksKnown, bookOwned, onOwnershipStored]);
+  }, [data, booksKnown, bookOwned, hasDefaultSystems, onOwnershipStored]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
   const { failed: failedClaims } = useAutoClaimDonations(

@@ -104,7 +104,21 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     const { result } = renderHook(() => useTaxCorpBooks(data, [], null, onOwnershipStored));
     expect(result.current.accounts.isBookOwned('p1')).toBe(true);
     expect(saveBookOwned).toHaveBeenCalledWith(new Set(['p1']));
-    // The load path held Default Systems back until ownership was stored: read the snapshot again.
-    await vi.waitFor(() => expect(onOwnershipStored).toHaveBeenCalledTimes(1));
+    // No Payee has Default Systems, so nothing was held back: no second read.
+    // Wait on the store itself settling (and its follow-up), not on a duration.
+    await saveBookOwned.mock.results.at(-1)?.value;
+    await Promise.resolve();
+    expect(onOwnershipStored).not.toHaveBeenCalled();
+
+    // With Default Systems held back until ownership was stored, the snapshot is read again.
+    const withDefaults = {
+      ...data,
+      payeesByCharacter: new Map([
+        [1, [{ ...payee, defaultSystems: [{ systemId: 30000142, from: '2026-01-01' }] }]],
+      ]),
+    } as unknown as TaxSnapshot;
+    const again = vi.fn();
+    renderHook(() => useTaxCorpBooks(withDefaults, [], null, again));
+    await vi.waitFor(() => expect(again).toHaveBeenCalledTimes(1));
   });
 });
