@@ -101,12 +101,14 @@ export function CorpAssetLocationTable({
       align: 'right',
       className: 'tabular-nums',
       cellClassName: dim,
+      stackAffix: { after: t('corp.assets.stackAffix.items') },
       sortValue: sinkDeliveries((r) => r.cell.itemCount),
       render: (r) => formatCount(r.cell.itemCount),
     },
     largest: {
       id: 'largest',
       header: t('corp.assets.column.largest'),
+      stackAffix: { before: t('corp.assets.stackAffix.largest') },
       cellClassName: dim,
       sortValue: sinkDeliveries((r) => r.cell.topStacks[0]?.estimatedValue),
       render: (r) => (r.cell.itemCount === 0 ? '—' : largestText(r)),
@@ -117,6 +119,7 @@ export function CorpAssetLocationTable({
       align: 'right',
       className: 'tabular-nums',
       cellClassName: dim,
+      cardCorner: true,
       sortValue: sinkDeliveries((r) => r.cell.estimatedValue),
       render: (r) => (r.cell.estimatedValue === 0 ? '—' : formatIsk(r.cell.estimatedValue)),
     },
@@ -190,6 +193,7 @@ export function CorpAssetLocationTable({
             {...tableExport.tableProps}
             density="compact"
             responsive="stack"
+            stackLayout="dense"
             mobileSort
             rowContextMenu={rowContextMenu}
             rowMoreActions

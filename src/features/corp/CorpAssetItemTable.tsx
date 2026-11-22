@@ -141,6 +141,7 @@ export function CorpAssetItemTable({
       align: 'right',
       width: COL_QUANTITY,
       className: 'tabular-nums whitespace-nowrap',
+      stackAffix: { before: t('corp.assets.stackAffix.quantity') },
       sortValue: (r) => r.ledger.quantity,
       render: (r) => formatCount(r.ledger.quantity),
     },
@@ -213,6 +214,7 @@ export function CorpAssetItemTable({
       align: 'right',
       width: COL_ISK,
       className: 'tabular-nums whitespace-nowrap',
+      cardCorner: true,
       sortValue: (r) => r.ledger.estimatedValue,
       render: (r) => (r.ledger.estimatedValue === 0 ? '—' : formatIsk(r.ledger.estimatedValue)),
     },
@@ -240,7 +242,7 @@ export function CorpAssetItemTable({
     header: '',
     width: COL_ICON,
     className: 'w-8',
-    cardCorner: 'start',
+    stackEdge: 'start',
     render: (r) => (
       <label className={touchCheckboxLabelClassName}>
         <Checkbox
@@ -292,6 +294,7 @@ export function CorpAssetItemTable({
             {...tableExport.tableProps}
             density="compact"
             responsive="stack"
+            stackLayout="dense"
             mobileSort
             virtualize="auto"
             expandableRow={{

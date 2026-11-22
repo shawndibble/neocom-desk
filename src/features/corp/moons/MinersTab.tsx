@@ -192,7 +192,15 @@ export function MinersTab() {
     {
       id: 'overdue',
       header: t('corpTaxBook.moons.cols.overdue'),
-      render: (m) => <OverdueWord days={m.overdueDays} paused={m.paused} />,
+      // Nothing overdue is nothing to say on the phone card.
+      render: (m) =>
+        m.overdueDays === null && !m.paused ? (
+          <span data-dense-omit>
+            <OverdueWord days={m.overdueDays} paused={m.paused} />
+          </span>
+        ) : (
+          <OverdueWord days={m.overdueDays} paused={m.paused} />
+        ),
       sortValue: (m) => m.overdueDays ?? -1,
     },
     // The Running account bills every day as it closes (#6294): where each Miner stands.
@@ -216,7 +224,7 @@ export function MinersTab() {
     {
       id: 'paid',
       header: t('corpTaxBook.moons.cols.lastPaid'),
-      render: (m) => (m.lastPaidAt ? atDate(m.lastPaidAt, zone) : '—'),
+      render: (m) => (m.lastPaidAt ? atDate(m.lastPaidAt, zone) : <span data-dense-omit>—</span>),
       sortValue: (m) => m.lastPaidAt ?? '',
     },
   ];
@@ -387,6 +395,7 @@ export function MinersTab() {
               onRowClick={(m) => navigate(minerPath(m.id))}
               rowHref={(m) => minerPath(m.id)}
               stacked={cards}
+              stackLayout="dense"
               rowClassName={() => 'group'}
               rowContextMenu={rowContextMenu}
               rowMoreActions={canEdit}

@@ -15842,6 +15842,11 @@
           "offline": "Offline",
           "cleanup": "Going offline"
         }
+      },
+      "stackAffix": {
+        "blocks": " blocks",
+        "needed": " needed",
+        "timer": "Timer "
       }
     },
     "rolesUnavailable": "Can't check your corporation roles right now",
@@ -16128,7 +16133,12 @@
       "belowTargetCount_one": "{{count}} item type below target",
       "belowTargetCount_other": "{{count}} item types below target",
       "belowTargetNone": "Set a stock target first.",
-      "stockTargetsButton": "Stock targets"
+      "stockTargetsButton": "Stock targets",
+      "stackAffix": {
+        "quantity": "×",
+        "items": " items",
+        "largest": "largest "
+      }
     },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so Neocom Desk can show your corporation's data?",
