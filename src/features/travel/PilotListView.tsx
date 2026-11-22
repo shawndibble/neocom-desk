@@ -20,6 +20,7 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  LiveNote,
   Panel,
   SegmentedControl,
   Spinner,
@@ -438,9 +439,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           </p>
         )}
         {settled === checked.length && unreachable > 0 && (
-          <p role="status" className="text-xs text-text-dim">
+          <LiveNote className="text-xs text-text-dim">
             {t('travel.pilot.list.unreachableSummary', { count: unreachable })}
-          </p>
+          </LiveNote>
         )}
         {byOrganization ? (
           <>

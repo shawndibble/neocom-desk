@@ -14,7 +14,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
+import { Button, EmptyState, InfoTooltip, IskAmount, LiveNote, TypeIcon } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { ratioMeterColor } from '@/engine/pilotList/meterColor';
@@ -86,11 +86,7 @@ export function ZkillStatsStatus({
 }): ReactNode {
   const { t } = useTranslation();
   if (stats === null) {
-    return (
-      <p role="status" className="text-text-dim">
-        {t('travel.pilot.statsLoading')}
-      </p>
-    );
+    return <LiveNote className="text-text-dim">{t('travel.pilot.statsLoading')}</LiveNote>;
   }
   if (stats.kind === 'failed') {
     return (
