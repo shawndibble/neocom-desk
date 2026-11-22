@@ -37,6 +37,8 @@ type Story = StoryObj<typeof meta>;
 export const Center: Story = { args: { placement: 'center' } };
 
 /** @summary `sheet`: a bottom-anchored mobile drawer. */
+export const Top: Story = { args: { placement: 'top', title: 'Search' } };
+
 export const Sheet: Story = { args: { placement: 'sheet', title: 'Filters' } };
 
 /** @summary `sheet-full`: the same drawer at full viewport height, for long lists. */

@@ -47,7 +47,7 @@ export function Callback() {
   }, [search, navigate]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg p-6 text-text">
+    <main className="flex safe-inset min-h-dvh [--safe-x:1.5rem] [--safe-y:1.5rem] items-center justify-center bg-bg text-text">
       {errorKind === null ? (
         <div className="flex items-center gap-3 text-sm text-text-dim">
           <Spinner size="sm" label={t('common.loading')} />

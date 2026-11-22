@@ -94,7 +94,9 @@ export function SegmentedControl<T extends string>({
             aria-disabled={explained || undefined}
             onClick={explained ? undefined : () => onChange(option.value)}
             className={cx(
-              'inline-flex items-center justify-center px-3 whitespace-nowrap',
+              'inline-flex items-center justify-center px-3',
+              // A filled control shares its width evenly, so a long label wraps rather than clipping.
+              fill ? 'min-w-0 text-center leading-tight' : 'whitespace-nowrap',
               interactiveClassName,
               focusRingInsetClassName,
               disabledClassName,

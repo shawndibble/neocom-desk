@@ -79,7 +79,7 @@ export function Login() {
 
   if (inApp) {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-bg px-6 py-10 text-center text-text">
+      <main className="safe-inset flex min-h-dvh [--safe-x:1.5rem] [--safe-y:2.5rem] flex-col items-center justify-center gap-6 bg-bg text-center text-text">
         <LogoMark className="size-20" />
         <h1 className="text-2xl font-bold tracking-wide">{t('app.name')}</h1>
         <EveSsoButton size="large" pending={pending} onClick={onLogin} label={t('login.button')} />
