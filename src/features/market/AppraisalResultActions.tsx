@@ -53,6 +53,12 @@ export function AppraisalResultActions({
 }: AppraisalResultActionsProps) {
   const { t } = useTranslation();
   const openAfterMenu = useOpenAfterMenu();
+  const shareBlocked =
+    characterId === null ||
+    !isSyncConfigured() ||
+    rowCount === 0 ||
+    shareItemCount > MAX_SNAPSHOT_ITEMS ||
+    share.status === 'saving';
   return (
     <>
       {/* An icon at every width, like the Columns, Share and export controls beside it. */}
@@ -87,15 +93,11 @@ export function AppraisalResultActions({
                 ? t('market.appraisal.shareFailed')
                 : share.status === 'copied'
                   ? t('market.appraisal.shareCopied')
-                  : undefined
+                  : shareBlocked
+                    ? t('market.appraisal.shareUnavailable')
+                    : undefined
         }
-        disabled={
-          characterId === null ||
-          !isSyncConfigured() ||
-          rowCount === 0 ||
-          shareItemCount > MAX_SNAPSHOT_ITEMS ||
-          share.status === 'saving'
-        }
+        aria-disabled={shareBlocked || undefined}
         onClick={() => void handleShare()}
       />
       {pending !== null && (

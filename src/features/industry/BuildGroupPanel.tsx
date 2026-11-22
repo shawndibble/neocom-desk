@@ -274,7 +274,8 @@ export function BuildGroupPanel({
                     : t('industry.copyShoppingList')
               }
               onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
-              disabled={!canCopy}
+              aria-disabled={!canCopy || undefined}
+              tooltip={!canCopy ? t('industry.copyShoppingListNothing') : undefined}
             />
           </>
         }

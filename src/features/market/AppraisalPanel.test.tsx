@@ -1541,7 +1541,10 @@ describe('AppraisalPanel — the row as an item', () => {
 
     it('is disabled with no Character to store the share as', () => {
       renderPanel({ controller: controller({ result: SHARED }), characterId: null });
-      expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Copy Share Link' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
     });
   });
 

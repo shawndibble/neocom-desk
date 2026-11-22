@@ -282,7 +282,7 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
     renderMixedGroup();
 
     const groupCopy = screen.getByRole('button', { name: 'Copy shopping list for multibuy' });
-    expect((groupCopy as HTMLButtonElement).disabled).toBe(true);
+    expect((groupCopy as HTMLButtonElement).getAttribute('aria-disabled')).toBe('true');
   });
 
   it('says the clipboard refused rather than reporting a copy that never happened', async () => {
