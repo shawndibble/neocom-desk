@@ -2834,8 +2834,7 @@
       "showNeeds": "What {{grade}} needs for {{name}}",
       "showDetails": "About {{name}}",
       "missingFor": "Missing for {{grade}}",
-      "noMatches": "No certificates match these filters.",
-      "loadFailed": "Couldn’t load the certificates."
+      "noMatches": "No certificates match these filters."
     }
   },
   "accelerator": {
@@ -7226,12 +7225,10 @@
       "corpJournal": "Couldn't load the Corporation's wallet journal",
       "corpDivisions": "Couldn't load the Corporation's wallet balances",
       "interactions": "Couldn't load your interactions",
-      "routeSafety": "Couldn't read the stargate map",
       "survey": "Couldn't load this survey",
       "surveyShare": "Couldn't load this survey",
       "publicContract": "Couldn't load this contract's items",
       "communityInvite": "Couldn't reach Neocom Desk to check this invite",
-      "belowMarket": "Couldn't price these contracts",
       "skillCertificates": "Couldn't load your skill certificates"
     }
   },
@@ -7662,7 +7659,6 @@
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
     "refused": "This scan was rejected, so it wasn't saved.",
-    "loadFailed": "Couldn't load this survey. Trying again soon.",
     "emptyTitle": "No survey yet",
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
     "howTo": {
@@ -15980,8 +15976,6 @@
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE shows the corporation asset list only to a Director. No other corporation role can see it, and granting access here won't change that.",
       "roleLine": "The corporation asset list needs Director.",
-      "loadFailedTitle": "Could not load corp assets",
-      "loadFailedHint": "Couldn't read the corporation's assets. Try refreshing.",
       "searchPlaceholder": "Search items…",
       "unknownLocation": "Location #{{locationId}}",
       "unknownPlace": "Unknown location",
@@ -16233,7 +16227,6 @@
         "weKilled": "A corp pilot was on the killmail that killed them"
       }
     },
-    "loadFailedTitle": "Some interactions could not load",
     "loadFailedHint": "Showing what loaded. Try again to load the rest.",
     "filterLabel": "Show",
     "filterAll": "All",

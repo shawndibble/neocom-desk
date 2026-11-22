@@ -3,7 +3,7 @@
  * Cancel and "Show best so far", or why there is nothing to show.
  */
 import { useTranslation } from 'react-i18next';
-import { Button, ProgressBar, Spinner } from '@/components/ui';
+import { Button, LoadFailedState, ProgressBar, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import type { ImproveSearch } from './useImprove';
 
@@ -75,12 +75,7 @@ export function ImproveSearchStatus({
       )}
 
       {state.status === 'failed' && (
-        <div className="space-y-2" role="alert">
-          <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
-          <Button size="sm" onClick={search.restart}>
-            {t('common.retry')}
-          </Button>
-        </div>
+        <LoadFailedState title={t('fittings.improve.failed')} onRetry={search.restart} />
       )}
     </>
   );

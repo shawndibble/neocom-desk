@@ -13,7 +13,6 @@ import {
   Button,
   DataTable,
   EmptyState,
-  LoadFailedState,
   IskAmount,
   Spinner,
   Tooltip,
@@ -245,7 +244,7 @@ export function BelowMarketResults({
       {state.status === 'idle' || state.status === 'pricing' ? (
         <Spinner block="page" label={t('contractSearch.belowMarket.pricing')} />
       ) : state.status === 'failed' ? (
-        <LoadFailedState
+        <EmptyState
           title={t('contractSearch.belowMarket.failedTitle')}
           hint={t('contractSearch.belowMarket.failedHint')}
           className="py-8"
