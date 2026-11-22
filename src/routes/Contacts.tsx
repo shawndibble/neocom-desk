@@ -318,7 +318,7 @@ export function Contacts() {
                 icon={<Icon.Refresh />}
                 label={t('contacts.refresh')}
                 onClick={refresh}
-                disabled={loading}
+                busy={loading}
               />
             </>
           )

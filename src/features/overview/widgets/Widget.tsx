@@ -123,11 +123,11 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
 function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: boolean }) {
   const toned = model.tone !== 'clear';
   return (
-    <div className={cx('grid gap-1 px-3 py-2.5', dimmed && 'opacity-45')}>
+    <div className="grid gap-1 px-3 py-2.5">
       <div
         className={cx(
           'flex flex-wrap items-baseline gap-x-1.5 text-2xl leading-tight font-semibold tabular-nums',
-          toned ? SEVERITY_TEXT[model.tone] : 'text-text'
+          dimmed ? 'text-text-dim' : toned ? SEVERITY_TEXT[model.tone] : 'text-text'
         )}
       >
         {toned && <SeverityIcon severity={model.tone} size="1rem" className="self-center" />}

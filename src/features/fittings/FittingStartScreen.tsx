@@ -338,7 +338,7 @@ export function FittingStartScreen({
           void active.refresh();
           void doctrine.refresh();
         }}
-        disabled={inGame.loading}
+        busy={inGame.loading}
       />
     ) : null;
 

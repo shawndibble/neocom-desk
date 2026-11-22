@@ -413,7 +413,11 @@ export function SettleUpDialog({
               >
                 {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
               </Button>
-              <Button size="sm" disabled={saving} onClick={() => setConfirmingDismiss(false)}>
+              <Button
+                size="sm"
+                aria-disabled={saving || undefined}
+                onClick={() => setConfirmingDismiss(false)}
+              >
                 {t('common.cancel')}
               </Button>
             </div>
@@ -434,7 +438,11 @@ export function SettleUpDialog({
             </Button>
           )}
           {onDismissBalance && !confirmingDismiss && (
-            <Button variant="danger" disabled={saving} onClick={() => setConfirmingDismiss(true)}>
+            <Button
+              variant="danger"
+              aria-disabled={saving || undefined}
+              onClick={() => setConfirmingDismiss(true)}
+            >
               {t('miningTax.settleUp.dismiss.action')}
             </Button>
           )}

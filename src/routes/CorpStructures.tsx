@@ -513,7 +513,7 @@ export function CorpStructures() {
             icon={<Icon.Refresh />}
             label={t('corp.structures.refresh')}
             onClick={snapshot.refresh}
-            disabled={snapshot.loading}
+            busy={snapshot.loading}
           />
         }
       />

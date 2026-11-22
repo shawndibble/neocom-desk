@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPortal } from 'react-dom';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import { PageHeader } from './PageHeader';
 import { usePageHeaderSlot } from './pageHeaderSlot';
@@ -92,12 +92,14 @@ describe('PageHeader', () => {
       expect(names).toEqual(['All characters', 'Export', 'Refresh', 'Alerts, none waiting']);
     });
 
-    it('locks the title row to one line: the h1 truncates with its full name in title', () => {
+    it('locks the title row to one line: the h1 truncates with its full name in a Tooltip', async () => {
       renderWithScope();
       const h1 = screen.getByRole('heading', { level: 1 });
       expect(h1).toHaveClass('truncate');
       expect(h1).not.toHaveClass('break-words');
-      expect(h1).toHaveAttribute('title', 'Market orders and history');
+      expect(h1).not.toHaveAttribute('title');
+      fireEvent.pointerMove(h1.parentElement!);
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Market orders and history');
       const cluster = screen.getByRole('button', { name: 'All characters' }).parentElement;
       expect(cluster).toHaveClass('shrink-0', 'flex-nowrap');
       expect(cluster).not.toHaveClass('flex-wrap');

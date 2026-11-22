@@ -165,11 +165,7 @@ function GalleryItem({
   }
   return (
     <li
-      className={cx(
-        'grid gap-2 rounded-xs border border-line bg-panel-2 p-3',
-        soon && 'opacity-60',
-        dim && 'opacity-75'
-      )}
+      className={cx('grid gap-2 rounded-xs border border-line bg-panel-2 p-3', dim && 'opacity-75')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

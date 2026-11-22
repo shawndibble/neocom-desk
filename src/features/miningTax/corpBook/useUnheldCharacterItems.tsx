@@ -77,7 +77,12 @@ export function useUnheldCharacterItems(
       ? { detail: <p role="alert">{t('miningTax.corpBook.unheld.failed')}</p> }
       : {}),
     action: (
-      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void decline(entry)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-disabled={busy || undefined}
+        onClick={() => void decline(entry)}
+      >
         {t('miningTax.corpBook.unheld.decline', { corp: entry.corpName })}
       </Button>
     ),

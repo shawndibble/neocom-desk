@@ -495,7 +495,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
               icon={<Icon.Refresh />}
               label={t('corp.members.refresh')}
               onClick={snapshot.refresh}
-              disabled={snapshot.loading}
+              busy={snapshot.loading}
             />
           </>
         }

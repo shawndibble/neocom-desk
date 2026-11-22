@@ -192,7 +192,7 @@ export function PlanetaryIndustry() {
                       icon={<Icon.Refresh />}
                       label={t('pi.refresh')}
                       onClick={refresh}
-                      disabled={loading}
+                      busy={loading}
                     />
                   </>
                 }

@@ -52,12 +52,22 @@ export function RemovalStrip({
         actions={
           <>
             {!timed && onNoticeSent && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={run(onNoticeSent)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-disabled={busy || undefined}
+                onClick={run(onNoticeSent)}
+              >
                 {t(k('sentIt'))}
               </Button>
             )}
             {onCancel && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={run(onCancel)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-disabled={busy || undefined}
+                onClick={run(onCancel)}
+              >
                 {t(k('cancel'))}
               </Button>
             )}

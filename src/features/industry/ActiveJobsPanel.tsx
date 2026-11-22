@@ -769,7 +769,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         icon={<Icon.Refresh />}
         label={t('industry.jobsRefresh')}
         onClick={listRefresh}
-        disabled={listLoading}
+        busy={listLoading}
       />
     </span>
   );

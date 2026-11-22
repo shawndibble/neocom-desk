@@ -8,7 +8,7 @@ describe('textActionClassName', () => {
     const tokens = textActionClassName().split(' ');
     for (const token of [
       'min-h-9',
-      'md:min-h-0',
+      'md:min-h-6',
       'font-semibold',
       'tracking-widest',
       'text-accent',

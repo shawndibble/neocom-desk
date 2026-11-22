@@ -266,7 +266,7 @@ export function AssetsList({
         <IncompleteNotice
           hint={t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
           action={
-            <Button size="sm" disabled={loading} onClick={refresh}>
+            <Button size="sm" loading={loading} onClick={refresh}>
               {t('assets.fetchTruncatedRetry')}
             </Button>
           }

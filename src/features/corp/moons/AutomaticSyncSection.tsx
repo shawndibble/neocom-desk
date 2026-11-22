@@ -127,7 +127,7 @@ export function AutomaticSyncSection() {
         <div className="flex flex-wrap items-center gap-2">
           {!(active && isHolder) && (
             <NeedsConnection>
-              <Button size="sm" variant="primary" loading={busy} disabled={busy} onClick={turnOn}>
+              <Button size="sm" variant="primary" loading={busy} onClick={turnOn}>
                 {t(
                   active || scheduled?.status === 'stopped'
                     ? 'corpTaxBook.moons.autoSync.turnOnAgain'
@@ -138,7 +138,7 @@ export function AutomaticSyncSection() {
             </NeedsConnection>
           )}
           {canTurnOff && active && (
-            <Button size="sm" disabled={busy} onClick={() => void turnOff()}>
+            <Button size="sm" aria-disabled={busy || undefined} onClick={() => void turnOff()}>
               {isHolder
                 ? t('corpTaxBook.moons.autoSync.turnOff')
                 : t('corpTaxBook.moons.autoSync.revoke', { name: scheduled.characterName })}

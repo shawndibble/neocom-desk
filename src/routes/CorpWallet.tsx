@@ -615,7 +615,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
               onClick={handleRefresh}
-              disabled={corpBalances.loading || corpJournal.loading || corpTransactions.loading}
+              busy={corpBalances.loading || corpJournal.loading || corpTransactions.loading}
             />
           }
         />

@@ -143,7 +143,7 @@ export function TurnOnBook({
         )}
         <div className="flex gap-2">
           {onBack && (
-            <Button variant="ghost" onClick={onBack} disabled={busy}>
+            <Button variant="ghost" onClick={onBack} aria-disabled={busy || undefined}>
               {t('corpTaxBook.moons.setup.back')}
             </Button>
           )}
