@@ -264,4 +264,25 @@ describe('bar structure', () => {
     link.focus();
     expect(await screen.findByRole('tooltip')).toHaveTextContent("can't carry a link");
   });
+
+  it('is one Tab stop; arrows, Home and End rove within it', async () => {
+    render(<MailFormatBar commands={commands()} phone={false} onToggleSource={vi.fn()} />);
+    const user = userEvent.setup();
+    const bold = screen.getByRole('button', { name: 'Bold' });
+    expect(bold).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('tabindex', '-1');
+    await user.tab();
+    expect(bold).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('button', { name: 'Italic' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('tabindex', '0');
+    await user.keyboard('{End}');
+    expect(screen.getByRole('button', { name: 'Edit source' })).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(bold).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(screen.getByRole('button', { name: 'Edit source' })).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(bold).toHaveFocus();
+  });
 });
