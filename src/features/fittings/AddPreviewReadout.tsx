@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { LiveStatus, StatChange } from '@/components/ui';
+import { StatChange } from '@/components/ui';
 import type { AddPreview } from './useModuleAddPreview';
 import { fixed1 } from '@/lib/fixedFormat';
 
@@ -23,8 +23,10 @@ export function AddPreviewReadout({ preview, name }: AddPreviewReadoutProps) {
   const listed = delta.changes.slice(0, MAX_LISTED);
   const hidden = delta.count - listed.length;
   return (
-    <div className="sticky bottom-0 z-10 space-y-1 rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs">
-      <LiveStatus>{t('fittings.add.preview.title', { name })}</LiveStatus>
+    <div
+      role="status"
+      className="sticky bottom-0 z-10 space-y-1 rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs"
+    >
       <p className="font-semibold">{t('fittings.add.preview.title', { name })}</p>
       {listed.length === 0 ? (
         <p className="text-text-dim">{t('fittings.variations.noChanges')}</p>
