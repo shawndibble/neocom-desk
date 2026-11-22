@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClaimDonations';
@@ -30,28 +30,6 @@ export function useTaxCorpBooks(
   );
   // A payment a link holds pays its personal Payee, never a book as a donation in flight too.
   const linked = useMemo(() => heldPaymentKeys(data?.paymentLinks ?? []), [data?.paymentLinks]);
-  // What the books bill too, as last seen; replaced (and stored) when the overlay below reads
-  // something else, so every account build bills the same.
-  const [billedElsewhere, setBilledElsewhere] = useState<ReadonlyMap<string, number> | null>(null);
-  const billed = billedElsewhere ?? data?.billedElsewhere;
-  // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
-  const accounts = useMemo(
-    () =>
-      PayeeRunningAccounts.build({
-        assignments: data?.entries.flatMap((row) => row.assignments) ?? [],
-        payees,
-        links: data?.paymentLinks ?? [],
-        ...(billed ? { billedElsewhere: billed } : {}),
-      }),
-    [data, payees, billed]
-  );
-  // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
-  // day, oldest first (decision 20261120-235011), whatever mark it stores.
-  const ledger = useMemo(
-    (): TaxSnapshot | null =>
-      data ? { ...data, entries: withPaidStatus(data.entries, accounts) } : null,
-    [data, accounts]
-  );
   // What the books read of the ledger is each Assignment as its Payee's account stands before any
   // book takes ore off it (no `billedElsewhere`): a Default System's day is the book's to take only
   // while unpaid, and reading it after the take (a trimmed day paid by exactly what is left) would
@@ -94,21 +72,38 @@ export function useTaxCorpBooks(
     reloadKey: data?.fetchedAt?.getTime(),
     hiddenCorps: leftAck.hidden,
   });
-  // The overlay's shares, once they differ from what the accounts were built with: stored, and
-  // the accounts rebuilt with them (the next overlay reads the same, so this settles).
+  // What the books bill too: derived from the overlay in this very render, so the accounts, the
+  // owed cards and the Payee cards never count a book's days twice while a stored copy catches up.
+  // Until a book is read, the copy the device last stored stands.
   const overlay = corpView?.overlay;
+  const billed = useMemo(
+    () => (overlay ? billedElsewhereOf(overlay) : data?.billedElsewhere),
+    [overlay, data?.billedElsewhere]
+  );
+  // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
+  const accounts = useMemo(
+    () =>
+      PayeeRunningAccounts.build({
+        assignments: data?.entries.flatMap((row) => row.assignments) ?? [],
+        payees,
+        links: data?.paymentLinks ?? [],
+        ...(billed ? { billedElsewhere: billed } : {}),
+      }),
+    [data, payees, billed]
+  );
+  // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
+  // day, oldest first (decision 20261120-235011), whatever mark it stores.
+  const ledger = useMemo(
+    (): TaxSnapshot | null =>
+      data ? { ...data, entries: withPaidStatus(data.entries, accounts) } : null,
+    [data, accounts]
+  );
+  // Stored for the builds outside this page (the Overview's, the journal's), which read it back.
+  const stored = useRef<ReadonlyMap<string, number> | undefined>(data?.billedElsewhere);
   useEffect(() => {
-    if (!data || !overlay) return;
-    const next = billedElsewhereOf(overlay);
-    const held = billed ?? new Map<string, number>();
-    const same =
-      next.size === held.size &&
-      [...next].every(([id, v]) => Math.abs((held.get(id) ?? 0) - v) < 1e-9);
-    if (same) return;
-    // Rebuilt once stored (or once storing failed: this page still bills what the books do).
-    void saveBilledElsewhere(next)
-      .catch(() => undefined)
-      .finally(() => setBilledElsewhere(next));
+    if (!data || !overlay || !billed || billed === stored.current) return;
+    stored.current = billed;
+    void saveBilledElsewhere(billed).catch(() => undefined);
   }, [overlay, billed, data]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
