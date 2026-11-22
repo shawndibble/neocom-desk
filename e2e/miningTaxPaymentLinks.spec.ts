@@ -124,7 +124,7 @@ test('old paid marks are read into a link and the figures stay the same', async 
   await expect(owedCard(page)).toContainText(isk(DAY_TAX));
   await ledgerButton(page).click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
-  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*\u2212${isk(DAY_TAX)} ISK`));
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*1`));
   await expect(
     ledger.getByRole('table', { name: 'Ledger' }).getByRole('row', { name: /Payment/ })
