@@ -15,11 +15,11 @@ import {
   PopoverTrigger,
   SearchInput,
 } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { suggestionOptionClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { useCombobox } from '@/lib/useCombobox';
-import { cx } from '@/lib/cx';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { useKnownPlaces } from '@/features/places/useKnownPlaces';
 import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
@@ -98,9 +98,10 @@ export function SolarSystemPicker({
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (combo.handleNavKey(event)) return;
-    if (event.key === 'Enter' && combo.highlight !== null && matches[combo.highlight]) {
+    const pick = matches[combo.highlight ?? 0];
+    if (event.key === 'Enter' && pick) {
       event.preventDefault();
-      choose(matches[combo.highlight]);
+      choose(pick);
     }
   }
 
@@ -157,14 +158,11 @@ export function SolarSystemPicker({
                 <li
                   key={option.key}
                   {...combo.optionProps(index)}
-                  className={cx(
-                    'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2',
-                    index === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
-                  )}
+                  className={suggestionOptionClassName(index === combo.activeIndex)}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(option)}
                 >
-                  {option.name}
+                  <span className="min-w-0 truncate">{option.name}</span>
                   {showSecurity && option.security !== null && (
                     <SecurityStatus security={option.security} className="ml-1" />
                   )}
@@ -176,6 +174,11 @@ export function SolarSystemPicker({
                 </li>
               ))}
             </ul>
+          )}
+          {!systemsFailed && query.trim() !== '' && matches.length === 0 && (
+            <p className={cx('flex items-center text-text-dim', tappableRowClassName)}>
+              {systems === null ? t('jumpRange.searching') : t('jumpRange.noMatch')}
+            </p>
           )}
           {footer?.(close)}
         </div>

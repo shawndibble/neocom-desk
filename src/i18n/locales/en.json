@@ -16756,6 +16756,8 @@
   },
   "jumpRange": {
     "systemsFailed": "System list couldn't load",
+    "searching": "Loading systems…",
+    "noMatch": "No system matches.",
     "label": "Distance",
     "currentSystemLabel": "Current system",
     "option": {

@@ -8,7 +8,6 @@ import {
   Modal,
   NativeSelect,
   Checkbox,
-  SearchInput,
   TextArea,
   TextInput,
 } from '@/components/ui';
@@ -46,7 +45,7 @@ import {
   type CommunityRequest,
   type RequestNotify,
 } from '@/engine/communities/requests';
-import { namedLike, needleOf } from './shareLists';
+import { ItemSearchPicker } from './ItemSearchPicker';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 
 /** What a caller may start the dialog with: Ask to copy (issue #3813) fills in its one blueprint line. */
@@ -73,9 +72,6 @@ interface LineEdit {
 /** A post that has not answered by then stops blocking the dialog (sign-in or the network may hang). */
 export const POST_TIMEOUT_MS = 75_000;
 const TIMED_OUT = Symbol('post timed out');
-
-const SEARCH_RESULTS = 8;
-const MIN_SEARCH_CHARS = 2;
 
 /** An optional whole number as typed: blank is none, anything else must be in range. */
 function optionalNumber(text: string | undefined, min: number, max: number) {
@@ -153,7 +149,6 @@ export function ComposeRequestDialog({
   );
   const [edits, setEdits] = useState<Record<string, LineEdit>>({});
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
-  const [search, setSearch] = useState('');
   const [announce, setAnnounce] = useState<{ text: string; key: number }>({ text: '', key: 0 });
   const catalogueLoad = useAsyncLoad(loadAppraisalCatalogue);
   const catalogue: AppraisalCatalogue | null = catalogueLoad.data ?? null;
@@ -197,12 +192,6 @@ export function ComposeRequestDialog({
     };
   }, [matches, added, removed, edits]);
 
-  const results = useMemo(() => {
-    const needle = needleOf(search);
-    if (!catalogue || needle.length < MIN_SEARCH_CHARS) return [];
-    return namedLike([...catalogue.values()], needle).slice(0, SEARCH_RESULTS);
-  }, [catalogue, search]);
-
   const edit = (key: string, patch: LineEdit) =>
     setEdits((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
 
@@ -234,7 +223,6 @@ export function ComposeRequestDialog({
         edit(existing.key, { quantity: String(existing.line.quantity + 1) });
       }
     }
-    setSearch('');
     setAnnounce((a) => ({
       text: t('communities.board.compose.added', { name: item.name }),
       key: a.key + 1,
@@ -521,33 +509,14 @@ export function ComposeRequestDialog({
               </ul>
             )}
             {!linesLocked && (
-              <div className="space-y-1">
-                <SearchInput
-                  ref={searchRef}
-                  aria-label={t('communities.board.compose.addLabel')}
-                  placeholder={t('communities.board.compose.addPlaceholder')}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                {results.length > 0 && (
-                  <ul
-                    aria-label={t('communities.board.compose.results')}
-                    className="divide-y divide-line rounded-xs border border-line"
-                  >
-                    {results.map((item) => (
-                      <li key={item.typeId}>
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
-                          onClick={() => addItem(item)}
-                        >
-                          {item.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <ItemSearchPicker
+                catalogue={catalogue}
+                inputRef={searchRef}
+                label={t('communities.board.compose.addLabel')}
+                placeholder={t('communities.board.compose.addPlaceholder')}
+                resultsLabel={t('communities.board.compose.results')}
+                onPick={addItem}
+              />
             )}
           </>
         )}

@@ -28,4 +28,16 @@ describe('SolarSystemPicker', () => {
     expect(await screen.findByRole('option', { name: /Jita/ })).toBeInTheDocument();
     expect(screen.queryByText("System list couldn't load")).not.toBeInTheDocument();
   });
+
+  it('Enter takes the first match without an arrow key, and a miss says so', async () => {
+    sde.loadSolarSystems.mockResolvedValue([JITA]);
+    const onChange = vi.fn();
+    render(<SolarSystemPicker value={null} onChange={onChange} ariaLabel="Pick system" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Pick system' }));
+    await userEvent.type(screen.getByRole('combobox'), 'zzz');
+    expect(await screen.findByText('No system matches.')).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('combobox'));
+    await userEvent.type(screen.getByRole('combobox'), 'Jit{Enter}');
+    expect(onChange).toHaveBeenCalledWith(JITA.id, undefined);
+  });
 });

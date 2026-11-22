@@ -1,6 +1,8 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
+import { suggestionListClassName, suggestionOptionClassName } from '@/components/ui/controlStyles';
+import { useCombobox } from '@/lib/useCombobox';
 import { resolvePlace, searchPlaces } from '@/engine/communities/requestPlaces';
 import { usePlaceIndex } from './usePlaceIndex';
 
@@ -32,6 +34,29 @@ export function LocationPicker({
     () => (index && typing ? searchPlaces(value, index, SUGGESTIONS) : []),
     [index, typing, value]
   );
+  const combo = useCombobox({ count: suggestions.length, open: suggestions.length > 0 });
+
+  function choose(text: string) {
+    setTyping(false);
+    combo.reset();
+    onChange(text);
+  }
+
+  // Enter takes a result only once one is highlighted: the field is free text first.
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (combo.handleNavKey(event)) return;
+    if (event.key === 'Enter' && combo.highlight !== null && suggestions[combo.highlight]) {
+      event.preventDefault();
+      choose(suggestions[combo.highlight].text);
+    } else if (event.key === 'Escape' && suggestions.length > 0) {
+      // Closes the list, not the dialog.
+      event.preventDefault();
+      event.stopPropagation();
+      setTyping(false);
+      combo.reset();
+    }
+  }
+
   const trimmed = value.trim();
   const measurable = index && trimmed !== '' ? resolvePlace(trimmed, index) !== null : null;
 
@@ -42,32 +67,34 @@ export function LocationPicker({
       </label>
       <TextInput
         id={`${id}-input`}
+        {...combo.inputProps}
+        autoComplete="off"
         className="w-full"
         value={value}
         maxLength={maxLength}
         aria-describedby={`${id}-hint`}
         onChange={(e) => {
           setTyping(true);
+          combo.reset();
           onChange(e.target.value);
         }}
+        onKeyDown={onKeyDown}
       />
       {suggestions.length > 0 && (
         <ul
+          {...combo.listboxProps}
           aria-label={t('communities.board.compose.places')}
-          className="divide-y divide-line rounded-xs border border-line"
+          className={suggestionListClassName}
         >
-          {suggestions.map((place) => (
-            <li key={place.text}>
-              <button
-                type="button"
-                className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
-                onClick={() => {
-                  setTyping(false);
-                  onChange(place.text);
-                }}
-              >
-                {place.text}
-              </button>
+          {suggestions.map((place, index) => (
+            <li
+              key={place.text}
+              {...combo.optionProps(index)}
+              className={suggestionOptionClassName(index === combo.activeIndex)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(place.text)}
+            >
+              {place.text}
             </li>
           ))}
         </ul>

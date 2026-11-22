@@ -372,18 +372,31 @@ describe('New request dialog', () => {
     expect(screen.getByText(/Not a system or region/)).toBeInTheDocument();
     await user.clear(field);
     await user.type(field, 'badi');
-    await user.click(await screen.findByRole('button', { name: 'Badivefi, Khanid' }));
+    await user.click(await screen.findByRole('option', { name: 'Badivefi, Khanid' }));
     expect(field).toHaveValue('Badivefi, Khanid');
     expect(screen.getByText('Others can filter this Request by distance.')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Matching systems and regions' })).toBeNull();
+  });
+
+  it('picks a location with the arrow keys and Enter, and Enter alone leaves the text', async () => {
+    const user = userEvent.setup();
+    renderTab([]);
+    await user.click(screen.getByRole('button', { name: 'New request' }));
+    const field = await screen.findByRole('combobox', { name: /^Location/ });
+    await user.type(field, 'badi');
+    await screen.findByRole('option', { name: 'Badivefi, Khanid' });
+    await user.keyboard('{Enter}');
+    expect(field).toHaveValue('badi');
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(field).toHaveValue('Badivefi, Khanid');
   });
 
   it('adds an item by search and offers copy/original on a blueprint line', async () => {
     const user = userEvent.setup();
     renderTab([]);
     await user.click(screen.getByRole('button', { name: 'New request' }));
-    await user.type(await screen.findByRole('searchbox', { name: 'Add an item' }), 'ishtar');
-    await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
+    await user.type(await screen.findByRole('combobox', { name: 'Add an item' }), 'ishtar');
+    await user.click(await screen.findByRole('option', { name: 'Ishtar Blueprint' }));
     expect(screen.getByLabelText('Ishtar Blueprint quantity')).toHaveValue('1');
     await user.type(screen.getByLabelText('Runs'), '5');
     await postFromDialog(user);
@@ -434,11 +447,11 @@ describe('New request dialog', () => {
     const user = userEvent.setup();
     renderTab([]);
     await user.click(screen.getByRole('button', { name: 'New request' }));
-    const search = await screen.findByRole('searchbox', { name: 'Add an item' });
+    const search = await screen.findByRole('combobox', { name: 'Add an item' });
     await user.type(search, 'ishtar');
-    await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
+    await user.click(await screen.findByRole('option', { name: 'Ishtar Blueprint' }));
     await user.type(search, 'ishtar');
-    await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
+    await user.click(await screen.findByRole('option', { name: 'Ishtar Blueprint' }));
     expect(screen.getAllByLabelText('Ishtar Blueprint quantity')).toHaveLength(2);
     await postFromDialog(user);
     expect(store.postRequest.mock.calls[0][2].lines.map((l: { kind: string }) => l.kind)).toEqual([

@@ -162,6 +162,10 @@ export const tappableRowClassName = 'min-h-9 md:min-h-7 touch:min-h-9';
 export const suggestionPopupClassName =
   'absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg';
 
+/** The same surface in the flow, under its input, for a form where a floating popup would clip. */
+export const suggestionListClassName =
+  'overflow-hidden rounded-xs border border-line-bright bg-panel';
+
 /** One plain-text row of that popup; the active row takes the accent edge and bold. */
 export const suggestionOptionClassName = (active: boolean) =>
   cx(
