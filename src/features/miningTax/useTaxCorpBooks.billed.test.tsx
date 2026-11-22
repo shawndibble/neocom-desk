@@ -4,7 +4,10 @@ import type { CorpBookView } from './corpBook/corpBookView';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { PayeeRecord } from '@/db';
 
-const hoisted = vi.hoisted(() => ({ view: null as CorpBookView | null }));
+const hoisted = vi.hoisted(() => ({
+  view: null as CorpBookView | null,
+  shownBooks: [] as { corporationId: number; memberCharacterIds: number[] }[],
+}));
 
 vi.mock('./useMadePayments', () => ({
   useMadePayments: () => ({ madePayments: [], paymentSources: [] }),
@@ -27,8 +30,8 @@ vi.mock('@/features/miningTax/corpBook/useCorpBookView', () => ({
     booksRead: true,
     booksKnown: true,
     reload: vi.fn(),
-    shownBooks: [],
-    corpNameOf: (id: number) => `Corp ${id}`,
+    shownBooks: hoisted.shownBooks,
+    corpNameOf: (id: number) => (id === 5 ? 'Ashfall' : `Corp ${id}`),
     hiddenLeft: [],
   }),
 }));
@@ -57,6 +60,7 @@ const assignment = {
 
 describe('useTaxCorpBooks billed elsewhere', () => {
   beforeEach(() => {
+    hoisted.shownBooks = [];
     // A book that took the day whole; the stored copy has not seen it yet.
     hoisted.view = {
       overlay: {
@@ -86,6 +90,8 @@ describe('useTaxCorpBooks billed elsewhere', () => {
       ...hoisted.view,
       books: [{ left: false, corpName: 'Ashfall', loaded: { corporationId: 5 } }],
     } as unknown as CorpBookView;
+    // Ownership reads the loaded books, not the priced view.
+    hoisted.shownBooks = [{ corporationId: 5, memberCharacterIds: [1] }];
     const data = {
       entries: [{ assignments: [assignment] }],
       payeesByCharacter: new Map([[1, [payee]]]),
