@@ -2834,8 +2834,7 @@
       "showNeeds": "What {{grade}} needs for {{name}}",
       "showDetails": "About {{name}}",
       "missingFor": "Missing for {{grade}}",
-      "noMatches": "No certificates match these filters.",
-      "loadFailed": "Couldn’t load the certificates."
+      "noMatches": "No certificates match these filters."
     }
   },
   "accelerator": {
@@ -3904,7 +3903,7 @@
     "jobsTitle": "Jobs",
     "jobsRefresh": "Refresh",
     "jobsEmptyTitle": "Job data not loaded yet",
-    "jobsEmptyHint": "Refresh once you're back online to load this character's running industry jobs.",
+    "jobsEmptyHint": "EVE's servers didn't send this character's running industry jobs. Try Refresh in a moment.",
     "jobsNoneMeta": "None",
     "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
@@ -7210,6 +7209,28 @@
       "none": "None",
       "count": "{{count}} selected",
       "labelled": "{{label}}: {{value}}"
+    },
+    "loadFailed": {
+      "skills": "Couldn't load your skills",
+      "wallet": "Couldn't load your wallet",
+      "clones": "Couldn't load your clones",
+      "contacts": "Couldn't load your contacts",
+      "calendar": "Couldn't load your calendar",
+      "employment": "Couldn't load your employment history",
+      "contracts": "Couldn't load your contracts",
+      "mail": "Couldn't load your mail",
+      "assets": "Couldn't load your assets",
+      "tax": "Couldn't load the tax ledger",
+      "overview": "Couldn't load the mining overview",
+      "corpAssets": "Couldn't load the Corporation's assets",
+      "corpJournal": "Couldn't load the Corporation's wallet journal",
+      "corpDivisions": "Couldn't load the Corporation's wallet balances",
+      "interactions": "Couldn't load your interactions",
+      "survey": "Couldn't load this survey",
+      "surveyShare": "Couldn't load this survey",
+      "publicContract": "Couldn't load this contract's items",
+      "communityInvite": "Couldn't reach Neocom Desk to check this invite",
+      "skillCertificates": "Couldn't load your skill certificates"
     }
   },
   "wallet": {
@@ -7639,7 +7660,6 @@
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
     "refused": "This scan was rejected, so it wasn't saved.",
-    "loadFailed": "Couldn't load this survey. Trying again soon.",
     "emptyTitle": "No survey yet",
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
     "howTo": {
@@ -15960,8 +15980,6 @@
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE shows the corporation asset list only to a Director. No other corporation role can see it, and granting access here won't change that.",
       "roleLine": "The corporation asset list needs Director.",
-      "loadFailedTitle": "Could not load corp assets",
-      "loadFailedHint": "Couldn't read the corporation's assets. Try refreshing.",
       "searchPlaceholder": "Search items…",
       "unknownLocation": "Location #{{locationId}}",
       "unknownPlace": "Unknown location",
@@ -16213,7 +16231,6 @@
         "weKilled": "A corp pilot was on the killmail that killed them"
       }
     },
-    "loadFailedTitle": "Some interactions could not load",
     "loadFailedHint": "Showing what loaded. Try again to load the rest.",
     "filterLabel": "Show",
     "filterAll": "All",

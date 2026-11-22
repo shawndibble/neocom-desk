@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
-  EmptyState,
+  LoadFailedState,
   IconButton,
   PageHeader,
   Panel,
@@ -495,7 +495,7 @@ export function Calendar() {
       {loading && !data ? (
         <Spinner block="page" label={t('common.loading')} />
       ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        <LoadFailedState title={t('common.loadFailed.calendar')} onRetry={refresh} />
       ) : (
         <>
           {data?.fromCache && <CachedNotice withBadge fetchedAt={data.oldestFetchedAt} />}

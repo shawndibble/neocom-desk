@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { EmptyState, Spinner } from '@/components/ui';
+import { EmptyState, LoadFailedState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { ownsSurvey } from '@/engine/survey/owner';
@@ -164,7 +164,11 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
         <EmptyState title={t('survey.gone')} hint={t('survey.goneHint')} className="py-10" />
       )}
       {state.status === 'failed' && (
-        <EmptyState title={t('share.failedTitle')} hint={t('share.failedHint')} className="py-10" />
+        <LoadFailedState
+          title={t('common.loadFailed.surveyShare')}
+          onRetry={refresh}
+          className="py-10"
+        />
       )}
       {state.status === 'ready' && (
         <>

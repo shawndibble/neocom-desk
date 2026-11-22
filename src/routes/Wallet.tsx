@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
-  EmptyState,
+  LoadFailedState,
   IconButton,
   PageHeader,
   Spinner,
@@ -267,7 +267,7 @@ export function Wallet() {
         {loading && !data ? (
           <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          <LoadFailedState title={t('common.loadFailed.wallet')} onRetry={refresh} />
         ) : tab === 'balance' ? (
           <WalletBalanceTab
             activeCharacterId={activeCharacterId}

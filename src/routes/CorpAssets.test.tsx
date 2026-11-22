@@ -615,7 +615,10 @@ describe('failed vs. genuinely empty reads', () => {
   it('shows a load-failed state rather than an empty corporation when the read failed', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(READ_FAILED);
     renderAssets();
-    expect(await screen.findByText('Could not load corp assets')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't load the Corporation's assets"
+    );
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
   it('shows the empty state when the corporation genuinely owns nothing', async () => {

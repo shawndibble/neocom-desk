@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   EmptyState,
+  LoadFailedState,
   IconButton,
   IskAmount,
   Panel,
@@ -252,7 +253,7 @@ export function AssetsList({
     // copy the items stay and a small note sits above them.
     <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterAssets']} />
   ) : error ? (
-    <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+    <LoadFailedState title={t('common.loadFailed.assets')} onRetry={refresh} />
   ) : !assetsResult ? (
     <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
   ) : (

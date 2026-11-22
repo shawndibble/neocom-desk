@@ -8,7 +8,14 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, FilterChip, Spinner, StatChip, StatChips } from '@/components/ui';
+import {
+  EmptyState,
+  FilterChip,
+  LoadFailedState,
+  Spinner,
+  StatChip,
+  StatChips,
+} from '@/components/ui';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import type { CharacterScopeChoice } from '@/features/character/CharacterFilterControl';
 import { useCharacters } from '@/features/character/useCharacters';
@@ -211,9 +218,9 @@ export default function InteractionsTab({
       {load.status === 'loading' || load.status === 'idle' ? (
         <Spinner block="panel" label={t('common.loading')} />
       ) : load.status === 'failed' || !load.data ? (
-        <EmptyState
-          title={t('interactions.loadFailedTitle')}
-          hint={t('common.loadFailedHint')}
+        <LoadFailedState
+          title={t('common.loadFailed.interactions')}
+          onRetry={load.retry}
           className="py-8"
         />
       ) : all.length === 0 ? (
