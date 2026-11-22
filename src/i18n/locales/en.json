@@ -15903,6 +15903,8 @@
       },
       "servicesOnline_one": "{{count}} online",
       "servicesOnline_other": "{{count}} online",
+      "offlineCount_one": "{{count}} offline",
+      "offlineCount_other": "{{count}} offline",
       "servicesNone": "None",
       "detail": {
         "eveTime": "{{time}} EVE",
