@@ -8674,6 +8674,14 @@
       "sentAmountPlaceholder": "ISK, e.g. 1,250,000",
       "hint": "Send it in EVE, then record it here. The wallet payment links itself once it shows in your journal.",
       "recordAction": "Record payment",
+      "dismiss": {
+        "action": "Dismiss balance",
+        "title": "Dismiss what {{payee}} is owed",
+        "intro": "I won't pay it: dismiss the {{amount}} ISK still owed to {{payee}}.",
+        "effect": "These days stay in your list marked No tax owed, and the Payee's account stops counting them. Nothing is sent to anyone. Undo a day from its row's menu.",
+        "confirm_one": "Dismiss {{count}} entry",
+        "confirm_other": "Dismiss {{count}} entries"
+      },
       "pickFromWallet": "Already in my wallet? Pick it",
       "fromLabel": "Paying from",
       "openInEveAs": "Open in EVE · {{name}}",

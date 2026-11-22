@@ -16,6 +16,7 @@ import {
   continueSession,
   deletePayee,
   dismiss,
+  dismissOwed,
   unassign,
   uncombine,
   undoContinue,
@@ -251,6 +252,55 @@ describe('unassign', () => {
     expect(await stored()).toEqual(members);
     expect(await tombstonedIds()).toEqual([]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('dismissOwed', () => {
+  it('turns each owed day into a dismissal with its ore, leaving no Payee and no tax', async () => {
+    const days = [
+      assignment({ id: 'a1', date: '2026-09-04', groupId: 'g1', override: false }),
+      assignment({ id: 'a2', date: '2026-09-05', groupId: 'g1' }),
+    ];
+    await db.miningTaxAssignments.bulkPut(days);
+
+    const result = await dismissOwed(days);
+
+    expect(result.ok).toBe(true);
+    const rows = (await stored()).sort((a, b) => a.date.localeCompare(b.date));
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.date)).toEqual(['2026-09-04', '2026-09-05']);
+    for (const r of rows) {
+      expect(r).toMatchObject({
+        status: 'dismissed',
+        taxOwed: 0,
+        oreLines: [{ typeId: ORE, quantity: 100 }],
+        estimatedValue: 1000,
+      });
+      expect(r.payeeId).toBeUndefined();
+      expect(r.groupId).toBeUndefined();
+    }
+    expect((await tombstonedIds()).sort()).toEqual(['a1', 'a2']);
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('remembers the days so a Default System does not assign them again', async () => {
+    const day = assignment({ id: 'a1', override: false });
+    await db.miningTaxAssignments.put(day);
+
+    await dismissOwed([day]);
+
+    expect(await loadDefaultOptOuts()).toEqual(new Set([`${CHAR}|2026-09-04|${SYSTEM}`]));
+  });
+
+  it('changes nothing when the write fails', async () => {
+    const day = assignment({ id: 'a1' });
+    await db.miningTaxAssignments.put(day);
+    vi.spyOn(db.settings, 'put').mockRejectedValueOnce(new Error('disk full'));
+
+    const result = await dismissOwed([day]);
+
+    expect(result).toMatchObject({ ok: false, reason: 'save-failed' });
+    expect(await stored()).toEqual([day]);
   });
 });
 

@@ -25,6 +25,7 @@ import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import {
   acceptNewTotal,
   dismiss,
+  dismissOwed,
   linkPayment,
   unassign,
   uncombine,
@@ -1000,6 +1001,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 },
                 payment.payerId ?? settleUpPayee.characterId
               )
+            }
+            // "I won't pay it": every owed day of this Payee becomes a dismissal.
+            onDismissBalance={() =>
+              dismissOwed((liveSettleUpRows ?? settleUpRows).map((r) => r.assignment))
             }
             onPaid={() => {
               onClearSelection();
