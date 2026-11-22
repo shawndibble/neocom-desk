@@ -7,6 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui';
+import { HeaderMoreMenu } from '@/components/ui/HeaderMoreMenu';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { InlineError } from '@/components/ui/InlineError';
 import * as Icon from '@/components/ui/icons';
 import { ExportTableSub } from '@/components/ui/TableExport';
@@ -50,6 +52,75 @@ export function PlanImportExportActions({
     handleTableDone,
     tableExport,
   } = exporter;
+  const isPhone = useIsPhone();
+  const exportClipboard = (event: Event) => {
+    // Keep the menu open (skip Radix's default auto-close)
+    // until the write settles, then close it ourselves:
+    // closing first moves focus back to the trigger as part
+    // of the same transition, and writeText() called
+    // mid-transition can throw "Document is not focused"
+    // (NotAllowedError).
+    event.preventDefault();
+    void handleExport().finally(() => setExportMenuOpen(false));
+  };
+  const feedback = (
+    <>
+      {/* Beside the buttons that produced them, not down in the entries
+          panel — a confirmation/error disconnected from its trigger
+          reads as belonging to something else. */}
+      {copyConfirm && <PlanConfirmation message={t('plans.exportCopied')} />}
+      {importConfirm && (
+        <PlanConfirmation
+          message={importConfirm}
+          action={
+            undoImport && (
+              <Button size="md" variant="ghost" onClick={undoQueueImportReplace}>
+                {t('plans.importQueueUndo')}
+              </Button>
+            )
+          }
+        />
+      )}
+      {importError && <InlineError>{importError}</InlineError>}
+    </>
+  );
+  // On a phone the two menus would wrap under the title: one ⋮ holds both
+  // actions (DESIGN.md §6c Header controls, tier 3).
+  if (isPhone) {
+    return createPortal(
+      <>
+        {feedback}
+        <HeaderMoreMenu
+          open={exportMenuOpen}
+          onOpenChange={setExportMenuOpen}
+          onCloseAutoFocus={() => {
+            if (openImportDialogAfterMenuRef.current) {
+              openImportDialogAfterMenuRef.current = false;
+              setImportOpen(true);
+            }
+          }}
+        >
+          <DropdownMenuItem disabled={queueImporting} onSelect={() => void handleImport()}>
+            {t('plans.importFromQueueItem')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              openImportDialogAfterMenuRef.current = true;
+            }}
+          >
+            {t('plans.importFromTextOrFileItem')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={exportClipboard}>
+            {t('plans.exportClipboard')}
+          </DropdownMenuItem>
+          <MenuKindContext.Provider value="dropdown">
+            <ExportTableSub tableExport={tableExport} onDone={handleTableDone} />
+          </MenuKindContext.Provider>
+        </HeaderMoreMenu>
+      </>,
+      container
+    );
+  }
   return createPortal(
     <>
       <DropdownMenu
@@ -97,18 +168,7 @@ export function PlanImportExportActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={(event) => {
-              // Keep the menu open (skip Radix's default auto-close)
-              // until the write settles, then close it ourselves:
-              // closing first moves focus back to the trigger as part
-              // of the same transition, and writeText() called
-              // mid-transition can throw "Document is not focused"
-              // (NotAllowedError).
-              event.preventDefault();
-              void handleExport().finally(() => setExportMenuOpen(false));
-            }}
-          >
+          <DropdownMenuItem onSelect={exportClipboard}>
             {t('plans.exportClipboard')}
           </DropdownMenuItem>
           <MenuKindContext.Provider value="dropdown">
@@ -116,23 +176,7 @@ export function PlanImportExportActions({
           </MenuKindContext.Provider>
         </DropdownMenuContent>
       </DropdownMenu>
-      {/* Beside the buttons that produced them, not down in the entries
-          panel — a confirmation/error disconnected from its trigger
-          reads as belonging to something else. */}
-      {copyConfirm && <PlanConfirmation message={t('plans.exportCopied')} />}
-      {importConfirm && (
-        <PlanConfirmation
-          message={importConfirm}
-          action={
-            undoImport && (
-              <Button size="md" variant="ghost" onClick={undoQueueImportReplace}>
-                {t('plans.importQueueUndo')}
-              </Button>
-            )
-          }
-        />
-      )}
-      {importError && <InlineError>{importError}</InlineError>}
+      {feedback}
     </>,
     container
   );
