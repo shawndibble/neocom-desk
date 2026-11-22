@@ -76,6 +76,22 @@ describe('createAssignment', () => {
     expect(pricingMock.loadUnitPricesOnDate).not.toHaveBeenCalled();
   });
 
+  it('remembers the ore a book took from the form, so the ledger never grows it back in', async () => {
+    const assignment = await createAssignment({
+      isPaid: byStatus,
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      releasedTypeIds: [TYPE_B],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+    });
+    expect((await db.miningTaxAssignments.get(assignment.id))?.releasedTypeIds).toEqual([TYPE_B]);
+  });
+
   it('marks the record raw-priced when the Ore Form setting is off, so a later flip can re-price it', async () => {
     useMiningTaxCompressedOre.setState({ value: false, hydrated: true });
 

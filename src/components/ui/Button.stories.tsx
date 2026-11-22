@@ -22,3 +22,13 @@ export const Danger: Story = { args: { variant: 'danger', children: 'Delete plan
 
 /** @summary An action is running: the label keeps its width and a spinner shows. */
 export const Loading: Story = { args: { variant: 'primary', loading: true } };
+
+export const WrappingLabel: Story = {
+  args: {
+    variant: 'warning',
+    size: 'sm',
+    wrap: true,
+    className: 'w-64',
+    children: 'Tell Bureau of Unified Harvesting it went to Star Tail Industries',
+  },
+};

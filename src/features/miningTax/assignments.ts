@@ -143,6 +143,8 @@ export interface AssignInput {
   taxOwed: number;
   /** Optional "Moon / structure" note; metadata only. */
   label?: string;
+  /** Ore types a Corp Tax Book took from what was offered (`bookTakenTypeIds`): never grown back in. */
+  releasedTypeIds?: readonly number[];
   /**
    * Make this the entry's growth collector even over an unpaid one: a Survey
    * connection's ore (issue #4684), so ore mined after it goes to the moon
@@ -189,6 +191,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     status: 'outstanding',
     ...(normalizeLabel(input.label) ? { label: normalizeLabel(input.label) } : {}),
     ...(input.byDefault ? { override: false } : {}),
+    ...(input.releasedTypeIds?.length ? { releasedTypeIds: [...input.releasedTypeIds] } : {}),
     ...oreFormMarker(),
     updatedAt: now,
   };
