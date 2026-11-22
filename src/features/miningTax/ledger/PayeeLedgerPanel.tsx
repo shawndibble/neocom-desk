@@ -28,10 +28,10 @@ import {
   type PayeeLedgerRow,
   type PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
-import type { CsvColumn } from '@/lib/csv';
 import { formatIsk } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
 import { LedgerRowDetail } from './LedgerRowDetail';
+import { ledgerCsvColumns, ledgerWhat } from './ledgerCsv';
 import { lockRowBoundary } from './lockBoundary';
 
 /** The panel's filter and the words for each row, shared by its table and its export. */
@@ -80,51 +80,6 @@ function activeLedgerFilters(filter: LedgerFilter, t: Translate): ActiveFilter<L
       clear: (value) => ({ ...value, kinds: LEDGER_KINDS }),
     });
   return active;
-}
-
-/** What a row is, in a few words: the table's What column and the export's. */
-function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
-  switch (row.kind) {
-    case 'charge':
-      if (row.reversal) return t('miningTax.ledger.what.reversal');
-      if (row.charge.kind === 'correction')
-        return t(
-          row.charge.opening
-            ? 'miningTax.ledger.what.openingBalance'
-            : 'miningTax.ledger.what.correction'
-        );
-      return row.charge.place
-        ? t('miningTax.ledger.what.minedAt', { place: row.charge.place })
-        : t('miningTax.ledger.what.mined');
-    case 'payment':
-      if (row.payment.via)
-        return row.payment.from
-          ? t(`miningTax.ledger.what.paymentViaFrom.${row.payment.via}`, {
-              name: row.payment.from,
-            })
-          : t(`miningTax.ledger.what.paymentVia.${row.payment.via}`);
-      return row.payment.from
-        ? t('miningTax.ledger.what.paymentFrom', { name: row.payment.from })
-        : t('miningTax.ledger.what.payment');
-    case 'writeOff':
-      return row.reversal
-        ? t('miningTax.ledger.what.reversal')
-        : t(`miningTax.ledger.what.${row.cause}`);
-    case 'notice':
-      return t(`miningTax.ledger.what.${row.notice.kind}`);
-    case 'opening':
-      return t('miningTax.ledger.what.opening', { date: row.date });
-  }
-}
-
-function ledgerCsvColumns(t: Translate): CsvColumn<PayeeLedgerRow>[] {
-  return [
-    { header: t('miningTax.ledger.column.date'), value: (r) => r.date },
-    { header: t('miningTax.ledger.column.what'), value: (r) => ledgerWhat(r, t) },
-    { header: t('miningTax.ledger.column.charged'), value: (r) => r.charged || null },
-    { header: t('miningTax.ledger.column.credited'), value: (r) => r.paid || null },
-    { header: t('miningTax.ledger.column.balance'), value: (r) => r.balance },
-  ];
 }
 
 export interface PayeeLedgerPanelProps {
@@ -263,7 +218,7 @@ function LedgerBody({
   // Shown newest first, like a bank statement: the latest payment is the top row, not the bottom
   // of a long list. Only the order is reversed; no balance is recomputed.
   const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
-  const csvColumns = useMemo(() => ledgerCsvColumns(t), [t]);
+  const csvColumns = useMemo(() => ledgerCsvColumns(t, history), [t, history]);
   // The file stays in date order (oldest first), whichever way the table reads.
   const tableExport = useTableExport({
     surface: 'mining-tax-payee-ledger',

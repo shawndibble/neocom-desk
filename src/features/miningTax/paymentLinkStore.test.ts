@@ -15,6 +15,7 @@ import {
   removePaymentLinks,
   saveBilledElsewhere,
   saveBookOwned,
+  isBookOwnedKnown,
   savePaymentLink,
 } from './paymentLinkStore';
 
@@ -135,6 +136,13 @@ describe('a book share', () => {
 });
 
 describe('the Payees a book owns', () => {
+  it('is unknown until first stored, an empty set included', async () => {
+    expect(await isBookOwnedKnown()).toBe(false);
+    expect(await saveBookOwned(new Set())).toBe(true);
+    expect(await isBookOwnedKnown()).toBe(true);
+    expect(await saveBookOwned(new Set())).toBe(false);
+  });
+
   it('is stored only when it changed, as the device last saw the books', async () => {
     expect(await saveBookOwned(new Set(['p1']))).toBe(true);
     expect(await saveBookOwned(new Set(['p1']))).toBe(false);

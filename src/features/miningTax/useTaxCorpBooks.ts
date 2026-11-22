@@ -83,7 +83,10 @@ export function useTaxCorpBooks(
   );
   // A Payee that is a book's corporation is the book's to answer for: its account counts nowhere.
   // The one reading of it (with the corporation's name): the accounts and Manage Payees share it.
-  const bookOwners = useMemo(() => bookOwnersOf(payees, corpView), [payees, corpView]);
+  const bookOwners = useMemo(
+    () => bookOwnersOf(payees, shownBooks, corpNameOf),
+    [payees, shownBooks, corpNameOf]
+  );
   const bookOwned = useMemo(() => new Set(bookOwners.keys()), [bookOwners]);
   // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
   const accounts = useMemo(

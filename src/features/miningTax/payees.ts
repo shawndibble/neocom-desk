@@ -204,14 +204,20 @@ export async function setPayeesArchived(
   archived: boolean,
   now: number = Date.now()
 ): Promise<void> {
-  const written = records.map((record): PayeeRecord => {
-    const next: PayeeRecord = { ...record, updatedAt: now };
-    if (archived) next.archivedAt = now;
-    else delete next.archivedAt;
-    return next;
+  const written: PayeeRecord[] = [];
+  // The stored record is read in the write's own transaction: only the archive stamp changes, so
+  // a newer edit made while the dialog was open is never replaced by its snapshot.
+  await db.transaction('rw', db.payees, async () => {
+    for (const record of records) {
+      const stored = await db.payees.get(record.id);
+      if (!stored) continue;
+      const next: PayeeRecord = { ...stored, updatedAt: now };
+      if (archived) next.archivedAt = now;
+      else delete next.archivedAt;
+      written.push(next);
+    }
+    await db.payees.bulkPut(written);
   });
-  if (written.length === 0) return;
-  await db.payees.bulkPut(written);
   for (const characterId of new Set(written.map((p) => p.characterId))) {
     scheduleSync(characterId, { collections: ['payees'] });
   }

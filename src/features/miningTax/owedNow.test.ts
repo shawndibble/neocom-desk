@@ -13,7 +13,7 @@ vi.mock('./corpBook/corpBookSources', () => ({
 }));
 vi.mock('./madePayments', () => ({ loadMadePaymentsWithStatus: mocks.made }));
 
-const { billedElsewhereOf, bookCreditsOf, bookDaysOf, bookOwesOf, loadOwedBalances } =
+const { billedElsewhereOf, bookCreditsOf, bookOwnersOf, bookDaysOf, bookOwesOf, loadOwedBalances } =
   await import('./owedNow');
 
 const CHAR = 90000001;
@@ -193,5 +193,33 @@ describe("a Corp Tax Book's figures by the selected Characters", () => {
     expect([...bookDaysOf(view, new Set([3]))]).toEqual([
       ['corp-book:2', { days: 5, oldest: '2026-11-03' }],
     ]);
+  });
+});
+
+describe('bookOwnersOf', () => {
+  const corp = {
+    id: 'p-corp',
+    name: 'Acme',
+    entityId: 98000001,
+    entityKind: 'corporation',
+  } as PayeeRecord;
+  const name = (id: number) => (id === 98000001 ? 'Acme' : `#${id}`);
+
+  it('owns a Payee from a loaded book alone, with no prices read', () => {
+    const owners = bookOwnersOf(
+      [corp],
+      [{ corporationId: 98000001, memberCharacterIds: [1] }],
+      name
+    );
+    expect([...owners]).toEqual([['p-corp', 'Acme']]);
+  });
+
+  it('leaves a book the pilot left out', () => {
+    const owners = bookOwnersOf(
+      [corp],
+      [{ corporationId: 98000001, memberCharacterIds: [] }],
+      name
+    );
+    expect(owners.size).toBe(0);
   });
 });

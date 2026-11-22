@@ -1047,11 +1047,16 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 ? { history: true }
                 : {
                     onUnlinkPayment: unlinkPayment,
-                    onLinkWalletPayment: () => {
-                      const payeeId = ledgerTarget.payeeId;
-                      actions.openLedger(null);
-                      actions.openLinkPayment({ payeeId });
-                    },
+                    // An archived Payee is never linkable (`linkable`), so it is offered none.
+                    ...(accounts.isArchived(ledgerTarget.payeeId)
+                      ? {}
+                      : {
+                          onLinkWalletPayment: () => {
+                            const payeeId = ledgerTarget.payeeId;
+                            actions.openLedger(null);
+                            actions.openLinkPayment({ payeeId });
+                          },
+                        }),
                   })}
           />
         </Suspense>

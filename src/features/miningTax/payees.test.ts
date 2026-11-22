@@ -436,4 +436,16 @@ describe('setPayeesArchived', () => {
     await setPayeesArchived([a, b], false);
     expect('archivedAt' in (await db.payees.get(a.id))!).toBe(false);
   });
+
+  it("keeps the stored record's newer fields, and writes nothing for one that is gone", async () => {
+    const a = await createPayee(CHAR_A, { name: 'Ion Strider', defaultTaxPct: 10 });
+    const gone = { ...a, id: 'gone' };
+    await db.payees.put({ ...a, defaultTaxPct: 25, updatedAt: a.updatedAt + 5 });
+
+    await setPayeesArchived([a, gone], true, 1_700_000_000_000);
+    const stored = await db.payees.get(a.id);
+    expect(stored?.defaultTaxPct).toBe(25);
+    expect(stored?.archivedAt).toBe(1_700_000_000_000);
+    expect(await db.payees.get('gone')).toBeUndefined();
+  });
 });

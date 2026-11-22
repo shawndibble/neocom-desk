@@ -16,6 +16,7 @@ import {
   type UnassignedSummary,
 } from './balances';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/corpBookSources';
+import type { LoadedCorpBook } from './corpBook/corpBookStore';
 import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
 import type { DisplayRow } from './groupRows';
@@ -62,15 +63,17 @@ export function billedElsewhereOf(
  */
 export function bookOwnersOf(
   payees: readonly PayeeRecord[],
-  corpView: CorpBookView | null | undefined
+  books: readonly Pick<LoadedCorpBook, 'corporationId' | 'memberCharacterIds'>[],
+  corpNameOf: (corporationId: number) => string
 ): Map<string, string> {
   const out = new Map<string, string>();
-  for (const b of corpView?.books ?? []) {
-    if (b.left) continue;
-    for (const id of bookOwnedPayeeIds(payees, [
-      { corporationId: b.loaded.corporationId, name: b.corpName },
-    ]))
-      out.set(id, b.corpName);
+  // From the loaded books, never the priced view: a book whose prices are loading or failed still
+  // owns its Payee.
+  for (const b of books) {
+    if (b.memberCharacterIds.length === 0) continue; // left
+    const name = corpNameOf(b.corporationId);
+    for (const id of bookOwnedPayeeIds(payees, [{ corporationId: b.corporationId, name }]))
+      out.set(id, name);
   }
   return out;
 }
@@ -78,8 +81,9 @@ export function bookOwnersOf(
 /** The ids alone of `bookOwnersOf`. */
 export const bookOwnedPayees = (
   payees: readonly PayeeRecord[],
-  corpView: CorpBookView | null | undefined
-): Set<string> => new Set(bookOwnersOf(payees, corpView).keys());
+  books: readonly Pick<LoadedCorpBook, 'corporationId' | 'memberCharacterIds'>[],
+  corpNameOf: (corporationId: number) => string
+): Set<string> => new Set(bookOwnersOf(payees, books, corpNameOf).keys());
 
 /** The Characters in view: the Tax tab's selector (`'all'` is no filter). */
 export type CharactersInView = ReadonlySet<number> | 'all';
@@ -174,6 +178,7 @@ export async function loadOwedBalances(
   const characterNames = new Map(snapshot.characters.map((c) => [c.characterId, c.characterName]));
 
   const books = await loadTrackedCorpBooks();
+  let corpNames: ReadonlyMap<number, string> = new Map();
   const corpView =
     books.length === 0
       ? null
@@ -184,13 +189,14 @@ export async function loadOwedBalances(
             (r) => r.payments,
             () => []
           ),
-        ]).then(([corpNames, pricesByCorp, made]) =>
-          buildCorpBookView(
+        ]).then(([names, pricesByCorp, made]) => {
+          corpNames = names;
+          return buildCorpBookView(
             {
               rows: bookEntries,
               loaded: books,
               pricesByCorp,
-              corpNames,
+              corpNames: names,
               payees,
               made,
               linked: heldPaymentKeys(snapshot.paymentLinks),
@@ -198,8 +204,8 @@ export async function loadOwedBalances(
               now: new Date(now).toISOString(),
             },
             (corp) => i18n.t('miningTax.corpBook.payeeName', { corp })
-          )
-        );
+          );
+        });
 
   // Paid read off each Payee's account, the one build the Tax tab reads too: a Payee a book is the
   // authority for counts nowhere.
@@ -208,7 +214,7 @@ export async function loadOwedBalances(
     payees,
     links: snapshot.paymentLinks,
     billedElsewhere: snapshot.billedElsewhere,
-    bookOwned: bookOwnedPayees(payees, corpView),
+    bookOwned: bookOwnedPayees(payees, books, (id) => corpNames.get(id) ?? `#${id}`),
   });
   const entries = withPaidStatus(snapshot.rows, accounts);
   const rows = buildDisplayRows(

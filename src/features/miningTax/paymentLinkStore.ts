@@ -171,6 +171,11 @@ export async function loadBookOwned(): Promise<Set<string>> {
   );
 }
 
+/** Whether the device has ever stored which Payees the books own (an empty set counts). */
+export async function isBookOwnedKnown(): Promise<boolean> {
+  return (await db.settings.get(BOOK_OWNED_KEY)) !== undefined;
+}
+
 /**
  * Stores which Payees the books own, as the Tax tab reads them now, so every account build (the
  * load path's safeguards, the journal's, Settle up's) applies the same rule the tab does. Returns
@@ -178,8 +183,9 @@ export async function loadBookOwned(): Promise<Set<string>> {
  */
 export async function saveBookOwned(next: ReadonlySet<string>): Promise<boolean> {
   return db.transaction('rw', db.settings, async () => {
+    const known = (await db.settings.get(BOOK_OWNED_KEY)) !== undefined;
     const held = await loadBookOwned();
-    if (held.size === next.size && [...next].every((id) => held.has(id))) return false;
+    if (known && held.size === next.size && [...next].every((id) => held.has(id))) return false;
     await db.settings.put({ key: BOOK_OWNED_KEY, value: [...next].sort() });
     return true;
   });

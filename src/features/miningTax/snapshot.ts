@@ -20,6 +20,7 @@ import {
   loadRunningAccountInputs,
   loadPayeeRunningAccounts,
   readLegacyPaidMarks,
+  isBookOwnedKnown,
 } from './paymentLinkStore';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
@@ -106,7 +107,10 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     await applySurveyConnections(ledgers, Date.now(), accounts).catch(() => []);
     // Last resort, after the Survey has had first claim: a Payee's Default Systems assign what
     // nothing else has touched.
-    await applyDefaultSystems(ledgers, accounts).catch(() => []);
+    // Only once the books' ownership has been stored: until then a book's own Payee is not known
+    // to be one, and must not be given an Assignment (the Tax tab stores it on its first load).
+    if (await isBookOwnedKnown().catch(() => false))
+      await applyDefaultSystems(ledgers, accounts).catch(() => []);
     // Read again: a Survey or a Default System may have billed a paid day anew.
     const grown = await loadPayeeRunningAccounts();
     await Promise.all(
