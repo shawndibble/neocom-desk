@@ -110,7 +110,10 @@ function ChipGroup({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-/** A labelled row of preset chips — the shape every threshold control here uses; a `Fields` row. */
+/**
+ * A labelled row of preset chips; a `Fields` row. Only for a single choice whose labels are
+ * too long for a `SegmentedControl` at 390px (the number-format examples); otherwise `SegmentedRow`.
+ */
 export function ChipRow<T extends string | number>({
   label,
   hint,
