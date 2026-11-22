@@ -33,7 +33,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { Checkbox, CollapsiblePanel, IconButton } from '@/components/ui';
+import {
+  Checkbox,
+  CollapsiblePanel,
+  IconButton,
+  MenuItem,
+  RowActionsMenu,
+  RowMoreActions,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,
@@ -71,6 +78,8 @@ function StopRow({
   systemName,
   security,
   onRemove,
+  onMove,
+  count,
 }: {
   systemId: number;
   index: number;
@@ -79,12 +88,15 @@ function StopRow({
   systemName: string | null;
   security: number | null;
   onRemove: (index: number) => void;
+  /** The drag's single-pointer alternative (WCAG 2.5.7): swap with a neighbour. */
+  onMove: (from: number, to: number) => void;
+  count: number;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: systemId,
   });
-  return (
+  const li = (
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
@@ -117,7 +129,33 @@ function StopRow({
         label={t('travel.stops.remove', { name })}
         onClick={() => onRemove(index)}
       />
+      {count > 1 && <RowMoreActions />}
     </li>
+  );
+  if (count < 2) return li;
+  return (
+    <RowActionsMenu
+      name={name}
+      items={
+        <>
+          {index > 0 && (
+            <MenuItem onSelect={() => onMove(index, index - 1)}>
+              {t('travel.stops.moveUp')}
+            </MenuItem>
+          )}
+          {index < count - 1 && (
+            <MenuItem onSelect={() => onMove(index, index + 1)}>
+              {t('travel.stops.moveDown')}
+            </MenuItem>
+          )}
+          <MenuItem className="text-danger" onSelect={() => onRemove(index)}>
+            {t('travel.stops.removeMenu')}
+          </MenuItem>
+        </>
+      }
+    >
+      {li}
+    </RowActionsMenu>
   );
 }
 
@@ -280,6 +318,8 @@ export function StopsPanel({
                       }
                       security={systems?.get(systemId)?.security ?? null}
                       onRemove={remove}
+                      onMove={move}
+                      count={stops.length}
                     />
                   ))}
                 </ol>
