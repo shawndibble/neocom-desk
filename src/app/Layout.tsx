@@ -341,7 +341,7 @@ export const Layout = memo(function Layout() {
   return (
     <UnreadAlertsContext.Provider value={alertBadge}>
       <AlertsPanelProvider>
-        <div className="flex min-h-screen bg-bg text-text">
+        <div className="flex min-h-dvh bg-bg text-text">
           {/* Only where the rail shows: below `md` there is nothing to skip. */}
           {isDesktop && <SkipLink />}
           {/* Desktop left rail */}

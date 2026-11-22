@@ -55,8 +55,8 @@ function ErrorScreen({ inline }: { inline: boolean }) {
   const Wrapper = inline ? 'section' : 'main';
   return (
     <Wrapper
-      className={`flex flex-col items-center justify-center gap-3 p-6 text-center text-text ${
-        inline ? 'py-16' : 'min-h-screen bg-bg'
+      className={`flex flex-col items-center justify-center gap-3 text-center text-text ${
+        inline ? 'p-6 py-16' : 'safe-inset min-h-dvh [--safe-x:1.5rem] [--safe-y:1.5rem] bg-bg'
       }`}
     >
       <h1

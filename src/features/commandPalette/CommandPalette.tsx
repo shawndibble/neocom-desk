@@ -490,7 +490,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       : `${statusParts.map((part) => part.replace(/\.$/, '')).join('. ')}${statusParts.length > 1 ? '.' : ''}`;
 
   return (
-    <Modal open onClose={onClose} title={t('commandPalette.title')}>
+    <Modal open onClose={onClose} title={t('commandPalette.title')} placement="top">
       <div className="flex flex-col gap-2">
         <SearchInput
           ref={inputRef}
@@ -514,7 +514,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             role="listbox"
             aria-label={t('commandPalette.resultsLabel')}
             // The input stays put above; only the results scroll.
-            className="flex max-h-[min(30rem,calc(70vh-9rem))] scroll-py-2 flex-col gap-2 overflow-y-auto overscroll-contain"
+            className="flex max-h-[min(30rem,calc(70dvh-9rem))] scroll-py-2 flex-col gap-2 overflow-y-auto overscroll-contain"
           >
             {groups.map((group) => {
               const headingId = `${baseId}-group-${group.provider.id}`;

@@ -183,7 +183,7 @@ export function CommunityJoin() {
   const anyJoined = Object.values(results).some((r) => r === 'joined' || r === 'alreadyMember');
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
+    <div className="safe-inset mx-auto flex min-h-dvh max-w-xl [--safe-x:0.5rem] [--safe-y:0.5rem] flex-col gap-4 bg-bg text-text sm:[--safe-x:1.5rem] sm:[--safe-y:1.5rem]">
       <header>
         <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
           <LogoMark className="size-9" />

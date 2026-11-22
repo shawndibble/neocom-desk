@@ -19,7 +19,7 @@ import { useSheetSwipe } from './useSheetSwipe';
 import { ConfirmDialog } from './ConfirmDialog';
 
 export type ModalPlacement =
-  'center' | 'sheet' | 'sheet-full' | 'medium' | 'detail' | 'wide' | 'page' | 'media';
+  'center' | 'top' | 'sheet' | 'sheet-full' | 'medium' | 'detail' | 'wide' | 'page' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -48,7 +48,7 @@ interface ModalProps {
    * dialog exists to fill (a quantity), so the user can type straight away.
    */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `detail` (40rem) for Item Detail's name/value rows, `page` for a whole page's worth of content as a layer over another (full screen on a phone, content-area wide and tall from `md`), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
+  /** `center` for dialogs, `top` for one a phone keyboard would cover (anchored to the top edge, centred from `md`), `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `detail` (40rem) for Item Detail's name/value rows, `page` for a whole page's worth of content as a layer over another (full screen on a phone, content-area wide and tall from `md`), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
   /**
    * Whether the modal owns a history entry so Back closes it (default). Pass
@@ -85,11 +85,18 @@ interface ModalProps {
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
   center: {
     dialogClass: 'motion-dialog m-auto w-full max-w-lg',
-    heightClass: 'h-fit max-h-[85vh]',
+    heightClass: 'h-fit max-h-[85dvh]',
+  },
+  // Top-anchored on a phone, where the on-screen keyboard covers a centred box
+  // (the command palette); centred from `md`.
+  top: {
+    dialogClass:
+      'motion-dialog mx-auto mt-[max(1rem,env(safe-area-inset-top))] mb-auto w-full max-w-lg md:m-auto',
+    heightClass: 'h-fit max-h-[85dvh]',
   },
   sheet: {
     dialogClass: 'motion-sheet mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
-    heightClass: 'h-fit max-h-[85vh]',
+    heightClass: 'h-fit max-h-[85dvh]',
   },
   'sheet-full': {
     dialogClass: 'motion-sheet mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
@@ -97,17 +104,17 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
   },
   medium: {
     dialogClass: 'motion-dialog m-auto w-full max-w-3xl',
-    heightClass: 'h-fit max-h-[85vh]',
+    heightClass: 'h-fit max-h-[85dvh]',
   },
   // Item Detail (Show info): name/value rows that read across, so a name
   // stays close to its value.
   detail: {
     dialogClass: 'motion-dialog m-auto w-full max-w-[40rem]',
-    heightClass: 'h-fit max-h-[85vh]',
+    heightClass: 'h-fit max-h-[85dvh]',
   },
   wide: {
     dialogClass: 'motion-dialog m-auto w-full max-w-[min(64rem,100vw)]',
-    heightClass: 'h-fit max-h-[85vh]',
+    heightClass: 'h-fit max-h-[85dvh]',
   },
   page: {
     dialogClass:
@@ -116,7 +123,7 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
   },
   media: {
     dialogClass: 'motion-dialog m-auto w-fit max-w-[95vw]',
-    heightClass: 'h-fit max-h-[95vh]',
+    heightClass: 'h-fit max-h-[95dvh]',
   },
 };
 

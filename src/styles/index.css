@@ -216,6 +216,19 @@
 
 @layer utilities {
   /*
+   * Page padding that clears the notch, home bar and rounded corners
+   * (`viewport-fit=cover`). A full-bleed page with its own padding sets
+   * `--safe-x` / `--safe-y` to that padding instead of a `p-*` class; each side
+   * is the larger of it and the device inset.
+   */
+  .safe-inset {
+    padding-block: max(var(--safe-y, 0px), env(safe-area-inset-top))
+      max(var(--safe-y, 0px), env(safe-area-inset-bottom));
+    padding-inline: max(var(--safe-x, 0px), env(safe-area-inset-left))
+      max(var(--safe-x, 0px), env(safe-area-inset-right));
+  }
+
+  /*
    * The tab bar's scroll frame (`components/ui/tabStyles.ts`).
    *
    * Tailwind can express the scrolling; it cannot express hiding the

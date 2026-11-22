@@ -27,7 +27,7 @@ export function ToastStack({ items, undoLabel, onUndo, onClose }: ToastStackProp
   const portalContainer = usePortalContainer();
   if (items.length === 0) return null;
   return createPortal(
-    <div className="pointer-events-none fixed bottom-32 left-1/2 z-40 flex w-[95vw] -translate-x-1/2 flex-col items-center gap-2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]">
+    <div className="pointer-events-none fixed bottom-[calc(8rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[95vw] -translate-x-1/2 flex-col items-center gap-2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]">
       {items.map((item) => (
         <Toast
           key={item.id}
