@@ -1728,6 +1728,8 @@ Every interactive element takes its states from one shared recipe in
   attribute. A control that its own press puts to work (Refresh, Scan, Start
   plan) stays focusable: `busy` on `IconButton`, `aria-disabled` on `Button`,
   never native `disabled`, which drops keyboard focus to the page.
+  A form-submit button states its reason in an adjacent dim line linked by
+  `aria-describedby`; the tooltip stays for toolbar buttons and menu items.
 - **Loading:** `Button loading` puts a small `Spinner` in place of the
   leading icon and locks the width. The button is `aria-disabled` while it
   runs, and the start and result are announced through a toast or a polite

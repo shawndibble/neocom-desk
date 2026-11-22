@@ -1,10 +1,11 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { grantMissingPath } from '@/app/grantMissingPath';
 import type { ScopeGroup } from '@/esi/registry';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DisabledMenuItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -13,8 +14,18 @@ import {
   Tooltip,
   SplitButtonChevron,
 } from '@/components/ui';
+import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { isApplePlatform, modChordDisplayKey } from '@/lib/shortcuts';
 import { useChord } from '@/lib/useChord';
+
+/** An inert item in this dropdown: focusable, its reason a tooltip (an empty reason shows none). */
+function DisabledItem({ reason, children }: { reason: string | undefined; children: ReactNode }) {
+  return (
+    <MenuKindContext.Provider value="dropdown">
+      <DisabledMenuItem reason={reason ?? ''}>{children}</DisabledMenuItem>
+    </MenuKindContext.Provider>
+  );
+}
 
 interface FittingSaveButtonProps {
   /** Save (or update) to My Fittings — the button itself. */
@@ -86,24 +97,40 @@ export function FittingSaveButton({
           <SplitButtonChevron label={t('fittings.header.moreSave')} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
-          <DropdownMenuItem disabled={!canSave} onSelect={onSave}>
-            {destination}
-            <span className="ml-auto pl-4 text-text-dim">{modChordDisplayKey(apple, 'S')}</span>
-          </DropdownMenuItem>
+          {canSave ? (
+            <DropdownMenuItem onSelect={onSave}>
+              {destination}
+              <span className="ml-auto pl-4 text-text-dim">{modChordDisplayKey(apple, 'S')}</span>
+            </DropdownMenuItem>
+          ) : (
+            <DisabledItem reason={saveBlockedReason}>{destination}</DisabledItem>
+          )}
           {updating && (
             <>
-              <DropdownMenuItem disabled={!canSave} onSelect={onSaveAsNew}>
-                {t('fittings.myFittings.saveAsNew')}
-                <span className="ml-auto pl-4 text-text-dim">
-                  {modChordDisplayKey(apple, 'S', { shift: true })}
-                </span>
-              </DropdownMenuItem>
+              {canSave ? (
+                <DropdownMenuItem onSelect={onSaveAsNew}>
+                  {t('fittings.myFittings.saveAsNew')}
+                  <span className="ml-auto pl-4 text-text-dim">
+                    {modChordDisplayKey(apple, 'S', { shift: true })}
+                  </span>
+                </DropdownMenuItem>
+              ) : (
+                <DisabledItem reason={saveBlockedReason}>
+                  {t('fittings.myFittings.saveAsNew')}
+                </DisabledItem>
+              )}
             </>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={!canSaveToEve} onSelect={onSaveToEve}>
-            {t('fittings.saveToEve.action')}
-          </DropdownMenuItem>
+          {canSaveToEve ? (
+            <DropdownMenuItem onSelect={onSaveToEve}>
+              {t('fittings.saveToEve.action')}
+            </DropdownMenuItem>
+          ) : (
+            <DisabledItem reason={saveToEveBlockedReason}>
+              {t('fittings.saveToEve.action')}
+            </DisabledItem>
+          )}
           {!canSaveToEve && saveToEveMissingGroups.length > 0 && (
             <DropdownMenuItem onSelect={() => navigate(grantMissingPath(saveToEveMissingGroups))}>
               {t('permissions.grantMissing')}

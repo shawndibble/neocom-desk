@@ -11,7 +11,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { Button, EmptyState, IconButton, Panel } from '@/components/ui';
+import { Button, EmptyState, IconButton, Panel, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useStableCallback } from './useStableCallback';
 import { useUrlFilter } from '@/lib/useUrlState';
@@ -347,14 +347,16 @@ export function BuildPlanList({
             <Button size="sm" onClick={onToggleCompareMode}>
               {t('industry.compareCancel')}
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={compareSelectedIds.size < 2}
-              onClick={onOpenCompare}
-            >
-              {t('industry.compareHandle', { count: compareSelectedIds.size })}
-            </Button>
+            <Tooltip content={compareSelectedIds.size < 2 ? t('industry.compareNeedsTwo') : null}>
+              <Button
+                variant="primary"
+                size="sm"
+                aria-disabled={compareSelectedIds.size < 2 || undefined}
+                onClick={onOpenCompare}
+              >
+                {t('industry.compareHandle', { count: compareSelectedIds.size })}
+              </Button>
+            </Tooltip>
           </div>
         ) : (
           <div className="flex items-center gap-1">

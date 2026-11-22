@@ -347,7 +347,10 @@ describe('SaveToEveDialog', () => {
       await waitFor(() =>
         expect(screen.getByRole('status')).toHaveTextContent('Needs a connection.')
       );
-      expect(screen.getByRole('button', { name: 'Save to My Fittings' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Save to My Fittings' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
     });
   });
 });

@@ -1,6 +1,6 @@
 /** The Appraisal tab's paste card: the list box, Price %, hub, "Minus owned" and the Recent picker. */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -78,6 +78,10 @@ export function AppraisalPasteCard({
 }: AppraisalPasteCardProps) {
   const { t } = useTranslation();
   const { text, setText, loading } = controller;
+  const ownedReasonId = useId();
+  const checkboxBlocked = lacksAssets || characterId === null;
+  // A missing Assets grant explains itself in the GrantNote below; a missing character has no other line.
+  const needsCharacter = characterId === null && !lacksAssets;
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   // One picker, rendered in the header below `md` and above the textarea from `md` up:
   // beside the title it squeezed "Paste" to "PA…" in the narrow desktop paste column (#5761).
@@ -185,10 +189,12 @@ export function AppraisalPasteCard({
             <label className={`flex items-center gap-2 text-xs ${tappableRowClassName}`}>
               <Checkbox
                 checked={minusOwned}
-                disabled={lacksAssets || characterId === null}
-                onChange={(event) =>
-                  void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
-                }
+                aria-disabled={checkboxBlocked || undefined}
+                aria-describedby={needsCharacter ? ownedReasonId : undefined}
+                onChange={(event) => {
+                  if (checkboxBlocked) return;
+                  void setOwnedPref({ ...ownedPref, enabled: event.target.checked });
+                }}
               />
               {t('market.appraisal.minusOwned')}
             </label>
@@ -229,6 +235,11 @@ export function AppraisalPasteCard({
               </SelectContent>
             </Select>
           </div>
+          {needsCharacter && (
+            <p id={ownedReasonId} className="text-[0.6875rem] text-text-dim">
+              {t('market.appraisal.minusOwnedNeedsCharacter')}
+            </p>
+          )}
           {lacksAssets && (
             <GrantNote
               {...(characterId !== null ? { characterId } : {})}

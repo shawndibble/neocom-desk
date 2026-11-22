@@ -282,6 +282,7 @@
   "fittings": {
     "editTitle": "Editor",
     "myFittings": {
+      "saveAsNewNeedsName": "Enter a name",
       "title": "My Fittings",
       "save": "Save",
       "update": "Update",
@@ -368,7 +369,6 @@
       "overwriteConfirm": "This deletes \"{{name}}\" from your in-game Fittings and replaces it with this one. This can't be undone.",
       "saveAction": "Save",
       "overwriteAction": "Replace",
-      "saving": "Saving…",
       "cancel": "Cancel",
       "errorTitle": "Couldn't save",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
@@ -1020,6 +1020,7 @@
       "downloadFailed": "Couldn't make the file."
     },
     "stats": {
+      "copyLoading": "Stats are still loading",
       "error": "Couldn't load ship data for this fit.",
       "errorSkills": "Couldn't load this Character's skills, so the stats can't be worked out.",
       "skillsUnknown": "Pilot skills unknown: stats assume no skills.",
@@ -1490,6 +1491,8 @@
       "costs": "Costs"
     },
     "improve": {
+      "applyNeedsPick": "Tick a change to apply",
+      "applyBlocked": "Fix the problems listed above first",
       "menuItem": "Improve Fit",
       "button": "Improve",
       "fixMenuItem": "Fix Fit",
@@ -2082,6 +2085,8 @@
       }
     },
     "compare": {
+      "slotsFull": "Compare holds up to {{count}} fittings",
+      "differencesNeedsTwo": "Add two fittings to compare differences",
       "entryButton": "Compare",
       "title": "Compare Fittings",
       "addFitting": "Compare with",
@@ -2281,6 +2286,8 @@
       "noCharges": "No other charge fits this"
     },
     "libraryMenu": {
+      "saveToEveUnavailable": "Needs In-game Fittings access",
+      "needsCharacter": "Log in a character to save a copy",
       "open": "Open",
       "compare": "Compare with",
       "duplicate": "Duplicate",
@@ -3304,6 +3311,9 @@
     "differingOnlyEmptyHint": "No differences. These characters have the same skills at the same levels."
   },
   "industry": {
+    "compareNeedsTwo": "Check at least two plans to compare",
+    "logProductionNeedsProduct": "This plan has no product to log",
+    "copyShoppingListNothing": "Nothing to copy yet",
     "catalogUnavailable": "Blueprint data couldn't load",
     "catalogUnavailableOwnedHint": "Your blueprints loaded, but the blueprint list they need hasn't downloaded yet. Go online once to get it. We'll try again when you're back online.",
     "marketWideTreesUnavailable": "Market-wide build data hasn't been downloaded yet",
@@ -7478,6 +7488,8 @@
       "fixOrders": "Fix in Open Orders"
     },
     "goal": {
+      "needsAmount": "Enter an amount",
+      "needsFitting": "Pick a fitting",
       "title": "Goals",
       "add": "Add goal",
       "edit": "Edit",
@@ -8942,6 +8954,7 @@
     }
   },
   "assets": {
+    "refreshing": "Refreshing…",
     "tabs": {
       "items": "Items",
       "ships": "Ships",
@@ -13270,6 +13283,7 @@
     "columnsMenuTitle": "Columns",
     "unknownStructure": "Unknown Structure",
     "structureFee": {
+      "percentInvalid": "Enter a percent from 0 to 100",
       "assumed": "Assuming NPC station fees",
       "set": "Broker fee {{pct}}% (you set this)",
       "setFee": "Set fee",
@@ -13483,6 +13497,7 @@
         "books": "Reading the sell orders ({{done}} of {{total}})…"
       },
       "cargo": {
+        "needsSize": "Enter a cargo size above 0",
         "label": "Cargo space",
         "choose": "Your Ship",
         "chosenM3": " · {{m3}}",
@@ -13608,6 +13623,10 @@
       }
     },
     "appraisal": {
+      "minusOwnedNeedsCharacter": "Log in a character to subtract what they own.",
+      "janiceNeedsText": "Paste a list to open it in Janice",
+      "copyBusy": "Another copy is still running",
+      "copyNothing": "Nothing to copy",
       "live": {
         "barLabel": "Live prices checked",
         "checking": "Checking live prices {{done}} / {{total}}",
@@ -13937,6 +13956,7 @@
       "compareEmpty": "{{region}} · no trades in this range"
     },
     "compare": {
+      "differencesNeedsTwo": "Needs two or more items",
       "unitColumn": "Unit",
       "categoryColumn": "Category",
       "handle": "Compare ({{count}})",

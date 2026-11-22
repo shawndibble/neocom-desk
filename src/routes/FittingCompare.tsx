@@ -308,11 +308,15 @@ export function FittingCompare() {
 
   const differencesToggle = (
     <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
-      <Checkbox
-        checked={showDifferencesOnly}
-        disabled={count < 2}
-        onChange={() => setDifferencesOnly((v) => !v)}
-      />
+      <Tooltip content={count < 2 ? t('fittings.compare.differencesNeedsTwo') : null}>
+        <Checkbox
+          checked={showDifferencesOnly}
+          aria-disabled={count < 2 || undefined}
+          onChange={() => {
+            if (count >= 2) setDifferencesOnly((v) => !v);
+          }}
+        />
+      </Tooltip>
       {t('fittings.compare.differencesOnly')}
     </label>
   );
@@ -322,14 +326,22 @@ export function FittingCompare() {
       <PageHeader
         title={t('fittings.compare.title')}
         actions={
-          <Button
-            ref={addFittingRef}
-            variant="primary"
-            disabled={count >= MAX_COMPARE_SLOTS}
-            onClick={() => setPickerOpen(true)}
+          <Tooltip
+            content={
+              count >= MAX_COMPARE_SLOTS
+                ? t('fittings.compare.slotsFull', { count: MAX_COMPARE_SLOTS })
+                : null
+            }
           >
-            {t('fittings.compare.addFitting')}
-          </Button>
+            <Button
+              ref={addFittingRef}
+              variant="primary"
+              aria-disabled={count >= MAX_COMPARE_SLOTS || undefined}
+              onClick={() => setPickerOpen(true)}
+            >
+              {t('fittings.compare.addFitting')}
+            </Button>
+          </Tooltip>
         }
       />
 

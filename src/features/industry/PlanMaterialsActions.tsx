@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, DataAgeBadge, IconButton, LiveStatus } from '@/components/ui';
+import { Button, Checkbox, DataAgeBadge, IconButton, LiveStatus, Tooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -64,34 +64,36 @@ export function PlanMaterialsActions({
           {t('industry.compressedGasToggle')}
         </label>
       )}
-      <Button size="sm" onClick={onCopy} disabled={copyDisabled}>
-        {/* Both outcomes change the glyph as well as the words, so neither
+      <Tooltip content={copyDisabled ? t('industry.copyShoppingListNothing') : null}>
+        <Button size="sm" onClick={onCopy} aria-disabled={copyDisabled || undefined}>
+          {/* Both outcomes change the glyph as well as the words, so neither
             is carried by colour alone (docs/DESIGN.md §7). */}
-        {copyState === 'copied' ? (
-          <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        ) : copyState === 'failed' ? (
-          <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-danger" />
-        ) : (
-          <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        )}
-        {/* A short visible label from `md` up, icon-only below it so the
+          {copyState === 'copied' ? (
+            <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          ) : copyState === 'failed' ? (
+            <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-danger" />
+          ) : (
+            <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          )}
+          {/* A short visible label from `md` up, icon-only below it so the
             header keeps its title on a phone; the full words stay the
             button's accessible name either way. */}
-        <span aria-hidden="true" className="max-md:hidden">
-          {copyState === 'copied'
-            ? t('industry.copyShoppingListDone')
-            : copyState === 'failed'
-              ? t('industry.copyShoppingListFailed')
-              : t('industry.copyShoppingListShort')}
-        </span>
-        <span className="sr-only">
-          {copyState === 'copied'
-            ? t('industry.copyShoppingListDone')
-            : copyState === 'failed'
-              ? t('industry.copyShoppingListFailed')
-              : t('industry.copyShoppingList')}
-        </span>
-      </Button>
+          <span aria-hidden="true" className="max-md:hidden">
+            {copyState === 'copied'
+              ? t('industry.copyShoppingListDone')
+              : copyState === 'failed'
+                ? t('industry.copyShoppingListFailed')
+                : t('industry.copyShoppingListShort')}
+          </span>
+          <span className="sr-only">
+            {copyState === 'copied'
+              ? t('industry.copyShoppingListDone')
+              : copyState === 'failed'
+                ? t('industry.copyShoppingListFailed')
+                : t('industry.copyShoppingList')}
+          </span>
+        </Button>
+      </Tooltip>
       {showExport && (
         <TableActionsMenu name={t('industry.materials')} tableExport={materialsExport} />
       )}

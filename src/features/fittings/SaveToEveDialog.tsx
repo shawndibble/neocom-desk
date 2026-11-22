@@ -7,7 +7,7 @@
  * the pilot their original — a failed *delete* after a successful save
  * leaves both, which this dialog reports rather than hiding.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
@@ -60,6 +60,8 @@ export function SaveToEveDialog({
 }: SaveToEveDialogProps) {
   const { t } = useTranslation();
   const online = useOnline();
+  const nameReasonId = useId();
+  const offlineReasonId = useId();
   const [name, setName] = useState(() => clampFittingName(fitting.name));
   const [existing, setExisting] = useState<CharacterFitting[]>([]);
   const [target, setTarget] = useState<string>(NEW_TARGET);
@@ -105,6 +107,10 @@ export function SaveToEveDialog({
 
   const overwriteTarget =
     target === NEW_TARGET ? null : (existing.find((f) => String(f.fitting_id) === target) ?? null);
+
+  const nameMissing = name.trim() === '';
+  // Offline, saving to EVE can't happen; the connection note above says so. Saving to My Fittings alone still can.
+  const offlineBlocked = !online && !(onSaveToMyFittings && alsoSave);
 
   async function handleSave() {
     const trimmed = name.trim();
@@ -255,13 +261,15 @@ export function SaveToEveDialog({
           />
         )}
         {!online ? (
-          <LiveNote className="text-xs text-warning">
-            {t(
-              onSaveToMyFittings
-                ? 'fittings.saveToEve.needsConnectionKeepMine'
-                : 'fittings.saveToEve.needsConnection'
-            )}
-          </LiveNote>
+          <div id={offlineReasonId}>
+            <LiveNote className="text-xs text-warning">
+              {t(
+                onSaveToMyFittings
+                  ? 'fittings.saveToEve.needsConnectionKeepMine'
+                  : 'fittings.saveToEve.needsConnection'
+              )}
+            </LiveNote>
+          </div>
         ) : (
           offlineFailed && <InlineError>{t('fittings.saveToEve.offlineFailed')}</InlineError>
         )}
@@ -279,20 +287,25 @@ export function SaveToEveDialog({
           <Button type="button" onClick={onClose}>
             {t('fittings.saveToEve.cancel')}
           </Button>
+          {nameMissing && !saving && (
+            <span id={nameReasonId} className="mr-auto text-[0.6875rem] text-text-dim">
+              {t('fittings.myFittings.saveAsNewNeedsName')}
+            </span>
+          )}
           <Button
             type="submit"
             variant={overwriteTarget ? 'danger' : 'primary'}
-            disabled={
-              saving || name.trim() === '' || (!online && !(onSaveToMyFittings && alsoSave))
+            loading={saving}
+            aria-disabled={nameMissing || offlineBlocked || undefined}
+            aria-describedby={
+              nameMissing ? nameReasonId : offlineBlocked ? offlineReasonId : undefined
             }
           >
-            {saving
-              ? t('fittings.saveToEve.saving')
-              : !online
-                ? t('fittings.saveToEve.saveMineOnlyAction')
-                : overwriteTarget
-                  ? t('fittings.saveToEve.overwriteAction')
-                  : t('fittings.saveToEve.saveAction')}
+            {!online
+              ? t('fittings.saveToEve.saveMineOnlyAction')
+              : overwriteTarget
+                ? t('fittings.saveToEve.overwriteAction')
+                : t('fittings.saveToEve.saveAction')}
           </Button>
         </DialogFooter>
       </form>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import type { FittingRecord } from '@/db';
@@ -29,6 +29,7 @@ export function FittingNameModal({
   onClose,
 }: FittingNameModalProps) {
   const { t } = useTranslation();
+  const reasonId = useId();
   // Reset to the given name each time a different one opens, during render.
   const [text, setText] = useState(name);
   const [forKey, setForKey] = useState(resetKey);
@@ -58,7 +59,17 @@ export function FittingNameModal({
         />
         <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
-          <Button type="submit" variant="primary" disabled={text.trim() === ''}>
+          {text.trim() === '' && (
+            <span id={reasonId} className="mr-auto text-[0.6875rem] text-text-dim">
+              {t('fittings.myFittings.saveAsNewNeedsName')}
+            </span>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            aria-disabled={text.trim() === '' || undefined}
+            aria-describedby={text.trim() === '' ? reasonId : undefined}
+          >
             {t('fittings.myFittings.confirmRename')}
           </Button>
         </DialogFooter>

@@ -11,7 +11,14 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from '@/components/ui';
+import {
+  DisabledMenuItem,
+  MenuItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
+} from '@/components/ui';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import {
   shareMarker,
@@ -186,26 +193,30 @@ export function useLibraryRowActions({
         >
           {t('fittings.libraryMenu.compare')}
         </MenuItem>
-        <MenuItem
-          disabled={characterId === null}
-          onSelect={() =>
-            void withFitting(row, async ({ code }) => {
-              if (characterId === null) return;
-              if (code === null) {
-                setNotice(t('fittings.myFittings.tooLarge'));
-                return;
-              }
-              await saveFitting(characterId, {
-                name: t('fittings.myFittings.saveAsNewDefaultName', { name: row.name }),
-                code,
-                ...(saved?.record.notes ? { notes: saved.record.notes } : {}),
-              });
-              setNotice(t('fittings.libraryMenu.duplicated', { name: row.name }));
-            })
-          }
-        >
-          {t(shared ? 'fittings.libraryMenu.saveCopy' : 'fittings.libraryMenu.duplicate')}
-        </MenuItem>
+        {characterId === null ? (
+          <DisabledMenuItem reason={t('fittings.libraryMenu.needsCharacter')}>
+            {t(shared ? 'fittings.libraryMenu.saveCopy' : 'fittings.libraryMenu.duplicate')}
+          </DisabledMenuItem>
+        ) : (
+          <MenuItem
+            onSelect={() =>
+              void withFitting(row, async ({ code }) => {
+                if (code === null) {
+                  setNotice(t('fittings.myFittings.tooLarge'));
+                  return;
+                }
+                await saveFitting(characterId, {
+                  name: t('fittings.myFittings.saveAsNewDefaultName', { name: row.name }),
+                  code,
+                  ...(saved?.record.notes ? { notes: saved.record.notes } : {}),
+                });
+                setNotice(t('fittings.libraryMenu.duplicated', { name: row.name }));
+              })
+            }
+          >
+            {t(shared ? 'fittings.libraryMenu.saveCopy' : 'fittings.libraryMenu.duplicate')}
+          </MenuItem>
+        )}
         {!shared && <MenuSeparator />}
         {!shared && (
           <>
@@ -218,18 +229,30 @@ export function useLibraryRowActions({
           </>
         )}
         {/* An In-game Fitting is in EVE already. */}
-        {saved && (
-          <MenuItem
-            disabled={characterId === null || canSaveToEve !== true || !online}
-            onSelect={() =>
-              void withFitting(row, ({ fitting }) =>
-                setSaving({ fitting, description: saved.record.notes ?? '' })
-              )
-            }
-          >
-            {t('fittings.libraryMenu.saveToEve')}
-          </MenuItem>
-        )}
+        {saved &&
+          (characterId === null || canSaveToEve !== true || !online ? (
+            <DisabledMenuItem
+              reason={
+                characterId === null
+                  ? t('fittings.libraryMenu.needsCharacter')
+                  : canSaveToEve !== true
+                    ? t('fittings.libraryMenu.saveToEveUnavailable')
+                    : t('fittings.saveToEve.needsConnection')
+              }
+            >
+              {t('fittings.libraryMenu.saveToEve')}
+            </DisabledMenuItem>
+          ) : (
+            <MenuItem
+              onSelect={() =>
+                void withFitting(row, ({ fitting }) =>
+                  setSaving({ fitting, description: saved.record.notes ?? '' })
+                )
+              }
+            >
+              {t('fittings.libraryMenu.saveToEve')}
+            </MenuItem>
+          ))}
         {saved && !online && (
           <p className="max-w-64 px-3 pb-2 text-xs text-text-dim">
             {t('fittings.saveToEve.needsConnection')}

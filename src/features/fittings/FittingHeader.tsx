@@ -7,6 +7,7 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
+  DisabledMenuItem,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -14,6 +15,7 @@ import {
   TypeIcon,
   useOpenAfterMenu,
 } from '@/components/ui';
+import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { Expanded, More, Rename } from '@/components/ui/icons';
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
 import type { AlphaBlocker } from '@/engine/fittings/alphaClone';
@@ -89,6 +91,25 @@ function useCopyStats(stats: FittingStats | null) {
   return { notice, copy, canCopy: stats !== null };
 }
 
+/** "Copy stats" in a menu; while the stats load it stays focusable and says why it does nothing. */
+function CopyStatsMenuItem({ copyStats }: { copyStats: ReturnType<typeof useCopyStats> }) {
+  const { t } = useTranslation();
+  if (!copyStats.canCopy) {
+    return (
+      <MenuKindContext.Provider value="dropdown">
+        <DisabledMenuItem reason={t('fittings.stats.copyLoading')}>
+          {t('fittings.stats.copy')}
+        </DisabledMenuItem>
+      </MenuKindContext.Provider>
+    );
+  }
+  return (
+    <DropdownMenuItem onSelect={() => void copyStats.copy()}>
+      {t('fittings.stats.copy')}
+    </DropdownMenuItem>
+  );
+}
+
 /**
  * Below desktop: one row — the identity, then Save and one ⋮ menu holding the
  * Fittings menu's items, the view, Export's and the badges (text, since a
@@ -152,9 +173,7 @@ function CompactFittingHeader({
             <DropdownMenuSeparator />
             {libraryItems}
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={!copyStats.canCopy} onSelect={() => void copyStats.copy()}>
-              {t('fittings.stats.copy')}
-            </DropdownMenuItem>
+            <CopyStatsMenuItem copyStats={copyStats} />
             <DropdownMenuSeparator />
             <p className={cx(eyebrowClassName, 'px-2 pt-1')}>{t('fittings.export.button')}</p>
             <FittingExportItems actions={exportActions} price={price} share={share?.items} />
@@ -354,12 +373,7 @@ export function FittingHeader({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
               {compareItem}
-              <DropdownMenuItem
-                disabled={!copyStats.canCopy}
-                onSelect={() => void copyStats.copy()}
-              >
-                {t('fittings.stats.copy')}
-              </DropdownMenuItem>
+              <CopyStatsMenuItem copyStats={copyStats} />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
