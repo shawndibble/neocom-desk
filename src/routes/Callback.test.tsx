@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -10,6 +10,7 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { Callback } from './Callback';
+import { resetCallbackRunsForTests } from './callbackRun';
 import { assignLocation } from '@/app/navigation';
 
 // `beginAddCharacterLogin` ends in a real top-level navigation; jsdom cannot
@@ -54,6 +55,7 @@ const server = mswServer(
 );
 
 beforeEach(async () => {
+  resetCallbackRunsForTests();
   tokenRequests = 0;
   vi.mocked(assignLocation).mockClear();
   sessionStorage.clear();
@@ -171,6 +173,90 @@ describe('Callback, Alerts Grant round trip (ADR 0020)', () => {
 
     expect(await screen.findByText('settings landing: failed')).toBeInTheDocument();
     expect(vi.mocked(assignLocation)).not.toHaveBeenCalled();
+  });
+});
+
+describe('Callback remounted mid-login', () => {
+  // A route remount (App's Suspense is keyed on the number format, which loads after the first
+  // paint) mounts a fresh Callback while the first one's exchange is in flight. It must wait for
+  // that login, not try to spend the one-time PKCE stash again.
+  function renderRemountable(search: string) {
+    const tree = (key: string) => (
+      <MemoryRouter initialEntries={[`/callback${search}`]}>
+        <Routes>
+          <Route path="/callback" element={<Callback key={key} />} />
+          <Route path="/characters" element={<div>characters page</div>} />
+          <Route path="/overview" element={<div>overview page</div>} />
+          <Route path="/ships/fittings" element={<div>fittings page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const view = render(tree('first'));
+    view.rerender(tree('second'));
+  }
+
+  it('waits for the login in flight with no error panel, then keeps the page it came from', async () => {
+    // The reported case: the automatic restart is already spent, so a second run would have
+    // stopped on the spent stash and shown "already used" until the first one landed.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.post('https://login.eveonline.com/v2/oauth/token', async () => {
+        tokenRequests += 1;
+        await held;
+        return HttpResponse.json({
+          access_token: makeAccessJwt(),
+          token_type: 'Bearer',
+          expires_in: 1199,
+          refresh_token: 'refresh-1',
+        });
+      })
+    );
+    stashLogin('state-r');
+    exhaustedBudget();
+    setLoginReturnTo('/ships/fittings');
+    renderRemountable('?code=good-code&state=state-r');
+
+    await waitFor(() => expect(tokenRequests).toBe(1));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    release();
+
+    expect(await screen.findByText('fittings page')).toBeInTheDocument();
+    expect(tokenRequests).toBe(1);
+    expect(vi.mocked(assignLocation)).not.toHaveBeenCalled();
+  });
+
+  describe('a real failure', () => {
+    beforeEach(() => {
+      server.use(
+        http.post('https://login.eveonline.com/v2/oauth/token', () => {
+          tokenRequests += 1;
+          return HttpResponse.json({ error: 'invalid_grant' }, { status: 400 });
+        })
+      );
+      stashLogin('state-r');
+      exhaustedBudget();
+      setLoginReturnTo('/ships/fittings');
+    });
+
+    it('is shown once, from the one exchange', async () => {
+      renderRemountable('?code=bad&state=state-r');
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(tokenRequests).toBe(1);
+      expect(screen.queryByText(/already been used/i)).not.toBeInTheDocument();
+    });
+
+    it('Try again restarts the login and keeps the page it came from', async () => {
+      renderRemountable('?code=bad&state=state-r');
+      await screen.findByRole('alert');
+      await userEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+      await waitFor(() => expect(vi.mocked(assignLocation)).toHaveBeenCalledTimes(1));
+      expect(JSON.parse(sessionStorage.getItem('neocom.loginReturnTo') ?? '{}').path).toBe(
+        '/ships/fittings'
+      );
+    });
   });
 });
 
