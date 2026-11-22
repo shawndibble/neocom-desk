@@ -35,6 +35,17 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
   ticket loop calls it automatically. `/code-review` sub-agents are
   read-only diff review and must never run tests, lint, typecheck, or build.
+- **Lint, format and typecheck results are cached.** `npm run lint` and
+  `npm run format:check` run with `--cache --cache-strategy content` (into
+  `.cache/eslint`, `.cache/prettier`), and `tsc -b` keeps `.cache/tsc`, so a
+  rerun re-checks only the files that changed (measured on a fresh-mtime
+  checkout: ESLint 169s -> 3s, Prettier 88s -> 12s, `tsc -b` 106s -> 1s).
+  `check-cache-warm.yml` saves the three on `develop`, one entry a day, and
+  `static` restores them (restore only: a PR run saving its own copy would
+  fill the cache quota with single-use entries, the reason `cache-warm.yml`
+  exists). ESLint here has no type-aware rules, so a content-keyed cache
+  cannot miss an error caused by another file; adding one means dropping
+  `--cache` from `lint`.
 - **`npm run typecheck` is `tsc -b` over two projects**: `tsconfig.src.json` (shipped code, emits
   declarations to `.cache/tsc`) and `tsconfig.tests.json` (tests, stories, e2e, tool configs;
   checks `src` through the reference). A single `tsc --noEmit` over everything peaked at 4.3 GB and

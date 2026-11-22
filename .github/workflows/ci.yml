@@ -26,7 +26,9 @@ jobs:
   # its base branch or the default branch (`main`), and this workflow never
   # runs on either. cache-warm.yml saves the dependency caches there, so a PR's
   # first run hits them. It mirrors every actions/cache and setup-node cache
-  # below (path, key, runner image), so change one in both places. Jobs that
+  # below (path, key, runner image), so change one in both places. The one
+  # exception is the lint/format/typecheck result cache in `static`, saved by
+  # check-cache-warm.yml (path list and key prefix must match there too). Jobs that
   # restore node_modules don't also take setup-node's npm download cache: on a
   # hit it is a wasted download, and on a miss each PR would save its own.
   #
@@ -81,6 +83,19 @@ jobs:
             ~/.cache/firebase
           key: firebase-tools-14.27.0-${{ runner.os }}
       - run: npm ci --prefix functions
+      # Lint, format and typecheck results, saved on `develop` by
+      # check-cache-warm.yml (never here: a PR run would save its own copy).
+      # ESLint and Prettier key on file content and tsc on file hashes, so a
+      # fresh checkout reuses every unchanged file's result. The key never
+      # exists, so only a restore key can hit, and the newest one wins.
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache/eslint
+            .cache/prettier
+            .cache/tsc
+          key: checks-${{ runner.os }}-${{ github.sha }}
+          restore-keys: checks-${{ runner.os }}-
       # The checks are independent; each runs even when the one before it
       # failed, so one red result never hides the others. Still
       # `!cancelled()`, so a superseded run stops.
