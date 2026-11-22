@@ -7404,6 +7404,8 @@
       "gap": "Missing: {{ranges, list}}. EVE only gives us the last 30 days, so days when the app wasn't opened can't be filled in later."
     },
     "viewByStation": "By station",
+    "viewFlat": "All transactions",
+    "viewLabel": "Transactions view",
     "stationsFilterLabel": "Stations",
     "stationsAll": "All stations",
     "stationsSearchPlaceholder": "Search stations…",
