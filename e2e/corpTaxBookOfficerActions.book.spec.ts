@@ -78,7 +78,7 @@ test('recording a transfer the book already holds is refused', async ({ page }) 
 async function openMovePayment(page: Page) {
   await openMiner(page, book.id('bram'), MINER.bram.name);
   await owed(page, 0);
-  await page.getByRole('button', { name: /^More actions for .* payment$/ }).click();
+  await page.getByRole('button', { name: /^More actions for .* Payment$/ }).click();
   await page.getByRole('menuitem', { name: 'Move to another Miner' }).click();
   return page.getByRole('dialog', { name: 'Move a payment' });
 }
@@ -100,7 +100,7 @@ test('an officer moves a payment to another Miner', async ({ page }) => {
   // Straight to Bram's page, as a link would: the book is read for him alone.
   await page.goto(minerUrl(book.id('bram')));
   await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /^More actions for .* payment$/ }).click();
+  await page.getByRole('button', { name: /^More actions for .* Payment$/ }).click();
   await page.getByRole('menuitem', { name: 'Move to another Miner' }).click();
   const dialog = page.getByRole('dialog', { name: 'Move a payment' });
   await dialog.getByRole('radio', { name: MINER.cora.name }).check();

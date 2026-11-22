@@ -24,8 +24,8 @@ test('an edit before the lock date is refused or hidden', async ({ page, book: e
   const ledger = page.getByRole('table', { name: 'Ledger', exact: true });
   // Her two recent owed days can be re-rated or dismissed; the old owed day, before the lock
   // date, cannot, and nor can the old payment.
-  await expect(ledger.getByRole('button', { name: /^More actions for .* charge$/ })).toHaveCount(2);
-  await expect(ledger.getByRole('button', { name: /^More actions for .* payment$/ })).toHaveCount(
+  await expect(ledger.getByRole('button', { name: /^More actions for .* Charge$/ })).toHaveCount(2);
+  await expect(ledger.getByRole('button', { name: /^More actions for .* Payment$/ })).toHaveCount(
     0
   );
 });
