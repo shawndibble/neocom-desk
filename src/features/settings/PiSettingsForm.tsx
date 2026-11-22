@@ -22,7 +22,7 @@ import {
 } from '@/features/pi/piSettings';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { ChipRow, SettingsFormLoading } from './settingsFields';
+import { SegmentedRow, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /**
@@ -130,7 +130,7 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
         </label>
       </Field>
 
-      <ChipRow
+      <SegmentedRow
         label={t('settings.piExpiringLabel')}
         hint={t('settings.piExpiringHint')}
         options={EXPIRING_WINDOW_HOUR_OPTIONS}

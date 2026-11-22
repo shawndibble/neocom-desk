@@ -18,7 +18,7 @@ import {
 import { RefiningSetupFields } from '@/features/refining/RefiningSetupFields';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { LpValueField } from '@/features/settings/LpValueSettingsForm';
-import { ChipRow, SettingsPanelLoading } from '@/features/settings/settingsFields';
+import { SegmentedRow, SettingsPanelLoading } from '@/features/settings/settingsFields';
 
 export function MarketDefaultsPanel() {
   const { t } = useTranslation();
@@ -51,7 +51,7 @@ export function MarketDefaultsPanel() {
 
           <RefiningSetupFields refining={refining} />
 
-          <ChipRow
+          <SegmentedRow
             label={t('settings.courierCollateralLabel')}
             hint={t('settings.courierCollateralHint')}
             options={COLLATERAL_RATIO_OPTIONS}
@@ -60,7 +60,7 @@ export function MarketDefaultsPanel() {
             labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
           />
 
-          <ChipRow
+          <SegmentedRow
             label={t('settings.itemContractFlagLabel')}
             hint={t('settings.itemContractFlagHint')}
             options={ITEM_FLAG_MULTIPLE_OPTIONS}

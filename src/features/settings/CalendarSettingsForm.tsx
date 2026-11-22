@@ -10,7 +10,7 @@ import {
 } from '@/features/character/calendarSharedPopTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TIME_FORMATS, useTimeFormat } from '@/lib/timeFormat';
-import { ChipRow, SettingsFormLoading } from './settingsFields';
+import { SegmentedRow, SettingsFormLoading } from './settingsFields';
 
 /**
  * The Calendar page's settings modal: time format and which day the week starts on (the same
@@ -29,7 +29,7 @@ export function CalendarSettingsForm() {
   if (!hydrated) return <SettingsFormLoading />;
   return (
     <Fields variant="form">
-      <ChipRow
+      <SegmentedRow
         label={t('settings.timeFormatLabel')}
         hint={t('settings.timeFormatHint')}
         options={TIME_FORMATS}
@@ -37,7 +37,7 @@ export function CalendarSettingsForm() {
         onSelect={(format) => void setTimeFormat(format)}
         labelFor={(format) => t(`settings.timeFormat.${format}`)}
       />
-      <ChipRow
+      <SegmentedRow
         label={t('settings.weekStartLabel')}
         hint={t('settings.weekStartHint')}
         options={CALENDAR_WEEK_START_DAYS}
@@ -45,7 +45,7 @@ export function CalendarSettingsForm() {
         onSelect={(day) => void setWeekStart(day)}
         labelFor={(day) => t(`settings.weekStart.${day}`)}
       />
-      <ChipRow
+      <SegmentedRow
         label={t('settings.sharedPopTimeLabel')}
         hint={t('settings.sharedPopTimeHint')}
         options={SHARED_POP_TIME_CHOICES}
