@@ -67,13 +67,13 @@ export function ContinueSessionCard({
           })}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" disabled={busy} onClick={onContinue}>
+          <Button variant="primary" aria-disabled={busy || undefined} onClick={onContinue}>
             {t('miningTax.continue.action', { date: previous.date })}
           </Button>
-          <Button disabled={busy} onClick={onChooseOther}>
+          <Button aria-disabled={busy || undefined} onClick={onChooseOther}>
             {t('miningTax.continue.otherPayee')}
           </Button>
-          <Button variant="ghost" disabled={busy} onClick={onKeepSeparate}>
+          <Button variant="ghost" aria-disabled={busy || undefined} onClick={onKeepSeparate}>
             {t('miningTax.continue.keepSeparate')}
           </Button>
         </div>

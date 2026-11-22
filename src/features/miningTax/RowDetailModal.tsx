@@ -383,7 +383,7 @@ export function RowDetailModal({
           >
             <p>{t('miningTax.detail.unassignConfirm', { payee: payeeName })}</p>
             <div className="flex gap-2">
-              <Button size="sm" variant="danger" disabled={busy} onClick={onUndo}>
+              <Button size="sm" variant="danger" aria-disabled={busy || undefined} onClick={onUndo}>
                 {t('miningTax.unassignAction')}
               </Button>
               <Button size="sm" onClick={() => setConfirmUnassign(false)}>
@@ -396,7 +396,7 @@ export function RowDetailModal({
         <LedgerActionError error={saveError} />
         {status === 'dismissed' ? (
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button size="sm" disabled={busy} onClick={onUndo}>
+            <Button size="sm" aria-disabled={busy || undefined} onClick={onUndo}>
               {t('miningTax.undismissAction')}
             </Button>
             <Button size="sm" onClick={onClose}>
@@ -418,11 +418,11 @@ export function RowDetailModal({
             suggestion={suggestion}
             extraActions={
               <>
-                <Button size="sm" disabled={busy} onClick={onDismiss}>
+                <Button size="sm" aria-disabled={busy || undefined} onClick={onDismiss}>
                   {t('miningTax.dismissAction')}
                 </Button>
                 {onJoin && (
-                  <Button size="sm" disabled={busy} onClick={onJoin}>
+                  <Button size="sm" aria-disabled={busy || undefined} onClick={onJoin}>
                     {t('miningTax.joinAction')}
                   </Button>
                 )}
@@ -432,17 +432,17 @@ export function RowDetailModal({
         ) : (
           <div className="flex flex-wrap gap-2 pt-1">
             {status === 'outstanding' && onSettleUp && (
-              <Button variant="primary" disabled={busy} onClick={onSettleUp}>
+              <Button variant="primary" aria-disabled={busy || undefined} onClick={onSettleUp}>
                 {t('miningTax.settleUpAction')}
               </Button>
             )}
             {status === 'needs-review' && (
-              <Button variant="primary" disabled={busy} onClick={onResolve}>
+              <Button variant="primary" aria-disabled={busy || undefined} onClick={onResolve}>
                 {t('miningTax.resolveConfirm')}
               </Button>
             )}
             {status === 'needs-review' && onSplit && (
-              <Button disabled={busy} onClick={onSplit}>
+              <Button aria-disabled={busy || undefined} onClick={onSplit}>
                 {t('miningTax.detail.reviewSplitAction')}
               </Button>
             )}

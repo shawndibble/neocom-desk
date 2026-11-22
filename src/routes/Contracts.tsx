@@ -435,7 +435,7 @@ export function Contracts() {
               icon={<Icon.Refresh />}
               label={t('contractSearch.refresh')}
               onClick={() => searchStatus?.refresh()}
-              disabled={searchStatus === null || searchStatus.loading}
+              busy={searchStatus === null || searchStatus.loading}
             />
           )
         }
