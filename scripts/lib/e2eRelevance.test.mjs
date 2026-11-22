@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { needsBookE2e, needsE2e } from './e2eRelevance.mjs';
+import { needsBookE2e, needsBookE2eOnPr, needsE2e } from './e2eRelevance.mjs';
 
 describe('needsE2e', () => {
   it('skips e2e when every change is docs, tooling config or backend-only', () => {
@@ -81,5 +81,30 @@ describe('needsBookE2e', () => {
 
   it('runs them when it was given no files', () => {
     expect(needsBookE2e([])).toBe(true);
+  });
+});
+
+describe('needsBookE2eOnPr', () => {
+  it('runs for the backend, the harness and tax, mining or moons code', () => {
+    expect(needsBookE2eOnPr(['functions/src/corpTaxBook.ts'])).toBe(true);
+    expect(needsBookE2eOnPr(['firestore.rules'])).toBe(true);
+    expect(needsBookE2eOnPr(['e2e/corpTaxBookNotes.book.spec.ts'])).toBe(true);
+    expect(needsBookE2eOnPr(['src/features/mining/MiningTaxPage.tsx'])).toBe(true);
+    expect(needsBookE2eOnPr(['src/features/corp/moons/MoonsList.tsx'])).toBe(true);
+  });
+
+  it('skips unrelated app code, which the full run covers', () => {
+    expect(needsBookE2eOnPr(['src/routes/Market.tsx', 'src/features/fittings/Fit.tsx'])).toBe(
+      false
+    );
+  });
+
+  it('skips unit tests even under a matching path', () => {
+    expect(needsBookE2eOnPr(['src/features/mining/MiningTax.test.tsx'])).toBe(false);
+    expect(needsBookE2eOnPr(['functions/src/corpTaxBook.test.ts'])).toBe(false);
+  });
+
+  it('runs when the diff failed', () => {
+    expect(needsBookE2eOnPr([])).toBe(true);
   });
 });

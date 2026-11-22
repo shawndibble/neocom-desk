@@ -61,3 +61,38 @@ export function needsE2e(changedFiles) {
 export function needsBookE2e(changedFiles) {
   return needsRun(changedFiles, BOOK_SAFE);
 }
+
+/**
+ * What the Corp Tax Book specs can see on a PR: the backend and emulator
+ * config, their own harness and specs, and the tax, mining and moons code they
+ * drive (`/mining/tax`, `/corp-tax-book/verify`, `/corp/moons`). The wider
+ * `needsBookE2e` also runs them for any other app change; that is the full
+ * run's job (`develop-full.yml`), since this job alone takes ~11 minutes.
+ */
+const BOOK_PR_INPUTS = [
+  /^functions\//,
+  /^firestore\.(rules|indexes\.json)$/,
+  /^firebase\.json$/,
+  /^\.firebaserc$/,
+  /^playwright\.book\.config\.ts$/,
+  /^scripts\/e2e-book\//,
+  /^e2e\/(support\/taxBook|.*\.book\.spec\.ts$)/,
+  /^src\/.*(tax|mining|moon|sync|db\/)/i,
+];
+
+/**
+ * @param {string[]} changedFiles repo-relative paths, `/`-separated
+ * @returns {boolean} true when a PR's change can reach the Corp Tax Book specs
+ */
+export function needsBookE2eOnPr(changedFiles) {
+  if (changedFiles.length === 0) return true;
+  return (
+    needsBookE2e(changedFiles) &&
+    changedFiles.some(
+      (file) =>
+        BOOK_PR_INPUTS.some((pattern) => pattern.test(file)) &&
+        !/^functions\/src\/.*\.test\.ts$/.test(file) &&
+        !/^src\/.*\.test\.tsx?$/.test(file)
+    )
+  );
+}

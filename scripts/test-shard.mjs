@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
  * Prints the unit test files one CI shard should run, one per line:
- *   node scripts/test-shard.mjs --shard 3/4
+ *   node scripts/test-shard.mjs --shard 3/4 [--from <file>]
+ *
+ * `--from` deals out the test files listed in <file> (one per line, as
+ * `select-tests.mjs` writes it) instead of every test file in the repo.
  *
  * Weights live in scripts/test-shard-weights.json (seconds of wall time per
  * file). Refresh them from the `vitest-timing-shard-N` CI artifacts with
@@ -40,9 +43,11 @@ if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || cur
 }
 
 // Recursive, unlike `e2e/`, so ask git rather than read one directory.
-const files = execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-  .split('\n')
-  .filter(isUnitTestFile);
+const files = args.includes('--from')
+  ? readFileSync(flag('--from'), 'utf8').split('\n').filter(isUnitTestFile)
+  : execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+      .split('\n')
+      .filter(isUnitTestFile);
 const weights = JSON.parse(readFileSync(WEIGHTS_PATH, 'utf8'));
 const mine = partitionByWeight(files, weights, total)[current - 1];
 // Nothing at all for an empty shard: a bare newline would reach Vitest as one

@@ -1,22 +1,43 @@
 #!/usr/bin/env node
 /**
- * Decides whether this PR run needs the e2e shards (ci.yml's `build` job reads `run_e2e`) and
- * the Corp Tax Book specs (its `tests-needed` job reads `run_book`):
- *   node scripts/needs-e2e.mjs      (appends `run_e2e=` and `run_book=true|false` to $GITHUB_OUTPUT)
+ * Decides what e2e work this run does, for ci.yml's `build` job (`run_e2e`,
+ * `e2e_shards`, `e2e_matrix`) and `tests-needed` job (`run_book`):
+ *   node scripts/needs-e2e.mjs
+ * and appends the answers to $GITHUB_OUTPUT.
  *
- * Diffs the merge commit against its base (see lib/changedFiles.mjs). Anything
- * that does not look like that answers `true`: a wasted e2e run is cheap, a
- * skipped one that mattered is not.
+ * A pull request diffs its merge commit against the base (lib/changedFiles.mjs)
+ * and runs the behaviour specs when app code changed, plus the Corp Tax Book
+ * specs when their inputs did (`needsBookE2eOnPr`). A full run (`CI_FULL=true`,
+ * `develop-full.yml`) runs every spec, layout ones included. Anything that does
+ * not look like either answers `true`: a wasted e2e run is cheap, a skipped one
+ * that mattered is not.
  */
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { changedFiles } from './lib/changedFiles.mjs';
-import { needsBookE2e, needsE2e } from './lib/e2eRelevance.mjs';
+import { shardCount, shardMatrix } from './lib/ciPlan.mjs';
+import { listE2eSpecs } from './lib/e2eSpecs.mjs';
+import { needsBookE2eOnPr, needsE2e } from './lib/e2eRelevance.mjs';
 
-const files = changedFiles('needs-e2e');
-const run = needsE2e(files);
-console.log(`needs-e2e: ${files.length} changed files, e2e ${run ? 'needed' : 'skipped'}`);
-if (!run) console.log(files.map((file) => `  ${file}`).join('\n'));
-const book = needsBookE2e(files);
-console.log(`needs-e2e: Corp Tax Book specs ${book ? 'needed' : 'skipped'}`);
+/** Seconds of worker time per shard to aim for (the weights are worker seconds). */
+const SHARD_TARGET_WEIGHT = 400;
+const MAX_SHARDS = 6;
+
+const full = process.env.CI_FULL === 'true';
+const files = full ? [] : changedFiles('needs-e2e');
+const run = full || needsE2e(files);
+const book = full || needsBookE2eOnPr(files);
+console.log(
+  `needs-e2e: ${full ? 'full run' : `${files.length} changed files`}, e2e ${run ? 'needed' : 'skipped'}, Corp Tax Book specs ${book ? 'needed' : 'skipped'}`
+);
+if (!run || !book) console.log(files.map((file) => `  ${file}`).join('\n'));
+
+const specs = run ? listE2eSpecs({ skipLayout: !full }) : [];
+const weights = JSON.parse(readFileSync('e2e/shard-weights.json', 'utf8'));
+const shards = shardCount(specs, weights, SHARD_TARGET_WEIGHT, MAX_SHARDS);
+console.log(`needs-e2e: ${specs.length} specs in ${shards} shards`);
+
 if (process.env.GITHUB_OUTPUT)
-  appendFileSync(process.env.GITHUB_OUTPUT, `run_e2e=${run}\nrun_book=${book}\n`);
+  appendFileSync(
+    process.env.GITHUB_OUTPUT,
+    `run_e2e=${run}\nrun_book=${book}\ne2e_shards=${shards}\ne2e_matrix=${shardMatrix(shards)}\n`
+  );
