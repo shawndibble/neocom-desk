@@ -66,9 +66,7 @@ describe('computeOwnership — ore released to a corporation book stays released
   ): CoveringAssignment => ({ id, oreLines: lines, releasedTypeIds });
 
   it('does not grow a released type back into the sole collector, nor offer it as unassigned', () => {
-    const result = computeOwnership(entry, [
-      released('a', [{ typeId: A, quantity: 100 }], [B]),
-    ]);
+    const result = computeOwnership(entry, [released('a', [{ typeId: A, quantity: 100 }], [B])]);
     expect(result.unassigned).toEqual([]);
     expect(result.ownedLines.get('a')).toEqual([{ typeId: A, quantity: 100 }]);
   });
