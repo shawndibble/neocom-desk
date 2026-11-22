@@ -90,7 +90,7 @@ describe('RichMailBodyEditor', () => {
     expect(seen).toHaveBeenLastCalledWith('ax<b>b</b> &lt; c');
     expect(screen.getByTestId('value')).toHaveTextContent('ax<b>b</b> &lt; c');
     await user.click(screen.getByRole('button', { name: 'Edit source' }));
-    expect(screen.getByRole('status')).toHaveTextContent("EVE can't show it");
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("EVE can't show it"));
   });
 
   it('wraps the Source selection in tags from the format bar', async () => {
