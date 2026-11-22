@@ -183,7 +183,7 @@ export function OverviewDemo() {
     >
       <span
         id="login-preview-label"
-        className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase"
+        className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.6875rem] tracking-widest text-text-dim uppercase"
       >
         {t('login.previewLabel')}
       </span>
@@ -238,7 +238,7 @@ export function OverviewDemo() {
               <span
                 aria-hidden="true"
                 className={cx(
-                  'absolute -top-1 -right-1 min-w-4 rounded-xs bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-bg tabular-nums',
+                  'absolute -top-1 -right-1 min-w-4 rounded-xs bg-accent px-1 text-center text-[0.6875rem] leading-4 font-semibold text-bg tabular-nums',
                   phase === 'arrived' && 'lp-badge-pulse'
                 )}
               >

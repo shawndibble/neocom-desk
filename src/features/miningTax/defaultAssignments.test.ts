@@ -3,6 +3,7 @@ import { db, type PayeeRecord } from '@/db';
 import { applyDefaultSystems } from './defaultAssignments';
 import { useDefaultOptOuts } from './defaultOptOuts';
 import { unassign } from './ledgerActions';
+import { saveBookOwned } from './paymentLinkStore';
 
 const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn(), setSyncedSetting: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
@@ -47,6 +48,13 @@ beforeEach(async () => {
 });
 
 describe('applyDefaultSystems', () => {
+  it('never bills a Payee a Corp Tax Book is the authority for, whatever its Default Systems say', async () => {
+    await db.payees.put(payee());
+    await saveBookOwned(new Set(['landlord']));
+    expect(await applyDefaultSystems([ledger(50)])).toEqual([]);
+    expect(await db.miningTaxAssignments.count()).toBe(0);
+  });
+
   it('assigns a Default System’s ore to its Payee at the Payee’s rate and hub, marked as a default', async () => {
     await db.payees.put(payee());
 

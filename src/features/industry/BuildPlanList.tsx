@@ -450,7 +450,7 @@ export function BuildPlanList({
               (a nested list per group would announce "list, 1 item" before
               every plan), so this is a plain labelled strip lined up with the
               row cells by the same fixed widths, not real table cells. */}
-            <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               <span className="flex-1">{t('industry.title')}</span>
               <BuildPlanSortHeader
                 sortKey="profit"

@@ -52,8 +52,18 @@ export interface LedgerPayment {
   href?: string;
   /** A wallet donation, or a payment an officer recorded by hand. */
   source?: 'donation' | 'manual';
+  /**
+   * What a personal Payee's payment is, so a pilot can tell them apart: a wallet transfer, a
+   * contract paid in kind, a payment recorded in Settle up, one read from an old client's marks,
+   * or a bare "Mark paid" (no money at all: it settled one day).
+   */
+  via?: 'journal' | 'contract' | 'recorded' | 'legacy' | 'marked';
+  /** Who a personal payment was sent to (the Payee), already named. */
+  to?: string;
   /** What an officer marked not tax: the account credits only the rest. */
   notTax?: number;
+  /** A personal payment's full transfer amount, before any not-tax part or write-off. */
+  amount?: number;
 }
 
 /** An officer's write-off, as the account was given it. */
@@ -100,6 +110,11 @@ export interface PayeeLedgerSource {
   opening?: { through: string; balance: number };
   charges: readonly LedgerCharge[];
   payments?: readonly LedgerPayment[];
+  /**
+   * A personal Payee's bare "Mark paid"s (`PayeeRunningAccount.marked`): each shows as a Marked
+   * paid row with what it settled of its own day, possibly nothing. Never money.
+   */
+  marked?: readonly { id: string; at: string; date: string | null; amount: number }[];
   /** In the order they were recorded; absent for a personal Payee. */
   writeOffs?: readonly LedgerWriteOff[];
   /** Absent for a personal Payee. */
@@ -190,6 +205,7 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
       : []),
     ...chargeRows(source).filter((r) => !opening || r.date > opening.through),
     ...paymentRows(source),
+    ...markedRows(source),
     ...officerWriteOffRows(source),
     ...toleranceRows(source),
     ...(source.notices ?? []).map((notice): Unbalanced => ({
@@ -287,6 +303,20 @@ function paymentRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[
       },
     ];
   });
+}
+
+function markedRows({ marked = [] }: PayeeLedgerSource): Unbalanced[] {
+  return marked.map((m): Unbalanced => ({
+    kind: 'payment',
+    key: `payment:${m.id}`,
+    date: utcDayOf(m.at),
+    at: m.at,
+    charged: 0,
+    paid: m.amount,
+    payment: { id: m.id, at: m.at, via: 'marked' },
+    days: m.date !== null && m.amount > 0 ? [{ date: m.date, amount: m.amount }] : [],
+    credit: 0,
+  }));
 }
 
 /**

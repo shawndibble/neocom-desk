@@ -7,6 +7,7 @@ import { db } from '@/db';
 import {
   DataAgeBadge,
   EmptyState,
+  LoadFailedState,
   Panel,
   SearchInput,
   Spinner,
@@ -357,7 +358,7 @@ export function Skills() {
       {loading && !data ? (
         <Spinner block="page" label={t('common.loading')} />
       ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        <LoadFailedState title={t('common.loadFailed.skills')} onRetry={refresh} />
       ) : skillsBlocked ? (
         <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterSkills']} />
       ) : !skillsResult ? (

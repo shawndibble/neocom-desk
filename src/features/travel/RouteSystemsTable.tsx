@@ -258,7 +258,7 @@ function useColumns(
 function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell }) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-1 text-[0.8125rem]">
+    <div className="space-y-1 text-sm">
       <p>{t('travel.detail.npcKills', { count: count(row.npcKills) })}</p>
       <RecentKillsDetail cell={cell} systemId={row.systemId} systemName={routeSystemName(row)} />
     </div>

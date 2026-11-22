@@ -154,12 +154,25 @@ const mail: Builder = (feeds, { t, now, activeCharacterId }) => {
   };
 };
 
+/** The oldest real read among the entries; null when none landed (a failed read is not a fresh one). */
+function oldestFetch(entries: readonly { fetchedAt: number }[]): Date | null {
+  const times = entries.map((entry) => entry.fetchedAt).filter((at) => at > 0);
+  return times.length > 0 ? new Date(Math.min(...times)) : null;
+}
+
 const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const feed = feeds.orders;
   const snapshot = feed?.data ?? null;
   const to = '/market/orders';
   if (!snapshot) return blank(to, statusOf(feed));
   const everyone = scopeAll || activeCharacterId === null;
+  // A read that landed nothing (no result, no lapsed grant) is unknown, never "no open orders".
+  const asked = snapshot.openOrders.entries.filter(
+    (entry) => everyone || entry.characterId === activeCharacterId
+  );
+  if (asked.length > 0 && asked.every((entry) => entry.fetchedAt === 0 && !entry.needsReauth)) {
+    return blank(to, { ...statusOf(feed, { hasData: false }), error: true });
+  }
   // `loadOpenOrdersSnapshot` fans out across every Character because it backs
   // the cross-character Orders page; a widget on one Character narrows the
   // built rows, which costs nothing since the other Characters' orders were
@@ -191,8 +204,8 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
         hasStaleData: rows.length > 0,
       })
     ),
-    // The snapshot's own clock: when its orders were read, not when this view was built.
-    fetchedAt: new Date(snapshot.now),
+    // When ESI last answered for these Characters, never when this view was built.
+    fetchedAt: oldestFetch(asked),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),

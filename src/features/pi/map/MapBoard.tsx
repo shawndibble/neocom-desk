@@ -595,7 +595,7 @@ export function MapBoard(props: MapBoardProps) {
                                 {formatIskCompact(figure.iskPerDay)}
                               </span>
                               {figure.needsCcLevel && (
-                                <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
+                                <span className="rounded-xs border border-warning/60 px-1 text-[0.6875rem] leading-[0.875rem] font-semibold text-warning">
                                   {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
                                 </span>
                               )}

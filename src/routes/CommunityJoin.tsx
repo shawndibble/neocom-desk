@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { InlineError } from '@/components/ui/InlineError';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -13,6 +12,7 @@ import {
   Checkbox,
   CharacterAvatar,
   EmptyState,
+  LoadFailedState,
   EveSsoButton,
   NeedsConnection,
   LogoMark,
@@ -63,6 +63,7 @@ export function CommunityJoin() {
   const setActiveCharacter = useActiveCharacter((s) => s.setActiveCharacter);
 
   const [state, setState] = useState<PreviewState>({ status: 'loading' });
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -82,7 +83,7 @@ export function CommunityJoin() {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, previewAttempt]);
 
   const characters = useLiveQuery(async () =>
     (await db.characters.toArray()).sort((a, b) => a.addedAt - b.addedAt)
@@ -199,7 +200,14 @@ export function CommunityJoin() {
           <EmptyState title={t('communities.join.gone')} hint={t('communities.join.goneHint')} />
         )}
         {state.status === 'unavailable' && (
-          <InlineError>{t('communities.join.unavailable')}</InlineError>
+          <LoadFailedState
+            title={t('common.loadFailed.communityInvite')}
+            hint={t('communities.join.unavailable')}
+            onRetry={() => {
+              setState({ status: 'loading' });
+              setPreviewAttempt((n) => n + 1);
+            }}
+          />
         )}
 
         {state.status === 'ok' && (

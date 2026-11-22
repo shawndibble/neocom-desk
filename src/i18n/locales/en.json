@@ -2834,8 +2834,7 @@
       "showNeeds": "What {{grade}} needs for {{name}}",
       "showDetails": "About {{name}}",
       "missingFor": "Missing for {{grade}}",
-      "noMatches": "No certificates match these filters.",
-      "loadFailed": "Couldn’t load the certificates."
+      "noMatches": "No certificates match these filters."
     }
   },
   "accelerator": {
@@ -3904,7 +3903,7 @@
     "jobsTitle": "Jobs",
     "jobsRefresh": "Refresh",
     "jobsEmptyTitle": "Job data not loaded yet",
-    "jobsEmptyHint": "Refresh once you're back online to load this character's running industry jobs.",
+    "jobsEmptyHint": "EVE's servers didn't send this character's running industry jobs. Try Refresh in a moment.",
     "jobsNoneMeta": "None",
     "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
@@ -4958,7 +4957,8 @@
     "footerPrivacy": "Privacy policy",
     "footerDataCredit": "Data credit",
     "footerDiscord": "Discord",
-    "permissionsPrivacy": "How your data is stored and deleted:"
+    "permissionsPrivacy": "How your data is stored and deleted:",
+    "failed": "Couldn’t start the login. Check your connection and try again."
   },
   "callback": {
     "completing": "Completing login…",
@@ -5073,7 +5073,7 @@
       "idle": "Idle",
       "paused": "Paused",
       "endingSoon": "Ending soon",
-      "unknown": "Unknown"
+      "unknown": "Not read"
     },
     "newGroup": "New group",
     "newGroupName": "New group name",
@@ -7130,6 +7130,11 @@
     "resetColumns": "Reset to default",
     "resetFilters": "Reset filters",
     "close": "Close",
+    "discardInputTitle": "Discard what you typed?",
+    "discardInputBody": "Closing this will throw away the changes you have not saved.",
+    "discardInputKeep": "Keep editing",
+    "discardInputConfirm": "Discard",
+    "needsInput": "Fill in the required fields to continue.",
     "save": "Save",
     "cancel": "Cancel",
     "loading": "Loading",
@@ -7204,6 +7209,28 @@
       "none": "None",
       "count": "{{count}} selected",
       "labelled": "{{label}}: {{value}}"
+    },
+    "loadFailed": {
+      "skills": "Couldn't load your skills",
+      "wallet": "Couldn't load your wallet",
+      "clones": "Couldn't load your clones",
+      "contacts": "Couldn't load your contacts",
+      "calendar": "Couldn't load your calendar",
+      "employment": "Couldn't load your employment history",
+      "contracts": "Couldn't load your contracts",
+      "mail": "Couldn't load your mail",
+      "assets": "Couldn't load your assets",
+      "tax": "Couldn't load the tax ledger",
+      "overview": "Couldn't load the mining overview",
+      "corpAssets": "Couldn't load the Corporation's assets",
+      "corpJournal": "Couldn't load the Corporation's wallet journal",
+      "corpDivisions": "Couldn't load the Corporation's wallet balances",
+      "interactions": "Couldn't load your interactions",
+      "survey": "Couldn't load this survey",
+      "surveyShare": "Couldn't load this survey",
+      "publicContract": "Couldn't load this contract's items",
+      "communityInvite": "Couldn't reach Neocom Desk to check this invite",
+      "skillCertificates": "Couldn't load your skill certificates"
     }
   },
   "wallet": {
@@ -7633,7 +7660,6 @@
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
     "refused": "This scan was rejected, so it wasn't saved.",
-    "loadFailed": "Couldn't load this survey. Trying again soon.",
     "emptyTitle": "No survey yet",
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
     "howTo": {
@@ -7838,7 +7864,8 @@
       "warning": "{{name}} becomes the owner and you will only be able to view it. They may need to log into Neocom Desk before they can edit the survey.",
       "submit": "Change owner",
       "back": "Back",
-      "failed": "Couldn't change the owner. Try again."
+      "failed": "Couldn't change the owner. Try again.",
+      "searchFailed": "Couldn’t search. Check your connection and keep typing to try again."
     },
     "formCompressed": "compressed",
     "formRaw": "raw",
@@ -8356,9 +8383,11 @@
       "unassigned": "Unassigned",
       "needsReview": "Needs Review",
       "outstanding": "Outstanding",
+      "tracked": "In the book",
       "paid": "Paid",
       "dismissed": "Dismissed"
     },
+    "trackedHint": "This Payee is a Corp Tax Book's corporation now. The book is what you owe it, so this day is not owed or settled here.",
     "needsReviewHint": "More ore showed up for this entry. Open the row to review the new total.",
     "selectRow": "Select {{date}}, {{system}}",
     "selectionCount": "{{count}} selected",
@@ -8571,6 +8600,14 @@
       "detailWithSystems": "{{pct}}% · priced at {{hub}} · mined in {{systems}}",
       "owed": "{{amount}} ISK",
       "settled": "Settled",
+      "archive": "Archive",
+      "archiveNamed": "Archive {{name}}",
+      "unarchive": "Unarchive",
+      "unarchiveNamed": "Unarchive {{name}}",
+      "archiveOwes": "Settle what you owe to archive this Payee.",
+      "archivedTitle": "Archived",
+      "trackedByBook": "Tracked by {{corp}}'s Corp Tax Book now",
+      "oldHistory": "Old history",
       "credit": "{{amount}} ISK credit",
       "sharedByCharacters_one": "Used by {{count}} character",
       "sharedByCharacters_other": "Used by {{count}} characters",
@@ -8637,6 +8674,14 @@
       "sentAmountPlaceholder": "ISK, e.g. 1,250,000",
       "hint": "Send it in EVE, then record it here. The wallet payment links itself once it shows in your journal.",
       "recordAction": "Record payment",
+      "dismiss": {
+        "action": "Dismiss balance",
+        "title": "Dismiss what {{payee}} is owed",
+        "intro": "I won't pay it: dismiss the {{amount}} ISK still owed to {{payee}}.",
+        "effect": "These days stay in your list marked No tax owed, and the Payee's account stops counting them. Nothing is sent to anyone. Undo a day from its row's menu.",
+        "confirm_one": "Dismiss {{count}} entry",
+        "confirm_other": "Dismiss {{count}} entries"
+      },
       "pickFromWallet": "Already in my wallet? Pick it",
       "fromLabel": "Paying from",
       "openInEveAs": "Open in EVE · {{name}}",
@@ -8827,6 +8872,20 @@
         "correction": "Adjustment",
         "payment": "Payment",
         "paymentFrom": "Payment from {{name}}",
+        "paymentVia": {
+          "journal": "Payment by wallet transfer",
+          "contract": "Payment by contract",
+          "recorded": "Payment recorded in Settle up",
+          "legacy": "Payment from older marks",
+          "marked": "Marked paid"
+        },
+        "paymentViaFrom": {
+          "journal": "Payment by wallet transfer from {{name}}",
+          "contract": "Payment by contract from {{name}}",
+          "recorded": "Payment recorded in Settle up by {{name}}",
+          "legacy": "Payment from older marks, {{name}}",
+          "marked": "Marked paid by {{name}}"
+        },
         "officer": "Written off by an officer",
         "tolerance": "Shortfall forgiven",
         "late": "Late notice sent",
@@ -8844,6 +8903,7 @@
           "donation": "A donation",
           "manual": "Recorded by hand"
         },
+        "marked": "You marked this day paid before payments could be linked. It settles only that day, for what real payments left of it: it is never money, and never credit.",
         "notTax": "{{amount}} marked not tax, so not credited.",
         "leftAsCredit": "{{amount}} left as credit.",
         "officer": "An officer forgave this much of the oldest unpaid days.",
@@ -8856,9 +8916,15 @@
         "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today.",
         "note": "The officer noted: {{note}}",
         "viewPayment": "View the payment",
+        "viewWalletEntry": "Open the wallet entry",
+        "sentTo": "Sent to {{payee}}: {{amount}} on {{date}}.",
+        "markedNoPayment": "Marked paid in an older version: no wallet payment recorded.",
+        "linkWalletPayment": "Link the wallet payment",
+        "recordedWaits": "Recorded in Settle up. It waits for its wallet entry, and links to it once a transfer of this amount shows up.",
         "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link."
       },
       "unlinkedToast": "Unlinked the {{amount}} ISK payment. Its days are owed again.",
+      "historySubtitle": "Your own record from before the Corp Tax Book. For reference only: it changes no figure.",
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
@@ -9943,7 +10009,8 @@
       "explain": "Scanned this planet? Pick the resources you would mine and Plan, Map and Colonies will only advise on those. Skip it and every resource counts.",
       "pickLabel": "Resources you would pull here",
       "clear": "Clear picks",
-      "done": "Back to the map"
+      "done": "Back to the map",
+      "saveFailed": "Couldn’t save these picks. They’re shown but not saved; tap a chip to try again."
     },
     "title": "Planet map",
     "helpButton": "How to use the map",
@@ -14627,7 +14694,8 @@
       "selectAll": "Select all",
       "selectNone": "Select none",
       "optionalCount": "Optional · {{count}} of {{total}}",
-      "submit": "Log in with selected permissions"
+      "submit": "Log in with selected permissions",
+      "loginFailed": "Couldn’t start the login. Your choices are kept; try again."
     }
   },
   "pageSettings": {
@@ -15951,8 +16019,6 @@
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE shows the corporation asset list only to a Director. No other corporation role can see it, and granting access here won't change that.",
       "roleLine": "The corporation asset list needs Director.",
-      "loadFailedTitle": "Could not load corp assets",
-      "loadFailedHint": "Couldn't read the corporation's assets. Try refreshing.",
       "searchPlaceholder": "Search items…",
       "unknownLocation": "Location #{{locationId}}",
       "unknownPlace": "Unknown location",
@@ -16204,7 +16270,6 @@
         "weKilled": "A corp pilot was on the killmail that killed them"
       }
     },
-    "loadFailedTitle": "Some interactions could not load",
     "loadFailedHint": "Showing what loaded. Try again to load the rest.",
     "filterLabel": "Show",
     "filterAll": "All",
@@ -16687,7 +16752,8 @@
     "structureUnreadable": "Can't read this structure",
     "structureUnreadableHint": "Only a character with docking access can see a structure's name and system.",
     "unknown": "Can't find this place",
-    "unknownHint": "Neocom Desk has no record of this location."
+    "unknownHint": "Neocom Desk has no record of this location.",
+    "loadFailed": "Couldn’t load this place"
   },
   "openInEve": {
     "label": "Open in EVE",
@@ -17945,7 +18011,8 @@
       "legendListed": "Listed (coloured by status)",
       "legendHangar": "In hangar, ready to list",
       "legendJobs": "In running jobs",
-      "fill": "Fill"
+      "fill": "Fill",
+      "targetInvalid": "Enter a whole number above 0."
     },
     "holders": {
       "characters_one": "{{count}} character",
@@ -18819,7 +18886,8 @@
           "mail": "Mail",
           "dismissed": "Dismissed",
           "audit": "Audit"
-        }
+        },
+        "activityLoadFailed": "Couldn’t load the audit log, so this list may be missing entries."
       },
       "activity": {
         "button": "Activity",
@@ -18924,7 +18992,8 @@
           "issueLateNoticePlain": "issued a late notice to <name>{{name}}</name>",
           "recordLateNoticeMail": "mailed a late notice to <name>{{name}}</name>"
         },
-        "declaredAmount": "they say they paid {{amount}}"
+        "declaredAmount": "they say they paid {{amount}}",
+        "loadFailed": "Couldn’t load the activity log"
       },
       "health": {
         "hiddenFromMembers": "Hidden from members until {{date}}",
@@ -22105,6 +22174,7 @@
       "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
       "esi-error": "EVE's servers did not answer. Try again in a few minutes.",
       "esi-forbidden": "EVE refused that login. Log in again."
-    }
+    },
+    "copyFailed": "Couldn’t copy"
   }
 }

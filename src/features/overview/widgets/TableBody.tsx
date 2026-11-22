@@ -202,7 +202,7 @@ function Row({
               cellPad,
               column.hideNarrow && HIDE_NARROW,
               trailingHidden && 'pr-3 @md:pr-0',
-              'py-0.5 text-[0.8125rem] tabular-nums',
+              'py-0.5 text-sm tabular-nums',
               column.key === growKey
                 ? 'w-full max-w-0 truncate whitespace-nowrap'
                 : first

@@ -302,4 +302,26 @@ describe('payeeLedger: what an officer’s page needs (C3)', () => {
     });
     expect(payeeLedger(src).notYetBilled).toEqual({ tax: 0, days: 0 });
   });
+
+  it('shows a bare mark as a Marked paid row with what it settled, never as money', () => {
+    const src = source(MINED, [payment('p1', 1_000_000, '2026-10-02T12:00:00Z')]);
+    const ledger = payeeLedger({
+      ...src,
+      payments: [{ id: 'p1', at: '2026-10-02T12:00:00Z', via: 'journal' }],
+      marked: [
+        {
+          id: 'legacy:mark:x',
+          at: '2026-10-04T00:00:00.000Z',
+          date: '2026-10-03',
+          amount: 500_000,
+        },
+        { id: 'legacy:mark:y', at: '2026-10-04T00:00:00.000Z', date: '2026-10-01', amount: 0 },
+      ],
+    });
+    const marked = ledger.rows.filter((r) => r.kind === 'payment' && r.payment.via === 'marked');
+    expect(marked.map((r) => [r.paid, r.kind === 'payment' ? r.days : []])).toEqual([
+      [500_000, [{ date: '2026-10-03', amount: 500_000 }]],
+      [0, []],
+    ]);
+  });
 });

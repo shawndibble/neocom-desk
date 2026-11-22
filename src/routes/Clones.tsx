@@ -6,6 +6,7 @@ import {
   DataAgeBadge,
   CachedEmptyState,
   EmptyState,
+  LoadFailedState,
   IconButton,
   Panel,
   SegmentedControl,
@@ -268,7 +269,7 @@ export function Clones() {
             <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterClones']} />
           </div>
         ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          <LoadFailedState title={t('common.loadFailed.clones')} onRetry={refresh} />
         ) : !clonesResult ? (
           <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
         ) : (

@@ -152,7 +152,7 @@ export function useAppraisalColumns({
         row.need !== undefined ? (
           <span>
             {formatVolume(row.need)}
-            <span className="block text-[0.625rem] text-text-dim">
+            <span className="block text-[0.6875rem] text-text-dim">
               {t('market.appraisal.ownedBeneath', { qty: formatVolume(row.owned ?? 0) })}
             </span>
           </span>

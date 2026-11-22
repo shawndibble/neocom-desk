@@ -58,7 +58,7 @@ const snapshot = {
   unpricedTypeIds: new Set<number>(),
 };
 
-const hoisted = vi.hoisted(() => ({ view: null as CorpBookView | null }));
+const hoisted = vi.hoisted(() => ({ view: null as CorpBookView | null, booksKnown: true }));
 
 vi.mock('@/lib/useRouteSnapshot', () => ({
   useRouteSnapshot: () => ({
@@ -72,6 +72,7 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
 vi.mock('./corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
     booksRead: true,
+    booksKnown: hoisted.booksKnown,
     view: hoisted.view,
     reload: vi.fn(),
     // No book the member has left: the left-the-corp notice has nothing to say here.
@@ -137,6 +138,7 @@ function renderTab() {
 beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-18T14:00:00Z'));
   hoisted.view = null;
+  hoisted.booksKnown = true;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -147,6 +149,13 @@ describe('TaxTab with a Corp Tax Book', () => {
     renderTab();
     expect(screen.queryByText(/Corp Tax Book/)).not.toBeInTheDocument();
     expect(screen.getAllByText('Unassigned').length).toBeGreaterThan(0);
+  });
+
+  it('shows no Payee card until the books are known, so a card is never replaced by its book', () => {
+    hoisted.booksKnown = false;
+    renderTab();
+    expect(screen.queryByRole('region', { name: /You owe|No moon mining tax/ })).toBeNull();
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
   });
 
   it('shows the corp Payee balance, a Billed row and the Safe to pay note', async () => {

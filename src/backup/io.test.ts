@@ -200,9 +200,9 @@ describe('restoring an existing-format backup file', () => {
     // costIndexOverridePct (J-Space cost index, 2026-10-12) and productSalePrice
     // (#6391) postdate this fixture.
     buildPlans: ['costIndexOverridePct', 'productSalePrice'],
-    // entityKind (Payee verification, 2026-10-14) and defaultSystems (Default Systems, 2026-11-03)
-    // postdate this fixture.
-    payees: ['entityKind', 'defaultSystems'],
+    // entityKind (Payee verification, 2026-10-14), defaultSystems (Default Systems, 2026-11-03) and
+    // archivedAt (archived Payees, decision 20261122-030058) postdate this fixture.
+    payees: ['entityKind', 'defaultSystems', 'archivedAt'],
   };
   /**
    * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than

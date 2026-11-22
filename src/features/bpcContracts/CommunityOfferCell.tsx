@@ -56,7 +56,7 @@ export function CommunityOfferCell({
         ) : (
           <span>{t('bpcContracts.communityAskToCopy', { name: row.memberName })}</span>
         )}
-        <span className="text-[0.625rem] font-semibold tracking-widest uppercase">
+        <span className="text-[0.6875rem] font-semibold tracking-widest uppercase">
           {t('bpcContracts.communityChip', {
             names: row.communities.map((c) => c.name).join(', '),
           })}

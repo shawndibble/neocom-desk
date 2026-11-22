@@ -91,6 +91,12 @@ interface SettleUpDialogProps {
    * `onPickFromWallet` (when given) is the way to link them first.
    */
   unlinked?: UnlinkedSent;
+  /**
+   * "Dismiss balance": the pilot won't pay what this personal Payee is owed, so every entry in
+   * `rows` becomes a dismissal (no tax owed). Absent for a Corp Tax Book, whose own officers
+   * waive what is owed. Asks to confirm first, since it changes what the pilot owes.
+   */
+  onDismissBalance?: () => Promise<LedgerActionResult>;
   /** The fresh ledger pull behind the "Ore still arriving" line. */
   arrivalCheck?: SettleUpRecheck;
   /** The Character paying; absent, the Character owing most. */
@@ -122,6 +128,7 @@ export function SettleUpDialog({
   preview,
   record,
   onPickFromWallet,
+  onDismissBalance,
   unlinked,
   arrivalCheck,
   payerId,
@@ -143,6 +150,7 @@ export function SettleUpDialog({
   const { pending: saving, error: saveError, run } = useLedgerAction();
   const [different, setDifferent] = useState(false);
   const [sentText, setSentText] = useState('');
+  const [confirmingDismiss, setConfirmingDismiss] = useState(false);
 
   const owed = owedFor(payer);
   const sentAmount = different ? unmaskNumber(sentText) : undefined;
@@ -183,6 +191,14 @@ export function SettleUpDialog({
         onClose();
       }
     );
+  }
+
+  async function dismissBalance() {
+    if (!onDismissBalance) return;
+    await run(onDismissBalance, () => {
+      onPaid();
+      onClose();
+    });
   }
 
   const copyRow = (key: string, label: string, value: string, copyText: string, dim = false) => (
@@ -348,6 +364,34 @@ export function SettleUpDialog({
         )}
 
         <LedgerActionError error={saveError} />
+        {confirmingDismiss && onDismissBalance && (
+          <div
+            role="group"
+            aria-label={t('miningTax.settleUp.dismiss.title')}
+            className="space-y-2 rounded-xs border border-line bg-panel-2 p-2 text-xs"
+          >
+            <p>
+              {t('miningTax.settleUp.dismiss.intro', {
+                amount: formatIsk(owed, 0),
+                payee: payeeName,
+              })}
+            </p>
+            <p className="text-text-dim">{t('miningTax.settleUp.dismiss.effect')}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={saving}
+                onClick={() => void dismissBalance()}
+              >
+                {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
+              </Button>
+              <Button size="sm" disabled={saving} onClick={() => setConfirmingDismiss(false)}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           {record ? (
             <Button
@@ -360,6 +404,11 @@ export function SettleUpDialog({
           ) : (
             <Button variant="primary" onClick={onClose}>
               {t('common.close')}
+            </Button>
+          )}
+          {onDismissBalance && !confirmingDismiss && (
+            <Button variant="danger" disabled={saving} onClick={() => setConfirmingDismiss(true)}>
+              {t('miningTax.settleUp.dismiss.action')}
             </Button>
           )}
         </div>

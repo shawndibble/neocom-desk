@@ -25,6 +25,7 @@ import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import {
   acceptNewTotal,
   dismiss,
+  dismissOwed,
   linkPayment,
   unassign,
   uncombine,
@@ -45,6 +46,7 @@ import {
   PayeeRunningAccount,
   type PayeePaymentLink,
   heldPaymentKeys,
+  isBareMark,
 } from '@/engine/miningTax/payeeRunningAccount';
 import { formatIsk } from '@/lib/isk';
 import type { LedgerCharge, LedgerPayment } from '@/engine/miningTax/payeeLedger';
@@ -279,8 +281,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   /** Prefill for a new Assignment's Payee: the one last used in that system, by that pilot. */
   const pickablePayees = useMemo(
-    () => allPayees.filter((p) => !duplicateAliases.has(p.id)),
-    [allPayees, duplicateAliases]
+    () => accounts.assignable(allPayees).filter((p) => !duplicateAliases.has(p.id)),
+    [allPayees, duplicateAliases, accounts]
   );
 
   /**
@@ -288,8 +290,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
    * its Payee by id, and a duplicate is otherwise not listed.
    */
   function payeesWithRecordsOf(payeeIds: readonly (string | undefined)[]): PayeeRecord[] {
+    // A Payee an existing Assignment names is always found, archived or a book's or not.
     const extra = payeeIds.flatMap((id) =>
-      id !== undefined && duplicateAliases.has(id) ? (payeeById.get(id) ?? []) : []
+      id !== undefined &&
+      (duplicateAliases.has(id) || accounts.isArchived(id) || accounts.isBookOwned(id))
+        ? (payeeById.get(id) ?? [])
+        : []
     );
     return extra.length > 0 ? [...pickablePayees, ...new Set(extra)] : pickablePayees;
   }
@@ -297,7 +303,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   function suggestionFor(row: MoonMiningTaxRow) {
     return suggestPayeeForSystem(
       everyAssignment.filter((a) => a.characterId === row.characterId),
-      allPayees,
+      accounts.assignable(allPayees),
       row.entry.solarSystemId,
       row.characterId,
       duplicateAliases
@@ -620,8 +626,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     if (!ledgerTarget) return null;
     if (ledgerTarget.kind === 'personal') {
       // A Payee nothing was billed to has no account: its ledger opens empty.
+      // A Payee a book is the authority for opens its old history only (read-only, no balance).
       const account =
-        accounts.of(ledgerTarget.payeeId) ??
+        (accounts.isBookOwned(ledgerTarget.payeeId)
+          ? accounts.historyOf(ledgerTarget.payeeId)
+          : accounts.of(ledgerTarget.payeeId)) ??
         PayeeRunningAccount.build({ payeeId: ledgerTarget.payeeId, charges: [], links: [] });
       const byId = new Map(everyAssignment.map((a) => [a.id, a]));
       return {
@@ -638,22 +647,32 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             ...(a ? { ore: a.oreLines } : {}),
           };
         }),
-        payments: account.links.map((l): LedgerPayment => {
-          // A recorded or legacy link names no payer of its own, and no transaction.
-          const payer =
-            l.kind === 'recorded' || l.kind === 'legacy'
-              ? undefined
-              : characterNameOf(
-                  madePayments.find((m) => m.key === paymentLinkKey(l))?.characterId ?? 0
-                );
-          const href = madePaymentHref(l);
-          return {
-            id: paymentLinkKey(l),
-            at: linkAt(l),
-            ...(payer ? { from: payer } : {}),
-            ...(href ? { href } : {}),
-          };
+        marked: account.marked.flatMap((m) => {
+          const l = account.links.find((x) => paymentLinkKey(x) === m.id);
+          return l ? [{ id: m.id, at: linkAt(l), date: m.date, amount: m.amount }] : [];
         }),
+        payments: account.links
+          .filter((l) => !isBareMark(l))
+          .map((l): LedgerPayment => {
+            // A recorded or legacy link names no payer of its own, and no transaction.
+            const payer =
+              l.kind === 'recorded' || l.kind === 'legacy'
+                ? undefined
+                : characterNameOf(
+                    madePayments.find((m) => m.key === paymentLinkKey(l))?.characterId ?? 0
+                  );
+            // A legacy link names its old payment's transactions: its entry is the first of them.
+            const href = madePaymentHref(l.refs?.[0] ?? l);
+            return {
+              id: paymentLinkKey(l),
+              at: linkAt(l),
+              via: l.kind,
+              amount: l.amount,
+              to: payeeById.get(accounts.primaryIdOf(ledgerTarget.payeeId))?.name ?? '',
+              ...(payer ? { from: payer } : {}),
+              ...(href ? { href } : {}),
+            };
+          }),
       };
     }
     const book = ledgerBook;
@@ -786,7 +805,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 everyAssignment={everyAssignment}
                 payeeById={payeeById}
                 typeNames={typeNames}
-                onChanged={refresh}
+                onChanged={() => {
+                  // The take-over rewrote the entry this detail was opened on: close and reload, like every row action.
+                  actions.openDetail(null);
+                  refresh();
+                }}
                 onBookChanged={reloadCorpBooks}
                 mail={{
                   characterId: corpDetail.view.characterId,
@@ -979,6 +1002,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 payment.payerId ?? settleUpPayee.characterId
               )
             }
+            // "I won't pay it": every owed day of this Payee becomes a dismissal.
+            onDismissBalance={() =>
+              dismissOwed((liveSettleUpRows ?? settleUpRows).map((r) => r.assignment))
+            }
             onPaid={() => {
               onClearSelection();
               refresh();
@@ -1023,9 +1050,23 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             source={ledgerSource}
             typeNames={typeNames}
             {...(ledgerPicker ? { picker: ledgerPicker } : {})}
-            {...(ledgerTarget.kind === 'personal'
-              ? { onUnlinkPayment: unlinkPayment }
-              : { lockDate: lockDateFor(utcDay()) })}
+            {...(ledgerTarget.kind === 'book'
+              ? { lockDate: lockDateFor(utcDay()) }
+              : accounts.isBookOwned(ledgerTarget.payeeId)
+                ? { history: true }
+                : {
+                    onUnlinkPayment: unlinkPayment,
+                    // An archived Payee is never linkable (`linkable`), so it is offered none.
+                    ...(accounts.isArchived(ledgerTarget.payeeId)
+                      ? {}
+                      : {
+                          onLinkWalletPayment: () => {
+                            const payeeId = ledgerTarget.payeeId;
+                            actions.openLedger(null);
+                            actions.openLinkPayment({ payeeId });
+                          },
+                        }),
+                  })}
           />
         </Suspense>
       )}

@@ -10,7 +10,8 @@ export function withoutPaidMark(next: MiningTaxAssignmentRecord): MiningTaxAssig
   const out: MiningTaxAssignmentRecord = { ...next };
   delete out.payment;
   delete out.paidAt;
-  if (out.status === 'paid') out.status = 'outstanding';
+  // `tracked` is the display form of a stored `outstanding` Assignment (`displayStatusOf`).
+  if (out.status === 'paid' || (out.status as string) === 'tracked') out.status = 'outstanding';
   return out;
 }
 

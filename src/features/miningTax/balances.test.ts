@@ -186,6 +186,43 @@ describe('a Corp Tax Book Payee read off the book', () => {
   });
 });
 
+describe('a personal Payee that is a Corp Tax Book corporation', () => {
+  it("has no card: its debt and its credit count nowhere, only the book's does", () => {
+    const own = payee('p1', 'Brass Meridian');
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const days = [
+      assignment({ id: 'a', date: '2026-09-01', taxOwed: 100 }),
+      assignment({ id: 'b', date: '2026-09-02', taxOwed: 100 }),
+    ];
+    const rows = days.map((a) => displayRow(a));
+    // 5,000 linked to the Payee: far more than its days, so it would read as credit.
+    const accounts = PayeeRunningAccounts.build({
+      assignments: days,
+      payees: [own],
+      links: [
+        {
+          payeeId: 'p1',
+          kind: 'journal',
+          refId: 1,
+          amount: 5_000,
+          paidOn: '2026-09-10',
+          source: 'manual',
+        },
+      ],
+      bookOwned: new Set(['p1']),
+    });
+    const balances = computePayeeBalances(
+      rows,
+      [own, corp],
+      accounts,
+      new Map(),
+      new Map([[corp.id, 40]]),
+      new Map([[corp.id, 250]])
+    );
+    expect(balances.map((b) => [b.payee.id, b.owed, b.credit])).toEqual([[corp.id, 250, 40]]);
+  });
+});
+
 describe('summarizeUnassigned', () => {
   it('counts unassigned rows and sums their live value', () => {
     const rows = [

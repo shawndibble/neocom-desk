@@ -31,4 +31,9 @@ describe('a view never reaches a write', () => {
     expect(written).not.toHaveProperty('payment');
     expect(withoutPaidMark(record({ status: 'dismissed' })).status).toBe('dismissed');
   });
+
+  it('never writes the display-only Tracked status', () => {
+    const tracked = record({ status: 'tracked' as unknown as MiningTaxAssignmentRecord['status'] });
+    expect(withoutPaidMark(tracked).status).toBe('outstanding');
+  });
 });

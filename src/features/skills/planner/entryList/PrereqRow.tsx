@@ -91,7 +91,7 @@ export const PrereqRow = memo(function PrereqRow({
       </SkillLink>{' '}
       <span className="shrink-0">
         <span>{romanLevel(row.step.level)}</span>
-        <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
+        <span className="ml-2 text-[0.6875rem] uppercase">{t('plans.prereq')}</span>
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>

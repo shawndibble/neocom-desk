@@ -34,6 +34,7 @@ import {
   CachedNotice,
   DataAgeBadge,
   EmptyState,
+  LoadFailedState,
   FilterBar,
   FilterChip,
   FilterField,
@@ -700,10 +701,7 @@ function CorpAssetsView({
         {snapshot.loading && data === null ? (
           <Spinner />
         ) : data === null || data.inputs === null ? (
-          <EmptyState
-            title={t('corp.assets.loadFailedTitle')}
-            hint={t('corp.assets.loadFailedHint')}
-          />
+          <LoadFailedState title={t('common.loadFailed.corpAssets')} onRetry={snapshot.refresh} />
         ) : !hasAnyAssets ? (
           <EmptyState title={t('corp.assets.empty')} />
         ) : (

@@ -1296,4 +1296,24 @@ describe('orders widget', () => {
     const view = buildView('orders', ordersFeed([order(90)]), ctx());
     expect(view.number?.link).toBeUndefined();
   });
+
+  it('is failed, never "no open orders", when the read landed nothing and the grant is fine', () => {
+    const feeds = ordersFeed([]);
+    const read = feeds.orders as unknown as {
+      data: { openOrders: { entries: { fetchedAt: number }[] } };
+    };
+    read.data.openOrders.entries[0]!.fetchedAt = 0;
+    const view = buildView('orders', feeds, ctx());
+    expect(stateOf(view)).toBe('failed');
+    expect(view.fetchedAt).toBeNull();
+  });
+
+  it('stamps the data age with the real read, not the moment the view was built', () => {
+    const feeds = ordersFeed([order(90)]);
+    const read = feeds.orders as unknown as {
+      data: { openOrders: { entries: { fetchedAt: number }[] } };
+    };
+    read.data.openOrders.entries[0]!.fetchedAt = NOW - 3_600_000;
+    expect(buildView('orders', feeds, ctx()).fetchedAt).toEqual(new Date(NOW - 3_600_000));
+  });
 });

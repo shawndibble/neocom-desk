@@ -87,7 +87,7 @@ describe('DeleteBookSection', () => {
   it('deletes only once the corporation ticker is typed, then reloads', async () => {
     const { reload } = renderSection({ isDirector: true }, ME, true);
     const confirm = await lastButton('Delete the book');
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
     await userEvent.type(screen.getByRole('textbox'), 'test');
     await userEvent.click(confirm);
     await waitFor(() => expect(deleteBook).toHaveBeenCalledWith(ME, CORP));
@@ -102,7 +102,7 @@ describe('DeleteBookSection', () => {
     await userEvent.type(screen.getByRole('textbox'), 'test');
     expect(confirm).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Download the book (.xlsx)' }));
-    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute('aria-disabled', 'true');
     finish(null);
     await waitFor(() => expect(confirm).toBeEnabled());
     expect(deleteBook).not.toHaveBeenCalled();

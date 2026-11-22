@@ -802,7 +802,7 @@ export function CourierResults({
                 // card, which has no column header to name the figure.
                 <span className="whitespace-nowrap">
                   <IskAmount value={rate} />
-                  <span className="text-[0.625rem] font-semibold text-text-dim sm:hidden">
+                  <span className="text-[0.6875rem] font-semibold text-text-dim sm:hidden">
                     {t('contractSearch.courierMobile.perJumpSuffix')}
                   </span>
                 </span>

@@ -436,7 +436,7 @@ export function FittingStartScreen({
               </span>
             </Tooltip>
           ) : row.source === 'active' ? null : (
-            <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
+            <span className="shrink-0 text-[0.6875rem] tracking-widest text-text-dim uppercase">
               {row.source === 'saved'
                 ? t('fittings.start.sourceSaved')
                 : row.source === 'doctrine'

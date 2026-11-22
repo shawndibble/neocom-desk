@@ -93,6 +93,8 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
+      ) : audit.failed ? (
+        <LoadFailedState title={t('corpTaxBook.moons.activity.loadFailed')} onRetry={audit.retry} />
       ) : (
         // A Miner link opens their page: close over it rather than cover it.
         <AuditFeed entries={audit.entries} subject={subject} words={words} onOpen={onClose} />
@@ -157,7 +159,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const tabs = tabBarTabs(MOONS_TABS);
   return (
     <BookContext.Provider value={bookWithSettings}>
-      <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-page space-y-4">
         {detail === null && (
           <>
             <PageHeader
@@ -311,7 +313,7 @@ function MoonsLoading() {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader title={t('corp.moons.title')} />
       <div
         role="status"
@@ -362,7 +364,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
-      <div className="mx-auto max-w-page p-4">
+      <div className="mx-auto max-w-page">
         <LoadFailedState
           title={t('corpTaxBook.moons.failed')}
           hint={t('corpTaxBook.moons.failedHint')}
@@ -374,7 +376,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status === 'denied' && state.unverified) {
     return (
-      <div className="mx-auto max-w-page space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.moons.title')} />
         <LoadFailedState
           title={t('corpTaxBook.moons.unverified.title')}
@@ -386,7 +388,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status === 'denied') {
     return (
-      <div className="mx-auto max-w-page space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.moons.title')} />
         <EmptyState
           title={t('corp.moons.noAccessTitle')}
@@ -397,7 +399,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   }
   if (state.status === 'off' && book.characterId !== null && book.corporationId !== null) {
     return (
-      <div className="mx-auto max-w-page space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.moons.title')} />
         <MoonsSetup
           characterId={book.characterId}
@@ -414,7 +416,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   // Only a corporation with a book syncs it: a moon owner never needs the mining scope here.
   if (needsScope) {
     return (
-      <div className="mx-auto max-w-page space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.moons.title')} />
         <EmptyState
           title={t('corpTaxBook.moons.scope.title')}
@@ -466,7 +468,7 @@ export function CorpMoons() {
   if (access.state === 'unknown') return <MoonsLoading />;
   if (access.state !== 'ready') {
     return (
-      <div className="mx-auto max-w-page space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.moons.title')} />
         <CorpDenied
           reason={access.state === 'none' ? 'none' : access.state}
@@ -479,7 +481,7 @@ export function CorpMoons() {
   }
   if (!viewer && (ledger.state === 'unavailable' || ledger.state === 'unknown')) {
     return (
-      <div className="mx-auto max-w-page space-y-4 p-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.moons.title')} />
         <EmptyState title={t('corp.moons.noAccessTitle')} hint={t('corp.moons.noAccessHint')} />
       </div>

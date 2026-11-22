@@ -60,6 +60,7 @@ function renderDialog(
     onPickFromWallet?: () => void;
     unlinked?: { count: number; amount: number };
     reason?: string | ((payerId: number | null) => string | undefined);
+    onDismissBalance?: () => Promise<LedgerActionResult>;
   } = {}
 ) {
   const rows = extra.rows ?? ROWS;
@@ -76,6 +77,7 @@ function renderDialog(
       {...(extra.record ? { record: extra.record } : {})}
       {...(extra.onPickFromWallet ? { onPickFromWallet: extra.onPickFromWallet } : {})}
       {...(extra.unlinked ? { unlinked: extra.unlinked } : {})}
+      {...(extra.onDismissBalance ? { onDismissBalance: extra.onDismissBalance } : {})}
     />
   );
 }
@@ -183,5 +185,45 @@ describe('SettleUpDialog', () => {
     renderDialog({ record: vi.fn(), onPickFromWallet: vi.fn() });
     expect(screen.queryByText(/isn't linked yet/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Link payment' })).not.toBeInTheDocument();
+  });
+
+  describe('dismiss balance', () => {
+    const ok = async (): Promise<LedgerActionResult> => ({ ok: true, value: undefined });
+
+    it('is offered beside Record payment, and asks before it dismisses anything', async () => {
+      const user = userEvent.setup();
+      const onDismissBalance = vi.fn(ok);
+      renderDialog({ record: vi.fn(), onDismissBalance });
+      await user.click(screen.getByRole('button', { name: 'Dismiss balance' }));
+      expect(onDismissBalance).not.toHaveBeenCalled();
+      expect(screen.getByText(/I won't pay it/i)).toBeInTheDocument();
+      expect(screen.getByRole('group')).toHaveTextContent(/600,000 ISK/);
+    });
+
+    it('dismisses once confirmed, then reloads and closes', async () => {
+      const user = userEvent.setup();
+      const onDismissBalance = vi.fn(ok);
+      const onPaid = vi.fn();
+      renderDialog({ record: vi.fn(), onDismissBalance, onPaid });
+      await user.click(screen.getByRole('button', { name: 'Dismiss balance' }));
+      await user.click(screen.getByRole('button', { name: 'Dismiss 3 entries' }));
+      await waitFor(() => expect(onDismissBalance).toHaveBeenCalledOnce());
+      await waitFor(() => expect(onPaid).toHaveBeenCalledOnce());
+    });
+
+    it('backs out without writing', async () => {
+      const user = userEvent.setup();
+      const onDismissBalance = vi.fn(ok);
+      renderDialog({ record: vi.fn(), onDismissBalance });
+      await user.click(screen.getByRole('button', { name: 'Dismiss balance' }));
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onDismissBalance).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Dismiss balance' })).toBeInTheDocument();
+    });
+
+    it('is not offered without a handler (a Corp Tax Book bills its own)', () => {
+      renderDialog({ record: vi.fn() });
+      expect(screen.queryByRole('button', { name: 'Dismiss balance' })).not.toBeInTheDocument();
+    });
   });
 });

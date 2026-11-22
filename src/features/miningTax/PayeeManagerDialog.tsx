@@ -8,6 +8,7 @@ import {
   Field,
   Fields,
   IconButton,
+  textActionClassName,
   Modal,
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ import { groupPayees, type PayeeGroup, type PayeeVariant } from './payeeGroups';
 import {
   DefaultSystemTakenError,
   applyPayeeTerms,
+  setPayeesArchived,
   createPayee,
   loadPayees,
   updatePayee,
@@ -81,6 +83,13 @@ interface PayeeManagerDialogProps {
   accountOf?: (payeeId: string) => PayeeRunningAccount | undefined;
   /** Opens a Payee's ledger: each row's balance is the way in, owed, in credit or settled. */
   onOpenLedger?: (payeeId: string) => void;
+  /** Whether the pilot archived this Payee and it still reads archived (`isArchivedPayee`). */
+  isArchived?: (payeeId: string) => boolean;
+  /**
+   * The name of the Corp Tax Book corporation this Payee is, when a book the pilot is in answers
+   * for it: the Payee shows no figures, only its old history.
+   */
+  bookOwnerOf?: (payeeId: string) => string | undefined;
 }
 
 export interface PayeeOwed {
@@ -170,6 +179,8 @@ export function PayeeManagerDialog({
   bookCorporations = NO_BOOK_CORPORATIONS,
   accountOf,
   onOpenLedger,
+  isArchived,
+  bookOwnerOf,
 }: PayeeManagerDialogProps) {
   const { t } = useTranslation();
   const formId = useId();
@@ -467,6 +478,13 @@ export function PayeeManagerDialog({
     );
   }
 
+  /** Archives a Payee (it owes nothing: the row offers it only then) or brings it back. */
+  async function archive(group: PayeeGroup, archived: boolean) {
+    await setPayeesArchived(group.members, archived);
+    await refresh();
+    onChanged();
+  }
+
   /** The pilot's pick of which terms a merged Payee's records all bill with. */
   async function applyVariant(group: PayeeGroup, variant: PayeeVariant) {
     await applyPayeeTerms(variant.members[0], group.members);
@@ -478,6 +496,143 @@ export function PayeeManagerDialog({
   const deletingOwed =
     (owedOfGroup(deletingGroup)?.count ?? 0) > 0 ? owedOfGroup(deletingGroup) : undefined;
   const moveTargets = groups.filter((g) => g !== deletingGroup).map((g) => g.primary);
+
+  const archivedGroups = groups.filter((g) => isArchived?.(g.primary.id));
+  const renderGroup = (group: PayeeGroup, archived: boolean) => {
+    const payee = group.primary;
+    const owed = owedOfGroup(group);
+    const credit = creditOfGroup(group);
+    const systems = payeeSystemNames(
+      new Set(group.members.flatMap((m) => [...(systemsByPayee?.get(m.id) ?? [])])),
+      systemNames
+    );
+    const hub = hubForPayee(payee.hubId).systemName;
+    return (
+      <li key={group.key} className="flex items-center gap-1 py-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <Tooltip content={payee.name}>
+              <p className="min-w-0 flex-1 truncate text-sm">{payee.name}</p>
+            </Tooltip>
+            {bookOwnerOf?.(payee.id) !== undefined ? (
+              <>
+                <span className="shrink-0 text-xs text-text-dim">
+                  {t('miningTax.payees.trackedByBook', { corp: bookOwnerOf(payee.id) })}
+                </span>
+                {onOpenLedger && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenLedger(payee.id)}
+                    className={textActionClassName()}
+                  >
+                    {t('miningTax.payees.oldHistory')}
+                  </button>
+                )}
+              </>
+            ) : (
+              balanceReadout(
+                payee,
+                owed && owed.amount > 0 ? (
+                  <span className="shrink-0 text-xs text-isk-neg tabular-nums">
+                    {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
+                  </span>
+                ) : credit > 0 ? (
+                  <span className="shrink-0 text-xs text-isk-pos tabular-nums">
+                    {t('miningTax.payees.credit', { amount: formatIsk(credit, 0) })}
+                  </span>
+                ) : owedByPayee ? (
+                  <span className="shrink-0 text-xs text-text-dim">
+                    {t('miningTax.payees.settled')}
+                  </span>
+                ) : null
+              )
+            )}
+          </div>
+          <p className="mt-0.5 truncate text-[0.6875rem] text-text-dim">
+            {systems.length > 0
+              ? t('miningTax.payees.detailWithSystems', {
+                  pct: payee.defaultTaxPct,
+                  hub,
+                  systems: systems.join(', '),
+                })
+              : t('miningTax.payees.detail', { pct: payee.defaultTaxPct, hub })}
+            <span>
+              {' · '}
+              {payee.entityKind !== undefined ? (
+                t(`miningTax.payees.verify.kind.${payee.entityKind}`)
+              ) : payee.entityId !== undefined ? (
+                t('miningTax.payees.verify.linkedShort')
+              ) : (
+                // The row's Edit carries the fix: pick who this is there.
+                <span className="text-warning">{t('miningTax.payees.verify.notFoundShort')}</span>
+              )}
+            </span>
+          </p>
+          {archived ? (
+            <button
+              type="button"
+              className={textActionClassName()}
+              aria-label={t('miningTax.payees.unarchiveNamed', { name: payee.name })}
+              onClick={() => void archive(group, false)}
+            >
+              {t('miningTax.payees.unarchive')}
+            </button>
+          ) : bookOwnerOf?.(payee.id) === undefined ? (
+            owed && owed.amount > 0 ? (
+              <p className="mt-0.5 text-[0.6875rem] text-text-dim">
+                {t('miningTax.payees.archiveOwes')}
+              </p>
+            ) : (
+              <button
+                type="button"
+                className={textActionClassName()}
+                aria-label={t('miningTax.payees.archiveNamed', { name: payee.name })}
+                onClick={() => void archive(group, true)}
+              >
+                {t('miningTax.payees.archive')}
+              </button>
+            )
+          ) : null}
+          {group.members.length > 1 && (
+            <p className="mt-0.5 text-[0.6875rem] text-text-dim">
+              {t('miningTax.payees.sharedByCharacters', {
+                count: group.members.length,
+              })}
+            </p>
+          )}
+          {group.variants.length > 1 && (
+            <div className="mt-1 space-y-1">
+              <p className="text-[0.6875rem] text-warning">{t('miningTax.payees.termsDiffer')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {group.variants.map((variant) => (
+                  <Button
+                    key={`${variant.members[0].defaultTaxPct}-${variant.members[0].hubId ?? ''}`}
+                    size="sm"
+                    onClick={() => void applyVariant(group, variant)}
+                  >
+                    {t('miningTax.payees.useTermsForAll', {
+                      pct: variant.members[0].defaultTaxPct,
+                      hub: hubForPayee(variant.members[0].hubId).systemName,
+                      characters: variant.members
+                        .map((m) => characterNameOf(m.characterId))
+                        .join(', '),
+                    })}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <IconButton
+          variant="plain"
+          size="row"
+          icon={<Icon.Rename />}
+          label={t('miningTax.editPayee', { name: payee.name })}
+          onClick={() => startEdit(payee)}
+        />
+      </li>
+    );
+  };
 
   return (
     <Modal
@@ -504,104 +659,16 @@ export function PayeeManagerDialog({
           <p className="text-xs text-text-dim">{t('miningTax.payeesEmpty')}</p>
         ) : (
           <ul className="divide-y divide-line">
-            {groups.map((group) => {
-              const payee = group.primary;
-              const owed = owedOfGroup(group);
-              const credit = creditOfGroup(group);
-              const systems = payeeSystemNames(
-                new Set(group.members.flatMap((m) => [...(systemsByPayee?.get(m.id) ?? [])])),
-                systemNames
-              );
-              const hub = hubForPayee(payee.hubId).systemName;
-              return (
-                <li key={group.key} className="flex items-center gap-1 py-1.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <Tooltip content={payee.name}>
-                        <p className="min-w-0 flex-1 truncate text-sm">{payee.name}</p>
-                      </Tooltip>
-                      {balanceReadout(
-                        payee,
-                        owed && owed.amount > 0 ? (
-                          <span className="shrink-0 text-xs text-isk-neg tabular-nums">
-                            {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
-                          </span>
-                        ) : credit > 0 ? (
-                          <span className="shrink-0 text-xs text-isk-pos tabular-nums">
-                            {t('miningTax.payees.credit', { amount: formatIsk(credit, 0) })}
-                          </span>
-                        ) : owedByPayee ? (
-                          <span className="shrink-0 text-xs text-text-dim">
-                            {t('miningTax.payees.settled')}
-                          </span>
-                        ) : null
-                      )}
-                    </div>
-                    <p className="mt-0.5 truncate text-[0.6875rem] text-text-dim">
-                      {systems.length > 0
-                        ? t('miningTax.payees.detailWithSystems', {
-                            pct: payee.defaultTaxPct,
-                            hub,
-                            systems: systems.join(', '),
-                          })
-                        : t('miningTax.payees.detail', { pct: payee.defaultTaxPct, hub })}
-                      <span>
-                        {' · '}
-                        {payee.entityKind !== undefined ? (
-                          t(`miningTax.payees.verify.kind.${payee.entityKind}`)
-                        ) : payee.entityId !== undefined ? (
-                          t('miningTax.payees.verify.linkedShort')
-                        ) : (
-                          // The row's Edit carries the fix: pick who this is there.
-                          <span className="text-warning">
-                            {t('miningTax.payees.verify.notFoundShort')}
-                          </span>
-                        )}
-                      </span>
-                    </p>
-                    {group.members.length > 1 && (
-                      <p className="mt-0.5 text-[0.6875rem] text-text-dim">
-                        {t('miningTax.payees.sharedByCharacters', {
-                          count: group.members.length,
-                        })}
-                      </p>
-                    )}
-                    {group.variants.length > 1 && (
-                      <div className="mt-1 space-y-1">
-                        <p className="text-[0.6875rem] text-warning">
-                          {t('miningTax.payees.termsDiffer')}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.variants.map((variant) => (
-                            <Button
-                              key={`${variant.members[0].defaultTaxPct}-${variant.members[0].hubId ?? ''}`}
-                              size="sm"
-                              onClick={() => void applyVariant(group, variant)}
-                            >
-                              {t('miningTax.payees.useTermsForAll', {
-                                pct: variant.members[0].defaultTaxPct,
-                                hub: hubForPayee(variant.members[0].hubId).systemName,
-                                characters: variant.members
-                                  .map((m) => characterNameOf(m.characterId))
-                                  .join(', '),
-                              })}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <IconButton
-                    variant="plain"
-                    size="row"
-                    icon={<Icon.Rename />}
-                    label={t('miningTax.editPayee', { name: payee.name })}
-                    onClick={() => startEdit(payee)}
-                  />
-                </li>
-              );
-            })}
+            {groups.filter((g) => !isArchived?.(g.primary.id)).map((g) => renderGroup(g, false))}
           </ul>
+        )}
+        {archivedGroups.length > 0 && (
+          <section aria-label={t('miningTax.payees.archivedTitle')}>
+            <p className={eyebrowClassName}>{t('miningTax.payees.archivedTitle')}</p>
+            <ul className="divide-y divide-line">
+              {archivedGroups.map((g) => renderGroup(g, true))}
+            </ul>
+          </section>
         )}
 
         {showForm && (

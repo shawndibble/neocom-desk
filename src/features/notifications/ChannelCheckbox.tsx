@@ -75,7 +75,7 @@ export function ChannelCheckbox({
         className={usable ? undefined : 'cursor-not-allowed! opacity-40'}
       />
       {caption !== undefined && (
-        <span aria-hidden="true" className="font-mono text-[0.625rem] text-text-dim">
+        <span aria-hidden="true" className="font-mono text-[0.6875rem] text-text-dim">
           {caption}
         </span>
       )}

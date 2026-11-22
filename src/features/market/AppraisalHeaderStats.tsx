@@ -176,7 +176,7 @@ function PriceCell({
           rowInteractiveClassName
         )}
       >
-        <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           <button
             type="button"
             onClick={() => void total.copy()}

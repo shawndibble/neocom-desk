@@ -37,6 +37,10 @@ interface TaxPageDialogsProps {
   accountOf?: (payeeId: string) => PayeeRunningAccount | undefined;
   /** Opens a Payee's ledger from its Manage Payees row. */
   onOpenLedger?: (payeeId: string) => void;
+  /** Whether a Payee reads archived (`PayeeRunningAccounts.isArchived`). */
+  isArchived?: (payeeId: string) => boolean;
+  /** The Corp Tax Book corporation a Payee is, when a book answers for it. */
+  bookOwnerOf?: (payeeId: string) => string | undefined;
   refresh: () => void;
 }
 
@@ -57,6 +61,8 @@ export function TaxPageDialogs({
   bookCorporations,
   accountOf,
   onOpenLedger,
+  isArchived,
+  bookOwnerOf,
   refresh,
 }: TaxPageDialogsProps) {
   const { t } = useTranslation();
@@ -90,6 +96,8 @@ export function TaxPageDialogs({
             bookCorporations={bookCorporations}
             {...(accountOf ? { accountOf } : {})}
             {...(onOpenLedger ? { onOpenLedger } : {})}
+            {...(isArchived ? { isArchived } : {})}
+            {...(bookOwnerOf ? { bookOwnerOf } : {})}
           />
         </Suspense>
       )}

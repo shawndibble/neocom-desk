@@ -100,4 +100,19 @@ describe('ColonyRichness', () => {
       expect(sync.setPlanetRichness).toHaveBeenLastCalledWith(PLANET, [2268, 2305])
     );
   });
+
+  it('says so when a save fails, and keeps the pick shown', async () => {
+    sync.setPlanetRichness.mockRejectedValueOnce(new Error('quota'));
+    const user = userEvent.setup();
+    renderIt();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Aqueous Liquids' })).toBeEnabled()
+    );
+    await user.click(screen.getByRole('button', { name: 'Aqueous Liquids' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn.t save these picks/);
+    expect(screen.getByRole('button', { name: 'Aqueous Liquids' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
 });

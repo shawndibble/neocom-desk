@@ -14,6 +14,7 @@ import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
+import { InlineError } from '@/components/ui/InlineError';
 import { db } from '@/db';
 import { clearPlanetRichness, setPlanetRichness } from '@/sync';
 import type { PlanetType } from '@/engine/pi/goalTypes';
@@ -60,13 +61,18 @@ export function ColonyRichness({
   if (shown.key !== savedKey) setShown({ key: savedKey, picks: null });
   const picked = shown.key === savedKey && shown.picks ? shown.picks : savedPicks;
   const queue = useRef<Promise<void>>(Promise.resolve());
+  // The picks stay shown when a save fails, so the error says they are not saved.
+  const [saveFailed, setSaveFailed] = useState(false);
   const change = (next: number[]) => {
     setShown({ key: savedKey, picks: next });
     queue.current = queue.current
       .then(() =>
         next.length === 0 ? clearPlanetRichness(planetId) : setPlanetRichness(planetId, next)
       )
-      .catch(() => {});
+      .then(
+        () => setSaveFailed(false),
+        () => setSaveFailed(true)
+      );
   };
 
   return (
@@ -110,6 +116,7 @@ export function ColonyRichness({
           </Button>
         )}
       </div>
+      {saveFailed && <InlineError>{t('piMap.richness.saveFailed')}</InlineError>}
       {onClose && (
         <Button size="sm" onClick={onClose}>
           {t('piMap.richness.done')}

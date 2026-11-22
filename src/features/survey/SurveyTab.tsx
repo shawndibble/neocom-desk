@@ -16,7 +16,14 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
-import { Button, EmptyState, PageHeader, TabPanel, textActionClassName } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  LoadFailedState,
+  PageHeader,
+  TabPanel,
+  textActionClassName,
+} from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
 import { countedScans } from '@/engine/survey/series';
@@ -288,9 +295,11 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
         {state.status === 'loading' ? null : (
           <>
             {state.status === 'failed' && (
-              <p role="alert" className="text-xs text-warning">
-                {t('survey.loadFailed')}
-              </p>
+              <LoadFailedState
+                title={t('common.loadFailed.survey')}
+                onRetry={refresh}
+                className="py-6"
+              />
             )}
             {state.status === 'gone' && (
               <EmptyState title={t('survey.gone')} hint={t('survey.goneHint')} className="py-6" />

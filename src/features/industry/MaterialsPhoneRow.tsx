@@ -175,7 +175,7 @@ export function MaterialsPhoneRow({
         <span className="min-w-0 text-sm font-semibold">{name}</span>
         <span className="flex shrink-0 items-baseline gap-1 text-sm font-semibold tabular-nums">
           {ownedBlueprint ? (
-            <span className="text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
+            <span className="text-[0.6875rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
               {t('industry.blueprintAcquisitionOwned')}
             </span>
           ) : (

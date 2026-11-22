@@ -39,6 +39,7 @@ export interface UnassignedSummary {
  * One balance per known Payee, owed-first then by name, settled Payees included (owed 0) so the
  * strip can offer to show them. Credit is the Payee's Running account's, for every Payee. A personal Payee owes what its Running account owes, oldest day
  * first; a Corp Tax Book's owes the book's account total (`bookOwes`), else what its rows still owe.
+ * A Payee that is a Corp Tax Book's corporation (`PayeeRunningAccounts.isBookOwned`) has no balance at all.
  * A Payee with nothing Outstanding in view owes nothing here. An Assignment whose Payee is no
  * longer known is skipped rather than invented: the table still shows it as "Unknown Payee".
  */
@@ -57,7 +58,13 @@ export function computePayeeBalances(
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
     payees
-      .filter((payee) => !aliases.has(payee.id))
+      // A Payee a Corp Tax Book is the authority for, or one the pilot archived, has no card.
+      .filter(
+        (payee) =>
+          !aliases.has(payee.id) &&
+          !accounts.isBookOwned(payee.id) &&
+          !accounts.isArchived(payee.id)
+      )
       .map((payee) => [payee.id, { payee, owed: 0, credit: 0, members: [] }])
   );
   for (const dr of rows) {

@@ -103,9 +103,9 @@ export function rosterCoreMap(
  * value the roster already had, the same as the four-`Map` version this
  * replaced (its `jobSlotSkillsMap`/`totalSpMap` simply skipped such an
  * entry, so the old value in each `Map` survived the merge untouched).
- * `stats`/`queue` always take the fresh value, as before: both are built
- * for every roster entry regardless of what failed, `queue`'s own `state`
- * reading `unknown` rather than holding a stale prior reading.
+ * `stats` always takes the fresh value. `queue` does too unless the fresh
+ * read never landed (no `fetchedAt`), when the prior one stays rather than
+ * flipping to `unknown`.
  */
 export function mergeRosterCore(
   previous: Map<number, RosterCore>,
@@ -117,6 +117,8 @@ export function mergeRosterCore(
   const prior = previous.get(entry.characterId);
   const merged: RosterCore = {
     ...fresh,
+    // A queue read that failed (never fetched) must not replace the last good one.
+    queue: fresh.queue.fetchedAt === null && prior ? prior.queue : fresh.queue,
     jobSlotSkills: fresh.jobSlotSkills ?? prior?.jobSlotSkills,
     totalSp: fresh.totalSp ?? prior?.totalSp,
   };

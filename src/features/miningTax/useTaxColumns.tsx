@@ -368,7 +368,13 @@ export function useTaxColumns({
             <StatusPill
               status={dr.status}
               label={statusLabel(t, dr.status)}
-              hint={dr.status === 'needs-review' ? t('miningTax.needsReviewHint') : undefined}
+              hint={
+                dr.status === 'needs-review'
+                  ? t('miningTax.needsReviewHint')
+                  : dr.status === 'tracked'
+                    ? t('miningTax.trackedHint')
+                    : undefined
+              }
             />
           ),
         sortValue: (dr) => (dr.corp ? corpStateLabel(dr.corp) : statusLabel(t, dr.status)),

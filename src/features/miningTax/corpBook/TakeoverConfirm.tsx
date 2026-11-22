@@ -66,7 +66,7 @@ export function TakeoverConfirm({ previews, typeNames, busy, onTakeOver, label, 
           </>
         ) : (
           <>
-            <Button size="sm" disabled={busy} onClick={() => setConfirming(true)}>
+            <Button size="sm" variant="warning" disabled={busy} onClick={() => setConfirming(true)}>
               {label ?? t('miningTax.corpBook.overlap.letBill')}
             </Button>
             {others}

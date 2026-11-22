@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
-import { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
+import type { MoonMiningTaxRow } from './snapshot';
 
 const payee = (id: string, characterId: number, entityId?: number): PayeeRecord => ({
   id,
@@ -126,5 +127,141 @@ describe('PayeeRunningAccounts', () => {
     const account = accounts.of('p1')!;
     expect(account.charges.map((c) => c.id)).toEqual(['old']);
     expect(account.owes?.amount).toBe(40);
+  });
+
+  describe('a Payee a Corp Tax Book is the authority for', () => {
+    const build = () =>
+      PayeeRunningAccounts.build({
+        assignments: [
+          assignment('a', 'p1', '2026-10-01', 100),
+          assignment('b', 'p2', '2026-10-02', 100),
+          assignment('c', 'q', '2026-10-02', 70),
+        ],
+        payees: [payee('p1', 1, 98000001), payee('p2', 2, 98000001), payee('q', 1, 5)],
+        links: [link('p1', 500, 7)],
+        bookOwned: new Set(['p2']),
+      });
+
+    it('has no account that counts: no debt, no credit, never offered a payment', () => {
+      const accounts = build();
+      // p2's record makes the whole merged Payee the book's, whichever record a caller asks by.
+      expect(accounts.isBookOwned('p1')).toBe(true);
+      expect(accounts.of('p1')).toBeUndefined();
+      expect([...accounts.entries()].map(([id]) => id)).toEqual(['q']);
+      expect(
+        accounts.linkable([payee('p1', 1, 98000001), payee('q', 1, 5)]).map((p) => p.id)
+      ).toEqual(['q']);
+    });
+
+    it('keeps its old history, read-only, with the credit it would have shown counting nowhere', () => {
+      const accounts = build();
+      expect(accounts.historyOf('p2')?.credit).toBe(300);
+      expect(accounts.of('q')?.owes?.amount).toBe(70);
+    });
+  });
+
+  describe('the Assignments of a Payee a book is the authority for', () => {
+    const owned = new Set(['p1']);
+    const build = () =>
+      PayeeRunningAccounts.build({
+        assignments: [
+          assignment('paid', 'p1', '2026-10-01', 100),
+          assignment('open', 'p1', '2026-10-02', 100),
+          assignment('mine', 'q', '2026-10-02', 70),
+        ],
+        payees: [payee('p1', 1, 98000001), payee('q', 1, 5)],
+        links: [link('p1', 100, 7)],
+        bookOwned: owned,
+      });
+
+    it('read Tracked, not Outstanding, when nothing can settle them; a paid day stays Paid', () => {
+      const accounts = build();
+      const read = (id: string) =>
+        accounts.displayStatusOf(assignment(id, id === 'mine' ? 'q' : 'p1', '2026-10-02', 1));
+      expect(read('open')).toBe('tracked');
+      expect(read('mine')).toBe('outstanding');
+      expect(accounts.displayStatusOf(assignment('paid', 'p1', '2026-10-01', 100))).toBe('paid');
+      expect(
+        accounts.displayStatusOf(assignment('r', 'p1', '2026-10-02', 1, { status: 'needs-review' }))
+      ).toBe('needs-review');
+    });
+
+    it('are never offered to a new Assignment: neither suggested, pre-filled nor listed', () => {
+      const payees = [payee('p1', 1, 98000001), payee('q', 1, 5)];
+      expect(
+        build()
+          .assignable(payees)
+          .map((p) => p.id)
+      ).toEqual(['q']);
+    });
+
+    it('stay Outstanding to the safeguards, which never read a paid day as unpaid or the reverse', () => {
+      const accounts = build();
+      expect(accounts.statusOf(assignment('open', 'p1', '2026-10-02', 100))).toBe('outstanding');
+      expect(accounts.statusOf(assignment('paid', 'p1', '2026-10-01', 100))).toBe('paid');
+    });
+
+    it('count in no total: the ledger view leaves them out of what is owed', () => {
+      const accounts = build();
+      const row = {
+        assignments: [assignment('open', 'p1', '2026-10-02', 100)],
+      } as unknown as MoonMiningTaxRow;
+      expect(withPaidStatus([row], accounts)[0].assignments[0].status).toBe('tracked');
+    });
+  });
+
+  describe('an archived Payee', () => {
+    const ARCHIVED = Date.UTC(2026, 9, 10);
+    const archivedPayee = (id: string, characterId: number) => ({
+      ...payee(id, characterId, 98000001),
+      archivedAt: ARCHIVED,
+    });
+
+    it('has no card, and its credit and Settle up count nowhere, while nothing new is billed', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [assignment('a', 'p1', '2026-10-01', 100)],
+        payees: [archivedPayee('p1', 1), payee('q', 1, 5)],
+        links: [link('p1', 500, 3)],
+      });
+      expect(accounts.isArchived('p1')).toBe(true);
+      expect(accounts.of('p1')?.credit).toBe(400);
+      expect(
+        accounts.linkable([archivedPayee('p1', 1), payee('q', 1, 5)]).map((p) => p.id)
+      ).toEqual(['q']);
+    });
+
+    it('shows again, by itself, once an Assignment is billed after it was archived', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [
+          assignment('a', 'p1', '2026-10-01', 100),
+          assignment('b', 'p1', '2026-10-11', 100, { updatedAt: ARCHIVED + 1 }),
+        ],
+        payees: [archivedPayee('p1', 1)],
+        links: [link('p1', 100, 3)],
+      });
+      expect(accounts.isArchived('p1')).toBe(false);
+    });
+
+    it('shows again for a backfilled or same-day entry, though it is covered by credit', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [
+          // Mined long ago, entered after the Payee was archived, and paid for by what was held.
+          assignment('late', 'p1', '2026-09-01', 50, { updatedAt: ARCHIVED + 1000 }),
+        ],
+        payees: [archivedPayee('p1', 1)],
+        links: [link('p1', 500, 3)],
+      });
+      expect(accounts.of('p1')?.owes).toBeNull();
+      expect(accounts.isArchived('p1')).toBe(false);
+    });
+
+    it('is archived only when every record of a merged Payee is', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [assignment('a', 'p1', '2026-10-01', 100)],
+        payees: [archivedPayee('p1', 1), payee('p2', 2, 98000001)],
+        links: [link('p1', 100, 3)],
+      });
+      expect(accounts.isArchived('p2')).toBe(false);
+    });
   });
 });

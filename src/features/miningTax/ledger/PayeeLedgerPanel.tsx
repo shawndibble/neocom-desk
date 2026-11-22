@@ -28,10 +28,10 @@ import {
   type PayeeLedgerRow,
   type PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
-import type { CsvColumn } from '@/lib/csv';
 import { formatIsk } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
 import { LedgerRowDetail } from './LedgerRowDetail';
+import { ledgerCsvColumns, ledgerWhat } from './ledgerCsv';
 import { lockRowBoundary } from './lockBoundary';
 
 /** The panel's filter and the words for each row, shared by its table and its export. */
@@ -82,45 +82,6 @@ function activeLedgerFilters(filter: LedgerFilter, t: Translate): ActiveFilter<L
   return active;
 }
 
-/** What a row is, in a few words: the table's What column and the export's. */
-function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
-  switch (row.kind) {
-    case 'charge':
-      if (row.reversal) return t('miningTax.ledger.what.reversal');
-      if (row.charge.kind === 'correction')
-        return t(
-          row.charge.opening
-            ? 'miningTax.ledger.what.openingBalance'
-            : 'miningTax.ledger.what.correction'
-        );
-      return row.charge.place
-        ? t('miningTax.ledger.what.minedAt', { place: row.charge.place })
-        : t('miningTax.ledger.what.mined');
-    case 'payment':
-      return row.payment.from
-        ? t('miningTax.ledger.what.paymentFrom', { name: row.payment.from })
-        : t('miningTax.ledger.what.payment');
-    case 'writeOff':
-      return row.reversal
-        ? t('miningTax.ledger.what.reversal')
-        : t(`miningTax.ledger.what.${row.cause}`);
-    case 'notice':
-      return t(`miningTax.ledger.what.${row.notice.kind}`);
-    case 'opening':
-      return t('miningTax.ledger.what.opening', { date: row.date });
-  }
-}
-
-function ledgerCsvColumns(t: Translate): CsvColumn<PayeeLedgerRow>[] {
-  return [
-    { header: t('miningTax.ledger.column.date'), value: (r) => r.date },
-    { header: t('miningTax.ledger.column.what'), value: (r) => ledgerWhat(r, t) },
-    { header: t('miningTax.ledger.column.charged'), value: (r) => r.charged || null },
-    { header: t('miningTax.ledger.column.credited'), value: (r) => r.paid || null },
-    { header: t('miningTax.ledger.column.balance'), value: (r) => r.balance },
-  ];
-}
-
 export interface PayeeLedgerPanelProps {
   open: boolean;
   onClose: () => void;
@@ -142,6 +103,13 @@ export interface PayeeLedgerPanelProps {
    * Absent for a personal Payee, whose ledger has none.
    */
   lockDate?: string;
+  /**
+   * The old personal history of a Payee a Corp Tax Book now answers for: the rows only, with no
+   * balance and no status, since none of it is anyone's figure.
+   */
+  history?: boolean;
+  /** A personal Payee's: opens the wallet payments to link to it (from a Marked paid row). */
+  onLinkWalletPayment?: () => void;
 }
 
 /**
@@ -159,6 +127,8 @@ export function PayeeLedgerPanel({
   picker,
   onUnlinkPayment,
   lockDate,
+  history,
+  onLinkWalletPayment,
 }: PayeeLedgerPanelProps) {
   const { t } = useTranslation();
   const ledger = useMemo(() => (source ? payeeLedger(source) : null), [source]);
@@ -167,7 +137,7 @@ export function PayeeLedgerPanel({
       open={open}
       onClose={onClose}
       title={payeeName}
-      subtitle={t('miningTax.ledger.subtitle')}
+      subtitle={t(history ? 'miningTax.ledger.historySubtitle' : 'miningTax.ledger.subtitle')}
       side="right"
       wide
     >
@@ -178,6 +148,8 @@ export function PayeeLedgerPanel({
           typeNames={typeNames}
           onUnlinkPayment={onUnlinkPayment}
           lockDate={lockDate}
+          history={history}
+          onLinkWalletPayment={onLinkWalletPayment}
         />
       ) : (
         <Spinner block="panel" label={t('miningTax.ledger.loading')} />
@@ -229,8 +201,12 @@ function LedgerBody({
   typeNames,
   onUnlinkPayment,
   lockDate,
+  history,
+  onLinkWalletPayment,
 }: {
+  onLinkWalletPayment?: (() => void) | undefined;
   ledger: PayeeLedger;
+  history?: boolean | undefined;
   typeNames?: ReadonlyMap<number, string>;
   onUnlinkPayment?: ((paymentId: string) => void) | undefined;
   lockDate?: string | undefined;
@@ -242,7 +218,7 @@ function LedgerBody({
   // Shown newest first, like a bank statement: the latest payment is the top row, not the bottom
   // of a long list. Only the order is reversed; no balance is recomputed.
   const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
-  const csvColumns = useMemo(() => ledgerCsvColumns(t), [t]);
+  const csvColumns = useMemo(() => ledgerCsvColumns(t, history), [t, history]);
   // The file stays in date order (oldest first), whichever way the table reads.
   const tableExport = useTableExport({
     surface: 'mining-tax-payee-ledger',
@@ -257,7 +233,7 @@ function LedgerBody({
 
   return (
     <div className="space-y-4">
-      <LedgerStatus ledger={ledger} />
+      {!history && <LedgerStatus ledger={ledger} />}
       <FilterBar
         value={filter}
         onChange={setFilter}
@@ -323,6 +299,8 @@ function LedgerBody({
             typeNames={typeNames}
             {...(onUnlinkPayment ? { onUnlinkPayment } : {})}
             {...(lockDate ? { lockDate } : {})}
+            {...(history ? { showBalance: false } : {})}
+            {...(onLinkWalletPayment ? { onLinkWalletPayment } : {})}
           />
         )}
       </Panel>
@@ -343,8 +321,14 @@ export function PayeeLedgerTable({
   onUnlinkPayment,
   lockDate,
   lockDateLabel,
+  showBalance = true,
+  onLinkWalletPayment,
   ...rest
 }: {
+  /** Opens the wallet payments to link, from a Marked paid row's detail. */
+  onLinkWalletPayment?: () => void;
+  /** Whether the running balance column is shown; an old history's rows carry none. */
+  showBalance?: boolean;
   rows: readonly PayeeLedgerRow[];
   label: string;
   typeNames?: ReadonlyMap<number, string>;
@@ -421,20 +405,24 @@ export function PayeeLedgerTable({
         className: 'tabular-nums',
         render: (r) => amountCell(r.paid),
       },
-      {
-        id: 'balance',
-        header: t('miningTax.ledger.column.balance'),
-        align: 'right',
-        className: 'tabular-nums font-medium',
-        // Owed reads positive; money ahead reads as credit, never as a negative balance.
-        cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
-        render: (r) =>
-          r.balance < -0.005
-            ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
-            : formatIsk(Math.max(0, r.balance)),
-      },
+      ...(showBalance
+        ? [
+            {
+              id: 'balance',
+              header: t('miningTax.ledger.column.balance'),
+              align: 'right',
+              className: 'tabular-nums font-medium',
+              // Owed reads positive; money ahead reads as credit, never as a negative balance.
+              cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
+              render: (r) =>
+                r.balance < -0.005
+                  ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
+                  : formatIsk(Math.max(0, r.balance)),
+            } satisfies DataTableColumn<PayeeLedgerRow>,
+          ]
+        : []),
     ],
-    [t]
+    [t, showBalance]
   );
   return (
     <DataTable
@@ -452,7 +440,12 @@ export function PayeeLedgerTable({
       expandableRow={{
         leadingIcon: true,
         renderDetail: (r) => (
-          <LedgerRowDetail row={r} typeNames={typeNames} onUnlinkPayment={onUnlinkPayment} />
+          <LedgerRowDetail
+            row={r}
+            typeNames={typeNames}
+            onUnlinkPayment={onUnlinkPayment}
+            onLinkWalletPayment={onLinkWalletPayment}
+          />
         ),
       }}
       {...(rowContextMenu ? { rowMoreActions: true, rowContextMenu } : {})}

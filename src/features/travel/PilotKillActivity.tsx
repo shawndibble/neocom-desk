@@ -220,7 +220,7 @@ export function PilotKillActivityView({
                 count > 0 ? SPACE_RULE[space] : 'border-t-line'
               )}
             >
-              <span className="block text-[0.625rem] font-semibold tracking-wider text-text-dim uppercase @sm/kills:text-[0.6875rem] @sm/kills:tracking-widest">
+              <span className="block text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase @sm/kills:tracking-widest">
                 {t(`common.spaceOption.${space}`)}
               </span>
               <span

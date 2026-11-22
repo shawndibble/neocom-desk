@@ -137,7 +137,7 @@ function SignedPlot({
         (count - 1 - i) % stride === 0 && bars[i] && bars[i].size > 0 ? (
           <b
             key={i}
-            className="pointer-events-none absolute -translate-x-1/2 text-[0.625rem] leading-none font-normal whitespace-nowrap text-text-dim tabular-nums"
+            className="pointer-events-none absolute -translate-x-1/2 text-[0.6875rem] leading-none font-normal whitespace-nowrap text-text-dim tabular-nums"
             style={{
               left: `${((i + 0.5) / count) * 100}%`,
               ...(bars[i].negative

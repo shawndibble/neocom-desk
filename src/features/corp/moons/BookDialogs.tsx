@@ -101,9 +101,14 @@ export function DialogShell({
 }: ShellProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
+  const formId = useId();
+  const reasonId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Any typing in the body: closing by Escape, Back or a stray click then asks first.
+  const [touched, setTouched] = useState(false);
   const confirm = async () => {
+    if (!canConfirm || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -115,11 +120,14 @@ export function DialogShell({
       setBusy(false);
     }
   };
+  // Said once the pilot has typed and Confirm is still off, so a disabled button is never mute.
+  const needsReason = touched && !canConfirm;
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={title}
+      dirty={touched && !busy}
       initialFocusRef={initialFocusRef}
       placement={phone ? 'sheet' : 'center'}
       footer={
@@ -128,16 +136,28 @@ export function DialogShell({
             {t('common.cancel')}
           </Button>
           <Button
+            type="submit"
+            form={formId}
             variant={danger ? 'danger' : 'primary'}
-            onClick={() => void confirm()}
-            disabled={!canConfirm || busy}
+            loading={busy}
+            aria-disabled={!canConfirm || undefined}
+            aria-describedby={needsReason ? reasonId : undefined}
           >
             {confirmLabel}
           </Button>
         </DialogFooter>
       }
     >
-      <div className="space-y-3 text-sm">
+      <form
+        id={formId}
+        noValidate
+        className="space-y-3 text-sm"
+        onInput={() => setTouched(true)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void confirm();
+        }}
+      >
         {children}
         {error && (
           <p role="alert" className="text-danger">
@@ -153,7 +173,12 @@ export function DialogShell({
             )}
           </p>
         )}
-      </div>
+        {needsReason && (
+          <p id={reasonId} className="text-xs text-text-dim">
+            {t('common.needsInput')}
+          </p>
+        )}
+      </form>
     </Modal>
   );
 }

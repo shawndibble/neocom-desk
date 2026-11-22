@@ -113,6 +113,8 @@ export async function loadPlanetaryBoard(
   signal: RouteSnapshotSignal
 ): Promise<PlanetaryBoardData> {
   const { cached, needsReauth } = await loadCharacterPlanets(characterId);
+  // Nothing cached and the grant is fine: the read failed, never "no colonies".
+  if (!cached && !needsReauth) throw new Error('Colonies could not be read');
   const loadedAt = Date.now();
   const planets = cached?.data ?? [];
   const base = {
@@ -277,6 +279,7 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
   const ownEntry = fanOut.entries.find((entry) => entry.characterId === characterId);
   const { cached, needsReauth } =
     ownEntry?.result ?? (await loadCharacterIndustryJobs(characterId));
+  if (!cached && !needsReauth) throw new Error('Industry jobs could not be read');
   const jobs = cached?.data ?? [];
   const known = fanOut.entries.flatMap((entry) =>
     entry.result.cached && !entry.result.needsReauth
@@ -342,6 +345,7 @@ export interface ContractsBoardData {
  */
 export async function loadContractsBoard(characterId: number): Promise<ContractsBoardData> {
   const { cached, needsReauth } = await loadContracts(characterId);
+  if (!cached && !needsReauth) throw new Error('Contracts could not be read');
   const loadedAt = Date.now();
   const summary = summarizeContractsBoard(cached?.data ?? [], characterId, loadedAt);
   const { soonest } = summary;
@@ -423,6 +427,10 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     loadMailLabels(characterId),
     loadMailHeaders(characterId),
   ]);
+  // Neither read landed and the grant is fine: unknown, never "0 unread".
+  if (!labels.cached && !headers.cached && !labels.needsReauth && !headers.needsReauth) {
+    throw new Error('Mail could not be read');
+  }
   const newestFirst = (headers.cached?.data ?? [])
     .map((header) => ({
       header,

@@ -485,7 +485,7 @@ export function BlueprintAcquisitionModal({
             <span
               key={tag}
               // Accent is for the selected state only (DESIGN.md); static facts stay dim.
-              className={`ml-1.5 inline-block text-[0.625rem] font-semibold tracking-widest uppercase ${tag === selectedTag ? 'text-accent' : 'text-text-dim'}`}
+              className={`ml-1.5 inline-block text-[0.6875rem] font-semibold tracking-widest uppercase ${tag === selectedTag ? 'text-accent' : 'text-text-dim'}`}
             >
               {tag}
             </span>

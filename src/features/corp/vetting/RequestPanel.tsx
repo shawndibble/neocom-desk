@@ -31,7 +31,7 @@ interface RequestPanelProps {
 export function RequestPanel({ review, reviewerId, send, preview }: RequestPanelProps) {
   const { t } = useTranslation();
   const now = useNow();
-  const { copied, flash } = useCopyFeedback(2000);
+  const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<RequestMailRun | null>(null);
   const [shown, setShown] = useState<RequestMailPreview | null>(null);
@@ -53,9 +53,10 @@ export function RequestPanel({ review, reviewerId, send, preview }: RequestPanel
   const copy = async () => {
     try {
       await writeToClipboard(requestLink());
-      flash();
+      flash('copied');
     } catch {
-      // The clipboard was refused; nothing was copied and nothing claims it was.
+      // The clipboard was refused: nothing was copied, and the button says so.
+      flash('failed');
     }
   };
 
@@ -124,7 +125,13 @@ export function RequestPanel({ review, reviewerId, send, preview }: RequestPanel
           )}
           <Button onClick={() => void preview().then(setShown)}>{t('vetting.tell.preview')}</Button>
           <Button onClick={() => void copy()}>
-            {t(copied ? 'vetting.tell.linkCopied' : 'vetting.tell.copyLink')}
+            {t(
+              copied === 'failed'
+                ? 'vetting.copyFailed'
+                : copied
+                  ? 'vetting.tell.linkCopied'
+                  : 'vetting.tell.copyLink'
+            )}
           </Button>
         </div>
         {isYou && waiting && review.requestMail && (

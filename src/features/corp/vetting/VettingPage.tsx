@@ -66,7 +66,7 @@ export function VettingPage() {
   const { pathname } = useLocation();
   const [tab, selectTab] = usePageTab(VETTING_TABS);
   const { state, characterId, corporationId, reload, replace } = useVettingOverview();
-  const { copied, flash } = useCopyFeedback(2000);
+  const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [requesting, setRequesting] = useState(false);
   const roster = useReviewRoster(requesting ? characterId : null, corporationId);
   // The tab the settings gear was pressed on, which closing the modal returns to.
@@ -118,7 +118,7 @@ export function VettingPage() {
   }
 
   const page = (body: React.ReactNode, actions?: React.ReactNode) => (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader title={t('vetting.title')} actions={actions} />
       {body}
     </div>
@@ -161,9 +161,10 @@ export function VettingPage() {
   const copy = async () => {
     try {
       await writeToClipboard(applyLink(corporationId));
-      flash();
+      flash('copied');
     } catch {
-      // The clipboard was refused; nothing was copied and nothing claims it was.
+      // The clipboard was refused: nothing was copied, and the button says so.
+      flash('failed');
     }
   };
   const mailRow = async (review: VettingReviewSummary) => {
@@ -172,9 +173,10 @@ export function VettingPage() {
   const copyRequestLink = async () => {
     try {
       await writeToClipboard(requestLink());
-      flash();
+      flash('copied');
     } catch {
-      // The clipboard was refused; nothing was copied and nothing claims it was.
+      // The clipboard was refused: nothing was copied, and the button says so.
+      flash('failed');
     }
   };
   // By invite, the bare apply link takes nobody anywhere: the header makes an invite link instead.
@@ -185,7 +187,9 @@ export function VettingPage() {
     </Button>
   ) : (
     <Button aria-disabled={!on || undefined} onClick={on ? () => void copy() : undefined}>
-      {t(copied ? 'vetting.copied' : 'vetting.copyLink')}
+      {t(
+        copied === 'failed' ? 'vetting.copyFailed' : copied ? 'vetting.copied' : 'vetting.copyLink'
+      )}
     </Button>
   );
 
@@ -215,7 +219,9 @@ export function VettingPage() {
           <Button onClick={() => setInvitesOpen('list')}>{t('vetting.invites.open')}</Button>
           <Button onClick={() => setRequesting(true)}>{t('vetting.reviewMember')}</Button>
         </span>
-        <LiveStatus>{copied ? t('vetting.copied') : ''}</LiveStatus>
+        <LiveStatus>
+          {copied === 'failed' ? t('vetting.copyFailed') : copied ? t('vetting.copied') : ''}
+        </LiveStatus>
       </div>
       {!on && (
         <p className="text-sm text-text-dim">
