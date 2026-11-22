@@ -205,6 +205,7 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
   paidAt: UPDATED_AT - 1000,
   groupId: 'grp1',
   collectsGrowth: true,
+  releasedTypeIds: [45491],
   override: false,
   payment: {
     paymentId: 'pay1',

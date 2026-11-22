@@ -754,6 +754,12 @@ export interface MiningTaxAssignmentRecord {
    */
   collectsGrowth?: boolean;
   /**
+   * Ore types a Corp Tax Book took off this Assignment ("Let the corporation bill it"). The
+   * game's ledger still reports that ore for the day, so without this it would grow straight back
+   * into the Assignment as late ore and clash with the book again (`computeOwnership`).
+   */
+  releasedTypeIds?: number[];
+  /**
    * `false` on an Assignment a Payee's Default Systems made and no one has changed since. Such a
    * row is the last resort: a Survey connection takes its ore over and the Corp Tax Book bills it
    * as ore given to no Payee. Absent means a pilot (or a Survey) assigned it, so every row stored
