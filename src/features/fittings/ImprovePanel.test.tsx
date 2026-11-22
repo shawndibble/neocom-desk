@@ -252,7 +252,7 @@ describe('ImprovePanel', () => {
     expect(screen.getByText(/Gives up:/)).toBeInTheDocument();
     expect(screen.getByText(/Max velocity 300 to 250 m\/s, worse/)).toBeInTheDocument();
     const apply = screen.getByRole('button', { name: 'Apply' });
-    expect(apply).toBeDisabled();
+    expect(apply).toHaveAttribute('aria-disabled', 'true');
     // Opaque in the drawer's surface token, so rows scrolling under it don't show through.
     expect(apply.closest('.sticky')).toHaveClass('bg-panel');
     const boxes = screen.getAllByRole('checkbox');
@@ -360,7 +360,10 @@ describe('ImprovePanel', () => {
     await userEvent.click(a);
     await userEvent.click(b);
     expect(await screen.findByText(/use more CPU than the ship has/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(
       await screen.findByText('Add one of these so the set fits:', {}, { timeout: 3000 })
     ).toBeInTheDocument();
@@ -371,7 +374,10 @@ describe('ImprovePanel', () => {
     // The added cover has its own tick, so it can be taken back out.
     await userEvent.click(screen.getByRole('checkbox', { name: /Added to cover the set/ }));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
     );
   });
 
@@ -1058,7 +1064,10 @@ describe('ImprovePanel', () => {
       renderPanel(s, onApply, vi.fn(), settings(), { fitting });
       await userEvent.click(screen.getByRole('checkbox'));
       expect(await screen.findByRole('alert')).toHaveTextContent('use more CPU than the ship has');
-      expect(screen.getByRole('button', { name: 'Apply 1 change' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Apply 1 change' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
     });
 
     it('says which pick a ticked row replaces', async () => {

@@ -353,7 +353,6 @@
       "refresh": "Refresh"
     },
     "saveToEve": {
-      "nameRequired": "Enter a name",
       "action": "Save to EVE",
       "needCharacter": "Log in with a Character to save Fittings to EVE.",
       "needsConnection": "Needs a connection.",
@@ -1492,6 +1491,8 @@
       "costs": "Costs"
     },
     "improve": {
+      "applyNeedsPick": "Tick a change to apply",
+      "applyBlocked": "Fix the problems listed above first",
       "menuItem": "Improve Fit",
       "button": "Improve",
       "fixMenuItem": "Fix Fit",

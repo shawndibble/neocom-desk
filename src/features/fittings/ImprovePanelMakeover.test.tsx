@@ -105,7 +105,7 @@ describe('Improve panel with a Makeover', () => {
     renderPanel(state({}));
     await userEvent.click(screen.getByRole('checkbox', { name: /^Whole Makeover/ }));
     expect(applyButton()).not.toHaveTextContent(String(MAKEOVER_KEYS.length));
-    expect(applyButton()).toBeDisabled();
+    expect(applyButton()).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('shows the Makeover when no single swap was found', () => {

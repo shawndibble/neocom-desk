@@ -61,6 +61,7 @@ export function SaveToEveDialog({
   const { t } = useTranslation();
   const online = useOnline();
   const nameReasonId = useId();
+  const offlineReasonId = useId();
   const [name, setName] = useState(() => clampFittingName(fitting.name));
   const [existing, setExisting] = useState<CharacterFitting[]>([]);
   const [target, setTarget] = useState<string>(NEW_TARGET);
@@ -260,13 +261,15 @@ export function SaveToEveDialog({
           />
         )}
         {!online ? (
-          <LiveNote className="text-xs text-warning">
-            {t(
-              onSaveToMyFittings
-                ? 'fittings.saveToEve.needsConnectionKeepMine'
-                : 'fittings.saveToEve.needsConnection'
-            )}
-          </LiveNote>
+          <div id={offlineReasonId}>
+            <LiveNote className="text-xs text-warning">
+              {t(
+                onSaveToMyFittings
+                  ? 'fittings.saveToEve.needsConnectionKeepMine'
+                  : 'fittings.saveToEve.needsConnection'
+              )}
+            </LiveNote>
+          </div>
         ) : (
           offlineFailed && <InlineError>{t('fittings.saveToEve.offlineFailed')}</InlineError>
         )}
@@ -286,7 +289,7 @@ export function SaveToEveDialog({
           </Button>
           {nameMissing && !saving && (
             <span id={nameReasonId} className="mr-auto text-[0.6875rem] text-text-dim">
-              {t('fittings.saveToEve.nameRequired')}
+              {t('fittings.myFittings.saveAsNewNeedsName')}
             </span>
           )}
           <Button
@@ -294,7 +297,9 @@ export function SaveToEveDialog({
             variant={overwriteTarget ? 'danger' : 'primary'}
             loading={saving}
             aria-disabled={nameMissing || offlineBlocked || undefined}
-            aria-describedby={nameMissing ? nameReasonId : undefined}
+            aria-describedby={
+              nameMissing ? nameReasonId : offlineBlocked ? offlineReasonId : undefined
+            }
           >
             {!online
               ? t('fittings.saveToEve.saveMineOnlyAction')
