@@ -1,14 +1,17 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
+import { divisionsPrimaryFirst, primaryDivisionOf } from '@/engine/corpTaxBook/uncounted';
 import { previewPayment } from '@/engine/corpTaxBook/paymentPreview';
 import type { DisplayRow } from '../groupRows';
 import { defaultPayer } from '../settlePayer';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { buildSettleUpReason } from '../groupRows';
+import { linkPayment } from '../ledgerActions';
 import { SettleUpDialog, type SettleUpRow } from '../SettleUpDialog';
 import { useCopiedField } from '../settleUpFields';
 import { CorpBookSyncNote } from './CorpBookSyncNote';
-import { corpPayAccount } from './corpPayAccount';
+import { corpPayAccount, corpPayAccounts } from './corpPayAccount';
 import { suggestedCode, type MinerPayCode } from './minerPayCodes';
 import type { CorpBookViewBook } from './corpBookView';
 
@@ -36,7 +39,13 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
   const { t } = useTranslation();
   const { copied, copy } = useCopiedField();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const division = book.loaded.divisions[0] ?? 1;
+  const division = primaryDivisionOf(book.loaded.divisions, book.loaded.primaryDivision);
+  // The other divisions it reads: a donation into one of them is credited all the same.
+  const otherAccounts = corpPayAccounts(
+    divisionsPrimaryFirst(book.loaded.divisions, book.loaded.primaryDivision).slice(1),
+    book.loaded.divisionNames,
+    t
+  );
   const settleRows: SettleUpRow[] = rows.flatMap((dr) =>
     dr.assignment
       ? [
@@ -79,7 +88,30 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
           source: 'donation',
         });
       }}
-      reason={(payer) => suggestedCode(codes, payer ?? undefined)?.code}
+      // The Miner's code says whose money it is; the days say what it pays (oldest first).
+      reason={(payer, outcome) =>
+        buildSettleUpReason(
+          suggestedCode(codes, payer ?? undefined)?.code ?? t('miningTax.settleUpReasonPrefix'),
+          [],
+          (outcome?.lines ?? []).map((l) => l.date).sort()
+        )
+      }
+      reasonHint={t('miningTax.corpBook.pay.codeInReason')}
+      methods={['donation']}
+      // "I sent it": counted as paid until the book reads its wallet and does not find it.
+      record={(payment) =>
+        linkPayment(
+          {
+            payeeId: book.payee.id,
+            kind: 'recorded',
+            refId: crypto.randomUUID(),
+            amount: payment.amount,
+            paidOn: payment.paidOn,
+            source: 'manual',
+          },
+          payment.payerId ?? activeCharacterId ?? book.loaded.characterIds[0] ?? 0
+        )
+      }
       notice={(_payer, amount) => (
         <div className="space-y-1.5 text-xs text-text-dim">
           <p>
@@ -89,7 +121,11 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
               components={{ strong: <strong className="font-semibold text-text" /> }}
             />
           </p>
-          <p>{t('miningTax.corpBook.pay.codeInReason')}</p>
+          {otherAccounts.length > 0 && (
+            <p>
+              {t('miningTax.corpBook.pay.alsoAccepted', { accounts: otherAccounts.join(', ') })}
+            </p>
+          )}
           {several && (
             <ul className="space-y-1">
               {codes.map((c) => (
@@ -105,7 +141,7 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
               ))}
             </ul>
           )}
-          <CorpBookSyncNote book={book} owedNow={amount} />
+          <CorpBookSyncNote book={book} owedNow={amount} showStanding={false} />
         </div>
       )}
     />

@@ -28,12 +28,15 @@ export function CorpBookSyncNote({
   book,
   owedNow,
   now: nowOverride,
+  showStanding = true,
 }: {
   book: CorpBookViewBook;
   /** What the book's rows owe right now. */
   owedNow: number;
   /** Test seam; the note reads the shared minute ticker otherwise. */
   now?: number;
+  /** Whether to say how far behind the account is; the pay dialog already shows the amount. */
+  showStanding?: boolean;
 }) {
   const ticked = useTicker(MINUTE_MS);
   const now = nowOverride ?? ticked;
@@ -46,14 +49,15 @@ export function CorpBookSyncNote({
   const credit = summary.credit > 0;
   // A running account (#6294) says where the member stands: paid through a day, or how far behind.
   const account = summary.account;
-  const standing = account?.owes
-    ? t('miningTax.corpBook.sync.behind', {
-        amount: formatIsk(account.owes.amount, 0),
-        count: account.owes.days,
-        date: shortDate(account.owes.oldest, i18n.language),
-        corp: corpName,
-      })
-    : null;
+  const standing =
+    showStanding && account?.owes
+      ? t('miningTax.corpBook.sync.behind', {
+          amount: formatIsk(account.owes.amount, 0),
+          count: account.owes.days,
+          date: shortDate(account.owes.oldest, i18n.language),
+          corp: corpName,
+        })
+      : null;
   // The balance an officer rolled over from another system, until they reverse it.
   // A note of where the account started, so it shows only while a balance is open: owing it, or
   // holding credit.

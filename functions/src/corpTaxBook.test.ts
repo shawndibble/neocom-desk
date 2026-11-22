@@ -136,6 +136,15 @@ describe('parsers', () => {
     });
   });
 
+  it('takes a primary division of 1-7 and refuses any other', () => {
+    expect(parseSettingsPatch({ divisions: [1, 3], primaryDivision: 3 })).toEqual({
+      divisions: [1, 3],
+      primaryDivision: 3,
+    });
+    expect(() => parseSettingsPatch({ primaryDivision: 8 })).toThrow();
+    expect(() => parseSettingsPatch({ primaryDivision: 'x' })).toThrow();
+  });
+
   it('bounds the notice rules', () => {
     const rules = { after: { kind: 'dayOfMonth', day: 5 }, minimum: 10_000_000, cooldownDays: 7 };
     expect(parseSettingsPatch({ noticeRules: rules, dayTolerancePct: 0.5 })).toEqual({

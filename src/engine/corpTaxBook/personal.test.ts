@@ -558,7 +558,7 @@ describe('overlayCorpBooks', () => {
           },
         ],
         // The donation that paid the 16th, also sitting in flight.
-        inFlight: [{ characterId: ME, amount: 43_050 * 148 * 0.15, at: '2026-10-17T10:00:00Z' }],
+        inFlight: [{ characterId: ME, amount: 43_050 * 148 * 0.15, at: '2026-10-18T11:00:00Z' }],
       });
       const out = overlay([two, other], [b]);
       const byDate = (d: string) => out.rows.find((r) => r.date === d)!;
@@ -1368,6 +1368,31 @@ describe('inFlightDonations', () => {
     expect(inFlightDonations([made()], [], CORP, '2026-10-01')[0]).not.toHaveProperty('refId');
   });
 
+  describe('a payment the member recorded by hand (stated)', () => {
+    const stated = (over = {}) =>
+      made({ date: '2026-10-18T12:00:00.000Z', stated: true as const, ...over });
+
+    it('counts as in flight, marked stated', () => {
+      expect(inFlightDonations([stated()], [], CORP, '2026-10-01')).toEqual([
+        { characterId: ME, amount: 500_000, at: '2026-10-18T12:00:00.000Z', stated: true },
+      ]);
+    });
+
+    it('is the same donation as the wallet one that shows up: one counts, not both', () => {
+      const out = inFlightDonations([stated(), made({ refId: 9 })], [], CORP, '2026-10-01');
+      expect(out).toEqual([
+        { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z', refId: 9 },
+      ]);
+    });
+
+    it('is dropped once the book holds it, though the day is only stated to the day', () => {
+      const held = [
+        { characterId: ME, amount: 500_000, at: '2026-10-18T18:40:00Z', notTaxAmount: 0 },
+      ];
+      expect(inFlightDonations([stated()], held, CORP, '2026-10-01')).toEqual([]);
+    });
+  });
+
   it('counts donations to the corp the book has not credited yet', () => {
     expect(inFlightDonations([made()], [], CORP, '2026-10-01')).toEqual([
       { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z' },
@@ -2045,7 +2070,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
 
       it('names only the days that went back to Billed when a newer donation still counts', () => {
-        const counted = { ...old, amount: Math.ceil(tax), at: '2026-10-16T10:00:00Z' };
+        const counted = { ...old, amount: Math.ceil(tax), at: '2026-10-18T11:00:00Z' };
         const lost = { ...old, amount: Math.ceil(tax) };
         const out = twoDays([counted, lost]);
         // The pooled money paid both days; without the lost one, the newer day is owed again.
@@ -2072,15 +2097,15 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       // The last sync that did read it was too soon after the donation.
       const early = overlay(
         [entry()],
-        [book({ inFlight: [old], donationsCheckedAt: '2026-10-15T10:00:00Z' })]
+        [book({ inFlight: [old], donationsCheckedAt: '2026-10-14T11:00:00Z' })]
       );
       expect(early.books[0].uncredited).toEqual([]);
       const late = overlay([entry()], [book({ inFlight: [old], donationsCheckedAt: SYNCED })]);
       expect(late.books[0].uncredited).toMatchObject([old]);
     });
 
-    it('still counts while the book has not synced 3 days after it', () => {
-      const recent = { ...old, at: '2026-10-16T10:00:00Z' };
+    it('still counts while the book has not read its wallet 2 hours after it', () => {
+      const recent = { ...old, at: '2026-10-18T11:00:00Z' };
       const out = overlay([entry()], [book({ inFlight: [recent] })]);
       expect(out.rows[0]).toMatchObject({ state: 'paid' });
       expect(out.books[0].uncredited).toEqual([]);

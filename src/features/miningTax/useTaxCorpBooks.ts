@@ -74,6 +74,7 @@ export function useTaxCorpBooks(
     activeCharacterId,
     madePayments,
     linked,
+    recorded: data?.paymentLinks,
     payees,
     reloadKey: data?.fetchedAt?.getTime(),
     hiddenCorps: leftAck.hidden,

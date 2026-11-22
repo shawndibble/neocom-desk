@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
+import type { PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
 import type { LedgerActionResult } from './ledgerActions';
 import { SettleUpDialog, type SettlePayment, type SettleUpRow } from './SettleUpDialog';
 
@@ -59,7 +60,9 @@ function renderDialog(
     onPaid?: () => void;
     onPickFromWallet?: () => void;
     unlinked?: { count: number; amount: number };
-    reason?: string | ((payerId: number | null) => string | undefined);
+    reason?:
+      | string
+      | ((payerId: number | null, outcome: PaymentOutcome | undefined) => string | undefined);
     onDismissBalance?: () => Promise<LedgerActionResult>;
   } = {}
 ) {
@@ -146,6 +149,17 @@ describe('SettleUpDialog', () => {
     expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument();
     expect(screen.queryByText('Paid on')).not.toBeInTheDocument();
     expect(screen.getByText('MTABC123')).toBeInTheDocument();
+  });
+
+  it('hands the Reason the days the amount pays, so it can name them (oldest first)', async () => {
+    const user = userEvent.setup();
+    const days = (outcome: PaymentOutcome | undefined) =>
+      (outcome?.lines ?? []).map((l) => l.date.slice(5)).join('/');
+    renderDialog({ reason: (_payer, outcome) => `MTABC123 ${days(outcome)}` });
+    expect(screen.getByText('MTABC123 09-04/09-05/09-06')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /different amount/i }));
+    await user.type(screen.getByRole('textbox', { name: /amount you sent/i }), '100000');
+    expect(screen.getByText('MTABC123 09-04')).toBeInTheDocument();
   });
 
   it('asks who is paying when the entries are more than one Character’s', () => {

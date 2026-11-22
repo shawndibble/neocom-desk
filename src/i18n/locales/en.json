@@ -8349,7 +8349,8 @@
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
         "codeOf": "{{character}} · code:",
-        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first."
+        "alsoAccepted": "The book also counts a donation into: {{accounts}}.",
+        "codeInReason": "The Reason starts with your own code, which tells the book the money is yours, then the days this pays (month-day). A payment pays your oldest unpaid days first."
       },
       "attention": {
         "overdueTitle": "{{corp}} Late notice {{period}}, sent {{date}}, not paid yet",
@@ -8677,6 +8678,7 @@
       "toLabel": "To",
       "reasonLabel": "Reason",
       "copyNamed": "Copy {{what}}",
+      "aboutNamed": "About {{what}}",
       "differentAmountAction": "Sent a different amount?",
       "differentAmountHide": "Sent the full amount",
       "sentAmountLabel": "Amount you sent",
@@ -19650,6 +19652,8 @@
         "startLocked": "The start date ({{date}}) is before {{lock}}, in locked history, so it is locked.",
         "grace": "Grace after day end (hours)",
         "divisions": "Wallet divisions donations are read from",
+        "primaryDivision": "Preferred account to pay into",
+        "primaryDivisionHint": "Miners are asked to pay into this one first. A donation into any other division above is still counted.",
         "division": "Division {{n}}",
         "extractions": "Extractions",
         "chunk": "Chunk rate (m³ per hour)",
