@@ -197,9 +197,8 @@ export async function saveAlertGrant(
   };
   await deps.store.set(characterId, doc);
 
-  // The replaced token is the same Character's, so it is dropped, never revoked: SSO's
-  // revoke ends the Character's whole authorization of this app, which would take the
-  // token just stored and every device's login for them with it.
+  // The replaced token is the same Character's, so it is dropped, never revoked
+  // (decision 20261122-170655: SSO's revoke ends the Character's every login here).
   return {
     characterId,
     enabledAt: doc.enabledAt,
@@ -234,16 +233,14 @@ async function verifyAlertsToken(
   return claims;
 }
 
-/** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
+/** Decrypt and revoke a stored token at SSO. False if it could not be done. */
 async function revokeStored(
   deps: AlertGrantDeps,
   characterId: number,
-  doc: AlertGrantDoc,
-  keepToken?: string
+  doc: AlertGrantDoc
 ): Promise<boolean> {
   try {
     const token = decryptRefreshToken(doc.encryptedRefreshToken, characterId, deps.key());
-    if (token === keepToken) return true;
     await deps.revoke(doc.clientId, token);
     return true;
   } catch (err) {

@@ -338,16 +338,17 @@ emulatorSuite('add my other corps', () => {
     expect(await pointer()).toBeUndefined();
     expect(await grant()).toBeUndefined();
     expect(await invites()).toBe(0);
-    expect(revoked.length).toBeGreaterThan(0);
+    // The CEO's token is dropped, never revoked: that would end their device login too.
+    expect(revoked).toEqual([]);
   });
 
-  it('refuses an alt who is in another corporation (wrong-corp) and revokes its token', async () => {
+  it('refuses an alt who is in another corporation (wrong-corp) and drops its token', async () => {
     const other = { ...deps(), lookupCorporation: async () => 98000099 };
     expect(await reason(add({}, other))).toBe('wrong-corp');
     expect(await feederRecord()).toBeUndefined();
     expect(await grant()).toBeUndefined();
     expect(await invites()).toBe(0);
-    expect(revoked).toContain(`rt-${ALT}`);
+    expect(revoked).toEqual([]);
   });
 
   it('removes an own corporation at once, keeping its record and coverage', async () => {

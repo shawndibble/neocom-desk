@@ -538,27 +538,35 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     }
   });
 
-  it('revokes a rotated token it could not store because a re-grant replaced the grant (S5)', async () => {
+  /** A re-grant by `holder` lands while the run is redeeming the stored token. */
+  const regrantMidRefresh = (holder: number) => async () => {
+    const grant = (await grantDoc(98000002)) as CorpSyncGrantDoc;
+    await db
+      .collection(CORP_SYNC_GRANTS_COLLECTION)
+      .doc('98000002')
+      .set({
+        ...grant,
+        characterId: holder,
+        encryptedRefreshToken: encryptRefreshToken(`rt-${holder}-7`, holder, KEY, 'corpSyncGrant'),
+      });
+  };
+
+  it('revokes a rotated token it could not store because another Character re-granted (S5)', async () => {
     await addFeeder(98000002);
     rotate = true;
-    duringRefresh = async () => {
-      const grant = (await grantDoc(98000002)) as CorpSyncGrantDoc;
-      await db
-        .collection(CORP_SYNC_GRANTS_COLLECTION)
-        .doc('98000002')
-        .set({
-          ...grant,
-          encryptedRefreshToken: encryptRefreshToken(
-            'rt-98001002-7',
-            98001002,
-            KEY,
-            'corpSyncGrant'
-          ),
-        });
-    };
+    duringRefresh = regrantMidRefresh(98001009);
     await run();
     // The rotated token is live at SSO and stored nowhere: it goes.
     expect(revokedAtSso).toEqual(['rt-98001002-1']);
+  });
+
+  it('drops, never revokes, a rotated token the same Character re-granted over (S5)', async () => {
+    await addFeeder(98000002);
+    rotate = true;
+    duringRefresh = regrantMidRefresh(98001002);
+    await run();
+    // Revoking it would end that Character's new grant and device login with it.
+    expect(revokedAtSso).toEqual([]);
   });
 
   it('never revokes a rotated token the grant now holds (a concurrent run stored it)', async () => {

@@ -302,7 +302,7 @@ export async function saveCorpSyncGrant(
   });
 
   // The replaced token is orphaned; revoke it, best effort, unless the same Character holds both.
-  if (previous) await revokeReplaced(deps, previous, doc.characterId, refreshed.refreshToken);
+  if (previous) await revokeReplaced(deps, previous, doc.characterId);
   return { corporationId: input.corporationId, characterId: doc.characterId, enabledAt: now };
 }
 
@@ -324,26 +324,19 @@ async function verifyGrantToken(deps: CorpSyncDeps, accessToken: string): Promis
 }
 
 /**
- * Revoke a grant a new one replaced, unless the same Character holds both: SSO's revoke ends
- * the Character's whole authorization of this app, so revoking their own earlier token would
- * also end the token just stored and every device's login for them. That token is only dropped.
+ * Revoke a grant a new one replaced, unless the same Character holds both: that one is only
+ * dropped (decision 20261122-170655, SSO's revoke ends the Character's every login here).
  */
 export async function revokeReplaced(
   deps: CorpSyncDeps,
   previous: CorpSyncGrantDoc,
-  characterId: number,
-  keepToken: string
+  characterId: number
 ): Promise<void> {
-  if (previous.characterId === characterId) return;
-  await revokeStored(deps, previous, keepToken);
+  if (previous.characterId !== characterId) await revokeStored(deps, previous);
 }
 
-/** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
-export async function revokeStored(
-  deps: CorpSyncDeps,
-  doc: CorpSyncGrantDoc,
-  keepToken?: string
-): Promise<boolean> {
+/** Decrypt and revoke a stored token at SSO. False if it could not be done. */
+export async function revokeStored(deps: CorpSyncDeps, doc: CorpSyncGrantDoc): Promise<boolean> {
   try {
     const token = decryptRefreshToken(
       doc.encryptedRefreshToken,
@@ -351,7 +344,6 @@ export async function revokeStored(
       deps.key(),
       PURPOSE
     );
-    if (token === keepToken) return true;
     await deps.revoke(doc.clientId, token);
     return true;
   } catch (err) {
@@ -875,7 +867,9 @@ async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promis
   });
   if (written !== true) {
     // A re-grant, revoke or leave replaced the grant mid-refresh: the rotated token is live at
-    // SSO and stored nowhere, so it goes too, unless the grant now holds that very token.
+    // SSO and stored nowhere, so it goes too, unless the grant now holds that very token or
+    // the same Character re-granted (decision 20261122-170655: dropped, never revoked).
+    if (written && written.characterId === grant.characterId) return { kind: 'skip' };
     await revokeUnlessHeld(deps, grant, tokens.refreshToken, written ?? undefined);
     return { kind: 'skip' };
   }

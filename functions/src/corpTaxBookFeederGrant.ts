@@ -373,19 +373,14 @@ export async function saveFeederGrant(
     });
     throw new HttpsError('unauthenticated', 'EVE refresh token rejected');
   }
-  // From here the rotated token is live at SSO: any failure must revoke it.
-  const orphan = async () => {
-    try {
-      await deps.revoke(supplied.clientId, refreshed.refreshToken);
-    } catch {
-      deps.log('Feeder grant token revoke failed after a refused save');
-    }
-  };
+  // From here the rotated token is live at SSO. A refused save drops it, never revokes it
+  // (decision 20261122-170655: SSO's revoke ends the Character's every login here).
 
   let undo: AcceptUndo | undefined;
   let accepted: (AcceptFeederInviteResult & { undo?: AcceptUndo }) | undefined;
   let reconnect: ReconnectUndo | undefined;
-  // The grant this save replaces (a Reconnect): revoked once the new one works, else put back.
+  // The grant this save replaces (a Reconnect): revoked once the new one works unless the same
+  // Character holds both, else put back.
   let previousGrant: CorpSyncGrantDoc | undefined;
   let grantWritten = false;
   try {
@@ -482,12 +477,11 @@ export async function saveFeederGrant(
     if (accepted && grantWritten) {
       await putBackGrant(deps, accepted.feederCorporationId, previousGrant);
     }
-    await orphan();
     throw err;
   }
   // The replaced token is orphaned: revoke it, unless the same Character holds both.
   if (previousGrant) {
-    await revokeReplaced(deps, previousGrant, supplied.characterId, refreshed.refreshToken);
+    await revokeReplaced(deps, previousGrant, supplied.characterId);
   }
 
   if (input.requestedRatePct !== undefined) {
@@ -520,8 +514,8 @@ export async function saveFeederGrant(
 }
 
 /**
- * A refused save stored a grant over whatever was held: drop the new one (SSO may have
- * rotated it on the first pull, so it is revoked as stored) and restore the earlier one.
+ * A refused save stored a grant over whatever was held: drop the new one, unrevoked (the
+ * save's own comment says why), and restore the earlier one.
  */
 async function putBackGrant(
   deps: CorpSyncDeps,
@@ -532,9 +526,6 @@ async function putBackGrant(
   const current = (await ref.get()).data() as CorpSyncGrantDoc | undefined;
   if (previous) await ref.set(previous);
   else if (current) await ref.delete();
-  if (current && current.encryptedRefreshToken !== previous?.encryptedRefreshToken) {
-    await revokeStored(deps, current);
-  }
 }
 
 /** Put the feeder record, pointer, invite and grant back to how they were before the accept. */
@@ -569,8 +560,6 @@ async function unwindAccept(
       { feederCorporationId: feederCorp, inviteId: undo.inviteId }
     );
   });
-  // The rotated token the sync stored; the caller revokes the originally rotated one.
-  if (held && held.kind === 'feeder') await revokeStored(deps, held);
   // The refused first pull rebuilt the view; put it back, or drop it with the record it described.
   try {
     if (undo.priorRecord) await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);

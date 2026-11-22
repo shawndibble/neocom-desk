@@ -200,15 +200,6 @@ describe('saveAlertGrant', () => {
     expect(deps.revoke).not.toHaveBeenCalled();
   });
 
-  it('re-saving the token already stored does not revoke the live token', async () => {
-    const { deps } = makeDeps({
-      refresh: vi.fn(async (_c: string, t: string) => ({ accessToken: 'fresh', refreshToken: t })),
-    });
-    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
-    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
-    expect(deps.revoke).not.toHaveBeenCalled();
-  });
-
   it('rejects a refresh token SSO will not redeem, storing nothing', async () => {
     const { deps, docs } = makeDeps({
       refresh: vi.fn(async () => {

@@ -150,6 +150,12 @@ so the sync reads each refinery's name and system with the moon owner's own toke
 grant with the mining scope only still syncs and is never stale for lacking it. See
 `docs/context/decisions/20261021-084219-moon-owner-grant-also-reads-refinery-names-esi.md`.
 
+Amended by `docs/context/decisions/20261122-170655-a-grant-replaced-by-the-same-character-is.md`:
+a grant replaced by the same Character (a re-opt-in, Grant again, a Reconnect), and a refused
+save's new token, are dropped, never revoked at SSO. Revoking one of a Character's tokens ends
+their every login to this app, device logins included. Replacement by a different Character
+and removal still revoke.
+
 Amended by #5312: the schedule is fixed UTC clock times (00:35, 06:35, 12:35, 18:35), still
 every 6 hours, so the 00:35 tick closes yesterday under the new 30-minute default grace (moved from :30 so the 00:30 close has margin). See
 `docs/context/decisions/20261026-210856-yesterday-closes-at-00-30-utc-30-minute.md`.

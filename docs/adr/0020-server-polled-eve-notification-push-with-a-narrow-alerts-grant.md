@@ -3,7 +3,10 @@
 ## Status
 
 Accepted (2026-10-18). Amended by ADR 0028: the grant may also carry the
-location scope, for nearby alerts.
+location scope, for nearby alerts. Amended by decision
+`20261122-170655-a-grant-replaced-by-the-same-character-is.md`: saving the
+grant again drops the old token without revoking it at SSO, which would end
+the Character's device logins too. That token is left live at SSO, held by no one.
 
 ## Context
 

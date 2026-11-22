@@ -221,7 +221,8 @@ emulatorSuite('moon owner onboarding', () => {
     expect(await grant()).toBeUndefined();
     expect(await feederRecord()).toBeUndefined();
     expect(await pointer()).toBeUndefined();
-    expect(revoked).toContain(`rt-${ALT}`);
+    // Dropped, never revoked: SSO's revoke would end the alt's device login too.
+    expect(revoked).toEqual([]);
     const invite = (
       await db.collection('corpTaxBookFeederInvites').doc(hashInviteCode(code)).get()
     ).data();
@@ -340,8 +341,8 @@ emulatorSuite('moon owner onboarding', () => {
     ledger = 'forbidden';
     expect(await reason(save(RECONNECT_CODE, undefined, OTHER_ALT))).toBe('not-an-accountant');
     expect(await grant()).toMatchObject({ kind: 'feeder', characterId: ALT });
-    expect(revoked).toContain(`rt-${OTHER_ALT}`);
-    expect(revoked).not.toContain(`rt-${ALT}`);
+    // The refused token is dropped, the earlier one kept: nothing is revoked.
+    expect(revoked).toEqual([]);
   });
 
   it('a refused rejoin of a disconnected moon owner keeps it pointed at its book', async () => {
@@ -424,7 +425,7 @@ emulatorSuite('moon owner onboarding', () => {
     expect(await grant()).toBeUndefined();
     expect(await feederRecord()).toBeUndefined();
     expect(await pointer()).toBeUndefined();
-    expect(revoked).toContain(`rt-${ALT}`);
+    expect(revoked).toEqual([]);
     ledger = 'ok';
     expect(await save(code)).toMatchObject({ feederCorporationId: FEEDER });
   });
