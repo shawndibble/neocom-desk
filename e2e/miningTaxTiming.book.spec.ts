@@ -61,6 +61,10 @@ const CODE = minerPaymentCode(PILOT_MINER_ID);
 
 const ledgerButton = (page: Page, name = CORP_NAME) =>
   page.getByRole('button', { name: `Open the ledger of ${name}` });
+const cardOf = (page: Page, name = CORP_NAME) => page.getByRole('group', { name });
+/** A Payee in credit is a one-line note: its name, then the green figure. */
+const creditNote = (page: Page, amount: number) =>
+  page.getByRole('main').getByText(new RegExp(`${CORP_NAME}\\s*${isk(amount)}\\s*ISK`));
 const pilotLedger = (page: Page) => page.getByRole('dialog', { name: CORP_NAME });
 const officerLedger = (page: Page) => page.getByRole('table', { name: 'Ledger', exact: true });
 const officerRow = (page: Page, name: RegExp) => officerLedger(page).getByRole('row', { name });
@@ -126,7 +130,7 @@ test('pilot side: a donation just sent counts at once, and is not counted again 
     journal: [sentDonation(sent)],
   });
   // The book holds nothing yet, and the money already pays the oldest day on the pilot's account.
-  await expect(ledgerButton(page)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(2 * DAY_TAX));
   await ledgerButton(page).click();
   await expect(pilotLedger(page).getByRole('row', { name: /Payment/ })).toHaveCount(1);
   await expect(pilotLedger(page)).toContainText(
@@ -137,7 +141,7 @@ test('pilot side: a donation just sent counts at once, and is not counted again 
   // The book's sync stores the same transfer: it is now credited, and still counted once.
   await book.seed([credited(sent)]);
   await page.reload();
-  await expect(ledgerButton(page)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(2 * DAY_TAX));
   await ledgerButton(page).click();
   await expect(pilotLedger(page).getByRole('row', { name: /Payment/ })).toHaveCount(1);
   await expect(page.getByRole('region', { name: 'You owe' })).toContainText(
@@ -179,7 +183,7 @@ test('Settle up for the book records nothing on the device: the money counts onl
 }) => {
   const sent = { refId: 970_103, amount: DAY_TAX, back: 0, at: justNow() };
   await openPilot(page, book, esi, { seed: pilotBook([6, 5, 4]), mined: [6, 5, 4] });
-  await expect(ledgerButton(page)).toContainText(isk(3 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(3 * DAY_TAX));
   await ledgerButton(page)
     .locator('xpath=following::button[normalize-space()="Settle up"][1]')
     .click();
@@ -192,12 +196,12 @@ test('Settle up for the book records nothing on the device: the money counts onl
   // Nothing was written: the pilot has not paid, so nothing is counted as paid.
   expect(await readStore(page, 'miningTaxPaymentLinks')).toEqual([]);
   expect(await readStore(page, 'miningTaxAssignments')).toEqual([]);
-  await expect(ledgerButton(page)).toContainText(isk(3 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(3 * DAY_TAX));
 
   // The pilot sends it in the game, and the book's sync reads it: now it pays the oldest day.
   await book.seed([credited(sent)]);
   await page.reload();
-  await expect(ledgerButton(page)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(2 * DAY_TAX));
   expect(await readStore(page, 'miningTaxPaymentLinks')).toEqual([]);
   await gotoMiner(page);
   await owed(page, 2 * DAY_TAX);
@@ -262,7 +266,7 @@ test("pilot side: an officer's hand record, the wallet entry and the synced dona
   // one transfer (within two days either way).
   const journal = [sentDonation({ ...sent, at: `${day(1)}T13:05:00.000Z` })];
   await openPilot(page, book, esi, { seed, mined: [6, 5, 4], journal });
-  await expect(ledgerButton(page)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(2 * DAY_TAX));
   // The book already holds the money, so there is nothing to link it to.
   await expect(page.getByText('Payments to link')).toHaveCount(0);
   await ledgerButton(page).click();
@@ -274,7 +278,7 @@ test("pilot side: an officer's hand record, the wallet entry and the synced dona
     { path: `corps/${CORP}/payments/${hand.id}`, data: { ...hand, transferId: 'j1_970202' } },
   ]);
   await page.reload();
-  await expect(ledgerButton(page)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(2 * DAY_TAX));
   await expect(page.getByText('Payments to link')).toHaveCount(0);
   await ledgerButton(page).click();
   await expect(pilotLedger(page).getByRole('row', { name: /Payment/ })).toHaveCount(1);
@@ -301,7 +305,7 @@ test("a day mined today owes nothing yet: the pilot's payment is credit, on both
     journal: [sentDonation(sent)],
   });
   // The pilot's side, with the transfer still only in their wallet: paid ahead, nothing owed.
-  await expect(ledgerButton(page)).toContainText(new RegExp(`${isk(ESTIMATE)}\\s*ISK credit`));
+  await expect(creditNote(page, ESTIMATE)).toBeVisible();
   await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
   const today = page.getByRole('row').filter({ hasText: day(0) });
   await expect(today).toContainText(/pending corp record/i);
@@ -357,7 +361,7 @@ for (const { kind, title } of SAME_DAY_CASES) {
     if (kind === 'slightlyLower') {
       expect(gap).toBeLessThan(0);
       // 4,000 over: credit, nothing owed.
-      await expect(ledgerButton(page)).toContainText(new RegExp(`${isk(-gap)}\\s*ISK credit`));
+      await expect(creditNote(page, -gap)).toBeVisible();
       await ledgerButton(page).click();
       await expect(pilotLedger(page)).toContainText(`Mined at E2E Athanor Alpha\u2212${isk(tax)}`);
       await expect(pilotLedger(page)).toContainText(isk(-gap));
@@ -374,7 +378,7 @@ for (const { kind, title } of SAME_DAY_CASES) {
       await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
       // The pilot reads the forgiven gap too: the paid day's detail opens the book's ledger.
       await dayRow().click();
-      await page.getByRole('button', { name: `Open ${CORP_NAME} ledger` }).click();
+      await page.getByRole('button', { name: `Open the ledger of ${CORP_NAME}` }).click();
       await expect(pilotLedger(page)).toContainText(/Shortfall forgiven/);
       await expect(pilotLedger(page)).toContainText(isk(gap));
       await page.keyboard.press('Escape');
@@ -387,7 +391,7 @@ for (const { kind, title } of SAME_DAY_CASES) {
     } else if (kind === 'clearlyHigher') {
       expect(gap).toBeGreaterThan(tolerance);
       // Short 10,000: the day stays owed for that much, on both sides.
-      await expect(ledgerButton(page)).toContainText(isk(gap));
+      await expect(cardOf(page)).toContainText(isk(gap));
       await ledgerButton(page).click();
       await expect(pilotLedger(page)).toContainText(
         new RegExp(`Days owed\\s*1[\\s\\S]*Oldest unpaid${day(SAME_DAY)}`)
@@ -401,7 +405,7 @@ for (const { kind, title } of SAME_DAY_CASES) {
     } else {
       expect(-gap).toBeGreaterThan(0);
       // 20,000 over: the day is paid and the extra pays into the next day billed.
-      await expect(ledgerButton(page)).toContainText(isk(DAY_TAX + gap));
+      await expect(cardOf(page)).toContainText(isk(DAY_TAX + gap));
       await ledgerButton(page).click();
       await expect(pilotLedger(page)).toContainText(
         new RegExp(`Days owed\\s*1[\\s\\S]*Oldest unpaid${day(NEXT_DAY)}`)
@@ -449,7 +453,7 @@ for (const close of [
       },
     };
     await openMixed(page, scenario, book, esi);
-    await expect(ledgerButton(page, ROOK.name)).toContainText(isk(ESTIMATE));
+    await expect(cardOf(page, ROOK.name)).toContainText(isk(ESTIMATE));
     const stored = () => readStore<MiningTaxAssignmentRecord>(page, 'miningTaxAssignments');
     expect((await stored()).map((a) => [a.date, a.taxOwed, a.estimatedValue])).toEqual([
       [day(0), ESTIMATE, 10 * ESTIMATE],
@@ -459,7 +463,7 @@ for (const close of [
     // (only an Ore Form change reprices an Outstanding one), so the pilot owes what they were shown.
     await installDayPrices(page, { 0: close.price });
     await page.reload();
-    await expect(ledgerButton(page, ROOK.name)).toContainText(isk(ESTIMATE));
+    await expect(cardOf(page, ROOK.name)).toContainText(isk(ESTIMATE));
     expect((await stored()).map((a) => [a.taxOwed, a.estimatedValue])).toEqual([
       [ESTIMATE, 10 * ESTIMATE],
     ]);
@@ -497,7 +501,7 @@ test('a payment from before any mining is billed is held, then pays the first da
     extra: [credited(sent)],
     journal: [sentDonation(sent)],
   });
-  await expect(ledgerButton(page)).toContainText(isk(0.5 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(0.5 * DAY_TAX));
   await ledgerButton(page).click();
   await expect(pilotLedger(page)).toContainText(
     new RegExp(`Days owed\\s*1[\\s\\S]*Oldest unpaid${day(NEXT_DAY)}`)
@@ -527,7 +531,7 @@ test('a payment from before the book began credits nothing; one on its first day
     extra: [credited(before), credited(onStart)],
     journal: [sentDonation(before), sentDonation(onStart)],
   });
-  await expect(ledgerButton(page)).toContainText(isk(2 * DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(2 * DAY_TAX));
   await gotoMiner(page);
   await owed(page, 2 * DAY_TAX);
   await expect(page.getByRole('main')).toContainText(`Paid${isk(DAY_TAX)}`);
@@ -567,7 +571,7 @@ for (const exemption of [
       journal: [sentDonation(sent)],
     });
     const left = short - exemption.forgiven;
-    await expect(ledgerButton(page)).toContainText(isk(left));
+    await expect(cardOf(page)).toContainText(isk(left));
     await ledgerButton(page).click();
     await expect(pilotLedger(page)).toContainText(
       new RegExp(`Days owed\\s*1[\\s\\S]*Oldest unpaid${day(SAME_DAY)}`)
@@ -606,7 +610,7 @@ test('an officer charges a forgiven shortfall: the Miner owes it again, on the p
   await owed(page, short);
 
   await page.goto('./mining/tax').catch(() => page.goto('./mining/tax'));
-  await expect(ledgerButton(page)).toContainText(isk(short));
+  await expect(cardOf(page)).toContainText(isk(short));
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -628,7 +632,7 @@ test('two equal donations sent minutes apart are two payments, though the book h
   });
   // The one the book holds is matched to one wallet entry only: the other is still in flight, and
   // counts. Both pay: one day owed. Never "the book holds an equal one, so this is it twice".
-  await expect(ledgerButton(page)).toContainText(isk(DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(DAY_TAX));
   await ledgerButton(page).click();
   await expect(pilotLedger(page).getByRole('row', { name: /Payment/ })).toHaveCount(2);
   await page.keyboard.press('Escape');
@@ -642,7 +646,7 @@ test('two equal donations sent minutes apart are two payments, though the book h
   await owed(page, DAY_TAX);
   await expect(officerRow(page, /Payment from/)).toHaveCount(2);
   await page.goto('./mining/tax').catch(() => page.goto('./mining/tax'));
-  await expect(ledgerButton(page)).toContainText(isk(DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(DAY_TAX));
   await ledgerButton(page).click();
   await expect(pilotLedger(page).getByRole('row', { name: /Payment/ })).toHaveCount(2);
 });
@@ -707,5 +711,5 @@ test('a day paid exactly and stored as paid stays paid when its close price late
   await owed(page, DAY_TAX);
   await owedDaysHeading(page, 1);
   await page.goto('./mining/tax').catch(() => page.goto('./mining/tax'));
-  await expect(ledgerButton(page)).toContainText(isk(DAY_TAX));
+  await expect(cardOf(page)).toContainText(isk(DAY_TAX));
 });

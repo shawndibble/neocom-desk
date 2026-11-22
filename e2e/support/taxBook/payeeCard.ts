@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Presses a secondary action of a Payee card on the Tax tab ("Ledger", "Link payment"): the text
@@ -16,13 +16,15 @@ export async function pressCardAction(
     action === 'Ledger'
       ? scope.getByRole('button', { name: /^Open the ledger of / })
       : scope.getByRole('button', { name: 'Link payment', exact: true });
+  const more = scope.getByRole('button', { name: /^More actions for / }).first();
+  // The card may not have rendered yet: wait for either control before choosing the path.
+  await expect
+    .poll(async () => (await direct.first().isVisible()) || (await more.isVisible()))
+    .toBe(true);
   if (await direct.first().isVisible()) {
     await direct.first().click();
     return;
   }
-  await scope
-    .getByRole('button', { name: /^More actions for / })
-    .first()
-    .click();
+  await more.click();
   await page.getByRole('menuitem', { name: action }).click();
 }
