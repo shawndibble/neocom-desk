@@ -948,3 +948,26 @@ describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue'
     expect(screen.getByText('0m')).toBeInTheDocument();
   });
 });
+
+describe('EntryList groups consecutive levels of one skill on the phone (#6562)', () => {
+  const rows = [entryRow(1, [0]), entryRow(1, [1], [2]), entryRow(2, [2])];
+  const skillLinks = (name: string) => screen.queryAllByRole('link', { name });
+
+  it('names the skill once for a run, while each level keeps its own grip', () => {
+    renderInRouter(
+      <EntryList {...defaultProps} rows={rows} bandsAt={new Map()} onReorder={noop} />
+    );
+    expect(skillLinks('Skill 1')).toHaveLength(1);
+    expect(skillLinks('Skill 2')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /Reorder Skill 1/ })).toHaveLength(2);
+  });
+
+  it('repeats the name on every level at desktop width', () => {
+    const restore = mockDesktop(true);
+    renderInRouter(
+      <EntryList {...defaultProps} rows={rows} bandsAt={new Map()} onReorder={noop} />
+    );
+    expect(skillLinks('Skill 1')).toHaveLength(2);
+    restore();
+  });
+});

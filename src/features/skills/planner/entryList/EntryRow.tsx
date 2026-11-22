@@ -36,6 +36,13 @@ interface EntryRowProps {
   startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
+  /**
+   * Phone only: this row trains the next level of the skill the row above it
+   * trains. It drops the repeated skill name and the per-skill attribute pair
+   * and priority, so the run reads as one skill with its levels inline. It
+   * keeps its own grip, time and ⋮ — reordering and removal stay per level.
+   */
+  continuation?: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
   /** Runs as a skill name is clicked, before the link navigates — carries this plan's entries to the modal. */
   onStageSkillDetail: (skillTypeID: number) => void;
@@ -81,6 +88,7 @@ export const EntryRow = memo(function EntryRow({
   startDate,
   columns,
   isDesktop,
+  continuation = false,
   onRemove,
   onStageSkillDetail,
   removalBlockedReason,
@@ -125,7 +133,16 @@ export const EntryRow = memo(function EntryRow({
   // and there is nothing left to disclose — the caret and the per-level
   // breakdown it opened (#254) both retired with the level ranges that made
   // them necessary.
-  const nameSpan = (
+  const nameSpan = continuation ? (
+    <span className={NAME_CELL}>
+      <span className="sr-only">{name} </span>
+      <span className="shrink-0">
+        <span>{romanLevel(entry.targetLevel)}</span>
+        {boosted && <BoosterMark />}
+        {alphaCapped && <AlphaCapMark />}
+      </span>
+    </span>
+  ) : (
     <span className={NAME_CELL}>
       <SkillLink
         typeId={entry.skillTypeID}
@@ -147,19 +164,20 @@ export const EntryRow = memo(function EntryRow({
   );
 
   const attributeBadge =
-    columns.attributePair && attributes ? (
+    columns.attributePair && attributes && !continuation ? (
       <AttributePairBadge primary={attributes.primary} secondary={attributes.secondary} />
     ) : null;
 
-  const priorityControl = columns.priority ? (
-    <PriorityPill
-      skillTypeID={entry.skillTypeID}
-      name={rowLabel}
-      priority={entry.priority ?? 'normal'}
-      onSetPriority={onSetPriority}
-      touchTarget={!isDesktop}
-    />
-  ) : null;
+  const priorityControl =
+    columns.priority && !continuation ? (
+      <PriorityPill
+        skillTypeID={entry.skillTypeID}
+        name={rowLabel}
+        priority={entry.priority ?? 'normal'}
+        onSetPriority={onSetPriority}
+        touchTarget={!isDesktop}
+      />
+    ) : null;
 
   const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
   // One ⋮ ends the row (right-click and touch-and-hold open the same menu):
@@ -239,8 +257,8 @@ export const EntryRow = memo(function EntryRow({
       ref={setNodeRef}
       style={style}
       className={`border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${
-        isDragging ? 'bg-panel-2' : ''
-      }`}
+        continuation ? 'ml-6 border-l py-1' : ''
+      } ${isDragging ? 'bg-panel-2' : ''}`}
     >
       <RowActionsMenu name={rowLabel} items={rowMenuItems} onCloseAutoFocus={menu.onCloseAutoFocus}>
         <div>

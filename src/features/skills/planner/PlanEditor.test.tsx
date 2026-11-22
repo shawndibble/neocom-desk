@@ -2,6 +2,7 @@ import { DAY_MS } from '@/lib/age';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { stubViewport } from '@/test/viewport';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -412,6 +413,20 @@ describe('PlanEditor tools pane', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     expect(within(dialog).getByRole('button', { name: 'Append to plan' })).toBeEnabled();
     expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('folds Import and Export into one ⋮ menu on a phone (#6562)', async () => {
+    stubViewport((query) => query === PHONE_QUERY);
+    const user = userEvent.setup();
+    renderEditor();
+
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.getByRole('menuitem', { name: 'From skill queue' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'From text or file' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Export to clipboard' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Export table' })).toBeInTheDocument();
   });
 
   it("doesn't render Import/Export when the caller has no header-actions slot to portal into", () => {

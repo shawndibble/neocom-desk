@@ -42,3 +42,4 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [phone-status-strip](phone-status-strip/README.md) | Issue #6560 | Chosen by the agent: re-login, role notice and sync error as rows of one shell strip; actions wrap under the words on a phone |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
+| [plan-editor-phone](plan-editor-phone/README.md) | Issue #6562 | Chosen by Shawn's review: levels of one skill grouped under its name on a phone (grip, time and ⋮ per level, drag-only reorder); Import/Export in the header ⋮ below 40rem |
