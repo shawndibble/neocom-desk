@@ -57,16 +57,30 @@ export function TakeoverConfirm({ previews, typeNames, busy, onTakeOver, label, 
       <div className="flex flex-wrap gap-2">
         {confirming ? (
           <>
-            <Button size="sm" variant="primary" disabled={busy} onClick={onTakeOver}>
+            <Button
+              size="sm"
+              variant="primary"
+              aria-disabled={busy || undefined}
+              onClick={onTakeOver}
+            >
               {t('miningTax.corpBook.overlap.confirm')}
             </Button>
-            <Button size="sm" disabled={busy} onClick={() => setConfirming(false)}>
+            <Button
+              size="sm"
+              aria-disabled={busy || undefined}
+              onClick={() => setConfirming(false)}
+            >
               {t('common.cancel')}
             </Button>
           </>
         ) : (
           <>
-            <Button size="sm" variant="warning" disabled={busy} onClick={() => setConfirming(true)}>
+            <Button
+              size="sm"
+              variant="warning"
+              aria-disabled={busy || undefined}
+              onClick={() => setConfirming(true)}
+            >
               {label ?? t('miningTax.corpBook.overlap.letBill')}
             </Button>
             {others}

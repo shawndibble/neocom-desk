@@ -556,7 +556,7 @@ export function ComposeRequestDialog({
         {error && <InlineError>{error}</InlineError>}
         <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
         <DialogFooter>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onClose}>
+          <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>

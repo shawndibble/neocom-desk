@@ -505,7 +505,7 @@ export function ComposeFleetPayoutDialog({
 
         {error && <InlineError>{error}</InlineError>}
         <DialogFooter>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onClose}>
+          <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>

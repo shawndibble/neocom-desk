@@ -45,7 +45,12 @@ export function OverlapNotice({
   const { t } = useTranslation();
   const payee = payeeNames.join(', ');
   const other = paidAnotherWay ?? (
-    <Button size="sm" variant="warning" disabled={busy} onClick={onPaidAnotherWay}>
+    <Button
+      size="sm"
+      variant="warning"
+      aria-disabled={busy || undefined}
+      onClick={onPaidAnotherWay}
+    >
       {t('miningTax.corpBook.overlap.paidOther')}
     </Button>
   );

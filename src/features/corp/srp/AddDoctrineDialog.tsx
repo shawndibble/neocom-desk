@@ -128,7 +128,7 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
       placement="center"
       footer={
         <DialogFooter>
-          <Button size="sm" disabled={busy} onClick={onClose}>
+          <Button size="sm" aria-disabled={busy || undefined} onClick={onClose}>
             {t('srp.settings.doctrines.dialog.cancel')}
           </Button>
           <Button

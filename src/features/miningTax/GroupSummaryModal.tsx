@@ -220,7 +220,12 @@ export function GroupSummaryModal({
           >
             <p>{t('miningTax.combined.unassignConfirm', { count: members.length })}</p>
             <div className="flex gap-2">
-              <Button size="sm" variant="danger" disabled={busy} onClick={onUnassignAll}>
+              <Button
+                size="sm"
+                variant="danger"
+                aria-disabled={busy || undefined}
+                onClick={onUnassignAll}
+              >
                 {t('miningTax.unassignAction')}
               </Button>
               <Button size="sm" onClick={() => setConfirmUnassign(false)}>
@@ -233,19 +238,19 @@ export function GroupSummaryModal({
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           {anyGrown ? (
-            <Button variant="primary" disabled={busy} onClick={onResolve}>
+            <Button variant="primary" aria-disabled={busy || undefined} onClick={onResolve}>
               {t('miningTax.resolveConfirm')}
             </Button>
           ) : (
             anyOutstanding &&
             onSettleUp && (
-              <Button variant="primary" disabled={busy} onClick={onSettleUp}>
+              <Button variant="primary" aria-disabled={busy || undefined} onClick={onSettleUp}>
                 {t('miningTax.settleUpAction')}
               </Button>
             )
           )}
           <div className="flex">
-            <Button disabled={busy} onClick={onEdit} className="rounded-r-none">
+            <Button aria-disabled={busy || undefined} onClick={onEdit} className="rounded-r-none">
               {t('miningTax.combined.edit')}
             </Button>
             {moreMenu}

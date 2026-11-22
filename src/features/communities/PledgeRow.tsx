@@ -150,7 +150,12 @@ export function PledgeRow({
           </NeedsConnection>
           {own && own.delivered === 0 && (
             <NeedsConnection>
-              <Button size="sm" variant="ghost" disabled={busy} onClick={onWithdraw}>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-disabled={busy || undefined}
+                onClick={onWithdraw}
+              >
                 {t('communities.board.withdraw')}
               </Button>
             </NeedsConnection>
