@@ -41,4 +41,23 @@ describe('HeaderMoreMenu', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('follows a controlled open state and reports changes', async () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <HeaderMoreMenu open={false} onOpenChange={onOpenChange}>
+        <DropdownMenuItem>Ore tags</DropdownMenuItem>
+      </HeaderMoreMenu>
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('menuitem', { name: 'Ore tags' })).toBeNull();
+    rerender(
+      <HeaderMoreMenu open onOpenChange={onOpenChange}>
+        <DropdownMenuItem>Ore tags</DropdownMenuItem>
+      </HeaderMoreMenu>
+    );
+    expect(screen.getByRole('menuitem', { name: 'Ore tags' })).toBeInTheDocument();
+  });
 });

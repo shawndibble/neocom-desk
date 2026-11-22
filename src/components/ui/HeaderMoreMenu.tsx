@@ -36,6 +36,7 @@ interface HeaderMoreMenuProps {
   children?: ReactNode;
   /** @summary Controlled open state, for a menu whose item must keep it open (a clipboard write) or open a dialog after it closes; omit for an uncontrolled menu. */
   open?: boolean;
+  /** @summary Called when the menu opens or closes; pass with `open`. */
   onOpenChange?: (open: boolean) => void;
   /** @summary Runs once the menu has handed focus back to ⋮: the moment to open a dialog an item chose. */
   onCloseAutoFocus?: () => void;

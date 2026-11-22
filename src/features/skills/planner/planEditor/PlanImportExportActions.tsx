@@ -91,11 +91,8 @@ export function PlanImportExportActions({
       <>
         {feedback}
         <HeaderMoreMenu
-          open={exportMenuOpen || importMenuOpen}
-          onOpenChange={(next) => {
-            setExportMenuOpen(next);
-            setImportMenuOpen(next && !queueImporting);
-          }}
+          open={exportMenuOpen}
+          onOpenChange={setExportMenuOpen}
           onCloseAutoFocus={() => {
             if (openImportDialogAfterMenuRef.current) {
               openImportDialogAfterMenuRef.current = false;
