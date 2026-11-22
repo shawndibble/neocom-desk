@@ -181,6 +181,7 @@ export function GroupMaterialsPanel({
       {
         id: 'need',
         header: t('industry.quantity'),
+        stackAffix: { before: `${t('industry.quantity')} ` },
         align: 'right',
         className: 'tabular-nums text-text-dim',
         sortValue: (material) => material.quantity,
@@ -196,12 +197,18 @@ export function GroupMaterialsPanel({
           rowVolume(material, (typeID) => volumeForType(catalog, typeID)) ?? undefined,
         render: (material) => {
           const volume = rowVolume(material, (typeID) => volumeForType(catalog, typeID));
-          return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;
+          return (
+            <span data-dense-omit>
+              {volume === null ? t('common.unknown') : formatVolume(volume)}
+            </span>
+          );
         },
       },
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
+        // The input is a control: on a phone card it closes the second line, tappable.
+        stackEdge: 'end',
         align: 'right',
         sortValue: (material) => ownedStockMap.get(material.typeID) ?? 0,
         render: (material) => {
@@ -238,6 +245,7 @@ export function GroupMaterialsPanel({
       {
         id: 'stillToBuy',
         header: t('industry.stillToBuyColumn'),
+        cardCorner: true,
         align: 'right',
         headerClassName: 'whitespace-nowrap',
         className: 'tabular-nums',
@@ -343,9 +351,11 @@ export function GroupMaterialsPanel({
                 rowKey={(material) => material.typeID}
                 label={t('industry.groupMaterials')}
                 density="compact"
-                // Figures read across columns: a table that scrolls sideways on a
-                // phone (name pinned, volume and owned dropped), not cards.
-                responsive="table"
+                // A phone gets the dense two-line card: material and what is still
+                // to buy on line one, the need and the owned input on line two.
+                responsive="stack"
+                stackLayout="dense"
+                mobileSort
               />
             </div>
           ) : null}
