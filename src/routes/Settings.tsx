@@ -14,7 +14,12 @@ import { checkForUpdate } from '@/app/updateAvailable';
 import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
-import { CheckboxField, ChipRow, SettingsScopeHint } from '@/features/settings/settingsFields';
+import {
+  CheckboxField,
+  ChipRow,
+  SegmentedRow,
+  SettingsScopeHint,
+} from '@/features/settings/settingsFields';
 import { ActivityLogPanel } from '@/features/settings/ActivityLogPanel';
 import { DataAgePanel } from '@/features/settings/DataAgePanel';
 import { ExportPanel } from '@/features/settings/ExportPanel';
@@ -158,7 +163,7 @@ export function Settings() {
                   rendered string would file a late-evening event under the wrong
                   day.
                 */}
-                    <ChipRow
+                    <SegmentedRow
                       label={t('settings.timeFormatLabel')}
                       hint={t('settings.timeFormatHint')}
                       options={TIME_FORMATS}
@@ -179,7 +184,7 @@ export function Settings() {
                       }
                     />
                     {weekStartHydrated && (
-                      <ChipRow
+                      <SegmentedRow
                         label={t('settings.weekStartLabel')}
                         hint={t('settings.weekStartHint')}
                         options={CALENDAR_WEEK_START_DAYS}

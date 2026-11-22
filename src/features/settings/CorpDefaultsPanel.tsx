@@ -7,7 +7,11 @@ import {
   npcCorporationText,
   useActiveNpcCorporation,
 } from '@/features/corp/useActiveNpcCorporation';
-import { ChipRow, SettingsHint, SettingsPanelLoading } from '@/features/settings/settingsFields';
+import {
+  SegmentedRow,
+  SettingsHint,
+  SettingsPanelLoading,
+} from '@/features/settings/settingsFields';
 
 /**
  * The corp roster's inactivity policy. The rail lists it only for a Character
@@ -39,7 +43,7 @@ export function CorpDefaultsPanel() {
     <Panel>
       <div className="space-y-4">
         <Fields variant="form">
-          <ChipRow
+          <SegmentedRow
             label={t('settings.darkThresholdLabel')}
             hint={t('settings.darkThresholdHint')}
             options={DARK_AFTER_DAY_OPTIONS}

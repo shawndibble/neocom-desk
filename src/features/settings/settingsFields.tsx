@@ -5,7 +5,7 @@
  */
 import { useContext, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Field, FilterChip, Panel, Spinner } from '@/components/ui';
+import { Checkbox, Field, FilterChip, Panel, SegmentedControl, Spinner } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { FieldNoteContext } from '@/components/ui/fieldNote';
 
@@ -110,7 +110,10 @@ function ChipGroup({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-/** A labelled row of preset chips — the shape every threshold control here uses; a `Fields` row. */
+/**
+ * A labelled row of preset chips; a `Fields` row. Only for a single choice whose labels are
+ * too long for a `SegmentedControl` at 390px (the number-format examples); otherwise `SegmentedRow`.
+ */
 export function ChipRow<T extends string | number>({
   label,
   hint,
@@ -138,6 +141,37 @@ export function ChipRow<T extends string | number>({
           />
         ))}
       </ChipGroup>
+    </Field>
+  );
+}
+
+/** A labelled single-choice row of 2–4 presets, exactly one always on (DESIGN §4); a `Fields` row. */
+export function SegmentedRow<T extends string | number>({
+  label,
+  hint,
+  options,
+  selected,
+  onSelect,
+  labelFor,
+}: {
+  label: string;
+  hint?: string;
+  options: readonly T[];
+  selected: T;
+  onSelect: (value: T) => void;
+  labelFor: (value: T) => string;
+}) {
+  const noteId = useContext(FieldNoteContext);
+  return (
+    <Field label={label} note={hint}>
+      <SegmentedControl
+        label={label}
+        describedBy={noteId}
+        uppercase={false}
+        options={options.map((o) => ({ value: String(o), label: labelFor(o) }))}
+        value={String(selected)}
+        onChange={(v) => onSelect(options.find((o) => String(o) === v) as T)}
+      />
     </Field>
   );
 }
