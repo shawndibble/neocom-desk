@@ -491,6 +491,7 @@ export function RowMoreActions({
         </PopoverAnchor>
         <PopoverContent
           align="end"
+          aria-label={label ?? t('common.moreActionsLabel', { name: actions.name })}
           className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
           // A hint never takes focus from where the pilot is working.
           onOpenAutoFocus={(event) => event.preventDefault()}

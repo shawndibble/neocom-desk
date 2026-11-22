@@ -81,7 +81,11 @@ export function MailQueueChip(props: ChipProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>{button}</PopoverTrigger>
-      <PopoverContent align="end" className="w-[34rem] max-w-[90vw] space-y-3 p-3">
+      <PopoverContent
+        align="end"
+        aria-label={t('corpTaxBook.mailQueue.panelTitle')}
+        className="w-[34rem] max-w-[90vw] space-y-3 p-3"
+      >
         <p className="text-sm font-semibold">{t('corpTaxBook.mailQueue.panelTitle')}</p>
         <div className="max-h-[28rem] overflow-y-auto">{panel}</div>
       </PopoverContent>

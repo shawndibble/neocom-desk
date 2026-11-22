@@ -53,7 +53,7 @@ export function ItemPriceAlertBell({
           className="aria-disabled:cursor-default aria-disabled:opacity-40"
         />
       </PopoverTrigger>
-      <PopoverContent align="end">
+      <PopoverContent align="end" aria-label={t('market.priceAlert.button', { name })}>
         <PriceAlertForm
           typeId={typeId}
           targetPrice={item?.targetPrice}

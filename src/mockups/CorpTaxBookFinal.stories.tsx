@@ -1198,7 +1198,11 @@ function ChipF({ items, open }: { items: QueueItem[]; open?: boolean }) {
       renderButton={(button) => (
         <Popover open={Boolean(open)}>
           <PopoverTrigger asChild>{button}</PopoverTrigger>
-          <PopoverContent align="end" className="w-[34rem] max-w-[90vw] space-y-3 p-3">
+          <PopoverContent
+            align="end"
+            aria-label="Late notices"
+            className="w-[34rem] max-w-[90vw] space-y-3 p-3"
+          >
             <p className="text-sm font-semibold">Sep 2026 Late notices</p>
             <QueueSummary items={items} />
             <div className="max-h-[28rem] overflow-y-auto">

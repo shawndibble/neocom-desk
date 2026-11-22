@@ -200,7 +200,11 @@ export function ValueMenu({
           {triggerCaret}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-4 p-3.5">
+      <PopoverContent
+        align="end"
+        aria-label={t('miningTax.overview.valueMenu')}
+        className="w-80 space-y-4 p-3.5"
+      >
         {children}
       </PopoverContent>
     </Popover>

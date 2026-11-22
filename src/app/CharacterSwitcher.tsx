@@ -57,7 +57,11 @@ export function CharacterSwitcher({
           icon={<Icon.AllCharacters />}
         />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-max min-w-56 max-w-[90vw] p-0">
+      <PopoverContent
+        align="start"
+        aria-label={t('nav.characterSwitcher')}
+        className="w-max min-w-56 max-w-[90vw] p-0"
+      >
         <ul className="max-h-80 divide-y divide-line overflow-y-auto">
           {rows.map((row) => {
             const active = row.characterId === activeId;

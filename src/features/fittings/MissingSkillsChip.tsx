@@ -23,19 +23,23 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
   const missing = useMissingSkillRows(entries, characterId);
   if (!missing) return null;
 
+  const chipLabel = t('fittings.missingSkills.chip', {
+    count: missing.missingCount,
+    time: formatCountdown(missing.totalSeconds),
+  });
+
   return (
     // A popover rather than an inline panel: the chip sits in the Fitting's
     // one-row header, which an inline list would push apart.
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="warning">
-          {t('fittings.missingSkills.chip', {
-            count: missing.missingCount,
-            time: formatCountdown(missing.totalSeconds),
-          })}
-        </Button>
+        <Button variant="warning">{chipLabel}</Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-3">
+      <PopoverContent
+        align="start"
+        aria-label={chipLabel}
+        className="w-80 max-w-[calc(100vw-2rem)] p-3"
+      >
         <MissingSkillsList
           entries={entries}
           characterId={characterId}

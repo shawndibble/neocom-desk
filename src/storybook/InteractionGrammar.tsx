@@ -439,7 +439,7 @@ export function InteractionGrammar() {
                 <Icon.Expanded />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="p-3 text-xs text-text-dim">
+            <PopoverContent aria-label={k('samples.legend')} className="p-3 text-xs text-text-dim">
               {k('rules.legendPopover')}
             </PopoverContent>
           </Popover>

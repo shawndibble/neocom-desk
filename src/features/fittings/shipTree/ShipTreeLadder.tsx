@@ -289,7 +289,7 @@ function LegendPopover() {
           <Icon.Expanded />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="p-3">
+      <PopoverContent align="end" aria-label={t('ships.tree.legendButton')} className="p-3">
         <Legend className="flex-col items-start" />
       </PopoverContent>
     </Popover>

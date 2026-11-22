@@ -120,7 +120,7 @@ export function SolarSystemPicker({
           <span className="truncate">{shown}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2">
+      <PopoverContent align="start" aria-label={ariaLabel} className="w-72 p-2">
         <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-2 focus:outline-none">
           <LiveStatus>{systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
           {hint !== undefined && <p className="text-text-dim">{hint}</p>}
