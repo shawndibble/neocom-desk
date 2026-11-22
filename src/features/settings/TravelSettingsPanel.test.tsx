@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -98,7 +98,9 @@ describe('TravelSettingsPanel', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Systems with recent pod kills' }));
 
     // Scoped to the warning's text: the rule fields also hold an always-mounted live region.
-    expect(await screen.findByText(/kill report isn't available right now/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getAllByText(/kill report isn't available right now/)).toHaveLength(2)
+    );
     expect(threshold).toBeEnabled();
   });
 });

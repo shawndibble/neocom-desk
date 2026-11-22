@@ -11,7 +11,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, IconButton, LiveStatus, TextInput } from '@/components/ui';
+import { Button, Checkbox, IconButton, LiveNote, LiveStatus, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
@@ -138,9 +138,9 @@ export function AvoidRuleToggles({ podKillsUnavailable }: { podKillsUnavailable:
         <span>{t('settings.travel.podKillsSuffix', { count: podKillThreshold })}</span>
       </div>
       {podKillsUnavailable && (
-        <p role="status" className="text-xs text-warning">
+        <LiveNote className="text-xs text-warning">
           {t('settings.travel.podKillsUnavailable')}
-        </p>
+        </LiveNote>
       )}
     </div>
   );

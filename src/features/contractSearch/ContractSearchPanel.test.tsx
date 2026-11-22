@@ -593,9 +593,10 @@ describe('ContractSearchPanel', () => {
     loadCharacterSolarSystemId.mockResolvedValue(null);
     renderWithRouter(['/?items.jumps=3']);
 
-    expect(
-      await screen.findByText('Set your current system to filter by distance.')
-    ).toBeInTheDocument();
+    // The notice is visible and announced: its text sits in a LiveNote twice.
+    await waitFor(() =>
+      expect(screen.getAllByText('Set your current system to filter by distance.')).toHaveLength(2)
+    );
     expect(screen.queryByRole('group', { name: 'Filters' })).not.toBeInTheDocument();
   });
 
