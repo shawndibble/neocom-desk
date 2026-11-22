@@ -229,6 +229,24 @@ describe('Toast', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
+    it('Alt+Z moves focus onto Undo from anywhere, and Escape hands it back', () => {
+      const onClose = vi.fn();
+      render(
+        <>
+          <button type="button">Page</button>
+          <Toast message="Removed" undo={{ label: 'Undo', onUndo: vi.fn() }} onClose={onClose} />
+        </>
+      );
+      const page = screen.getByRole('button', { name: 'Page' });
+      page.focus();
+      fireEvent.keyDown(page, { key: 'z', code: 'KeyZ', altKey: true });
+      const undo = screen.getByRole('button', { name: 'Undo' });
+      expect(undo).toHaveFocus();
+      expect(undo).toHaveAttribute('aria-keyshortcuts', 'Alt+Z');
+      fireEvent.keyDown(undo, { key: 'Escape' });
+      expect(page).toHaveFocus();
+    });
+
     it('closes on Escape and returns focus to where it came from', () => {
       const onClose = vi.fn();
       render(

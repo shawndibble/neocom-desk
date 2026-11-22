@@ -100,8 +100,11 @@ export function IndustryGroupPage() {
   const accountSkills = useAccountSkillLevels([...ownedStockSnapshot.characterNames.keys()]);
 
   /** @see BuildGroupPanel's `onAutoBuild` doc — same one-shot bulk build/buy control, run once per member. */
-  async function handleAutoBuildGroup(options: { strategy: BuildStrategy; depth: number }) {
-    if (activeCharacterId === null || groupId === undefined || !catalog) return;
+  async function handleAutoBuildGroup(options: {
+    strategy: BuildStrategy;
+    depth: number;
+  }): Promise<number> {
+    if (activeCharacterId === null || groupId === undefined || !catalog) return 0;
     await workspace.setBuildGroups(
       withGroupAutoBuildDefault(workspace.buildGroups, activeCharacterId, groupId, {
         strategy: options.strategy,
@@ -127,11 +130,12 @@ export function IndustryGroupPage() {
       accountSkills,
       pricingInputs.standings
     );
-    if (picks.size === 0) return;
+    if (picks.size === 0) return 0;
     await patchBuildPlans([...picks.keys()], (p) => {
       const picked = picks.get(p.id);
       return picked ? { buildHere: [...picked] } : null;
     });
+    return picks.size;
   }
 
   async function handleGroupOwnedStockChange(ownedStock: Record<number, number>) {

@@ -16,7 +16,7 @@
 import { useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, LiveStatus, Panel, Spinner } from '@/components/ui';
+import { Button, EmptyState, IconButton, LiveStatus, Panel, Spinner, Toast } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -69,9 +69,10 @@ interface BuildGroupPanelProps {
    * every member independently, always across each member's own whole tree
    * (issue #798 dropped the depth choice). Returns a Promise so this
    * panel can disable the control for the duration, the same way a
-   * synchronous single-plan Apply never needs to.
+   * synchronous single-plan Apply never needs to. Resolves to how many
+   * plans changed, so the panel can say when none did.
    */
-  onAutoBuild: (options: { strategy: BuildStrategy; depth: number }) => Promise<void>;
+  onAutoBuild: (options: { strategy: BuildStrategy; depth: number }) => Promise<number | void>;
   /**
    * Group Owned Overlay (issue #697): writes the group's own owned-stock
    * ledger, replacing it wholesale — the same "replace, don't merge"
@@ -107,6 +108,7 @@ export function BuildGroupPanel({
   }>(2000);
   const [retargeting, setRetargeting] = useState(false);
   const [applyingAutoBuild, setApplyingAutoBuild] = useState(false);
+  const [autoBuildToast, setAutoBuildToast] = useState<string | null>(null);
   // computeGroupResult: true — the group total needs each member's tree
   // re-resolved with owned-stock deduction disabled (issue #697), never the
   // owned-netted `result` a member's own page shows (still read below, for
@@ -276,11 +278,20 @@ export function BuildGroupPanel({
         })}
         onApply={(options) => {
           setApplyingAutoBuild(true);
-          void onAutoBuild({ ...options, depth: autoBuild.maxDepth }).finally(() =>
-            setApplyingAutoBuild(false)
-          );
+          void onAutoBuild({ ...options, depth: autoBuild.maxDepth })
+            .then((changed) => {
+              if (changed === undefined) return;
+              setAutoBuildToast(
+                changed === 0
+                  ? t('industry.autoBuildGroupNothing')
+                  : t('industry.autoBuildGroupApplied', { count: changed })
+              );
+            })
+            .finally(() => setApplyingAutoBuild(false));
         }}
       />
+
+      {autoBuildToast && <Toast message={autoBuildToast} onClose={() => setAutoBuildToast(null)} />}
 
       {/* Shown as a line rather than as the button's own label: the message
           is about the clipboard, not about which list, and it is a sentence
