@@ -1,13 +1,6 @@
-import { useId, useMemo, useState } from 'react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Checkbox,
-  FieldError,
-  NativeSelect,
-  SearchInput,
-  TextInput,
-  Button,
-} from '@/components/ui';
+import { Checkbox, FieldError, NativeSelect, TextInput, Button } from '@/components/ui';
 import {
   BUYBACK_GROUP_KEYS,
   parseRate,
@@ -19,10 +12,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { COMPARED_HUBS } from '@/market/hubs';
 import { addType, removeType, toggleGroup, type BuybackDraft } from './buybackDraft';
-import { namedLike, needleOf } from './shareLists';
-
-const SEARCH_RESULTS = 8;
-const MIN_SEARCH_CHARS = 2;
+import { ItemSearchPicker } from './ItemSearchPicker';
 
 /** A Character of the requester that may take the contracts: it is a Member of this Community. */
 export interface BuyerOption {
@@ -51,14 +41,7 @@ export function BuybackFields({
 }) {
   const { t } = useTranslation();
   const rateErrorId = useId();
-  const [search, setSearch] = useState('');
   const rateValid = parseRate(draft.rate) !== null;
-
-  const results = useMemo(() => {
-    const needle = needleOf(search);
-    if (!catalogue || needle.length < MIN_SEARCH_CHARS) return [];
-    return namedLike([...catalogue.values()], needle).slice(0, SEARCH_RESULTS);
-  }, [catalogue, search]);
 
   return (
     <div className="space-y-4">
@@ -143,35 +126,13 @@ export function BuybackFields({
           ))}
         </div>
       </fieldset>
-      <div className="space-y-1">
-        <SearchInput
-          aria-label={t('communities.board.buyback.addLabel')}
-          placeholder={t('communities.board.buyback.addPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {results.length > 0 && (
-          <ul
-            aria-label={t('communities.board.compose.results')}
-            className="divide-y divide-line rounded-xs border border-line"
-          >
-            {results.map((item) => (
-              <li key={item.typeId}>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
-                  onClick={() => {
-                    onChange(addType(draft, item));
-                    setSearch('');
-                  }}
-                >
-                  {item.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <ItemSearchPicker
+        catalogue={catalogue}
+        label={t('communities.board.buyback.addLabel')}
+        placeholder={t('communities.board.buyback.addPlaceholder')}
+        resultsLabel={t('communities.board.compose.results')}
+        onPick={(item) => onChange(addType(draft, item))}
+      />
       {draft.types.length > 0 && (
         <ul
           aria-label={t('communities.board.buyback.typesLabel')}
