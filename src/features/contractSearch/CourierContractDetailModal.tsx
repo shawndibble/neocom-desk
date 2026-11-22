@@ -24,7 +24,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Link } from 'react-router-dom';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InfoTooltip, IskAmount, SlideOver, Tooltip } from '@/components/ui';
+import { InfoTooltip, IskAmount, SlideOver, Tooltip, ValueList, ValueRow } from '@/components/ui';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { Caret } from '@/components/ui/Disclosure';
@@ -291,25 +291,35 @@ function EndpointPlace({
  * One row of the benchmark readout: a short value under a label, with the
  * reasoning in the label's tooltip so it never has to be read to scan the row.
  */
-function BenchmarkFact({
+function BenchmarkRow({
   label,
   tip,
-  warn = false,
+  tone = 'default',
   children,
 }: {
   label: string;
   tip?: string;
-  warn?: boolean;
+  tone?: 'default' | 'warning';
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
-    <>
-      <dt className="flex items-center gap-1 text-text-dim">
-        {label}
-        {tip !== undefined && <InfoTooltip label={label} content={tip} glyph="info" />}
-      </dt>
-      <dd className={`tabular-nums ${warn ? 'text-warning' : ''}`}>{children}</dd>
-    </>
+    <ValueRow
+      label={
+        <span className="inline-flex items-center gap-1 text-text-dim">
+          {label}
+          {tip !== undefined && (
+            <InfoTooltip
+              label={t('contractSearch.benchmark.about', { label })}
+              content={tip}
+              glyph="info"
+            />
+          )}
+        </span>
+      }
+      value={children}
+      tone={tone}
+    />
   );
 }
 
@@ -637,8 +647,8 @@ export function CourierContractDetailModal({
         */}
         <Well size="lg" as="section" className="flex flex-col gap-2">
           <h3 className={eyebrowClassName}>{t('contractSearch.goingRateBenchmarkLabel')}</h3>
-          <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-1.5 text-sm">
-            <BenchmarkFact
+          <ValueList variant="plain">
+            <BenchmarkRow
               label={t('contractSearch.benchmark.rateLabel')}
               tip={
                 measuring
@@ -652,10 +662,12 @@ export function CourierContractDetailModal({
                 ? t('contractSearch.benchmark.measuring')
                 : goingRateMultiple === null
                   ? t('contractSearch.benchmark.unavailable')
-                  : `${formatMagnitude(goingRateMultiple)}x`}
-            </BenchmarkFact>
+                  : t('contractSearch.benchmark.rateMultiple', {
+                      multiple: formatMagnitude(goingRateMultiple),
+                    })}
+            </BenchmarkRow>
             {floor !== null && (
-              <BenchmarkFact
+              <BenchmarkRow
                 label={t('contractSearch.benchmark.floorLabel')}
                 // A high multiple beside a short floor reads as a contradiction
                 // unless the two bases are named: one is cargo size, the other
@@ -677,10 +689,10 @@ export function CourierContractDetailModal({
                     })}
                   </span>
                 )}
-              </BenchmarkFact>
+              </BenchmarkRow>
             )}
             {forcesFreighter(row.volume) && (
-              <BenchmarkFact
+              <BenchmarkRow
                 label={t('contractSearch.benchmark.cargoLabel')}
                 tip={t('contractSearch.freighterVolumeNote', {
                   volume: formatMagnitude(FREIGHTER_VOLUME_M3),
@@ -689,26 +701,28 @@ export function CourierContractDetailModal({
                 // the bait is an oversized load *on a lowsec route*. A 400,000
                 // m³ Jita-to-Perimeter haul is a freighter job, which is worth
                 // stating and is not a warning.
-                warn={exposure?.kind === 'known' && exposure.exposedSystems > 0}
+                tone={
+                  exposure?.kind === 'known' && exposure.exposedSystems > 0 ? 'warning' : 'default'
+                }
               >
                 {t('contractSearch.benchmark.freighterOnly')}
-              </BenchmarkFact>
+              </BenchmarkRow>
             )}
             {exposure?.kind === 'known' && exposure.chokepoints.length > 0 && (
-              <BenchmarkFact
+              <BenchmarkRow
                 label={t('contractSearch.benchmark.chokepointLabel')}
                 tip={t('contractSearch.routeExposureChokepoints')}
-                warn
+                tone="warning"
               >
                 {exposure.chokepoints.join(', ')}
-              </BenchmarkFact>
+              </BenchmarkRow>
             )}
             {/*
               Said either way: silence for a clean route reads the same as
               silence for a route we could not work out, and the rule on this
               surface is to state what is not in the figure.
             */}
-            <BenchmarkFact
+            <BenchmarkRow
               label={t('contractSearch.benchmark.routeLabel')}
               tip={
                 exposure === null || exposure.kind === 'known'
@@ -721,15 +735,17 @@ export function CourierContractDetailModal({
               {exposure === null
                 ? t('contractSearch.benchmark.measuring')
                 : exposure.kind === 'known'
-                  ? t('contractSearch.routeExposureCrossed', { count: exposure.exposedSystems })
+                  ? exposure.exposedSystems === 0
+                    ? t('contractSearch.benchmark.routeClear')
+                    : String(exposure.exposedSystems)
                   : exposure.kind === 'no-route'
                     ? t('contractSearch.benchmark.noRoute')
                     : t('contractSearch.benchmark.routeUnknown')}
-            </BenchmarkFact>
-            <BenchmarkFact label={t('contractSearch.benchmark.expiresLabel')}>
+            </BenchmarkRow>
+            <BenchmarkRow label={t('contractSearch.benchmark.expiresLabel')}>
               {t('contractSearch.benchmark.expiresIn', { hours: expiresIn })}
-            </BenchmarkFact>
-          </dl>
+            </BenchmarkRow>
+          </ValueList>
         </Well>
 
         {/*
