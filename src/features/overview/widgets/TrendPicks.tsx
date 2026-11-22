@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   IconButton,
+  LiveNote,
+  LiveStatus,
   MenuCheckboxItem,
   MenuLabel,
   Modal,
@@ -309,12 +311,11 @@ export function TrendItemsDialog({
           <p className="text-xs text-text-dim">{t('overview.menu.trendQuickbarEmpty')}</p>
         )}
         {(searching || source !== 'quickbar') && catalogue.status === 'loading' && (
-          <p className="text-xs text-text-dim" role="status">
-            {t('overview.menu.trendLoading')}
-          </p>
+          <LiveNote className="text-xs text-text-dim">{t('overview.menu.trendLoading')}</LiveNote>
         )}
         {(searching || source !== 'quickbar') && catalogue.status === 'failed' && (
-          <p className="text-xs text-danger" role="alert">
+          <p className="text-xs text-danger">
+            <LiveStatus>{t('overview.menu.trendLoadFailed')}</LiveStatus>
             {t('overview.menu.trendLoadFailed')}{' '}
             <Button type="button" size="sm" onClick={loadCatalogue}>
               {t('overview.menu.trendRetry')}

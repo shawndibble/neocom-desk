@@ -8,8 +8,9 @@ import type { TFunction } from 'i18next';
 import {
   DataAgeBadge,
   EmptyState,
-  IskAmount,
   InfoTooltip,
+  IskAmount,
+  LiveStatus,
   Panel,
   StatChip,
   StatChips,
@@ -113,11 +114,7 @@ function LiveVerdict({ text, pending }: { text: string; pending: boolean }) {
     const timer = setTimeout(() => setAnnounced(text), pending ? 5_000 : 500);
     return () => clearTimeout(timer);
   }, [text, pending]);
-  return (
-    <span role="status" aria-live="polite" className="sr-only">
-      {announced}
-    </span>
-  );
+  return <LiveStatus>{announced}</LiveStatus>;
 }
 
 export function Headline({

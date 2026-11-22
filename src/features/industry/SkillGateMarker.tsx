@@ -95,6 +95,7 @@ export function SkillGateMarker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
+        aria-label={`${t('industry.skillGateTooltipTitle')}: ${label}`}
         className="w-80 max-w-[calc(100vw-2rem)] p-3"
         onClick={(event) => event.stopPropagation()}
       >

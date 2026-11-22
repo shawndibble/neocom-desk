@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, NeedsConnection, SearchInput, Spinner } from '@/components/ui';
+import {
+  Button,
+  Disclosure,
+  LiveStatus,
+  NeedsConnection,
+  SearchInput,
+  Spinner,
+} from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
@@ -246,7 +253,7 @@ export function BuildLocationPicker({
             highlightedOption ? optionId(highlightedOption.structureId) : undefined
           }
         />
-        <span role="status" aria-live="polite" className="sr-only">
+        <LiveStatus>
           {!searching &&
             !failed &&
             results !== null &&
@@ -256,7 +263,7 @@ export function BuildLocationPicker({
                   name: highlightedName,
                 })
               : t('industry.buildLocationResultsCount', { count: results.length }))}
-        </span>
+        </LiveStatus>
         {searching && (
           <span className="flex items-center gap-1 text-text-dim">
             <Spinner size="sm" label={t('industry.buildLocationSearching')} />

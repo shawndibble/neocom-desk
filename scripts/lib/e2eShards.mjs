@@ -17,6 +17,16 @@ function medianWeight(weights) {
 }
 
 /**
+ * Total weight of `files`, a file with no measurement counting as the median.
+ * @param {string[]} files
+ * @param {Record<string, number>} weights
+ */
+export function totalWeight(files, weights) {
+  const fallback = medianWeight(weights);
+  return files.reduce((sum, file) => sum + (weights[file] ?? fallback), 0);
+}
+
+/**
  * @param {string[]} files   every spec file, e.g. `e2e/foo.spec.ts`
  * @param {Record<string, number>} weights  seconds of worker time per file
  * @param {number} shardCount

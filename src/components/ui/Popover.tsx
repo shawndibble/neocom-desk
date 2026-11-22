@@ -18,16 +18,28 @@ export const PopoverTrigger = PopoverPrimitive.Trigger;
 /** Positions the popover on an element other than its trigger, for a hint that opens itself. */
 export const PopoverAnchor = PopoverPrimitive.Anchor;
 
+type PopoverContentBaseProps = Omit<
+  ComponentProps<typeof PopoverPrimitive.Content>,
+  'aria-label' | 'aria-labelledby'
+> & {
+  /** A pointer toward the anchor, for a hint that names the control it sits beside. */
+  arrow?: boolean;
+};
+
+/** The popover is a `dialog`, so it needs a name: a label string, or the id of its visible heading. */
+export type PopoverContentProps = PopoverContentBaseProps &
+  (
+    | { 'aria-label': string; 'aria-labelledby'?: string }
+    | { 'aria-labelledby': string; 'aria-label'?: string }
+  );
+
 export function PopoverContent({
   className,
   sideOffset = 4,
   arrow = false,
   children,
   ...props
-}: ComponentProps<typeof PopoverPrimitive.Content> & {
-  /** A pointer toward the anchor, for a hint that names the control it sits beside. */
-  arrow?: boolean;
-}) {
+}: PopoverContentProps) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
@@ -39,7 +51,14 @@ export function PopoverContent({
       <PopoverPrimitive.Portal container={container}>
         <PopoverPrimitive.Content
           sideOffset={sideOffset}
-          className={cx(menuContentClassName, 'motion-pop-exit', className)}
+          className={cx(
+            menuContentClassName,
+            // Tailwind cannot resolve two max-height utilities, so a caller's own cap replaces the default.
+            !className?.includes('max-h-') &&
+              'max-h-[min(32rem,var(--radix-popover-content-available-height))]',
+            'overflow-y-auto overscroll-contain motion-pop-exit',
+            className
+          )}
           {...props}
         >
           {children}

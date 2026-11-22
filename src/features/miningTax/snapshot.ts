@@ -35,6 +35,16 @@ export interface MoonMiningTaxRow {
   assignments: MiningTaxAssignmentRecord[];
   /** Ore this entry's assignments don't yet cover. */
   unassignedOreLines: MiningLedgerEntry['oreLines'];
+  /**
+   * Free ore the Corp Tax Books took off `unassignedOreLines` (`buildDisplayRows`): the ledger still
+   * reports it, so a new Assignment must remember it (`releasedTypeIds`) or it grows straight back in.
+   */
+  bookTakenOreLines?: MiningLedgerEntry['oreLines'];
+  /**
+   * What the entry still reports of ore a Corp Tax Book took off an Assignment (`releasedTypeIds`):
+   * not offered and not owned here, but free as far as the book goes (`personalEntriesOf`).
+   */
+  releasedOreLines?: MiningLedgerEntry['oreLines'];
   /** Assignments that look like one obligation stored twice over this entry — see `findDuplicateAssignmentIds`. Empty for a healthy row. */
   duplicateAssignmentIds?: string[];
 }
@@ -183,16 +193,18 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
 
     for (const entry of ledger.entries) {
       const covering = byDaySystem.get(`${entry.date}|${String(entry.solarSystemId)}`) ?? [];
+      // A paid day never grows (ADR 0024): read Paid off its Payee's account.
+      const ownership = computeOwnership(
+        entry.oreLines,
+        covering.map((a) => grown.view(a))
+      );
       rows.push({
         characterId: ledger.characterId,
         characterName: ledger.characterName,
         entry,
         assignments: covering,
-        // A paid day never grows (ADR 0024): read Paid off its Payee's account.
-        unassignedOreLines: computeOwnership(
-          entry.oreLines,
-          covering.map((a) => grown.view(a))
-        ).unassigned,
+        unassignedOreLines: ownership.unassigned,
+        ...(ownership.released.length > 0 ? { releasedOreLines: ownership.released } : {}),
         duplicateAssignmentIds: findDuplicateAssignmentIds(entry.oreLines, covering),
       });
     }

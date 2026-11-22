@@ -14,7 +14,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { LiveStatus, Tooltip } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -216,9 +216,7 @@ export function HubCompareCards({
         a screen reader hears, and ten of them would be ten places for it to
         come from.
       */}
-      <span role="status" aria-live="polite" className="sr-only">
-        {copied === null ? '' : t('market.appraisal.copiedToClipboard')}
-      </span>
+      <LiveStatus>{copied === null ? '' : t('market.appraisal.copiedToClipboard')}</LiveStatus>
     </>
   );
 }

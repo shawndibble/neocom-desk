@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { configureClipboard } from '@/lib/clipboard';
@@ -21,6 +21,8 @@ describe('FullIskTotal', () => {
     render(<FullIskTotal value={67_214_000_000} />);
     await userEvent.click(screen.getByRole('button'));
     expect(written).toEqual(['67,214,000,000']);
-    expect(await screen.findByRole('status')).toHaveTextContent('Copied to clipboard');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard')
+    );
   });
 });

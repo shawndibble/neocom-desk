@@ -11,23 +11,24 @@ import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/Hauling
 import {
   Button,
   DataAgeBadge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   FilterChip,
   IconButton,
+  LiveNote,
+  LiveStatus,
   PageHeader,
   Panel,
-  SearchInput,
   RegionSelect,
-  LiveStatus,
-  DropdownMenuItem,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  useOpenAfterMenu,
+  SearchInput,
   Spinner,
   TabPanel,
   Tabs,
   Toast,
+  useOpenAfterMenu,
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -1039,9 +1040,9 @@ export function Market() {
                             <div className="flex flex-col items-end gap-1 text-xs text-text-dim">
                               {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
                               {failedRegionCount > 0 && (
-                                <p role="status" className="text-warning">
+                                <LiveNote className="text-warning">
                                   {t('market.regionsFailed', { count: failedRegionCount })}
-                                </p>
+                                </LiveNote>
                               )}
                             </div>
                           )}

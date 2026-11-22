@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { IconButton, TextInput } from '@/components/ui';
+import { IconButton, LiveStatus, TextInput } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { isOfflineFailure } from '@/esi/client';
@@ -240,7 +240,7 @@ export function NewMailRecipientPicker({
         <span className={cx('text-xs tabular-nums', full ? 'text-warning' : 'text-text-dim')}>
           {t('mail.counter', { count: recipients.length, max: MAX_RECIPIENTS })}
         </span>
-        <span role="status" aria-live="polite" className="sr-only">
+        <LiveStatus>
           {open &&
             !full &&
             candidates.length > 0 &&
@@ -250,7 +250,7 @@ export function NewMailRecipientPicker({
                   name: candidates[combo.highlight].name,
                 })
               : t('mail.recipientResultsCount', { count: candidates.length }))}
-        </span>
+        </LiveStatus>
         {open && !full && (
           <ul
             {...combo.listboxProps}

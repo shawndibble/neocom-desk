@@ -153,7 +153,11 @@ export function StructureFeeLine({ structureId, gross, accountingLevel }: Struct
       ) : (
         <Popover open={open} onOpenChange={(next) => (next ? openEditor() : setOpen(false))}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent align="start" className="w-72 p-3">
+          <PopoverContent
+            align="start"
+            aria-label={t('market.structureFee.title')}
+            className="w-72 p-3"
+          >
             {form}
           </PopoverContent>
         </Popover>

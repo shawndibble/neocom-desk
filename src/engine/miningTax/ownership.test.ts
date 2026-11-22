@@ -54,6 +54,76 @@ describe('computeOwnership — a sole Assignment is the collector', () => {
   });
 });
 
+describe('computeOwnership — ore released to a corporation book stays released', () => {
+  const entry: OreLine[] = [
+    { typeId: A, quantity: 100 },
+    { typeId: B, quantity: 50 },
+  ];
+  const released = (
+    id: string,
+    lines: OreLine[],
+    releasedTypeIds: number[]
+  ): CoveringAssignment => ({ id, oreLines: lines, releasedTypeIds });
+
+  it('does not grow a released type back into the sole collector, nor offer it as unassigned', () => {
+    const result = computeOwnership(entry, [released('a', [{ typeId: A, quantity: 100 }], [B])]);
+    expect(result.unassigned).toEqual([]);
+    expect(result.ownedLines.get('a')).toEqual([{ typeId: A, quantity: 100 }]);
+  });
+
+  it('still grows a type that was not released', () => {
+    const result = computeOwnership(
+      [...entry, { typeId: C, quantity: 5 }],
+      [released('a', [{ typeId: A, quantity: 100 }], [B])]
+    );
+    expect(result.ownedLines.get('a')).toEqual([
+      { typeId: A, quantity: 100 },
+      { typeId: C, quantity: 5 },
+    ]);
+  });
+
+  it('applies to the whole entry: a release on one side hides the type from the other too', () => {
+    const result = computeOwnership(entry, [
+      released('a', [{ typeId: A, quantity: 100 }], [B]),
+      covering('b', [{ typeId: C, quantity: 1 }]),
+    ]);
+    expect(result.unassigned).toEqual([]);
+  });
+});
+
+describe('computeOwnership — released ore is reported as released, not lost', () => {
+  const entry: OreLine[] = [
+    { typeId: A, quantity: 100 },
+    { typeId: B, quantity: 50 },
+  ];
+
+  it('returns what the entry still reports of a released type, which nothing owns', () => {
+    const result = computeOwnership(entry, [
+      { id: 'a', oreLines: [{ typeId: A, quantity: 100 }], releasedTypeIds: [B] },
+    ]);
+    expect(result.unassigned).toEqual([]);
+    expect(result.released).toEqual([{ typeId: B, quantity: 50 }]);
+  });
+
+  it('counts only the part of a released type no Assignment holds', () => {
+    const result = computeOwnership(entry, [
+      {
+        id: 'a',
+        oreLines: [
+          { typeId: A, quantity: 100 },
+          { typeId: B, quantity: 20 },
+        ],
+        releasedTypeIds: [B],
+      },
+    ]);
+    expect(result.released).toEqual([{ typeId: B, quantity: 30 }]);
+  });
+
+  it('is empty when nothing was released', () => {
+    expect(computeOwnership(entry, []).released).toEqual([]);
+  });
+});
+
 describe('computeOwnership — quantity split with a flagged collector', () => {
   it('splits one type by quantity between two Assignments with no residual', () => {
     const entry: OreLine[] = [{ typeId: A, quantity: 100 }];

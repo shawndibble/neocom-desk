@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, LiveStatus } from '@/components/ui';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -47,7 +47,8 @@ export function StandingsScopeNotice() {
   if (dismissedNow === characterId || readDismissed(characterId)) return null;
 
   return (
-    <div role="status" className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
+    <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
+      <LiveStatus>{t('reauth.standingsTitle')}</LiveStatus>
       <GrantBanner
         standalone
         characterId={characterId}

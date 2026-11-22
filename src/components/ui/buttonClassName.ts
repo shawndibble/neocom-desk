@@ -36,14 +36,21 @@ const ALIGN: Record<ButtonAlign, string> = {
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: `${controlHeightClassName.sm} px-2.5 text-[0.6875rem]`,
-  md: `${controlHeightClassName.md} px-4 text-xs`,
+  sm: 'px-2.5 text-[0.6875rem]',
+  md: 'px-4 text-xs',
+};
+
+/** `wrap`: the height is a floor, so a label too long for one line grows the button instead of spilling out of it. */
+const WRAP: Record<ButtonSize, string> = {
+  sm: 'h-auto min-h-9 py-1 text-center whitespace-normal md:min-h-7 touch:min-h-9',
+  md: 'h-auto min-h-9 py-1.5 text-center whitespace-normal',
 };
 
 export interface ButtonClassNameOptions {
   variant?: ButtonVariant;
   size?: ButtonSize;
   align?: ButtonAlign;
+  wrap?: boolean;
   className?: string;
 }
 
@@ -59,7 +66,8 @@ export function buttonClassName({
   variant = 'ghost',
   size = 'md',
   align = 'center',
+  wrap = false,
   className = '',
 }: ButtonClassNameOptions = {}): string {
-  return `inline-flex items-center gap-1.5 rounded-xs border font-semibold tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ${disabledClassName} ${ALIGN[align]} ${VARIANT[variant]} ${SIZE[size]} ${className}`;
+  return `inline-flex items-center gap-1.5 rounded-xs border font-semibold tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ${disabledClassName} ${ALIGN[align]} ${VARIANT[variant]} ${wrap ? WRAP[size] : controlHeightClassName[size]} ${SIZE[size]} ${className}`;
 }

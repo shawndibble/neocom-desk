@@ -731,8 +731,8 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
     Runs its own dev server on port 5199 with blanked Firebase env (see §4).
 
 A pre-commit hook runs lint/format (staged files) + typecheck automatically.
-CI (`validate` job) runs the full suite (`test:run`) and `build` on every
-push — don't run those locally; see `CLAUDE.md`. Full E2E: `npm run test:e2e`.
+CI runs the unit tests a PR's change can reach and `build` on every PR, and
+the full suite on every push to `develop` — don't run those locally; see `CLAUDE.md`. Full E2E: `npm run test:e2e`.
 SDE rebuild: `npm run sde:build`.
 
 ## 6. Feature inventory

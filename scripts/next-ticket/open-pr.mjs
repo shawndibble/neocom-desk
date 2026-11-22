@@ -7,8 +7,8 @@
 // `--hold` (a `hold-for-review` ticket) opens the PR but does NOT arm
 // auto-merge: the PR is left for a human to review and merge.
 //
-// Also arms auto-merge (repo has allow_auto_merge on, and `validate` + `e2e`
-// are required checks) so GitHub merges the PR itself the moment it goes
+// Also arms auto-merge (repo has allow_auto_merge on, and the `ci` check
+// is required) so GitHub merges the PR itself the moment it goes
 // green and mergeable — finish.mjs no longer races a manual merge against
 // it, and a CI-watch hiccup in drive-ci.mjs can't strand an otherwise-green
 // PR.

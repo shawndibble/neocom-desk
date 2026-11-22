@@ -143,6 +143,8 @@ export interface AssignInput {
   taxOwed: number;
   /** Optional "Moon / structure" note; metadata only. */
   label?: string;
+  /** Ore types a Corp Tax Book took from what was offered (`bookTakenTypeIds`): never grown back in. */
+  releasedTypeIds?: readonly number[];
   /**
    * Make this the entry's growth collector even over an unpaid one: a Survey
    * connection's ore (issue #4684), so ore mined after it goes to the moon
@@ -189,6 +191,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     status: 'outstanding',
     ...(normalizeLabel(input.label) ? { label: normalizeLabel(input.label) } : {}),
     ...(input.byDefault ? { override: false } : {}),
+    ...(input.releasedTypeIds?.length ? { releasedTypeIds: [...input.releasedTypeIds] } : {}),
     ...oreFormMarker(),
     updatedAt: now,
   };
@@ -630,11 +633,21 @@ export async function releaseOreFromAssignment(
     priced.prices,
     assignment.taxPct
   );
+  // Remember what went, or the game's ledger, which still reports it, grows it straight back in.
+  // A Survey connection's takeover is not the book's: its ore is assigned elsewhere.
+  const keptBy = new Map(kept.map((l) => [l.typeId, l.quantity]));
+  const released = keepOverride
+    ? []
+    : assignment.oreLines
+        .filter((l) => (keptBy.get(l.typeId) ?? 0) < l.quantity)
+        .map((l) => l.typeId);
+  const releasedTypeIds = [...new Set([...(assignment.releasedTypeIds ?? []), ...released])];
   const next: MiningTaxAssignmentRecord = withOreFormMarker(
     { ...assignment, oreLines: kept, estimatedValue, taxOwed, updatedAt: Date.now() },
     priced.compressed
   );
   delete next.oreLineValues;
+  if (releasedTypeIds.length > 0) next.releasedTypeIds = releasedTypeIds;
   if (!keepOverride) asPilotAct(next);
   await putAssignments([next]);
   return next;

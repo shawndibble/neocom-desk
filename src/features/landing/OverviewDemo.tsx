@@ -246,7 +246,11 @@ export function OverviewDemo() {
               </span>
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-0">
+          <PopoverContent
+            align="end"
+            aria-label={t('nav.alerts')}
+            className="w-80 max-w-[calc(100vw-2rem)] p-0"
+          >
             <p className="border-b border-line px-3 py-2 text-[0.6875rem] font-semibold tracking-widest uppercase">
               {t('nav.alerts')}
             </p>

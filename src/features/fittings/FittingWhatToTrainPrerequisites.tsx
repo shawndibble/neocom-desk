@@ -55,7 +55,11 @@ export function WhatToTrainPrerequisites({
           <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
+      <PopoverContent
+        align="start"
+        aria-label={t('fittings.whatToTrain.prerequisitesTitle', { skill })}
+        className="w-96 max-w-[calc(100vw-2rem)] p-3"
+      >
         <div className="space-y-2">
           <p className="text-xs font-semibold text-text">
             {t('fittings.whatToTrain.prerequisitesTitle', { skill })}

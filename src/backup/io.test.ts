@@ -193,8 +193,9 @@ describe('restoring an existing-format backup file', () => {
   const LEGACY_OMISSIONS: Partial<Record<keyof typeof FULL_RECORDS, string[]>> = {
     // oreLineValues (grilling session, 2026-09-27) and rawOrePriced (Ore Form,
     // 2026-10-06) and label (Moon / structure) postdate this fixture.
-    // override (Default Systems, 2026-11-03) postdates it too.
-    miningTaxAssignments: ['oreLineValues', 'rawOrePriced', 'label', 'override'],
+    // override (Default Systems, 2026-11-03) and releasedTypeIds (decision 20261122-053305)
+    // postdate it too.
+    miningTaxAssignments: ['oreLineValues', 'rawOrePriced', 'label', 'override', 'releasedTypeIds'],
     // sourceJobId (Job History, #2866) postdates this fixture.
     productionRuns: ['sourceJobId'],
     // costIndexOverridePct (J-Space cost index, 2026-10-12) and productSalePrice

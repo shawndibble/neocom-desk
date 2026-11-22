@@ -17,6 +17,8 @@ import {
   deletePayee,
   dismiss,
   dismissOwed,
+  releaseOre,
+  restoreAssignments,
   unassign,
   uncombine,
   undoContinue,
@@ -252,6 +254,41 @@ describe('unassign', () => {
     expect(await stored()).toEqual(members);
     expect(await tombstonedIds()).toEqual([]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('restoreAssignments (Undo of a release)', () => {
+  beforeEach(() => {
+    pricingMock.loadUnitPricesOnDate.mockResolvedValue({ prices: PRICES });
+  });
+
+  it('brings back what a release changed and what it deleted, and tombstones neither', async () => {
+    const kept = assignment({
+      id: 'a1',
+      oreLines: [
+        { typeId: ORE, quantity: 100 },
+        { typeId: 45491, quantity: 40 },
+      ],
+    });
+    const gone = assignment({ id: 'a2', date: '2026-09-05' });
+    await db.miningTaxAssignments.bulkPut([kept, gone]);
+
+    const released = await releaseOre([
+      { assignment: kept, after: [{ typeId: ORE, quantity: 100 }] },
+      { assignment: gone, after: [] },
+    ]);
+    expect(released.ok).toBe(true);
+    expect((await stored()).map((r) => r.id)).toEqual(['a1']);
+    expect(await tombstonedIds()).toEqual(['a2']);
+
+    const result = await restoreAssignments([kept, gone]);
+
+    expect(result.ok).toBe(true);
+    const rows = (await stored()).sort((a, b) => a.id.localeCompare(b.id));
+    expect(rows.map((r) => r.id)).toEqual(['a1', 'a2']);
+    expect(rows[0]!.oreLines).toEqual(kept.oreLines);
+    expect(rows[0]!.releasedTypeIds).toBeUndefined();
+    expect(await tombstonedIds()).toEqual([]);
   });
 });
 

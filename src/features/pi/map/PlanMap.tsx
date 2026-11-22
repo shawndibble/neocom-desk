@@ -47,7 +47,7 @@
  *   the what-if planet, if one is ticked.
  */
 
-import { Panel } from '@/components/ui';
+import { LiveStatus, Panel } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
@@ -108,9 +108,7 @@ export function PlanMap(props: PlanMapProps) {
         )}
       </div>
 
-      <div role="status" aria-live="polite" className="sr-only">
-        {announce}
-      </div>
+      <LiveStatus>{announce}</LiveStatus>
       {s.whatIfChainKey && s.hasFreeSlot && pi && (
         <WhatIfChainsFeed advice={advice} pi={pi} types={s.whatIfTypes} onChange={s.setFed} />
       )}

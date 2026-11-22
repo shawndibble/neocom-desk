@@ -9,6 +9,12 @@ export interface CoveringAssignment {
   collectsGrowth?: boolean;
   /** `'paid'` freezes the Assignment at its own snapshot: it never grows (ADR 0024). Any other status, or none, can. */
   status?: string;
+  /**
+   * Ore types the pilot let a corporation's book take off this Assignment ("Let the corporation
+   * bill it"): the entry still reports them, but they are the book's, so they neither grow back
+   * into a collector nor show as unassigned.
+   */
+  releasedTypeIds?: readonly number[];
 }
 
 export interface Ownership {
@@ -20,6 +26,12 @@ export interface Ownership {
    * collector. Never smaller than the Assignment's own snapshot.
    */
   ownedLines: Map<string, OreLine[]>;
+  /**
+   * What the entry still reports of ore a Corp Tax Book took (`releasedTypeIds`) and no Assignment
+   * holds. Nobody here owns it and it is not offered, but the book must still see it as free ore:
+   * left out, the book calls it a Conflict with no owner.
+   */
+  released: OreLine[];
 }
 
 function sortedByType(lines: readonly OreLine[]): OreLine[] {
@@ -84,7 +96,7 @@ export function computeOwnership(
 ): Ownership {
   const ownedLines = new Map<string, OreLine[]>();
   if (covering.length === 0) {
-    return { unassigned: sortedByType([...entryLines]), ownedLines };
+    return { unassigned: sortedByType([...entryLines]), ownedLines, released: [] };
   }
 
   const collector = growthCollector(covering);
@@ -95,8 +107,21 @@ export function computeOwnership(
     ownedByType.set(c.id, new Map(c.oreLines.map((line) => [line.typeId, line.quantity])));
   }
 
+  // Ore a book took is the book's whichever side let it go: nothing here owns or offers it.
+  const released = new Set(covering.flatMap((c) => c.releasedTypeIds ?? []));
+
   const unassigned: OreLine[] = [];
+  const releasedOre: OreLine[] = [];
   for (const line of entryLines) {
+    if (released.has(line.typeId)) {
+      const held = covering.reduce(
+        (sum, c) => sum + (ownedByType.get(c.id)?.get(line.typeId) ?? 0),
+        0
+      );
+      if (line.quantity > held)
+        releasedOre.push({ typeId: line.typeId, quantity: line.quantity - held });
+      continue;
+    }
     const claimants = covering.filter((c) => ownedByType.get(c.id)!.has(line.typeId));
     const covered = claimants.reduce(
       (sum, c) => sum + (ownedByType.get(c.id)?.get(line.typeId) ?? 0),
@@ -120,7 +145,7 @@ export function computeOwnership(
       sortedByType([...byType.entries()].map(([typeId, quantity]) => ({ typeId, quantity })))
     );
   }
-  return { unassigned: sortedByType(unassigned), ownedLines };
+  return { unassigned: sortedByType(unassigned), ownedLines, released: sortedByType(releasedOre) };
 }
 
 /** One ore type an Assignment claims more of than ESI has reported for it so far. */

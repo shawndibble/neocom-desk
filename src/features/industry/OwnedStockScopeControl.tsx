@@ -201,7 +201,11 @@ export function OwnedStockScopeControl({
         ) : (
           <Popover>
             <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-            <PopoverContent align="start" className="max-h-80 w-80 overflow-y-auto p-2">
+            <PopoverContent
+              align="start"
+              aria-label={t('industry.ownedStockScopeLabel')}
+              className="max-h-80 w-80 overflow-y-auto p-2"
+            >
               <OwnedStockScopeTree
                 stations={stations}
                 scope={scope}

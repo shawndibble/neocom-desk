@@ -1,0 +1,84 @@
+name: Check cache warm
+
+# Saves the lint, format and typecheck result caches under `develop`, the only
+# scope every PR can read (the reasoning is cache-warm.yml's). ci.yml's `static`
+# job restores them and so re-checks only the files a PR changed: ESLint 169s,
+# Prettier 88s and `tsc -b` 106s cold, a few seconds warm.
+#
+# One entry a day (the key carries the date), so a merge after the first costs
+# a lookup. A restore key finds the newest earlier entry, so a day's changes
+# are the only files this run re-checks. The checks may fail on a red
+# `develop`: the results of the files that passed are still worth saving.
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-cache-warm
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - id: day
+        run: echo "key=checks-${{ runner.os }}-$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      # Today's entry exists once any earlier merge made it: nothing to do.
+      - id: today
+        uses: actions/cache/restore@v4
+        with:
+          # The same three paths as the save below: a cache's version hashes
+          # its path list, so a lookup on any other list never finds the entry.
+          path: |
+            .cache/eslint
+            .cache/prettier
+            .cache/tsc
+          key: ${{ steps.day.outputs.key }}
+          lookup-only: true
+      - if: steps.today.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+      - if: steps.today.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # `static`'s node_modules cache (same path and key; cache-warm.yml saves it).
+      - if: steps.today.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.today.outputs.cache-hit != 'true' && steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - if: steps.today.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache/eslint
+            .cache/prettier
+            .cache/tsc
+          key: ${{ steps.day.outputs.key }}
+          restore-keys: checks-${{ runner.os }}-
+      - if: steps.today.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: npm run lint
+      - if: steps.today.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: npm run format:check
+      - if: steps.today.outputs.cache-hit != 'true'
+        continue-on-error: true
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: npm run typecheck
+      - if: steps.today.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache/eslint
+            .cache/prettier
+            .cache/tsc
+          key: ${{ steps.day.outputs.key }}

@@ -24,7 +24,7 @@ export { useOpenAfterMenu } from './useOpenAfterMenu';
 export { Tabs, TabPanel } from './Tabs';
 export { useTabPanelProps, useTabsId } from './tabPanel';
 export type { TabItem } from './Tabs';
-export { LiveStatus } from './LiveStatus';
+export { LiveNote, LiveStatus } from './LiveStatus';
 export { EveSsoButton } from './EveSsoButton';
 export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';

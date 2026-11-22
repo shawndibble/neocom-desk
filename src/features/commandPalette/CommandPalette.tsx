@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
-import { EmptyState, Modal, SearchInput, Spinner } from '@/components/ui';
+import { EmptyState, LiveStatus, Modal, SearchInput, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   activeOptionClassName,
@@ -662,9 +662,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             {altOutcome.text}
           </p>
         )}
-        <span role="status" aria-live="polite" className="sr-only">
-          {statusText}
-        </span>
+        <LiveStatus>{statusText}</LiveStatus>
       </div>
     </Modal>
   );

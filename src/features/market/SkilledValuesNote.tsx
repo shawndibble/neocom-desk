@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Spinner } from '@/components/ui';
+import { Button, LiveStatus, Spinner } from '@/components/ui';
 import type { SkilledAttributesState } from '@/features/fittings/useSkilledAttributes';
 
 /**
@@ -24,7 +24,8 @@ export function SkilledValuesNote({
   }
   if (state.status === 'loading' && asked) {
     return (
-      <p className="flex items-center gap-2 text-xs text-text-dim" role="status">
+      <p className="flex items-center gap-2 text-xs text-text-dim">
+        <LiveStatus>{t('market.itemDetail.skilled.loading')}</LiveStatus>
         <Spinner size="sm" />
         {t('market.itemDetail.skilled.loading')}
       </p>

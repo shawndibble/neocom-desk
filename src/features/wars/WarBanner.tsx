@@ -10,6 +10,7 @@
  * nothing to acknowledge. It is a plain status, not an alert: the war is not a
  * new event on every visit.
  */
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
@@ -39,6 +40,13 @@ export function WarBanner({ characterId }: { characterId: number }) {
 
   const corporations = groupWarsByCorporation(wars).length;
   const more = wars.length - 1;
+  // The announced text leaves out `when`: it ticks, and a live region would read every tick.
+  const title =
+    corporations > 1
+      ? t('wars.banner.corporations', { count: corporations })
+      : more > 0
+        ? t('wars.banner.titleMore', { name, count: more })
+        : t('wars.banner.title', { name });
   const when =
     corporations > 1
       ? null
@@ -50,7 +58,8 @@ export function WarBanner({ characterId }: { characterId: number }) {
 
   return (
     <>
-      <div role="status">
+      <div>
+        <LiveStatus>{title}</LiveStatus>
         {/* The whole strip is the one control (§6c "Topic drill-in": a trailing GoTo chevron). */}
         <button
           type="button"
@@ -66,13 +75,7 @@ export function WarBanner({ characterId }: { characterId: number }) {
           <span className="text-[0.6875rem] font-semibold tracking-widest text-danger uppercase">
             {t('wars.banner.label')}
           </span>
-          <b className="min-w-0 text-sm">
-            {corporations > 1
-              ? t('wars.banner.corporations', { count: corporations })
-              : more > 0
-                ? t('wars.banner.titleMore', { name, count: more })
-                : t('wars.banner.title', { name })}
-          </b>
+          <b className="min-w-0 text-sm">{title}</b>
           {when !== null && <span className="min-w-0 text-xs text-text-dim">{when}</span>}
           <Icon.GoTo aria-hidden="true" className="ml-auto shrink-0 text-text-dim" />
         </button>

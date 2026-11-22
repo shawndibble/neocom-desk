@@ -111,7 +111,7 @@ describe('MakeMorePlan', () => {
     expect(stops.length).toBeGreaterThan(0);
     expect(stops.length).toBeLessThan(figures.length);
     expect(stops.length).toBeLessThanOrEqual(5);
-    expect(container.querySelector('.sr-only')?.textContent).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('.sr-only')?.textContent).toBeTruthy());
     (stops[0] as HTMLElement).focus();
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/ISK/);
   });
@@ -169,14 +169,15 @@ describe('MakeMorePlan', () => {
     expect(screen.getAllByRole('group', { name: 'What matters more?' })).toHaveLength(1);
   });
 
-  it('announces the headline in a live region', () => {
+  it('announces the headline in a live region', async () => {
     renderPlan();
     const live = screen.getByRole('status');
+    await waitFor(() => expect(live).not.toBeEmptyDOMElement());
     expect(live).toHaveTextContent(/Quick wins add .* ISK a day/);
     expect(live).toHaveTextContent(/Rebuilding 1 planet adds/);
   });
 
-  it('gives quick wins with no ISK gain their time only, never "add 0 ISK"', () => {
+  it('gives quick wins with no ISK gain their time only, never "add 0 ISK"', async () => {
     mockState = ready({
       ...fixtureAdvice,
       colonies: fixtureAdvice.colonies.map((colony) => ({
@@ -191,11 +192,12 @@ describe('MakeMorePlan', () => {
     } as unknown as PlanAdvice);
     renderPlan();
     const live = screen.getByRole('status');
+    await waitFor(() => expect(live).not.toBeEmptyDOMElement());
     expect(live).toHaveTextContent(/Quick wins take about \d+ minutes\./);
     expect(live).not.toHaveTextContent(/add 0/);
   });
 
-  it('leaves quick wins out of the live region when there are none', () => {
+  it('leaves quick wins out of the live region when there are none', async () => {
     mockState = ready({
       ...fixtureAdvice,
       quickWins: [],
@@ -203,6 +205,7 @@ describe('MakeMorePlan', () => {
     } as unknown as PlanAdvice);
     renderPlan();
     const live = screen.getByRole('status');
+    await waitFor(() => expect(live).not.toBeEmptyDOMElement());
     expect(live).not.toHaveTextContent(/Quick wins add/);
     expect(live).toHaveTextContent(/Rebuilding 1 planet adds/);
   });
@@ -210,7 +213,7 @@ describe('MakeMorePlan', () => {
   it.each([
     [-756_000, /Rebuilding 1 planet costs 756K ISK a day\./],
     [-0.3, /^((?!costs).)*$/s],
-  ])('words a rebuild of %d ISK a day as a cost, never "adds -"', (gain, pattern) => {
+  ])('words a rebuild of %d ISK a day as a cost, never "adds -"', async (gain, pattern) => {
     const [changing, ...rest] = fixtureAdvice.colonies;
     const advice = {
       ...fixtureAdvice,
@@ -225,6 +228,7 @@ describe('MakeMorePlan', () => {
     mockState = ready(advice);
     renderPlan();
     const live = screen.getByRole('status');
+    await waitFor(() => expect(live).not.toBeEmptyDOMElement());
     expect(live.textContent).toMatch(pattern);
     expect(live.textContent).not.toMatch(/adds -/);
   });
@@ -511,8 +515,9 @@ describe('MakeMorePlan', () => {
     await waitFor(() => expect(usePiSettings.getState().value.haulBetweenPlanets).toBeUndefined());
   });
 
-  it('draws a chain in its own section and never moves a headline, quick win or total', () => {
+  it('draws a chain in its own section and never moves a headline, quick win or total', async () => {
     const { unmount } = renderPlan();
+    await waitFor(() => expect(screen.getByRole('status')).not.toBeEmptyDOMElement());
     const figures = () => ({
       live: screen.getByRole('status').textContent,
       planets: screen.getByRole('heading', { name: /Your planets/ }).closest('section')!
@@ -529,6 +534,7 @@ describe('MakeMorePlan', () => {
       hydrated: true,
     });
     renderPlan();
+    await waitFor(() => expect(screen.getByRole('status')).not.toBeEmptyDOMElement());
     expect(figures()).toEqual(off);
     const chains = screen.getByRole('heading', { name: /Bigger chains/ }).closest('section')!;
     expect(within(chains).getByRole('link', { name: 'Condensates' })).toHaveAttribute(

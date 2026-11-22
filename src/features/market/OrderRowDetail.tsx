@@ -12,7 +12,7 @@ import { fixed2 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, IskAmount, ProgressBar } from '@/components/ui';
+import { Button, InfoTooltip, IskAmount, LiveNote, ProgressBar } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import {
   orderExpiry,
@@ -221,9 +221,9 @@ export function OrderRowDetail({
           {t('market.contextMenu.copyPrice')}
         </Button>
         {copied && (
-          <span role="status" className="text-xs text-success">
+          <LiveNote as="span" className="text-xs text-success">
             {t('market.orderDetail.copied')}
-          </span>
+          </LiveNote>
         )}
       </div>
     </div>

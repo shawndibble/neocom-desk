@@ -200,7 +200,7 @@ what closes the gap that let #310's worktree run with no hook despite the
 install step "succeeding."
 
 No full local gate (format:check/lint/typecheck/`test:run`/build) runs
-anywhere in this loop. GitHub Actions' `validate` job runs exactly those
+anywhere in this loop. GitHub Actions' `static` job runs exactly those
 checks on every push regardless, so a local pre-PR full run only ever
 duplicated a check CI was about to run again — it added ~10 minutes per
 ticket for no coverage CI didn't already provide. `npm run test:run` and
@@ -366,7 +366,7 @@ Loop up to **5 rounds** (this budget is shared across both triggers below —
 it is not 5 conflict rounds plus 5 CI rounds):
 
 - `node scripts/next-ticket/drive-ci.mjs <pr>` — checks mergeability, and if
-  clean, blocks on `gh pr checks --watch` until `validate` + `e2e` finish
+  clean, blocks on `gh pr checks --watch` until `ci` finishes
   (this is the CI runtime itself, not overhead — nothing to speed up here).
   Prints one of:
   - `{"status":"conflict"}` — follow the sync-with-main / conflict resolution
@@ -374,8 +374,7 @@ it is not 5 conflict rounds plus 5 CI rounds):
     "Pre-commit hook, then CI"), push, and restart this round.
   - `{"status":"green","mergeable":true}` — proceed to step 9.
   - `{"status":"missing-checks","missing":[<context>, ...]}` — one or more
-    contexts the branch ruleset requires (typically `validate` and/or
-    `e2e`) never reported a check run at all. `drive-ci.mjs` already waits
+    contexts the branch ruleset requires (typically `ci`) never reported a check run at all. `drive-ci.mjs` already waits
     out a short internal grace period (~45s) for ordinary registration lag
     before returning this, so seeing it means that grace period already
     elapsed — there's nothing failing to diagnose and nothing to fix on

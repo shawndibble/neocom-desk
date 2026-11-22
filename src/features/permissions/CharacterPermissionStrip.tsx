@@ -181,7 +181,11 @@ function Picker({
           <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[26rem] max-w-[90vw] p-0">
+      <PopoverContent
+        align="start"
+        aria-label={t('settings.permissions.character.label')}
+        className="w-[26rem] max-w-[90vw] p-0"
+      >
         <div className="p-2">
           <SearchInput
             value={query}

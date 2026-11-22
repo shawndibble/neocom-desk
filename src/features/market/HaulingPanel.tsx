@@ -24,7 +24,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
-  type ActiveFilter,
   Button,
   Checkbox,
   ColumnPickerMenu,
@@ -33,17 +32,19 @@ import {
   FilterBar,
   FilterField,
   IconButton,
+  LiveStatus,
+  MenuItem,
   Modal,
-  SlideOver,
   Panel,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  MenuItem,
+  SlideOver,
   Spinner,
   Toast,
+  type ActiveFilter,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -719,7 +720,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   } else if (state.status === 'loading') {
     content = (
       <Panel padded={false}>
-        <div className="flex items-center gap-3 px-3 py-10" role="status">
+        <div className="flex items-center gap-3 px-3 py-10">
+          <LiveStatus>{progressText(state.progress)}</LiveStatus>
           <Spinner label={t('common.loading')} size="sm" />
           <span className="text-sm text-text-dim">{progressText(state.progress)}</span>
         </div>

@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { SearchInput } from '@/components/ui';
+import { LiveStatus, SearchInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   fieldBaseClassName,
@@ -241,7 +241,7 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
             aria-activedescendant={highlighted ? optionId(highlighted.corporationId) : undefined}
             autoComplete="off"
           />
-          <span role="status" aria-live="polite" className="sr-only">
+          <LiveStatus>
             {listOpen &&
               (highlighted
                 ? t('loyaltyStore.pickerHighlighted', {
@@ -250,7 +250,7 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
                   })
                 : t('loyaltyStore.pickerResultsCount', { count: options.length }))}
             {noMatches && t('loyaltyStore.pickerNoResults')}
-          </span>
+          </LiveStatus>
           {noMatches && (
             <span aria-hidden="true" className="px-2 py-1.5 text-text-dim">
               {t('loyaltyStore.pickerNoResults')}

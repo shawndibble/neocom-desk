@@ -272,6 +272,8 @@ export function AssignDialog({
           payeeId,
           oreLines: selectedLines,
           entryOreLines: row.entry.oreLines,
+          // Ore a Corp Tax Book took is not on offer here, but the game's ledger still reports it.
+          releasedTypeIds: (row.bookTakenOreLines ?? []).map((l) => l.typeId),
           taxPct: pctValue,
           estimatedValue,
           taxOwed,

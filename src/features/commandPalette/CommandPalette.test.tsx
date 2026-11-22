@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -400,9 +400,10 @@ describe('CommandPalette', () => {
     expect(within(items).queryByRole('option')).not.toBeInTheDocument();
     const pages = screen.getByRole('group', { name: 'Pages' });
     // Announced too: the error row is not an option, so the count alone would miss it.
-    expect(screen.getByText(/^\d+ results?\..*Couldn't load these results\.$/)).toHaveAttribute(
-      'aria-live',
-      'polite'
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        /^\d+ results?\..*Couldn't load these results\.$/
+      )
     );
     // The error row is never highlighted; the best page still is.
     expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
@@ -436,7 +437,7 @@ describe('CommandPalette', () => {
       screen.getByRole('group', { name: 'Pages' }).getAttribute('aria-labelledby')!
     )!;
     expect(heading.parentElement).toHaveTextContent(/^Pages\d+\+?$/);
-    expect(screen.getByRole('status')).toHaveTextContent(/\d+ results?/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/\d+ results?/));
   });
 
   it('keeps the search field outside the scrolling results', async () => {

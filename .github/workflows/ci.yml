@@ -5,6 +5,25 @@ on:
   # deploy.yml, so a push never starts a run here whose jobs all skip.
   pull_request:
     branches: [main, develop]
+  # `develop-full.yml` calls this with `full: true`; a by-hand dispatch on a
+  # branch does the same (`gh workflow run ci.yml --ref <branch> -f full=true`).
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Run every test and every e2e spec, layout ones included
+        type: boolean
+        default: false
+
+# A pull request runs what its change can reach (the unit tests whose import
+# graph holds a changed file, the behaviour e2e specs); a full run runs it all.
+# The planning scripts read this (scripts/lib/ciPlan.mjs says why).
+env:
+  CI_FULL: ${{ inputs.full == true && 'true' || 'false' }}
 
 # Superseding a PR's checks is free.
 concurrency:
@@ -12,8 +31,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `validate` below aggregates `static` and `build` and keeps the
-  # context name the `develop`/`main` ruleset requires.
+  # `ci` at the bottom aggregates every job below into the one context name
+  # the `develop` ruleset requires.
   #
   # Runner budget: GitHub Actions runs at most 20 jobs at once across the
   # whole account (Free plan), and every job here counts against it. Parallel
@@ -23,10 +42,13 @@ jobs:
   # matrix: its suite runs inside the window `test-shard` already takes.
   #
   # Caches: a PR run can restore only caches its own PR saved or ones saved on
-  # its base branch or the default branch (`main`), and this workflow never
-  # runs on either. cache-warm.yml saves the dependency caches there, so a PR's
-  # first run hits them. It mirrors every actions/cache and setup-node cache
-  # below (path, key, runner image), so change one in both places. Jobs that
+  # its base branch or the default branch (`main`), and its PR runs are neither.
+  # (develop-full.yml also runs this workflow on `develop`; cache-warm.yml is
+  # still what saves the dependency caches there on purpose.) A PR's first run
+  # hits them. It mirrors every actions/cache and setup-node cache
+  # below (path, key, runner image), so change one in both places. The one
+  # exception is the lint/format/typecheck result cache in `static`, saved by
+  # check-cache-warm.yml (path list and key prefix must match there too). Jobs that
   # restore node_modules don't also take setup-node's npm download cache: on a
   # hit it is a wasted download, and on a miss each PR would save its own.
   #
@@ -43,7 +65,7 @@ jobs:
   # tsconfig and vitest run — neither the root typecheck nor the pre-commit
   # hook's copy of it ever reads it, so without these steps the Cloud
   # Functions ship unchecked (issue #595). The rules tests are merge-blocking
-  # through `validate`.
+  # through `ci`.
   static:
     runs-on: ubuntu-latest
     steps:
@@ -81,6 +103,19 @@ jobs:
             ~/.cache/firebase
           key: firebase-tools-14.27.0-${{ runner.os }}
       - run: npm ci --prefix functions
+      # Lint, format and typecheck results, saved on `develop` by
+      # check-cache-warm.yml (never here: a PR run would save its own copy).
+      # ESLint and Prettier key on file content and tsc on file hashes, so a
+      # fresh checkout reuses every unchanged file's result. The key never
+      # exists, so only a restore key can hit, and the newest one wins.
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache/eslint
+            .cache/prettier
+            .cache/tsc
+          key: checks-${{ runner.os }}-${{ github.sha }}
+          restore-keys: checks-${{ runner.os }}-
       # The checks are independent; each runs even when the one before it
       # failed, so one red result never hides the others. Still
       # `!cancelled()`, so a superseded run stops.
@@ -111,13 +146,15 @@ jobs:
   # not readable from the environment later, and blank Firebase vars are what
   # keep isSyncConfigured() false so the suite's network guard holds. The
   # variables change values only, not types or imports, so the same build also
-  # answers "does the app build" for `validate`.
+  # answers "does the app build" for `ci`.
   build:
     runs-on: ubuntu-latest
-    # Also decides whether the e2e shards run at all (see the `e2e` job): this
+    # Also decides whether the e2e shards run at all (see the `ci` job): this
     # job is already first on every PR, so it costs no extra runner.
     outputs:
       run_e2e: ${{ steps.e2e-needed.outputs.run_e2e }}
+      e2e_shards: ${{ steps.e2e-needed.outputs.e2e_shards }}
+      e2e_matrix: ${{ steps.e2e-needed.outputs.e2e_matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -160,24 +197,10 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
-  # reasoning; this one aggregates `static` and `build` above instead of
-  # a matrix.
-  validate:
-    if: ${{ !cancelled() }}
-    needs: [static, build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fail unless every validate job passed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
-        run: |
-          echo "::error::validate jobs did not all pass (results: ${{ join(needs.*.result, ', ') }})"
-          exit 1
-
   # Decides whether the `test-shard` jobs run at all: a docs-only PR has
   # nothing for vitest to check (scripts/lib/testRelevance.mjs). Its own tiny
   # job rather than a step in `build`, so the shards do not wait on the bundle.
-  # It also decides `e2e-book` (scripts/lib/e2eRelevance.mjs, `needsBookE2e`),
+  # It also decides `e2e-book` (scripts/lib/e2eRelevance.mjs, `needsBookE2eOnPr`),
   # which uses no `dist/` and so need not wait on `build` either.
   tests-needed:
     runs-on: ubuntu-latest
@@ -195,10 +218,48 @@ jobs:
       - id: book-needed
         run: node scripts/needs-e2e.mjs
 
-  test-shard:
+  # Picks the unit test files this run executes and how many shards they need
+  # (scripts/select-tests.mjs): on a PR the tests whose import graph holds a
+  # changed file, all of them for a full run or a change that can move any test.
+  # Listing them takes ~1 minute of module-graph work, so it is its own job and
+  # the shards start from its list; `e2e-book` and the e2e shards do not wait.
+  select-tests:
     needs: [tests-needed]
-    # Docs-only PRs skip the four shards; the `test` job below still reports.
     if: needs.tests-needed.outputs.run_tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      test_shards: ${{ steps.select.outputs.test_shards }}
+      test_matrix: ${{ steps.select.outputs.test_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The PR's merge commit plus its first parent, so the script can diff
+          # what the merge changes.
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - id: select
+        run: node scripts/select-tests.mjs affected-tests.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: affected-tests
+          path: affected-tests.txt
+          retention-days: 1
+
+  test-shard:
+    needs: [select-tests]
+    # Skipped when the PR has nothing for vitest to check (docs only, or no test
+    # reaches the change); the `ci` job below still reports.
+    if: needs.select-tests.outputs.test_shards != '' && needs.select-tests.outputs.test_shards != '0'
     runs-on: ubuntu-latest
     # A hung test fails here with a readable log instead of holding a runner for GitHub's 6-hour default (a shard runs ~4–7 min).
     timeout-minutes: 15
@@ -210,7 +271,8 @@ jobs:
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
     #
-    # Four, not more. Whole files are dealt out by measured run time
+    # One to four (`select-tests` sizes it from the files it picked: a PR often
+    # needs one or two, a full run four). Whole files are dealt out by measured run time
     # (`scripts/test-shard.mjs`, weights in `scripts/test-shard-weights.json`),
     # as `e2e-shard` does; vitest's own `--shard` hashes the path and ignores
     # run time. A file with no weight counts as median.
@@ -219,13 +281,17 @@ jobs:
     # each shard still runs vitest's default 3 workers on its own runner.
     strategy:
       fail-fast: false
+      # One to four, by the weight of the files `select-tests` picked.
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: ${{ fromJSON(needs.select-tests.outputs.test_matrix || '[]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: affected-tests
       # Restoring node_modules skips the install (see "Caches" at the top);
       # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
@@ -246,7 +312,7 @@ jobs:
         run: |
           # Assigned first so a crash in the script fails the step; `mapfile < <(...)`
           # would swallow it and the shard would pass with no tests run.
-          list=$(node scripts/test-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
+          list=$(node scripts/test-shard.mjs --shard ${{ matrix.shard }}/${{ needs.select-tests.outputs.test_shards }} --from affected-tests.txt)
           if [ -z "$list" ]; then echo "::error::no test files assigned to this shard"; exit 1; fi
           mapfile -t files <<< "$list"
           npm run test:run -- "${files[@]}" \
@@ -263,28 +329,11 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
-  # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
-  # the required context, so this turns the shard results back into it.
-  test:
-    if: ${{ !cancelled() }}
-    needs: [tests-needed, test-shard]
-    runs-on: ubuntu-latest
-    steps:
-      # A matrix `needs` result is `success` only when every shard succeeded.
-      # The one accepted `skipped` is `tests-needed` having decided nothing in
-      # the PR can affect vitest; a skip for any other reason still fails here.
-      - name: Fail unless every shard passed
-        if: needs.test-shard.result != 'success' && !(needs.test-shard.result == 'skipped' && needs.tests-needed.result == 'success' && needs.tests-needed.outputs.run_tests == 'false')
-        run: |
-          echo "::error::test shards did not all pass (shards: ${{ needs.test-shard.result }}, tests-needed: ${{ needs.tests-needed.result }})"
-          exit 1
-
   e2e-shard:
     needs: [build]
-    # Docs-, backend- and test-only PRs skip the six shards (see
-    # scripts/lib/e2eRelevance.mjs); the `e2e` job below still reports.
-    if: needs.build.outputs.run_e2e == 'true'
+    # Docs-, backend- and test-only PRs skip the shards (see
+    # scripts/lib/e2eRelevance.mjs); the `ci` job below still reports.
+    if: needs.build.outputs.run_e2e == 'true' && needs.build.outputs.e2e_shards != '0'
     runs-on: ubuntu-latest
     # A hung test fails here with a readable log instead of holding a runner for GitHub's 6-hour default (a shard runs ~4–7 min).
     timeout-minutes: 15
@@ -313,6 +362,9 @@ jobs:
     # ~100-test sweep landed whole in one shard: wall time per shard ranged
     # 259s to 354s on the same suite.
     #
+    # (The count is now planned per run, up to six: scripts/needs-e2e.mjs. What
+    # follows is why six is the ceiling.)
+    #
     # Six shards, down from eight, for the runner budget (top of file): eight
     # plus `static` and the four `test-shard`s held up to 13 runners
     # per PR at the peak, so two PRs in flight queued. The e2e path isn't the
@@ -322,8 +374,10 @@ jobs:
     # make e2e the long pole of every PR.
     strategy:
       fail-fast: false
+      # Up to six, by the weight of the specs this run covers: a PR skips the
+      # layout specs (scripts/lib/ciPlan.mjs), a full run does not.
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: ${{ fromJSON(needs.build.outputs.e2e_matrix || '[]') }}
     # Playwright's own image: Chromium and its apt libraries are baked in, so
     # there is no `playwright install --with-deps`, no apt index to go bad
     # (that failure mode cost a whole run before), and no browser cache to
@@ -376,7 +430,10 @@ jobs:
         # The container's default shell is sh, which has no `mapfile`.
         shell: bash
         run: |
-          mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
+          # A PR leaves out the layout specs; the full run (CI_FULL) keeps them.
+          skip=--skip-layout
+          if [ "$CI_FULL" = true ]; then skip=; fi
+          mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/${{ needs.build.outputs.e2e_shards }} $skip)
           if [ "${#specs[@]}" -eq 0 ]; then echo "no specs in this shard"; exit 0; fi
           # The Vite dev server only serves the `*.dev.spec.ts` files; skip
           # booting it on a shard that has none (see playwright.config.ts).
@@ -417,7 +474,8 @@ jobs:
   # emulator database. ~37 tests run ~3.5 min, plus ~1.5 min to install,
   # start the emulators and warm up, which fits the `test-shard` window; a
   # second shard would buy nothing on the critical path (see "Runner budget").
-  # Backend changes run it, unlike the e2e shards (`needsBookE2e`).
+  # ~11 minutes on its own, so a PR runs it only when its change can reach the
+  # specs (`needsBookE2eOnPr`); the full run (develop-full.yml) always does.
   e2e-book:
     needs: [tests-needed]
     if: needs.tests-needed.outputs.run_book == 'true'
@@ -471,34 +529,53 @@ jobs:
             test-results
           if-no-files-found: error
 
-  # The `main` ruleset requires a status check named exactly `e2e`, and a
-  # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — one context per shard,
-  # none of them the required one. This job keeps that single name and turns
-  # the shard results back into it. `scripts/next-ticket/drive-ci.mjs`
-  # waits on the same context, so the ticket loop needs no change either.
+  # The one check the `develop` ruleset requires. A matrix job reports one
+  # context per shard (`test-shard (1)`, `e2e-shard (2)`, ...), none of them a
+  # name a ruleset can require, so this turns every job's result back into a
+  # single context. `scripts/next-ticket/drive-ci.mjs` reads the required
+  # contexts from the ruleset, so the ticket loop needs no change.
+  #
+  # One aggregate rather than one per area (it was `validate`, `test` and
+  # `e2e`): every job here queues for a runner like the real ones, and an
+  # account-wide pool of 20 means each 3-second aggregate waited minutes behind
+  # other PRs' shards.
   #
   # `!cancelled()` rather than the default: `fail-fast: false` means a failing
   # shard still lets the rest finish, and this has to run and fail afterwards
-  # instead of being skipped — a skipped required check never resolves and the
+  # instead of being skipped: a skipped required check never resolves and the
   # PR waits forever.
-  #
-  # It covers `e2e-book` too, the same way: skipped only when `tests-needed`
-  # decided nothing in the PR can affect the Corp Tax Book specs.
-  e2e:
+  ci:
     if: ${{ !cancelled() }}
-    needs: [build, e2e-shard, tests-needed, e2e-book]
+    needs: [static, build, tests-needed, select-tests, test-shard, e2e-shard, e2e-book]
     runs-on: ubuntu-latest
     steps:
+      - name: Fail unless the static checks and the build passed
+        if: needs.static.result != 'success' || needs.build.result != 'success'
+        run: |
+          echo "::error::static or build did not pass (static: ${{ needs.static.result }}, build: ${{ needs.build.result }})"
+          exit 1
       # A matrix `needs` result is `success` only when every shard succeeded,
-      # so this one comparison covers failure, cancellation and a shard that
-      # never started. The one accepted `skipped` is `build` having decided
-      # nothing in the PR can affect e2e; a skip for any other reason (build
-      # failed, so no output) still fails here.
-      - name: Fail unless every shard passed
+      # so one comparison covers failure, cancellation and a shard that never
+      # started. The one accepted `skipped` is `tests-needed` having decided
+      # nothing in the PR can affect vitest; a skip for any other reason still
+      # fails here.
+      #
+      # `select-tests` can also decide no test reaches the change, which skips
+      # the shards the same way.
+      - name: Fail unless every unit shard passed
+        if: needs.test-shard.result != 'success' && !(needs.test-shard.result == 'skipped' && needs.tests-needed.result == 'success' && (needs.tests-needed.outputs.run_tests == 'false' || (needs.select-tests.result == 'success' && needs.select-tests.outputs.test_shards == '0')))
+        run: |
+          echo "::error::test shards did not all pass (shards: ${{ needs.test-shard.result }}, select-tests: ${{ needs.select-tests.result }}, tests-needed: ${{ needs.tests-needed.result }})"
+          exit 1
+      # Likewise for e2e: skipped only when `build` decided nothing in the PR
+      # can affect it (a failed build has no output, so that still fails).
+      - name: Fail unless every e2e shard passed
         if: needs.e2e-shard.result != 'success' && !(needs.e2e-shard.result == 'skipped' && needs.build.result == 'success' && needs.build.outputs.run_e2e == 'false')
         run: |
           echo "::error::e2e shards did not all pass (shards: ${{ needs.e2e-shard.result }}, build: ${{ needs.build.result }})"
           exit 1
+      # Skipped only when `tests-needed` decided nothing in the PR can affect
+      # the Corp Tax Book specs.
       - name: Fail unless the Corp Tax Book specs passed
         if: needs.e2e-book.result != 'success' && !(needs.e2e-book.result == 'skipped' && needs.tests-needed.result == 'success' && needs.tests-needed.outputs.run_book == 'false')
         run: |

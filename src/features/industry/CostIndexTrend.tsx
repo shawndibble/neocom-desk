@@ -64,7 +64,14 @@ export function CostIndexTrend({
         {value}
         <Icon.Market size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-dim" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 max-w-[calc(100vw-2rem)] space-y-2 p-3">
+      <PopoverContent
+        align="end"
+        aria-label={t('industry.costIndexTrend.title', {
+          system: systemName,
+          days: trend.points.length,
+        })}
+        className="w-64 max-w-[calc(100vw-2rem)] space-y-2 p-3"
+      >
         <p className="text-xs font-semibold text-text">
           {t('industry.costIndexTrend.title', { system: systemName, days: trend.points.length })}
         </p>
