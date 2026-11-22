@@ -190,8 +190,8 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
                       choice.typeId,
                       <button
                         type="button"
-                        disabled={!onLoad || choice.skillMissing}
-                        onClick={() => onLoad?.(choice.typeId)}
+                        aria-disabled={!onLoad || choice.skillMissing || undefined}
+                        onClick={() => !choice.skillMissing && onLoad?.(choice.typeId)}
                         aria-pressed={isLoaded}
                         aria-label={rowLabel(t, crystal)}
                         className={chargeRowClassName(

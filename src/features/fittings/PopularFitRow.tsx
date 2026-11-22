@@ -82,8 +82,8 @@ export function PopularFitRow({
         <p className="-mx-1 min-w-0 flex-1 basis-40 truncate px-1 text-sm">
           <button
             type="button"
-            disabled={disabled}
-            onClick={onOpen}
+            aria-disabled={disabled || undefined}
+            onClick={disabled ? undefined : onOpen}
             className={entityLinkClassName(disabledClassName)}
           >
             {title}

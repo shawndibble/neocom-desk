@@ -123,12 +123,12 @@ describe('AutoBuildControl', () => {
   it('disables Apply when the plan has nothing to auto-build', () => {
     render(<AutoBuildControl maxDepth={0} scope={['manufacturing']} onApply={vi.fn()} />);
 
-    expect(applyButton()).toBeDisabled();
+    expect(applyButton()).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('disables Apply while prices are not yet loaded', () => {
     render(<AutoBuildControl maxDepth={2} scope={['manufacturing']} disabled onApply={vi.fn()} />);
 
-    expect(applyButton()).toBeDisabled();
+    expect(applyButton()).toHaveAttribute('aria-disabled', 'true');
   });
 });

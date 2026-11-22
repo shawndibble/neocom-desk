@@ -16,7 +16,7 @@ import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import { ChargePickerMenuItems } from '../ChargePickerMenu';
 import { useFittingItemActions, type FittingItemActions } from '../fittingItemActions';
 import { OpenAfterMenuContext, slotName } from './menuContext';
-import { ChangeChargeItems, ChargeToCargoItem } from './shared';
+import { ChangeChargeItems, ChargeToCargoItem, GuardedMenuItem } from './shared';
 
 /** Load charge (from cargo) and "Load into all compatible", for one module. */
 function ModuleChargeItems({
@@ -177,15 +177,18 @@ export function ModuleMenuItems({
       </MenuItem>
       {withMove && count !== null && (
         <>
-          <MenuItem disabled={index === 0} onSelect={() => actions.move(rack, index, index - 1)}>
+          <GuardedMenuItem
+            reason={index === 0 ? t('fittings.item.alreadyFirst') : null}
+            onSelect={() => actions.move(rack, index, index - 1)}
+          >
             {t('fittings.item.moveUp')}
-          </MenuItem>
-          <MenuItem
-            disabled={index >= count - 1}
+          </GuardedMenuItem>
+          <GuardedMenuItem
+            reason={index >= count - 1 ? t('fittings.item.alreadyLast') : null}
             onSelect={() => actions.move(rack, index, index + 1)}
           >
             {t('fittings.item.moveDown')}
-          </MenuItem>
+          </GuardedMenuItem>
           <MenuSub>
             <MenuSubTrigger disabled={count < 2}>{t('fittings.item.moveTo')}</MenuSubTrigger>
             <MenuSubContent>

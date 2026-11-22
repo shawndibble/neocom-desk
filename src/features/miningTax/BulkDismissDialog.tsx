@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Checkbox } from '@/components/ui';
+import { Button, Modal, Checkbox, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -125,14 +125,17 @@ export function BulkDismissDialog({
 
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={included.length === 0 || saving}
-            onClick={() => void commit()}
-          >
-            {t('miningTax.bulkDismissConfirmAction', { count: included.length })}
-          </Button>
+          <Tooltip content={included.length === 0 ? t('common.nothingSelected') : null}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saving}
+              aria-disabled={included.length === 0 || undefined}
+              onClick={() => void commit()}
+            >
+              {t('miningTax.bulkDismissConfirmAction', { count: included.length })}
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={onClose}>
             {t('filters.cancel')}
           </Button>

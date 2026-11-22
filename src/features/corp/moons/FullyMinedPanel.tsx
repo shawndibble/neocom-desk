@@ -53,9 +53,11 @@ export function FullyMinedPanel({ id }: { id: string }) {
             {' '}
             <button
               type="button"
-              className={entityLinkClassName()}
-              disabled={busy}
-              onClick={() => void setMark(false)}
+              className={entityLinkClassName(
+                'aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
+              )}
+              aria-disabled={busy || undefined}
+              onClick={busy ? undefined : () => void setMark(false)}
             >
               {t('corpTaxBook.moons.fullyMined.clear')}
             </button>
@@ -102,9 +104,11 @@ export function FullyMinedPanel({ id }: { id: string }) {
                   {' '}
                   <button
                     type="button"
-                    className={entityLinkClassName()}
-                    disabled={busy}
-                    onClick={() => void setMark(false)}
+                    className={entityLinkClassName(
+                      'aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
+                    )}
+                    aria-disabled={busy || undefined}
+                    onClick={busy ? undefined : () => void setMark(false)}
                   >
                     {t('corpTaxBook.moons.fullyMined.clear')}
                   </button>

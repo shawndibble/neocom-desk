@@ -18,6 +18,7 @@ import {
   Modal,
   NativeSelect,
   SearchInput,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -273,10 +274,12 @@ export function TrendItemsDialog({
             <li key={item.typeId}>
               <button
                 type="button"
-                disabled={full}
+                aria-disabled={full || undefined}
                 aria-describedby={full ? noteId : undefined}
                 aria-label={t('overview.menu.trendAdd', { name: item.name })}
-                onClick={() => toggle(item.typeId, true)}
+                onClick={() => {
+                  if (!full) toggle(item.typeId, true);
+                }}
                 className={cx(
                   'flex w-full items-center gap-2 rounded-xs px-1 text-left text-sm',
                   tappableRowClassName,
@@ -382,9 +385,15 @@ export function TrendItemsDialog({
           <Button type="button" onClick={onClose}>
             {t('overview.menu.trendCancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={picked.length === 0}>
-            {t('overview.menu.trendSave')}
-          </Button>
+          <Tooltip content={picked.length === 0 ? t('overview.menu.trendSaveEmpty') : null}>
+            <Button
+              type="submit"
+              variant="primary"
+              aria-disabled={picked.length === 0 || undefined}
+            >
+              {t('overview.menu.trendSave')}
+            </Button>
+          </Tooltip>
         </div>
       </form>
     </Modal>

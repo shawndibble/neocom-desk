@@ -417,7 +417,10 @@ describe('Ship Info window', () => {
     useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
     const { user, dialog } = await openShip(/^Merlin/);
     await user.click(within(dialog).getByRole('tab', { name: 'Blueprint' }));
-    expect(await within(dialog).findByRole('button', { name: 'Plan to build it' })).toBeDisabled();
+    expect(await within(dialog).findByRole('button', { name: 'Plan to build it' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(within(dialog).getByText('Log in with a character to plan a build.')).toBeVisible();
     expect(within(dialog).queryByText(/You own/)).not.toBeInTheDocument();
   });

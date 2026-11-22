@@ -146,7 +146,12 @@ export function RemapMarkerModal({
                 : t('plans.markerAttributesRemaining', { count: 0 })}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" size="sm" disabled={!canSave} onClick={() => save(draft)}>
+          <Button
+            variant="primary"
+            size="sm"
+            aria-disabled={!canSave || undefined}
+            onClick={() => save(draft)}
+          >
             {t('plans.markerAttributesSave')}
           </Button>
           {override !== null && (

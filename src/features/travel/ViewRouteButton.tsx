@@ -19,7 +19,7 @@ export function ViewRouteButton({
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button
         size="sm"
-        disabled={resolving}
+        loading={resolving}
         aria-label={t('travel.waypoints.viewRouteTo', { placeName })}
         onClick={view}
       >

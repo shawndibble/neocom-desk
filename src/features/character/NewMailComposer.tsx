@@ -401,7 +401,7 @@ export function NewMailComposer({
             variant="danger"
             size="md"
             onClick={() => setConfirmingDiscard(true)}
-            disabled={sending}
+            aria-disabled={sending || undefined}
           >
             {t('mail.discardDraft')}
           </Button>

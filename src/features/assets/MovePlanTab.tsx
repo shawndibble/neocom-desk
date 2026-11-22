@@ -1017,7 +1017,7 @@ function MovePlanTabBody({
               <Button
                 variant="primary"
                 className="max-sm:flex-1"
-                disabled={totals.stacks + totals.ships === 0 || !hasDestination || working}
+                aria-disabled={totals.stacks + totals.ships === 0 || !hasDestination || undefined}
                 loading={working}
                 onClick={() => void showPlan()}
               >

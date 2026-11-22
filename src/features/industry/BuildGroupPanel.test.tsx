@@ -313,11 +313,11 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
     renderPanel([plan('a', 'jita'), plan('b', 'jita'), plan('c', 'amarr')]);
 
     expect(
-      (screen.getByRole('button', { name: 'Copy Jita list' }) as HTMLButtonElement).disabled
-    ).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Copy Amarr list' }) as HTMLButtonElement).disabled
-    ).toBe(false);
+      screen.getByRole('button', { name: 'Copy Jita list' }).getAttribute('aria-disabled')
+    ).toBe('true');
+    expect(screen.getByRole('button', { name: 'Copy Amarr list' })).not.toHaveAttribute(
+      'aria-disabled'
+    );
   });
 
   it('disables a hub whose materials are all owned rather than copying nothing', () => {
@@ -329,11 +329,11 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
     renderPanel([plan('a', 'jita'), plan('b', 'amarr')]);
 
     expect(
-      (screen.getByRole('button', { name: 'Copy Amarr list' }) as HTMLButtonElement).disabled
-    ).toBe(true);
-    expect(
-      (screen.getByRole('button', { name: 'Copy Jita list' }) as HTMLButtonElement).disabled
-    ).toBe(false);
+      screen.getByRole('button', { name: 'Copy Amarr list' }).getAttribute('aria-disabled')
+    ).toBe('true');
+    expect(screen.getByRole('button', { name: 'Copy Jita list' })).not.toHaveAttribute(
+      'aria-disabled'
+    );
   });
 });
 

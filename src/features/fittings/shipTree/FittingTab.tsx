@@ -124,7 +124,7 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
       <Button
         variant="primary"
         onClick={() => void openInEditor(newFitting(ship.typeID, ship.name), 'hull')}
-        disabled={busy}
+        loading={busy}
       >
         {t('ships.info.fitting.startEmptyFit')}
       </Button>

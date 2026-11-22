@@ -26,6 +26,7 @@ import {
   SelectValue,
   Checkbox,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import {
   FACILITY_PRESETS,
@@ -344,13 +345,15 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
               <Button size="sm" onClick={onClose}>
                 {t('industry.cancel')}
               </Button>
-              <Button
-                size="sm"
-                onClick={() => onApply(target, [...checked])}
-                disabled={checked.size === 0}
-              >
-                {t('industry.retargetApply')}
-              </Button>
+              <Tooltip content={checked.size === 0 ? t('industry.retargetApplyNeedsPlan') : null}>
+                <Button
+                  size="sm"
+                  onClick={() => onApply(target, [...checked])}
+                  aria-disabled={checked.size === 0 || undefined}
+                >
+                  {t('industry.retargetApply')}
+                </Button>
+              </Tooltip>
             </div>
           </div>
         </div>

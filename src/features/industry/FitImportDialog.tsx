@@ -12,7 +12,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { InlineError } from '@/components/ui/InlineError';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, LiveStatus, Modal, Checkbox, TextArea } from '@/components/ui';
+import { Button, LiveStatus, Modal, Checkbox, TextArea, Tooltip } from '@/components/ui';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -102,9 +102,16 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
                 : t('industry.fitImportApply', { count: planCount })
               : null}
           </LiveStatus>
-          <Button size="sm" variant="primary" onClick={() => parse()} disabled={text.trim() === ''}>
-            {t('industry.fitImportParse')}
-          </Button>
+          <Tooltip content={text.trim() === '' ? t('industry.fitImportParseNeedsText') : null}>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => parse()}
+              aria-disabled={text.trim() === '' || undefined}
+            >
+              {t('industry.fitImportParse')}
+            </Button>
+          </Tooltip>
         </div>
         {pasteError && <InlineError>{t('industry.fitImportPasteFailed')}</InlineError>}
 
@@ -184,14 +191,16 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
               {t('industry.fitImportIncludeCharges')}
             </label>
 
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => onApply(preview)}
-              disabled={planCount === 0}
-            >
-              {t('industry.fitImportApply', { count: planCount })}
-            </Button>
+            <Tooltip content={planCount === 0 ? t('industry.fitImportApplyNothing') : null}>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => onApply(preview)}
+                aria-disabled={planCount === 0 || undefined}
+              >
+                {t('industry.fitImportApply', { count: planCount })}
+              </Button>
+            </Tooltip>
           </div>
         )}
       </div>

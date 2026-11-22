@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FieldError, TextInput, NeedsConnection, Button } from '@/components/ui';
+import { FieldError, TextInput, NeedsConnection, Button, Tooltip } from '@/components/ui';
 import type { DeliveryFlag } from '@/engine/communities/delivery';
 import {
   STALE_PLEDGE_DAYS,
@@ -139,14 +139,16 @@ export function PledgeRow({
             }}
           />
           <NeedsConnection>
-            <Button
-              size="sm"
-              disabled={parsed === null}
-              loading={busy}
-              onClick={() => parsed !== null && onPledge(parsed)}
-            >
-              {own ? t('communities.board.updatePledge') : t('communities.board.pledge')}
-            </Button>
+            <Tooltip content={parsed === null ? t('common.needsInput') : null}>
+              <Button
+                size="sm"
+                aria-disabled={parsed === null || undefined}
+                loading={busy}
+                onClick={() => parsed !== null && onPledge(parsed)}
+              >
+                {own ? t('communities.board.updatePledge') : t('communities.board.pledge')}
+              </Button>
+            </Tooltip>
           </NeedsConnection>
           {own && own.delivered === 0 && (
             <NeedsConnection>
@@ -183,15 +185,23 @@ export function PledgeRow({
             }}
           />
           <NeedsConnection>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={deliveredAmount === null || deliveredText.trim() === ''}
-              loading={busy}
-              onClick={() => deliveredAmount !== null && onSaveDelivered(deliveredAmount)}
+            <Tooltip
+              content={
+                deliveredAmount === null || deliveredText.trim() === ''
+                  ? t('common.needsInput')
+                  : null
+              }
             >
-              {t('communities.board.saveDelivered')}
-            </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-disabled={deliveredAmount === null || deliveredText.trim() === '' || undefined}
+                loading={busy}
+                onClick={() => deliveredAmount !== null && onSaveDelivered(deliveredAmount)}
+              >
+                {t('communities.board.saveDelivered')}
+              </Button>
+            </Tooltip>
           </NeedsConnection>
         </div>
       )}

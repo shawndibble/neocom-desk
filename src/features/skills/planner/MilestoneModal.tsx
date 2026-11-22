@@ -8,7 +8,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, Modal, TextInput, Tooltip } from '@/components/ui';
 
 interface MilestoneModalProps {
   open: boolean;
@@ -61,9 +61,16 @@ export function MilestoneModal({ open, initialName, onClose, onSave }: Milestone
           }}
         />
         <div className="flex gap-2">
-          <Button variant="primary" size="sm" onClick={save} disabled={draft.trim() === ''}>
-            {t('plans.milestone.save')}
-          </Button>
+          <Tooltip content={draft.trim() === '' ? t('plans.milestone.saveNeedsName') : null}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={save}
+              aria-disabled={draft.trim() === '' || undefined}
+            >
+              {t('plans.milestone.save')}
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={onClose}>
             {t('plans.milestone.cancel')}
           </Button>

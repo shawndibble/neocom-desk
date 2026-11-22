@@ -96,7 +96,7 @@ export function RemoveCharacterDialog({
         <UnsyncedChangesWarning characterIds={[target.id]} syncConfigured={isSyncConfigured()} />
       )}
       <DialogFooter className="mt-3">
-        <Button ref={cancelRef} size="sm" disabled={removing} onClick={onClose}>
+        <Button ref={cancelRef} size="sm" aria-disabled={removing || undefined} onClick={onClose}>
           {t('characters.cancel')}
         </Button>
         <Button variant="danger" size="sm" loading={removing} onClick={() => void confirm()}>

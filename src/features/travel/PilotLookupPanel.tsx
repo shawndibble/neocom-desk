@@ -29,6 +29,7 @@ import {
   Spinner,
   TextArea,
   TabPanel,
+  Tooltip,
 } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
@@ -393,13 +394,16 @@ function PilotSearch({
               )}
             </div>
           </FilterField>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={exact === '' || resolve.kind === 'resolving'}
-          >
-            {t('travel.pilot.lookUp')}
-          </Button>
+          <Tooltip content={exact === '' ? t('travel.pilot.lookUpEmpty') : null}>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={resolve.kind === 'resolving'}
+              aria-disabled={exact === '' || undefined}
+            >
+              {t('travel.pilot.lookUp')}
+            </Button>
+          </Tooltip>
           {list !== null && (
             // A pasted list collapses out of the box; the box stays, so one pilot can be
             // looked up without clearing the list first. Clear drops the list.

@@ -34,10 +34,10 @@ describe('MilestoneModal', () => {
     const user = userEvent.setup();
     renderModal();
     const save = screen.getByRole('button', { name: /save/i });
-    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute('aria-disabled', 'true');
 
     await user.type(screen.getByRole('textbox'), '   ');
-    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('saves on Enter', async () => {

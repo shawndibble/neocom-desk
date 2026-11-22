@@ -98,7 +98,7 @@ export function BootScreen({ gate }: { gate?: BootGate }) {
               dead button and invites a second tap, which starts a second flow. */}
           <Button
             size="sm"
-            disabled={recovering}
+            loading={recovering}
             onClick={() => {
               recoveringRef.current = true;
               setRecovering(true);

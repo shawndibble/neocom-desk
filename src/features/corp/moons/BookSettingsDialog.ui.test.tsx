@@ -151,7 +151,10 @@ describe('BookSettingsDialog pending rates (#6323)', () => {
     renderDialog();
     await addGuest(user, '1');
     await user.type(screen.getByLabelText('Rate (%)'), '2');
-    expect(screen.getByRole('button', { name: 'Add rate' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add rate' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(
       screen.getByText('Another pending rate has the same type, target and day.')
     ).toBeInTheDocument();

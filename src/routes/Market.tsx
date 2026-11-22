@@ -921,10 +921,11 @@ export function Market() {
                             {t('market.contextMenu.showInfo')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            disabled={!selectedBlueprintTypeId}
-                            onSelect={() =>
-                              navigate(`${industryTabHref('plans')}?product=${selectedTypeId}`)
-                            }
+                            aria-disabled={!selectedBlueprintTypeId || undefined}
+                            onSelect={() => {
+                              if (selectedBlueprintTypeId)
+                                navigate(`${industryTabHref('plans')}?product=${selectedTypeId}`);
+                            }}
                           >
                             {selectedBlueprintTypeId === undefined
                               ? t('industry.contextMenu.buildPlanChecking')

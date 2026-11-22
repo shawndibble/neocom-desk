@@ -18,6 +18,7 @@ import {
   LogoMark,
   Panel,
   Spinner,
+  Tooltip,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
@@ -271,7 +272,7 @@ export function CommunityJoin() {
                             <Button
                               size="sm"
                               aria-expanded={pickerFor === character.characterId}
-                              disabled={working}
+                              aria-disabled={working || undefined}
                               onClick={() =>
                                 setPickerFor(
                                   pickerFor === character.characterId ? null : character.characterId
@@ -322,14 +323,16 @@ export function CommunityJoin() {
                 </ul>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <NeedsConnection>
-                    <Button
-                      variant="primary"
-                      loading={working}
-                      disabled={chosen.length === 0}
-                      onClick={() => void join()}
-                    >
-                      {t('communities.join.joinAction', { count: totalShared })}
-                    </Button>
+                    <Tooltip content={chosen.length === 0 ? t('communities.join.chooseOne') : null}>
+                      <Button
+                        variant="primary"
+                        loading={working}
+                        aria-disabled={chosen.length === 0 || undefined}
+                        onClick={() => void join()}
+                      >
+                        {t('communities.join.joinAction', { count: totalShared })}
+                      </Button>
+                    </Tooltip>
                   </NeedsConnection>
                   <NeedsConnection>
                     <Button onClick={logIn} loading={loggingIn || working}>

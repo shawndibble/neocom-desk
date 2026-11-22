@@ -139,11 +139,16 @@ export function CustomizePermissionsDialog({
         <div className="flex flex-wrap gap-2">
           {loginFailed && <InlineError>{t('permissions.customize.loginFailed')}</InlineError>}
           <NeedsConnection>
-            <Button variant="primary" disabled={locked} onClick={() => void submit()}>
+            <Button
+              variant="primary"
+              loading={submitting}
+              aria-disabled={locked || undefined}
+              onClick={() => void submit()}
+            >
               {t('permissions.customize.submit')}
             </Button>
           </NeedsConnection>
-          <Button onClick={handleClose} disabled={submitting}>
+          <Button onClick={handleClose} aria-disabled={submitting || undefined}>
             {t('common.cancel')}
           </Button>
         </div>
@@ -172,10 +177,18 @@ export function CustomizePermissionsDialog({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-2">
-            <Button size="sm" disabled={locked} onClick={() => setPending(new Set(SCOPE_GROUPS))}>
+            <Button
+              size="sm"
+              aria-disabled={locked || undefined}
+              onClick={() => setPending(new Set(SCOPE_GROUPS))}
+            >
               {t('permissions.customize.selectAll')}
             </Button>
-            <Button size="sm" disabled={locked} onClick={() => setPending(new Set())}>
+            <Button
+              size="sm"
+              aria-disabled={locked || undefined}
+              onClick={() => setPending(new Set())}
+            >
               {t('permissions.customize.selectNone')}
             </Button>
           </div>

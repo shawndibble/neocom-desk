@@ -276,20 +276,20 @@ export function CalendarKindFilterMenu({
             `preventDefault` keeps the menu open, like the rows above. */}
         <div className="mt-1 flex border-t border-line">
           <DropdownMenuItem
-            disabled={hidden.length === 0}
+            aria-disabled={hidden.length === 0 || undefined}
             onSelect={(event) => {
               event.preventDefault();
-              onShowAll();
+              if (hidden.length > 0) onShowAll();
             }}
             className="flex-1 justify-center rounded-none touch:min-h-9"
           >
             {t('calendar.filter.showAll')}
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={listedKinds.every((k) => hiddenSet.has(k))}
+            aria-disabled={listedKinds.every((k) => hiddenSet.has(k)) || undefined}
             onSelect={(event) => {
               event.preventDefault();
-              onHideAll(listedKinds);
+              if (!listedKinds.every((k) => hiddenSet.has(k))) onHideAll(listedKinds);
             }}
             className="flex-1 justify-center rounded-none border-l border-line touch:min-h-9"
           >

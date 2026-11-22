@@ -69,7 +69,7 @@ export function PlaceJumpsLink({
         <button
           type="button"
           className={entityLinkClassName(`text-left ${className ?? ''}`.trim())}
-          disabled={resolving}
+          aria-disabled={resolving || undefined}
           onClick={(event) => {
             stop(event);
             view();

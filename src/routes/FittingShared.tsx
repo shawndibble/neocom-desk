@@ -12,6 +12,7 @@ import {
   Spinner,
   StatChip,
   StatChips,
+  Tooltip,
   TypeIcon,
 } from '@/components/ui';
 import { ShareShell } from '@/features/share/ShareShell';
@@ -245,18 +246,20 @@ export function FittingShareView({
             <LiveStatus announceKey={copyCount}>
               {copied ? t('fittingShare.copied') : copyFailed ? t('fittingShare.copyFailed') : null}
             </LiveStatus>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => void copyEft()}
-              disabled={typeName === null}
-            >
-              {copied
-                ? t('fittingShare.copied')
-                : copyFailed
-                  ? t('fittingShare.copyFailed')
-                  : t('fittingShare.copyEft')}
-            </Button>
+            <Tooltip content={typeName === null ? t('common.loading') : null}>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => void copyEft()}
+                aria-disabled={typeName === null || undefined}
+              >
+                {copied
+                  ? t('fittingShare.copied')
+                  : copyFailed
+                    ? t('fittingShare.copyFailed')
+                    : t('fittingShare.copyEft')}
+              </Button>
+            </Tooltip>
           </>
         ) : undefined
       }

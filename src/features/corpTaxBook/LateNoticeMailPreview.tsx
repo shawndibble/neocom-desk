@@ -96,12 +96,12 @@ export function EditableMailPreview({
           <Button
             size="sm"
             onClick={() => setDraft({ subject: mail.subject, body: mail.body, basis })}
-            disabled={disabled}
+            aria-disabled={disabled || undefined}
           >
             {t('corpTaxBook.mailQueue.preview.edit')}
           </Button>
           {edited && (
-            <Button size="sm" onClick={onReset} disabled={disabled}>
+            <Button size="sm" onClick={onReset} aria-disabled={disabled || undefined}>
               {t('corpTaxBook.mailQueue.preview.reset')}
             </Button>
           )}
@@ -161,7 +161,7 @@ export function EditableMailPreview({
             onSave(draft);
             setDraft(null);
           }}
-          disabled={disabled || editedMailBlocked(problems)}
+          aria-disabled={disabled || editedMailBlocked(problems) || undefined}
         >
           {t('corpTaxBook.mailQueue.preview.save')}
         </Button>

@@ -146,11 +146,15 @@ export function NewPlanSplitButton({
             {onOptimizeQueue && (
               <DropdownMenuItem
                 aria-label={t('plans.fromQueueOptimizedItem')}
-                disabled={queueEmpty}
-                onSelect={() => newPlanMenu.run(onOptimizeQueue)}
+                aria-disabled={queueEmpty || undefined}
+                onSelect={(event) => {
+                  // Stays focusable so its reason can be read; selecting does nothing.
+                  if (queueEmpty) event.preventDefault();
+                  else newPlanMenu.run(onOptimizeQueue);
+                }}
                 // A phone has no hover for the desktop button's tooltip: the reason is printed.
                 aria-describedby={queueEmpty ? queueEmptyId : undefined}
-                className={queueEmpty ? 'flex-col items-start' : undefined}
+                className={queueEmpty ? 'flex-col items-start opacity-50' : undefined}
               >
                 <span className="block">{t('plans.fromQueueOptimizedItem')}</span>
                 {queueEmpty && (

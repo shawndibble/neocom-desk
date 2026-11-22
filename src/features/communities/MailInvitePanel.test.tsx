@@ -185,7 +185,7 @@ describe('Invite by mail panel', () => {
     expect(await screen.findByText(m.grantTitle)).toBeInTheDocument();
     // The note and the panel read the grant through separate live queries.
     await waitFor(() => expect(screen.getByLabelText(m.nameLabel)).toBeDisabled());
-    expect(screen.getByRole('button', { name: m.send })).toBeDisabled();
+    expect(screen.getByRole('button', { name: m.send })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('disables sending once the day’s invites are used', async () => {

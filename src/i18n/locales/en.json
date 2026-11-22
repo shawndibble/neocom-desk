@@ -568,6 +568,7 @@
       "cargoQuantityInvalid": "Enter a whole number, 1 or more.",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}",
+      "cargoAddNone": "Nothing to add to the cargo hold.",
       "cargoAddMenu_one": "Add {{count}} to cargo",
       "cargoAddMenu_other": "Add {{count}} to cargo"
     },
@@ -869,6 +870,7 @@
         "skillsNeedCharacter": "Pick a Character to see which skills this needs.",
         "skillsHint": "You can't fly this yet. Add the missing skills to a Skill Plan:",
         "skillsUnknown": "Some skill requirements didn't load, so we can't confirm you can fly this. They load again when you're back online.",
+        "openLoading": "This fit is still loading.",
         "tooLargeToCompare": "Too large to compare through a link",
         "meter": "{{used}} / {{total}} {{unit}}",
         "meterOver": "{{used}} / {{total}} {{unit}} (over)",
@@ -2059,6 +2061,7 @@
       "boostersHeading": "Boosters",
       "empty": "None",
       "unknownType": "Type #{{typeId}}",
+      "addNeedsQuery": "Type an implant or booster name first.",
       "addPlaceholder": "Implant or booster name",
       "addLabel": "Add an implant or booster",
       "add": "Add",
@@ -2244,6 +2247,11 @@
       "copyToAllOfType": "Copy to all of this type",
       "variations": "Variations",
       "copyModule": "Copy module",
+      "alreadyFirst": "Already first in this rack.",
+      "alreadyLast": "Already last in this rack.",
+      "noneInBay": "No drone of this type is in the bay.",
+      "noneInSpace": "No drone of this type is in space.",
+      "noFreeSlot": "No free slot takes this.",
       "moveUp": "Move up",
       "moveDown": "Move down",
       "moveTo": "Move to slot",
@@ -2838,6 +2846,7 @@
       "addLabel": "Add to plan: {{grade}} for {{name}}",
       "inPlan": "In plan",
       "complete": "Complete",
+      "addLoading": "Your plans are still loading.",
       "omegaOnly": "Omega only",
       "alphaCapped": "An Alpha clone can’t reach {{grade}}: {{skills}} need Omega.",
       "showNeeds": "What {{grade}} needs for {{name}}",
@@ -3060,6 +3069,9 @@
     "importDialogTitle": "Import plan",
     "importPaste": "Paste an EFT fit or a skill plan (one \"Skill Name Level\" per line)",
     "importApply": "Apply",
+    "importNothingToApply": "Nothing was read that can be added.",
+    "importNeedsText": "Paste a plan or drop a file first.",
+    "optimizeNeedsSkills": "Nothing is scheduled in this plan yet, so there is nothing to optimize.",
     "importCancel": "Cancel",
     "importFileTooLarge": "That file is too large to import.",
     "importFileReadFailed": "Couldn't read that file. Try picking it again.",
@@ -3228,6 +3240,7 @@
       "orphaned": "Entry removed",
       "orphanedNotice": "{{name}} — entry removed from plan",
       "namePlaceholder": "Goal name (e.g. \"Fly Loki\")",
+      "saveNeedsName": "Name the milestone first.",
       "save": "Save",
       "cancel": "Cancel"
     },
@@ -3248,6 +3261,8 @@
     },
     "jumpToAdded": "Jump to it",
     "certified": {
+      "createLoading": "Your skills are still loading.",
+      "createNeedsPick": "Pick a certified plan first.",
       "title": "New certified plan",
       "pickLabel": "Certified plans",
       "intro": "These are CCP’s career plans, from Skill Plans › Certified Plans in the game. The new plan keeps CCP’s order and milestones, minus levels you’ve already trained.",
@@ -3296,6 +3311,7 @@
     "levelsBehind_other": "{{count}} levels behind the baseline",
     "identicalCount_one": "{{count}} skill identical",
     "identicalCount_other": "{{count}} skills identical",
+    "saveNeedsSelection": "Pick at least one skill to compare before saving.",
     "saveComparison": "Save comparison",
     "untitledName": "Untitled comparison",
     "saved": "Saved",
@@ -4015,6 +4031,15 @@
     "fitImportPaste": "Paste an EFT fit",
     "fitImportPasteFromClipboard": "Paste from clipboard",
     "fitImportPasteFailed": "Couldn't reach the clipboard. Check the device's clipboard permission.",
+    "fitImportParseNeedsText": "Paste a fit first.",
+    "fitImportApplyNothing": "Nothing in this fit can be made into a plan.",
+    "retargetApplyNeedsPlan": "Tick at least one plan to retarget.",
+    "copyHubShoppingListIncomplete": "A plan in this group is still missing a material list, so this list would come up short.",
+    "copyHubShoppingListNothing": "You already have everything for this hub.",
+    "autoBuildWaiting": "Waiting for the last Auto Build’s prices to finish loading.",
+    "autoBuildNothing": "Nothing in this group has a part you could make or buy.",
+    "alreadyInGroup": "The plan is already in this group.",
+    "notInGroup": "The plan is not in a group.",
     "fitImportParse": "Read fit",
     "fitImportWillCreate": "Will create",
     "fitImportEmpty": "Nothing in this fit can be built.",
@@ -5007,6 +5032,7 @@
       "signedIn": "EVE still has you logged in as {{name}}, so each step is one Authorize click on EVE's page.",
       "hint": "EVE sends you back here after each step. Choosing a different character there approves nothing.",
       "continue": "Continue",
+      "pickFirst": "Tick at least one approval first.",
       "notNow": "Not now",
       "stop": "Stop here",
       "failed": "Could not open EVE's login. Try again.",
@@ -7031,7 +7057,12 @@
       "plexPlanLabel": "PLEX per 30 days",
       "plexPlanHint": "How much PLEX you expect to spend per 30 days. 500 is one month, and longer plans cost less per month. Enter 1 to 5000.",
       "plexPlanSave": "Save",
-      "plexPlanCancel": "Cancel"
+      "plexPlanCancel": "Cancel",
+      "showAllNothingHidden": "Nothing is hidden",
+      "duplicateAtLimit": "The board is at its widget limit",
+      "alreadyTop": "Already at the top",
+      "alreadyBottom": "Already at the bottom",
+      "trendSaveEmpty": "Pick at least one item"
     }
   },
   "alerts": {
@@ -7152,6 +7183,8 @@
     "discardInputKeep": "Keep editing",
     "discardInputConfirm": "Discard",
     "needsInput": "Fill in the required fields to continue.",
+    "nothingToDo": "Nothing to do yet.",
+    "nothingSelected": "Select at least one first.",
     "save": "Save",
     "cancel": "Cancel",
     "loading": "Loading",
@@ -7842,6 +7875,7 @@
       "rename": "Rename",
       "renameLabel": "Template name",
       "updateFromCurrent": "Update from current",
+      "updateNothing": "This template has nothing to update from the current survey.",
       "updated": "Updated “{{name}}”",
       "delete": "Delete",
       "deleted": "Deleted “{{name}}”",
@@ -8653,6 +8687,7 @@
       "moveTakesCombined_other": "Moving takes {{count}} entries, counting the other days of the Combined Entries they're in.",
       "moveToLabel": "Move them to…",
       "moveAndDelete": "Move and delete",
+      "moveAndDeleteNeedsTarget": "Pick the payee to move their rows to first.",
       "deleteAnyway": "Delete anyway",
       "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again.",
       "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again.",
@@ -9287,7 +9322,8 @@
       "totalIskShown": "<isk/> ISK",
       "totalVolume": "{{volume}} m³",
       "unpriced_one": "{{count, number}} unpriced",
-      "unpriced_other": "{{count, number}} unpriced"
+      "unpriced_other": "{{count, number}} unpriced",
+      "deselectAllEmpty": "Nothing is selected"
     },
     "itemCount_one": "{{count, number}} item",
     "itemCount_other": "{{count, number}} items",
@@ -12113,7 +12149,8 @@
       "full": "This Community is full.",
       "tooMany": "This Character is already in 10 Communities.",
       "failed": "Could not join. Try again.",
-      "open": "Open the Community"
+      "open": "Open the Community",
+      "chooseOne": "Choose at least one Character to share"
     },
     "board": {
       "summary_zero": "You have no open Requests.",
@@ -13629,7 +13666,9 @@
       "tripBar": {
         "free": "{{m3}} m³ free",
         "details": "Trip details"
-      }
+      },
+      "copyMultibuyEmpty": "Nothing in the trip to copy",
+      "fillHoldNothing": "No manual changes to reset"
     },
     "appraisal": {
       "minusOwnedNeedsCharacter": "Log in a character to subtract what they own.",
@@ -13885,7 +13924,8 @@
         "choices": "Quantity column",
         "choice": "Column {{column}} · {{sample}}",
         "confirm": "Use this column",
-        "leave": "Leave them out"
+        "leave": "Leave them out",
+        "confirmEmpty": "Pick a column first"
       },
       "abyssal_one": "{{count}} abyssal module not priced",
       "abyssal_other": "{{count}} abyssal modules not priced",
@@ -13900,7 +13940,8 @@
       "copyCardSecond": "Copy {{title}}: {{label}}, {{amount}}",
       "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
-      "copiedToClipboard": "Copied to clipboard"
+      "copiedToClipboard": "Copied to clipboard",
+      "clearEmpty": "Nothing to clear"
     },
     "priceHistory": {
       "chartLabel": "Daily price range, average, traded volume and order count for {{item}}",
@@ -14903,6 +14944,7 @@
     "deviceLogoutHintLocalOnly": "Removes all logins and local data from this device, including plans and data stored only here.",
     "deviceLogoutAction": "Log out",
     "deviceLogoutOpen": "Log out",
+    "deviceNoneLoggedIn": "No characters are logged in on this device.",
     "deviceLogoutFailed": "Could not log out. Try again, or reload the page.",
     "deviceLogoutConfirmTitle": "Log out of all characters?",
     "deviceLogoutConfirm_one": "This removes {{count}} character's login and local data from this device. You will be taken to the login page.",
@@ -17420,7 +17462,8 @@
           "abyssal_other": "{{count}} abyssal modules aren't priced. Their value depends on their rolls, and a killmail doesn't record them. They're left out of the loss.",
           "zkb": "zKillboard valued it at {{value}} when it died."
         }
-      }
+      },
+      "lookUpEmpty": "Type a pilot name first"
     },
     "pickSystem": "Pick a system",
     "currentSystem": "{{system}} (current system)",
@@ -17749,7 +17792,10 @@
       "foundBy": "found by {{names}}",
       "unknownCharacter": "character {{id}}",
       "remove": "Remove",
-      "removeLabel": "Remove {{name}}"
+      "removeLabel": "Remove {{name}}",
+      "lookupLoading": "Still loading the system list",
+      "searchBusy": "Another search is running",
+      "pasteEmpty": "Paste a gate list first"
     },
     "waypoints": {
       "action": "Set waypoints in game",
@@ -17826,7 +17872,8 @@
       "unknownSignature": "the signature",
       "stripCell": "Wormhole jump, {{from}} → {{to}}",
       "stripLabel_one": "{{count}} jump through a wormhole.",
-      "stripLabel_other": "{{count}} jumps through wormholes."
+      "stripLabel_other": "{{count}} jumps through wormholes.",
+      "copyNoSignature": "This wormhole has no known signature to copy"
     },
     "thera": {
       "modalTitle": "Thera / Turnur",
@@ -19169,7 +19216,8 @@
           "continue_other": "Continue with {{count}} corps",
           "loading": "Looking for your corps",
           "empty": "None of your characters is CEO of another corp.",
-          "error": "Could not load your corps. Try again in a moment."
+          "error": "Could not load your corps. Try again in a moment.",
+          "pickFirst": "Tick at least one corporation first."
         },
         "hidden": {
           "title": "Hidden corps",
@@ -19336,7 +19384,8 @@
         "handled": {
           "title": "Let an accounting corporation handle it",
           "hint": "Another corporation keeps the book and bills the miners. You only share who mined at your refineries.",
-          "action": "Continue"
+          "action": "Continue",
+          "needsLink": "Paste the invite link first."
         },
         "collect": {
           "title": "Collect tax for other corporations",
@@ -19419,7 +19468,8 @@
         "from": "{{name}} will handle the tax on your moons.",
         "offered": "They offer you {{pct}}% of the value of ore mined at your refineries.",
         "accountant": "Next, EVE asks you to log in. Pick a Character that is an Accountant in your corporation.",
-        "continue": "Continue to EVE"
+        "continue": "Continue to EVE",
+        "rateInvalid": "Enter a rate from 0 to 100, or leave it blank."
       },
       "owner": {
         "waiting": "Waiting for the first sync.",
@@ -19764,6 +19814,7 @@
         "saved": "Settings saved",
         "rateIncomplete": "Finish the rate form, or clear its percent, to save.",
         "addRate": "Add rate",
+        "addRateLimit": "You can add at most 50 rates at a time. Save these first.",
         "removePending": "Remove",
         "removePendingNamed": "Remove pending rate: {{name}}, {{pct}}%",
         "pendingTitle_one": "Pending rate ({{count}})",
@@ -20174,6 +20225,7 @@
             "title": "Invite a moon owner",
             "intro": "Make a link to send in EVE chat or mail. The moon owner opens it and shares their mining ledger with this book.",
             "offer": "Rate to offer (%), optional",
+            "offerInvalid": "Enter a percent from 0 to 100, or leave the rate blank.",
             "make": "Make a link",
             "link": "Invite link",
             "copy": "Copy link",

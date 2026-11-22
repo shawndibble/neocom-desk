@@ -224,10 +224,16 @@ describe('MailFormatBar placement and Source', () => {
     const user = userEvent.setup();
     render(<MailFormatBar commands={commands({}, { canReset: false })} phone />);
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
-    expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Default colour' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Text size' }));
-    expect(await screen.findByRole('button', { name: 'Normal' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Normal' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });
 

@@ -23,6 +23,7 @@ import {
   TabPanel,
   Tabs,
   TextInput,
+  Tooltip,
   useTabsId,
   type TabItem,
 } from '@/components/ui';
@@ -531,8 +532,8 @@ export function BookSettingsDialog({
                 <Button
                   variant="primary"
                   onClick={() => void save()}
-                  disabled={!canEdit || busy}
-                  aria-disabled={problem || rateIsDuplicate ? true : undefined}
+                  loading={busy}
+                  aria-disabled={!canEdit || problem || rateIsDuplicate ? true : undefined}
                   aria-describedby={(problem || rateIsDuplicate) && !error ? rateHintId : undefined}
                 >
                   {t('common.save')}
@@ -707,13 +708,25 @@ export function BookSettingsDialog({
                       />
                     </Label>
                   </div>
-                  <Button
-                    variant="accent"
-                    onClick={addPending}
-                    disabled={!rateReady || rateIsDuplicate || pending.length >= 50}
+                  <Tooltip
+                    content={
+                      pending.length >= 50
+                        ? t('corpTaxBook.moons.settings.addRateLimit')
+                        : !rateReady
+                          ? t('common.needsInput')
+                          : null
+                    }
                   >
-                    {t('corpTaxBook.moons.settings.addRate')}
-                  </Button>
+                    <Button
+                      variant="accent"
+                      onClick={addPending}
+                      aria-disabled={
+                        !rateReady || rateIsDuplicate || pending.length >= 50 || undefined
+                      }
+                    >
+                      {t('corpTaxBook.moons.settings.addRate')}
+                    </Button>
+                  </Tooltip>
                   {pending.length > 0 && (
                     <div className="space-y-2">
                       <h4 className={eyebrowClassName}>
