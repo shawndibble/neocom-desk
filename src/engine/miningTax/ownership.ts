@@ -133,6 +133,23 @@ export function computeOwnership(
   return { unassigned: sortedByType(unassigned), ownedLines };
 }
 
+/**
+ * The ore types a Corp Tax Book took from what an Assign form offers: types the entry still
+ * reports free of every Assignment, but that the form no longer offers in full. The new
+ * Assignment must remember them (`CoveringAssignment.releasedTypeIds`), or the game's ledger,
+ * which still reports that ore, grows it straight back in as late ore.
+ */
+export function bookTakenTypeIds(
+  entryLines: readonly OreLine[],
+  covering: readonly CoveringAssignment[],
+  offered: readonly OreLine[]
+): number[] {
+  const offeredBy = new Map(offered.map((l) => [l.typeId, l.quantity]));
+  return computeOwnership(entryLines, covering)
+    .unassigned.filter((l) => (offeredBy.get(l.typeId) ?? 0) < l.quantity)
+    .map((l) => l.typeId);
+}
+
 /** One ore type an Assignment claims more of than ESI has reported for it so far. */
 export interface UnreportedClaim {
   typeId: number;

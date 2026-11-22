@@ -16,6 +16,7 @@ import {
   Checkbox,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
+import { bookTakenTypeIds } from '@/engine/miningTax/ownership';
 import { defaultPayeeForSystem } from '@/engine/miningTax/defaultSystems';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -272,6 +273,8 @@ export function AssignDialog({
           payeeId,
           oreLines: selectedLines,
           entryOreLines: row.entry.oreLines,
+          // Ore a Corp Tax Book took is not on offer here, but the game's ledger still reports it.
+          releasedTypeIds: bookTakenTypeIds(row.entry.oreLines, row.assignments, oreLines),
           taxPct: pctValue,
           estimatedValue,
           taxOwed,

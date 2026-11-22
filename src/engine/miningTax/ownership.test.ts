@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  bookTakenTypeIds,
   computeOwnership,
   findDuplicateAssignmentIds,
   unreportedClaims,
@@ -356,5 +357,49 @@ describe('findDuplicateAssignmentIds', () => {
       ]
     );
     expect(dupes).toEqual([]);
+  });
+});
+
+describe('bookTakenTypeIds', () => {
+  const entry: OreLine[] = [
+    { typeId: A, quantity: 100 },
+    { typeId: B, quantity: 50 },
+  ];
+
+  it('names a type the form no longer offers, because a book took it', () => {
+    expect(bookTakenTypeIds(entry, [], [{ typeId: A, quantity: 100 }])).toEqual([B]);
+  });
+
+  it('names a type the book took only part of', () => {
+    expect(
+      bookTakenTypeIds(
+        entry,
+        [],
+        [
+          { typeId: A, quantity: 100 },
+          { typeId: B, quantity: 20 },
+        ]
+      )
+    ).toEqual([B]);
+  });
+
+  it('names nothing when the form offers everything no Assignment holds', () => {
+    expect(
+      bookTakenTypeIds(
+        entry,
+        [covering('x', [{ typeId: A, quantity: 100 }])],
+        [{ typeId: B, quantity: 50 }]
+      )
+    ).toEqual([]);
+  });
+
+  it('ignores ore another Assignment already holds', () => {
+    expect(
+      bookTakenTypeIds(
+        entry,
+        [covering('x', [{ typeId: B, quantity: 50 }])],
+        [{ typeId: A, quantity: 100 }]
+      )
+    ).toEqual([]);
   });
 });

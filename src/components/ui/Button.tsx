@@ -34,6 +34,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    * `disabled` would not. DESIGN.md §6c.
    */
   loading?: boolean;
+  /** @summary Let a long label wrap onto more lines, the button growing taller instead of overflowing. */
+  wrap?: boolean;
 }
 
 /**
@@ -49,6 +51,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     type = 'button',
     className = '',
     loading = false,
+    wrap = false,
     onClick,
     children,
     ...rest
@@ -74,6 +77,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         variant,
         size,
         align,
+        wrap,
         className: cx(loading && 'relative', className),
       })}
       {...rest}
