@@ -75,7 +75,12 @@ export function ImproveSearchStatus({
       )}
 
       {state.status === 'failed' && (
-        <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
+        <div className="space-y-2" role="alert">
+          <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
+          <Button size="sm" onClick={search.restart}>
+            {t('common.retry')}
+          </Button>
+        </div>
       )}
     </>
   );

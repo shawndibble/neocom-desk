@@ -6,7 +6,7 @@ import {
   Button,
   DataAgeBadge,
   CachedEmptyState,
-  EmptyState,
+  LoadFailedState,
   IconButton,
   PageHeader,
   Panel,
@@ -401,9 +401,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
           <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterMailHeaders']} />
         </>
       ) : error ? (
-        (newMailPanel ?? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-        ))
+        (newMailPanel ?? <LoadFailedState title={t('common.loadFailed.mail')} onRetry={refresh} />)
       ) : !headersResult || rows.length === 0 ? (
         (newMailPanel ?? (
           <CachedEmptyState

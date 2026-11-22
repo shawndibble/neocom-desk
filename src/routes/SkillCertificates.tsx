@@ -7,6 +7,7 @@ import {
   CheckboxSelect,
   DataAgeBadge,
   EmptyState,
+  LoadFailedState,
   IconButton,
   Select,
   SelectContent,
@@ -150,7 +151,7 @@ export function SkillCertificates() {
   let body;
   if (data.load.status === 'failed') {
     body = (
-      <EmptyState title={t('skills.certificates.loadFailed')} hint={t('common.loadFailedHint')} />
+      <LoadFailedState title={t('common.loadFailed.skillCertificates')} onRetry={data.refresh} />
     );
   } else if (loading) {
     body = <Spinner block="page" label={t('common.loading')} />;

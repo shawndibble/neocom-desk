@@ -21,6 +21,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   EmptyState,
+  LoadFailedState,
   IconButton,
   Panel,
   SegmentedControl,
@@ -861,7 +862,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : jobs.length === 0 ? (
         // Only the "no data at all" case reaches here — `noneActive` has
         // already taken "answered, none running" out of the body.
-        <EmptyState
+        <LoadFailedState
           title={t('industry.jobsEmptyTitle')}
           hint={t('industry.jobsEmptyHint')}
           className="py-4"

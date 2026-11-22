@@ -63,6 +63,7 @@ import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   DataAgeBadge,
   EmptyState,
+  LoadFailedState,
   PageHeader,
   Panel,
   Spinner,
@@ -593,7 +594,7 @@ function RouteBody({
     case 'no-route':
       return <EmptyState title={t('travel.noRouteTitle')} hint={t('travel.noRouteHint')} />;
     case 'unknown':
-      return <EmptyState title={t('travel.unknownTitle')} hint={t('travel.unknownHint')} />;
+      return <LoadFailedState title={t('travel.unknownTitle')} hint={t('travel.unknownHint')} />;
     case 'loading':
       return (
         <div className="flex justify-center py-10">

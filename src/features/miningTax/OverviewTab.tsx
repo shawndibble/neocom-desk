@@ -30,6 +30,7 @@ import {
   DataTable,
   DataTableDenseCell,
   EmptyState,
+  LoadFailedState,
   IconButton,
   IskAmount,
   LiveStatus,
@@ -583,7 +584,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
         {loading && !data ? (
           <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          <LoadFailedState title={t('common.loadFailed.overview')} onRetry={refresh} />
         ) : (
           <>
             {data && data.fromCache && <CachedNotice withBadge fetchedAt={data.fetchedAt} />}

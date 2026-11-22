@@ -9,6 +9,7 @@ import {
   DataTable,
   CachedEmptyState,
   EmptyState,
+  LoadFailedState,
   IconButton,
   PageHeader,
   Panel,
@@ -367,7 +368,7 @@ export function Contacts() {
               // saved contacts the table stays and a small note sits above it.
               <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContacts']} />
             ) : error ? (
-              <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+              <LoadFailedState title={t('common.loadFailed.contacts')} onRetry={refresh} />
             ) : !contactsResult || contacts.length === 0 ? (
               <CachedEmptyState
                 result={contactsResult}

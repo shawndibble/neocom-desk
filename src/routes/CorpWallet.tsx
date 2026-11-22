@@ -35,6 +35,7 @@ import {
   CollapsiblePanel,
   DataAgeBadge,
   EmptyState,
+  LoadFailedState,
   IconButton,
   PageHeader,
   Panel,
@@ -188,6 +189,7 @@ interface CorpDivisionsPanelProps {
   onSelect: (division: number) => void;
   divisionLabel: (entry: WalletDivision) => string;
   refreshFailed: boolean;
+  onRetry: () => void;
 }
 
 /**
@@ -202,6 +204,7 @@ function CorpDivisionsPanel({
   onSelect,
   divisionLabel,
   refreshFailed,
+  onRetry,
 }: CorpDivisionsPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -254,7 +257,13 @@ function CorpDivisionsPanel({
     >
       {loading ? (
         <Spinner block="panel" label={t('common.loading')} />
-      ) : !walletsResult || divisions.length === 0 ? (
+      ) : !walletsResult ? (
+        <LoadFailedState
+          title={t('common.loadFailed.corpDivisions')}
+          onRetry={onRetry}
+          className="py-4"
+        />
+      ) : divisions.length === 0 ? (
         <EmptyState title={t('wallet.corpBalanceEmpty')} className="py-4" />
       ) : (
         <>
@@ -325,6 +334,7 @@ interface CorpJournalPanelProps {
   onSortChange: (sort: DataTableSort) => void;
   divisionQualifier: string | undefined;
   refreshFailed: boolean;
+  onRetry: () => void;
   /** "Where the ISK went" side panel; its state lives on the page, which shifts aside for it. */
   iskPanelOpen: boolean;
   onIskPanelOpenChange: (open: boolean) => void;
@@ -348,6 +358,7 @@ function CorpJournalPanel({
   onSortChange,
   divisionQualifier,
   refreshFailed,
+  onRetry,
   iskPanelOpen,
   onIskPanelOpenChange,
   highlightRowKey,
@@ -387,9 +398,9 @@ function CorpJournalPanel({
       ) : journalResult === null ? (
         // No cache and the read didn't come back — offline, or a 403 the role
         // gate swallowed (GLOSSARY.md's `/corp/assets` split, same axis here).
-        <EmptyState
-          title={t('common.loadFailedTitle')}
-          hint={t('common.loadFailedHint')}
+        <LoadFailedState
+          title={t('common.loadFailed.corpJournal')}
+          onRetry={onRetry}
           className="py-8"
         />
       ) : journal.length === 0 ? (
@@ -617,6 +628,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
           onSelect={setDivision}
           divisionLabel={divisionLabel}
           refreshFailed={corpBalances.refreshCount > 0}
+          onRetry={corpBalances.refresh}
         />
 
         <CorpJournalPanel
@@ -635,6 +647,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
           onSortChange={journalSortProps.onSortChange}
           divisionQualifier={divisionQualifier}
           refreshFailed={corpJournal.refreshCount > 0}
+          onRetry={corpJournal.refresh}
           iskPanelOpen={iskPanelOpen}
           onIskPanelOpenChange={setIskPanelOpen}
           highlightRowKey={highlightedEntry}
