@@ -42,9 +42,10 @@ jobs:
   # matrix: its suite runs inside the window `test-shard` already takes.
   #
   # Caches: a PR run can restore only caches its own PR saved or ones saved on
-  # its base branch or the default branch (`main`), and this workflow never
-  # runs on either. cache-warm.yml saves the dependency caches there, so a PR's
-  # first run hits them. It mirrors every actions/cache and setup-node cache
+  # its base branch or the default branch (`main`), and its PR runs are neither.
+  # (develop-full.yml also runs this workflow on `develop`; cache-warm.yml is
+  # still what saves the dependency caches there on purpose.) A PR's first run
+  # hits them. It mirrors every actions/cache and setup-node cache
   # below (path, key, runner image), so change one in both places. The one
   # exception is the lint/format/typecheck result cache in `static`, saved by
   # check-cache-warm.yml (path list and key prefix must match there too). Jobs that

@@ -61,6 +61,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
     as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
     ticket loop calls it automatically. `/code-review` sub-agents are
     read-only diff review and must never run tests, lint, typecheck, or build.
+
 - **Lint, format and typecheck results are cached.** `npm run lint` and
   `npm run format:check` run with `--cache --cache-strategy content` (into
   `.cache/eslint`, `.cache/prettier`), and `tsc -b` keeps `.cache/tsc`, so a
