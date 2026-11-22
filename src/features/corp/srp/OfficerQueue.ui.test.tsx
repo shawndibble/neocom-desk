@@ -178,8 +178,10 @@ describe('OfficerQueue pending', () => {
     await userEvent.click(approve);
     expect(data.approve).not.toHaveBeenCalled();
     await userEvent.type(screen.getByLabelText('Amount for Pilot3'), '2500000');
-    expect(approve).not.toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(approve);
+    // The reason tooltip unwraps once an amount is typed, so the button is a fresh element.
+    const ready = screen.getAllByRole('button', { name: 'Approve' })[2]!;
+    expect(ready).not.toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(ready);
     expect(data.approve).toHaveBeenCalledWith({
       killmailId: 3,
       amount: 2_500_000,
@@ -189,7 +191,7 @@ describe('OfficerQueue pending', () => {
 
   it('asks before a bulk approve and does nothing on Cancel', async () => {
     const data = setup(pendingSet());
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Select all \(2/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Approve 2 claims');
     await userEvent.click(
@@ -200,7 +202,7 @@ describe('OfficerQueue pending', () => {
 
   it('bulk approves the ticked rows only', async () => {
     const data = setup(pendingSet());
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Select all \(2/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' })
@@ -215,7 +217,7 @@ describe('OfficerQueue pending', () => {
   it('reports the result mail after a batch approve, and a failed one keeps the status', async () => {
     mailResult.mockResolvedValue({ queued: ['Pilot1'], failed: ['Pilot2'], missingScope: false });
     setup(pendingSet());
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Select all \(2/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' })
@@ -254,7 +256,7 @@ describe('OfficerQueue pending', () => {
         { ok: false, killmailId: 2, reason: 'illegal-transition', message: 'x' },
       ],
     } as never);
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Select all \(2/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' })
@@ -280,7 +282,7 @@ describe('OfficerQueue pending', () => {
     data.approveMany.mockResolvedValueOnce({
       results: [{ ok: false, killmailId: 2, reason: 'illegal-transition', message: 'x' }],
     } as never);
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Select all \(2/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' })
@@ -420,7 +422,7 @@ describe('OfficerQueue own claim in bulk', () => {
     expect(boxes[1]).not.toHaveAttribute('aria-disabled');
     await userEvent.click(boxes[0]!);
     expect(boxes[0]).not.toBeChecked();
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (1)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (1 of 3 eligible)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (1)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' })
@@ -442,7 +444,7 @@ describe('OfficerQueue owed and history', () => {
       expect(data.markPaid).toHaveBeenCalledWith({ killmailId: 4, expectedAmount: 1_000_000 })
     );
     expect(await findLine(/Marked Pilot4 paid/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Select all \(2/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Mark paid (2)' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Mark paid' })

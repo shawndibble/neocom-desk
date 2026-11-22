@@ -627,8 +627,16 @@ export type EditAction =
       reason: string;
     }
   | { action: 'reverseDismissal'; dismissalId: string; reason: string }
-  /** Links a Moon Ore Survey (a Share Link id) as a chunk's ore source, or unlinks it with null (D13). */
-  | { action: 'linkSurvey'; extractionId: string; surveyId: string | null }
+  /**
+   * Links a Moon Ore Survey (a Share Link id) as a chunk's ore source, or unlinks it with null (D13).
+   * `surveyScan` keeps its first scan on the Extraction, so the make-up outlives the Survey's link.
+   */
+  | {
+      action: 'linkSurvey';
+      extractionId: string;
+      surveyId: string | null;
+      surveyScan?: SurveyScanSnapshot;
+    }
   /** Flags an Extraction Fully Mined (who and when kept) or clears it (#5257). Both are audited. */
   | { action: 'setFullyMined'; extractionId: string; fullyMined: boolean }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
@@ -804,6 +812,30 @@ const optNote = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'note', PAYMENT_NOTE_MAX);
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
+/** A linked Survey's first scan as the book keeps it (engine `SurveyScanSnapshot`). */
+export interface SurveyScanSnapshot {
+  at?: number;
+  volumeM3: number;
+  ores: { typeId: number; volumeM3: number }[];
+}
+
+const MAX_SURVEY_ORES = 50;
+
+function surveyScanOf(raw: unknown): SurveyScanSnapshot {
+  const s = record(raw);
+  return {
+    ...(s.at === undefined ? {} : { at: num(s.at, 'surveyScan.at', 0, 1e15) }),
+    volumeM3: num(s.volumeM3, 'surveyScan.volumeM3', 0, 1e12),
+    ores: list(s.ores, 'surveyScan.ores', MAX_SURVEY_ORES).map((o) => {
+      const ore = record(o);
+      return {
+        typeId: int(ore.typeId, 'surveyScan.typeId'),
+        volumeM3: num(ore.volumeM3, 'surveyScan.volumeM3', 0, 1e12),
+      };
+    }),
+  };
+}
+
 /** A Late notice's id, as `noticeId` or by the old name an older client still sends. */
 const noticeIdOf = (d: Record<string, unknown>) =>
   docId(d.noticeId ?? d[NOTICE_ID_FIELD], 'noticeId');
@@ -936,12 +968,18 @@ export function parseEditAction(data: unknown): EditAction {
     }
     case 'reverseDismissal':
       return { action, dismissalId: docId(d.dismissalId, 'dismissalId'), reason: reason(d.reason) };
-    case 'linkSurvey':
+    case 'linkSurvey': {
+      const surveyId = d.surveyId === null ? null : docId(d.surveyId, 'surveyId');
       return {
         action,
         extractionId: docId(d.extractionId, 'extractionId'),
-        surveyId: d.surveyId === null ? null : docId(d.surveyId, 'surveyId'),
+        surveyId,
+        // Kept with a link only: an unlink drops it with the link.
+        ...(surveyId !== null && d.surveyScan !== undefined
+          ? { surveyScan: surveyScanOf(d.surveyScan) }
+          : {}),
       };
+    }
     case 'setFullyMined':
       if (typeof d.fullyMined !== 'boolean')
         throw new HttpsError('invalid-argument', 'fullyMined must be true or false');

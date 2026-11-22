@@ -427,6 +427,45 @@ describe('buildBookView with a feeder', () => {
       expect(r.oreLines).toEqual([{ typeId: ORE, quantity: 100 }]);
     });
 
+    it('splits a notified base ore into the variants mined, and counts them as mined', () => {
+      const BRIMFUL = 46280; // Brimful Zeolites: the notification lists only Zeolites.
+      const r = row({
+        now: '2026-09-16T14:00:00Z',
+        entries: [mine('2026-09-16', ORE, 300), mine('2026-09-16', BRIMFUL, 500)],
+        extractions: [{ ...x, oreLines: [{ typeId: ORE, quantity: 1000 }] }],
+      });
+      expect(r.oreSource).toBe('notification');
+      expect(r.oreLines).toEqual([
+        { typeId: ORE, quantity: 375 },
+        { typeId: BRIMFUL, quantity: 625 },
+      ]);
+      expect(r.minedPct).toBe(80);
+    });
+
+    it('splits a notified ore nothing has been mined of by its linked survey', () => {
+      const BRIMFUL = 46280;
+      const notified = { ...x, oreLines: [{ typeId: ORE, quantity: 1000 }] };
+      const id = buildBookView(input({ extractions: [notified] })).extractions[0].id;
+      const r = row({
+        now: '2026-09-16T14:00:00Z',
+        extractions: [notified],
+        surveyOreLines: new Map([
+          [
+            id,
+            [
+              { typeId: ORE, quantity: 30 },
+              { typeId: BRIMFUL, quantity: 10 },
+            ],
+          ],
+        ]),
+      });
+      expect(r.oreSource).toBe('notification');
+      expect(r.oreLines).toEqual([
+        { typeId: ORE, quantity: 750 },
+        { typeId: BRIMFUL, quantity: 250 },
+      ]);
+    });
+
     it('rebuilds the make-up from the mined ore when there is neither notification nor survey', () => {
       const r = row({ ...ended, entries: minedBoth });
       expect(r.oreSource).toBe('mined');

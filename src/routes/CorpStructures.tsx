@@ -21,6 +21,7 @@ import {
   FilterChip,
   FilterField,
   IconButton,
+  LiveStatus,
   PageHeader,
   Panel,
   SearchInput,
@@ -677,6 +678,10 @@ export function CorpStructures() {
                         </span>
                       )}
                     </span>
+                    <LiveStatus>
+                      {copied === 'copied' && t('corp.structures.fuelPlan.copied')}
+                      {copied === 'failed' && t('corp.structures.fuelPlan.copyFailed')}
+                    </LiveStatus>
                     {shoppingList.length > 0 && (
                       <button
                         type="button"

@@ -16,14 +16,17 @@ import { CharacterLink } from '@/features/entities';
 import type { SrpClaimValues } from '../srpTypes';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
-import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
+import {
+  approveBlockedReason,
+  ownClaimReason,
+  type ClaimColumnsContext,
+} from './claimColumnsContext';
 import { DoctrineCheckView } from './DoctrineCheckView';
 import { OfficerKillmailModal } from './OfficerKillmailModal';
 import { AppraisalComparison, type Read } from './SrpKillmailView';
 import { ClaimStatePill, CopyAmount, DecideTip, TypeAmountField } from './OfficerClaimCells';
 import { SrpAuditTrail } from './SrpAuditTrail';
 import { claimBasisLine } from './srpClaimText';
-import { approveAmount } from './srpQueue';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -87,8 +90,8 @@ export function SrpClaimDetail({
   const at = (ms: number) => formatTimestamp(new Date(ms), ctx.zone);
   const hull = ctx.names.hull(claim.hullTypeId);
   const own = ownClaimReason(claim, ctx);
-  const blocked =
-    ctx.busy || own !== undefined || approveAmount(claim, ctx.typed[claim.killmailId]) === null;
+  const approveReason = approveBlockedReason(claim, ctx);
+  const blocked = ctx.busy || approveReason !== undefined;
   return (
     <SlideOver
       open
@@ -218,7 +221,7 @@ export function SrpClaimDetail({
                     {t('srp.officer.actions.reject')}
                   </Button>
                 </DecideTip>
-                <DecideTip reason={own}>
+                <DecideTip reason={approveReason}>
                   <Button
                     variant="success"
                     aria-disabled={blocked || undefined}

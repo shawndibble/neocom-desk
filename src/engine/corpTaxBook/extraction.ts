@@ -4,7 +4,7 @@
  * fired or the chunk breaks on its own at `natural_decay_time`, and Expired
  * once the field is assumed gone: fracture + 48h by default, overridable per
  * structure up to 4 days. ESI lists only current extractions and no ore, so
- * the chunk's make-up comes from the ExtractionStarted notification, else a
+ * the chunk's make-up comes from a moon drill notification, else a
  * linked Moon Ore Survey, else it is unknown.
  */
 import type { ObservedMiningEntry, OreLine } from './types';
@@ -77,7 +77,7 @@ export function extractionStatus(
 }
 
 export interface ChunkSources {
-  /** Ore volumes from the MoonminingExtractionStarted notification. */
+  /** Ore volumes from a moon drill notification (started, else finished or fractured). */
   notified?: readonly { typeId: number; volumeM3: number }[];
   /** A linked Moon Ore Survey's composition, as fractions of the chunk. */
   survey?: readonly { typeId: number; fraction: number }[];
@@ -174,6 +174,52 @@ export function learnChunkRates(
 }
 
 /**
+ * A linked Moon Ore Survey's first counted scan as the book keeps it on the Extraction, so the
+ * chunk keeps its make-up after the Survey's share link expires: each ore's volume (rocks summed),
+ * the scan's whole volume, and when it was taken.
+ */
+export interface SurveyScanSnapshot {
+  /** When the scan was taken, epoch ms; absent for a scan with no time. */
+  at?: number;
+  /** Every rock's volume, named or not (`scanVolume`), in m³. */
+  volumeM3: number;
+  ores: { typeId: number; volumeM3: number }[];
+}
+
+/**
+ * A scan's rocks as a `SurveyScanSnapshot`. An ore the type lookup cannot name is left out of
+ * `ores` but counted in the whole volume, as the live estimate counts it.
+ */
+export function surveySnapshotOf(
+  rocks: readonly { ore: string; volume: number }[],
+  typeIdOf: (ore: string) => number | undefined,
+  at?: number
+): SurveyScanSnapshot {
+  const byType = new Map<number, number>();
+  let volumeM3 = 0;
+  for (const rock of rocks) {
+    if (!(rock.volume > 0)) continue;
+    volumeM3 += rock.volume;
+    const typeId = typeIdOf(rock.ore);
+    if (typeId !== undefined) byType.set(typeId, (byType.get(typeId) ?? 0) + rock.volume);
+  }
+  return {
+    ...(at !== undefined ? { at } : {}),
+    volumeM3,
+    ores: [...byType]
+      .map(([typeId, v]) => ({ typeId, volumeM3: v }))
+      .sort((a, b) => a.typeId - b.typeId),
+  };
+}
+
+/** A kept scan's ores as shares of its named volume (each ore's fraction sums to 1). */
+function snapshotFractions(s: SurveyScanSnapshot): { typeId: number; fraction: number }[] {
+  const total = s.ores.reduce((sum, o) => sum + o.volumeM3, 0);
+  if (total === 0) return [];
+  return s.ores.map((o) => ({ typeId: o.typeId, fraction: o.volumeM3 / total }));
+}
+
+/**
  * A linked Moon Ore Survey's composition as shares of its volume: the rocks of
  * its first scan summed per ore. An ore the type lookup cannot name is left
  * out and the rest renormalised, so the shares always sum to 1.
@@ -182,18 +228,18 @@ export function surveyFractions(
   rocks: readonly { ore: string; volume: number }[],
   typeIdOf: (ore: string) => number | undefined
 ): { typeId: number; fraction: number }[] {
-  const byType = new Map<number, number>();
-  for (const rock of rocks) {
-    const typeId = typeIdOf(rock.ore);
-    if (typeId !== undefined && rock.volume > 0) {
-      byType.set(typeId, (byType.get(typeId) ?? 0) + rock.volume);
-    }
-  }
-  const total = [...byType.values()].reduce((a, b) => a + b, 0);
-  if (total === 0) return [];
-  return [...byType]
-    .map(([typeId, volume]) => ({ typeId, fraction: volume / total }))
-    .sort((a, b) => a.typeId - b.typeId);
+  return snapshotFractions(surveySnapshotOf(rocks, typeIdOf));
+}
+
+/** The chunk sources a kept scan gives `estimateChunk`. */
+export function snapshotSources(
+  s: SurveyScanSnapshot
+): Pick<ChunkSources, 'survey' | 'surveyVolumeM3' | 'surveyAt'> {
+  return {
+    survey: snapshotFractions(s),
+    surveyVolumeM3: s.volumeM3,
+    ...(s.at !== undefined ? { surveyAt: s.at } : {}),
+  };
 }
 
 export interface ChunkEstimate {

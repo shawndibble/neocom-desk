@@ -16,6 +16,8 @@ import {
 } from '../../../functions/src/corpTaxBookMoonDocs';
 import type { BookView, ExtractionRow } from './bookView';
 import { extractionId, type SyncExtraction } from './sync';
+import { chunkMinedPct, splitChunkVariants } from './moonOreVariants';
+import { utcDayOf } from '../localDay';
 
 /** A doc this client can read: current schema and the fields the page takes. */
 export function moonDocUsable(doc: MoonDoc | undefined): doc is MoonDoc {
@@ -90,18 +92,18 @@ export function withMoonDocs(
   fromDocs: ReadonlySet<string>
 ): BookView {
   if (fromDocs.size === 0) return view;
+  const prices = view.input.pricesOn(utcDayOf(view.input.now)).prices;
   const figures = (row: ExtractionRow, doc: MoonDoc): ExtractionRow => {
-    let minedPct: number | null = null;
-    if (row.fracturedAt && row.oreLines.length) {
-      const mined = new Map(doc.mined.map((m) => [m.typeId, m.quantity]));
-      const total = row.oreLines.reduce((s, l) => s + l.quantity, 0);
-      const got = row.oreLines.reduce(
-        (s, l) => s + Math.min(l.quantity, mined.get(l.typeId) ?? 0),
-        0
-      );
-      minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
-    }
-    return { ...row, minedPct, minerCount: doc.minerCount };
+    // The view had no ledger rows for this cycle: its variant split is the survey's or none.
+    // The doc's mined ore wins (moonOreVariants.ts), and the value follows when it can be priced.
+    const oreLines = splitChunkVariants(row.oreLines, doc.mined);
+    const resplit = JSON.stringify(oreLines) !== JSON.stringify(row.oreLines);
+    const estimatedValue =
+      resplit && oreLines.every((l) => prices.has(l.typeId))
+        ? oreLines.reduce((sum, l) => sum + l.quantity * prices.get(l.typeId)!, 0)
+        : row.estimatedValue;
+    const minedPct = row.fracturedAt && oreLines.length ? chunkMinedPct(oreLines, doc.mined) : null;
+    return { ...row, oreLines, estimatedValue, minedPct, minerCount: doc.minerCount };
   };
   return {
     ...view,

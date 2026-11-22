@@ -14,6 +14,15 @@ const entry = (action: string, detail: Record<string, unknown>): SrpAuditEntry =
 const t = i18n.t.bind(i18n);
 
 describe('auditText', () => {
+  it('never prints a bare ? for a decision with no amount', () => {
+    expect(auditText(t, entry('approveClaim', { killmailId: 5, amount: null }))).toBe(
+      'Approved killmail 5, no amount recorded'
+    );
+    expect(auditText(t, entry('markClaimPaid', { killmailId: 5 }))).toBe(
+      'Marked killmail 5 paid, no amount recorded'
+    );
+  });
+
   it('words an approval, with and without a changed amount', () => {
     expect(auditText(t, entry('approveClaim', { killmailId: 5, amount: 1000 }))).toBe(
       'Approved killmail 5 for 1,000 ISK'

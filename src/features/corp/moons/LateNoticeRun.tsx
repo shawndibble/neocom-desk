@@ -523,7 +523,7 @@ export function LateNoticeRun() {
                       <Button
                         variant="ghost"
                         onClick={() => setPreviewOpen(true)}
-                        disabled={busy || corporationName === null}
+                        aria-disabled={busy || corporationName === null || undefined}
                       >
                         {t('corpTaxBook.moons.run.preview')}
                       </Button>
@@ -531,11 +531,15 @@ export function LateNoticeRun() {
                     <Button
                       variant="primary"
                       onClick={() => void send()}
-                      disabled={busy || corporationName === null}
+                      aria-disabled={busy || corporationName === null || undefined}
                     >
                       {t('corpTaxBook.moons.run.sendNotices', { count: total })}
                     </Button>
-                    <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setStep('check')}
+                      aria-disabled={busy || undefined}
+                    >
                       {t('corpTaxBook.moons.run.back')}
                     </Button>
                   </div>
