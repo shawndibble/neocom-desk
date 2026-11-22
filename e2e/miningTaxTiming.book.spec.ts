@@ -372,6 +372,12 @@ for (const { kind, title } of SAME_DAY_CASES) {
       await expect(page.getByRole('row').filter({ hasText: day(SAME_DAY) })).toContainText(/paid/i);
       await expect(ledgerButton(page)).toHaveCount(0);
       await expect(page.getByRole('main')).not.toContainText(/You owe|Owes/);
+      // The pilot reads the forgiven gap too: the paid day's detail opens the book's ledger.
+      await dayRow().click();
+      await page.getByRole('button', { name: `Open ${CORP_NAME} ledger` }).click();
+      await expect(pilotLedger(page)).toContainText(/Shortfall forgiven/);
+      await expect(pilotLedger(page)).toContainText(isk(gap));
+      await page.keyboard.press('Escape');
       await gotoMiner(page);
       await expect(officerRow(page, /Shortfall forgiven/)).toContainText(isk(gap));
       await owedDaysHeading(page, 0);
