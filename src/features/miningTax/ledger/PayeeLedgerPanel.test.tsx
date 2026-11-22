@@ -51,8 +51,13 @@ describe('PayeeLedgerPanel', () => {
   it("keeps each row's balance the one after it in date order, only displayed in reverse", () => {
     renderPanel(CORP_BOOK_LEDGER);
     const shown = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
+    // Owed reads with a minus, money ahead plain, nothing at zero.
     const inDateOrder = payeeLedger(CORP_BOOK_LEDGER).rows.map((r) =>
-      formatIsk(Math.max(0, r.balance))
+      r.balance > 0.005
+        ? `−${formatIsk(r.balance)}`
+        : r.balance < -0.005
+          ? formatIsk(-r.balance)
+          : '0'
     );
     expect(shown.reverse()).toEqual(inDateOrder);
   });
@@ -156,16 +161,20 @@ describe('PayeeLedgerPanel', () => {
   it('reads Paid through with credit for a Payee paid ahead', () => {
     renderPanel(CREDIT_LEDGER);
     expect(screen.getByText('Paid through')).toBeInTheDocument();
-    expect(screen.getByText('Credit')).toBeInTheDocument();
+    expect(screen.queryByText('Credit')).toBeNull();
     expect(screen.getByText('4,150,000 ISK')).toBeInTheDocument();
   });
 
-  it('shows owed as a positive balance, and money ahead as credit, never negative', () => {
+  it('shows owed as red with a minus and money ahead as plain green, never the word credit', () => {
     renderPanel(CREDIT_LEDGER);
-    const balances = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
-    expect(balances.some((b) => b?.startsWith('-'))).toBe(false);
+    const cells = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)!);
+    const balances = cells.map((c) => c.textContent);
+    expect(balances.some((b) => /credit/i.test(b ?? ''))).toBe(false);
     // The latest row, now on top, is the one that left the Payee paid ahead.
-    expect(balances[0]).toMatch(/credit$/);
+    expect(balances[0]).toBe('4,150,000');
+    expect(cells[0]).toHaveClass('text-isk-pos');
+    const owed = cells.find((c) => c.textContent?.startsWith('−'));
+    expect(owed).toHaveClass('text-isk-neg');
   });
 
   it("shows an officer's note on a payment, on its row", () => {

@@ -23,8 +23,6 @@ function renderBalances(
       balances={balances}
       unassigned={{ entryCount: 0, estimatedValue: 0 }}
       unlinkedPaymentCount={0}
-      isSoleFilter={() => false}
-      onFilterPayee={vi.fn()}
       onSettleUp={vi.fn()}
       onLinkPayment={vi.fn()}
       onAssignNext={vi.fn()}
@@ -246,17 +244,44 @@ describe('OwedBalances Conflicts the member has already answered', () => {
 });
 
 describe('OwedBalances credit', () => {
-  it("keeps a card for a Payee in credit: the credit is its figure, and it opens the Payee's ledger", async () => {
+  it('shows a Payee in credit as a one-line note with its Ledger link, not a card', async () => {
     const onOpenLedger = vi.fn();
     renderBalances([balance('a', 0, 500_000), balance('b', 0)], { onOpenLedger });
-    // One card alone is a wide row, drawn once per width.
-    const [figure] = screen.getAllByRole('button', { name: 'Open the ledger of Payee a' });
-    expect(figure).toHaveTextContent(/500,000\s*ISK credit/);
+    expect(screen.getByText('500,000 ISK')).toHaveClass('text-isk-pos');
+    expect(screen.queryByText(/ISK credit/i)).toBeNull(); // colour carries it, never the word
     expect(screen.queryByRole('button', { name: 'Settle up' })).not.toBeInTheDocument();
-    // A settled Payee has no card: Manage Payees opens its ledger.
+    // A settled Payee has no note either: Manage Payees opens its ledger.
     expect(screen.queryByRole('button', { name: 'Open the ledger of Payee b' })).toBeNull();
-    await userEvent.click(figure!);
+    await userEvent.click(screen.getByRole('button', { name: 'Open the ledger of Payee a' }));
     expect(onOpenLedger).toHaveBeenCalledWith(expect.objectContaining({ credit: 500_000 }));
+  });
+});
+
+describe('OwedBalances card actions', () => {
+  it('reads the owed figure red with a minus and has no hidden name or figure links', () => {
+    renderBalances([balance('a', 1_000_000)]);
+    expect(screen.getAllByText(/^−1,000,000/)[0]).toHaveClass('text-isk-neg');
+    expect(screen.queryByRole('button', { name: /Show only/ })).toBeNull();
+  });
+
+  it('puts Ledger and Link payment beside Settle up, each calling its handler', async () => {
+    const onOpenLedger = vi.fn();
+    const onLinkPayment = vi.fn();
+    renderBalances([balance('a', 1_000_000)], { onOpenLedger, onLinkPayment });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Ledger' })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Link payment' })[0]!);
+    expect(onOpenLedger).toHaveBeenCalledOnce();
+    expect(onLinkPayment).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a lone Ledger action as text, with no menu of one', () => {
+    renderBalances([balance('a', 1_000_000)], {
+      onOpenLedger: vi.fn(),
+      hideLinkPayment: () => true,
+    });
+    expect(screen.getAllByRole('button', { name: 'Ledger' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Link payment' })).toBeNull();
   });
 });
 

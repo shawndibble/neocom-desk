@@ -30,7 +30,7 @@ import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { OrePricedCard } from './OrePricedCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { PayeeLedgerLink } from './PayeeLedgerLink';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
@@ -276,7 +276,11 @@ export function RowDetailModal({
             view does; the pilot and the paperwork sit on the line below. */}
         {assigned && assignment && (
           <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 text-base font-semibold">{payeeName}</span>
+            <PayeeLedgerLink
+              name={payeeName}
+              className="min-w-0 text-left text-base font-semibold"
+              onOpenLedger={payee ? onOpenLedger : undefined}
+            />
             <span
               className={cx(
                 'shrink-0 text-xl font-medium tabular-nums',
@@ -338,12 +342,6 @@ export function RowDetailModal({
             priceSourcesFor={priceSourcesFor}
             quantityFor={unreportedText}
           />
-        )}
-
-        {payee && onOpenLedger && (
-          <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
-            {t('miningTax.openLedger', { payee: payee.name })}
-          </button>
         )}
 
         {assignment && row.duplicateAssignmentIds?.includes(assignment.id) && (

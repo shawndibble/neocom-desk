@@ -29,6 +29,7 @@ import {
   type PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
 import { formatIsk } from '@/lib/isk';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { Translate } from '@/lib/translate';
 import { LedgerRowDetail } from './LedgerRowDetail';
 import { ledgerCsvColumns, ledgerWhat } from './ledgerCsv';
@@ -195,6 +196,17 @@ function LedgerStatus({ ledger }: { ledger: PayeeLedger }) {
 }
 
 const amountCell = (value: number) => (value === 0 ? '' : formatIsk(value));
+/**
+ * What the account owes reads with a minus; a payment has none, so the two are told apart. A
+ * negative charge (an Adjustment in the pilot's favour) lowers what is owed, so it reads like one.
+ */
+const chargedCell = (value: number) =>
+  value === 0 ? '' : value > 0 ? `−${formatIsk(value)}` : formatIsk(-value);
+/** The running balance: owed is red with a minus, money ahead is green, never the word "credit". */
+const balanceCell = (balance: number) =>
+  balance < -0.005 ? formatIsk(-balance) : balance > 0.005 ? `−${formatIsk(balance)}` : '0';
+const balanceTone = (balance: number) =>
+  balance < -0.005 ? 'text-isk-pos' : balance > 0.005 ? 'text-isk-neg' : undefined;
 
 function LedgerBody({
   ledger,
@@ -348,6 +360,7 @@ export function PayeeLedgerTable({
   'rows' | 'label' | 'columns' | 'rowKey' | 'expandableRow' | 'rowContextMenu'
 >) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const columns = useMemo<DataTableColumn<PayeeLedgerRow>[]>(
     () => [
       {
@@ -390,13 +403,27 @@ export function PayeeLedgerTable({
           );
         },
       },
+      // A phone card has one amount: Charged and Credited are two columns of which each row
+      // fills one, so the card would print a blank labelled line for the other.
+      ...(isPhone
+        ? [
+            {
+              id: 'amount',
+              header: t('miningTax.ledger.column.amount'),
+              align: 'right',
+              className: 'tabular-nums',
+              cardCorner: true,
+              render: (r) => (r.charged !== 0 ? chargedCell(r.charged) : amountCell(r.paid)),
+            } satisfies DataTableColumn<PayeeLedgerRow>,
+          ]
+        : []),
       {
         id: 'charged',
         header: t('miningTax.ledger.column.charged'),
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (r) => (r.kind === 'charge' && r.held ? 'text-text-dim' : undefined),
-        render: (r) => amountCell(r.charged),
+        render: (r) => chargedCell(r.charged),
       },
       {
         id: 'credited',
@@ -412,23 +439,24 @@ export function PayeeLedgerTable({
               header: t('miningTax.ledger.column.balance'),
               align: 'right',
               className: 'tabular-nums font-medium',
-              // Owed reads positive; money ahead reads as credit, never as a negative balance.
-              cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
-              render: (r) =>
-                r.balance < -0.005
-                  ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
-                  : formatIsk(Math.max(0, r.balance)),
+              cellClassName: (r) => balanceTone(r.balance),
+              stackAffix: { before: `${t('miningTax.ledger.column.balance')} ` },
+              // The span carries the tone on a phone card too, whose meta line forces dim text.
+              render: (r) => (
+                <span className={balanceTone(r.balance)}>{balanceCell(r.balance)}</span>
+              ),
             } satisfies DataTableColumn<PayeeLedgerRow>,
           ]
         : []),
     ],
-    [t, showBalance]
+    [t, showBalance, isPhone]
   );
   return (
     <DataTable
       {...rest}
       label={label}
-      columns={columns}
+      stackLayout="dense"
+      columns={isPhone ? columns.filter((c) => c.id !== 'charged' && c.id !== 'credited') : columns}
       rows={[...rows]}
       rowKey={(r) => r.key}
       rowBoundary={lockRowBoundary(

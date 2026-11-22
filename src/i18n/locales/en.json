@@ -8272,7 +8272,6 @@
         "factSynced": "Synced",
         "factNotice": "Late notice",
         "factNoticeSent": "Sent. A payment pays your oldest unpaid days first, this one among them.",
-        "openLedger": "Open {{payee}} ledger",
         "factOriginal": "Originally billed",
         "settled": {},
         "disputeHint": "Your own record differs from the corp's records.",
@@ -8436,7 +8435,6 @@
     "conflictsWaitingHint_one": "You have told {{corp}}. It still bills on {{date}} unless an officer answers first, so check back.",
     "conflictsWaitingHint_other": "{{count}} days you have told their corporations about. The first still bills on {{date}} unless an officer answers first, so check back.",
     "settleUpAction": "Settle up",
-    "filterToPayee": "Show only {{payee}}'s entries",
     "unassignedCardTitle": "Unassigned",
     "assignNextAction": "Assign next",
     "unlinkedPaymentsCardTitle": "Payments to link",
@@ -8455,7 +8453,6 @@
     "linkPaymentAmountLabel": "Value handed over",
     "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what it was worth: that is what it pays.",
     "linkPaymentConfirmAction": "Link to {{payee}}",
-    "openLedger": "Open {{payee}} ledger",
     "unlinkTransactionAction": "Unlink",
     "characterColumn": "Character",
     "dateColumn": "Date",
@@ -8733,8 +8730,9 @@
       "waitingDays_one": "oldest unpaid day was yesterday",
       "waitingDays_other": "oldest unpaid day was {{count}} days ago",
       "linkPayment": "Link payment",
+      "ledgerAction": "Ledger",
+      "moreActions": "More actions for {{payee}}",
       "corpBookTag": "Corp Tax Book",
-      "creditLabel": "credit",
       "creditHint": "Paid ahead: new days of tax come out of this credit",
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
@@ -8841,7 +8839,7 @@
         "days": "Days owed",
         "oldest": "Oldest unpaid",
         "paidThrough": "Paid through",
-        "credit": "Credit"
+        "credit": "Balance"
       },
       "column": {
         "date": "Date",
@@ -8849,6 +8847,7 @@
         "what": "What",
         "charged": "Charged",
         "credited": "Credited",
+        "amount": "Amount",
         "balance": "Balance"
       },
       "kind": {
@@ -8931,7 +8930,7 @@
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
-      "balanceCredit": "{{amount}} credit",
+      "openLedgerTip": "Open this Payee's ledger",
       "reversedTag": "reversed",
       "minerPicker": "Whose account"
     }

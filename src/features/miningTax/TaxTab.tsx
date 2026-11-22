@@ -222,7 +222,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     payeeById
   );
 
-  const { resolvedPayeeFilter, togglePayee, isSolePayee, filterToPayee } = usePayeeFilter(
+  const { resolvedPayeeFilter, togglePayee } = usePayeeFilter(
     payeeFilter,
     setPayeeFilter,
     filterPayees,
@@ -588,8 +588,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                               ?.characterName
                         : undefined
                     }
-                    isSoleFilter={isSolePayee}
-                    onFilterPayee={filterToPayee}
+
                     onSettleUp={(balance) =>
                       isCorpPayeeId(balance.payee.id)
                         ? actions.openCorpPay(corporationOfPayee(balance.payee.id))

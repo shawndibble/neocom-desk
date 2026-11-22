@@ -8,11 +8,11 @@ import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatAge, MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { OrePricedCard } from '../OrePricedCard';
+import { PayeeLedgerLink } from '../PayeeLedgerLink';
 import { bookRowTax } from './corpRows';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
@@ -146,7 +146,11 @@ export function CorpRowDetailModal({
       >
         <div className="space-y-3 text-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 text-base font-semibold">{payeeName}</span>
+            <PayeeLedgerLink
+              name={payeeName}
+              className="min-w-0 text-left text-base font-semibold"
+              onOpenLedger={onOpenLedger}
+            />
             <span
               className={cx(
                 'shrink-0 text-xl font-medium tabular-nums',
@@ -334,12 +338,6 @@ export function CorpRowDetailModal({
                 {t('miningTax.corpBook.diff.open')}
               </Button>
             </div>
-          )}
-
-          {onOpenLedger && (
-            <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
-              {t('miningTax.corpBook.detail.openLedger', { payee: payeeName })}
-            </button>
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">

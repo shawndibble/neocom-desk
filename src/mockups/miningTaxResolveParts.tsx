@@ -111,10 +111,9 @@ export function Balances({ conflicts }: { conflicts: ConflictSummary }) {
           : undefined
       }
       hideLinkPayment={(b) => b.payee.id === 'corp-book:1'}
-      isSoleFilter={() => false}
-      onFilterPayee={noop}
       onSettleUp={noop}
       onLinkPayment={noop}
+      onOpenLedger={noop}
       onAssignNext={noop}
       onReviewPayments={noop}
       conflicts={conflicts}

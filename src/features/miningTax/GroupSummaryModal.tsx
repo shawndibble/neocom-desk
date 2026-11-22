@@ -20,7 +20,7 @@ import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { PayeeLedgerLink } from './PayeeLedgerLink';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
@@ -158,7 +158,7 @@ export function GroupSummaryModal({
       <div className="space-y-3 text-sm">
         <div className="flex items-baseline justify-between gap-3">
           <span className="min-w-0 text-text-dim">
-            {payeeDisplayName}
+            <PayeeLedgerLink name={payeeDisplayName} onOpenLedger={onOpenLedger} />
             {taxPct !== undefined && ` · ${taxPct}%`}
             {' · '}
             {t('miningTax.combined.days', { count: members.length })}
@@ -167,12 +167,6 @@ export function GroupSummaryModal({
             {formatIsk(totalTaxOwed)} ISK
           </span>
         </div>
-
-        {onOpenLedger && (
-          <button type="button" className={inlineLinkClassName} onClick={onOpenLedger}>
-            {t('miningTax.openLedger', { payee: payeeDisplayName })}
-          </button>
-        )}
 
         <ul className="space-y-2">
           {sorted.map((member) => (
