@@ -20,6 +20,7 @@ import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
 import type { DisplayRow } from './groupRows';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
+import { bookOwnedPayeeIds } from '@/engine/miningTax/payeeCorporation';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
 import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
@@ -53,6 +54,32 @@ export function billedElsewhereOf(
     out.set(id, 1 - (kept.get(id) ?? 1) * (1 - (also.get(id) ?? 0)) * (1 - (waiting.get(id) ?? 0)));
   return out;
 }
+
+/**
+ * The Payee records a Corp Tax Book the pilot is in is the authority for, each with that
+ * corporation's name: the ones verified as its corporation (`bookOwnedPayeeIds`). Their account
+ * counts nowhere (`PayeeRunningAccounts.bookOwned`).
+ */
+export function bookOwnersOf(
+  payees: readonly PayeeRecord[],
+  corpView: CorpBookView | null | undefined
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const b of corpView?.books ?? []) {
+    if (b.left) continue;
+    for (const id of bookOwnedPayeeIds(payees, [
+      { corporationId: b.loaded.corporationId, name: b.corpName },
+    ]))
+      out.set(id, b.corpName);
+  }
+  return out;
+}
+
+/** The ids alone of `bookOwnersOf`. */
+export const bookOwnedPayees = (
+  payees: readonly PayeeRecord[],
+  corpView: CorpBookView | null | undefined
+): Set<string> => new Set(bookOwnersOf(payees, corpView).keys());
 
 /** The Characters in view: the Tax tab's selector (`'all'` is no filter). */
 export type CharactersInView = ReadonlySet<number> | 'all';
@@ -134,14 +161,6 @@ export async function loadOwedBalances(
   const seen = new Map<string, PayeeRecord>();
   for (const list of snapshot.payeesByCharacter.values()) for (const p of list) seen.set(p.id, p);
   const payees = [...seen.values()];
-  // Paid read off each Payee's account, the one build the Tax tab reads too.
-  const accounts = PayeeRunningAccounts.build({
-    assignments: snapshot.rows.flatMap((row) => row.assignments),
-    payees,
-    links: snapshot.paymentLinks,
-    billedElsewhere: snapshot.billedElsewhere,
-  });
-  const entries = withPaidStatus(snapshot.rows, accounts);
   // The books read each Assignment as its Payee's account stands before any book takes ore off it
   // (see `useTaxCorpBooks`).
   const bookEntries = withPaidStatus(
@@ -182,6 +201,16 @@ export async function loadOwedBalances(
           )
         );
 
+  // Paid read off each Payee's account, the one build the Tax tab reads too: a Payee a book is the
+  // authority for counts nowhere.
+  const accounts = PayeeRunningAccounts.build({
+    assignments: snapshot.rows.flatMap((row) => row.assignments),
+    payees,
+    links: snapshot.paymentLinks,
+    billedElsewhere: snapshot.billedElsewhere,
+    bookOwned: bookOwnedPayees(payees, corpView),
+  });
+  const entries = withPaidStatus(snapshot.rows, accounts);
   const rows = buildDisplayRows(
     entries,
     corpView?.overlay ?? null,

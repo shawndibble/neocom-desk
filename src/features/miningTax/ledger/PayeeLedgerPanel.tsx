@@ -97,6 +97,12 @@ function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
         ? t('miningTax.ledger.what.minedAt', { place: row.charge.place })
         : t('miningTax.ledger.what.mined');
     case 'payment':
+      if (row.payment.via)
+        return row.payment.from
+          ? t(`miningTax.ledger.what.paymentViaFrom.${row.payment.via}`, {
+              name: row.payment.from,
+            })
+          : t(`miningTax.ledger.what.paymentVia.${row.payment.via}`);
       return row.payment.from
         ? t('miningTax.ledger.what.paymentFrom', { name: row.payment.from })
         : t('miningTax.ledger.what.payment');
@@ -142,6 +148,13 @@ export interface PayeeLedgerPanelProps {
    * Absent for a personal Payee, whose ledger has none.
    */
   lockDate?: string;
+  /**
+   * The old personal history of a Payee a Corp Tax Book now answers for: the rows only, with no
+   * balance and no status, since none of it is anyone's figure.
+   */
+  history?: boolean;
+  /** A personal Payee's: opens the wallet payments to link to it (from a Marked paid row). */
+  onLinkWalletPayment?: () => void;
 }
 
 /**
@@ -159,6 +172,8 @@ export function PayeeLedgerPanel({
   picker,
   onUnlinkPayment,
   lockDate,
+  history,
+  onLinkWalletPayment,
 }: PayeeLedgerPanelProps) {
   const { t } = useTranslation();
   const ledger = useMemo(() => (source ? payeeLedger(source) : null), [source]);
@@ -167,7 +182,7 @@ export function PayeeLedgerPanel({
       open={open}
       onClose={onClose}
       title={payeeName}
-      subtitle={t('miningTax.ledger.subtitle')}
+      subtitle={t(history ? 'miningTax.ledger.historySubtitle' : 'miningTax.ledger.subtitle')}
       side="right"
       wide
     >
@@ -178,6 +193,8 @@ export function PayeeLedgerPanel({
           typeNames={typeNames}
           onUnlinkPayment={onUnlinkPayment}
           lockDate={lockDate}
+          history={history}
+          onLinkWalletPayment={onLinkWalletPayment}
         />
       ) : (
         <Spinner block="panel" label={t('miningTax.ledger.loading')} />
@@ -229,8 +246,12 @@ function LedgerBody({
   typeNames,
   onUnlinkPayment,
   lockDate,
+  history,
+  onLinkWalletPayment,
 }: {
+  onLinkWalletPayment?: (() => void) | undefined;
   ledger: PayeeLedger;
+  history?: boolean | undefined;
   typeNames?: ReadonlyMap<number, string>;
   onUnlinkPayment?: ((paymentId: string) => void) | undefined;
   lockDate?: string | undefined;
@@ -257,7 +278,7 @@ function LedgerBody({
 
   return (
     <div className="space-y-4">
-      <LedgerStatus ledger={ledger} />
+      {!history && <LedgerStatus ledger={ledger} />}
       <FilterBar
         value={filter}
         onChange={setFilter}
@@ -323,6 +344,8 @@ function LedgerBody({
             typeNames={typeNames}
             {...(onUnlinkPayment ? { onUnlinkPayment } : {})}
             {...(lockDate ? { lockDate } : {})}
+            {...(history ? { showBalance: false } : {})}
+            {...(onLinkWalletPayment ? { onLinkWalletPayment } : {})}
           />
         )}
       </Panel>
@@ -343,8 +366,14 @@ export function PayeeLedgerTable({
   onUnlinkPayment,
   lockDate,
   lockDateLabel,
+  showBalance = true,
+  onLinkWalletPayment,
   ...rest
 }: {
+  /** Opens the wallet payments to link, from a Marked paid row's detail. */
+  onLinkWalletPayment?: () => void;
+  /** Whether the running balance column is shown; an old history's rows carry none. */
+  showBalance?: boolean;
   rows: readonly PayeeLedgerRow[];
   label: string;
   typeNames?: ReadonlyMap<number, string>;
@@ -421,20 +450,24 @@ export function PayeeLedgerTable({
         className: 'tabular-nums',
         render: (r) => amountCell(r.paid),
       },
-      {
-        id: 'balance',
-        header: t('miningTax.ledger.column.balance'),
-        align: 'right',
-        className: 'tabular-nums font-medium',
-        // Owed reads positive; money ahead reads as credit, never as a negative balance.
-        cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
-        render: (r) =>
-          r.balance < -0.005
-            ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
-            : formatIsk(Math.max(0, r.balance)),
-      },
+      ...(showBalance
+        ? [
+            {
+              id: 'balance',
+              header: t('miningTax.ledger.column.balance'),
+              align: 'right',
+              className: 'tabular-nums font-medium',
+              // Owed reads positive; money ahead reads as credit, never as a negative balance.
+              cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
+              render: (r) =>
+                r.balance < -0.005
+                  ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
+                  : formatIsk(Math.max(0, r.balance)),
+            } satisfies DataTableColumn<PayeeLedgerRow>,
+          ]
+        : []),
     ],
-    [t]
+    [t, showBalance]
   );
   return (
     <DataTable
@@ -452,7 +485,12 @@ export function PayeeLedgerTable({
       expandableRow={{
         leadingIcon: true,
         renderDetail: (r) => (
-          <LedgerRowDetail row={r} typeNames={typeNames} onUnlinkPayment={onUnlinkPayment} />
+          <LedgerRowDetail
+            row={r}
+            typeNames={typeNames}
+            onUnlinkPayment={onUnlinkPayment}
+            onLinkWalletPayment={onLinkWalletPayment}
+          />
         ),
       }}
       {...(rowContextMenu ? { rowMoreActions: true, rowContextMenu } : {})}

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { corporationNamed, payeesOfBookCorporation, type PayeeLike } from './payeeCorporation';
+import {
+  bookOwnedPayeeIds,
+  corporationNamed,
+  payeesOfBookCorporation,
+  type PayeeLike,
+} from './payeeCorporation';
 
 const books = [
   { corporationId: 98000001, name: 'Corp A' },
@@ -90,5 +95,54 @@ describe('payeesOfBookCorporation', () => {
         bureau
       )
     ).toEqual([]);
+  });
+});
+
+describe('bookOwnedPayeeIds', () => {
+  const bureau = { corporationId: 98837836, name: 'Bureau of Unified Harvesting' };
+  const record = (over: Partial<PayeeLike>): PayeeLike => ({
+    id: 'p',
+    characterId: 1,
+    name: 'Someone',
+    ...over,
+  });
+
+  it('is every record verified as a book corporation, one per Character of a merged Payee', () => {
+    const ids = bookOwnedPayeeIds(
+      [
+        record({
+          id: 'main',
+          characterId: 1,
+          entityId: bureau.corporationId,
+          entityKind: 'corporation',
+        }),
+        record({
+          id: 'alt',
+          characterId: 2,
+          entityId: bureau.corporationId,
+          entityKind: 'corporation',
+        }),
+        record({ id: 'other', name: 'Ion Strider', entityId: 5, entityKind: 'character' }),
+      ],
+      [bureau]
+    );
+    expect([...ids].sort()).toEqual(['alt', 'main']);
+  });
+
+  it('matches the id a Payee carries with no kind recorded', () => {
+    expect([
+      ...bookOwnedPayeeIds([record({ id: 'a', entityId: bureau.corporationId })], [bureau]),
+    ]).toEqual(['a']);
+  });
+
+  it('never goes by name: a same-named Payee that is not verified as the corporation is not its', () => {
+    const ids = bookOwnedPayeeIds(
+      [
+        record({ id: 'named', name: bureau.name }),
+        record({ id: 'someoneElse', name: bureau.name, entityId: 7, entityKind: 'character' }),
+      ],
+      [bureau]
+    );
+    expect(ids.size).toBe(0);
   });
 });

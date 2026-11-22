@@ -8,7 +8,7 @@ import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
 import { saveBilledElsewhere } from './paymentLinkStore';
-import { billedElsewhereOf } from './owedNow';
+import { billedElsewhereOf, bookOwnedPayees } from './owedNow';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
@@ -80,6 +80,8 @@ export function useTaxCorpBooks(
     () => (overlay ? billedElsewhereOf(overlay) : data?.billedElsewhere),
     [overlay, data?.billedElsewhere]
   );
+  // A Payee that is a book's corporation is the book's to answer for: its account counts nowhere.
+  const bookOwned = useMemo(() => bookOwnedPayees(payees, corpView), [payees, corpView]);
   // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
   const accounts = useMemo(
     () =>
@@ -88,8 +90,9 @@ export function useTaxCorpBooks(
         payees,
         links: data?.paymentLinks ?? [],
         ...(billed ? { billedElsewhere: billed } : {}),
+        bookOwned,
       }),
-    [data, payees, billed]
+    [data, payees, billed, bookOwned]
   );
   // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
   // day, oldest first (decision 20261120-235011), whatever mark it stores.

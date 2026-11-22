@@ -53,7 +53,7 @@ test('the ledger lists every charge and payment with a running balance', async (
   const rows = bodyRows(ledger);
   await expect(rows).toHaveCount(4);
   await expect(rows.nth(0)).toContainText(
-    `${day(PAID_BACK)}Payment${isk(DAY_TAX)}${isk(2 * DAY_TAX)}`
+    `${day(PAID_BACK)}Payment by wallet transfer${isk(DAY_TAX)}${isk(2 * DAY_TAX)}`
   );
   await expect(rows.nth(3)).toContainText(`${day(6)}Mined at Jita${isk(DAY_TAX)}${isk(DAY_TAX)}`);
   await expect(ledger).toContainText('Ledger, newest first');
@@ -146,5 +146,5 @@ test('Unlink says so with an Undo that links the same payment back', async ({ pa
   await expect(toast).toBeVisible();
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(2 * DAY_TAX)} ISK`));
-  await expect(ledger).toContainText(`${day(PAID_BACK)}Payment`);
+  await expect(ledger).toContainText(`${day(PAID_BACK)}Payment by wallet transfer`);
 });

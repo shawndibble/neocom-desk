@@ -79,3 +79,20 @@ function ofOneCharacter(
       : []
   );
 }
+
+/**
+ * The ids of every Payee record that is, by its verified entity id, the corporation of one of the
+ * member's Corp Tax Books: the Payees a book is the authority for (decision 20261122, one card per corporation). Never by name: a name only suggests the link (`payeesOfBookCorporation`'s
+ * `link`), which is made and synced before the Payee stops counting as its own.
+ */
+export function bookOwnedPayeeIds(
+  payees: readonly PayeeLike[],
+  corporations: readonly NamedCorporation[]
+): Set<string> {
+  const byId = new Map(payees.map((p) => [p.id, p]));
+  const out = new Set<string>();
+  for (const corporation of corporations)
+    for (const found of payeesOfBookCorporation(payees, corporation))
+      if (byId.get(found.id)?.entityId === corporation.corporationId) out.add(found.id);
+  return out;
+}

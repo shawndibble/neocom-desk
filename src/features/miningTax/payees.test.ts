@@ -8,6 +8,7 @@ import {
   createPayee,
   loadPayees,
   applyPayeeTerms,
+  setPayeesArchived,
   linkPayeeToCorporation,
   rememberPayeeEntity,
   removePayeeRecord,
@@ -418,5 +419,21 @@ describe('applyPayeeTerms', () => {
     const other = await createPayee(CHAR_B, { name: 'BUH', defaultTaxPct: 7, hubId: 'amarr' });
     await applyPayeeTerms(source, [other]);
     expect('hubId' in ((await db.payees.get(other.id)) ?? {})).toBe(false);
+  });
+});
+
+describe('setPayeesArchived', () => {
+  it('stamps every record of a merged Payee, syncing each Character once, and unarchives by dropping the key', async () => {
+    const a = await createPayee(CHAR_A, { name: 'Ion Strider', defaultTaxPct: 10 });
+    const b = await createPayee(CHAR_B, { name: 'Ion Strider', defaultTaxPct: 10 });
+    syncMock.scheduleSync.mockClear();
+
+    await setPayeesArchived([a, b], true, 1_700_000_000_000);
+    expect((await db.payees.get(a.id))?.archivedAt).toBe(1_700_000_000_000);
+    expect((await db.payees.get(b.id))?.archivedAt).toBe(1_700_000_000_000);
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(2);
+
+    await setPayeesArchived([a, b], false);
+    expect('archivedAt' in (await db.payees.get(a.id))!).toBe(false);
   });
 });

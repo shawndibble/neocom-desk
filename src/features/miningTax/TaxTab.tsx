@@ -57,7 +57,7 @@ import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useUnheldCharacterItems } from './corpBook/useUnheldCharacterItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
-import { bookCreditsOf, bookDaysOf, bookOwesOf } from './owedNow';
+import { bookCreditsOf, bookDaysOf, bookOwesOf, bookOwnersOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -157,6 +157,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         credit: b.summary.credit,
       })) ?? [],
     [corpView]
+  );
+  // The Payees a book answers for, with its corporation's name: Manage Payees says so on each.
+  const bookOwners = useMemo(
+    () => bookOwnersOf([...(data?.payeesByCharacter.values() ?? [])].flat(), corpView),
+    [data?.payeesByCharacter, corpView]
   );
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
@@ -681,6 +686,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           systemNames={systemNames}
           bookCorporations={bookCorporations}
           accountOf={(id) => accounts.of(id)}
+          isArchived={(id) => accounts.isArchived(id)}
+          bookOwnerOf={(id) => {
+            if (!accounts.isBookOwned(id)) return undefined;
+            const primary = accounts.primaryIdOf(id);
+            return [...bookOwners].find(([own]) => accounts.primaryIdOf(own) === primary)?.[1];
+          }}
           onOpenLedger={(payeeId) => {
             closePayeeManager();
             actions.openLedger({ kind: 'personal', payeeId });

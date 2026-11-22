@@ -14,6 +14,7 @@ import type {
   MiningTaxPaymentLinkRecord,
   PayeeRecord,
 } from '@/db';
+import { isArchivedPayee } from '@/engine/miningTax/archivedPayee';
 import { PayeeRunningAccount, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { groupPayees } from './payeeGroups';
 import type { LinkablePayee } from './paymentLinks';
@@ -40,6 +41,12 @@ export interface PayeeRunningAccountsInput {
    * (`saveBilledElsewhere`), so every build bills the same.
    */
   billedElsewhere?: ReadonlyMap<string, number>;
+  /**
+   * The ids of the Payee records that are a Corp Tax Book's corporation (`bookOwnedPayeeIds`): the
+   * book is the only authority for what the pilot owes or has paid that corporation, so such a
+   * Payee has no account that counts (`of`), only its old history (`historyOf`), read-only.
+   */
+  bookOwned?: ReadonlySet<string>;
 }
 
 /** Every personal Payee's account, looked up by any of a merged Payee's record ids. */
@@ -47,7 +54,13 @@ export class PayeeRunningAccounts {
   private constructor(
     private readonly byPrimary: ReadonlyMap<string, PayeeRunningAccount>,
     /** Each record's id to its merged Payee's primary id. */
-    private readonly primaryOf: ReadonlyMap<string, string>
+    private readonly primaryOf: ReadonlyMap<string, string>,
+    /** The accounts of the merged Payees a book is the authority for: never counted. */
+    private readonly history: ReadonlyMap<string, PayeeRunningAccount> = new Map(),
+    /** The primary ids of the merged Payees a book is the authority for. */
+    private readonly owned: ReadonlySet<string> = new Set(),
+    /** The primary ids of the merged Payees the pilot archived (`isArchivedPayee`). */
+    private readonly archived: ReadonlySet<string> = new Set()
   ) {}
 
   static build(input: PayeeRunningAccountsInput): PayeeRunningAccounts {
@@ -71,9 +84,12 @@ export class PayeeRunningAccounts {
       const key = keyOf(l.payeeId);
       links.set(key, [...(links.get(key) ?? []), l]);
     }
+    // A merged Payee is a book's when any of its records is.
+    const owned = new Set([...(input.bookOwned ?? [])].map((id) => primaryOf.get(id) ?? id));
     const byPrimary = new Map<string, PayeeRunningAccount>();
+    const history = new Map<string, PayeeRunningAccount>();
     for (const key of new Set([...charges.keys(), ...links.keys()])) {
-      byPrimary.set(
+      (owned.has(key) ? history : byPrimary).set(
         key,
         PayeeRunningAccount.build({
           payeeId: key,
@@ -82,7 +98,20 @@ export class PayeeRunningAccounts {
         })
       );
     }
-    return new PayeeRunningAccounts(byPrimary, primaryOf);
+    // Archived: every record of the merged Payee carries it, nothing is owed, nothing is newer.
+    const archived = new Set<string>();
+    for (const group of groupPayees(input.payees)) {
+      const stamps = group.members.map((m) => m.archivedAt);
+      if (stamps.some((a) => a === undefined)) continue;
+      const account = byPrimary.get(group.primary.id);
+      if (
+        isArchivedPayee(Math.max(...(stamps as number[])), account?.owes ?? null, [
+          ...(charges.get(group.primary.id) ?? []),
+        ])
+      )
+        archived.add(group.primary.id);
+    }
+    return new PayeeRunningAccounts(byPrimary, primaryOf, history, owned, archived);
   }
 
   /** A merged Payee's primary id, for any of its records' ids. */
@@ -90,9 +119,33 @@ export class PayeeRunningAccounts {
     return this.primaryOf.get(payeeId) ?? payeeId;
   }
 
-  /** The account of the Payee a record id belongs to; undefined while nothing bills or pays it. */
+  /**
+   * The account of the Payee a record id belongs to; undefined while nothing bills or pays it, and
+   * for a Payee a book is the authority for (`isBookOwned`): its figures count nowhere.
+   */
   of(payeeId: string): PayeeRunningAccount | undefined {
     return this.byPrimary.get(this.primaryIdOf(payeeId));
+  }
+
+  /**
+   * Whether the pilot archived this Payee and it still reads archived: no card, its credit
+   * counts nowhere. Its account and ledger stay reachable (`of`) from Manage Payees.
+   */
+  isArchived(payeeId: string): boolean {
+    return this.archived.has(this.primaryIdOf(payeeId));
+  }
+
+  /** Whether a Corp Tax Book is the authority for this Payee: it is that book's corporation. */
+  isBookOwned(payeeId: string): boolean {
+    return this.owned.has(this.primaryIdOf(payeeId));
+  }
+
+  /**
+   * The old personal history of a Payee a book is the authority for, shown read-only: its balance
+   * and credit are no one's figure. Undefined for any other Payee, or one with no history.
+   */
+  historyOf(payeeId: string): PayeeRunningAccount | undefined {
+    return this.history.get(this.primaryIdOf(payeeId));
   }
 
   /** Every account, by its merged Payee's primary id. */
@@ -105,26 +158,33 @@ export class PayeeRunningAccounts {
    * is weighed against (`paymentLinks.ts`).
    */
   linkable(payees: readonly PayeeRecord[]): LinkablePayee[] {
-    return groupPayees(payees).map((g) => {
-      const account = this.byPrimary.get(g.primary.id);
-      return {
-        id: g.primary.id,
-        name: g.primary.name,
-        members: g.members,
-        owed: account?.owes?.amount ?? 0,
-        billed: (account?.charges.length ?? 0) > 0,
-      };
-    });
+    return groupPayees(payees)
+      .filter((g) => !this.owned.has(g.primary.id) && !this.archived.has(g.primary.id))
+      .map((g) => {
+        const account = this.byPrimary.get(g.primary.id);
+        return {
+          id: g.primary.id,
+          name: g.primary.name,
+          members: g.members,
+          owed: account?.owes?.amount ?? 0,
+          billed: (account?.charges.length ?? 0) > 0,
+        };
+      });
   }
 
   /** The newest day a Payee has nothing owed on or before; null while none is paid. */
   paidThroughOf(payeeId: string): string | null {
-    return this.of(payeeId)?.paidThrough ?? null;
+    return (this.of(payeeId) ?? this.historyOf(payeeId))?.paidThrough ?? null;
   }
 
-  /** Whether an Assignment's day is paid on its Payee's account. */
+  /**
+   * Whether an Assignment's day is paid on its Payee's account. A day of a Payee a book is the
+   * authority for reads off its old history, only to label the row: it is owed to no one here.
+   */
   isPaid(a: Pick<MiningTaxAssignmentRecord, 'payeeId' | 'status' | 'date'>): boolean {
-    return isBilled(a) && this.of(a.payeeId!)?.isPaid(a.date) === true;
+    return (
+      isBilled(a) && (this.of(a.payeeId!) ?? this.historyOf(a.payeeId!))?.isPaid(a.date) === true
+    );
   }
 
   /**

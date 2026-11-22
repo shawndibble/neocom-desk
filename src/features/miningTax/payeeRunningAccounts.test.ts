@@ -127,4 +127,77 @@ describe('PayeeRunningAccounts', () => {
     expect(account.charges.map((c) => c.id)).toEqual(['old']);
     expect(account.owes?.amount).toBe(40);
   });
+
+  describe('a Payee a Corp Tax Book is the authority for', () => {
+    const build = () =>
+      PayeeRunningAccounts.build({
+        assignments: [
+          assignment('a', 'p1', '2026-10-01', 100),
+          assignment('b', 'p2', '2026-10-02', 100),
+          assignment('c', 'q', '2026-10-02', 70),
+        ],
+        payees: [payee('p1', 1, 98000001), payee('p2', 2, 98000001), payee('q', 1, 5)],
+        links: [link('p1', 500, 7)],
+        bookOwned: new Set(['p2']),
+      });
+
+    it('has no account that counts: no debt, no credit, never offered a payment', () => {
+      const accounts = build();
+      // p2's record makes the whole merged Payee the book's, whichever record a caller asks by.
+      expect(accounts.isBookOwned('p1')).toBe(true);
+      expect(accounts.of('p1')).toBeUndefined();
+      expect([...accounts.entries()].map(([id]) => id)).toEqual(['q']);
+      expect(
+        accounts.linkable([payee('p1', 1, 98000001), payee('q', 1, 5)]).map((p) => p.id)
+      ).toEqual(['q']);
+    });
+
+    it('keeps its old history, read-only, with the credit it would have shown counting nowhere', () => {
+      const accounts = build();
+      expect(accounts.historyOf('p2')?.credit).toBe(300);
+      expect(accounts.of('q')?.owes?.amount).toBe(70);
+    });
+  });
+
+  describe('an archived Payee', () => {
+    const ARCHIVED = Date.UTC(2026, 9, 10);
+    const archivedPayee = (id: string, characterId: number) => ({
+      ...payee(id, characterId, 98000001),
+      archivedAt: ARCHIVED,
+    });
+
+    it('has no card, and its credit and Settle up count nowhere, while nothing new is billed', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [assignment('a', 'p1', '2026-10-01', 100)],
+        payees: [archivedPayee('p1', 1), payee('q', 1, 5)],
+        links: [link('p1', 500, 3)],
+      });
+      expect(accounts.isArchived('p1')).toBe(true);
+      expect(accounts.of('p1')?.credit).toBe(400);
+      expect(
+        accounts.linkable([archivedPayee('p1', 1), payee('q', 1, 5)]).map((p) => p.id)
+      ).toEqual(['q']);
+    });
+
+    it('shows again, by itself, once a day after it was archived is billed', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [
+          assignment('a', 'p1', '2026-10-01', 100),
+          assignment('b', 'p1', '2026-10-11', 100),
+        ],
+        payees: [archivedPayee('p1', 1)],
+        links: [link('p1', 100, 3)],
+      });
+      expect(accounts.isArchived('p1')).toBe(false);
+    });
+
+    it('is archived only when every record of a merged Payee is', () => {
+      const accounts = PayeeRunningAccounts.build({
+        assignments: [assignment('a', 'p1', '2026-10-01', 100)],
+        payees: [archivedPayee('p1', 1), payee('p2', 2, 98000001)],
+        links: [link('p1', 100, 3)],
+      });
+      expect(accounts.isArchived('p2')).toBe(false);
+    });
+  });
 });

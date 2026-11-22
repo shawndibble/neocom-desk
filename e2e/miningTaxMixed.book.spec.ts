@@ -384,44 +384,42 @@ test("the officer's Miner page shows only that book's days, not the pilot's othe
 // 4. History moving over, the pilot's side
 // ---------------------------------------------------------------------------------------------
 
-test("a corporation's new book bills the days it recorded once; the pilot's older personal days and payment stay", async ({
+test("a corporation's new book is its one card; the pilot's older personal history stays, read-only", async ({
   page,
   book,
   esi,
 }) => {
   const s = historyMovesOverScenario();
   await openMixed(page, { docs: s.docs, personal: s.personal, esi: s.esi }, book, esi);
-  const oldOwes = s.preDays.length * DAY_TAX - DAY_TAX;
   const bookOwes = s.bookDays.length * DAY_TAX;
-  // One corporation, two cards: the book's (what it bills now) and the pilot's own record of the
-  // days before it began, less what they paid then. The book's days are on the book alone.
-  await expect(page.getByRole('region', { name: 'You owe' })).toContainText(
-    `${isk(oldOwes + bookOwes)} ISK`
-  );
+  // One corporation, one card: the book's, tagged. The pilot's own Payee for the same corporation
+  // has no card, and its old balance (credit or owed) counts nowhere.
   const cards = page.getByRole('button', { name: `Open the ledger of ${CORP_NAME}` });
-  await expect(cards).toHaveCount(2);
-  const bookCard = cards.filter({ hasText: isk(bookOwes) });
-  const ownCard = cards.filter({ hasText: isk(oldOwes) });
-  await expect(bookCard).toHaveCount(1);
-  await expect(ownCard).toHaveCount(1);
-  // Two cards of one name: only the book's says it is the corporation's Corp Tax Book.
+  await expect(cards).toHaveCount(1);
+  await expect(cards).toContainText(isk(bookOwes));
   await expect(page.getByText('Corp Tax Book', { exact: true })).toHaveCount(1);
   await expect(page.getByRole('button', { name: `Show only ${CORP_NAME}'s entries` })).toHaveCount(
-    2
+    1
   );
 
-  await ownCard.click();
-  const own = ledgerOf(page, CORP_NAME);
-  // The old payment is still there, and pays the oldest of the old days; the book's days are not.
-  await expect(own.getByRole('row', { name: /Payment/ })).toContainText(isk(DAY_TAX));
-  await expect(own.getByRole('row', { name: /Mined/ })).toHaveCount(s.preDays.length);
-  await expect(own.getByRole('row', { name: new RegExp(day(s.bookDays[0]!)) })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
-  await bookCard.click();
+  await cards.click();
   const billed = ledgerOf(page, CORP_NAME);
   await expect(billed.getByRole('row', { name: /Mined at E2E Athanor Alpha/ })).toHaveCount(3);
   await expect(billed.getByRole('row', { name: /Payment/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // The old history is reachable from Manage Payees, which says the book tracks it now. It opens
+  // read-only: the pilot's old days and payment, no balance column, no status.
+  await page.getByRole('button', { name: 'Payees', exact: true }).click();
+  const manage = page.getByRole('dialog', { name: 'Manage Payees' });
+  await expect(manage).toContainText(`Tracked by ${CORP_NAME}'s Corp Tax Book now`);
+  await expect(manage.getByRole('button', { name: /^Archive/ })).toHaveCount(0);
+  await manage.getByRole('button', { name: 'Old history' }).click();
+  const own = ledgerOf(page, CORP_NAME);
+  await expect(own.getByRole('row', { name: /Payment/ })).toContainText(isk(DAY_TAX));
+  await expect(own.getByRole('row', { name: /Mined/ })).toHaveCount(s.preDays.length);
+  await expect(own.getByRole('columnheader', { name: 'Balance' })).toHaveCount(0);
+  await expect(own).not.toContainText(/Owes|Paid through| ISK credit/);
 });
 
 // ---------------------------------------------------------------------------------------------
