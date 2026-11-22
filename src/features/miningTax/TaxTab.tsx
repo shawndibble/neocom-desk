@@ -39,7 +39,12 @@ import {
 } from '@/features/miningTax/corpBook/useCorpStateText';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
-import { summarizeConflicts } from '@/features/miningTax/corpBook/conflictSummary';
+import {
+  conflictSiblings,
+  summarizeConflicts,
+} from '@/features/miningTax/corpBook/conflictSummary';
+import { planTakeover } from '@/features/miningTax/corpBook/conflictTakeover';
+import { releaseOre, restoreAssignments } from '@/features/miningTax/ledgerActions';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
 import { dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { useContinuations } from '@/features/miningTax/useContinuations';
@@ -348,6 +353,44 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     },
     [allDisplayRows, actions]
   );
+  /** What "Let {corp} bill it" would take off the member's own entries for this Conflict day. */
+  const takeoverOf = useCallback(
+    (row: BookRowView) =>
+      planTakeover(
+        row,
+        corpView ? conflictSiblings(corpView.overlay.rows, row) : [],
+        everyAssignment
+      ),
+    [corpView, everyAssignment]
+  );
+  // "The book is right": one click takes the contested ore off the member's entry, and an Undo
+  // puts it back. A day with nothing to take off opens instead, since the fix is not ore.
+  const fixConflict = useCallback(
+    async (row: BookRowView) => {
+      const { steps } = takeoverOf(row);
+      if (steps.length === 0) return openBookDay(row);
+      const result = await releaseOre(
+        steps.map((step) => ({ assignment: step.assignment, after: step.after }))
+      );
+      if (!result.ok) return setToast({ message: t('miningTax.saveFailed') });
+      const originals = steps.map((step) => step.assignment);
+      refresh();
+      setToast({
+        message: t('miningTax.corpBook.conflict.fixedToast', {
+          corp: row.corpName,
+          date: row.date,
+        }),
+        onUndo: () => void restoreAssignments(originals).then(() => refresh()),
+      });
+    },
+    [takeoverOf, openBookDay, refresh, t]
+  );
+  // One Conflict day with ore to take off: the banner fixes it in one click.
+  const quickFix = useMemo(() => {
+    const first = conflicts?.first.corp;
+    if (conflicts?.days !== 1 || first?.kind !== 'row') return undefined;
+    return takeoverOf(first.view).steps.length > 0 ? first.view : undefined;
+  }, [conflicts, takeoverOf]);
   const linkedKeys = useMemo(
     () => heldPaymentKeys(data?.paymentLinks ?? NO_LINKS),
     [data?.paymentLinks]
@@ -359,7 +402,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     madePayments,
     linked: linkedKeys,
     onPay: actions.openCorpPay,
-    onOpenDay: openBookDay,
+    onOpenDay: fixConflict,
   });
   // What the member has answered: one quiet line, out of the strip, never gone.
   const quiet = useMemo(() => {
@@ -572,6 +615,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     onAssignNext={assignNext}
                     onReviewPayments={() => actions.openLinkPayment({})}
                     conflicts={conflicts}
+                    {...(quickFix ? { onFixConflicts: () => void fixConflict(quickFix) } : {})}
                     onReviewConflicts={() => {
                       const first = conflicts?.first.corp;
                       if (first?.kind !== 'row') return;
