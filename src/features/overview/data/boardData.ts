@@ -423,6 +423,10 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     loadMailLabels(characterId),
     loadMailHeaders(characterId),
   ]);
+  // Neither read landed and the grant is fine: unknown, never "0 unread".
+  if (!labels.cached && !headers.cached && !labels.needsReauth && !headers.needsReauth) {
+    throw new Error('Mail could not be read');
+  }
   const newestFirst = (headers.cached?.data ?? [])
     .map((header) => ({
       header,
