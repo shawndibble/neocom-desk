@@ -365,6 +365,11 @@ export interface SettingsPatch {
    */
   divisionsBase?: number[];
   /**
+   * The division members are asked to pay into first. It must be one of the divisions the book
+   * reads once the edit lands; the book still credits a donation into any of them.
+   */
+  primaryDivision?: number;
+  /**
    * One division to add to the stored list inside the edit's transaction ("Count division"), so
    * two officers counting different divisions at once both land. When set, `divisions` in the
    * same patch is ignored: a client sends it only for a server that predates `addDivision`.
@@ -485,6 +490,8 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
       throw new HttpsError('invalid-argument', 'divisionsBase needs divisions');
     patch.divisionsBase = parseDivisions(d.divisionsBase, 'divisionsBase');
   }
+  if (d.primaryDivision !== undefined)
+    patch.primaryDivision = int(d.primaryDivision, 'primaryDivision', 1, 7);
   if (d.addDivision !== undefined) {
     if (patch.divisionsBase !== undefined)
       throw new HttpsError('invalid-argument', 'addDivision takes no divisionsBase');

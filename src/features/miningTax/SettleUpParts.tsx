@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, Tooltip, TextInput } from '@/components/ui';
+import { Button, FilterChip, InfoTooltip, Tooltip, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxPaymentMethod } from '@/db';
 import { SETTLE_FIELD_LABEL, SETTLE_METHODS } from './settleUpFields';
@@ -22,6 +22,7 @@ export function SettleCopyRow({
   onCopy,
   dim = false,
   openInEve,
+  hint,
 }: {
   label: string;
   value: string;
@@ -29,6 +30,8 @@ export function SettleCopyRow({
   onCopy: () => void;
   dim?: boolean;
   openInEve?: { name: string; entityId?: number; payeeId?: string };
+  /** A note on the value, as an info tooltip rather than text on the page. */
+  hint?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -44,6 +47,9 @@ export function SettleCopyRow({
           {value}
         </span>
       </Tooltip>
+      {hint && (
+        <InfoTooltip label={t('miningTax.settleUp.aboutNamed', { what: label })} content={hint} />
+      )}
       {openInEve && <PayeeOpenInEveButton {...openInEve} />}
       <Button
         size="sm"
@@ -69,12 +75,15 @@ export function SettleSentOnAndMethod({
   method,
   onMethod,
   extra,
+  methods = SETTLE_METHODS,
 }: {
   paidOn: string;
   onPaidOn: (value: string) => void;
   method: MiningTaxPaymentMethod;
   onMethod: (value: MiningTaxPaymentMethod) => void;
   extra?: ReactNode;
+  /** The ways it may have been paid; a lone one is not asked. */
+  methods?: readonly MiningTaxPaymentMethod[];
 }) {
   const { t } = useTranslation();
   return (
@@ -90,20 +99,22 @@ export function SettleSentOnAndMethod({
           className="w-full"
         />
       </div>
-      <div className="min-w-0 space-y-1 sm:flex-1">
-        <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpMethodLabel')}</p>
-        <div className="flex gap-1.5">
-          {SETTLE_METHODS.map((m) => (
-            <FilterChip
-              key={m}
-              label={t(`miningTax.settleUpMethod.${m}`)}
-              selected={method === m}
-              onToggle={() => onMethod(m)}
-              className="flex-1 justify-center"
-            />
-          ))}
+      {methods.length > 1 && (
+        <div className="min-w-0 space-y-1 sm:flex-1">
+          <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpMethodLabel')}</p>
+          <div className="flex gap-1.5">
+            {methods.map((m) => (
+              <FilterChip
+                key={m}
+                label={t(`miningTax.settleUpMethod.${m}`)}
+                selected={method === m}
+                onToggle={() => onMethod(m)}
+                className="flex-1 justify-center"
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       {extra}
     </div>
   );

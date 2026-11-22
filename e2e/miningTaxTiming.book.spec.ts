@@ -123,7 +123,7 @@ test('pilot side: a donation just sent counts at once, and is not counted again 
   book,
   esi,
 }) => {
-  const sent = { refId: 970_101, amount: DAY_TAX, back: 1 };
+  const sent = { refId: 970_101, amount: DAY_TAX, back: 1, at: justNow(30) };
   await openPilot(page, book, esi, {
     seed: pilotBook([6, 5, 4]),
     mined: [6, 5, 4],
@@ -176,7 +176,7 @@ test('officer side: nothing before the sync; after it the donation is on the rig
   await expect(officerLedger(page)).toContainText(`Days it paid${day(6)}`);
 });
 
-test('Settle up for the book records nothing on the device: the money counts only once it arrives', async ({
+test('Settle up for the book offers to record the payment, but writes nothing until pressed', async ({
   page,
   book,
   esi,
@@ -188,7 +188,7 @@ test('Settle up for the book records nothing on the device: the money counts onl
   const dialog = page.getByRole('dialog', { name: `Settle up — ${CORP_NAME}` });
   await expect(dialog).toContainText(`Amount${isk(3 * DAY_TAX)} ISK`);
   await expect(dialog).toContainText(`Reason${CODE}`);
-  await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   // Nothing was written: the pilot has not paid, so nothing is counted as paid.

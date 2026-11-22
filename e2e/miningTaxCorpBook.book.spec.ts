@@ -1,7 +1,7 @@
 /**
  * The pilot's Tax tab with two Payees (decision 20261120-235011): their corporation's Corp Tax
  * Book, whose figures are read off the book's Running account, and a personal Payee kept on the
- * device. Settle up for the book shows the Miner's one payment code and records nothing; a
+ * device. Settle up for the book shows the Miner's one payment code and can record the payment; a
  * donation counts while in flight and stays counted once the book credits it; an alt grouped with
  * the pilot but not added is named; a transfer to the book's corporation is never offered to a
  * personal Payee.
@@ -21,6 +21,7 @@ import {
   donationSent,
   memberBook,
 } from './support/taxBook/memberSeed';
+import { justNow } from './support/taxBook/timingScenarios';
 import {
   ROOK,
   assignment,
@@ -103,7 +104,7 @@ test("a book's credited payment pays its oldest days on the pilot's ledger", asy
   await expect(corp.getByRole('row', { name: /Payment/ })).toContainText(isk(DAY_TAX));
 });
 
-test("Settle up for the book shows the Miner's code and records nothing", async ({
+test("Settle up for the book shows the Miner's code and can record the payment", async ({
   page,
   book,
   esi,
@@ -115,7 +116,7 @@ test("Settle up for the book shows the Miner's code and records nothing", async 
   await expect(dialog).toContainText(`Amount${isk(member.owed)} ISK`);
   await expect(dialog).toContainText(`Reason${minerPaymentCode(PILOT_MINER_ID)}`);
   await expect(dialog.getByRole('status').getByRole('listitem')).toHaveCount(3);
-  await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Record payment' })).toHaveCount(1);
 });
 
 test('a donation in flight counts at once and stays counted once the book credits it', async ({
@@ -123,7 +124,7 @@ test('a donation in flight counts at once and stays counted once the book credit
   book,
   esi,
 }) => {
-  const sent = { refId: 960_002, amount: DAY_TAX, back: 1 };
+  const sent = { refId: 960_002, amount: DAY_TAX, back: 1, at: justNow(30) };
   const member = await openTax(page, book, esi, {
     journal: [donationSent({ ...sent, to: CORP, reason: minerPaymentCode(PILOT_MINER_ID) })],
     personal: false,

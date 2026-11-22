@@ -8243,7 +8243,14 @@
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
-        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you."
+        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
+        "safeHere": "Safe to pay — {{date}} is closed (synced {{ago}}).",
+        "safeOnceHere": "Safe to pay once the book syncs (last synced {{ago}}).",
+        "neverSyncedHere": "Safe to pay once the book syncs (never synced).",
+        "openDayHere": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and the book's next sync.",
+        "creditHere": "{{amount}} ISK credit pays your next days.",
+        "openingOwesHere": "Opening balance from the old system: you owe {{amount}} ISK.",
+        "openingCreditHere": "Opening balance from the old system: {{amount}} ISK credit held for you."
       },
       "diff": {
         "fixRecords": "Fix my records",
@@ -8360,7 +8367,8 @@
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
         "codeOf": "{{character}} · code:",
-        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first."
+        "alsoAccepted": "The book also counts a donation into: {{accounts}}.",
+        "codeInReason": "The Reason starts with your own code, which tells the book the money is yours, then the days this pays (month-day). A payment pays your oldest unpaid days first."
       },
       "attention": {
         "overdueTitle": "{{corp}} Late notice {{period}}, sent {{date}}, not paid yet",
@@ -8686,6 +8694,7 @@
       "toLabel": "To",
       "reasonLabel": "Reason",
       "copyNamed": "Copy {{what}}",
+      "aboutNamed": "About {{what}}",
       "differentAmountAction": "Sent a different amount?",
       "differentAmountHide": "Sent the full amount",
       "sentAmountLabel": "Amount you sent",
@@ -19673,6 +19682,8 @@
         "startLocked": "The start date ({{date}}) is before {{lock}}, in locked history, so it is locked.",
         "grace": "Grace after day end (hours)",
         "divisions": "Wallet divisions donations are read from",
+        "primaryDivision": "Preferred account to pay into",
+        "primaryDivisionHint": "Miners are asked to pay into this one first. A donation into any other division above is still counted.",
         "division": "Division {{n}}",
         "extractions": "Extractions",
         "chunk": "Chunk rate (m³ per hour)",

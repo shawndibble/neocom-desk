@@ -22,7 +22,7 @@ _Recorded 2026-11-15 · issue #6204._
   notices, payments and the book's Overdue days a member already reads. Declarations are
   officer-only, so the member's date ignores a declaration's pause.
 - **A donation the book synced past stops counting.** An in-flight donation counts as paid until
-  the book's last sync is 3 days or more after it (`UNCREDITED_AFTER_DAYS`); then it no longer
+  the book read its wallet 2 hours or more after it (`UNCREDITED_AFTER_HOURS`; was 3 days, shortened in 20261122); then it no longer
   pays any day and an attention item says "{corp} hasn't credited your {isk} donation of {date}
   — check the wallet division", naming the divisions the book reads. The Late notice mail and the
   verify page name those divisions as EVE's "Account" (the corp's own name when a Director

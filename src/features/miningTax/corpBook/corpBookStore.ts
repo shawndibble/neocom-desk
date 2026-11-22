@@ -81,6 +81,8 @@ export interface LoadedCorpBook {
   oreForm: 'compressed' | 'raw';
   /** The book's divisions, division 1 by default — where a donation should go. */
   divisions: number[];
+  /** The division to pay into first, when the book chose one (`primaryDivisionOf`). */
+  primaryDivision?: number;
   /** The corp's own names for those divisions, when a Director's visit stored them (#6161). */
   divisionNames?: DivisionNames;
   /** Who a member's tax question is also mailed to; absent → the CEO. */

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { otherDivisions, readUncounted, uncountedToShow } from './uncounted';
+import {
+  divisionsPrimaryFirst,
+  otherDivisions,
+  primaryDivisionOf,
+  readUncounted,
+  uncountedToShow,
+} from './uncounted';
 
 describe('otherDivisions', () => {
   it('is every wallet division the book does not read', () => {
@@ -55,5 +61,25 @@ describe('readUncounted', () => {
       }).donations.map((u) => u.id)
     ).toEqual(['j2_1']);
     expect(readUncounted(undefined).donations).toEqual([]);
+  });
+});
+
+describe('primaryDivisionOf', () => {
+  it('is the chosen primary when the book reads it', () => {
+    expect(primaryDivisionOf([1, 3], 3)).toBe(3);
+  });
+
+  it('falls back to the first division when none was chosen, or the chosen one is no longer read', () => {
+    expect(primaryDivisionOf([2, 3], undefined)).toBe(2);
+    expect(primaryDivisionOf([2, 3], 5)).toBe(2);
+  });
+
+  it('is the Master Wallet for a book with no divisions', () => {
+    expect(primaryDivisionOf([], undefined)).toBe(1);
+  });
+
+  it('lists the primary first and the rest in order', () => {
+    expect(divisionsPrimaryFirst([1, 2, 4], 4)).toEqual([4, 1, 2]);
+    expect(divisionsPrimaryFirst([1, 2, 4], undefined)).toEqual([1, 2, 4]);
   });
 });

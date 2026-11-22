@@ -4,6 +4,7 @@ import type { PayeeRecord } from '@/db';
 import { useTicker } from '@/lib/ticker';
 import { useRetainedResult } from '@/lib/useRetainedResult';
 import type { DatedUnitPrices } from '@/features/miningTax/pricing';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow, TrackedCharacter } from '../snapshot';
 import { teachRefinerySystems, type LoadedCorpBook } from './corpBookStore';
@@ -30,6 +31,8 @@ interface Args {
   madePayments: readonly MadePayment[];
   /** The Made Payments links hold: never a donation in flight to a book too. */
   linked?: ReadonlySet<string>;
+  /** Every stored payment link: the ones recorded to a book's Payee are donations in flight. */
+  recorded?: readonly PayeePaymentLink[];
   /** The member's stored Payees, to connect the one that is a book's corporation. */
   payees: readonly PayeeRecord[];
   /** Changes whenever the ledger was reloaded, so the books are read again with it. */
@@ -65,6 +68,7 @@ export function useCorpBookView({
   reloadKey,
   hiddenCorps = NONE_HIDDEN,
   linked,
+  recorded,
 }: Args): {
   view: CorpBookView | null;
   /** This mount's own read of the books has landed; until then `view` is built from the last good copy. */
@@ -204,12 +208,25 @@ export function useCorpBookView({
               payees,
               made: madePayments,
               linked,
+              ...(recorded ? { recorded } : {}),
               characterNames: new Map(characters.map((c) => [c.characterId, c.characterName])),
               now: new Date(nowMs).toISOString(),
             },
             (corp) => t('miningTax.corpBook.payeeName', { corp })
           ),
-    [rows, shownBooks, pricesByCorp, corpNames, payees, madePayments, linked, characters, nowMs, t]
+    [
+      rows,
+      shownBooks,
+      pricesByCorp,
+      corpNames,
+      payees,
+      madePayments,
+      linked,
+      recorded,
+      characters,
+      nowMs,
+      t,
+    ]
   );
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   // Names that failed to resolve are settled too (`loadCorpNames` is empty then): never a wait forever.

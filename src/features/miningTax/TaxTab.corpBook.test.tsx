@@ -268,7 +268,7 @@ function viewWith(
 describe('uncredited donations in the attention strip', () => {
   it('gives one book one item, however many of its donations are uncredited', async () => {
     hoisted.view = viewWith(everyDivisionBook, [
-      // Both are older than UNCREDITED_AFTER_DAYS before the book's last sync (18 Oct 12:00).
+      // Both are older than UNCREDITED_AFTER_HOURS before the book's last sync (18 Oct 12:00).
       donation(1, '2026-10-11T22:38:00.000Z', 26_952_549),
       donation(2, '2026-10-13T01:21:00.000Z', 1_824_664),
     ]);

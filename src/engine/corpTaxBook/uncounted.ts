@@ -17,6 +17,28 @@ export {
 /** Wallet divisions a corporation has. */
 export const WALLET_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 
+/**
+ * The Account a miner is asked to pay into: the book's chosen primary when it is one of the
+ * divisions it reads, else the first of them (a book that never chose one), else the Master Wallet.
+ * A book reads donations from any of its divisions; the primary is only the preferred one.
+ */
+export function primaryDivisionOf(
+  divisions: readonly number[],
+  primary: number | undefined
+): number {
+  if (primary !== undefined && divisions.includes(primary)) return primary;
+  return divisions[0] ?? 1;
+}
+
+/** The book's divisions with its primary first, the rest in division order. */
+export function divisionsPrimaryFirst(
+  divisions: readonly number[],
+  primary: number | undefined
+): number[] {
+  const first = primaryDivisionOf(divisions, primary);
+  return [first, ...divisions.filter((d) => d !== first)];
+}
+
 /** The wallet divisions the book does not read. */
 export function otherDivisions(divisions: readonly number[]): number[] {
   return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
