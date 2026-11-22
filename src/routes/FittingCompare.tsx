@@ -135,9 +135,11 @@ export function FittingCompare() {
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   // Slots whose stats calculated. A slot that failed is left out of the table (its column shows a
   // dash) so one bad Fitting doesn't hide the rest; best/differs are worked out over these only.
+  // `stats.values` can still be longer than `fittings` for a render after a slot is removed, so a
+  // slot also needs its Fitting.
   const okSlots = useMemo(
-    () => stats.values.flatMap((s, index) => (s ? [index] : [])),
-    [stats.values]
+    () => stats.values.flatMap((s, index) => (s && fittings[index] ? [index] : [])),
+    [stats.values, fittings]
   );
   const settled =
     count > 0 &&

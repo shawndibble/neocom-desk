@@ -19051,6 +19051,7 @@
           "declare": "declared a payment",
           "resolveDeclaration": "answered a declaration",
           "recordReminder": "sent a reminder",
+          "verifyMinerTotals": "flagged Miner totals that need a look",
           "recordMail": "mailed a late notice",
           "recordAccounts": "counted Miners' accounts for their pay page",
           "stopReminders": "stopped reminders",
