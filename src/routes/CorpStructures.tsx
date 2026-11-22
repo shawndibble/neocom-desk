@@ -350,15 +350,15 @@ export function CorpStructures() {
               </span>
             );
           return (
-            <span className="flex flex-col items-end">
+            <span className="sm:flex sm:flex-col sm:items-end">
               <span className="tabular-nums">{formatCount(fuel.blocks)}</span>
               {fuel.plan.ratePending && (
-                <span className="text-xs text-text-dim">
+                <span className="text-xs text-text-dim max-sm:hidden">
                   {t('corp.structures.fuelPlan.ratePending')}
                 </span>
               )}
               {fuel.plan.perDay !== null && (
-                <span className="text-xs text-text-dim">
+                <span className="text-xs text-text-dim max-sm:hidden">
                   {t(
                     fuel.plan.rateSource === 'remembered'
                       ? 'corp.structures.fuelPlan.perDayRemembered'
@@ -425,8 +425,8 @@ export function CorpStructures() {
           const online = row.source.services.filter((service) => service.state === 'online');
           if (row.source.services.length === 0)
             return <span data-dense-omit>{t('corp.structures.servicesNone')}</span>;
-          return (
-            <span data-dense-omit>
+          const services = (
+            <span data-dense-omit className={row.offline.length > 0 ? 'max-sm:hidden' : undefined}>
               {t('corp.structures.servicesOnline', { count: online.length })}
               {row.offline.length > 0 && (
                 <span className="text-danger">
@@ -435,6 +435,18 @@ export function CorpStructures() {
                 </span>
               )}
             </span>
+          );
+          // The phone card prints no Services text, so it names the offline ones as one token:
+          // a second child keeps the cell on the meta line past the `data-dense-omit` rule.
+          return row.offline.length === 0 ? (
+            services
+          ) : (
+            <>
+              {services}
+              <span className="text-danger sm:hidden">
+                {t('corp.structures.offlineCount', { count: row.offline.length })}
+              </span>
+            </>
           );
         },
         sortValue: (row) => row.offline.length,
