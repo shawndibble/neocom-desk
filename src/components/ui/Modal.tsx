@@ -319,13 +319,14 @@ export function Modal({
           </PortalContainerProvider>
         )}
       </dialog>
-      {askingDiscard && (
+      {open && askingDiscard && (
         <ConfirmDialog
           open
           title={t('common.discardInputTitle')}
           body={t('common.discardInputBody')}
           actionLabel={t('common.discardInputConfirm')}
           cancelLabel={t('common.discardInputKeep')}
+          closeOnBack={false}
           onConfirm={async () => {
             onClose();
           }}
