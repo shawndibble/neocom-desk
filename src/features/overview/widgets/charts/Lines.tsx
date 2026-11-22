@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { cx } from '@/lib/cx';
 import { ChartHover } from './ChartHover';
 import { linesRuns, runFills } from './geometry';
@@ -15,7 +15,6 @@ const DIMMED = 0.25;
  * aria-hidden; the summary carries the meaning and the hover reads every line.
  */
 export function Lines({ model, height }: { model: LinesChartModel; height: number }) {
-  const gradient = `fill-${useId().replace(/:/g, '')}`;
   const [active, setActive] = useState<string | null>(null);
   const runs = linesRuns(
     model.series.map((s) => s.values),
@@ -37,22 +36,13 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
           >
             {single && (
               <>
-                <defs>
-                  <linearGradient id={gradient} x1="0" x2="0" y1="0" y2="1">
-                    <stop
-                      offset="0"
-                      stopColor={CHART_COLOR[model.series[0]!.color]}
-                      stopOpacity="0.35"
-                    />
-                    <stop
-                      offset="1"
-                      stopColor={CHART_COLOR[model.series[0]!.color]}
-                      stopOpacity="0"
-                    />
-                  </linearGradient>
-                </defs>
                 {runFills(runs[0]!, height).map((points, n) => (
-                  <polygon key={`fill:${n}`} points={points} fill={`url(#${gradient})`} />
+                  <polygon
+                    key={`fill:${n}`}
+                    points={points}
+                    fill={CHART_COLOR[model.series[0]!.color]}
+                    fillOpacity="0.14"
+                  />
                 ))}
               </>
             )}
