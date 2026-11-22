@@ -3,6 +3,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  FieldError,
   LiveStatus,
   Modal,
   NativeSelect,
@@ -417,6 +418,8 @@ export function ComposeRequestDialog({
                 className="divide-y divide-line rounded-xs border border-line"
               >
                 {lines.map(({ key, line, quantityValid, specValid, duplicate }) => {
+                  const quantityErrorId = `${id}-q-${key}`;
+                  const specErrorId = `${id}-s-${key}`;
                   const e = edits[key];
                   const blueprint = isBlueprintName(line.name);
                   return (
@@ -430,6 +433,7 @@ export function ComposeRequestDialog({
                             name: line.name,
                           })}
                           aria-invalid={!quantityValid || undefined}
+                          aria-describedby={!quantityValid ? quantityErrorId : undefined}
                           className="w-28 tabular-nums"
                           value={e?.quantity ?? String(line.quantity)}
                           onChange={(ev) => edit(key, { quantity: ev.target.value })}
@@ -484,6 +488,7 @@ export function ComposeRequestDialog({
                                   size="sm"
                                   inputMode="numeric"
                                   aria-invalid={!specValid || undefined}
+                                  aria-describedby={!specValid ? specErrorId : undefined}
                                   className="w-16 tabular-nums"
                                   value={
                                     e?.[field] ??
@@ -494,6 +499,16 @@ export function ComposeRequestDialog({
                               </label>
                             ))}
                         </div>
+                      )}
+                      {!quantityValid && (
+                        <FieldError id={quantityErrorId} className="block text-xs">
+                          {t('communities.board.compose.quantityInvalid', { name: line.name })}
+                        </FieldError>
+                      )}
+                      {line.kind === 'bpc' && !specValid && (
+                        <FieldError id={specErrorId} className="block text-xs">
+                          {t('communities.board.compose.specInvalid', { name: line.name })}
+                        </FieldError>
                       )}
                       {duplicate && (
                         <InlineError>
@@ -541,7 +556,7 @@ export function ComposeRequestDialog({
         {error && <InlineError>{error}</InlineError>}
         <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
         <DialogFooter>
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>

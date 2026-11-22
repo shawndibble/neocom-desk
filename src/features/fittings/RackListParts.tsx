@@ -221,6 +221,7 @@ export function CountInput({
       {label}
       <TextInput
         type="number"
+        inputMode="numeric"
         min={min}
         max={Number.isFinite(max) ? max : undefined}
         size="sm"
