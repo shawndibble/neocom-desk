@@ -97,7 +97,7 @@ export function VettingRawData({ characterId, corporationId, reviewId, tab, sour
 
   const reportPath = reviewPath(tab, reviewId);
   const frame = (body: ReactNode, crumb = t('vetting.data.crumbPlain')) => (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4">
       <Link to={reportPath} className={cx(textActionClassName(), 'inline-flex w-fit text-sm')}>
         <span aria-hidden="true">‹&nbsp;</span>
         {crumb}

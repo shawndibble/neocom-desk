@@ -396,7 +396,10 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
       ) : needsReauth && (!headersResult || rows.length === 0) ? (
         // A lapsed grant with no saved mail: the full banner. With saved mail
         // the list stays and a small note sits above it.
-        <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterMailHeaders']} />
+        <>
+          {newMailPanel}
+          <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterMailHeaders']} />
+        </>
       ) : error ? (
         (newMailPanel ?? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

@@ -334,6 +334,23 @@ describe('Mail', () => {
     expect(screen.queryByText(/no mail saved yet/i)).not.toBeInTheDocument();
   });
 
+  it('Compose still opens the composer, beside the re-login prompt, when the mail scope was revoked', async () => {
+    useDesktopViewport();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const user = userEvent.setup();
+    renderMailRoute();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
+    await user.click(
+      within(document.querySelector('header')!).getByRole('button', { name: 'Compose' })
+    );
+    expect(await screen.findByRole('region', { name: 'New mail' })).toBeInTheDocument();
+    expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
+  });
+
   it('shows an Inbox/Corp/Alliance/Sent toggle group, all on, with unread counts from /mail/labels', async () => {
     renderMailRoute();
     const group = await screen.findByRole('group', { name: 'Mail folders' });

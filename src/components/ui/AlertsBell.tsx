@@ -52,8 +52,8 @@ export function AlertsBell({ showWhenEmpty }: { showWhenEmpty?: boolean }) {
             <span
               aria-hidden="true"
               className={cx(
-                'absolute -top-1 -right-1 min-w-4 rounded-xs px-1 text-center text-[0.625rem] leading-4 font-semibold tabular-nums',
-                danger ? 'bg-danger text-bg' : 'bg-accent text-bg'
+                'absolute -top-1 -right-1 min-w-4 rounded-xs px-1 text-center text-[0.625rem] leading-4 font-semibold text-bg tabular-nums',
+                danger ? 'bg-danger' : 'bg-accent'
               )}
             >
               {count > 99 ? '99+' : count}

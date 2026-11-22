@@ -127,7 +127,7 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
     return <Spinner block="page" label={t('common.loading')} />;
   }
   const page = (meta: string | undefined, body: React.ReactNode) => (
-    <div className="mx-auto max-w-2xl space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title={t('vetting.request.title')} meta={meta} />
       {body}
     </div>
