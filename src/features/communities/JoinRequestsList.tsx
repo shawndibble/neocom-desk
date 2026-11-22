@@ -63,7 +63,7 @@ export function JoinRequestsList({
                 <Button
                   size="sm"
                   variant="primary"
-                  disabled={busy !== null}
+                  aria-disabled={busy !== null || undefined}
                   loading={busy === request.uid}
                   onClick={() => void decide(request, true)}
                 >
@@ -73,7 +73,7 @@ export function JoinRequestsList({
               <NeedsConnection>
                 <Button
                   size="sm"
-                  disabled={busy !== null}
+                  aria-disabled={busy !== null || undefined}
                   onClick={() => void decide(request, false)}
                 >
                   {t('communities.requests.decline')}

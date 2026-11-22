@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, NativeSelect } from '@/components/ui';
+import { Button, Modal, NativeSelect, Tooltip } from '@/components/ui';
 import { askToCopyPrefill, type AskToCopyOffer } from '@/engine/communities/askToCopy';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -56,14 +56,16 @@ export function AskToCopyDialog({
           <Button size="sm" onClick={onClose}>
             {t('communities.cancel')}
           </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={pick === ''}
-            onClick={() => setChosen(pick)}
-          >
-            {t('communities.askToCopy.continue')}
-          </Button>
+          <Tooltip content={pick === '' ? t('common.nothingSelected') : null}>
+            <Button
+              size="sm"
+              variant="primary"
+              aria-disabled={pick === '' || undefined}
+              onClick={() => setChosen(pick)}
+            >
+              {t('communities.askToCopy.continue')}
+            </Button>
+          </Tooltip>
         </DialogFooter>
       </AskToCopyShell>
     );

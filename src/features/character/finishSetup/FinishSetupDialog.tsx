@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, CharacterAvatar, Checkbox, Modal } from '@/components/ui';
+import { Button, CharacterAvatar, Checkbox, Modal, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import {
@@ -115,14 +115,16 @@ export function FinishSetupDialog({
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button onClick={onNotNow}>{t(k('notNow'))}</Button>
-            <Button
-              variant="primary"
-              disabled={chosen.length === 0}
-              loading={busy}
-              onClick={() => leaveForEve(() => onContinue(chosen))}
-            >
-              {t(k('continue'))}
-            </Button>
+            <Tooltip content={chosen.length === 0 ? t(k('pickFirst')) : null}>
+              <Button
+                variant="primary"
+                aria-disabled={chosen.length === 0 || undefined}
+                loading={busy}
+                onClick={() => leaveForEve(() => onContinue(chosen))}
+              >
+                {t(k('continue'))}
+              </Button>
+            </Tooltip>
           </div>
         }
       >

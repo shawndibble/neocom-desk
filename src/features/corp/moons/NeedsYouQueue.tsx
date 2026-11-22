@@ -450,8 +450,8 @@ export function NeedsYouQueue() {
                           <button
                             type="button"
                             className={secondaryActionClassName}
-                            disabled={busy}
-                            onClick={() => void countDivision(divisionToCount)}
+                            aria-disabled={busy || undefined}
+                            onClick={busy ? undefined : () => void countDivision(divisionToCount)}
                           >
                             {t('corpTaxBook.moons.needs.declaration.count', {
                               division: divisionToCount,
@@ -488,7 +488,7 @@ export function NeedsYouQueue() {
                         <Button
                           size="sm"
                           onClick={() => void remind(item)}
-                          disabled={corporationName === null}
+                          aria-disabled={corporationName === null || undefined}
                         >
                           {t('corpTaxBook.moons.needs.overdue.remind')}
                         </Button>
@@ -585,7 +585,7 @@ export function NeedsYouQueue() {
                         <Button
                           size="sm"
                           onClick={() => void remind(item)}
-                          disabled={corporationName === null}
+                          aria-disabled={corporationName === null || undefined}
                         >
                           {t('corpTaxBook.moons.needs.leaver.remind')}
                         </Button>
@@ -717,8 +717,8 @@ export function NeedsYouQueue() {
                   <button
                     type="button"
                     className={secondaryActionClassName}
-                    disabled={busy}
-                    onClick={() => void dismissDeclined(a.characterId)}
+                    aria-disabled={busy || undefined}
+                    onClick={busy ? undefined : () => void dismissDeclined(a.characterId)}
                   >
                     {t('corpTaxBook.moons.needs.declinedGrouping.dismiss')}
                   </button>
@@ -756,8 +756,8 @@ export function NeedsYouQueue() {
                   <button
                     type="button"
                     className={secondaryActionClassName}
-                    disabled={busy}
-                    onClick={() => void answerUncounted(u, 'notTax')}
+                    aria-disabled={busy || undefined}
+                    onClick={busy ? undefined : () => void answerUncounted(u, 'notTax')}
                   >
                     {t('corpTaxBook.moons.needs.uncounted.notTax')}
                   </button>

@@ -20,7 +20,10 @@ describe('PickCorpsDialog', () => {
     expect(screen.getAllByRole('checkbox').every((c) => !(c as HTMLInputElement).checked)).toBe(
       true
     );
-    expect(screen.getByRole('button', { name: 'Continue with 0 corps' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continue with 0 corps' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('ticks, ticks all, clears and continues with the chosen corps', async () => {

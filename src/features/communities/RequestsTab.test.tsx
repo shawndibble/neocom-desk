@@ -409,13 +409,19 @@ describe('New request dialog', () => {
     const user = userEvent.setup();
     renderTab([]);
     await user.click(screen.getByRole('button', { name: 'New request' }));
-    expect(await screen.findByRole('button', { name: 'Post request' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Post request' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await user.click(screen.getByLabelText(/Paste a list/));
     await user.paste('Tritanium 5');
     const quantity = await screen.findByLabelText('Tritanium quantity');
     await user.clear(quantity);
     await user.type(quantity, 'lots');
-    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Post request' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('shows the cap message when the server refuses', async () => {
@@ -437,7 +443,10 @@ describe('New request dialog', () => {
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste(Array.from({ length: 51 }, (_, i) => `Bulk ${i + 1} 5`).join('\n'));
     expect(await screen.findByText(/Over the 50-line limit by 1/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Post request' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await user.click(screen.getByRole('button', { name: 'Remove Bulk 1' }));
     expect(screen.queryByText(/-line limit/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Post request' })).toBeEnabled();
@@ -680,7 +689,10 @@ describe('Pledging', () => {
     const field = within(panel).getByLabelText(/Quantity you can provide/);
     await user.clear(field);
     await user.type(field, '1.5');
-    expect(within(panel).getByRole('button', { name: 'Pledge' })).toBeDisabled();
+    expect(within(panel).getByRole('button', { name: 'Pledge' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(within(panel).getByText('Enter a whole number above 0.')).toBeInTheDocument();
   });
 

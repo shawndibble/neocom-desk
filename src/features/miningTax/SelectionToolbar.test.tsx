@@ -58,7 +58,7 @@ describe('SelectionToolbar', () => {
     );
     expect(visibleReasons(container)).toHaveLength(0);
     const settle = screen.getByRole('button', { name: /settle up/i });
-    expect(settle).toBeDisabled();
+    expect(settle).toHaveAttribute('aria-disabled', 'true');
     expect(settle).toHaveAccessibleDescription(SETTLE_REASON);
     expect(screen.getByRole('button', { name: /link payment/i })).toHaveAccessibleDescription(
       SETTLE_REASON

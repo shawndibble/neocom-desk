@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Button, Modal, Tooltip } from '@/components/ui';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { MakeMethod } from '@/engine/industry/makeOrBuy';
 import { CraftScopeChips, BuildStrategySelect } from './autoBuildShared';
@@ -74,13 +74,23 @@ export function AutoBuildControl({
           <BuildStrategySelect strategy={strategy} onChange={setStrategy} size="sm" />
         </label>
         <CraftScopeChips scope={scope} />
-        <Button
-          size="sm"
-          onClick={() => setConfirmOpen(true)}
-          disabled={disabled || maxDepth === 0}
+        <Tooltip
+          content={
+            disabled
+              ? t('industry.autoBuildWaiting')
+              : maxDepth === 0
+                ? t('industry.autoBuildNothing')
+                : null
+          }
         >
-          {t('industry.autoBuildApply')}
-        </Button>
+          <Button
+            size="sm"
+            onClick={() => setConfirmOpen(true)}
+            aria-disabled={disabled || maxDepth === 0 || undefined}
+          >
+            {t('industry.autoBuildApply')}
+          </Button>
+        </Tooltip>
         {trailing && <div className="ml-auto flex items-center gap-1">{trailing}</div>}
       </div>
 

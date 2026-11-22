@@ -188,8 +188,11 @@ describe('CustomizePermissionsDialog', () => {
     expect(wallet).toBeDisabled();
     expect(
       screen.getByRole('button', { name: /log in with selected permissions/i })
-    ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Select all' })).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Select all' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     // Hydration lands.
     useCustomizePermissionsSelection.setState({ hydrated: true, hydrate: realHydrate });

@@ -96,7 +96,7 @@ export function GroupingQuestions({
                     <Button
                       size="sm"
                       variant="primary"
-                      disabled={busy !== null}
+                      aria-disabled={busy !== null || undefined}
                       onClick={() => void run(id, signedIn.has(id) ? 'confirmed' : 'login')}
                     >
                       {signedIn.has(id)
@@ -106,7 +106,7 @@ export function GroupingQuestions({
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={busy !== null}
+                      aria-disabled={busy !== null || undefined}
                       onClick={() => void run(id, 'declined')}
                     >
                       {t('corpTaxBook.verify.grouping.decline')}

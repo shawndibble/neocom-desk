@@ -1,9 +1,34 @@
 /** Pieces the item menu's per-item files share. */
 import { useTranslation } from 'react-i18next';
-import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from '@/components/ui';
+import type { ReactNode } from 'react';
+import {
+  DisabledMenuItem,
+  MenuItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
+} from '@/components/ui';
 import type { FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import type { FittingItemActions } from '../fittingItemActions';
 import { slotName } from './menuContext';
+
+/** A menu item that stays focusable when `reason` is set, stating it in a tooltip instead of going native-disabled. */
+export function GuardedMenuItem({
+  reason,
+  onSelect,
+  children,
+}: {
+  reason: string | null;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
+  return reason === null ? (
+    <MenuItem onSelect={onSelect}>{children}</MenuItem>
+  ) : (
+    <DisabledMenuItem reason={reason}>{children}</DisabledMenuItem>
+  );
+}
 
 /**
  * "Put <charge> in cargo…": the cargo quantity dialog for the charge a module
@@ -44,7 +69,11 @@ export function ChangeChargeItems({
   const inCargo = actions.charges.cargoChargesFor(module).filter((id) => id !== current);
   const others = actions.chargesFor(module).filter((id) => id !== current && !inCargo.includes(id));
   if (inCargo.length === 0 && others.length === 0) {
-    return <MenuItem disabled>{t('fittings.item.noCharges')}</MenuItem>;
+    return (
+      <DisabledMenuItem reason={t('fittings.item.noCharges')}>
+        {t('fittings.item.noCharges')}
+      </DisabledMenuItem>
+    );
   }
   const item = (chargeTypeId: number, fromCargo: boolean) => (
     <MenuItem
@@ -77,14 +106,14 @@ export function ChargeLoadItems({
   const targets = actions.charges.targetsFor(typeId);
   return (
     <>
-      <MenuItem
-        disabled={targets.length === 0}
+      <GuardedMenuItem
+        reason={targets.length === 0 ? t('fittings.item.noneTakes') : null}
         onSelect={() => actions.charges.load(typeId, { fromCargo })}
       >
         {targets.length === 0
           ? t('fittings.item.noneTakes')
           : t('fittings.item.loadAllCompatibleCount', { count: targets.length })}
-      </MenuItem>
+      </GuardedMenuItem>
       {targets.length > 0 && (
         <MenuSub>
           <MenuSubTrigger>{t('fittings.item.loadInto')}</MenuSubTrigger>

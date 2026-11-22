@@ -122,12 +122,16 @@ describe('MoonTaxRow', () => {
   it('stays disabled until there is a name and a rate from 0 to 100, then creates the Payee', async () => {
     renderRow();
     const open = screen.getByRole('button', { name: 'Assign Taxes' });
-    expect((open as HTMLButtonElement).disabled).toBe(true);
+    expect((open as HTMLButtonElement).getAttribute('aria-disabled')).toBe('true');
     type('Who gets the tax', 'New Corp');
     type('Tax rate, percent', '150');
-    await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() =>
+      expect((open as HTMLButtonElement).getAttribute('aria-disabled')).toBe('true')
+    );
     type('Tax rate, percent', '12');
-    await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((open as HTMLButtonElement).getAttribute('aria-disabled')).toBeNull()
+    );
     fireEvent.click(open);
     await waitFor(async () => expect(await db.payees.count()).toBe(1));
     expect((await db.payees.toArray())[0]).toMatchObject({
@@ -144,7 +148,9 @@ describe('MoonTaxRow', () => {
     type('Who gets the tax', 'Moon 1 Planet 2');
     type('Tax rate, percent', '12');
     const open = screen.getByRole('button', { name: 'Assign Taxes' });
-    await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((open as HTMLButtonElement).getAttribute('aria-disabled')).toBeNull()
+    );
     fireEvent.click(open);
     expect((await screen.findByRole('alert')).textContent).toBe(
       "No corporation or character in EVE is named Moon 1 Planet 2, so it can't be your Payee. Whoever set this Survey up can correct the name."

@@ -94,7 +94,15 @@ export function useEditorShare(
     return {
       items: (
         <>
-          <DropdownMenuItem disabled={!online} onSelect={() => void toggle(only)}>
+          <DropdownMenuItem
+            aria-disabled={!online || undefined}
+            // Focusable so the offline note below can be read; selecting does nothing.
+            onSelect={(event) => {
+              if (!online) event.preventDefault();
+              else void toggle(only);
+            }}
+            className="aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+          >
             {label(only)}
           </DropdownMenuItem>
           {offlineReason}

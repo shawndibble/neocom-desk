@@ -54,7 +54,7 @@ describe('ImportClipboardDialog', () => {
     expect(screen.getByLabelText(/paste an eft fit/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /choose a \.emp or \.xml file/i })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Import' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /parse|paste from clipboard/i })).toBeNull();
   });
@@ -148,7 +148,7 @@ describe('ImportClipboardDialog', () => {
     await user.upload(input, planFile());
     expect(await screen.findByText('Gunnery IV')).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Apply' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('takes a plan file dropped on the dialog the same way', async () => {

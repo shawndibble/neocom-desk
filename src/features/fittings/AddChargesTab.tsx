@@ -187,7 +187,7 @@ export function ChargesTab({
                           <button
                             type="button"
                             aria-pressed={loaded}
-                            disabled={!onLoadCharge}
+                            aria-disabled={!onLoadCharge || undefined}
                             onClick={() => onLoadCharge?.(choice.typeId)}
                             className={chargeRowClassName(
                               loaded,

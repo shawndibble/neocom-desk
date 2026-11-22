@@ -256,8 +256,8 @@ export function TypeDetail({
                 c.typeId,
                 <button
                   type="button"
-                  disabled={!onLoad || c.skillMissing}
-                  onClick={() => onLoad?.(c.typeId)}
+                  aria-disabled={!onLoad || c.skillMissing || undefined}
+                  onClick={() => !c.skillMissing && onLoad?.(c.typeId)}
                   aria-pressed={isLoaded}
                   aria-label={rowLabel(t, c, distance, { pricey, worse })}
                   className={chargeRowClassName(
@@ -407,8 +407,8 @@ export function FactionList({ choices, group, settings, maxReach, onLoad, wrap }
                         c.typeId,
                         <button
                           type="button"
-                          disabled={!onLoad || c.skillMissing}
-                          onClick={() => onLoad?.(c.typeId)}
+                          aria-disabled={!onLoad || c.skillMissing || undefined}
+                          onClick={() => !c.skillMissing && onLoad?.(c.typeId)}
                           aria-pressed={isLoaded}
                           aria-label={rowLabel(t, c, distance, { pricey, worse: worse[i] })}
                           className={chargeRowClassName(

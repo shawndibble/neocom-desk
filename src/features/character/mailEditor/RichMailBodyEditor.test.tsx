@@ -186,7 +186,10 @@ describe('RichMailBodyEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Edit source' }));
     await user.click(screen.getByRole('textbox', { name: 'Message source (EVE markup)' }));
     await user.click(screen.getByRole('button', { name: 'Text colour' }));
-    expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Default colour' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('Source: inserts an escaped tag over the selection, and replaces a whole selected tag', async () => {

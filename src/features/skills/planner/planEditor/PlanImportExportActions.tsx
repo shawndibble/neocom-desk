@@ -52,9 +52,12 @@ export function PlanImportExportActions({
   } = exporter;
   return createPortal(
     <>
-      <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
+      <DropdownMenu
+        open={importMenuOpen}
+        onOpenChange={(next) => setImportMenuOpen(next && !queueImporting)}
+      >
         <DropdownMenuTrigger asChild>
-          <Button size="md" disabled={queueImporting}>
+          <Button size="md" loading={queueImporting}>
             <Icon.ImportClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
             {t('plans.import')}
             <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />

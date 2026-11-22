@@ -1,7 +1,7 @@
 import { romanLevel } from '@/engine/projection';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FieldError, LiveStatus, Modal, TextArea } from '@/components/ui';
+import { Button, FieldError, LiveStatus, Modal, TextArea, Tooltip } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
@@ -68,6 +68,8 @@ export function ImportClipboardDialog({
 
   const empty = preview !== null && importOutcome(preview) === 'empty';
   const needsReview = preview !== null && importOutcome(preview) === 'review';
+  const noEntries = preview !== null && preview.entries.length === 0;
+  const noText = text.trim() === '';
 
   /** Preview, then apply straight away unless something needs a look. */
   async function run(previewing: Promise<ClipboardImportPreview>, commit = onApply) {
@@ -110,46 +112,54 @@ export function ImportClipboardDialog({
           {needsReview ? (
             <>
               {onReplace && (
+                <Tooltip content={noEntries ? t('plans.importNothingToApply') : null}>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => onReplace(preview.entries)}
+                    aria-disabled={noEntries || undefined}
+                  >
+                    {t('plans.importQueueReplace')}
+                  </Button>
+                </Tooltip>
+              )}
+              <Tooltip content={noEntries ? t('plans.importNothingToApply') : null}>
                 <Button
                   size="sm"
-                  variant="danger"
-                  onClick={() => onReplace(preview.entries)}
-                  disabled={preview.entries.length === 0}
+                  variant="primary"
+                  onClick={() => onApply(preview.entries)}
+                  aria-disabled={noEntries || undefined}
                 >
-                  {t('plans.importQueueReplace')}
+                  {onReplace ? t('plans.importAppendToPlan') : t('plans.importApply')}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => onApply(preview.entries)}
-                disabled={preview.entries.length === 0}
-              >
-                {onReplace ? t('plans.importAppendToPlan') : t('plans.importApply')}
-              </Button>
+              </Tooltip>
             </>
           ) : (
             <>
               {onReplace && (
+                <Tooltip content={noText ? t('plans.importNeedsText') : null}>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => handleImport(onReplace)}
+                    aria-disabled={noText || undefined}
+                    loading={importing}
+                  >
+                    {t('plans.importQueueReplace')}
+                  </Button>
+                </Tooltip>
+              )}
+              <Tooltip content={noText ? t('plans.importNeedsText') : null}>
                 <Button
                   size="sm"
-                  variant="danger"
-                  onClick={() => handleImport(onReplace)}
-                  disabled={text.trim() === ''}
+                  variant="primary"
+                  onClick={() => handleImport()}
+                  aria-disabled={noText || undefined}
                   loading={importing}
                 >
-                  {t('plans.importQueueReplace')}
+                  {onReplace ? t('plans.importAppendToPlan') : t('plans.importAction')}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => handleImport()}
-                disabled={text.trim() === ''}
-                loading={importing}
-              >
-                {onReplace ? t('plans.importAppendToPlan') : t('plans.importAction')}
-              </Button>
+              </Tooltip>
             </>
           )}
         </div>

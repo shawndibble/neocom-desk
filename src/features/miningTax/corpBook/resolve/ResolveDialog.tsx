@@ -129,7 +129,6 @@ export function ResolveDialog({
   const needsText =
     choice === 'notOwed' ? problem.kind !== 'conflict' : choice === 'notPaying' && tell;
   const blocked =
-    busy ||
     (needsText && text.trim() === '') ||
     (choice === 'paid' && (offer.noNotice || (noticeId === undefined && !countsHeld))) ||
     (choice === 'fixRecords' && !onFixRecords);
@@ -358,7 +357,12 @@ export function ResolveDialog({
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button variant="primary" disabled={blocked} onClick={() => void submit()}>
+          <Button
+            variant="primary"
+            loading={busy}
+            aria-disabled={blocked || undefined}
+            onClick={() => void submit()}
+          >
             {t(k(`action.${choice}`), {
               context:
                 choice === 'notPaying' && tell

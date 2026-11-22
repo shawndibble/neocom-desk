@@ -132,7 +132,7 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
                 key={key}
                 type="button"
                 aria-pressed={group.loaded.has(choice.typeId)}
-                disabled={!onLoad}
+                aria-disabled={!onLoad || undefined}
                 onClick={() => onLoad?.(choice.typeId)}
                 className={chargeRowClassName(
                   group.loaded.has(choice.typeId),
@@ -187,8 +187,8 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
                 c.typeId,
                 <button
                   type="button"
-                  disabled={!onLoad || c.skillMissing}
-                  onClick={() => onLoad?.(c.typeId)}
+                  aria-disabled={!onLoad || c.skillMissing || undefined}
+                  onClick={() => !c.skillMissing && onLoad?.(c.typeId)}
                   aria-pressed={isLoaded}
                   aria-label={rowLabel(t, c, worse)}
                   className={chargeRowClassName(

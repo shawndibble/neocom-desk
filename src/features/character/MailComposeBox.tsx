@@ -457,7 +457,7 @@ export function MailComposeBox({
         <Button
           size="sm"
           onClick={() => (touchedRef.current ? setConfirmingDiscard(true) : discard())}
-          disabled={sending}
+          aria-disabled={sending || undefined}
         >
           {t('mail.cancel')}
         </Button>

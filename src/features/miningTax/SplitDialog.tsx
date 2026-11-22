@@ -15,6 +15,7 @@ import {
   TextInput,
   Radio,
   Slider,
+  Tooltip,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
@@ -446,18 +447,21 @@ export function SplitDialog({
         <LedgerActionError error={saveError} />
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canSplit || saving || busy}
-            onClick={() => void handleSplit()}
-          >
-            {movedUnits > 0
-              ? t('miningTax.splitConfirmAction', { count: movedUnits })
-              : t('miningTax.splitConfirmClaimAction', {
-                  formatted: formatCount(unreportedUnits),
-                })}
-          </Button>
+          <Tooltip content={!canSplit ? t('common.needsInput') : null}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saving || busy}
+              aria-disabled={!canSplit || undefined}
+              onClick={() => void handleSplit()}
+            >
+              {movedUnits > 0
+                ? t('miningTax.splitConfirmAction', { count: movedUnits })
+                : t('miningTax.splitConfirmClaimAction', {
+                    formatted: formatCount(unreportedUnits),
+                  })}
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={onClose}>
             {t('filters.cancel')}
           </Button>

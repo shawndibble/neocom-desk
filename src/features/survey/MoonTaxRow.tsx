@@ -24,7 +24,7 @@ import { useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } f
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, TextInput, Toast } from '@/components/ui';
+import { Button, TextInput, Toast, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
@@ -309,15 +309,17 @@ export function MoonTaxRow({
         </span>
       </div>
       <MoonConnectionSlot moon={moon}>
-        <Button
-          id={moon.manageId}
-          size="sm"
-          disabled={!ready}
-          loading={busy}
-          onClick={() => void openTax()}
-        >
-          {t('survey.moonTax.open')}
-        </Button>
+        <Tooltip content={!ready ? t('common.needsInput') : null}>
+          <Button
+            id={moon.manageId}
+            size="sm"
+            aria-disabled={!ready || undefined}
+            loading={busy}
+            onClick={() => void openTax()}
+          >
+            {t('survey.moonTax.open')}
+          </Button>
+        </Tooltip>
       </MoonConnectionSlot>
       <FailedLine message={failed} />
     </InfoRow>

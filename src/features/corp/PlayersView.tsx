@@ -536,7 +536,13 @@ function PlayerLineMenu({
         ) : blocked ? (
           inert(t('corpTaxBook.moons.grouping.makeMain'), t('corp.members.players.makeMainOutside'))
         ) : (
-          <MenuItem disabled={busy} onSelect={() => onMakeMain(line)}>
+          <MenuItem
+            aria-disabled={busy || undefined}
+            onSelect={(event) => {
+              if (busy) event.preventDefault();
+              else onMakeMain(line);
+            }}
+          >
             {t('corpTaxBook.moons.grouping.makeMain')}
           </MenuItem>
         )}

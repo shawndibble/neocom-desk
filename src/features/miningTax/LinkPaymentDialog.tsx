@@ -14,6 +14,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from '@/components/ui';
 import { DividedList } from '@/components/ui/DividedList';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
@@ -398,15 +399,18 @@ export function LinkPaymentDialog({
 
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button
-            variant="primary"
-            disabled={!selected || !target || !amountValid || saving || linked}
-            onClick={() => void commit()}
-          >
-            {target
-              ? t('miningTax.linkPaymentConfirmAction', { payee: target.name })
-              : t('miningTax.linkWallet.confirm')}
-          </Button>
+          <Tooltip content={!selected || !target || !amountValid ? t('common.needsInput') : null}>
+            <Button
+              variant="primary"
+              loading={saving}
+              aria-disabled={!selected || !target || !amountValid || linked || undefined}
+              onClick={() => void commit()}
+            >
+              {target
+                ? t('miningTax.linkPaymentConfirmAction', { payee: target.name })
+                : t('miningTax.linkWallet.confirm')}
+            </Button>
+          </Tooltip>
           <Button className="ml-auto" onClick={close}>
             {t('filters.cancel')}
           </Button>

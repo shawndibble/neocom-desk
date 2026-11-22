@@ -1,7 +1,7 @@
 import { useCharacters } from '@/features/character/useCharacters';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Field, Fields, Modal, Panel } from '@/components/ui';
+import { Button, Checkbox, Field, Fields, Modal, Panel, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
@@ -119,14 +119,16 @@ export function DevicePanel() {
               syncConfigured ? 'settings.deviceLogoutHint' : 'settings.deviceLogoutHintLocalOnly'
             )}
           >
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={loggedIn === 0}
-              onClick={() => openDialog('logout')}
-            >
-              {t('settings.deviceLogoutOpen')}
-            </Button>
+            <Tooltip content={loggedIn === 0 ? t('settings.deviceNoneLoggedIn') : null}>
+              <Button
+                variant="danger"
+                size="sm"
+                aria-disabled={loggedIn === 0 || undefined}
+                onClick={() => openDialog('logout')}
+              >
+                {t('settings.deviceLogoutOpen')}
+              </Button>
+            </Tooltip>
           </Field>
           <Field
             label={t('settings.deviceDeleteLabel')}
@@ -134,14 +136,16 @@ export function DevicePanel() {
               syncConfigured ? 'settings.deviceDeleteHint' : 'settings.deviceDeleteHintLocalOnly'
             )}
           >
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={loggedIn === 0}
-              onClick={() => openDialog('delete')}
-            >
-              {t('settings.deviceDeleteOpen')}
-            </Button>
+            <Tooltip content={loggedIn === 0 ? t('settings.deviceNoneLoggedIn') : null}>
+              <Button
+                variant="danger"
+                size="sm"
+                aria-disabled={loggedIn === 0 || undefined}
+                onClick={() => openDialog('delete')}
+              >
+                {t('settings.deviceDeleteOpen')}
+              </Button>
+            </Tooltip>
           </Field>
         </Fields>
       </div>
@@ -174,7 +178,7 @@ export function DevicePanel() {
           <Button
             ref={cancelLogoutRef}
             size="sm"
-            disabled={working}
+            aria-disabled={working || undefined}
             onClick={() => setDialog(null)}
           >
             {t('characters.cancel')}
@@ -246,16 +250,11 @@ export function DevicePanel() {
         )}
         <DialogFooter className="mt-3">
           {!unpurged && (
-            <Button size="sm" disabled={working} onClick={() => setDialog(null)}>
+            <Button size="sm" aria-disabled={working || undefined} onClick={() => setDialog(null)}>
               {t('characters.cancel')}
             </Button>
           )}
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={working}
-            onClick={() => void confirmDelete()}
-          >
+          <Button variant="danger" size="sm" loading={working} onClick={() => void confirmDelete()}>
             {t(unpurged ? 'settings.deviceDeleteFinish' : 'settings.deviceDeleteAction')}
           </Button>
         </DialogFooter>

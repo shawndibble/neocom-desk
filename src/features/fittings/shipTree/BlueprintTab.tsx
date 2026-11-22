@@ -4,7 +4,7 @@
  * says whether they already own it. A hull no blueprint makes (special
  * editions, rewards) says so instead.
  */
-import { useCallback } from 'react';
+import { useCallback, useId } from 'react';
 import { useAsyncLoad, useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -26,6 +26,7 @@ export function BlueprintTab({
   characterId: number | null;
 }) {
   const { t } = useTranslation();
+  const needsCharacterId = useId();
   const catalogLoad = useAsyncLoad(shipTreeBlueprintCatalog);
   const catalog = catalogLoad.status === 'failed' ? 'failed' : (catalogLoad.data ?? null);
   // Ownership is a nicety here; an unreadable list just leaves it unsaid.
@@ -81,13 +82,15 @@ export function BlueprintTab({
             {t('ships.info.blueprint.planBuild')}
           </Link>
         ) : (
-          <Button size="sm" variant="primary" disabled>
+          <Button size="sm" variant="primary" aria-disabled aria-describedby={needsCharacterId}>
             {t('ships.info.blueprint.planBuild')}
           </Button>
         )}
       </div>
       {characterId === null && (
-        <p className="text-text-dim">{t('ships.info.blueprint.planNeedsCharacter')}</p>
+        <p id={needsCharacterId} className="text-text-dim">
+          {t('ships.info.blueprint.planNeedsCharacter')}
+        </p>
       )}
     </div>
   );

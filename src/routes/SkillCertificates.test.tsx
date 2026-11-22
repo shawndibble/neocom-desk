@@ -223,7 +223,7 @@ describe('SkillCertificates', () => {
     data.cloneState = 'alpha';
     renderPage();
     const omegaOnly = await screen.findByRole('button', { name: 'Omega only' });
-    expect(omegaOnly).toBeDisabled();
+    expect(omegaOnly).toHaveAttribute('aria-disabled', 'true');
     const row = omegaOnly.closest('li');
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText(/Navigation III need Omega/)).toBeInTheDocument();

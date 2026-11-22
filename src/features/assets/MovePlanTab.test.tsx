@@ -358,8 +358,9 @@ describe('MovePlanTab', () => {
     expect((jita as HTMLInputElement).checked).toBe(false);
     expect(screen.getAllByText('At destination').length).toBeGreaterThan(0);
     expect(screen.getByText('Nothing picked yet')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Show plan' }) as HTMLButtonElement).disabled).toBe(
-      true
+    expect(screen.getByRole('button', { name: 'Show plan' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
     );
   });
 
@@ -393,13 +394,13 @@ describe('MovePlanTab', () => {
   it('keeps Show plan disabled until there is a destination and a pick away from it', async () => {
     const user = await open();
     const show = screen.getByRole('button', { name: 'Show plan' });
-    expect((show as HTMLButtonElement).disabled).toBe(true);
+    expect(show).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('checkbox', { name: /select everything at jita 4-4/i }));
-    expect((show as HTMLButtonElement).disabled).toBe(true);
+    expect(show).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
-    expect((show as HTMLButtonElement).disabled).toBe(true);
+    expect(show).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
-    expect((show as HTMLButtonElement).disabled).toBe(false);
+    expect(show).not.toHaveAttribute('aria-disabled');
   });
 
   it('puts focus on the plan heading after Show plan, and back on Deliver to after Back', async () => {

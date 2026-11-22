@@ -453,7 +453,7 @@ export function HaulingFillList({
             <div className="flex flex-col gap-1">
               <Button
                 className="w-full"
-                disabled={tickedTotals.count === 0}
+                aria-disabled={tickedTotals.count === 0 || undefined}
                 onClick={onAdd}
                 aria-describedby={addDetailId}
               >

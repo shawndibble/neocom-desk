@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from '@/components/ui';
+import { GuardedMenuItem } from './shared';
 import type { FittingSlotKind } from '@/engine/fittings/types';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
 import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
@@ -29,22 +30,22 @@ export function EmptySlotMenuItems({ rack, index }: { rack: FittingSlotKind; ind
           </MenuItem>
         </MenuSubContent>
       </MenuSub>
-      <MenuItem
-        disabled={copied === null}
+      <GuardedMenuItem
+        reason={copied === null ? t('fittings.item.pasteNone') : null}
         onSelect={() => copied !== null && actions.addModule(rack, index, copied)}
       >
         {copied === null
           ? t('fittings.item.pasteNone')
           : t('fittings.item.paste', { name: actions.typeName(copied) })}
-      </MenuItem>
-      <MenuItem
-        disabled={last === undefined}
+      </GuardedMenuItem>
+      <GuardedMenuItem
+        reason={last === undefined ? t('fittings.item.fillRackNone') : null}
         onSelect={() => last !== undefined && actions.fillRack(rack, last)}
       >
         {last === undefined
           ? t('fittings.item.fillRackNone')
           : t('fittings.item.fillRack', { name: actions.typeName(last) })}
-      </MenuItem>
+      </GuardedMenuItem>
     </>
   );
 }
@@ -65,12 +66,18 @@ export function DroneMenuItems({
   const name = actions.typeName(typeId);
   return (
     <>
-      <MenuItem disabled={inBay === 0} onSelect={() => actions.launchDrones(typeId)}>
+      <GuardedMenuItem
+        reason={inBay === 0 ? t('fittings.item.noneInBay') : null}
+        onSelect={() => actions.launchDrones(typeId)}
+      >
         {t('fittings.item.launchAll')}
-      </MenuItem>
-      <MenuItem disabled={inSpace === 0} onSelect={() => actions.recallDrones(typeId)}>
+      </GuardedMenuItem>
+      <GuardedMenuItem
+        reason={inSpace === 0 ? t('fittings.item.noneInSpace') : null}
+        onSelect={() => actions.recallDrones(typeId)}
+      >
         {t('fittings.item.moveToBay')}
-      </MenuItem>
+      </GuardedMenuItem>
       <MenuItem onSelect={() => actions.recallAllDrones()}>{t('fittings.item.recallAll')}</MenuItem>
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />

@@ -13,6 +13,7 @@ import {
   SelectValue,
   StatChip,
   StatChips,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
@@ -480,18 +481,20 @@ export function LateNoticeRun() {
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="primary"
-                      onClick={() => setStep('send')}
-                      disabled={!canEdit || total === 0}
-                    >
-                      {t('corpTaxBook.moons.run.continue')}
-                    </Button>
+                    <Tooltip content={canEdit && total === 0 ? t('common.nothingToDo') : null}>
+                      <Button
+                        variant="primary"
+                        onClick={() => setStep('send')}
+                        aria-disabled={!canEdit || total === 0 || undefined}
+                      >
+                        {t('corpTaxBook.moons.run.continue')}
+                      </Button>
+                    </Tooltip>
                     {previewItem && !inline && (
                       <Button
                         variant="ghost"
                         onClick={() => setPreviewOpen(true)}
-                        disabled={corporationName === null}
+                        aria-disabled={corporationName === null || undefined}
                       >
                         {t('corpTaxBook.moons.run.preview')}
                       </Button>

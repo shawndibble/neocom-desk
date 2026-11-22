@@ -424,7 +424,7 @@ export function RefineBreakdownModal({
             <Button
               size="sm"
               onClick={shared.onToggleSource}
-              disabled={shared.unavailable !== null && !usingMine}
+              aria-disabled={(shared.unavailable !== null && !usingMine) || undefined}
               loading={shared.unavailable === 'loading'}
             >
               {usingMine

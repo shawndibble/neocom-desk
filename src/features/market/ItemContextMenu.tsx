@@ -153,23 +153,27 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
   return (
     <>
       <MenuItem
-        disabled={!blueprintTypeID}
+        aria-disabled={!blueprintTypeID || undefined}
         onSelect={() => {
           if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
         }}
       >
         {buildPlanLabel}
       </MenuItem>
-      <MenuItem
-        disabled={!blueprintTypeID}
-        onSelect={() => {
-          if (!blueprintTypeID) return;
-          const params = marketLinkParams(blueprintTypeID, location.search);
-          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-        }}
-      >
-        {t('market.contextMenu.viewBlueprintInMarket')}
-      </MenuItem>
+      {blueprintTypeID ? (
+        <MenuItem
+          onSelect={() => {
+            const params = marketLinkParams(blueprintTypeID, location.search);
+            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+          }}
+        >
+          {t('market.contextMenu.viewBlueprintInMarket')}
+        </MenuItem>
+      ) : (
+        <DisabledMenuItem reason={buildPlanLabel}>
+          {t('market.contextMenu.viewBlueprintInMarket')}
+        </DisabledMenuItem>
+      )}
     </>
   );
 }
@@ -265,7 +269,7 @@ function useItemMenuItems(
         )}
         {!props.hideBuildPlan && (
           <MenuItem
-            disabled={!blueprintTypeID}
+            aria-disabled={!blueprintTypeID || undefined}
             onSelect={() => {
               if (blueprintTypeID)
                 navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);

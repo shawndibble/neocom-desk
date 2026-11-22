@@ -14,7 +14,7 @@ export function ViewRouteMenuItem({ locationId }: { locationId: number }) {
   const { resolving, failed, view } = useViewRoute(locationId);
   return (
     <MenuItem
-      disabled={resolving}
+      aria-disabled={resolving || undefined}
       onSelect={(event) => {
         event.preventDefault();
         view();

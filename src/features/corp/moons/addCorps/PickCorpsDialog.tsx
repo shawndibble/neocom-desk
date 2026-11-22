@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InlineError } from '@/components/ui/InlineError';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { Button, Checkbox, Modal, Spinner } from '@/components/ui';
+import { Button, Checkbox, Modal, Spinner, Tooltip } from '@/components/ui';
 import type { AddCorpsCandidate } from '@/engine/corpTaxBook/addCorpsRun';
 import { CorpRow } from './CorpRow';
 
@@ -54,13 +54,15 @@ export function PickCorpsDialog({
           ) : (
             <span />
           )}
-          <Button
-            variant="primary"
-            disabled={selected.length === 0}
-            onClick={() => onContinue(selected)}
-          >
-            {t(k('continue'), { count: selected.length })}
-          </Button>
+          <Tooltip content={selected.length === 0 ? t(k('pickFirst')) : null}>
+            <Button
+              variant="primary"
+              aria-disabled={selected.length === 0 || undefined}
+              onClick={() => onContinue(selected)}
+            >
+              {t(k('continue'), { count: selected.length })}
+            </Button>
+          </Tooltip>
         </div>
       }
     >

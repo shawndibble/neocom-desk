@@ -176,7 +176,7 @@ export function RemoveNowView({
                   : t(k('intro'), { accounting, owner, time: eveTimeLabel(at) })}
               </p>
               <p className="text-text-dim">{t(k('hint'), { accounting, owner })}</p>
-              <Button variant="danger" disabled={working} onClick={onRemove}>
+              <Button variant="danger" loading={working} onClick={onRemove}>
                 {t(k('confirm'))}
               </Button>
             </div>

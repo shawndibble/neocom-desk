@@ -850,13 +850,17 @@ export function PayeeManagerDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="danger"
-                  disabled={!moveTargetId}
-                  onClick={() => confirmDelete(true)}
+                <Tooltip
+                  content={!moveTargetId ? t('miningTax.payees.moveAndDeleteNeedsTarget') : null}
                 >
-                  {t('miningTax.payees.moveAndDelete')}
-                </Button>
+                  <Button
+                    variant="danger"
+                    aria-disabled={!moveTargetId || undefined}
+                    onClick={() => confirmDelete(true)}
+                  >
+                    {t('miningTax.payees.moveAndDelete')}
+                  </Button>
+                </Tooltip>
               </div>
             )}
             <p className="text-[0.6875rem] text-text-dim">

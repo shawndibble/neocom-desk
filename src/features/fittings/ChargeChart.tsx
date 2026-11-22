@@ -310,7 +310,7 @@ export function ChargeChart({
           </span>
           <Button
             size="sm"
-            disabled={!onLoad || isLoaded || selected.skillMissing}
+            aria-disabled={!onLoad || isLoaded || selected.skillMissing || undefined}
             onClick={() => onLoad?.(selected.typeId)}
           >
             {isLoaded
