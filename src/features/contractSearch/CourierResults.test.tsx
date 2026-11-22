@@ -243,8 +243,11 @@ describe('CourierResults "From my region" shortcut', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'From my region' })).toBeDisabled()
     );
-    // A reason, not a banner: a dead control with no explanation reads as broken.
-    expect(screen.getAllByText('Your current location is unavailable')).toHaveLength(2);
+    // A reason, not a banner: a dead control with no explanation reads as broken. Waited for: the
+    // button disables a render before both places that say why have the text.
+    await waitFor(() =>
+      expect(screen.getAllByText('Your current location is unavailable')).toHaveLength(2)
+    );
     expect(screen.queryByText('No hauls start in your region')).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('All regions');
   });
