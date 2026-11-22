@@ -160,6 +160,13 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const to = '/market/orders';
   if (!snapshot) return blank(to, statusOf(feed));
   const everyone = scopeAll || activeCharacterId === null;
+  // A read that landed nothing (no result, no lapsed grant) is unknown, never "no open orders".
+  const asked = snapshot.openOrders.entries.filter(
+    (entry) => everyone || entry.characterId === activeCharacterId
+  );
+  if (asked.length > 0 && asked.every((entry) => entry.fetchedAt === 0 && !entry.needsReauth)) {
+    return blank(to, { ...statusOf(feed, { hasData: false }), error: true });
+  }
   // `loadOpenOrdersSnapshot` fans out across every Character because it backs
   // the cross-character Orders page; a widget on one Character narrows the
   // built rows, which costs nothing since the other Characters' orders were

@@ -1296,4 +1296,15 @@ describe('orders widget', () => {
     const view = buildView('orders', ordersFeed([order(90)]), ctx());
     expect(view.number?.link).toBeUndefined();
   });
+
+  it('is failed, never "no open orders", when the read landed nothing and the grant is fine', () => {
+    const feeds = ordersFeed([]);
+    const read = feeds.orders as unknown as {
+      data: { openOrders: { entries: { fetchedAt: number }[] } };
+    };
+    read.data.openOrders.entries[0]!.fetchedAt = 0;
+    const view = buildView('orders', feeds, ctx());
+    expect(stateOf(view)).toBe('failed');
+    expect(view.fetchedAt).toBeNull();
+  });
 });
