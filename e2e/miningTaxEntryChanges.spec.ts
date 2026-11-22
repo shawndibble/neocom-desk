@@ -19,8 +19,7 @@ import {
 
 const DAYS = [6, 5, 4];
 const OWED = DAYS.length * DAY_TAX;
-const owedTo = (page: Page, name: string) =>
-  page.getByRole('button', { name: `Open the ledger of ${name}` });
+const owedTo = (page: Page, name: string) => page.getByRole('group', { name });
 
 /** Rook is owed three days; Bram is a second Payee the pilot can split a day to. */
 async function openTab(page: Page) {

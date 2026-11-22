@@ -92,8 +92,3 @@ export function togglePayeeFilter(
   else next.add(payeeId);
   return next.size === universe.length ? 'all' : next.size === 0 ? 'none' : next;
 }
-
-/** Whether the filter is narrowed to exactly this one Payee. */
-export function isSolePayeeFilter(resolved: PayeeFilter, payeeId: string): boolean {
-  return resolved !== 'all' && resolved !== 'none' && resolved.size === 1 && resolved.has(payeeId);
-}
