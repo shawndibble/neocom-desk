@@ -236,7 +236,7 @@ export function Contracts() {
   // hides it, ready to take effect again the moment it's shown back
   // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
   const historySortProps = useUrlSort('history.sort', HISTORY_SORT, [
-    'type',
+    'contract',
     'character',
     ...CONTRACTS_HISTORY_COLUMN_IDS,
   ]);

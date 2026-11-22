@@ -1007,7 +1007,6 @@
   "src/features/contractSearch/contractFlagThreshold.test.ts": 1,
   "src/features/contractSearch/contractQuery.worker.test.ts": 1,
   "src/features/contractSearch/contractSearchCsv.test.ts": 1,
-  "src/features/contractSearch/contractSearchModePref.test.ts": 1,
   "src/features/contractSearch/ContractSearchPanel.test.tsx": 53,
   "src/features/contractSearch/CourierContractDetailModal.test.tsx": 1,
   "src/features/contractSearch/courierContractsCsv.test.ts": 1,

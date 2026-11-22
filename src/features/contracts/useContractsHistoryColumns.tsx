@@ -99,7 +99,8 @@ export function useContractsHistoryColumns({
         width: '16ch',
         className: 'whitespace-nowrap',
         sortValue: (contract) => t(CONTRACT_TYPE_KEY[contract.type]),
-        render: (contract) => t(CONTRACT_TYPE_KEY[contract.type]),
+        // Off the phone card: an untitled contract's title line already says its type.
+        render: (contract) => <span data-dense-omit>{t(CONTRACT_TYPE_KEY[contract.type])}</span>,
       },
       status: {
         id: 'status',
