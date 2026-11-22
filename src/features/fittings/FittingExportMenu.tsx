@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  LiveNote,
 } from '@/components/ui';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
@@ -30,9 +31,9 @@ interface Props {
 export function FittingExportNotice({ notice }: { notice: string | null }) {
   if (notice === null) return null;
   return (
-    <span role="status" className="text-xs text-text-dim">
+    <LiveNote as="span" className="text-xs text-text-dim">
       {notice}
-    </span>
+    </LiveNote>
   );
 }
 

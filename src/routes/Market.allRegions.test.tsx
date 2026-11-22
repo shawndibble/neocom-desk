@@ -232,8 +232,8 @@ describe('Market Browser: All regions', () => {
     expect(await within(sellTable).findByText('1,000,000')).toBeInTheDocument();
     expect(within(sellTable).queryByText('1,100,000')).not.toBeInTheDocument();
     expect(
-      screen.getByText("1 region didn't load, so its orders are missing. Refresh to retry.")
-    ).toBeInTheDocument();
+      screen.getAllByText("1 region didn't load, so its orders are missing. Refresh to retry.")
+    ).toHaveLength(2);
   });
 
   it('is a failed book, not an empty one, when every region failed', async () => {

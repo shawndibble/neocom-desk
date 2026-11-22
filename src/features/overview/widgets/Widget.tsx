@@ -22,12 +22,13 @@ import { useRosterNames } from './useRosterNames';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
+  entityLinkClassName,
   IskAmount,
+  LiveStatus,
   RowMoreActions,
   SEVERITY_TEXT,
   SeverityIcon,
   Tooltip,
-  entityLinkClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -393,7 +394,8 @@ function WidgetFrame({
     );
   } else if (state === 'failed') {
     body = (
-      <div role="alert" className="grid gap-2 p-3 text-sm">
+      <div className="grid gap-2 p-3 text-sm">
+        <LiveStatus>{t('overview.widgets.failed.title')}</LiveStatus>
         <b className="flex items-center gap-1.5 text-danger">
           <SeverityIcon severity="critical" />
           {t('overview.widgets.failed.title')}

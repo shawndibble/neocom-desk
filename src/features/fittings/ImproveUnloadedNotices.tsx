@@ -3,7 +3,7 @@
  * score an empty weapon, and Mine more compares on the best crystals.
  */
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, LiveNote } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improve';
 import { crystalParts } from '@/engine/fittings/improve';
 import { crystalBasisOf } from './improveCrystalBasis';
@@ -32,9 +32,9 @@ export function ImproveUnloadedNotices({
     <>
       {unloaded && (
         <div className="space-y-2">
-          <p role="status" className="text-warning text-sm">
+          <LiveNote className="text-warning text-sm">
             {t(`fittings.improve.unloaded.${unloaded.kind}`, { count: unloaded.count })}
-          </p>
+          </LiveNote>
           {onLoadBestCharge && (
             <Button size="sm" onClick={onLoadBestCharge}>
               {t('fittings.improve.loadBestCharge')}
@@ -45,7 +45,7 @@ export function ImproveUnloadedNotices({
 
       {unloadedCrystals && (
         <div className="space-y-2">
-          <p role="status" className="text-warning text-sm">
+          <LiveNote className="text-warning text-sm">
             {t('fittings.improve.unloadedCrystals', {
               count: unloadedCrystals.count,
               family: oreFamily,
@@ -53,7 +53,7 @@ export function ImproveUnloadedNotices({
               crystal: t('fittings.improve.crystalType', crystalParts(basis?.bestKey ?? '')),
               best: m3sFormat(best),
             })}
-          </p>
+          </LiveNote>
           {onLoadBestCrystal && (
             <Button size="sm" onClick={onLoadBestCrystal}>
               {t('fittings.improve.loadBestCrystal')}

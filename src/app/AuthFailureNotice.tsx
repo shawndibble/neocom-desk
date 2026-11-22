@@ -73,7 +73,8 @@ export function NeedsLoginNotice() {
   if (shownId === null || character === undefined) return null;
 
   return (
-    <div role="status" className="rounded-xs border border-warning/40 bg-panel px-3 py-1">
+    <div className="rounded-xs border border-warning/40 bg-panel px-3 py-1">
+      <LiveStatus>{t('reauth.loginTitle', { character: character.name })}</LiveStatus>
       <ReauthBanner
         title={t('reauth.loginTitle', { character: character.name })}
         hint={t('reauth.refusedHint')}

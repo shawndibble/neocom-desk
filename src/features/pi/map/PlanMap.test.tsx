@@ -200,7 +200,9 @@ describe('PlanMap: trace', () => {
     renderMap();
     await user.click(product('Biofuels'));
     expect(product('Biofuels')).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByRole('status')).toHaveTextContent(/Tracing Biofuels\. Needs Temperate/);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/Tracing Biofuels\. Needs Temperate/)
+    );
     const dialog = screen.getByRole('dialog', { name: 'How to make Biofuels' });
     // Any planet hosts the factory, so the facility line names no planets.
     expect(within(dialog).getByText('Made in a Basic Industry Facility.')).toBeInTheDocument();

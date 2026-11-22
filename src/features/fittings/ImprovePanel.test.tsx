@@ -836,8 +836,10 @@ describe('ImprovePanel', () => {
         onLoadBestCrystal={onLoadBestCrystal}
       />
     );
-    expect(screen.getByRole('status')).toHaveTextContent(
-      '2 miners have no crystal for Simple Asteroid ore, so they mine 24.7 m³/s. With Type B II they would mine 55.6 m³/s.'
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '2 miners have no crystal for Simple Asteroid ore, so they mine 24.7 m³/s. With Type B II they would mine 55.6 m³/s.'
+      )
     );
     expect(screen.getByTestId('improve-best-found')).toHaveTextContent(
       'Now → best found Mines 24.7 → 57.1 m³/s'

@@ -1,6 +1,12 @@
 /** The Appraisal result Panel's header actions: Compare Hubs, columns, Share and the copy/export menu. */
 import { useTranslation } from 'react-i18next';
-import { ColumnPickerMenu, IconButton, MenuItem, useOpenAfterMenu } from '@/components/ui';
+import {
+  ColumnPickerMenu,
+  IconButton,
+  LiveNote,
+  MenuItem,
+  useOpenAfterMenu,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -92,17 +98,17 @@ export function AppraisalResultActions({
         onClick={() => void handleShare()}
       />
       {pending !== null && (
-        <span role="status" className="text-[0.6875rem] text-text-dim">
+        <LiveNote as="span" className="text-[0.6875rem] text-text-dim">
           {t('market.appraisal.copyWaiting', { list: t(`market.appraisal.copyList.${pending}`) })}
-        </span>
+        </LiveNote>
       )}
       {copied !== null && (
-        <span role="status" className="text-[0.6875rem] text-text-dim">
+        <LiveNote as="span" className="text-[0.6875rem] text-text-dim">
           {t('market.appraisal.copied', {
             list: t(`market.appraisal.copyList.${copied.list}`),
             count: copied.count,
           })}
-        </span>
+        </LiveNote>
       )}
       <TableActionsMenu
         name={t('market.appraisal.resultTitle')}

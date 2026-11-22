@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
+import { IconButton, LiveStatus, Popover, PopoverAnchor, PopoverContent } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useApplyUpdate } from '@/features/settings/useUpdateState';
 import { useUpdateStatus } from './updateAvailable';
@@ -57,11 +57,7 @@ export function RailUpgradeButton() {
           <p>{t('nav.upgradeCallout')}</p>
         </PopoverContent>
       </Popover>
-      {notice && (
-        <span role="status" className="sr-only">
-          {notice.text}
-        </span>
-      )}
+      <LiveStatus>{notice?.text}</LiveStatus>
     </>
   );
 }

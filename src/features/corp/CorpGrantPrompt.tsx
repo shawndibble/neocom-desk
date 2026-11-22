@@ -21,7 +21,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useRef } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, NeedsConnection } from '@/components/ui';
+import { Button, LiveStatus, NeedsConnection } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -94,7 +94,6 @@ export function CorpGrantPrompt() {
   return (
     <div
       ref={bannerRef}
-      role="alert"
       aria-label={t('corp.grantPromptTitle')}
       data-testid="onboarding-banner"
       // All three onboarding banners are fixed in this same corner and a new
@@ -103,6 +102,7 @@ export function CorpGrantPrompt() {
       // #1124) — hence a single offset clear of the phone tab bar.
       className="motion-rise fixed inset-x-4 bottom-16 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
     >
+      <LiveStatus>{t('corp.grantPromptTitle')}</LiveStatus>
       <p className={eyebrowClassName}>{t('corp.grantPromptTitle')}</p>
       <p>
         {t('corp.grantPromptBody', {

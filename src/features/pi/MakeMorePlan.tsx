@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
+import { EmptyState, IskFigureGroup, LiveStatus, Spinner } from '@/components/ui';
 import { clampIskZero, formatIskCompact } from '@/lib/isk';
 import { AssumedCustomsNote } from './AssumedCustomsNote';
 import { BiggerChainsPanel } from './BiggerChainsPanel';
@@ -157,9 +157,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
 
   return (
     <div className="space-y-4">
-      <div role="status" aria-live="polite" className="sr-only">
-        {headlineText(view, t)}
-      </div>
+      <LiveStatus>{headlineText(view, t)}</LiveStatus>
       <AssumedCustomsNote
         names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
