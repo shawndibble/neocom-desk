@@ -29,6 +29,7 @@ export function CorpBookSyncNote({
   owedNow,
   now: nowOverride,
   showStanding = true,
+  inDialog = false,
 }: {
   book: CorpBookViewBook;
   /** What the book's rows owe right now. */
@@ -37,7 +38,10 @@ export function CorpBookSyncNote({
   now?: number;
   /** Whether to say how far behind the account is; the pay dialog already shows the amount. */
   showStanding?: boolean;
+  /** Under a title that already names the corporation: the wording leaves its name out. */
+  inDialog?: boolean;
 }) {
+  const here = inDialog ? 'Here' : '';
   const ticked = useTicker(MINUTE_MS);
   const now = nowOverride ?? ticked;
   const { t, i18n } = useTranslation();
@@ -77,14 +81,14 @@ export function CorpBookSyncNote({
   const safe =
     owedNow > 0 || book.pendingFrom !== undefined
       ? closedThrough
-        ? t('miningTax.corpBook.sync.safe', {
+        ? t(`miningTax.corpBook.sync.safe${here}`, {
             date: shortDate(closedThrough, i18n.language),
             corp: corpName,
             ago,
           })
         : synced
-          ? t('miningTax.corpBook.sync.safeOnce', { corp: corpName, ago })
-          : t('miningTax.corpBook.sync.neverSynced', { corp: corpName })
+          ? t(`miningTax.corpBook.sync.safeOnce${here}`, { corp: corpName, ago })
+          : t(`miningTax.corpBook.sync.neverSynced${here}`, { corp: corpName })
       : null;
   const closesAt = book.pendingFrom
     ? new Date(dayClosesAt(book.pendingFrom, loaded.graceHours))
@@ -98,7 +102,7 @@ export function CorpBookSyncNote({
       )}
       {book.pendingFrom && closesAt && (
         <span className="text-text-dim">
-          {t('miningTax.corpBook.sync.openDay', {
+          {t(`miningTax.corpBook.sync.openDay${here}`, {
             date: shortDate(book.pendingFrom, i18n.language),
             time: closesAt.toISOString().slice(11, 16),
             closeDate: shortDate(utcDay(closesAt.getTime()), i18n.language),
@@ -113,8 +117,8 @@ export function CorpBookSyncNote({
         <span className="text-text-dim">
           {t(
             opening > 0
-              ? 'miningTax.corpBook.sync.openingOwes'
-              : 'miningTax.corpBook.sync.openingCredit',
+              ? `miningTax.corpBook.sync.openingOwes${here}`
+              : `miningTax.corpBook.sync.openingCredit${here}`,
             {
               amount: formatIsk(Math.abs(opening), 0),
               corp: corpName,
@@ -124,7 +128,7 @@ export function CorpBookSyncNote({
       )}
       {credit && !account && (
         <span className="text-text-dim">
-          {t('miningTax.corpBook.sync.credit', {
+          {t(`miningTax.corpBook.sync.credit${here}`, {
             amount: formatIsk(summary.credit, 0),
             corp: corpName,
           })}

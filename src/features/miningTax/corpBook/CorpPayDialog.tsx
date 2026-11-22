@@ -141,7 +141,7 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
               ))}
             </ul>
           )}
-          <CorpBookSyncNote book={book} owedNow={amount} showStanding={false} />
+          <CorpBookSyncNote book={book} owedNow={amount} showStanding={false} inDialog />
         </div>
       )}
     />

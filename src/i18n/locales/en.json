@@ -8231,7 +8231,14 @@
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
-        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you."
+        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
+        "safeHere": "Safe to pay — {{date}} is closed (synced {{ago}}).",
+        "safeOnceHere": "Safe to pay once the book syncs (last synced {{ago}}).",
+        "neverSyncedHere": "Safe to pay once the book syncs (never synced).",
+        "openDayHere": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and the book's next sync.",
+        "creditHere": "{{amount}} ISK credit pays your next days.",
+        "openingOwesHere": "Opening balance from the old system: you owe {{amount}} ISK.",
+        "openingCreditHere": "Opening balance from the old system: {{amount}} ISK credit held for you."
       },
       "diff": {
         "fixRecords": "Fix my records",
