@@ -14,12 +14,13 @@ export const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
   endingSoon: 'warning',
   paused: 'danger',
   idle: 'warning',
-  unknown: 'default',
+  // A queue that could not be read is a cue, never a calm neutral chip.
+  unknown: 'warning',
 };
 
 // Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped
 // onto training's own tones: paused and idle (both now warning-or-worse)
-// share rank 0, then endingSoon, then unknown (no cached queue yet), then
+// share rank 0, then endingSoon, then unknown (queue not read: none cached yet, or the read failed), then
 // training last since it needs no attention at all.
 export const QUEUE_STATE_RANK: Record<QueueState, number> = {
   paused: 0,

@@ -5072,7 +5072,7 @@
       "idle": "Idle",
       "paused": "Paused",
       "endingSoon": "Ending soon",
-      "unknown": "Unknown"
+      "unknown": "Not read"
     },
     "newGroup": "New group",
     "newGroupName": "New group name",
