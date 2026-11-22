@@ -9,7 +9,7 @@
  * Figures follow `bookSeed.ts`: flat prices (`prices.ts`), so one ordinary day of `DAY_QTY` units
  * at a Payee's `taxPct` of 10 owes `DAY_TAX`.
  */
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { signInAndGoto } from '../authSeed';
 import type {
   MiningTaxAssignmentRecord,
@@ -155,6 +155,28 @@ export async function seedPersonal(page: Page, data: PersonalData): Promise<void
   }, data);
 }
 
+/**
+ * Makes the app read an older client's paid marks (`legacyPaidAssignment`) again on its next start.
+ * It reads them once per device, as it first starts, and a spec seeds after that start: the
+ * "already read" flag (`paymentLinkStore.ts`) is dropped so the next start reads what was seeded.
+ */
+export async function forgetPaidMarksRead(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('neocom');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction('settings', 'readwrite');
+      tx.objectStore('settings').delete('miningTaxPaidMarksRead');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    database.close();
+  });
+}
+
 /** What the app holds of a store now, for asserting what an action wrote. */
 export async function readStore<T>(page: Page, store: string): Promise<T[]> {
   return page.evaluate(async (name: string) => {
@@ -254,11 +276,17 @@ export async function openPersonalTax(
 ): Promise<void> {
   await installPilotEsi(page, { ...esi, names: nameOf });
   await signInAndGoto(page, './mining/tax');
+  // Each step waits for the one before it with `waitFor` (the action clock, as `click` waits), not
+  // the 5s `expect` clock an app boot can overrun under load; and a click lands only on a tab the
+  // page has finished drawing, or it is dropped.
+  const selected = (name: string) => page.getByRole('tab', { name, selected: true });
+  await selected('Tax').waitFor();
   await seedPersonal(page, data);
   // Away and back by the page's own tabs (there at every width): the Tax tab mounts again and
-  // reads what was seeded, without a second full boot of the app. A reload cost seconds under
-  // load and failed the assertion below on its 5s clock.
+  // reads what was seeded, without a second full boot of the app (a reload's boot is what
+  // overran the 5s clock under load).
   await page.getByRole('tab', { name: 'Overview' }).click();
+  await selected('Overview').waitFor();
   await page.getByRole('tab', { name: 'Tax' }).click();
-  await expect(page.getByRole('tab', { name: 'Tax', selected: true })).toBeVisible();
+  await selected('Tax').waitFor();
 }

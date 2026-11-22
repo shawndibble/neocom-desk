@@ -15,6 +15,7 @@ import {
   ROOK,
   assignment,
   journalDonation,
+  forgetPaidMarksRead,
   legacyPaidAssignment,
   openPersonalTax,
   personalLedger,
@@ -114,6 +115,11 @@ test('old paid marks are read into a link and the figures stay the same', async 
     },
     { characterId: CHARACTER_ID, mining: personalLedger(DAYS) }
   );
+  // The marks are read into links as the app starts, and it has started already (before the seed):
+  // drop its "already read" flag and start it again.
+  await forgetPaidMarksRead(page);
+  await page.reload();
+  await page.getByRole('tab', { name: 'Tax', selected: true }).waitFor();
   await expect(ledgerButton(page)).toContainText(isk(DAY_TAX));
   await ledgerButton(page).click();
   const ledger = page.getByRole('dialog', { name: ROOK.name });
