@@ -1,6 +1,7 @@
 import { LiveNote } from '@/components/ui/LiveStatus';
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { cx } from '@/lib/cx';
+import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { LiveStatus } from './LiveStatus';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
@@ -82,6 +83,8 @@ export function RegionSelect({
   shortcut,
 }: RegionSelectProps) {
   const [open, setOpen] = useState(false);
+  // A phone keyboard would cover the list; touch users tap the field themselves.
+  const coarse = useMediaQuery(COARSE_POINTER_QUERY);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
   const listId = useId();
@@ -179,7 +182,7 @@ export function RegionSelect({
       >
         <div className="p-1">
           <SearchInput
-            autoFocus
+            autoFocus={!coarse}
             value={query}
             onChange={(event) => {
               const next = event.target.value;

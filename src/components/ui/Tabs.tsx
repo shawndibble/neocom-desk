@@ -141,11 +141,17 @@ export function Tabs({
   }, [focusedId]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const { key } = event;
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return;
     event.preventDefault();
     const index = tabs.findIndex((tab) => tab.id === focusedId);
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const next = tabs[(index + delta + tabs.length) % tabs.length];
+    // Arrows wrap; Home/End jump to the ends.
+    const next =
+      key === 'Home'
+        ? tabs[0]
+        : key === 'End'
+          ? tabs[tabs.length - 1]
+          : tabs[(index + (key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
     if (activation === 'manual') {
       setManualFocusId(next.id);
     } else {
