@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { beginGrant } from '@/app/grantAction';
+import { useReauthSlot } from '@/app/reauthSlots';
 import type { CharacterBoardItemKind } from '@/engine/character/board';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 import { KIND_LABEL } from './calendarKindLabels';
@@ -33,7 +34,6 @@ interface CalendarReauthNoticeProps {
  * refused later still shows, since the pilot never dismissed that one.
  */
 export function CalendarReauthNotice({ characterId, kinds }: CalendarReauthNoticeProps) {
-  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(() => readDismissed(characterId));
   const [forCharacter, setForCharacter] = useState(characterId);
   if (forCharacter !== characterId) {
@@ -50,6 +50,28 @@ export function CalendarReauthNotice({ characterId, kinds }: CalendarReauthNotic
     setDismissed(next);
   };
 
+  return <ShownNotice characterId={characterId} shown={shown} onDismiss={dismiss} />;
+}
+
+/**
+ * Claims the Character's one re-login slot while it is on screen, so the
+ * shell's "Log in again" card stands down instead of stacking above it.
+ */
+function ShownNotice({
+  characterId,
+  shown,
+  onDismiss,
+}: {
+  characterId: number;
+  shown: readonly CharacterBoardItemKind[];
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  useReauthSlot(
+    characterId,
+    'note',
+    shown.flatMap((kind) => KIND_ENDPOINTS[kind])
+  );
   return (
     <div role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-warning">
       <p className="min-w-0">
@@ -68,7 +90,7 @@ export function CalendarReauthNotice({ characterId, kinds }: CalendarReauthNotic
       >
         {t('calendar.reauthNoticeAction')}
       </Button>
-      <Button size="sm" onClick={dismiss}>
+      <Button size="sm" onClick={onDismiss}>
         {t('reauth.dismiss')}
       </Button>
     </div>

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { CalendarReauthNotice } from './CalendarReauthNotice';
 import { beginGrant } from '@/app/grantAction';
+import { useSlotCovers } from '@/app/reauthSlots';
+import { renderHook } from '@testing-library/react';
 
 vi.mock('@/app/grantAction', () => ({ beginGrant: vi.fn(async () => {}) }));
 
@@ -13,6 +15,15 @@ beforeEach(() => {
 });
 
 describe('CalendarReauthNotice', () => {
+  it("holds the Character's re-login slot so the shell card stands down, and frees it on dismiss", async () => {
+    const covers = renderHook(() => useSlotCovers(1));
+    expect(covers.result.current).toBe(false);
+    render(<CalendarReauthNotice characterId={1} kinds={['mercenaryDen']} />);
+    expect(covers.result.current).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(covers.result.current).toBe(false);
+  });
+
   it('names the refused sources', () => {
     render(<CalendarReauthNotice characterId={1} kinds={['mercenaryDen']} />);
     expect(screen.getByText(/Some sources need a new login: Mercenary dens/)).toBeInTheDocument();
