@@ -84,7 +84,7 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
           </ul>
         )}
         {confirming?.state === 'missing' && (
-          <div className="space-y-2 rounded-xs border border-border p-2">
+          <div className="space-y-2 rounded-xs border border-line p-2">
             <p>
               {t('plans.fitGoal.confirm', {
                 name: confirming.name,

@@ -25,7 +25,7 @@ export function AddPreviewReadout({ preview, name }: AddPreviewReadoutProps) {
   return (
     <div
       role="status"
-      className="sticky bottom-0 z-10 space-y-1 rounded-xs border border-border bg-panel-2 px-2 py-1.5 text-xs"
+      className="sticky bottom-0 z-10 space-y-1 rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs"
     >
       <p className="font-semibold">{t('fittings.add.preview.title', { name })}</p>
       {listed.length === 0 ? (

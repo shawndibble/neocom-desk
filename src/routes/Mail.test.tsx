@@ -288,6 +288,24 @@ describe('Mail', () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    ['holds no mail', 'No mail', () => HttpResponse.json([])],
+    ['has no saved mail and the read failed', /no mail saved yet/i, () => HttpResponse.error()],
+  ])(
+    'Compose opens the composer on a wide screen when the mailbox %s',
+    async (_name, emptyTitle, respond) => {
+      useDesktopViewport();
+      server.use(http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, respond));
+      const user = userEvent.setup();
+      renderMailRoute();
+      await screen.findByText(emptyTitle);
+      const header = document.querySelector('header')!;
+      await user.click(within(header).getByRole('button', { name: 'Compose' }));
+      const composer = await screen.findByRole('region', { name: 'New mail' });
+      await waitFor(() => expect(within(composer).getByLabelText('To')).toHaveFocus());
+    }
+  );
+
   it('falls back to the unknown-sender label when a header has no sender', async () => {
     // `cond && map.get(x) ?? fallback` yields `false` for a missing sender,
     // and React renders `false` as nothing — the label never appeared.

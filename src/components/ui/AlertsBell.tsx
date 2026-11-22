@@ -53,7 +53,7 @@ export function AlertsBell({ showWhenEmpty }: { showWhenEmpty?: boolean }) {
               aria-hidden="true"
               className={cx(
                 'absolute -top-1 -right-1 min-w-4 rounded-xs px-1 text-center text-[0.625rem] leading-4 font-semibold tabular-nums',
-                danger ? 'bg-danger text-text' : 'bg-accent text-bg'
+                danger ? 'bg-danger text-bg' : 'bg-accent text-bg'
               )}
             >
               {count > 99 ? '99+' : count}

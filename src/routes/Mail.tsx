@@ -325,6 +325,20 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
 
   // The composer takes the reader's place on a wide screen.
   const newMailInline = newMailOpen && isDesktop;
+  // One element for every branch below: with no mail to list (an empty or
+  // unreadable mailbox) the composer stands in for the empty state, so Compose
+  // still works for a pilot who has nothing yet.
+  const newMailPanel = newMailInline ? (
+    <Panel className="min-w-0">
+      <NewMailComposer
+        key={composeCharacterId}
+        characterId={composeCharacterId}
+        fullPane={false}
+        onClose={closeNewMail}
+        onSent={handleNewMailSent}
+      />
+    </Panel>
+  ) : null;
   const readerVisible = !newMailInline && (isDesktop || selectedKey !== null);
   const showBackControl = !isDesktop && selectedKey !== null;
   const selectedTab = selectedRow?.tab ?? 'inbox';
@@ -384,15 +398,19 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
         // the list stays and a small note sits above it.
         <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterMailHeaders']} />
       ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        (newMailPanel ?? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ))
       ) : !headersResult || rows.length === 0 ? (
-        <CachedEmptyState
-          result={headersResult}
-          title={t('mail.emptyTitle')}
-          hint={t('mail.emptyHint')}
-          fetchedTitle={t('mail.emptyFetchedTitle')}
-          fetchedHint={t('mail.emptyFetchedHint')}
-        />
+        (newMailPanel ?? (
+          <CachedEmptyState
+            result={headersResult}
+            title={t('mail.emptyTitle')}
+            hint={t('mail.emptyHint')}
+            fetchedTitle={t('mail.emptyFetchedTitle')}
+            fetchedHint={t('mail.emptyFetchedHint')}
+          />
+        ))
       ) : (
         <>
           {needsReauth && (
@@ -469,17 +487,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               onLoadMore={() => void handleLoadMore()}
             />
 
-            {newMailInline && (
-              <Panel className="min-w-0">
-                <NewMailComposer
-                  key={composeCharacterId}
-                  characterId={composeCharacterId}
-                  fullPane={false}
-                  onClose={closeNewMail}
-                  onSent={handleNewMailSent}
-                />
-              </Panel>
-            )}
+            {newMailPanel}
 
             <Panel
               className={readerVisible ? 'min-w-0' : 'hidden'}

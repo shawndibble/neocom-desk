@@ -157,7 +157,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const tabs = tabBarTabs(MOONS_TABS);
   return (
     <BookContext.Provider value={bookWithSettings}>
-      <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-page space-y-4">
         {detail === null && (
           <>
             <PageHeader
@@ -311,7 +311,7 @@ function MoonsLoading() {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
-    <div className="mx-auto max-w-page space-y-4 px-4 py-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader title={t('corp.moons.title')} />
       <div
         role="status"
@@ -362,7 +362,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
-      <div className="mx-auto max-w-page p-4">
+      <div className="mx-auto max-w-page">
         <LoadFailedState
           title={t('corpTaxBook.moons.failed')}
           hint={t('corpTaxBook.moons.failedHint')}
