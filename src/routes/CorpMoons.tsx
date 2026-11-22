@@ -93,6 +93,8 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
+      ) : audit.failed ? (
+        <LoadFailedState title={t('corpTaxBook.moons.activity.loadFailed')} onRetry={audit.retry} />
       ) : (
         // A Miner link opens their page: close over it rather than cover it.
         <AuditFeed entries={audit.entries} subject={subject} words={words} onOpen={onClose} />
