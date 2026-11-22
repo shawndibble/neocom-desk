@@ -804,7 +804,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 everyAssignment={everyAssignment}
                 payeeById={payeeById}
                 typeNames={typeNames}
-                onChanged={refresh}
+                onChanged={() => {
+                  // The take-over rewrote the entry this detail was opened on: close and reload, like every row action.
+                  actions.openDetail(null);
+                  refresh();
+                }}
                 onBookChanged={reloadCorpBooks}
                 mail={{
                   characterId: corpDetail.view.characterId,
