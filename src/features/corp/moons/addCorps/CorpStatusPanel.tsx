@@ -4,7 +4,7 @@ import { InlineError } from '@/components/ui/InlineError';
 import { Button, Panel } from '@/components/ui';
 import { addCorpsErrorText } from '../addCorpsErrorText';
 import { needsThePlayer, offersGrantAgain, type NeedsYouItem } from './addCorpsStatus';
-import { CorpStatePill } from './CorpRow';
+import { CorpCeo, CorpStatePill } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
 
@@ -65,11 +65,7 @@ export function CorpStatusPanel({
               <span className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
                 <span className="max-w-full truncate font-medium">{item.name}</span>
                 <CorpStatePill state={item.state} />
-                {item.ceoName && (
-                  <span className="max-w-full truncate text-xs text-text-dim">
-                    {t('corpTaxBook.moons.addCorps.pick.ceo', { name: item.ceoName })}
-                  </span>
-                )}
+                {item.ceoName && <CorpCeo name={item.ceoName} />}
               </span>
               {item.state === 'gone-quiet' ? (
                 <Button

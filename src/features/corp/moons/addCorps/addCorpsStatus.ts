@@ -67,6 +67,9 @@ export interface NeedsYouItem {
   ceoName?: string;
 }
 
+/** Run states fixed by logging in again as the queued CEO (a changed CEO is `failed`: not them). */
+const LOGIN_AS_CEO = new Set<CorpState>(['needs-sign-in', 'needs-role']);
+
 /** Whether a moon owner row of the player's own is no longer being read. */
 export const isGoneQuiet = (row: OwnerRowLike): boolean =>
   row.sameOwner === true && (row.status === 'cant-read' || row.status === 'disconnected');
@@ -93,21 +96,22 @@ export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'n
  * Corporations that need the player: run outcomes that did not connect, and the
  * player's own moon owners that stopped answering, and moon owners read without
  * refinery names: `needs-names` for one of the player's own that they can sign in
- * as the CEO of (`grantable`, each with its CEO's name), `names-not-shared` for the rest. One of those own
+ * as the CEO of (`ceoByCorp`), `names-not-shared` for the rest. One of those own
  * ones read without each chunk's ore is `needs-ore` (names, when both lack, since
- * the one Grant again fixes both). A corporation the book now reads well is never
- * listed, whatever the run once said about it.
+ * the one Grant again fixes both). A row fixed by a login names the CEO to log in
+ * as. A corporation the book now reads well is never listed, whatever the run once
+ * said about it.
  */
 export function needsYou(
   run: AddCorpsRun | null,
   rows: readonly OwnerRowLike[],
   name: (corporationId: number) => string,
-  grantable: ReadonlyMap<number, string> = new Map()
+  /** The player's own corps they are the CEO of, each with that CEO's name. */
+  ceoByCorp: ReadonlyMap<number, string> = new Map()
 ): NeedsYouItem[] {
-  const ceoOf = (id: number) => {
-    const ceoName = grantable.get(id);
-    return ceoName === undefined ? {} : { ceoName };
-  };
+  // An own corp the player can Grant again for: the CEO to log in as, else undefined.
+  const grantCeo = (r: OwnerRowLike) =>
+    r.sameOwner === true ? ceoByCorp.get(r.corporationId) : undefined;
   const items = new Map<number, NeedsYouItem>();
   const reading = new Set(
     rows.filter((r) => !isGoneQuiet(r) && r.status === 'active').map((r) => r.corporationId)
@@ -121,7 +125,7 @@ export function needsYou(
         corporationId: c.corporationId,
         name: c.name,
         state: state as NeedsYouState,
-        ceoName: c.ceoName,
+        ...(LOGIN_AS_CEO.has(state) ? { ceoName: c.ceoName } : {}),
         ...(outcome?.kind === 'refused' && (state === 'needs-sign-in' || state === 'failed')
           ? { reason: outcome.reason }
           : {}),
@@ -136,29 +140,22 @@ export function needsYou(
         state: 'gone-quiet',
       });
     } else if (lacksNames(r) && !items.has(r.corporationId)) {
+      const ceoName = grantCeo(r);
       items.set(r.corporationId, {
         corporationId: r.corporationId,
         name: name(r.corporationId),
-        state:
-          r.sameOwner === true && grantable.has(r.corporationId)
-            ? 'needs-names'
-            : 'names-not-shared',
-        ...(lacksOre(r) && r.sameOwner === true && grantable.has(r.corporationId)
-          ? { alsoOre: true as const }
-          : {}),
-        ...(r.sameOwner === true ? ceoOf(r.corporationId) : {}),
+        state: ceoName === undefined ? 'names-not-shared' : 'needs-names',
+        ...(ceoName === undefined ? {} : { ceoName }),
+        ...(ceoName !== undefined && lacksOre(r) ? { alsoOre: true as const } : {}),
       });
-    } else if (
-      lacksOre(r) &&
-      r.sameOwner === true &&
-      grantable.has(r.corporationId) &&
-      !items.has(r.corporationId)
-    ) {
+    } else if (lacksOre(r) && !items.has(r.corporationId)) {
+      const ceoName = grantCeo(r);
+      if (ceoName === undefined) continue;
       items.set(r.corporationId, {
         corporationId: r.corporationId,
         name: name(r.corporationId),
         state: 'needs-ore',
-        ...ceoOf(r.corporationId),
+        ceoName,
       });
     }
   }

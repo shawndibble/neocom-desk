@@ -43,10 +43,22 @@ describe('needsYou', () => {
       [CORPS[3]!.corporationId, 'needs-sign-in'],
       [99, 'gone-quiet'],
     ]);
-    // Each run corp names the CEO to log in as.
-    expect(items[0]?.ceoName).toBe(CORPS[1]!.ceoName);
-    expect(items.find((i) => i.corporationId === 99)).not.toHaveProperty('ceoName');
+    // A run corp whose fix is logging in again names the CEO to log in as; one that
+    // needs no login (its own book) or went quiet names no one.
+    expect(items.map((i) => i.ceoName)).toEqual([
+      CORPS[1]!.ceoName,
+      undefined,
+      CORPS[3]!.ceoName,
+      undefined,
+    ]);
     expect(connectedInRun(run)).toBe(1);
+  });
+
+  it('names no CEO on a run corp whose CEO changed: that character is the wrong login', () => {
+    const run = recordOutcome(freshRun(), { kind: 'refused', reason: 'ceo-changed' });
+    const [item] = needsYou(run, [], corpName);
+    expect(item?.state).toBe('failed');
+    expect(item).not.toHaveProperty('ceoName');
   });
 
   it('is empty with no run and nothing quiet', () => {
