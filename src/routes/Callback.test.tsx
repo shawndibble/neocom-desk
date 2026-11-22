@@ -10,6 +10,7 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { Callback } from './Callback';
+import { forgetCallbackRuns } from './callbackRun';
 import { assignLocation } from '@/app/navigation';
 
 // `beginAddCharacterLogin` ends in a real top-level navigation; jsdom cannot
@@ -54,6 +55,7 @@ const server = mswServer(
 );
 
 beforeEach(async () => {
+  forgetCallbackRuns();
   tokenRequests = 0;
   vi.mocked(assignLocation).mockClear();
   sessionStorage.clear();
@@ -171,6 +173,50 @@ describe('Callback, Alerts Grant round trip (ADR 0020)', () => {
 
     expect(await screen.findByText('settings landing: failed')).toBeInTheDocument();
     expect(vi.mocked(assignLocation)).not.toHaveBeenCalled();
+  });
+});
+
+describe('Callback remounted mid-login', () => {
+  // A route remount (App's Suspense is keyed on the number format, which loads after the first
+  // paint) mounts a fresh Callback while the first one's exchange is in flight. It must wait for
+  // that login, not try to spend the one-time PKCE stash again.
+  function renderRemountable(search: string) {
+    const tree = (key: string) => (
+      <MemoryRouter initialEntries={[`/callback${search}`]}>
+        <Routes>
+          <Route path="/callback" element={<Callback key={key} />} />
+          <Route path="/characters" element={<div>characters page</div>} />
+          <Route path="/overview" element={<div>overview page</div>} />
+          <Route path="/ships/fittings" element={<div>fittings page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const view = render(tree('first'));
+    view.rerender(tree('second'));
+  }
+
+  it('completes the one login, shows no error, and keeps the page it came from', async () => {
+    stashLogin('state-r');
+    setLoginReturnTo('/ships/fittings');
+    renderRemountable('?code=good-code&state=state-r');
+
+    expect(await screen.findByText('fittings page')).toBeInTheDocument();
+    expect(tokenRequests).toBe(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(vi.mocked(assignLocation)).not.toHaveBeenCalled();
+  });
+
+  it('shows a real failure on the remounted page', async () => {
+    server.use(
+      http.post('https://login.eveonline.com/v2/oauth/token', () =>
+        HttpResponse.json({ error: 'invalid_grant' }, { status: 400 })
+      )
+    );
+    stashLogin('state-r');
+    exhaustedBudget();
+    renderRemountable('?code=bad&state=state-r');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 });
 

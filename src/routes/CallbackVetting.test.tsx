@@ -11,6 +11,7 @@ import { db } from '@/db';
 import { useConsumedVettingLogin } from '@/features/corp/vetting/useConsumedVettingLogin';
 import { heldVettingLogin } from '@/features/corp/vetting/vettingLoginState';
 import { Callback } from './Callback';
+import { forgetCallbackRuns } from './callbackRun';
 
 const CHAR_ID = 2112625428;
 
@@ -42,6 +43,7 @@ mswServer(
 );
 
 beforeEach(async () => {
+  forgetCallbackRuns();
   tokenRequests = 0;
   sessionStorage.clear();
   await db.characters.clear();
