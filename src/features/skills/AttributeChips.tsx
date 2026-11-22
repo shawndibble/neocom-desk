@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { StatChip, StatChips, Tooltip } from '@/components/ui';
+import { Spinner, StatChip, StatChips, Tooltip } from '@/components/ui';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -32,6 +32,8 @@ interface AttributeChipsProps {
    * where the Plans page keeps them in a single row above the queue.
    */
   short?: boolean;
+  /** The sheet is still being read: a spinner stands in for the chips instead of "unknown". */
+  loading?: boolean;
 }
 
 /**
@@ -57,11 +59,14 @@ export function AttributeChips({
   boosterBonus = 0,
   dense = false,
   short = false,
+  loading = false,
 }: AttributeChipsProps) {
   const { t } = useTranslation();
   return (
     <StatChips dense={dense}>
-      {attributes ? (
+      {loading && !attributes ? (
+        <Spinner size="sm" />
+      ) : attributes ? (
         ATTRIBUTE_ORDER.map((name) => {
           const effective = attributes[name];
           const implant = implantBonuses[name] ?? 0;
