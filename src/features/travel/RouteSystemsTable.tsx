@@ -29,7 +29,7 @@
  * lists it.
  */
 import { fixed1 } from '@/lib/fixedFormat';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { SystemNote, SystemNoteAnchor, SystemNoteMenuItem } from './SystemNote';
@@ -175,7 +175,7 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
 function useColumns(
   killsOf: (systemId: number) => RouteKillsCell,
   noteOpen: number | null,
-  setNoteOpen: (systemId: number | null) => void
+  setNoteOpen: Dispatch<SetStateAction<number | null>>
 ): DataTableColumn<TableRow>[] {
   const { t } = useTranslation();
   const columns: DataTableColumn<RouteSafetyRow>[] = [
@@ -248,7 +248,12 @@ function useColumns(
           systemId={row.systemId}
           name={routeSystemName(row)}
           open={noteOpen === row.systemId}
-          onOpenChange={(open) => setNoteOpen(open ? row.systemId : null)}
+          // Closing only clears this row's own editor: a stale close must not shut another row's.
+          onOpenChange={(open) =>
+            setNoteOpen((current) =>
+              open ? row.systemId : current === row.systemId ? null : current
+            )
+          }
         >
           <RowMoreActions />
         </SystemNoteAnchor>
@@ -286,9 +291,9 @@ function RowMenuItems({
             href={systemZkillUrl(row.systemId)}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={t('travel.rowMenu.zkillboardLabel', { system: name })}
+            aria-label={t('travel.zkillboardLabel', { system: name })}
           >
-            {t('travel.rowMenu.zkillboard')}
+            {t('travel.zkillboard')}
             <ExternalMark />
           </a>
         </MenuItem>

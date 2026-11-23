@@ -279,6 +279,7 @@ describe('Travel › Route Safety › Route rules', () => {
     useAvoidEdencom.setState({ value: false });
     useAvoidedSystems.setState({ value: [] });
     useAvoidedSystemsEnabled.setState({ value: true });
+    useSystemNotes.setState({ value: {} });
     clearPodKillsLoad();
   });
 
@@ -371,6 +372,20 @@ describe('Travel › Route Safety › Route rules', () => {
     );
     const again = await openRowMenu(user, 'Perimeter');
     expect(within(again).getByRole('menuitem', { name: 'Edit note' })).toBeInTheDocument();
+  });
+
+  it('returns focus to the ⋮ when the note editor closes', async () => {
+    const user = userEvent.setup({ delay: null });
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const menu = await openRowMenu(user, 'Perimeter');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Add note' }));
+    await screen.findByRole('textbox');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'More actions for Perimeter' })).toHaveFocus()
+    );
   });
 
   it('links a row to its system on zKillboard', async () => {

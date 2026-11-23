@@ -118,12 +118,29 @@ export function SystemNoteAnchor({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  // The row can unmount (a fold collapsing) with the editor open, which fires no close.
+  const closeRef = useRef(onOpenChange);
+  useEffect(() => {
+    closeRef.current = onOpenChange;
+  });
+  useEffect(() => (open ? () => closeRef.current(false) : undefined), [open]);
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor asChild>
-        <span className="inline-flex">{children}</span>
+        <span ref={anchorRef} className="inline-flex">
+          {children}
+        </span>
       </PopoverAnchor>
-      <PopoverContent align="end" aria-label={t('travel.note.label', { name })}>
+      <PopoverContent
+        align="end"
+        aria-label={t('travel.note.label', { name })}
+        // An anchor is not a trigger, so Radix returns focus nowhere: hand it back to the ⋮.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          anchorRef.current?.querySelector('button')?.focus();
+        }}
+      >
         <NoteEditor systemId={systemId} name={name} />
       </PopoverContent>
     </Popover>
