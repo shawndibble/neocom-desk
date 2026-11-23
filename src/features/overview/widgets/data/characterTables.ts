@@ -314,7 +314,7 @@ export function mailTable(
         mail.subject || t('overview.board.mailNoSubject'),
       ],
       tone: mail.unread === false ? 'clear' : 'watch',
-      to: mailOpenHref(mail.mailId, ownerId),
+      to: mailOpenHref(mail.mailId, mail.ownerId ?? ownerId),
     })),
   };
 }

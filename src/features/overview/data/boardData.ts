@@ -25,6 +25,7 @@ import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { INBOX_ROWS, mergeMailBoards, RECENT_ROWS } from './mailAcross';
 import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
 import {
@@ -461,9 +462,6 @@ export interface SpExtractionBoardData {
 
 // --- Mail -------------------------------------------------------------------
 
-/** Mail rows the Table view can show at its tallest size. */
-const INBOX_ROWS = 12;
-
 export interface BoardMail {
   mailId: number;
   subject: string;
@@ -472,6 +470,8 @@ export interface BoardMail {
   atMs: number | null;
   /** Set on `inbox` rows: false for mail already read. */
   unread?: boolean;
+  /** The Character whose mailbox holds it, so a row opens in the right inbox on All characters. */
+  ownerId?: number;
 }
 
 export interface MailBoardData {
@@ -505,7 +505,9 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
       atMs: header.timestamp ? Date.parse(header.timestamp) : Number.NaN,
     }))
     .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs));
-  const unreadHeaders = newestFirst.filter(({ header }) => header.is_read === false).slice(0, 4);
+  const unreadHeaders = newestFirst
+    .filter(({ header }) => header.is_read === false)
+    .slice(0, RECENT_ROWS);
   const inboxHeaders = newestFirst.slice(0, INBOX_ROWS);
   const senderIds = [...new Set([...unreadHeaders, ...inboxHeaders])].flatMap(({ header }) =>
     header.from === undefined ? [] : [header.from]
@@ -524,6 +526,7 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     from: header.from === undefined ? null : (names.get(header.from) ?? null),
     atMs: Number.isNaN(atMs) ? null : atMs,
     unread: header.is_read === false,
+    ownerId: characterId,
   });
   return {
     unread:
@@ -538,6 +541,20 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
         .filter((date): date is Date => date instanceof Date)
         .sort((a, b) => a.getTime() - b.getTime())[0] ?? null,
   };
+}
+
+/** Every Character's mail folded into one board: the unread counts added, the newest rows interleaved. */
+export async function loadAllMailBoard(): Promise<MailBoardData> {
+  const { fanOutAllCharacters } = await import('@/features/character/allCharactersFanOut');
+  const { entries, skipped } = await fanOutAllCharacters<MailBoardData>({
+    scope: ESI_REGISTRY.getCharacterMailHeaders.scope,
+    load: ({ characterId }) => loadMailBoard(characterId),
+  });
+  // No Character granted mail: a permission to ask for, never "no mail".
+  if (entries.length === 0 && skipped.length > 0) {
+    return { unread: 0, recent: [], inbox: [], needsReauth: true, fetchedAt: null };
+  }
+  return mergeMailBoards(entries);
 }
 
 // --- Price alerts -----------------------------------------------------------

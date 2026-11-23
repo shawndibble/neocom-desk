@@ -333,6 +333,8 @@ export interface FeedMap {
   planetary: PlanetaryBoardData;
   industry: IndustryBoardData;
   contracts: ContractsBoardData;
+  /** Every Character's mail folded into one board (the Mail widget on All characters). */
+  mailAll: MailBoardData;
   /** Every Character's contracts as one board (the Contracts widget on All characters). */
   contractsAll: ContractsBoardData;
   /** The Calendar page's whole board read: every clock the Character can read. */

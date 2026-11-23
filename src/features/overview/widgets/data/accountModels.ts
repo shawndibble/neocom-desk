@@ -561,7 +561,12 @@ export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
         ctx.scopeAll ? walletAcross : wallet
       )(feeds, ctx),
   },
-  mail: { feeds: ['mail'], scope: 'character', build: mail },
+  mail: {
+    feeds: ['mail'],
+    allFeeds: ['mailAll'],
+    scope: 'account',
+    build: (feeds, ctx) => mail(ctx.scopeAll ? { ...feeds, mail: feeds.mailAll } : feeds, ctx),
+  },
   orders: { feeds: ['orders', 'skills'], scope: 'account', build: orders },
   contracts: {
     feeds: ['contracts'],
