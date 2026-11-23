@@ -26,7 +26,11 @@ import type { CachedResult } from '@/esi/cache';
 import { summarizeProductionRun } from '@/features/industry/productionRunSummary';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
-import { hasWalletScope, loadWalletJournalWithStatus } from '@/features/character/wallet';
+import {
+  hasWalletScope,
+  loadAllCharactersWalletBalances,
+  loadWalletJournalWithStatus,
+} from '@/features/character/wallet';
 import type { SovRaidsWidgetData } from './sovRaidsLoader';
 import { DAY_MS } from '@/lib/age';
 
@@ -51,6 +55,67 @@ export async function loadJournalPanel(characterId: number): Promise<JournalData
   if (!(await hasWalletScope(characterId))) return { result: null, needsReauth: true };
   const { cached, needsReauth } = await loadWalletJournalWithStatus(characterId);
   return { result: cached, needsReauth };
+}
+
+/** One Character's wallet balance in the All characters read. */
+export interface WalletAllCharacter {
+  characterId: number;
+  name: string;
+  /** The balance; null when the read landed nothing (a lapsed grant, or never read). */
+  balance: number | null;
+  needsReauth: boolean;
+  fetchedAt: number | null;
+  fromCache: boolean;
+}
+
+export interface WalletAllData {
+  characters: WalletAllCharacter[];
+  /** Characters that never granted the wallet scope: listed in the count, never read. */
+  skippedCount: number;
+}
+
+/** Every Character's balance (the Wallet page's cross-character read). */
+export async function loadWalletAllWidget(): Promise<WalletAllData> {
+  const { entries, skipped } = await loadAllCharactersWalletBalances();
+  return {
+    characters: entries.map((entry) => ({
+      characterId: entry.characterId,
+      name: entry.characterName,
+      balance: entry.balanceResult?.data ?? null,
+      needsReauth: entry.needsReauth,
+      fetchedAt: entry.balanceResult?.fetchedAt.getTime() ?? null,
+      fromCache: entry.balanceResult?.fromCache ?? false,
+    })),
+    skippedCount: skipped.length,
+  };
+}
+
+/**
+ * Every Character's journal merged into one list, in the shape the single read has, so the
+ * flow builders serve both. Behind `import()` like the other journal reads.
+ */
+export async function loadJournalAllWidget(): Promise<JournalData> {
+  const { loadAllCharactersJournals, loadWalletScopedCharacterIds } =
+    await import('@/features/character/walletJournalAll');
+  const [snapshot, scopedIds] = await Promise.all([
+    loadAllCharactersJournals(undefined, { typeNames: false, fills: false }),
+    loadWalletScopedCharacterIds(),
+  ]);
+  if (snapshot.loaded.length === 0) {
+    if (scopedIds.length > 0) throw new Error('The wallet journal could not be read');
+    return { result: null, needsReauth: true };
+  }
+  const reads = snapshot.loaded.map((c) => c.fetchedAt.getTime());
+  return {
+    result: {
+      data: snapshot.loaded.flatMap((c) => c.journal),
+      // The merged read is as fresh as its stalest part.
+      fetchedAt: new Date(Math.min(...reads)),
+      fromCache: false,
+      truncated: snapshot.loaded.some((c) => c.truncated),
+    },
+    needsReauth: false,
+  };
 }
 
 // --- Net worth -----------------------------------------------------------------

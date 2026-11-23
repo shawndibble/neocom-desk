@@ -47,7 +47,9 @@ import {
 } from './loaders';
 import {
   loadClonesWidget,
+  loadJournalAllWidget,
   loadJournalPanel,
+  loadWalletAllWidget,
   loadLocationWidget,
   loadLpWidget,
   loadMiningYieldWidget,
@@ -242,6 +244,8 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   spExtras: { type: 'hook', Component: SpExtrasSource },
   accelerator: { type: 'hook', Component: AcceleratorSource },
   journal: snapshot(loadJournalPanel, 'overview:journal'),
+  walletAll: snapshot(loadWalletAllWidget, 'overview:wallet-all', { accountWide: true }),
+  journalAll: snapshot(loadJournalAllWidget, 'overview:journal-all', { accountWide: true }),
   netWorth: snapshot(loadNetWorthWidget, 'overview:net-worth'),
   profit: snapshot(loadProfitWidget, 'overview:profit'),
   miningYield: snapshot(loadMiningYieldWidget, 'overview:mining-yield'),

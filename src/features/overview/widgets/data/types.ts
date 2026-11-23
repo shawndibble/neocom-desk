@@ -57,6 +57,7 @@ import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
   ClonesWidgetData,
   JournalData,
+  WalletAllData,
   LocationWidgetData,
   LpWidgetData,
   HaulingWidgetData,
@@ -353,6 +354,10 @@ export interface FeedMap {
   /** Every Character's typed-in accelerator, a hook not a load (Training's expiry). */
   accelerator: ReadonlyMap<number, TypedAccelerator>;
   journal: JournalData;
+  /** Every Character's wallet balance (the Wallet's All characters read). */
+  walletAll: WalletAllData;
+  /** Every Character's journal merged (Wallet flow's All characters read). */
+  journalAll: JournalData;
   netWorth: NetWorthWidgetData;
   profit: ProfitWidgetData;
   miningYield: MiningYieldWidgetData;
