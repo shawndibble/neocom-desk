@@ -33,6 +33,11 @@ vi.mock('@/features/route/useSolarSystems', () => ({
     ]),
 }));
 
+const corpAccess = vi.hoisted(() => ({ missingScopes: [] as string[] }));
+vi.mock('@/features/corp/useCorpAccess', () => ({
+  useCorpAccess: () => ({ missingScopes: corpAccess.missingScopes }),
+}));
+
 const mocked = vi.mocked(boardData);
 const mockedBays = vi.mocked(fuelBayData.loadStructureFuelBays);
 const now = Date.now();
@@ -112,6 +117,7 @@ function columnHeaders(tableEl: HTMLElement): string[] {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  corpAccess.missingScopes = [];
   await useFuelRates.getState().setValue({});
   useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
   mockedBays.mockResolvedValue(new Map());
@@ -125,6 +131,21 @@ beforeEach(async () => {
 });
 
 describe('CorpStructures', () => {
+  it('says towers are missing when the active Character has not granted the starbases scope', async () => {
+    feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
+    corpAccess.missingScopes = ['esi-corporations.read_starbases.v1'];
+    renderPage();
+    await table();
+    expect(await screen.findByText(/Control towers are not listed/)).toBeInTheDocument();
+  });
+
+  it('shows no towers note when nothing is missing', async () => {
+    feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
+    renderPage();
+    await table();
+    expect(screen.queryByText(/Control towers are not listed/)).not.toBeInTheDocument();
+  });
+
   it('lists two corporations’ structures together with a Corporation column', async () => {
     feed(
       [ALPHA, BETA],

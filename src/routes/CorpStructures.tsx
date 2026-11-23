@@ -10,6 +10,10 @@
  * (`structureRows`), so its Problems only and this page's keep the same rows.
  */
 import { useCallback, useEffect, useMemo } from 'react';
+import { GrantBanner } from '@/app/GrantNote';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { CORP_SCOPES_FOR_CAPABILITY } from '@/features/corp/corpScopes';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -188,6 +192,12 @@ export function CorpStructures() {
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
 
   const towers = snapshot.data?.towers ?? null;
+  // A Director who has not granted the starbases scope reads the structures but no towers, silently.
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const { missingScopes } = useCorpAccess();
+  const towersNeedGrant = CORP_SCOPES_FOR_CAPABILITY.canReadStarbases.some((scope) =>
+    missingScopes.includes(scope)
+  );
   const view = useMemo(
     () =>
       data ? structuresView(data, now, towers ? toBoardStarbases(towers, now) : undefined) : null,
@@ -597,6 +607,14 @@ export function CorpStructures() {
           />
         }
       />
+      {towersNeedGrant && activeCharacterId !== null && (
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCorporationStarbases']}
+          title={t('corp.structures.towersNeedGrant')}
+          compact
+        />
+      )}
       <DataGate
         status={snapshot.loading && data === null ? 'busy' : data === null ? 'failed' : 'ok'}
         title={t('common.couldntLoad')}

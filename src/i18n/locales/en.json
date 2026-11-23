@@ -15889,6 +15889,7 @@
       "noAccessHint": "None of your Characters can read a corporation's structures. EVE opens them to a Director or Station Manager.",
       "loadFailedHint": "EVE did not send the structure list. Try again in a moment.",
       "partlyFailed": "One or more corporations could not be read; their structures are missing.",
+      "towersNeedGrant": "Control towers are not listed until this Character grants the starbases permission.",
       "col": {
         "corp": "Corporation",
         "structure": "Structure",
