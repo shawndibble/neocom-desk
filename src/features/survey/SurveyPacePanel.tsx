@@ -19,11 +19,18 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { DataTable, type DataTableColumn } from '@/components/ui';
-import { formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
 import { paceShareSeries, type PaceInterval } from '@/engine/survey/chartViews';
 import { formatCount } from '@/lib/formatCount';
-import { MARGIN, formatPace, thinLabels, timeAxis, yAxis } from './surveyChartParts';
+import {
+  MARGIN,
+  clock,
+  formatPace,
+  gapBreaks,
+  thinLabels,
+  timeAxis,
+  yAxis,
+} from './surveyChartParts';
 import { PaceByOreChart } from './SurveyViewCharts';
 
 /** Room a rate label needs, in px: "1,116" at 10px. */
@@ -58,16 +65,16 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
         id: 'from',
         header: t('survey.tableFrom'),
         stickyStart: true,
-        render: (i) => formatEveClock(i.from),
+        render: (i) => clock(summary, i.from),
       },
-      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
+      { id: 'to', header: t('survey.tableTo'), render: (i) => clock(summary, i.to) },
       {
         id: 'rate',
         header: t('survey.tableRate'),
         render: (i) => `${formatCount(i.rate)} m³/s`,
       },
     ],
-    [t]
+    [summary, t]
   );
 
   // The rate is one flat block per pair of scans, from the earlier scan to the
@@ -75,11 +82,13 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
   // scan. The values are labelled at the middle of each block.
   const last = summary.intervals[summary.intervals.length - 1];
   if (last === undefined) return null;
+  // A squeezed gap has no rate: nothing was measured across it, so it draws at zero, unlabelled.
   const rateSteps = [
-    ...summary.intervals.map((i) => ({ at: i.from, rate: i.rate })),
-    { at: last.to, rate: last.rate },
+    ...summary.intervals.map((i) => ({ at: i.from, rate: i.gap ? 0 : i.rate })),
+    { at: last.to, rate: last.gap ? 0 : last.rate },
   ];
-  const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
+  const measured = summary.intervals.filter((i) => !i.gap);
+  const rateLabels = measured.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
   // Labels are thinned to the ones that fit; the tooltip carries the rest.
   const shown = thinLabels(
     rateLabels.map((r) => ({ at: r.at, weight: r.rate })),
@@ -97,6 +106,7 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
           <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
             <CartesianGrid stroke="var(--color-line)" vertical={false} />
             {xAxis(false)}
+            {gapBreaks(summary, false)}
             {yAxis({
               label: {
                 value: t('survey.chartRateAxis'),
@@ -144,7 +154,7 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
         <DataTable
           columns={columns}
           responsive="table"
-          rows={summary.intervals}
+          rows={measured}
           rowKey={(i) => i.from}
           label={label}
         />
@@ -163,9 +173,9 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
         id: 'from',
         header: t('survey.tableFrom'),
         stickyStart: true,
-        render: (i) => formatEveClock(i.from),
+        render: (i) => clock(summary, i.from),
       },
-      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
+      { id: 'to', header: t('survey.tableTo'), render: (i) => clock(summary, i.to) },
       {
         id: 'progress',
         header: t('survey.tableProgress'),
@@ -184,7 +194,7 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
               }),
       })),
     ],
-    [pace.activeOres, t]
+    [pace.activeOres, summary, t]
   );
 
   if (summary.intervals.length === 0) return null;
@@ -196,7 +206,7 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
         <DataTable
           columns={columns}
           responsive="table"
-          rows={pace.intervals}
+          rows={pace.intervals.filter((_, n) => !summary.intervals[n].gap)}
           rowKey={(i) => i.from}
           label={label}
         />

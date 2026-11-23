@@ -127,3 +127,30 @@ describe('SurveyCharts pace panel', () => {
     expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
   });
 });
+
+describe('SurveyCharts across a long gap with no scans', () => {
+  const HOUR = 3_600_000;
+  const T0 = Date.UTC(2026, 10, 20, 0, 30);
+  const summary = summarizeSurvey([
+    scan(T0, [['Veldspar', 1000]]),
+    scan(T0 + 30 * HOUR, [['Veldspar', 900]]),
+    scan(T0 + 30 * HOUR + 600_000, [['Veldspar', 800]]),
+    scan(T0 + 30 * HOUR + 1_200_000, [['Veldspar', 700]]),
+  ])!;
+
+  it('lists the real clock time of each scan and leaves the gap out of the rate table', () => {
+    render(<SurveyCharts summary={summary} />);
+    const volume = screen.getByRole('table', { name: /volume left/i });
+    expect(within(volume).getAllByRole('row')).toHaveLength(1 + 4);
+    // 00:30 on day one, then 06:30 the next day (30h later): the table speaks real time.
+    expect(within(volume).getByText(/00:30/)).toBeInTheDocument();
+    expect(within(volume).getByText(/06:30/)).toBeInTheDocument();
+    const rate = screen.getByRole('table', { name: /mining rate/i });
+    expect(within(rate).getAllByRole('row')).toHaveLength(1 + 2);
+  });
+
+  it('keeps real time on the Overview widget chart (compact), with no break', () => {
+    render(<SurveyCharts summary={summary} compactHeight={120} />);
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+});

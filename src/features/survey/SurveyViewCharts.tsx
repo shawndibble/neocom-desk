@@ -27,6 +27,7 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
+import { realTime } from '@/engine/survey/gapAxis';
 import {
   depletionSeries,
   iskSeries,
@@ -37,7 +38,16 @@ import {
 } from '@/engine/survey/chartViews';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatIskCompact } from '@/lib/isk';
-import { FULL_HEIGHT, MARGIN, formatPace, makeScanDot, timeAxis, yAxis } from './surveyChartParts';
+import {
+  FULL_HEIGHT,
+  MARGIN,
+  clock,
+  formatPace,
+  gapBreaks,
+  makeScanDot,
+  timeAxis,
+  yAxis,
+} from './surveyChartParts';
 import { oreTone } from './surveyTones';
 import { formatCount } from '@/lib/formatCount';
 
@@ -93,7 +103,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
         id: 'at',
         stickyStart: true,
         header: t('survey.chartScan'),
-        render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
+        render: (r) => t('survey.eveTime', { time: clock(summary, r.at) }),
       },
       { id: 'all', header: t('survey.chartAllOre'), render: (r) => pct(r.all) },
       ...summary.oreNames.map((ore) => ({
@@ -102,7 +112,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
         render: (r: SurveySeriesRow) => pct(r[ore]),
       })),
     ],
-    [summary.oreNames, t]
+    [summary, t]
   );
 
   function Tip({ active, payload }: TooltipContentProps) {
@@ -112,7 +122,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
       <ChartTooltipShell>
         <div className="min-w-48 space-y-1 text-xs">
           <div className="font-semibold text-text">
-            {t('survey.eveTime', { time: formatEveClock(row.at) })}
+            {t('survey.eveTime', { time: clock(summary, row.at) })}
           </div>
           <div className="space-y-0.5 border-t border-line pt-1">
             {summary.oreNames.map((ore, i) =>
@@ -139,7 +149,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
     );
   }
 
-  const nodeDot = makeScanDot();
+  const nodeDot = makeScanDot(undefined, summary.axis?.toTime);
   return (
     <ViewFigure
       label={label}
@@ -147,6 +157,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
         <ComposedChart key={summary.oreNames.join('|')} data={rows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(false)}
+          {gapBreaks(summary, true)}
           {cloneElement(yAxis() as ReactElement<ComponentProps<typeof YAxis>>, {
             domain: [0, 100],
             ticks: PERCENT_TICKS,
@@ -214,7 +225,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
         id: 'at',
         stickyStart: true,
         header: t('survey.chartScan'),
-        render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
+        render: (r) => t('survey.eveTime', { time: clock(summary, r.at) }),
       },
       { id: 'total', header: t('survey.tableIskTotal'), render: (r) => isk(r.total) },
       {
@@ -228,7 +239,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
         render: (r: SurveySeriesRow) => isk(r[ore]),
       })),
     ];
-  }, [pricedOres, t]);
+  }, [pricedOres, summary, t]);
 
   function Tip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as SurveySeriesRow | undefined;
@@ -237,7 +248,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
       <ChartTooltipShell>
         <div className="min-w-48 space-y-1 text-xs">
           <div className="font-semibold text-text">
-            {t('survey.eveTime', { time: formatEveClock(row.at) })}
+            {t('survey.eveTime', { time: clock(summary, row.at) })}
           </div>
           <div className="space-y-0.5 border-t border-line pt-1">
             {pricedOres.map((ore) => (
@@ -268,7 +279,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
     );
   }
 
-  const nodeDot = makeScanDot();
+  const nodeDot = makeScanDot(undefined, summary.axis?.toTime);
   return (
     <ViewFigure
       label={label}
@@ -276,6 +287,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
         <ComposedChart key={pricedOres.join('|')} data={rows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(false)}
+          {gapBreaks(summary, true)}
           {yAxis()}
           {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
           {[...pricedOres].reverse().map((ore) => (
@@ -316,7 +328,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
               stroke="var(--color-line-bright)"
               strokeDasharray="2 3"
               label={{
-                value: t('survey.chartDone', { time: formatEveClock(summary.etaAt) }),
+                value: t('survey.chartDone', { time: clock(summary, summary.etaAt) }),
                 position: 'insideTopLeft',
                 textAnchor: 'end',
                 fill: 'var(--color-text)',
@@ -457,9 +469,16 @@ export function PaceByOreChart({
 
   function Tip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as PaceRow | undefined;
-    const interval = row === undefined ? undefined : intervals[row.interval];
-    if (!active || interval === undefined) return null;
-    return <PaceTipBody interval={interval} activeOres={activeOres} toneIndex={toneIndex} />;
+    const index = row?.interval ?? -1;
+    const interval = intervals[index];
+    if (!active || interval === undefined || summary.intervals[index]?.gap) return null;
+    // The bars sit on the squeezed axis; the tip speaks in real time.
+    const real = {
+      ...interval,
+      from: realTime(summary, interval.from),
+      to: realTime(summary, interval.to),
+    };
+    return <PaceTipBody interval={real} activeOres={activeOres} toneIndex={toneIndex} />;
   }
 
   return (
@@ -467,6 +486,7 @@ export function PaceByOreChart({
       <ComposedChart data={rows} margin={{ ...MARGIN, top: 28 }}>
         <CartesianGrid stroke="var(--color-line)" vertical={false} />
         {xAxis(false)}
+        {gapBreaks(summary, false)}
         {yAxis({
           domain: [0, 100],
           label: {
