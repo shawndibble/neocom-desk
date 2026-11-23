@@ -98,6 +98,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.bpcHideAuctions': /hide auctions/i,
   'sync.bpcHidePlex': /hide PLEX/i,
   'sync.targetSkillPlan': /target skill plan/i,
+  'sync.permissionMarkDismissals': /Permissions you said not to ask for again/i,
   'sync.overviewHiddenCards': /hidden and reordered Overview cards/i,
   'sync.navHidden': /pages hidden from the navigation/i,
   'sync.overviewCardOrder': /hidden and reordered Overview cards/i,

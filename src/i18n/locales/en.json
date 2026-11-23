@@ -14683,6 +14683,10 @@
   },
   "permissions": {
     "grantMissing": "Grant missing Permissions",
+    "mark": {
+      "label": "{{character}}: {{permissions}} not granted",
+      "dontAsk": "Don't ask again"
+    },
     "writeSection": "Write to EVE",
     "writeSectionHint": "These change things in EVE or open windows in your game. They are off until you use one, and Neocom Desk asks first.",
     "wallet": {
@@ -15145,7 +15149,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, the moon surveys you connected to a payee with Assign Taxes, and the ledger days you unassigned so a payee's default systems leave them alone. Assets: the refining rate you type for your own structure, and its reprocessing tax, and the nicknames you gave your stations and structures (shown on the Assets page only). Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates, and the corporations you hid from Add my other corps.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, and pages hidden from the navigation.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, and pages hidden from the navigation. Permissions: the Permissions you said not to ask for again.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -15738,6 +15742,9 @@
       "grantSelected": "Grant selected ({{count}})",
       "corpRoles": "Roles: {{roles}}",
       "corpRolesUnknown": "Corporation roles show once granted.",
+      "notAsked": "Not asked for on other pages.",
+      "askAgain": "Ask again",
+      "askAgainAria": "Ask again for {{permission}}",
       "unlocks": {
         "corp": "Unlocks Corp Board, Members, Corp Wallet, Corp Assets, Moons, SRP officer view",
         "corpProjects": "Unlocks Corp projects in Build Opportunities",
@@ -20794,6 +20801,7 @@
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a permission the Character hasn't given",
+      "permissionCellMark": "Amber warning mark after a figure or control: the row's Character lacks a Permission; press to grant it for that Character or stop asking",
       "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "absenceNote": "Small dim text at a row's right edge: the row's item has none of something here; the row is not dimmed and stays clickable",
@@ -20883,6 +20891,10 @@
       "communityMark": "Shared in a Community",
       "channelOffLabel": "Device",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
+      "permissionCellMarkFigure": "Set destination",
+      "permissionCellMarkPermission": "Autopilot waypoints",
+      "permissionCellMarkWhy": "Sends the route to your EVE client.",
+      "permissionCellMarkLink": "Grant missing Permissions",
       "chartLast": "This week",
       "chartPrev": "Last week",
       "chartNet": "Net",
