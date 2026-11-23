@@ -1,3 +1,4 @@
+import { median } from '@/engine/math';
 import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 import type { SurveySummary } from './series';
 import { timeTicks } from './timeTicks';
@@ -12,7 +13,7 @@ import { timeTicks } from './timeTicks';
 
 /** A gap this long or more between scans may be broken… */
 const GAP_MIN_MS = 2 * HOUR_MS;
-/** …when it is also this many times the usual interval between scans. */
+/** …when it is also this many times the usual interval (the median of the scans under 2h apart). */
 const GAP_FACTOR = 3;
 /** A break is drawn this wide at least, and this share of the time on the chart outside the gaps (scanned, plus the run to the projected finish). */
 const BREAK_MIN_MS = 10 * MINUTE_MS;
@@ -37,24 +38,26 @@ export interface GapAxis {
   toTime: (x: number) => number;
 }
 
-const median = (xs: number[]): number => {
-  const s = [...xs].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)];
-};
-
 /** The summary on a squeezed axis, or the same summary when no gap is long enough to break. */
 export function compressGaps(summary: SurveySummary): SurveySummary {
   const spans = summary.intervals.map((i) => i.to - i.from);
-  if (spans.length < 2) return summary;
-  const usual = median(spans);
+  // "Usual" is the pace of the scans that are not themselves long gaps; a survey scanned only at
+  // long intervals has no usual one, so nothing in it is a gap.
+  const closeSpans = spans.filter((d) => d < GAP_MIN_MS);
+  if (closeSpans.length === 0) return summary;
+  const usual = median(closeSpans);
   const isGap = spans.map((d) => d >= GAP_MIN_MS && d > GAP_FACTOR * usual);
   if (!isGap.some(Boolean)) return summary;
 
   const shown =
     spans.reduce((sum, d, i) => (isGap[i] ? sum : sum + d), 0) +
     (summary.etaAt === null ? 0 : summary.etaAt - summary.lastAt);
-  const width = Math.max(BREAK_MIN_MS, shown * BREAK_SHARE);
   const gaps = summary.intervals.filter((_, i) => isGap[i]);
+  // Never wider than the shortest gap it stands for: a squeeze, not a stretch.
+  const width = Math.min(
+    Math.max(BREAK_MIN_MS, shown * BREAK_SHARE),
+    ...gaps.map((g) => g.to - g.from)
+  );
 
   // Time squeezed out before a real instant: every gap that has ended by then.
   const squeezed = (t: number): number =>

@@ -40,6 +40,28 @@ describe('compressGaps', () => {
     expect(compressGaps(s)).toBe(s);
   });
 
+  it('breaks a long gap even when only one short interval came before it (3 scans)', () => {
+    const three = summarizeSurvey([
+      scan(T0, 900),
+      scan(T0 + 10 * MINUTE_MS, 890),
+      scan(T0 + 23 * HOUR_MS, 880),
+    ]);
+    expect(compressGaps(three).axis?.breaks).toHaveLength(1);
+  });
+
+  it('never draws a break wider than the gap it stands for', () => {
+    const s = summarizeSurvey([
+      scan(T0, 900),
+      scan(T0 + 10 * MINUTE_MS, 890),
+      scan(T0 + 20 * MINUTE_MS + 2 * HOUR_MS, 880),
+      ...Array.from({ length: 40 }, (_, i) =>
+        scan(T0 + 3 * HOUR_MS + (i + 1) * 40 * MINUTE_MS, 870 - i)
+      ),
+    ]);
+    const [b] = compressGaps(s).axis!.breaks;
+    expect(b.to - b.from).toBeLessThanOrEqual(b.realTo - b.realFrom);
+  });
+
   it('squeezes each long gap to one short break, keeping the scans in order', () => {
     const summary = compressGaps(withGaps());
     const axis = summary.axis!;

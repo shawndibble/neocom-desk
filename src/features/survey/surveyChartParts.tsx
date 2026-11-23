@@ -10,6 +10,7 @@ import type { ReactElement } from 'react';
 import { ReferenceArea, XAxis, YAxis, type CartesianViewBox } from 'recharts';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { realTime } from '@/engine/survey/gapAxis';
+import i18n from '@/i18n';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -24,7 +25,11 @@ export const FULL_HEIGHT = 224;
 export const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
 
 const shortDate = (t: number): string =>
-  new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  new Date(t).toLocaleDateString(i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 
 /** The shared time axis: its domain, ticks, and an `<XAxis>` factory (`hide` hides it). */
 export function timeAxis(summary: SurveySummary): {
@@ -40,7 +45,7 @@ export function timeAxis(summary: SurveySummary): {
   // Past a day the clock alone repeats ("00:00" twice), so a midnight tick names its date.
   const multiDay = !axis && domain[1] - domain[0] > DAY_MS;
   // A tick that starts a stretch of scans (or midnight, past a day) carries its date under the clock.
-  const named = (x: number): boolean => {
+  const showsDate = (x: number): boolean => {
     return axis ? axis.dateTicks.has(x) : multiDay && x % DAY_MS === 0;
   };
   const tick = ({
@@ -52,13 +57,13 @@ export function timeAxis(summary: SurveySummary): {
     y: number | string;
     payload: { value: number };
   }) => {
-    const t = axis ? axis.toTime(payload.value) : payload.value;
+    const t = realTime(summary, payload.value);
     return (
       <g transform={`translate(${x},${y})`} fill="var(--color-text-dim)">
         <text textAnchor="middle" dy={12} fontSize="0.6875rem">
           {formatEveClock(t)}
         </text>
-        {named(payload.value) && (
+        {showsDate(payload.value) && (
           <text textAnchor="middle" dy={24} fontSize="0.6875rem">
             {shortDate(t)}
           </text>
@@ -66,7 +71,7 @@ export function timeAxis(summary: SurveySummary): {
       </g>
     );
   };
-  const height = ticks.some(named) ? 40 : 30;
+  const height = ticks.some(showsDate) ? 40 : 30;
   const xAxis = (hide: boolean) => (
     <XAxis
       dataKey="at"
@@ -74,7 +79,7 @@ export function timeAxis(summary: SurveySummary): {
       scale="time"
       domain={domain}
       ticks={ticks}
-      tickFormatter={(x: number) => formatEveClock(axis ? axis.toTime(x) : x)}
+      tickFormatter={(x: number) => formatEveClock(realTime(summary, x))}
       stroke="var(--color-line-bright)"
       tick={tick}
       height={height}
