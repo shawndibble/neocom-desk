@@ -39,7 +39,13 @@ const KINDS: Record<string, KindDef> = {
   ...ACCOUNT_DEFS,
   training: { feeds: ['skills', 'accelerator'], scope: 'character', build: training },
   sp: { feeds: ['skills', 'spExtras'], scope: 'character', build: sp },
-  comingUp: { feeds: ['calendar'], scope: 'character', build: comingUp },
+  comingUp: {
+    feeds: ['calendar'],
+    allFeeds: ['calendarAll'],
+    scope: 'account',
+    build: (feeds, ctx) =>
+      comingUp(ctx.scopeAll ? { ...feeds, calendar: feeds.calendarAll } : feeds, ctx),
+  },
   ...WORLD_DEFS,
   ...KIND_DEFS,
 };

@@ -23,7 +23,7 @@ import {
   isSpFarmCharacter,
 } from '@/features/character/spExtractionSettings';
 import { useExtractionPrices } from '@/features/character/useExtractionPrices';
-import { loadCalendarBoard } from '@/features/character/calendarBoardData';
+import { loadAllCalendarBoard, loadCalendarBoard } from '@/features/character/calendarBoardData';
 import {
   loadAllContractsBoard,
   loadAllMailBoard,
@@ -232,6 +232,7 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   contractsAll: snapshot(loadAllContractsBoard, 'overview:contracts-all', { accountWide: true }),
   // A new key: a snapshot saved under the old one holds the events-only shape.
   calendar: snapshot(loadCalendarBoard, 'overview:calendar-board'),
+  calendarAll: snapshot(loadAllCalendarBoard, 'overview:calendar-board-all', { accountWide: true }),
   mail: snapshot(loadMailBoard, 'overview:mail'),
   mailAll: snapshot(loadAllMailBoard, 'overview:mail-all', { accountWide: true }),
   priceAlerts: snapshot(loadPriceAlertsBoard, 'overview:price-alerts'),

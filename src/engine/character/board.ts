@@ -87,6 +87,8 @@ export interface BoardClockSource {
   deadlineMs: number;
   /** Set on a corporation's clock (`corpCalendar.ts`); absent on the pilot's own. */
   corporation?: BoardCorporation;
+  /** The Character a clock of their own belongs to, set only when the board reads every Character. */
+  characterName?: string;
   /**
    * The corporation sharing a Shared Pop with the pilot. Not `corporation`: the pilot reads
    * nothing of it, so the Corporation events filter never touches it.
@@ -239,6 +241,7 @@ function toItem(
     important: isCalendarEvent(source) ? source.important : false,
     ...(source.corporation ? { corporation: source.corporation } : {}),
     ...(source.sharedBy ? { sharedBy: source.sharedBy } : {}),
+    ...(source.characterName ? { characterName: source.characterName } : {}),
     ...(source.extra ? { extra: source.extra } : {}),
     ...(source.pastLabelKey ? { pastLabelKey: source.pastLabelKey } : {}),
     ...(source.muted ? { muted: true } : {}),
