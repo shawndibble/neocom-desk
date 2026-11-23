@@ -186,6 +186,8 @@ export const corpAssetsAcross: Builder = (feeds, ctx) => {
       ? []
       : [{ read, summary: read.summary, targets: targetsForCorp(targetData, read.corporationId) }]
   );
+  // Every read readable yet none with a summary is a read that landed nothing: never an all-clear.
+  if (held.length === 0) return corpUnreadable(ASSETS, feed, false, t);
   const lines = sumLines(
     held.map(({ summary, targets }) =>
       linesFor(summary, countShortTypes(targets, summary.usableByType))

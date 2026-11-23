@@ -8,7 +8,7 @@
 import { mergeCorpRows, mergeLookups } from '@/engine/corp/corpMerge';
 import { oldest } from '../../data/corpBoard';
 import type { CorpMembersFeed, CorpRoleAuditFeed, CorpSrpFeed } from './corpFeeds';
-import { characterKey, joinedKey, leftKey, srpClaimKey } from './corpRowKeys';
+import { changeKey, characterKey, joinedKey, leftKey, srpClaimKey } from './corpRowKeys';
 
 /** One corporation's read, tagged with its corporation. */
 type Tagged<F> = F & { corporationId: number };
@@ -25,6 +25,12 @@ export function mergeSrpReads(reads: readonly Tagged<CorpSrpFeed>[]) {
       enabled: reads.some((read) => read.enabled),
       canSetUp: reads.some((read) => read.canSetUp),
       claims: rows,
+      byCorporation: new Map(
+        reads.map((read) => [
+          read.corporationId,
+          { enabled: read.enabled, canSetUp: read.canSetUp },
+        ])
+      ),
       typeNames: mergeLookups(reads.map((read) => read.typeNames)),
       systemNames: mergeLookups(reads.map((read) => read.systemNames)),
     },
@@ -67,6 +73,12 @@ export function mergeRoleAuditReads(reads: readonly Tagged<CorpRoleAuditFeed>[])
     reads.map((read) => ({ corporationId: read.corporationId, rows: read.audit?.holders ?? [] })),
     characterKey
   );
+  // A change counts whether or not its character still holds a role, so it is filed on its own.
+  for (const read of reads) {
+    for (const change of read.audit?.changes ?? []) {
+      corporationOf.set(changeKey(change.characterId), read.corporationId);
+    }
+  }
   const histories = audits.flatMap((audit) => (audit.changes ? [audit.changes] : []));
   return {
     corporationOf,

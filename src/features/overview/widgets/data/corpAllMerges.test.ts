@@ -138,3 +138,92 @@ describe('mergeRoleAuditReads', () => {
     ).toHaveLength(1);
   });
 });
+
+describe('narrowing the merged Roles audit and SRP reads to one corporation', () => {
+  const change = (characterId: number, changedAtMs: number) =>
+    ({ characterId, changedAtMs }) as never;
+  const audit = (
+    corporationId: number,
+    holders: number[],
+    changes: ReturnType<typeof change>[] | null
+  ) => ({
+    ...base,
+    corporationId,
+    audit: {
+      holders: holders.map((characterId) => ({ characterId, roles: ['Director'] }) as never),
+      changes,
+      titlesKnown: true,
+      names: new Map(),
+      ceoId: null,
+      fetchedAt: new Date(1),
+      fromCache: false,
+    },
+  });
+  const state = (data: unknown) => ({ data, error: false, loading: false });
+
+  it('keeps a corporation’s holders and every change in it, even by someone who holds no role now', () => {
+    const merged = mergeRoleAuditReads([
+      audit(A, [1], [change(1, 10), change(7, 5)]),
+      audit(B, [2], [change(2, 50)]),
+    ]);
+    const feeds = {
+      corpRoleAuditAll: state({
+        ...base,
+        ...merged.body,
+        corporationOf: merged.corporationOf,
+        corporations: new Map([
+          [A, {}],
+          [B, {}],
+        ]),
+        partlyFailed: false,
+      }),
+    } as unknown as Feeds;
+    const narrowed = narrowFeedsToCorporation(feeds, A).corpRoleAuditAll!.data!;
+    expect(narrowed.audit!.holders.map((h) => h.characterId)).toEqual([1]);
+    // Character 7 lost every role, yet their change is still this corporation's.
+    expect(narrowed.audit!.changes!.map((c) => c.characterId).sort()).toEqual([1, 7]);
+  });
+
+  it('narrows an unreadable audit without throwing', () => {
+    const feeds = {
+      corpRoleAuditAll: state({
+        ...base,
+        readable: false,
+        audit: null,
+        corporations: new Map(),
+        corporationOf: new Map(),
+        partlyFailed: true,
+      }),
+    } as unknown as Feeds;
+    expect(narrowFeedsToCorporation(feeds, A).corpRoleAuditAll!.data!.audit).toBeNull();
+  });
+
+  it('gives a corporation with SRP off its own off state, not another corporation’s', () => {
+    const srp = (corporationId: number, enabled: boolean, canSetUp: boolean) => ({
+      ...base,
+      corporationId,
+      enabled,
+      canSetUp,
+      claims: enabled ? [{ killmailId: corporationId } as never] : [],
+      typeNames: new Map(),
+      systemNames: new Map(),
+    });
+    const merged = mergeSrpReads([srp(A, true, false), srp(B, false, true)]);
+    const feeds = {
+      corpSrpAll: state({
+        ...base,
+        ...merged.body,
+        corporationOf: merged.corporationOf,
+        corporations: new Map([
+          [A, {}],
+          [B, {}],
+        ]),
+        partlyFailed: false,
+      }),
+    } as unknown as Feeds;
+    const off = narrowFeedsToCorporation(feeds, B).corpSrpAll!.data!;
+    expect(off.enabled).toBe(false);
+    expect(off.canSetUp).toBe(true);
+    expect(off.claims).toEqual([]);
+  });
+});

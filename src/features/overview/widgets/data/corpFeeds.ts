@@ -195,6 +195,8 @@ export interface CorpSrpFeed extends CorpFeedBase {
   /** A Director (or the CEO) may turn it on: the tile offers Set up SRP. */
   canSetUp: boolean;
   claims: SrpClaimRow[];
+  /** Read across several corporations: each one's own switch and setup right, for a widget narrowed to one. */
+  byCorporation?: ReadonlyMap<number, { enabled: boolean; canSetUp: boolean }>;
   /** Hull names by type id; a missing one degrades one cell to the killmail id. */
   typeNames: ReadonlyMap<number, string>;
   /** System names from the static data. */

@@ -14,3 +14,5 @@ export const characterKey = (row: { characterId: number }) => String(row.charact
 /** The roster's joined and left rows, filed by the id of the character who joined or left. */
 export const joinedKey = (id: number) => `joined:${id}`;
 export const leftKey = (id: number) => `left:${id}`;
+/** A role change, filed by the character it changed, as the audit's change count reads it. */
+export const changeKey = (characterId: number) => `change:${characterId}`;
