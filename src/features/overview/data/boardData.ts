@@ -36,6 +36,7 @@ import {
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
 import { tradeHubIdFor } from '@/features/market/hub';
@@ -170,8 +171,9 @@ export async function loadAllPlanetaryBoard(
   signal: RouteSnapshotSignal
 ): Promise<PlanetaryBoardData> {
   const { fanOutAllCharacters } = await import('@/features/character/allCharactersFanOut');
-  const { entries, skipped } = await fanOutAllCharacters<CharacterPlanetaryBoard>({
-    scope: ESI_REGISTRY.getCharacterPlanets.scope,
+  const scope = ESI_REGISTRY.getCharacterPlanets.scope;
+  const { entries } = await fanOutAllCharacters<CharacterPlanetaryBoard>({
+    scope,
     load: async ({ characterId, name }) => ({
       characterId,
       name,
@@ -179,7 +181,9 @@ export async function loadAllPlanetaryBoard(
     }),
   });
   if (entries.length === 0) {
-    if (skipped.length > 0) return { ...EMPTY_PLANETARY, needsReauth: true, loadedAt: Date.now() };
+    if (await nobodyGranted(scope)) {
+      return { ...EMPTY_PLANETARY, needsReauth: true, loadedAt: Date.now() };
+    }
     throw new Error('Colonies could not be read');
   }
   return mergePlanetaryBoards(entries);
@@ -395,8 +399,9 @@ export async function loadAllContractsBoard(): Promise<ContractsBoardData> {
     import('@/features/character/allCharactersFanOut'),
     import('@/features/contracts/allContractsSnapshot'),
   ]);
-  const { entries, skipped } = await fanOutAllCharacters({
-    scope: ESI_REGISTRY.getCharacterContracts.scope,
+  const scope = ESI_REGISTRY.getCharacterContracts.scope;
+  const { entries } = await fanOutAllCharacters({
+    scope,
     load: async ({ characterId, name }) => {
       const { cached, needsReauth } = await loadContracts(characterId);
       return {
@@ -410,9 +415,9 @@ export async function loadAllContractsBoard(): Promise<ContractsBoardData> {
       };
     },
   });
-  const read = entries.filter((entry) => entry.fetchedAt > 0);
-  if (read.length === 0 && entries.length === 0 && skipped.length > 0) {
-    // Nobody granted the contracts scope: a permission to ask for, never "no contracts".
+  // Nobody granted the contracts scope: a permission to ask for, never "no contracts".
+  if (entries.length === 0) {
+    if (!(await nobodyGranted(scope))) throw new Error('Contracts could not be read');
     return {
       summary: summarizeContractsBoard([], 0, Date.now()),
       route: null,
@@ -420,6 +425,7 @@ export async function loadAllContractsBoard(): Promise<ContractsBoardData> {
       fetchedAt: null,
     };
   }
+  const read = entries.filter((entry) => entry.fetchedAt > 0);
   if (read.length === 0 && !entries.some((entry) => entry.needsReauth)) {
     throw new Error('Contracts could not be read');
   }
@@ -572,16 +578,28 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
   };
 }
 
+/**
+ * Why an All read came back with no Character: nobody holds `scope` (a permission to ask
+ * for), or every read that was tried failed (an outage, which must not read as a missing grant).
+ */
+async function nobodyGranted(scope: string): Promise<boolean> {
+  return (await characterIdsWithScopes([scope])).length === 0;
+}
+
 /** Every Character's mail folded into one board: the unread counts added, the newest rows interleaved. */
 export async function loadAllMailBoard(): Promise<MailBoardData> {
   const { fanOutAllCharacters } = await import('@/features/character/allCharactersFanOut');
-  const { entries, skipped } = await fanOutAllCharacters<MailBoardData>({
-    scope: ESI_REGISTRY.getCharacterMailHeaders.scope,
+  const scope = ESI_REGISTRY.getCharacterMailHeaders.scope;
+  const { entries } = await fanOutAllCharacters<MailBoardData>({
+    scope,
     load: ({ characterId }) => loadMailBoard(characterId),
   });
-  // No Character granted mail: a permission to ask for, never "no mail".
-  if (entries.length === 0 && skipped.length > 0) {
-    return { unread: 0, recent: [], inbox: [], needsReauth: true, fetchedAt: null };
+  if (entries.length === 0) {
+    // No Character granted mail: a permission to ask for, never "no mail".
+    if (await nobodyGranted(scope)) {
+      return { unread: 0, recent: [], inbox: [], needsReauth: true, fetchedAt: null };
+    }
+    throw new Error('Mail could not be read');
   }
   return mergeMailBoards(entries);
 }

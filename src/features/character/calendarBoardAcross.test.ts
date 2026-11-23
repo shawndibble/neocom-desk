@@ -60,6 +60,28 @@ describe('mergeCalendarBoards', () => {
     expect(corp.structureFuel![0]!.characterName).toBeUndefined();
   });
 
+  it('keeps the most committed answer to an event two Characters were both invited to', () => {
+    const event = (response: 'not_responded' | 'accepted' | 'declined') => ({
+      ...clock('9'),
+      response,
+      important: false,
+    });
+    const merged = mergeCalendarBoards([
+      entry(1, board({ calendarEvents: [event('not_responded')] })),
+      entry(2, board({ calendarEvents: [event('accepted')] })),
+    ]);
+    expect(merged.calendarEvents).toHaveLength(1);
+    expect(merged.calendarEvents![0]).toMatchObject({
+      response: 'accepted',
+      characterName: 'Pilot 2',
+    });
+    const declined = mergeCalendarBoards([
+      entry(1, board({ calendarEvents: [event('declined')] })),
+      entry(2, board({ calendarEvents: [event('not_responded')] })),
+    ]);
+    expect(declined.calendarEvents![0]).toMatchObject({ response: 'not_responded' });
+  });
+
   it('keeps unreadable apart from empty: a list nobody could read stays undefined', () => {
     const merged = mergeCalendarBoards([
       entry(1, board({ industryJobs: undefined })),

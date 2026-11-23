@@ -7,7 +7,12 @@
  * between them) is listed once; a corporation's (structures, moons, corp jobs, pops, skyhooks)
  * is the same read through every Character, so it is listed once and belongs to no Character.
  */
-import type { BoardClockSource, CharacterBoardItemKind } from '@/engine/character/board';
+import type {
+  BoardCalendarEventSource,
+  BoardClockSource,
+  CalendarResponse,
+  CharacterBoardItemKind,
+} from '@/engine/character/board';
 import type { CalendarBoardData } from './calendarBoardData';
 
 export interface CharacterCalendarBoard {
@@ -31,6 +36,27 @@ function distinct<T>(items: readonly T[], idOf: (item: T) => string | number): T
 function union<T>(lists: readonly (readonly T[] | undefined)[]): T[] | undefined {
   const read = lists.filter((list): list is readonly T[] => list !== undefined);
   return read.length === 0 ? undefined : read.flat();
+}
+
+/** How committed an RSVP is: the answer an event two of the Characters share is kept at. */
+const RESPONSE_RANK: Record<CalendarResponse, number> = {
+  accepted: 3,
+  tentative: 2,
+  not_responded: 1,
+  declined: 0,
+};
+
+/** One entry per event: the Characters were each invited, so the most committed answer stands. */
+function distinctEvents(events: readonly BoardCalendarEventSource[] | undefined) {
+  if (!events) return undefined;
+  const best = new Map<string, BoardCalendarEventSource>();
+  for (const event of events) {
+    const held = best.get(event.id);
+    if (!held || RESPONSE_RANK[event.response] > RESPONSE_RANK[held.response]) {
+      best.set(event.id, event);
+    }
+  }
+  return [...best.values()];
 }
 
 type ClockList =
@@ -76,7 +102,7 @@ export function mergeCalendarBoards(boards: readonly CharacterCalendarBoard[]): 
     data.oldestFetchedAt ? [data.oldestFetchedAt.getTime()] : []
   );
   return {
-    calendarEvents: dedupe(own('calendarEvents')),
+    calendarEvents: distinctEvents(own('calendarEvents')),
     skillTraining: own('skillTraining', true),
     industryJobs: dedupe(own('industryJobs')),
     planetExtractions: dedupe(own('planetExtractions')),

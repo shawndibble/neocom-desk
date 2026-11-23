@@ -243,7 +243,13 @@ export async function loadProfitWidget(characterId: number): Promise<ProfitWidge
 
 /** Every Character's logged runs, each read as that Character's own widget reads them. */
 export async function loadAllProfitWidget(): Promise<ProfitWidgetData> {
-  const characterIds = (await db.productionRuns.orderBy('characterId').uniqueKeys()) as number[];
+  // Only Characters still on the account: a removed Character's runs are not the pilot's now.
+  const [withRuns, stored] = await Promise.all([
+    db.productionRuns.orderBy('characterId').uniqueKeys() as Promise<number[]>,
+    db.characters.toArray(),
+  ]);
+  const storedIds = new Set(stored.map((character) => character.characterId));
+  const characterIds = withRuns.filter((id) => storedIds.has(id));
   const reads = await Promise.all(characterIds.map((id) => loadProfitWidget(id)));
   return {
     runs: reads.flatMap((read) => read.runs),

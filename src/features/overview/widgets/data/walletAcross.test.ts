@@ -31,6 +31,9 @@ describe('Wallet across every Character', () => {
     expect(kindSumsAcrossCharacters('wallet')).toBe(true);
     expect(feedsOf('wallet', undefined, true)).toEqual(['walletAll', 'journalAll']);
     expect(feedsOf('wallet')).toEqual(['wallet', 'journal']);
+    // Each Show loads only the All read it draws.
+    expect(feedsOf('wallet', { show: 'balance' }, true)).toEqual(['walletAll']);
+    expect(feedsOf('wallet', { show: 'flow' }, true)).toEqual(['journalAll']);
   });
 
   it('adds the balances, largest first, and counts the Characters it could not read', () => {

@@ -48,6 +48,7 @@ import {
 } from './builderKit';
 import { hbarsFromRows, walletArea } from './chartBuilders';
 import { walletFlow } from './kindModels';
+import { getKind } from '../kinds';
 import { dailyBalanceSeries } from './chartSeries';
 import { contractsTable, mailTable } from './characterTables';
 import {
@@ -553,6 +554,13 @@ export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
     feeds: ['wallet', 'journal'],
     allFeeds: ['walletAll', 'journalAll'],
     scope: 'account',
+    // Balance on All reads the balances alone; only Flow merges the journals.
+    bySettings: ({ show }) => ({
+      feeds: ['wallet', 'journal'],
+      allFeeds: show === 'flow' ? ['journalAll'] : ['walletAll'],
+      scope: 'account',
+      endpoints: getKind('wallet')?.endpoints ?? [],
+    }),
     build: (feeds, ctx) =>
       byShow(
         ctx.scopeAll

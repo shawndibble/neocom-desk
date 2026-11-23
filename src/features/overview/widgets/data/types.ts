@@ -340,9 +340,9 @@ export interface FeedMap {
   /** Every Character's contracts as one board (the Contracts widget on All characters). */
   contractsAll: ContractsBoardData;
   /** The Calendar page's whole board read: every clock the Character can read. */
+  calendar: CalendarBoardData;
   /** Every Character's calendar board folded into one (the Calendar widget on All characters). */
   calendarAll: CalendarBoardData;
-  calendar: CalendarBoardData;
   mail: MailBoardData;
   priceAlerts: PriceAlertsBoardData;
   /** `board` is null when the pilot stocks no market. */
