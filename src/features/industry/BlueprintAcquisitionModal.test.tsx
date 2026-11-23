@@ -522,7 +522,7 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
     expect(await screen.findByText(/3 copies per redemption/)).toBeInTheDocument();
   });
 
-  it('notes when the offer also demands a turn-in item', async () => {
+  it('notes when the offer also demands a required item', async () => {
     mockedFindLpOfferMatches.mockResolvedValue(
       lpResult([
         lpMatch({
@@ -531,7 +531,7 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
       ])
     );
     renderModal();
-    expect(await screen.findByText(/plus 1 turn-in item/)).toBeInTheDocument();
+    expect(await screen.findByText(/plus 1 required item/)).toBeInTheDocument();
   });
 
   it("looks up matches by the blueprint's own typeID, for the given character", async () => {
