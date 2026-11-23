@@ -10,11 +10,11 @@
  * (`structureRows`), so its Problems only and this page's keep the same rows.
  */
 import { useCallback, useEffect, useMemo } from 'react';
-import { GrantBanner } from '@/app/GrantNote';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
-import { CORP_SCOPES_FOR_CAPABILITY } from '@/features/corp/corpScopes';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
+import { GrantBanner } from '@/app/GrantNote';
+import { CORP_SCOPES_FOR_CAPABILITY } from '@/features/corp/corpScopes';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   Button,
   CachedNotice,

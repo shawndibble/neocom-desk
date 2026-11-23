@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import * as boardData from '@/features/overview/data/boardData';
@@ -131,12 +132,29 @@ beforeEach(async () => {
 });
 
 describe('CorpStructures', () => {
-  it('says towers are missing when the active Character has not granted the starbases scope', async () => {
+  it('offers the grant when the active Director has not granted the starbases scope', async () => {
+    await db.characters.put({ characterId: 42, name: 'Kestrel', ownerHash: 'oh', addedAt: 1 });
+    await db.tokens.put({
+      characterId: 42,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-corporations.read_structures.v1'],
+    });
     feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
     corpAccess.missingScopes = ['esi-corporations.read_starbases.v1'];
     renderPage();
     await table();
     expect(await screen.findByText(/Control towers are not listed/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
+  });
+
+  it('says nothing when only an unrelated scope is missing', async () => {
+    feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
+    corpAccess.missingScopes = ['esi-corporations.read_structures.v1'];
+    renderPage();
+    await table();
+    expect(screen.queryByText(/Control towers are not listed/)).not.toBeInTheDocument();
   });
 
   it('shows no towers note when nothing is missing', async () => {
