@@ -54,6 +54,7 @@ import type { StopRef } from '@/engine/route/stopRef';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
+import { UseGameLocationButton } from '@/features/route/UseGameLocationButton';
 import { SolarSystemSearchField } from '@/features/route/SolarSystemSearchField';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -170,6 +171,7 @@ export function StopsPanel({
   fromName,
   fromTrigger,
   onFromChange,
+  onFromReset,
   stops,
   onStopsChange,
   settings,
@@ -185,6 +187,8 @@ export function StopsPanel({
   /** The start's trigger text: its name, marked when it is the Current System. */
   fromTrigger: string;
   onFromChange: (systemId: number) => void;
+  /** Set when the start is not the game location: puts it back. */
+  onFromReset?: () => void;
   /** In the order typed. */
   stops: readonly StopRef[];
   /** `picked` is the station just added, so the page can name it before the link round-trips. */
@@ -269,6 +273,9 @@ export function StopsPanel({
               <SolarSystemPicker
                 value={fromId}
                 onChange={onFromChange}
+                footer={(close) =>
+                  onFromReset && <UseGameLocationButton onReset={onFromReset} close={close} />
+                }
                 ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
                 triggerLabel={fromTrigger}
               />
