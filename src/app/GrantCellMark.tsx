@@ -45,10 +45,12 @@ export function GrantCellMark({
       character={characterName ?? state.storedName ?? t('reauth.unknownCharacter')}
       permissions={asking.map((group) => t(PERMISSIONS[group].labelKey))}
       why={why ?? (first ? t(PERMISSIONS[first].captionKey) : '')}
+      // `beginGrant`'s own call, minus its endpoints-to-groups step: the mark may name a
+      // Permission directly, and asks only for the ones not dismissed.
       onGrant={() => void beginEveLogin({ characterId, groups: [...asking] })}
       onDismiss={() => void dismiss(asking)}
       settingsLink={<GrantMissingLink groups={asking} asCharacter={characterId} />}
-      {...(defaultOpen ? { defaultOpen } : {})}
+      defaultOpen={defaultOpen ?? false}
     />
   );
 }

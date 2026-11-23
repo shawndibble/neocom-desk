@@ -28,7 +28,9 @@ export interface PermissionMarkState {
  * Where `characterId` stands on `need`, after the account-wide Don't ask
  * again: `granted`, `missing` or `dismissed`; `undefined` until both the grant
  * and the dismissals are read, so nothing flashes on a cold load. A caller
- * reads it to put fallback words in its own tooltip once `dismissed`. Only the
+ * reads it to put fallback words in its own tooltip once `dismissed`. With no
+ * Character (`null`) it stays `undefined`: the caller checks for that itself
+ * and shows its no-Character wording. Only the
  * scope list leaves the token read (ADR 0001).
  */
 export function usePermissionMark(

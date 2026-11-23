@@ -25,7 +25,8 @@ import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Checkbox, Disclosure, InfoTooltip, NeedsConnection, Panel } from '@/components/ui';
-import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
@@ -180,7 +181,7 @@ export function PermissionsPanel() {
               {t('settings.permissions.notAsked')}{' '}
               <button
                 type="button"
-                className={inlineLinkClassName}
+                className={plainTextActionClassName()}
                 aria-label={t('settings.permissions.askAgainAria', { permission: label })}
                 onClick={() => void marks.askAgain(group)}
               >

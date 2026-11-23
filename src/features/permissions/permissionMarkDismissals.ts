@@ -4,7 +4,9 @@
  * Permission's mark for every Character, present and future, on every device,
  * and stays until undone on Settings › Permissions. Not per Character, unlike
  * Standings' device-local dismissal: twenty Characters must not mean twenty
- * clicks (scope decision 20261123-164921).
+ * clicks (docs/context/decisions/20261123-164921-campaign-turn-ins-rewards-from-campaign-objectives-one.md,
+ * "Don't ask again is per Permission, account-wide"; storage in
+ * 20261123-172548-permissioncellmark-is-a-popover-at-every-width-dont.md).
  *
  * Stored as plain strings, not `ScopeGroup`s: a Permission a newer build added
  * must survive an older build rewriting the list.

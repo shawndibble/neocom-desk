@@ -1,4 +1,4 @@
-import { useId, type MouseEvent, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { Button } from './Button';
@@ -29,8 +29,19 @@ export interface PermissionCellMarkProps {
   defaultOpen?: boolean;
 }
 
-/** A press on the mark is its own: it never also fires the row's click (§6c, one target, one action). */
-const stop = (event: MouseEvent) => event.stopPropagation();
+/**
+ * A press on the mark or in its popover is its own: it never also fires the
+ * row (§6c, one target, one action). The content is portalled, so React still
+ * bubbles these to the row's handlers; the same set `RowActions` stops.
+ */
+const stop = (event: SyntheticEvent) => event.stopPropagation();
+const stopRowEvents = {
+  onClick: stop,
+  onContextMenu: stop,
+  onPointerDown: stop,
+  onPointerUp: stop,
+  onKeyDown: stop,
+};
 
 /**
  * The amber mark after a figure or control that needs a Permission the row's
@@ -57,15 +68,27 @@ export function PermissionCellMark({
 }: PermissionCellMarkProps) {
   const { t } = useTranslation();
   const titleId = useId();
+  const whyId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   if (status !== 'missing') return null;
   const named = permissions.join(', ');
+  // Dismissing unmounts the mark with its popover, so focus would fall to <body>:
+  // hand it to the nearest focusable ancestor (the row) once the mark is gone.
+  const dismiss = () => {
+    const home = triggerRef.current?.parentElement?.closest<HTMLElement>(
+      '[tabindex]:not([tabindex="-1"])'
+    );
+    onDismiss();
+    if (home) requestAnimationFrame(() => home.focus());
+  };
   return (
     <Popover defaultOpen={defaultOpen}>
       <PopoverTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           aria-label={t('permissions.mark.label', { character, permissions: named })}
-          onClick={stop}
+          {...stopRowEvents}
           className={cx(
             // 24px hit area around a 14px glyph, pulled back so the row keeps its height (as `InfoTooltip`).
             '-m-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full align-middle text-warning hover:text-warning/80',
@@ -80,20 +103,23 @@ export function PermissionCellMark({
         side="bottom"
         collisionPadding={{ top: 8, right: 8, bottom: 80, left: 8 }}
         aria-labelledby={titleId}
+        aria-describedby={whyId}
         className="w-72 max-w-[calc(100vw-2rem)] p-3 text-sm"
-        onClick={stop}
+        {...stopRowEvents}
       >
         <p id={titleId} className="font-semibold text-warning">
           {t('reauth.missingTitle', { character, permissions: named })}
         </p>
-        <p className="mt-1 text-xs text-text-dim">{why}</p>
+        <p id={whyId} className="mt-1 text-xs text-text-dim">
+          {why}
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <NeedsConnection>
             <Button variant="primary" size="sm" onClick={onGrant}>
               {t('reauth.grantAction')}
             </Button>
           </NeedsConnection>
-          <Button size="sm" onClick={onDismiss}>
+          <Button size="sm" onClick={dismiss}>
             {t('permissions.mark.dontAsk')}
           </Button>
         </div>

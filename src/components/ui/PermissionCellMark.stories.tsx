@@ -32,7 +32,9 @@ const meta = {
   render: (args) => (
     <p className="flex items-center gap-1 text-sm text-text">
       <span>Jita IV - Moon 4</span>
-      <span className="text-text-dim">· Set destination</span>
+      <button type="button" aria-disabled="true" className="text-text-dim opacity-40">
+        Set destination
+      </button>
       <PermissionCellMark {...args} />
     </p>
   ),
