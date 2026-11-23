@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar, Disclosure } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { cx } from '@/lib/cx';
 import type { PlanTimingUnavailableReason } from '@/engine/skills/planTimeToFinish';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
@@ -93,9 +94,9 @@ function ClosestBody({ ranking, loaded, total, ownerId, nameOf }: ClosestBodyPro
   return (
     <div className="space-y-1 text-xs">
       {loaded < total && (
-        <p className="text-text-dim" role="status">
+        <LiveNote className="text-text-dim">
           {t('plans.closest.progress', { loaded, total })}
-        </p>
+        </LiveNote>
       )}
       {ranking.complete.length > 0 && (
         <NamesLine

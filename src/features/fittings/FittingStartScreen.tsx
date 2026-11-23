@@ -597,9 +597,9 @@ export function FittingStartScreen({
               }}
             >
               {searching && (
-                <p className="border-b border-line px-3 py-2 text-xs text-text-dim" role="status">
+                <LiveNote className="border-b border-line px-3 py-2 text-xs text-text-dim">
                   {t('fittings.start.matches', { count: visible.length })}
-                </p>
+                </LiveNote>
               )}
               {visible.length === 0 &&
                 (source === 'all' ? (

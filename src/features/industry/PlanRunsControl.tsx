@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { BREAK_EVEN_MAX_RUNS } from '@/engine/industry/breakEvenRuns';
 import { formatDuration } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
@@ -110,9 +111,9 @@ export function PlanRunsControl({
         </span>
       )}
       {noBreakEvenAt?.runs === runs && noBreakEvenAt.profit === profit && (
-        <span role="status" className="text-xs">
+        <LiveNote as="span" className="text-xs">
           {t('industry.breakEvenRunsNone', { max: formatNumber(BREAK_EVEN_MAX_RUNS) })}
-        </span>
+        </LiveNote>
       )}
     </span>
   );
