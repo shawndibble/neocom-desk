@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import * as boardData from '@/features/overview/data/boardData';
@@ -31,6 +32,11 @@ vi.mock('@/features/route/useSolarSystems', () => ({
       [30001, { id: 30001, name: 'Efa', security: -0.2, regionId: 1 }],
       [30002, { id: 30002, name: 'Amarr', security: 1, regionId: 2 }],
     ]),
+}));
+
+const corpAccess = vi.hoisted(() => ({ missingScopes: [] as string[] }));
+vi.mock('@/features/corp/useCorpAccess', () => ({
+  useCorpAccess: () => ({ missingScopes: corpAccess.missingScopes }),
 }));
 
 const mocked = vi.mocked(boardData);
@@ -112,6 +118,7 @@ function columnHeaders(tableEl: HTMLElement): string[] {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  corpAccess.missingScopes = [];
   await useFuelRates.getState().setValue({});
   useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
   mockedBays.mockResolvedValue(new Map());
@@ -125,6 +132,38 @@ beforeEach(async () => {
 });
 
 describe('CorpStructures', () => {
+  it('offers the grant when the active Director has not granted the starbases scope', async () => {
+    await db.characters.put({ characterId: 42, name: 'Kestrel', ownerHash: 'oh', addedAt: 1 });
+    await db.tokens.put({
+      characterId: 42,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-corporations.read_structures.v1'],
+    });
+    feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
+    corpAccess.missingScopes = ['esi-corporations.read_starbases.v1'];
+    renderPage();
+    await table();
+    expect(await screen.findByText(/Control towers are not listed/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
+  });
+
+  it('says nothing when only an unrelated scope is missing', async () => {
+    feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
+    corpAccess.missingScopes = ['esi-corporations.read_structures.v1'];
+    renderPage();
+    await table();
+    expect(screen.queryByText(/Control towers are not listed/)).not.toBeInTheDocument();
+  });
+
+  it('shows no towers note when nothing is missing', async () => {
+    feed([ALPHA], [[10, 'AAA', 'Alpha Corp']]);
+    renderPage();
+    await table();
+    expect(screen.queryByText(/Control towers are not listed/)).not.toBeInTheDocument();
+  });
+
   it('lists two corporations’ structures together with a Corporation column', async () => {
     feed(
       [ALPHA, BETA],
