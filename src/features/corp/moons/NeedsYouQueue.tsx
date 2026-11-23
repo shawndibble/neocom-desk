@@ -4,6 +4,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { Pill } from '@/components/ui/Pill';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
@@ -299,11 +300,7 @@ export function NeedsYouQueue() {
 
   return (
     <Panel title={t('corpTaxBook.moons.needs.title', { count })} padded={false}>
-      {notice && (
-        <p role="status" className="px-3 py-2 text-xs text-text-dim">
-          {notice}
-        </p>
-      )}
+      {notice && <LiveNote className="px-3 py-2 text-xs text-text-dim">{notice}</LiveNote>}
       {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
       )}

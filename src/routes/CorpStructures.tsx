@@ -39,6 +39,7 @@ import {
 } from '@/components/ui';
 import { SEVERITY_TEXT } from '@/components/ui/severityTone';
 import * as Icon from '@/components/ui/icons';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { DataGate } from '@/components/DataGate';
 import type { BoardExtractionSource } from '@/engine/corp/board';
@@ -612,9 +613,9 @@ export function CorpStructures() {
         ) : (
           <div className="space-y-2">
             {data?.partlyFailed && (
-              <p className="text-sm text-warning" role="status">
+              <LiveNote className="text-sm text-warning">
                 {t('corp.structures.partlyFailed')}
-              </p>
+              </LiveNote>
             )}
             {snapshot.refreshCount > 0 && snapshot.error !== null && data && (
               <CachedNotice withBadge fetchedAt={data.fetchedAt} refreshFailed />
