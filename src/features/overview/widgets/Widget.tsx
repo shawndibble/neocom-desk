@@ -441,7 +441,9 @@ function WidgetFrame({
   // One corporation is asked for, and it is not the header Character's: there is nothing to read.
   const asksCorporation =
     scope.needsOneCorporation === true &&
-    (scope.wantedCorporationId === undefined || scope.wantedCorporationId !== ownCorporationId);
+    // Until the header Character's corporation is known there is nothing to compare with.
+    (scope.wantedCorporationId === undefined ||
+      (ownCorporationId !== null && scope.wantedCorporationId !== ownCorporationId));
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
   const navigate = useNavigate();

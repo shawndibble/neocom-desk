@@ -95,4 +95,26 @@ describe('narrowFeedsToCorporation', () => {
     expect(out.corpWallet).toBe(wallet);
     expect(out.corpJobsAll?.data).toBeNull();
   });
+
+  it("does not flag another corporation's failed read on this one", () => {
+    const feeds = {
+      corpJobsAll: state({
+        corporations: [{ corporationId: 1, feed: { readable: true } }],
+        labels: new Map(),
+        partlyFailed: true,
+      }),
+      corpOrdersAll: state({
+        orders: [{ order_id: 10 }],
+        corporationOf: new Map([['10', 1]]),
+        corporations: new Map([[1, label(1)]]),
+        partlyFailed: true,
+      }),
+    } as unknown as Feeds;
+    // Corporation 1 read fine; corporation 2 is the one that failed.
+    expect(narrowFeedsToCorporation(feeds, 1).corpJobsAll?.data?.partlyFailed).toBe(false);
+    expect(narrowFeedsToCorporation(feeds, 1).corpOrdersAll?.data?.partlyFailed).toBe(false);
+    // The failed one itself is absent, so it is flagged.
+    expect(narrowFeedsToCorporation(feeds, 2).corpJobsAll?.data?.partlyFailed).toBe(true);
+    expect(narrowFeedsToCorporation(feeds, 2).corpOrdersAll?.data?.partlyFailed).toBe(true);
+  });
 });

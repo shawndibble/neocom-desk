@@ -75,6 +75,13 @@ import {
 } from '../../data/corpBoard';
 import { mergeCorpRows, mergeLookups } from '@/engine/corp/corpMerge';
 import type { CorpFeedBody } from './corpFeedRead';
+import {
+  contractKey,
+  customsOfficeKey,
+  orderKey,
+  sovereigntyRowKey,
+  starbaseKey,
+} from './corpRowKeys';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type {
@@ -808,7 +815,7 @@ export function loadCorpCustomsAll(): Promise<CorpCustomsFeed> {
     merge: (reads) => {
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.offices),
-        (office) => String(office.office_id)
+        customsOfficeKey
       );
       return {
         corporationOf,
@@ -830,7 +837,7 @@ export function loadCorpStarbasesAll(): Promise<CorpStarbasesFeed> {
     merge: (reads) => {
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.starbases),
-        (row) => String(row.starbaseId)
+        starbaseKey
       );
       return {
         corporationOf,
@@ -855,7 +862,7 @@ export function loadCorpSovereigntyAll(): Promise<CorpSovereigntyFeed> {
     merge: (reads) => {
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.rows),
-        (row) => row.key
+        sovereigntyRowKey
       );
       return {
         corporationOf,
@@ -881,12 +888,12 @@ export function loadCorpContractsAll(): Promise<CorpContractsFeed> {
       // under the corporation that issued it.
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.contracts),
-        (contract) => String(contract.contract_id)
+        contractKey
       );
       const read = new Set(reads.map((r) => r.corporationId));
       for (const contract of rows) {
         if (read.has(contract.issuer_corporation_id)) {
-          corporationOf.set(String(contract.contract_id), contract.issuer_corporation_id);
+          corporationOf.set(contractKey(contract), contract.issuer_corporation_id);
         }
       }
       return {
@@ -905,7 +912,7 @@ export function loadCorpOrdersAll(): Promise<CorpOrdersFeed> {
     merge: (reads) => {
       const { rows, corporationOf } = mergeCorpRows(
         rowsOf(reads, (read) => read.orders),
-        (order) => String(order.order_id)
+        orderKey
       );
       return {
         corporationOf,

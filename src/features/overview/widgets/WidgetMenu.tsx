@@ -363,11 +363,7 @@ export function WidgetMenu({
             </MenuRadioItem>
             {board.id === 'corp' &&
               corporations.map((corporation) => (
-                <MenuRadioItem
-                  key={corporation.id}
-                  value={corpScope(corporation.id)}
-                  disabled={!canSum}
-                >
+                <MenuRadioItem key={corporation.id} value={corpScope(corporation.id)}>
                   {corporation.label.name}
                 </MenuRadioItem>
               ))}

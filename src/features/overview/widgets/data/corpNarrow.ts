@@ -7,6 +7,13 @@
  * making a read of its own: two widgets on two corporations, or one on All and one on a
  * corporation, share the one feed. Pure: it never fetches.
  */
+import {
+  contractKey,
+  customsOfficeKey,
+  orderKey,
+  sovereigntyRowKey,
+  starbaseKey,
+} from './corpRowKeys';
 import type { CorpAllFeed, CorpDeadlinesAllFeed, CorpFeedBase } from './corpFeeds';
 import type { FeedId, FeedState, Feeds } from './types';
 
@@ -14,10 +21,9 @@ type Narrow = (data: never, corporationId: number) => unknown;
 
 /** A feed of `CorpAllFeed` shape: one entry per corporation. */
 function perCorporation(data: CorpAllFeed<CorpFeedBase>, corporationId: number) {
-  return {
-    ...data,
-    corporations: data.corporations.filter((read) => read.corporationId === corporationId),
-  };
+  const corporations = data.corporations.filter((read) => read.corporationId === corporationId);
+  // Another corporation's failed read is not this one's: flag only when this one is the one missing.
+  return { ...data, corporations, partlyFailed: data.partlyFailed && corporations.length === 0 };
 }
 
 function deadlines(data: CorpDeadlinesAllFeed, corporationId: number): CorpDeadlinesAllFeed {
@@ -42,6 +48,8 @@ function merged<F extends CorpFeedBase, K extends keyof F>(
       ...data,
       [field]: (data[field] as unknown as unknown[]).filter(own),
       corporations: new Map(label ? [[corporationId, label]] : []),
+      // Another corporation's failed read is not this one's: flag only when this one is missing.
+      partlyFailed: data.partlyFailed === true && label === undefined,
       corporationOf: new Map(
         [...(data.corporationOf ?? [])].filter(([, corporation]) => corporation === corporationId)
       ),
@@ -54,15 +62,11 @@ const NARROW: { readonly [K in FeedId]?: Narrow } = {
   corpJobsAll: perCorporation as Narrow,
   corpKillsAll: perCorporation as Narrow,
   corpDeadlinesAll: deadlines as Narrow,
-  corpCustomsAll: merged('offices', (o: { office_id: number }) => String(o.office_id)) as Narrow,
-  corpStarbasesAll: merged('starbases', (s: { starbaseId: number }) =>
-    String(s.starbaseId)
-  ) as Narrow,
-  corpSovereigntyAll: merged('rows', (r: { key: string }) => r.key) as Narrow,
-  corpContractsAll: merged('contracts', (c: { contract_id: number }) =>
-    String(c.contract_id)
-  ) as Narrow,
-  corpOrdersAll: merged('orders', (o: { order_id: number }) => String(o.order_id)) as Narrow,
+  corpCustomsAll: merged('offices', customsOfficeKey) as Narrow,
+  corpStarbasesAll: merged('starbases', starbaseKey) as Narrow,
+  corpSovereigntyAll: merged('rows', sovereigntyRowKey) as Narrow,
+  corpContractsAll: merged('contracts', contractKey) as Narrow,
+  corpOrdersAll: merged('orders', orderKey) as Narrow,
   structuresAll: ((
     data: {
       structures: { corporationId?: number }[] | null;

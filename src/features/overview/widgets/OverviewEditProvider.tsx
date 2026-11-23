@@ -23,6 +23,7 @@ import {
   duplicateWidgetUndoable,
   moveToWidget,
   moveWidget,
+  newWidget,
   removeWidgetUndoable,
   renameWidget,
   resetLayoutUndoable,
@@ -48,10 +49,17 @@ import {
   stepWidget,
   type OverviewLayout,
   type UndoableResult,
+  type WidgetShow,
 } from './layout';
 import { useWidgetBoard } from './board';
 import { kindSumsAcrossCharacters } from './data/models';
 import { visibleWidgets } from './visibility';
+
+/** Whether a widget of `kind` would sum across Characters with the settings it is created with. */
+function sumsAsCreated(kind: string, show?: WidgetShow): boolean {
+  const created = newWidget(kind, 'new', show);
+  return created !== null && kindSumsAcrossCharacters(kind, created);
+}
 
 export const FLASH_MS = 1600;
 const ROLES_UNDO_LABEL = 'overview.customize.undo.roles';
@@ -176,7 +184,7 @@ export function OverviewEditProvider({
         // corp wallet on Flow) stays on it.
         const opensOnAll =
           (boardRef.current.id === 'overview' || boardRef.current.opensOnAll.has(kind)) &&
-          kindSumsAcrossCharacters(kind, { show: init?.show });
+          sumsAsCreated(kind, init?.show);
         const result = addWidgetUndoable(
           layoutRef.current,
           kind,
@@ -228,8 +236,12 @@ export function OverviewEditProvider({
           setAllScopesUndoable(
             layoutRef.current,
             scope,
-            // A kind that cannot sum is never on All, so a bulk All leaves it where it is.
-            (w) => scope !== 'all' || kindSumsAcrossCharacters(w.kind, w)
+            // On the Overview a kind that cannot sum stays where it is; on the Corp Board it is
+            // put on All too, so it asks which corporation instead of quietly reading one.
+            (w) =>
+              scope !== 'all' ||
+              boardRef.current.id === 'corp' ||
+              kindSumsAcrossCharacters(w.kind, w)
           )
         ),
       setRange: (id, range) => commit(setRange(layoutRef.current, id, range)),

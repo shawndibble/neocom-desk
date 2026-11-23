@@ -111,6 +111,17 @@ describe('the page scope control on the Corp Board', () => {
     ]);
   });
 
+  it('puts a kind that reads one corporation on All too, so it asks which', async () => {
+    corporations.value = names;
+    const onLayoutChange = setup(
+      [widget('a', 'corpJobs', 'corp:98000001'), widget('b', 'corpMembers', 'header')],
+      board
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Amarr Control Tech' }));
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /^All characters/ }));
+    expect(onLayoutChange.mock.calls[0]![0].widgets.map((w) => w.scope)).toEqual(['all', 'all']);
+  });
+
   it('shows the corporation the widgets share', () => {
     corporations.value = names;
     setup([widget('a', 'corpJobs', 'corp:98000002')], board);
