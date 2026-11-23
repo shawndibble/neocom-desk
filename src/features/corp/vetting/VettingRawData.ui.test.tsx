@@ -203,7 +203,7 @@ describe('the data page', () => {
     await screen.findByText('All 31 rows read. Scroll for the rest.');
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search Skills' }), 'zzzz');
     expect(await screen.findByText('No rows match')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
     expect(await screen.findByText('All 31 rows read. Scroll for the rest.')).toBeInTheDocument();
   });
 

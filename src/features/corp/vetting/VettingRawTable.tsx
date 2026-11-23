@@ -505,8 +505,8 @@ export function VettingRawTable({
           shown: formatCount(scope.length),
         })}
         action={
-          <Button onClick={() => setFilters(NO_RAW_FILTERS)}>
-            {t('vetting.data.clearFilters')}
+          <Button size="sm" onClick={() => setFilters(NO_RAW_FILTERS)}>
+            {t('common.resetFilters')}
           </Button>
         }
       />

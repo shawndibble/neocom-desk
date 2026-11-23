@@ -407,7 +407,9 @@ function NoFilterMatches({
               <span className="sr-only">{t('ships.tree.matchCount', { count: f.count })}</span>
             </button>
           ))}
-          <Button onClick={onClear}>{t('ships.tree.clearFilters')}</Button>
+          <Button size="sm" onClick={onClear}>
+            {t('common.resetFilters')}
+          </Button>
         </div>
       }
     />

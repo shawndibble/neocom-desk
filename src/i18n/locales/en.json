@@ -161,7 +161,6 @@
       "matchesOfTotal": "{{n}} of {{total}}",
       "noFactionMatches": "No {{faction}} hulls match these filters",
       "otherFactionsMatch": "Other factions have matches:",
-      "clearFilters": "Clear filters",
       "matchCount_one": "{{count}} matching hull",
       "matchCount_other": "{{count}} matching hulls",
       "expandAll": "Expand all",
@@ -3436,8 +3435,7 @@
       "profitableOnly": "Profitable only",
       "count": "{{shown}} of {{total}} plans",
       "noMatchTitle": "No plans match these filters",
-      "noMatchHint": "Loosen a filter to see the rest.",
-      "clear": "Clear filters"
+      "noMatchHint": "Loosen a filter to see the rest."
     },
     "verdictColumn": "Verdict",
     "runsColumn": "Runs",
@@ -22013,7 +22011,6 @@
       "from": "From",
       "to": "To",
       "flaggedOnly": "Flagged rows only",
-      "clearFilters": "Clear filters",
       "allRows_one": "All {{total}} row read. Scroll for the rest.",
       "allRows_other": "All {{total}} rows read. Scroll for the rest.",
       "ofRows": "{{shown}} of {{total}} rows",
