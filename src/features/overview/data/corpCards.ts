@@ -26,10 +26,13 @@ export function structuresView(
   starbases?: readonly BoardStarbaseSource[]
 ): StructuresView {
   const { structures, ...rest } = data;
+  const towers = starbases?.length ?? 0;
   return {
     ...rest,
+    structureCount: rest.structureCount + towers,
+    // Towers stand in for an unreadable structures list only when there are some to show.
     items:
-      structures === null && starbases === undefined
+      structures === null && towers === 0
         ? null
         : buildCorpBoard({
             nowMs,

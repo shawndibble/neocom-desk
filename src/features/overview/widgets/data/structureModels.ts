@@ -159,7 +159,7 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
       a.remaining - b.remaining
   );
   const problemsOnly = show === 'problems';
-  const structureCount = view.structureCount + towers.length;
+  const { structureCount } = view;
   const rows = problemsOnly ? all.filter((row) => row.problem) : all;
   // Problems only reads the board of the structures it lists, so no hidden one sets a deadline or the summary.
   const shown = problemsOnly ? rows.flatMap((row) => row.items) : items;

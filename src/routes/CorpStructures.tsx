@@ -129,7 +129,7 @@ interface StructuresSnapshot {
 }
 
 async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
-  const [data, moons, fuelBays, towers] = await Promise.all([
+  const [data, moons, fuelBays, towerFeed] = await Promise.all([
     loadAllStructuresBoard(),
     // Extractions only add a section to a refinery's detail: a failed read costs that, nothing else.
     loadAllMoonChunksBoard().catch(() => null),
@@ -141,14 +141,16 @@ async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
   const typeIds = (data.structures ?? [])
     .map((structure) => structure.typeId)
     .filter((id): id is number => id !== undefined);
+  const typeNames = typeIds.length === 0 ? new Map<number, string>() : await loadTypeNames(typeIds);
   return {
     data,
     extractions: new Map(
       (moons?.extractions ?? []).map((extraction) => [extraction.structureId, extraction])
     ),
-    typeNames: typeIds.length === 0 ? new Map() : await loadTypeNames(typeIds),
+    // A tower's type name comes with its feed.
+    typeNames: new Map([...typeNames, ...(towerFeed?.typeNames ?? [])]),
     fuelBays,
-    towers: towers?.readable ? towers : null,
+    towers: towerFeed?.readable ? towerFeed : null,
   };
 }
 
@@ -200,7 +202,13 @@ export function CorpStructures() {
         : [],
     [view, data, towers, now]
   );
-  const corporations = data?.corporations ?? NO_CORPORATIONS;
+  const corporations = useMemo(
+    () =>
+      towers?.corporations
+        ? new Map([...towers.corporations, ...(data?.corporations ?? [])])
+        : (data?.corporations ?? NO_CORPORATIONS),
+    [towers, data]
+  );
   const fuelRows = useMemo(() => {
     const byId = new Map<number, FuelRow>();
     const untilMs = fuelUntilMs(fuelUntil);
@@ -516,7 +524,10 @@ export function CorpStructures() {
   );
   const totalNeeded = shoppingList.reduce((sum, item) => sum + item.needed, 0);
   const unknownNeeded = visible.filter((row) => (fuelOf(row)?.plan.needed ?? null) === null).length;
-  const noBayAccess = visible.some((row) => (fuelOf(row)?.blocks ?? null) === null);
+  // A tower's bay is read with the tower, not through assets, so it never lacks assets access.
+  const noBayAccess = visible.some(
+    (row) => !row.source.tower && (fuelOf(row)?.blocks ?? null) === null
+  );
 
   async function copyList() {
     const lines = shoppingList.map(({ row, needed }) =>
@@ -565,7 +576,7 @@ export function CorpStructures() {
     openId === null ? null : (rows.find((row) => row.source.structureId === openId) ?? null);
 
   if (!snapshot.hydrated) return <Spinner />;
-  const unreadable = data !== null && data.structures === null && towers === null;
+  const unreadable = data !== null && data.structures === null && !towers?.starbases.length;
 
   return (
     <div className="mx-auto max-w-page space-y-4">
@@ -774,7 +785,11 @@ export function CorpStructures() {
             ? undefined
             : snapshot.data?.typeNames.get(open.source.typeId)
         }
-        extraction={open ? snapshot.data?.extractions.get(open.source.structureId) : undefined}
+        extraction={
+          open && !open.source.tower
+            ? snapshot.data?.extractions.get(open.source.structureId)
+            : undefined
+        }
       />
     </div>
   );

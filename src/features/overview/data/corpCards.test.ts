@@ -181,3 +181,25 @@ describe('moon chunks', () => {
     expect(moonChunksDeadline([], NOW)).toBeNull();
   });
 });
+
+describe('structuresView with control towers', () => {
+  const tower = {
+    starbaseId: 5,
+    name: 'Tower (Efa)',
+    fuelExpiresMs: NOW + DAY_MS,
+    reinforcedUntilMs: null,
+    unanchorsAtMs: null,
+  };
+  const unreadable = { structures: null, structureCount: 0, needsReauth: false, fetchedAt: null };
+
+  it('counts towers and builds their fuel clocks', () => {
+    const view = structuresView({ ...unreadable, structures: [], structureCount: 2 }, NOW, [tower]);
+    expect(view.structureCount).toBe(3);
+    expect(view.items?.map((item) => item.id)).toEqual(['fuel:sb5']);
+  });
+
+  it('lists towers when the structures list is unreadable, and stays unreadable with none', () => {
+    expect(structuresView(unreadable, NOW, [tower]).items).toHaveLength(1);
+    expect(structuresView(unreadable, NOW, []).items).toBeNull();
+  });
+});
