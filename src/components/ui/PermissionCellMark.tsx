@@ -2,7 +2,7 @@ import { useId, useRef, type ReactNode, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { Button } from './Button';
-import { focusRingClassName } from './controlStyles';
+import { focusRingClassName, gripHitAreaClassName } from './controlStyles';
 import * as Icon from './icons';
 import { NeedsConnection } from './NeedsConnection';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
@@ -91,6 +91,9 @@ export function PermissionCellMark({
           {...stopRowEvents}
           className={cx(
             // 24px hit area around a 14px glyph, pulled back so the row keeps its height (as `InfoTooltip`).
+            // On touch an invisible ::before makes it 36px tall (DESIGN.md §3's touch tier, no 44px);
+            // only vertically, so it never covers the figure or control right beside it.
+            gripHitAreaClassName,
             '-m-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full align-middle text-warning hover:text-warning/80',
             focusRingClassName
           )}

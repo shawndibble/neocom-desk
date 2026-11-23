@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { gripHitAreaClassName } from './controlStyles';
 import { PermissionCellMark, type PermissionCellMarkProps } from './PermissionCellMark';
 
 const base: PermissionCellMarkProps = {
@@ -54,6 +55,13 @@ describe('PermissionCellMark', () => {
     );
     await user.click(await screen.findByRole('button', { name: "Don't ask again" }));
     await waitFor(() => expect(screen.getByTestId('row')).toHaveFocus());
+  });
+
+  it('grows a 36px-tall touch hit area without growing the glyph', () => {
+    render(<PermissionCellMark {...base} />);
+    const mark = screen.getByRole('button', { name: 'Kestrel: Autopilot waypoints not granted' });
+    for (const cls of gripHitAreaClassName.split(' ')) expect(mark).toHaveClass(cls);
+    expect(mark).toHaveClass('size-6', '-m-1');
   });
 
   it('renders nothing when granted or dismissed', () => {
