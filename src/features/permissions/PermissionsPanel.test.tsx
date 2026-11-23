@@ -15,6 +15,7 @@ import { loadCharacterRoles } from '@/features/corp/roles';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { FORMERLY_OPT_IN_GROUPS } from './customizeSelection';
 import { PermissionsPanel } from './PermissionsPanel';
+import { usePermissionMarkDismissalsStore } from './permissionMarkDismissals';
 
 vi.mock('@/features/corp/roles', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/roles')>()),
@@ -376,5 +377,26 @@ describe('PermissionsPanel — no active Character', () => {
     expect(screen.getByText(/select a character/i)).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(mockedLoadRoles).not.toHaveBeenCalled();
+  });
+});
+
+describe("PermissionsPanel — a Permission dismissed with Don't ask again", () => {
+  it('says so on its row, and Ask again brings the marks back for every Character', async () => {
+    const user = userEvent.setup();
+    await usePermissionMarkDismissalsStore.getState().setValue(['autopilot']);
+    mockedGrantedScopes.mockReturnValue([...PRE_6102_BASE]);
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    renderPanel();
+    const autopilot = row('Autopilot waypoints');
+    expect(within(autopilot).getByText(/not asked for on other pages/i)).toBeInTheDocument();
+    expect(within(row('Wallet')).queryByText(/not asked for/i)).not.toBeInTheDocument();
+
+    await user.click(
+      within(autopilot).getByRole('button', { name: 'Ask again for Autopilot waypoints' })
+    );
+    await waitFor(() => expect(usePermissionMarkDismissalsStore.getState().value).toEqual([]));
+    expect(
+      within(row('Autopilot waypoints')).queryByText(/not asked for/i)
+    ).not.toBeInTheDocument();
   });
 });

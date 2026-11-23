@@ -1,0 +1,8 @@
+# Scope decisions — PermissionCellMark is a popover at every width; Don't ask again is a synced Permission list (issue #6704)
+
+_Recorded 2026-11-23 · issue #6704._
+
+- **A popover at every width, never a bottom sheet on a phone.** The content is a title, one line and two buttons, anchored to one cell, the same size as a figure opener's popover (which stays a popover on a phone). A sheet would cut it loose from the row, and the row is what says which Character it is about. Capped at `100vw - 2rem` and kept clear of the phone's bottom tabs by collision padding. Panels (alerts, the mail queue) keep their sheets.
+- **Two layers, like `ReauthBanner` / `GrantBanner`.** `PermissionCellMark` (`src/components/ui`) only draws (status, names, actions passed in), so the primitive pulls no Dexie, sync or login code into the ui barrel. `GrantCellMark` (`src/app`) reads the Character's grant and the dismissals and wires Grant in EVE (`beginEveLogin` for that Character) and the Settings link (`GrantMissingLink`, switching to that Character). `usePermissionMark` gives a caller the same `granted` / `missing` / `dismissed` answer for its own tooltip.
+- **Don't ask again is one synced key, `sync.permissionMarkDismissals`, a list of Permission ids.** Plain strings, so a Permission a newer build added survives an older build rewriting the list. With several Permissions missing, the mark asks only for the ones not dismissed and hides once all are.
+- **The way back is a line on Settings › Permissions:** "Not asked for on other pages. Ask again" on each dismissed Permission's row, whether or not the shown Character holds it (the dismissal is account-wide).

@@ -25,7 +25,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Checkbox, Disclosure, InfoTooltip, NeedsConnection, Panel } from '@/components/ui';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
@@ -37,6 +37,7 @@ import { useActiveNpcCorporation } from '@/features/corp/useActiveNpcCorporation
 import { corpRoleLabel } from '@/features/corp/roles';
 import { SettingsHint } from '@/features/settings/settingsFields';
 import { usePhoneFold } from '@/features/settings/usePhoneFold';
+import { usePermissionMarkDismissals } from './permissionMarkDismissals';
 
 /**
  * `checking` while the answer is still loading — never `missing`, which would
@@ -87,6 +88,8 @@ export function PermissionsPanel() {
   const inNpcCorporation = useActiveNpcCorporation() != null;
   // A phone keeps the rows that need action open and folds the Granted ones.
   const grantedFold = usePhoneFold();
+  // "Don't ask again" on a PermissionCellMark is account-wide; this page is the way back (#6704).
+  const marks = usePermissionMarkDismissals();
   // Tagged with its Character so a switch drops the ticks instead of carrying them over.
   const [selection, setSelection] = useState<{
     characterId: number | null;
@@ -172,6 +175,19 @@ export function PermissionsPanel() {
           </div>
           <div className="text-text-dim">{t(PERMISSIONS[group].captionKey)}</div>
           {note && <div className="text-text-dim">{note}</div>}
+          {marks.dismissed.includes(group) && (
+            <div className="text-text-dim">
+              {t('settings.permissions.notAsked')}{' '}
+              <button
+                type="button"
+                className={inlineLinkClassName}
+                aria-label={t('settings.permissions.askAgainAria', { permission: label })}
+                onClick={() => void marks.askAgain(group)}
+              >
+                {t('settings.permissions.askAgain')}
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {status === 'granted' ? (

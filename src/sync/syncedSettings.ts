@@ -363,6 +363,12 @@
 // beside but deliberately not part of the Travel Settings: sync.routeHoles
 // (route through the open Thera / Turnur holes), sync.routeHoleShipSize,
 // sync.routeHoleMinLife and sync.routeHoleHubs. Also set, never unset.
+// sync.permissionMarkDismissals (issue #6704): the Permissions the pilot said
+// "Don't ask again" for on a PermissionCellMark, as one list of Permission ids.
+// Account-wide by design (one dismissal covers every Character), so one key.
+// Ask again on Settings › Permissions rewrites the list, never deletes the key,
+// so the tombstone edge does not bite. See
+// features/permissions/permissionMarkDismissals.ts.
 /** The Fittings damage / target profile settings (read by features/fittings). */
 export const SYNCED_CUSTOM_DAMAGE_PROFILES_KEY = 'sync.fittingDamageProfiles';
 export const SYNCED_SELECTED_DAMAGE_PROFILE_KEY = 'sync.fittingDamageProfileId';
@@ -416,6 +422,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.moonsHiddenCorps',
+  'sync.permissionMarkDismissals',
   'sync.placeNicknames',
   'sync.podKillThreshold',
   'sync.reprocessingTaxRate',
