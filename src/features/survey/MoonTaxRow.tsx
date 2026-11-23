@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, TextInput, Toast, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
@@ -80,13 +81,18 @@ function FailedLine({ message }: { message: string | null }) {
 /** "Auto-assigned until …" on its own line below the row, while the Survey is connected. */
 function ConnectedNote({ connection, nowMs }: { connection: SurveyConnection; nowMs: number }) {
   const { t } = useTranslation();
+  const text =
+    connection.systemId === null
+      ? t('survey.moonTax.connectedNoLocation')
+      : t('survey.moonTax.connected', { time: eveWhen(connection.untilMs, nowMs) });
   return (
-    <span role="status" className="flex items-center gap-1.5 self-center text-sm text-text-dim">
-      <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      {connection.systemId === null
-        ? t('survey.moonTax.connectedNoLocation')
-        : t('survey.moonTax.connected', { time: eveWhen(connection.untilMs, nowMs) })}
-    </span>
+    <>
+      <LiveStatus>{text}</LiveStatus>
+      <span className="flex items-center gap-1.5 self-center text-sm text-text-dim">
+        <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        {text}
+      </span>
+    </>
   );
 }
 
