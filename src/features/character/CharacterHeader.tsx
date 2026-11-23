@@ -1,5 +1,6 @@
 import { formatCount } from '@/lib/formatCount';
 import { useEffect, type ReactNode } from 'react';
+import { PageHeaderClusterContext } from '@/components/ui/pageHeaderCluster';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -28,6 +29,8 @@ interface CharacterHeaderProps {
   overview?: boolean;
   /** Beside the name, for a short fact about the Character itself; wraps under it when the name is long. Not a data age: that reads as the pilot being updated (see `OverviewSubNav`'s `trailing`). */
   aside?: ReactNode;
+  /** The page's `CharacterFilterControl`, first in the control cluster as on every `PageHeader` page. */
+  scope?: ReactNode;
   /** In the header's own flex row, ahead of the bell (the Overview's Next deadline and Customize; Employment History's Refresh and export). */
   actions?: ReactNode;
 }
@@ -64,6 +67,7 @@ export function CharacterHeader({
   unallocatedSp,
   overview = false,
   aside,
+  scope,
   actions,
 }: CharacterHeaderProps) {
   const { t } = useTranslation();
@@ -140,6 +144,9 @@ export function CharacterHeader({
         <CharacterAchievementLine characterId={characterId} />
       </div>
       {/* Controls sit in this flex row, then the bell: the Overview's Next and Customize, Employment History's Refresh and export. */}
+      {scope && (
+        <PageHeaderClusterContext.Provider value={true}>{scope}</PageHeaderClusterContext.Provider>
+      )}
       {actions}
       {showSp && (
         <StatChips>

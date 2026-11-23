@@ -47,6 +47,9 @@ import { endpointsOf } from './data/models';
 import { Chart } from './charts/Chart';
 import type { Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
+import { corpScope } from './layout';
+import { useActiveCorporationId } from '@/features/corp/owner';
+import { useAccountCorporations } from '@/features/corp/accountCorporations';
 import { readScope, useWidgetBoard } from './board';
 import { OVERVIEW_TICK_MS } from './data/tick';
 import { resolveWidget } from './state';
@@ -253,6 +256,92 @@ function AllCharactersReadout({ compact }: { compact: boolean }) {
   return <CharacterScopeReadout scope="all" total={total} compact={compact} />;
 }
 
+/** The fixed scope readout for a widget on one corporation (the Corp Board). */
+function CorporationReadout({
+  corporationId,
+  compact,
+}: {
+  corporationId: number;
+  compact: boolean;
+}) {
+  const corporation = useAccountCorporations().find((c) => c.id === corporationId);
+  return (
+    <CharacterScopeReadout
+      scope="corporation"
+      name={corporation?.label.name ?? String(corporationId)}
+      compact={compact}
+    />
+  );
+}
+
+/**
+ * A widget on the header Character says so too, once the pilot has anything else it could have
+ * read (a second Character, or on the Corp Board a second corporation): every widget on the
+ * board names whose data it shows, so a mixed board is never read as one scope.
+ */
+function HeaderScopeReadout({ compact }: { compact: boolean }) {
+  const board = useWidgetBoard();
+  const roster = useRosterNames();
+  const corporations = useAccountCorporations();
+  const ownCorporationId = useActiveCorporationId();
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  if (board.id === 'corp') {
+    if (corporations.length < 2 || ownCorporationId === null) return null;
+    return <CorporationReadout corporationId={ownCorporationId} compact={compact} />;
+  }
+  const name = characterId === null ? undefined : roster?.get(characterId);
+  if (!roster || roster.size < 2 || characterId === null || name === undefined) return null;
+  return (
+    <CharacterScopeReadout
+      scope="one"
+      characterId={characterId}
+      characterName={name}
+      compact={compact}
+    />
+  );
+}
+
+/**
+ * Corp Board: a kind that reads one corporation, through the header Character, under a scope
+ * that asks for several (All) or for another corporation. It asks which, so the card never
+ * shows one corporation's figure under a heading that says otherwise.
+ */
+function OneCorporationBody({
+  title,
+  wanted,
+  onUse,
+}: {
+  title: string;
+  wanted?: number;
+  onUse: (() => void) | null;
+}) {
+  const { t } = useTranslation();
+  const corporations = useAccountCorporations();
+  const own = useActiveCorporationId();
+  const name = corporations.find((c) => c.id === own)?.label.name;
+  const wantedName =
+    wanted === undefined
+      ? undefined
+      : (corporations.find((c) => c.id === wanted)?.label.name ?? String(wanted));
+  return (
+    <div className="grid gap-2 p-3 text-sm">
+      <b>{t('overview.widgets.oneCorporation.title')}</b>
+      <span className="text-text-dim">
+        {wantedName === undefined
+          ? t('overview.widgets.oneCorporation.hint', { title })
+          : t('overview.widgets.oneCorporation.hintOther', { title, corporation: wantedName })}
+      </span>
+      {onUse && name !== undefined && (
+        <span>
+          <Button size="sm" onClick={onUse}>
+            {t('overview.widgets.oneCorporation.use', { corporation: name })}
+          </Button>
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** The same readout in its "Name only" form: All was asked for, but this kind reads one Character. */
 function HeaderCharacterReadout({ characterId }: { characterId: number }) {
   const name = useRosterNames()?.get(characterId);
@@ -289,9 +378,14 @@ export function Widget(props: WidgetProps) {
 function LiveWidget(props: WidgetProps) {
   const { widget } = props;
   const board = useWidgetBoard();
-  const scope = scopePresentation(widget.kind, readScope(board, widget), widget);
+  const scope = scopePresentation(
+    widget.kind,
+    readScope(board, widget),
+    widget,
+    board.id === 'corp'
+  );
   // The kind's declared settings pick what counts; the rest are ignored (`viewSettings.ts`).
-  const view = useWidgetView(widget.kind, scope.scopeAll, widget);
+  const view = useWidgetView(widget.kind, scope.scopeAll, widget, scope.corporationId);
   return <WidgetFrame {...props} view={view} rememberHeight />;
 }
 
@@ -331,11 +425,23 @@ function WidgetFrame({
   const { t } = useTranslation();
   const kind = getKind(widget.kind);
   const { refresh } = useOverviewRefresh();
-  const { setRowsPerPage } = useOverviewEdit();
+  const edit = useOverviewEdit();
+  const { setRowsPerPage } = edit;
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(OVERVIEW_TICK_MS);
   // The scope it is read with, so a widget saved on All that reads one corporation draws no chip.
-  const scope = scopePresentation(widget.kind, readScope(useWidgetBoard(), widget), widget);
+  const board = useWidgetBoard();
+  const scope = scopePresentation(
+    widget.kind,
+    readScope(board, widget),
+    widget,
+    board.id === 'corp'
+  );
+  const ownCorporationId = useActiveCorporationId();
+  // One corporation is asked for, and it is not the header Character's: there is nothing to read.
+  const asksCorporation =
+    scope.needsOneCorporation === true &&
+    (scope.wantedCorporationId === undefined || scope.wantedCorporationId !== ownCorporationId);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
   const navigate = useNavigate();
@@ -371,8 +477,19 @@ function WidgetFrame({
     navigate(cardTo);
   };
 
+  const { setScope } = edit;
   let body;
-  if (state === 'loading') {
+  if (asksCorporation) {
+    body = (
+      <OneCorporationBody
+        title={title}
+        wanted={scope.wantedCorporationId}
+        onUse={
+          ownCorporationId === null ? null : () => setScope(widget.id, corpScope(ownCorporationId))
+        }
+      />
+    );
+  } else if (state === 'loading') {
     body = <Skeleton minHeight={reserved()} />;
   } else if (state === 'needsPermission') {
     body = (
@@ -519,7 +636,21 @@ function WidgetFrame({
               <span className="block truncate text-text">{title}</span>
             )}
           </h2>
-          {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
+          {scope.chip &&
+            !asksCorporation &&
+            (scope.corporationId === undefined ? (
+              <AllCharactersReadout compact={widget.size === 'S'} />
+            ) : (
+              <CorporationReadout
+                corporationId={scope.corporationId}
+                compact={widget.size === 'S'}
+              />
+            ))}
+          {!scope.chip &&
+            !scope.fallbackNote &&
+            !asksCorporation &&
+            menu !== undefined &&
+            !inertTitle && <HeaderScopeReadout compact={widget.size === 'S'} />}
           <span className="flex-1" />
           {menu && (
             // A card is not a row: the row tips wait for the first real table row.
@@ -536,7 +667,7 @@ function WidgetFrame({
         <div ref={measureRef}>{body}</div>
       </div>
       {editControls}
-      {scope.fallbackNote && state === 'ok' && characterId !== null && (
+      {scope.fallbackNote && !asksCorporation && state === 'ok' && characterId !== null && (
         <div className="border-t border-line px-3 py-1.5">
           <HeaderCharacterReadout characterId={characterId} />
         </div>

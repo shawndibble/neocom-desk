@@ -42,6 +42,8 @@ export interface OverviewEditActions {
   moveEdge: (id: string, edge: 'top' | 'bottom') => void;
   setView: (id: string, view: WidgetView) => void;
   setScope: (id: string, scope: WidgetScope) => void;
+  /** Every widget onto one scope (the page's scope control), those that can take it; undoable. */
+  setAllScopes: (scope: WidgetScope) => void;
   setRange: (id: string, range: WidgetRange) => void;
   setRowsPerPage: (id: string, rows: RowsPerPage) => void;
   setPlexPer30Days: (id: string, plex: number) => void;
@@ -90,6 +92,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   moveEdge: none,
   setView: none,
   setScope: none,
+  setAllScopes: none,
   setRange: none,
   setRowsPerPage: none,
   setPlexPer30Days: none,

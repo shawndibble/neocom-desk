@@ -27,7 +27,28 @@ export type { WidgetKindId, WidgetShow, WidgetSize, WidgetView };
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 
-export type WidgetScope = 'header' | 'all';
+/**
+ * Whose data a widget reads: the header Character, every Character, or one corporation (the
+ * Corp Board; stored as `corp:<id>`). A corporation is a scope of its own rather than a
+ * Character filter, so an older build that does not know it reads the header Character.
+ */
+export type CorpScope = `corp:${number}`;
+export type WidgetScope = 'header' | 'all' | CorpScope;
+
+export const corpScope = (corporationId: number): CorpScope => `corp:${corporationId}`;
+
+/** The corporation a scope names, or null for header and all. */
+export function scopeCorporation(scope: WidgetScope): number | null {
+  return scope.startsWith('corp:') ? Number(scope.slice(5)) : null;
+}
+
+export function isWidgetScope(value: unknown): value is WidgetScope {
+  return (
+    value === 'header' ||
+    value === 'all' ||
+    (typeof value === 'string' && /^corp:[1-9]\d*$/.test(value))
+  );
+}
 export type CalendarEventsChoice = 'committed' | 'all';
 export const CALENDAR_EVENTS_CHOICES: readonly CalendarEventsChoice[] = ['committed', 'all'];
 
@@ -275,6 +296,21 @@ export function setScope(layout: OverviewLayout, id: string, scope: WidgetScope)
   return update(layout, id, (w) => (w.scope === scope ? null : { ...w, scope }));
 }
 
+/**
+ * Every widget on `scope` at once (the page's scope control). `canTake` leaves out a widget
+ * that cannot be on it (a kind that cannot sum, under All); unchanged widgets keep their identity.
+ */
+export function setAllScopes(
+  layout: OverviewLayout,
+  scope: WidgetScope,
+  canTake: (widget: Widget) => boolean = () => true
+): OverviewLayout {
+  const widgets = layout.widgets.map((w) =>
+    w.scope === scope || !canTake(w) ? w : { ...w, scope }
+  );
+  return widgets.every((w, i) => w === layout.widgets[i]) ? layout : { ...layout, widgets };
+}
+
 export function setRange(layout: OverviewLayout, id: string, range: WidgetRange): OverviewLayout {
   return update(layout, id, (w) => {
     if (w.range === range || !rangesOf(w.kind).includes(range)) return null;
@@ -465,6 +501,7 @@ const UNDO_LABELS = {
   resized: 'overview.customize.undo.resized',
   duplicated: 'overview.customize.undo.duplicated',
   reset: 'overview.customize.undo.reset',
+  scoped: 'overview.customize.undo.scoped',
 } as const;
 
 export function addWidgetUndoable(
@@ -494,6 +531,14 @@ export function duplicateWidgetUndoable(
   makeId: MakeId
 ): UndoableResult | null {
   return undoable(layout, duplicateWidget(layout, id, makeId), UNDO_LABELS.duplicated);
+}
+
+export function setAllScopesUndoable(
+  layout: OverviewLayout,
+  scope: WidgetScope,
+  canTake?: (widget: Widget) => boolean
+): UndoableResult | null {
+  return undoable(layout, setAllScopes(layout, scope, canTake), UNDO_LABELS.scoped);
 }
 
 export function resetLayoutUndoable(

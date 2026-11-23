@@ -36,6 +36,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import { kindSumsAcrossCharacters } from './data/models';
+import { useAccountCorporations } from '@/features/corp/accountCorporations';
 import { boardKey, readScope, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
@@ -57,6 +58,7 @@ import {
   RAIDS_RADII,
   RAIDS_WHERES,
   type RaidsWhere,
+  corpScope,
   LEGACY_PROFIT_SOURCE,
   PROFIT_SOURCES,
   type ProfitSource,
@@ -276,6 +278,7 @@ export function WidgetMenu({
   const navigate = useNavigate();
   const edit = useOverviewEdit();
   const board = useWidgetBoard();
+  const corporations = useAccountCorporations();
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [renaming, setRenaming] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -291,7 +294,7 @@ export function WidgetMenu({
     board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
   // Read across every corporation, a Show that cannot sum is disabled with its reason (DESIGN §6c).
-  const onAll = offersScope && canSum && readScope(board, widget) === 'all';
+  const onAll = offersScope && canSum && readScope(board, widget) !== 'header';
   const showSums = (show: WidgetShow) =>
     !onAll || kindSumsAcrossCharacters(widget.kind, { ...widget, show });
   const someShowsOff = kind.shows.some((show) => !showSums(show));
@@ -358,6 +361,16 @@ export function WidgetMenu({
             <MenuRadioItem value="all" disabled={!canSum}>
               {t(`${scopeKey}.all`)}
             </MenuRadioItem>
+            {board.id === 'corp' &&
+              corporations.map((corporation) => (
+                <MenuRadioItem
+                  key={corporation.id}
+                  value={corpScope(corporation.id)}
+                  disabled={!canSum}
+                >
+                  {corporation.label.name}
+                </MenuRadioItem>
+              ))}
           </MenuRadioGroup>
           {!canSum && (
             <p className="px-2 pb-1 text-xs text-text-dim">{t('overview.menu.nameOnly')}</p>

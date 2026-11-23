@@ -40,6 +40,7 @@ import {
   setHiddenLayers,
   setTrendItems,
   setScope,
+  setAllScopesUndoable,
   setShow,
   setShowOnPhone,
   setView,
@@ -170,9 +171,11 @@ export function OverviewEditProvider({
         if (before !== null) commit(restoreLayout(before));
       },
       add: (kind, init) => {
-        // A preset that reads one corporation (the corp wallet on Flow) stays on it.
+        // A new widget opens on All characters wherever its kind can sum them (the Overview's
+        // default; the Corp Board's named kinds). A preset that reads one corporation (the
+        // corp wallet on Flow) stays on it.
         const opensOnAll =
-          boardRef.current.opensOnAll.has(kind) &&
+          (boardRef.current.id === 'overview' || boardRef.current.opensOnAll.has(kind)) &&
           kindSumsAcrossCharacters(kind, { show: init?.show });
         const result = addWidgetUndoable(
           layoutRef.current,
@@ -220,6 +223,15 @@ export function OverviewEditProvider({
       moveEdge: (id, edge) => commit(moveWidget(layoutRef.current, id, edge)),
       setView: (id, view) => commit(setView(layoutRef.current, id, view)),
       setScope: (id, scope) => commit(setScope(layoutRef.current, id, scope)),
+      setAllScopes: (scope) =>
+        void commitUndoable(
+          setAllScopesUndoable(
+            layoutRef.current,
+            scope,
+            // A kind that cannot sum is never on All, so a bulk All leaves it where it is.
+            (w) => scope !== 'all' || kindSumsAcrossCharacters(w.kind, w)
+          )
+        ),
       setRange: (id, range) => commit(setRange(layoutRef.current, id, range)),
       setRowsPerPage: (id, rows) => commit(setRowsPerPage(layoutRef.current, id, rows)),
       setPlexPer30Days: (id, plex) => commit(setPlexPer30Days(layoutRef.current, id, plex)),

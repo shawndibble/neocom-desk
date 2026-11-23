@@ -51,6 +51,8 @@ export interface ViewRequest extends ViewSettings {
   kind: string;
   /** This widget reads across Characters, and its kind can sum them. */
   scopeAll: boolean;
+  /** Narrow a read across corporations to this one (a widget scoped to a corporation). */
+  corporationId?: number;
 }
 
 /** The `BuildContext` fields the settings fill in. */
@@ -148,5 +150,5 @@ export function settingsContext(kind: string, settings: ViewSettings): SettingsC
 /** Identifies one built view: two requests with the same key build the same view. */
 export function viewKey(request: ViewRequest): string {
   // Whatever the specs resolve is the key, so a new setting joins it without a second edit.
-  return `${request.kind}:${request.scopeAll ? 1 : 0}:${JSON.stringify(settingsContext(request.kind, request))}`;
+  return `${request.kind}:${request.scopeAll ? 1 : 0}:${request.corporationId ?? ''}:${JSON.stringify(settingsContext(request.kind, request))}`;
 }

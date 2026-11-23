@@ -44,6 +44,8 @@ import {
   OverviewNext,
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { usePageScopeControl } from '@/features/overview/widgets/usePageScopeControl';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';
@@ -104,12 +106,14 @@ function Board({ characterId, layout }: BoardProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
+  const pageScope = usePageScopeControl();
 
   return (
     <div className="mx-auto max-w-page space-y-4">
       <CharacterHeader
         characterId={characterId}
         overview
+        scope={pageScope && <CharacterFilterControl {...pageScope} />}
         actions={
           <>
             <OverviewNext summary={summary} />

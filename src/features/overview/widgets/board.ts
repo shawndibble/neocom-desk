@@ -12,7 +12,13 @@ import {
   type KindCategory,
   type WidgetKindDef,
 } from './kinds';
-import type { MakeId, OverviewLayout, Widget, WidgetScope } from './layout';
+import {
+  scopeCorporation,
+  type MakeId,
+  type OverviewLayout,
+  type Widget,
+  type WidgetScope,
+} from './layout';
 import { defaultLayout } from './roles';
 
 export interface WidgetBoard {
@@ -40,6 +46,8 @@ export interface WidgetBoard {
 
 /** The scope a widget is read with on `board`: its saved one, unless All is not offered there now. */
 export function readScope(board: WidgetBoard, widget: Pick<Widget, 'kind' | 'scope'>): WidgetScope {
+  // A corporation is a scope of the Corp Board only; the Overview reads Characters.
+  if (scopeCorporation(widget.scope) !== null) return board.id === 'corp' ? widget.scope : 'header';
   return widget.scope === 'all' && board.allScopeOffered(widget.kind) ? 'all' : 'header';
 }
 

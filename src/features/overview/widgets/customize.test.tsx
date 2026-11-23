@@ -267,7 +267,7 @@ describe('Widget menu', () => {
     const { user, seen } = setup({ initial: profit });
     await user.click(screen.getByRole('button', { name: 'Settings for Profit' }));
     expect(screen.getByRole('menuitemradio', { name: 'Both' })).toBeChecked();
-    expect(screen.getByRole('menuitemradio', { name: 'All' })).toHaveAttribute(
+    expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
@@ -275,7 +275,7 @@ describe('Widget menu', () => {
     expect(seen.current.widgets[0].profitSource).toBe('trading');
 
     await user.click(screen.getByRole('button', { name: 'Settings for Profit' }));
-    expect(screen.getByRole('menuitemradio', { name: 'All' })).not.toHaveAttribute(
+    expect(screen.getByRole('menuitemradio', { name: 'All characters' })).not.toHaveAttribute(
       'aria-disabled',
       'true'
     );
@@ -329,7 +329,7 @@ describe('Widget menu', () => {
   it('disables All characters for a kind that reads the header Character only, with the reason', async () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));
-    expect(screen.getByRole('menuitemradio', { name: 'All' })).toHaveAttribute(
+    expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );

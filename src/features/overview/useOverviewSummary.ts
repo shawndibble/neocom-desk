@@ -10,7 +10,7 @@ import {
   fetchBreakdown,
   stalestFetch,
 } from './widgets/headerSummary';
-import type { Widget } from './widgets/layout';
+import { scopeCorporation, type Widget } from './widgets/layout';
 import { chipTone, nextDeadline } from './widgets/nextDeadline';
 import { readScope, useWidgetBoard, type WidgetBoard } from './widgets/board';
 import { visibleWidgets } from './widgets/visibility';
@@ -23,12 +23,19 @@ const EMPTY_READ = { fetchedAt: null, fromCache: false };
  * A kind with an All read of its own (the corp widgets) follows its widget's scope: its header feed
  * is not mounted when every widget of the kind is on All, so asking for it would never settle.
  */
+function across(board: WidgetBoard, widget: Widget) {
+  const scope = readScope(board, widget);
+  const sums =
+    scope !== 'header' &&
+    kindHasAllFeeds(widget.kind) &&
+    kindSumsAcrossCharacters(widget.kind, widget);
+  const corporationId = scopeCorporation(scope);
+  return { scopeAll: sums, ...(sums && corporationId !== null && { corporationId }) };
+}
+
 const requestOf = (board: WidgetBoard, widget: Widget) => ({
   kind: widget.kind,
-  scopeAll:
-    readScope(board, widget) === 'all' &&
-    kindHasAllFeeds(widget.kind) &&
-    kindSumsAcrossCharacters(widget.kind, widget),
+  ...across(board, widget),
   profitSource: widget.profitSource,
 });
 
