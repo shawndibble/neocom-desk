@@ -278,7 +278,10 @@ export function TheraTable({
       density="compact"
       stackLayout="dense"
       mobileSort
-      expandableRow={{ renderDetail: (row) => <HoleDetail row={row} onUse={onUse} /> }}
+      expandableRow={{
+        leadingIcon: true,
+        renderDetail: (row) => <HoleDetail row={row} onUse={onUse} />,
+      }}
     />
   );
 }

@@ -18,8 +18,8 @@ interface CollapsiblePanelProps {
   expanded: boolean;
   /** @summary Called when the caret is pressed. */
   onToggle: () => void;
-  /** Accessible names for the caret in each state. */
-  labels: { show: string; hide: string };
+  /** Accessible names for the caret in each state; defaults to the title, with `aria-expanded` saying which. */
+  labels?: { show: string; hide: string };
   /** Set false for flush content like tables. */
   padded?: boolean;
   /**
@@ -51,7 +51,8 @@ interface CollapsiblePanelProps {
 }
 
 /**
- * A `Panel` whose body can be folded away behind its header. The header
+ * A `Panel` whose body can be folded away: a leading caret, and a press anywhere on the
+ * header (outside its own buttons and links) toggles it. The header
  * keeps the title, a `meta` summary and any `actions`, so a closed panel
  * still answers the question it exists for — the caret only decides
  * whether the detail underneath is on screen. `children` are not rendered
@@ -90,20 +91,21 @@ export function CollapsiblePanel({
       metaOwnRow={metaOwnRow}
       className={className}
       padded={padded}
-      actions={
-        <>
-          {actions}
-          {collapsible && (
-            <IconButton
-              ref={toggleRef}
-              size={caretSize}
-              icon={<Caret expanded={open} />}
-              label={open ? labels.hide : labels.show}
-              aria-expanded={open}
-              onClick={onToggle}
-            />
-          )}
-        </>
+      actions={actions}
+      // The caret leads the title and the whole header toggles (DESIGN.md §6c, "Leading
+      // caret that rotates"); the far-right slot is for the panel's own actions only.
+      onHeaderToggle={collapsible ? onToggle : undefined}
+      leading={
+        collapsible && (
+          <IconButton
+            ref={toggleRef}
+            size={caretSize}
+            icon={<Caret expanded={open} />}
+            label={(open ? labels?.hide : labels?.show) ?? title}
+            aria-expanded={open}
+            onClick={onToggle}
+          />
+        )
       }
     >
       {open ? children : collapsedSummary}

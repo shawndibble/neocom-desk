@@ -5,8 +5,15 @@
  * quick way to the same action; this list is the way that works with a keyboard
  * or a finger, and the only place a removed scan can be restored from.
  */
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Popover, PopoverContent, PopoverTrigger, textActionClassName } from '@/components/ui';
+import {
+  CollapsiblePanel,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  textActionClassName,
+} from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { scanVolume, type SurveyScan } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -38,16 +45,24 @@ function oreLines(scan: SurveyScan): OreLine[] {
 
 export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListProps) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
   const rows = [...scans].reverse();
   const removed = rows.filter((s) => s.id !== undefined && ignored.has(s.id)).length;
   return (
-    <details className="group rounded-xs border border-line bg-panel/60">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm text-text-dim touch:py-3">
-        {removed > 0
+    <CollapsiblePanel
+      title={
+        removed > 0
           ? t('survey.scanList.titleWithRemoved', { count: scans.length, removed })
-          : t('survey.scanList.title', { count: scans.length })}
-      </summary>
-      <div className="space-y-1 border-t border-line px-3 py-2">
+          : t('survey.scanList.title', { count: scans.length })
+      }
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+      labels={{
+        show: t('survey.scanList.title', { count: scans.length }),
+        hide: t('survey.scanList.title', { count: scans.length }),
+      }}
+    >
+      <div className="space-y-1">
         <p className="text-xs text-text-dim">{t('survey.scanList.hint')}</p>
         <ul className="divide-y divide-line">
           {rows.map((scan) => {
@@ -102,7 +117,7 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
           })}
         </ul>
       </div>
-    </details>
+    </CollapsiblePanel>
   );
 }
 
