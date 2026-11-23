@@ -25,6 +25,7 @@ import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { mergePlanetaryBoards, type CharacterPlanetaryBoard } from './planetaryAcross';
 import { INBOX_ROWS, mergeMailBoards, RECENT_ROWS } from './mailAcross';
 import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
@@ -79,6 +80,9 @@ export interface BoardColony {
   status: ColonyStatus;
   /** Extractor programs on the colony; absent on data built before the widget read it. */
   programCount?: number;
+  /** The Character who owns it, set only when the board reads every Character. */
+  ownerId?: number;
+  ownerName?: string;
 }
 
 export interface PlanetaryBoardData {
@@ -154,6 +158,31 @@ export async function loadPlanetaryBoard(
     programCount,
     batches: groupColoniesIntoBatches(colonies, (colony) => colony.status, loadedAt),
   };
+}
+
+/**
+ * Every Character's colonies as one board, each read as that Character's own board is. Only
+ * Characters holding the planets scope are read, so an alt that never granted it raises no
+ * re-auth banner; with none of them granted, the widget asks for the permission.
+ */
+export async function loadAllPlanetaryBoard(
+  _characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<PlanetaryBoardData> {
+  const { fanOutAllCharacters } = await import('@/features/character/allCharactersFanOut');
+  const { entries, skipped } = await fanOutAllCharacters<CharacterPlanetaryBoard>({
+    scope: ESI_REGISTRY.getCharacterPlanets.scope,
+    load: async ({ characterId, name }) => ({
+      characterId,
+      name,
+      data: await loadPlanetaryBoard(characterId, signal),
+    }),
+  });
+  if (entries.length === 0) {
+    if (skipped.length > 0) return { ...EMPTY_PLANETARY, needsReauth: true, loadedAt: Date.now() };
+    throw new Error('Colonies could not be read');
+  }
+  return mergePlanetaryBoards(entries);
 }
 
 // --- Mining tax -----------------------------------------------------------

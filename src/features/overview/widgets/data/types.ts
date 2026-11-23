@@ -331,6 +331,8 @@ export interface FeedMap {
   orders: OpenOrdersPageSnapshot;
   mining: MiningTaxBoardData;
   planetary: PlanetaryBoardData;
+  /** Every Character's colonies regrouped as one board (the Planetary widget on All characters). */
+  planetaryAll: PlanetaryBoardData;
   industry: IndustryBoardData;
   contracts: ContractsBoardData;
   /** Every Character's mail folded into one board (the Mail widget on All characters). */
