@@ -23,6 +23,7 @@ const meta = {
   title: 'mockups/OverviewPhoneHeader',
   tags: ['!manifest'],
   parameters: { layout: 'fullscreen', shell: { path: '/overview' } },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 } satisfies Meta;
 
 export default meta;
@@ -31,12 +32,13 @@ type Story = StoryObj<typeof meta>;
 /** @summary Today's Overview in the phone shell. */
 export const TodayPhone: Story = {
   render: () => <Overview />,
-  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 /**
  * Hides the real page's own header and tab row (its first two children) so
- * the proposal replaces them while the real widgets stay below.
+ * the proposal replaces them while the real widgets stay below. Positional:
+ * it assumes `Overview`'s Board still opens with `CharacterHeader` then
+ * `OverviewSubNav`. The name below is a long placeholder, to show wrapping.
  */
 const HIDE_REAL_HEADER = '[&>div>*:nth-child(-n+2)]:hidden';
 
@@ -85,5 +87,4 @@ export const ProposedPhone: Story = {
       </div>
     </>
   ),
-  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
