@@ -27,11 +27,20 @@ import {
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
-import { formatEveClock } from '@/engine/survey/chatMessage';
+import { compressGaps } from '@/engine/survey/gapAxis';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { SurveyChartView } from '@/engine/survey/chartViews';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { FULL_HEIGHT, MARGIN, makeScanDot, thinLabels, timeAxis, yAxis } from './surveyChartParts';
+import {
+  FULL_HEIGHT,
+  MARGIN,
+  clock,
+  gapBreaks,
+  makeScanDot,
+  thinLabels,
+  timeAxis,
+  yAxis,
+} from './surveyChartParts';
 import { DepletionChart, IskChart } from './SurveyViewCharts';
 import { ByOrePaceFigure, TotalPaceFigure } from './SurveyPacePanel';
 import { oreTone } from './surveyTones';
@@ -74,7 +83,7 @@ function volumeRows(summary: SurveySummary): VolumeRow[] {
 }
 
 export function SurveyCharts({
-  summary,
+  summary: surveySummary,
   onRemoveScan,
   compactHeight,
   view = 'ore',
@@ -95,6 +104,11 @@ export function SurveyCharts({
 }) {
   const { t } = useTranslation();
   const compact = compactHeight !== undefined;
+  // Hours with no scans would fill the chart with a line nobody measured; the Overview's small chart keeps real time.
+  const summary = useMemo(
+    () => (compact ? surveySummary : compressGaps(surveySummary)),
+    [compact, surveySummary]
+  );
   const [plotWidth, setPlotWidth] = useState(0);
   const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
@@ -126,7 +140,7 @@ export function SurveyCharts({
         id: 'at',
         stickyStart: true,
         header: t('survey.chartScan'),
-        render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
+        render: (r) => t('survey.eveTime', { time: clock(summary, r.at) }),
       },
       {
         id: 'total',
@@ -144,7 +158,7 @@ export function SurveyCharts({
         render: (r: ScanTableRow) => `${formatVolume(r.byOre[ore] ?? 0)} m³`,
       })),
     ],
-    [summary.oreNames, t]
+    [summary, t]
   );
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as VolumeRow | undefined;
@@ -156,7 +170,7 @@ export function SurveyCharts({
         <div className="min-w-48 space-y-1 text-xs">
           <div className="flex items-baseline justify-between gap-4">
             <span className="font-semibold text-text">
-              {t('survey.eveTime', { time: formatEveClock(row.at) })}
+              {t('survey.eveTime', { time: clock(summary, row.at) })}
             </span>
             {row.delta !== undefined && row.delta > 0 && (
               <span>{t('survey.chartMined', { amount: formatCompactNumber(row.delta) })}</span>
@@ -195,7 +209,7 @@ export function SurveyCharts({
     );
   }
 
-  const nodeDot = makeScanDot(onRemoveScan);
+  const nodeDot = makeScanDot(onRemoveScan, summary.axis?.toTime);
 
   const plot = (
     <div className="w-full" style={{ height: compactHeight ?? FULL_HEIGHT }}>
@@ -205,6 +219,7 @@ export function SurveyCharts({
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(!compact)}
           {yAxis({ compact })}
+          {gapBreaks(summary, !compact)}
           {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
           {summary.oreNames
             .map((ore, i) => ({ ore, i }))
@@ -260,7 +275,7 @@ export function SurveyCharts({
               stroke="var(--color-line-bright)"
               strokeDasharray="2 3"
               label={{
-                value: t('survey.chartDone', { time: formatEveClock(summary.etaAt) }),
+                value: t('survey.chartDone', { time: clock(summary, summary.etaAt) }),
                 position: 'insideTopLeft',
                 textAnchor: 'end',
                 fill: 'var(--color-text)',
