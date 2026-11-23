@@ -46,8 +46,9 @@ import {
   type Builder,
   type KindDef,
 } from './builderKit';
-import { walletArea } from './chartBuilders';
+import { hbarsFromRows, walletArea } from './chartBuilders';
 import { walletFlow } from './kindModels';
+import { getKind } from '../kinds';
 import { dailyBalanceSeries } from './chartSeries';
 import { contractsTable, mailTable } from './characterTables';
 import {
@@ -107,6 +108,86 @@ const wallet: Builder = (feeds, { t, now, range }) => {
     chart: series ? (walletArea(t, series, formatIskCompact) ?? undefined) : undefined,
   };
 };
+
+/** Wallet balance across every Character: the sum, and who holds what. */
+const walletAcross: Builder = (feeds, { t }) => {
+  const feed = feeds.walletAll;
+  const data = feed?.data ?? null;
+  if (!data) return blank('/wallet', statusOf(feed));
+  const K = 'overview.widgets.wallet';
+  const read = data.characters.filter((c) => c.balance !== null);
+  const total = read.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+  const lapsed = data.characters.length - read.length + data.skippedCount;
+  const times = read.flatMap((c) => (c.fetchedAt === null ? [] : [c.fetchedAt]));
+  const rows = [...read].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0));
+  return {
+    ...blank(
+      '/wallet',
+      statusOf(feed, {
+        needsPermission: read.length === 0 && data.characters.some((c) => c.needsReauth),
+        isEmpty: data.characters.length === 0,
+        hasStaleData: read.length > 0,
+      })
+    ),
+    fetchedAt: times.length > 0 ? new Date(Math.min(...times)) : null,
+    fromCache: read.some((c) => c.fromCache),
+    number: {
+      value: formatIskCompact(total),
+      iskAmount: total,
+      unit: t('overview.isk'),
+      secondary: { text: t(`${K}.across.characters`, { count: read.length }) },
+      notes: lapsed > 0 ? [t(`${K}.across.missing`, { count: lapsed })] : undefined,
+      tone: 'clear',
+    },
+    rows: rows.map((c) => ({
+      key: String(c.characterId),
+      title: c.name,
+      value: formatIskCompact(c.balance ?? 0),
+      iskAmount: c.balance ?? 0,
+      tone: 'clear',
+    })),
+    table: {
+      columns: [
+        { key: 'character', label: t(`${K}.across.col.character`), priority: 0 },
+        { key: 'balance', label: t(`${K}.col.balance`), align: 'end', priority: 1 },
+        { key: 'share', label: t(`${K}.across.col.share`), align: 'end', priority: 2 },
+      ],
+      rows: rows.map((c) => ({
+        key: String(c.characterId),
+        to: '/wallet',
+        cells: [
+          c.name,
+          { text: formatIskCompact(c.balance ?? 0), iskAmount: c.balance ?? 0 },
+          total > 0 ? `${Math.round(((c.balance ?? 0) / total) * 100)}%` : UNKNOWN,
+        ],
+      })),
+    },
+    summary: t(`${K}.across.summary`, { isk: formatIskCompact(total), count: read.length }),
+    chart:
+      total > 0
+        ? (hbarsFromRows(
+            t,
+            rows
+              .filter((c) => (c.balance ?? 0) > 0)
+              .map((c) => {
+                const share = (c.balance ?? 0) / total;
+                return {
+                  key: String(c.characterId),
+                  label: c.name,
+                  value: c.balance ?? 0,
+                  share,
+                  text: `${Math.round(share * 100)}%`,
+                };
+              }),
+            t(`${K}.across.chartNote`)
+          ) ?? undefined)
+        : undefined,
+  };
+};
+
+/** Wallet flow across every Character: the same breakdown over their journals merged. */
+const walletFlowAcross: Builder = (feeds, ctx) =>
+  walletFlow({ ...feeds, journal: feeds.journalAll }, ctx);
 
 /** The newest message's sender and age: a fact the unread count does not carry. */
 function latestMail(t: Translate, now: number, data: MailBoardData): NumberSecondary | undefined {
@@ -471,12 +552,37 @@ export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
   // Balance reads both feeds, Flow the journal alone.
   wallet: {
     feeds: ['wallet', 'journal'],
-    scope: 'character',
-    build: byShow({ balance: wallet, flow: walletFlow }, wallet),
+    allFeeds: ['walletAll', 'journalAll'],
+    scope: 'account',
+    // Balance on All reads the balances alone; only Flow merges the journals.
+    bySettings: ({ show }) => ({
+      feeds: ['wallet', 'journal'],
+      allFeeds: show === 'flow' ? ['journalAll'] : ['walletAll'],
+      scope: 'account',
+      endpoints: getKind('wallet')?.endpoints ?? [],
+    }),
+    build: (feeds, ctx) =>
+      byShow(
+        ctx.scopeAll
+          ? { balance: walletAcross, flow: walletFlowAcross }
+          : { balance: wallet, flow: walletFlow },
+        ctx.scopeAll ? walletAcross : wallet
+      )(feeds, ctx),
   },
-  mail: { feeds: ['mail'], scope: 'character', build: mail },
+  mail: {
+    feeds: ['mail'],
+    allFeeds: ['mailAll'],
+    scope: 'account',
+    build: (feeds, ctx) => mail(ctx.scopeAll ? { ...feeds, mail: feeds.mailAll } : feeds, ctx),
+  },
   orders: { feeds: ['orders', 'skills'], scope: 'account', build: orders },
-  contracts: { feeds: ['contracts'], scope: 'character', build: contracts },
+  contracts: {
+    feeds: ['contracts'],
+    allFeeds: ['contractsAll'],
+    scope: 'account',
+    build: (feeds, ctx) =>
+      contracts(ctx.scopeAll ? { ...feeds, contracts: feeds.contractsAll } : feeds, ctx),
+  },
   miningTax: { feeds: ['mining'], scope: 'account', build: miningTax },
   stock: { feeds: ['stock'], scope: 'account', build: stock },
   priceWatch: { feeds: ['priceAlerts'], scope: 'account', build: priceWatch },

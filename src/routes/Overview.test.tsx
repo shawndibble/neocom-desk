@@ -450,12 +450,12 @@ describe('Overview widget grid', () => {
       ownerHash: 'oh2',
       addedAt: 2,
     });
-    await seedLayout(widget('w', 'wallet', { size: 'S', scope: 'all' }));
+    await seedLayout(widget('w', 'training', { size: 'S', scope: 'all' }));
     renderOverviewRoute();
 
-    // The wallet cannot sum, so it says it is still one Character's.
-    const wallet = await widgetCard('Wallet');
-    expect(await within(wallet).findByText('Pilot One only')).toBeInTheDocument();
+    // Training's queue is one Character's, so it says it is still one Character's.
+    const training = await widgetCard('Training');
+    expect(await within(training).findByText('Pilot One only')).toBeInTheDocument();
   });
 
   it('draws no Character switcher in the header, and no SP chips', async () => {

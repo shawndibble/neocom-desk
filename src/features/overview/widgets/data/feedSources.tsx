@@ -23,8 +23,10 @@ import {
   isSpFarmCharacter,
 } from '@/features/character/spExtractionSettings';
 import { useExtractionPrices } from '@/features/character/useExtractionPrices';
-import { loadCalendarBoard } from '@/features/character/calendarBoardData';
+import { loadAllCalendarBoard, loadCalendarBoard } from '@/features/character/calendarBoardData';
 import {
+  loadAllContractsBoard,
+  loadAllMailBoard,
   loadContractsBoard,
   loadIndustryBoard,
   loadMailBoard,
@@ -32,6 +34,7 @@ import {
   loadMoonChunksBoard,
   loadAllMoonChunksBoard,
   loadAllStructuresBoard,
+  loadAllPlanetaryBoard,
   loadPlanetaryBoard,
   loadPriceAlertsBoard,
   loadStructuresBoard,
@@ -47,11 +50,14 @@ import {
 } from './loaders';
 import {
   loadClonesWidget,
+  loadJournalAllWidget,
   loadJournalPanel,
+  loadWalletAllWidget,
   loadLocationWidget,
   loadLpWidget,
   loadMiningYieldWidget,
   loadNetWorthWidget,
+  loadAllProfitWidget,
   loadProfitWidget,
   loadHaulingWidget,
   loadBelowMarketWidget,
@@ -222,11 +228,15 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   orders: snapshot(loadOrdersBoard, 'overview:orders'),
   mining: snapshot(loadMiningTaxBoard, 'overview:mining-tax'),
   planetary: snapshot(loadPlanetaryBoard, 'overview:planetary'),
+  planetaryAll: snapshot(loadAllPlanetaryBoard, 'overview:planetary-all', { accountWide: true }),
   industry: snapshot(loadIndustryBoard, 'overview:industry'),
   contracts: snapshot(loadContractsBoard, 'overview:contracts'),
+  contractsAll: snapshot(loadAllContractsBoard, 'overview:contracts-all', { accountWide: true }),
   // A new key: a snapshot saved under the old one holds the events-only shape.
   calendar: snapshot(loadCalendarBoard, 'overview:calendar-board'),
+  calendarAll: snapshot(loadAllCalendarBoard, 'overview:calendar-board-all', { accountWide: true }),
   mail: snapshot(loadMailBoard, 'overview:mail'),
+  mailAll: snapshot(loadAllMailBoard, 'overview:mail-all', { accountWide: true }),
   priceAlerts: snapshot(loadPriceAlertsBoard, 'overview:price-alerts'),
   stock: snapshot(loadStockBoardFor, 'overview:stock'),
   structures: snapshot(loadStructuresBoard, 'overview:structures'),
@@ -242,8 +252,11 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   spExtras: { type: 'hook', Component: SpExtrasSource },
   accelerator: { type: 'hook', Component: AcceleratorSource },
   journal: snapshot(loadJournalPanel, 'overview:journal'),
+  walletAll: snapshot(loadWalletAllWidget, 'overview:wallet-all', { accountWide: true }),
+  journalAll: snapshot(loadJournalAllWidget, 'overview:journal-all', { accountWide: true }),
   netWorth: snapshot(loadNetWorthWidget, 'overview:net-worth'),
   profit: snapshot(loadProfitWidget, 'overview:profit'),
+  profitAll: snapshot(loadAllProfitWidget, 'overview:profit-all', { accountWide: true }),
   miningYield: snapshot(loadMiningYieldWidget, 'overview:mining-yield'),
   lp: snapshot(loadLpWidget, 'overview:lp'),
   survey: snapshot(loadSurveyWidget, 'overview:survey'),

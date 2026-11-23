@@ -5716,6 +5716,19 @@
           "amount": "Amount",
           "when": "When",
           "balance": "Balance"
+        },
+        "across": {
+          "characters_one": "{{count}} character",
+          "characters_other": "{{count}} characters",
+          "missing_one": "{{count}} character not read",
+          "missing_other": "{{count}} characters not read",
+          "col": {
+            "character": "Character",
+            "share": "Share"
+          },
+          "chartNote": "Each character's share of the total balance.",
+          "summary_one": "{{isk}} ISK across {{count}} character",
+          "summary_other": "{{isk}} ISK across {{count}} characters"
         }
       },
       "walletFlow": {

@@ -972,17 +972,29 @@ export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
   // Its reads and scope follow the widget's Source (`profitModel.ts`).
   profit: {
     feeds: ['profit', 'tradingProfit'],
-    scope: 'character',
+    allFeeds: ['profitAll', 'tradingProfit'],
+    scope: 'account',
     build: profit,
     bySettings: ({ profitSource }) =>
       profitSource === 'trading'
-        ? { feeds: ['tradingProfit'], scope: 'account', endpoints: WALLET_TRADE_ENDPOINTS }
+        ? {
+            feeds: ['tradingProfit'],
+            allFeeds: ['tradingProfit'],
+            scope: 'account',
+            endpoints: WALLET_TRADE_ENDPOINTS,
+          }
         : profitSource === 'both'
           ? {
               feeds: ['profit', 'tradingProfit'],
-              scope: 'character',
+              allFeeds: ['profitAll', 'tradingProfit'],
+              scope: 'account',
               endpoints: WALLET_TRADE_ENDPOINTS,
             }
-          : { feeds: ['profit'], scope: 'character', endpoints: [] },
+          : {
+              feeds: ['profit'],
+              allFeeds: ['profitAll'],
+              scope: 'account',
+              endpoints: [],
+            },
   },
 };

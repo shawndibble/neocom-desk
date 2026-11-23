@@ -311,6 +311,7 @@ export const comingUp: Builder = (
       item.response === null ? null : t(`overview.board.response.${item.response}`),
       item.corporation?.name,
       item.sharedBy?.name,
+      item.characterName,
     ]
       .filter(Boolean)
       .join(' · ');
