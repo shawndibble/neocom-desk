@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
-import { FUEL_BLOCK_VOLUME_M3, fuelBays, fuelPlan, fuelUntilMs } from './fuelPlan';
+import {
+  FUEL_BLOCK_VOLUME_M3,
+  fuelBays,
+  fuelPlan,
+  fuelUntilMs,
+  starbaseFuelPlan,
+} from './fuelPlan';
 
 const NOW = Date.UTC(2026, 10, 12, 12);
 const NITROGEN = 4051;
@@ -198,5 +204,28 @@ describe('fuelPlan', () => {
 
   it('prices a block at 5 m3', () => {
     expect(FUEL_BLOCK_VOLUME_M3).toBe(5);
+  });
+});
+
+describe('starbaseFuelPlan', () => {
+  const UNTIL = NOW + 10 * DAY_MS;
+
+  it('needs the blocks the tower burns between its dry date and the target', () => {
+    const plan = starbaseFuelPlan({ perDay: 480, fuelExpiresMs: NOW + 4 * DAY_MS, untilMs: UNTIL });
+    expect(plan).toEqual({ perDay: 480, needed: 2880, rateSource: null, ratePending: false });
+  });
+
+  it('needs nothing when the fuel already lasts to the target', () => {
+    const plan = starbaseFuelPlan({ perDay: 480, fuelExpiresMs: UNTIL, untilMs: UNTIL });
+    expect(plan.needed).toBe(0);
+  });
+
+  it('cannot say what it needs without a dry date or a burn rate', () => {
+    expect(
+      starbaseFuelPlan({ perDay: 480, fuelExpiresMs: null, untilMs: UNTIL }).needed
+    ).toBeNull();
+    expect(
+      starbaseFuelPlan({ perDay: null, fuelExpiresMs: NOW + DAY_MS, untilMs: UNTIL }).needed
+    ).toBeNull();
   });
 });

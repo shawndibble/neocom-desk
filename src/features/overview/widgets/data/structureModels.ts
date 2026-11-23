@@ -7,6 +7,7 @@ import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severit
 import type { CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
+import { toBoardStarbases, toStructureSources } from './corpStarbaseModels';
 import {
   shortStructureName,
   structureRows,
@@ -105,7 +106,12 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   const raw = feed?.data ?? null;
   const to = STRUCTURES_PAGE;
   if (!raw) return blank(to, statusOf(feed));
-  const view = structuresView(raw, now);
+  // Control towers are structures too, and fuel is what a structure list is for. They only add
+  // rows: a Character who may not read them still gets the Upwell ones.
+  const towerFeed = scopeAll ? feeds.corpStarbasesAll : feeds.corpStarbases;
+  const towerData = towerFeed?.data?.readable ? towerFeed.data : null;
+  const towers = towerData ? toStructureSources(towerData, now) : [];
+  const view = structuresView(raw, now, towerData ? toBoardStarbases(towerData, now) : undefined);
   const items = view.items;
   // A grant lapsed: ask for it. No roles: a grant would not fix that, so say so.
   if (items === null) {
@@ -120,9 +126,10 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
   }
 
   // Read across several corporations: each row names its own.
-  const labels = raw.corporations && raw.corporations.size > 1 ? raw.corporations : undefined;
+  const corporations = new Map([...(towerData?.corporations ?? []), ...(raw.corporations ?? [])]);
+  const labels = corporations.size > 1 ? corporations : undefined;
   // One row per structure, healthy ones too: the pilot asks "is everything fuelled", not only "what is wrong".
-  const all = structureRows(raw.structures ?? [], items).map((row) => {
+  const all = structureRows([...(raw.structures ?? []), ...towers], items).map((row) => {
     const { source, fuel, timer, offline, lowFuel } = row;
     const corp =
       labels && source.corporationId !== undefined ? labels.get(source.corporationId) : undefined;
@@ -152,6 +159,7 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
       a.remaining - b.remaining
   );
   const problemsOnly = show === 'problems';
+  const { structureCount } = view;
   const rows = problemsOnly ? all.filter((row) => row.problem) : all;
   // Problems only reads the board of the structures it lists, so no hidden one sets a deadline or the summary.
   const shown = problemsOnly ? rows.flatMap((row) => row.items) : items;
@@ -192,11 +200,11 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
 
   return {
     ...blank(to, {
-      ...statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : view.structureCount === 0 }),
+      ...statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : structureCount === 0 }),
       // One corporation of several failed: what the others gave still draws, flagged.
-      ...(raw.partlyFailed ? { error: true } : {}),
+      ...(raw.partlyFailed || towerData?.partlyFailed ? { error: true } : {}),
     }),
-    ...(problemsOnly && rows.length === 0 && view.structureCount > 0
+    ...(problemsOnly && rows.length === 0 && structureCount > 0
       ? { emptyMessage: t('overview.widgets.structures.noProblems'), emptyHealthy: true }
       : {}),
     fetchedAt: view.fetchedAt,
@@ -225,7 +233,7 @@ export const structures: Builder = (feeds, { t, now, show, scopeAll }) => {
           },
         ]
       : [],
-    summary: structuresSummary(t, { ...view, items: shown }),
+    summary: structuresSummary(t, { ...view, structureCount, items: shown }),
     chart:
       hbarsFromRows(
         t,

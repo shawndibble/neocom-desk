@@ -323,13 +323,13 @@ const SPECS = {
   structures: {
     category: 'planets',
     corp: 'corpStructures',
-    capabilities: ['canReadStructures'],
+    capabilities: ['canReadStructures', 'canReadStarbases'],
     views: NCT,
     view: 'table',
     size: 'M',
     // Problems only: a timer, fuel at warning or worse, or an offline service.
     shows: ['all', 'problems'],
-    endpoints: ['getCorporationStructures'],
+    endpoints: ['getCorporationStructures', 'getCorporationStarbases'],
   },
   moonChunks: {
     category: 'planets',

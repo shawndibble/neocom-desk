@@ -42,7 +42,13 @@ import * as Icon from '@/components/ui/icons';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { DataGate } from '@/components/DataGate';
 import type { BoardExtractionSource } from '@/engine/corp/board';
-import { FUEL_BLOCK_VOLUME_M3, fuelPlan, fuelUntilMs, type FuelPlan } from '@/engine/corp/fuelPlan';
+import {
+  FUEL_BLOCK_VOLUME_M3,
+  fuelPlan,
+  fuelUntilMs,
+  starbaseFuelPlan,
+  type FuelPlan,
+} from '@/engine/corp/fuelPlan';
 import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import { corpLabelText, type CorpLabel } from '@/features/corp/corpTicker';
@@ -61,6 +67,14 @@ import {
   type StructureRow,
 } from '@/features/corp/structures/structureRows';
 import { loadTypeNames } from '@/features/character/typeNames';
+import {
+  toBoardStarbases,
+  toStructureSources,
+} from '@/features/overview/widgets/data/corpStarbaseModels';
+import {
+  loadCorpStarbasesAllFeed,
+  type CorpStarbasesFeed,
+} from '@/features/overview/widgets/data/corpFeeds';
 import {
   loadAllMoonChunksBoard,
   loadAllStructuresBoard,
@@ -110,26 +124,33 @@ interface StructuresSnapshot {
   typeNames: ReadonlyMap<number, string>;
   /** Fuel bays by corporation id; a corporation without assets access has no entry. */
   fuelBays: ReadonlyMap<number, CorpFuelBays>;
+  /** Control towers, which are structures that need fuel too; null when they could not be read. */
+  towers: CorpStarbasesFeed | null;
 }
 
 async function loadStructuresSnapshot(): Promise<StructuresSnapshot> {
-  const [data, moons, fuelBays] = await Promise.all([
+  const [data, moons, fuelBays, towerFeed] = await Promise.all([
     loadAllStructuresBoard(),
     // Extractions only add a section to a refinery's detail: a failed read costs that, nothing else.
     loadAllMoonChunksBoard().catch(() => null),
     // Fuel bays only add the block counts: without them every row shows time left alone.
     loadStructureFuelBays().catch(() => new Map<number, CorpFuelBays>()),
+    // Towers only add rows: a corporation whose towers cannot be read still lists its Upwell ones.
+    loadCorpStarbasesAllFeed().catch(() => null),
   ]);
   const typeIds = (data.structures ?? [])
     .map((structure) => structure.typeId)
     .filter((id): id is number => id !== undefined);
+  const typeNames = typeIds.length === 0 ? new Map<number, string>() : await loadTypeNames(typeIds);
   return {
     data,
     extractions: new Map(
       (moons?.extractions ?? []).map((extraction) => [extraction.structureId, extraction])
     ),
-    typeNames: typeIds.length === 0 ? new Map() : await loadTypeNames(typeIds),
+    // A tower's type name comes with its feed.
+    typeNames: new Map([...typeNames, ...(towerFeed?.typeNames ?? [])]),
     fuelBays,
+    towers: towerFeed?.readable ? towerFeed : null,
   };
 }
 
@@ -165,19 +186,45 @@ export function CorpStructures() {
       : shiftUtcDate(today, DEFAULT_FUEL_DAYS);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
 
-  const view = useMemo(() => (data ? structuresView(data, now) : null), [data, now]);
+  const towers = snapshot.data?.towers ?? null;
+  const view = useMemo(
+    () =>
+      data ? structuresView(data, now, towers ? toBoardStarbases(towers, now) : undefined) : null,
+    [data, towers, now]
+  );
   const rows = useMemo(
     () =>
-      view?.items && data?.structures
-        ? structureRows(data.structures, view.items).sort(byUrgency)
+      view?.items
+        ? structureRows(
+            [...(data?.structures ?? []), ...(towers ? toStructureSources(towers, now) : [])],
+            view.items
+          ).sort(byUrgency)
         : [],
-    [view, data]
+    [view, data, towers, now]
   );
-  const corporations = data?.corporations ?? NO_CORPORATIONS;
+  const corporations = useMemo(
+    () =>
+      towers?.corporations
+        ? new Map([...towers.corporations, ...(data?.corporations ?? [])])
+        : (data?.corporations ?? NO_CORPORATIONS),
+    [towers, data]
+  );
   const fuelRows = useMemo(() => {
     const byId = new Map<number, FuelRow>();
     const untilMs = fuelUntilMs(fuelUntil);
     for (const { source } of rows) {
+      if (source.tower) {
+        // Its bay came with the tower and its burn rate is CCP's: no assets read, nothing to measure.
+        byId.set(source.structureId, {
+          blocks: source.tower.blocks,
+          plan: starbaseFuelPlan({
+            perDay: source.tower.perDay,
+            fuelExpiresMs: source.fuelExpiresMs,
+            untilMs,
+          }),
+        });
+        continue;
+      }
       const corp =
         source.corporationId === undefined
           ? undefined
@@ -477,7 +524,10 @@ export function CorpStructures() {
   );
   const totalNeeded = shoppingList.reduce((sum, item) => sum + item.needed, 0);
   const unknownNeeded = visible.filter((row) => (fuelOf(row)?.plan.needed ?? null) === null).length;
-  const noBayAccess = visible.some((row) => (fuelOf(row)?.blocks ?? null) === null);
+  // A tower's bay is read with the tower, not through assets, so it never lacks assets access.
+  const noBayAccess = visible.some(
+    (row) => !row.source.tower && (fuelOf(row)?.blocks ?? null) === null
+  );
 
   async function copyList() {
     const lines = shoppingList.map(({ row, needed }) =>
@@ -526,7 +576,7 @@ export function CorpStructures() {
     openId === null ? null : (rows.find((row) => row.source.structureId === openId) ?? null);
 
   if (!snapshot.hydrated) return <Spinner />;
-  const unreadable = data !== null && data.structures === null;
+  const unreadable = data !== null && data.structures === null && !towers?.starbases.length;
 
   return (
     <div className="mx-auto max-w-page space-y-4">
@@ -735,7 +785,11 @@ export function CorpStructures() {
             ? undefined
             : snapshot.data?.typeNames.get(open.source.typeId)
         }
-        extraction={open ? snapshot.data?.extractions.get(open.source.structureId) : undefined}
+        extraction={
+          open && !open.source.tower
+            ? snapshot.data?.extractions.get(open.source.structureId)
+            : undefined
+        }
       />
     </div>
   );

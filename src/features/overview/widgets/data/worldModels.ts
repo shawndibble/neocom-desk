@@ -457,8 +457,8 @@ export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   planetary: { feeds: ['planetary'], scope: 'character', build: planetary },
   mercenaryDens: { feeds: ['mercenaryDens'], scope: 'account', build: mercenaryDens },
   structures: {
-    feeds: ['structures'],
-    allFeeds: ['structuresAll'],
+    feeds: ['structures', 'corpStarbases'],
+    allFeeds: ['structuresAll', 'corpStarbasesAll'],
     scope: 'account',
     build: structures,
   },

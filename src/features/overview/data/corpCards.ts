@@ -6,7 +6,7 @@
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
-import { buildCorpBoard, type CorpBoardItem } from '@/engine/corp/board';
+import { buildCorpBoard, type BoardStarbaseSource, type CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { MoonChunksBoardData, StructuresBoardData, StructuresView } from './boardData';
 
@@ -19,14 +19,27 @@ export const CORP_CACHE_WINDOW_MS = HOUR_MS;
  * read from, and a timer 65 minutes out at load is 50 minutes out a quarter
  * of an hour later — frozen, it would tick below the window as if live.
  */
-export function structuresView(data: StructuresBoardData, nowMs: number): StructuresView {
+export function structuresView(
+  data: StructuresBoardData,
+  nowMs: number,
+  /** Control towers: structures too, with their own fuel and reinforcement clocks. */
+  starbases?: readonly BoardStarbaseSource[]
+): StructuresView {
   const { structures, ...rest } = data;
+  const towers = starbases?.length ?? 0;
   return {
     ...rest,
+    structureCount: rest.structureCount + towers,
+    // Towers stand in for an unreadable structures list only when there are some to show.
     items:
-      structures === null
+      structures === null && towers === 0
         ? null
-        : buildCorpBoard({ nowMs, staleWindowMs: CORP_CACHE_WINDOW_MS, structures }),
+        : buildCorpBoard({
+            nowMs,
+            staleWindowMs: CORP_CACHE_WINDOW_MS,
+            structures: structures ?? undefined,
+            starbases,
+          }),
   };
 }
 

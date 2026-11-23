@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { buildCorpBoard, type BoardStructureSource } from '@/engine/corp/board';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
-import { byUrgency, filterStructureRows, structureRows, type StructureRow } from './structureRows';
+import {
+  byUrgency,
+  filterStructureRows,
+  structureRows,
+  type StructureRow,
+  type StructureSource,
+} from './structureRows';
 
 const NOW = Date.UTC(2026, 10, 11, 12);
 
-function source(
-  over: Partial<BoardStructureSource> & { structureId: number }
-): BoardStructureSource {
+function source(over: Partial<StructureSource> & { structureId: number }): StructureSource {
   return {
     name: `Efa - Keep ${over.structureId}`,
     fuelExpiresMs: NOW + 20 * DAY_MS,
@@ -115,5 +119,38 @@ describe('filterStructureRows', () => {
     expect(q('amarr')).toEqual([2]);
     expect(q('hold1')).toEqual([1]);
     expect(q('nothing')).toEqual([]);
+  });
+});
+
+describe('structureRows with a control tower', () => {
+  it('reads the tower’s own fuel and reinforcement clocks, keyed apart from a structure’s', () => {
+    const tower = source({
+      structureId: 9,
+      fuelExpiresMs: NOW + 2 * DAY_MS,
+      state: 'reinforced',
+      stateTimerEndMs: NOW + 5 * HOUR_MS,
+      tower: { blocks: 100, perDay: 960 },
+    });
+    const structure = source({ structureId: 9 });
+    const items = buildCorpBoard({
+      nowMs: NOW,
+      staleWindowMs: HOUR_MS,
+      structures: [structure],
+      starbases: [
+        {
+          starbaseId: 9,
+          name: 'Tower (Efa)',
+          fuelExpiresMs: NOW + 2 * DAY_MS,
+          reinforcedUntilMs: NOW + 5 * HOUR_MS,
+          unanchorsAtMs: null,
+        },
+      ],
+    });
+    const [towerRow, structureRow] = structureRows([tower, structure], items);
+    expect(towerRow?.fuel?.id).toBe('fuel:sb9');
+    expect(towerRow?.timer?.id).toBe('state:sb9');
+    expect(towerRow?.problem).toBe(true);
+    expect(structureRow?.fuel?.id).toBe('fuel:9');
+    expect(structureRow?.timer).toBeUndefined();
   });
 });
