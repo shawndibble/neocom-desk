@@ -71,7 +71,7 @@ export {
 } from './activeFilters';
 export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';
-export { Disclosure, Caret } from './Disclosure';
+export { Disclosure, Caret, CaretToggle } from './Disclosure';
 export { RowCaret } from './RowCaret';
 export { FieldError } from './FieldError';
 export { UnsavedChangesBar } from './UnsavedChangesBar';

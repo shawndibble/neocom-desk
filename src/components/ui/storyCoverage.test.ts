@@ -14,10 +14,8 @@ const UI_DIR = 'src/components/ui';
 /** Today's unstoried components. Delete a name once its story lands. */
 const UNSTORIED = [
   'AlertsBell',
-  'Caret',
   'CharacterAvatar',
   'ColumnPickerMenu',
-  'Disclosure',
   'EveSsoButton',
   'IconButton',
   'IskAmount',
@@ -29,7 +27,7 @@ const UNSTORIED = [
 ];
 
 /** Pinned size. Removing a name means lowering this; adding a name fails. */
-const PINNED_COUNT = 13;
+const PINNED_COUNT = 11;
 
 /** Component name -> source module, from the value (non-type) re-exports in index.ts. */
 function exportedComponents(): Map<string, string> {

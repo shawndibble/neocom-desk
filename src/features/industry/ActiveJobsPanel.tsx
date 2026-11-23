@@ -13,7 +13,7 @@ import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   Button,
-  Caret,
+  CaretToggle,
   DataAgeBadge,
   DataTable,
   DropdownMenu,
@@ -792,11 +792,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       onHeaderToggle={collapsible ? () => setExpanded(!listExpanded) : undefined}
       leading={
         collapsible && (
-          <IconButton
-            size="sm"
-            icon={<Caret expanded={listExpanded} />}
+          <CaretToggle
+            expanded={listExpanded}
             label={listExpanded ? t('industry.jobsHideList') : t('industry.jobsShowList')}
-            aria-expanded={listExpanded}
             onClick={() => setExpanded(!listExpanded)}
           />
         )

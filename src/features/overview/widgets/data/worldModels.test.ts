@@ -293,10 +293,16 @@ describe('structures', () => {
     expect(buildView('structures', merged, ctx()).table).toBeUndefined();
     expect(kindHasAllFeeds('structures')).toBe(true);
     expect(kindHasAllFeeds('training')).toBe(false);
-    expect(feedsOf('structures')).toEqual(['structures']);
-    expect(feedsOf('structures', undefined, true)).toEqual(['structuresAll']);
-    expect(feedsFor([{ kind: 'structures', scope: 'all' }])).toEqual(['structuresAll']);
-    expect(feedsFor([{ kind: 'structures', scope: 'header' }])).toEqual(['structures']);
+    expect(feedsOf('structures')).toEqual(['structures', 'corpStarbases']);
+    expect(feedsOf('structures', undefined, true)).toEqual(['structuresAll', 'corpStarbasesAll']);
+    expect(feedsFor([{ kind: 'structures', scope: 'all' }])).toEqual([
+      'structuresAll',
+      'corpStarbasesAll',
+    ]);
+    expect(feedsFor([{ kind: 'structures', scope: 'header' }])).toEqual([
+      'structures',
+      'corpStarbases',
+    ]);
     // A kind that cannot sum keeps its feeds whatever its widget asks for.
     expect(feedsFor([{ kind: 'training', scope: 'all' }]).sort()).toEqual(
       [...feedsOf('training')!].sort()
