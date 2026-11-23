@@ -51,6 +51,7 @@ import {
 import { CharacterLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
+import { UseGameLocationButton } from '@/features/route/UseGameLocationButton';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { formatAge } from '@/lib/age';
@@ -594,15 +595,7 @@ function HereControl({ here }: { here: HereSpace }) {
         hint={t('travel.pilot.list.hereHint')}
         footer={(close) =>
           current.source === 'picked' && (
-            <Button
-              size="sm"
-              onClick={() => {
-                current.clearPick();
-                close();
-              }}
-            >
-              {t('jumpRange.useGameLocation')}
-            </Button>
+            <UseGameLocationButton onReset={current.clearPick} close={close} />
           )
         }
       />

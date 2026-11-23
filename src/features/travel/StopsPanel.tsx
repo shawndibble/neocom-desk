@@ -34,7 +34,6 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
-  Button,
   Checkbox,
   CollapsiblePanel,
   IconButton,
@@ -55,6 +54,7 @@ import type { StopRef } from '@/engine/route/stopRef';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
+import { UseGameLocationButton } from '@/features/route/UseGameLocationButton';
 import { SolarSystemSearchField } from '@/features/route/SolarSystemSearchField';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -274,17 +274,7 @@ export function StopsPanel({
                 value={fromId}
                 onChange={onFromChange}
                 footer={(close) =>
-                  onFromReset && (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        onFromReset();
-                        close();
-                      }}
-                    >
-                      {t('jumpRange.useGameLocation')}
-                    </Button>
-                  )
+                  onFromReset && <UseGameLocationButton onReset={onFromReset} close={close} />
                 }
                 ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
                 triggerLabel={fromTrigger}

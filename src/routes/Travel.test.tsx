@@ -291,6 +291,17 @@ describe('Travel › Route Safety', () => {
     expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
   });
 
+  it('offers the game location back from a start the link named', async () => {
+    const user = userEvent.setup({ delay: null });
+    visit(`?from=${PERIMETER}&to=${UEDAMA}`);
+
+    await user.click(await screen.findByRole('button', { name: /Perimeter/ }));
+    await user.click(await screen.findByRole('button', { name: 'Use game location' }));
+
+    expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('from')).toBeNull();
+  });
+
   it('says so when start and destination are the same system', async () => {
     visit(`?from=${JITA}&to=${JITA}`);
 
