@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
-import { Button, EmptyState, EveSsoButton, LogoMark, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  EveSsoButton,
+  LiveNote,
+  LogoMark,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import { db } from '@/db';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { useEntityName } from '@/features/character/useEntityName';
@@ -146,7 +154,7 @@ export function RemoveNowView({
   const { t } = useTranslation();
   const k = (key: string) => `corpTaxBook.removeNow.${key}`;
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
+    <div className="safe-inset mx-auto flex min-h-dvh max-w-xl [--safe-x:0.5rem] [--safe-y:0.5rem] flex-col gap-4 bg-bg text-text sm:[--safe-x:1.5rem] sm:[--safe-y:1.5rem]">
       <header className="flex items-center gap-3 text-xl font-semibold tracking-wide">
         <LogoMark className="size-9" />
         {t('share.brand')}
@@ -176,15 +184,13 @@ export function RemoveNowView({
                   : t(k('intro'), { accounting, owner, time: eveTimeLabel(at) })}
               </p>
               <p className="text-text-dim">{t(k('hint'), { accounting, owner })}</p>
-              <Button variant="danger" disabled={working} onClick={onRemove}>
+              <Button variant="danger" loading={working} onClick={onRemove}>
                 {t(k('confirm'))}
               </Button>
             </div>
           </Panel>
         ) : screen === 'done' ? (
-          <p role="status" className="text-sm">
-            {t(k('done'), { accounting, owner })}
-          </p>
+          <LiveNote className="text-sm">{t(k('done'), { accounting, owner })}</LiveNote>
         ) : screen === 'unavailable' ? (
           <EmptyState title={t(k('unavailable'))} />
         ) : (

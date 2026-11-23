@@ -60,6 +60,7 @@ export default function DemoBoard() {
       moveEdge: none,
       setView: none,
       setScope: none,
+      setAllScopes: none,
       setRange: none,
       setRowsPerPage: (id, rowsPerPage) =>
         setWidgets((all) => all.map((w) => (w.id === id ? { ...w, rowsPerPage } : w))),

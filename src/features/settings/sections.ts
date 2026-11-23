@@ -1,4 +1,4 @@
-import type { SETTINGS_TABS } from '@/app/pageTabs';
+import { SETTINGS_TABS } from '@/app/pageTabs';
 
 export type SettingsSectionId = (typeof SETTINGS_TABS)['tabs'][number]['id'];
 
@@ -49,3 +49,8 @@ export function visibleSettingsGroups(access: { corp: boolean }): SettingsGroup[
     sections: group.sections.filter((id) => id !== 'corporation' || access.corp),
   }));
 }
+
+const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
+
+/** Translation key naming a Settings section: the rail, the index and the page header all show it. */
+export const settingsSectionLabelKey = (id: string) => LABEL_KEYS.get(id) ?? id;

@@ -220,12 +220,18 @@ describe('LinkPaymentDialog for one Payee', () => {
       screen.queryByRole('checkbox', { name: /^Link future payments/ })
     ).not.toBeInTheDocument();
     // Left blank it links nothing: a cargo is never assumed to be the whole balance (N4).
-    expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     const input = screen.getByRole('textbox', { name: 'Value handed over' });
     // Shorthand reads as the full amount (issue #2227), and a figure that does not parse saves nothing.
     await userEvent.type(input, '1x');
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await userEvent.clear(input);
     await userEvent.type(input, '500,000');
     await userEvent.click(screen.getByRole('button', { name: 'Link to Moon Corp' }));
@@ -267,7 +273,10 @@ describe('LinkPaymentDialog for every Payee', () => {
   it('asks which Payee a payment picked by hand paid', async () => {
     renderDialog(both);
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
-    expect(screen.getByRole('button', { name: 'Link payment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link payment' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await userEvent.click(screen.getByRole('combobox', { name: 'Which Payee did it pay?' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Fen Corvane' }));
     await userEvent.click(screen.getByRole('button', { name: 'Link to Fen Corvane' }));
@@ -302,7 +311,10 @@ describe('LinkPaymentDialog a failed save', () => {
     );
     expect(onClose).not.toHaveBeenCalled();
     // Already linked: a second click must not link it twice.
-    expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Link to Moon Corp' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(linkPayment).toHaveBeenCalledTimes(1);
     // The reload waits for the close, so it can't unmount the message unread.
     expect(onLinked).not.toHaveBeenCalled();

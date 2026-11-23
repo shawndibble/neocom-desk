@@ -112,7 +112,10 @@ describe('TrendItemsDialog', () => {
 
   it('stops at six picks', async () => {
     open(widget({ trendItems: [1, 2, 3, 4, 5, 6] }));
-    expect(screen.getByRole('button', { name: 'Add Tritanium' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add Tritanium' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(screen.getByRole('button', { name: 'Add Tritanium' })).toHaveAccessibleDescription(
       /Remove one to add another/
     );

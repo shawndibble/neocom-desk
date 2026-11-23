@@ -8,9 +8,9 @@
  * dry-run time. Fuel is read at most once an hour (the corp cache window), so
  * no figure under that is ticked down.
  */
+import { fuelExpiresMs } from './towerSources';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
-import type { BoardStarbaseSource } from '@/engine/corp/board';
-import { STARBASE_FUEL_WARNING_HOURS, fuelHoursLeft } from '@/engine/corp/starbases';
+import { STARBASE_FUEL_WARNING_HOURS } from '@/engine/corp/starbases';
 import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
@@ -24,7 +24,7 @@ import {
   UNKNOWN,
   type Builder,
 } from './builderKit';
-import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
+import type { CorpStarbaseRow } from './corpFeeds';
 import type { NumberSecondary, RowDetailModel, TableRowModel } from './types';
 import type { Translate } from '@/lib/translate';
 import { HOUR_MS } from '@/lib/age';
@@ -32,31 +32,7 @@ import { HOUR_MS } from '@/lib/age';
 const W = 'overview.widgets.corpStarbases';
 const KNOWN_STATES = new Set(['offline', 'online', 'onlining', 'reinforced', 'unanchoring']);
 
-/** When the fuel runs out, from the moment this tower's bay was read; null when it cannot be told. */
-function fuelExpiresMs(row: CorpStarbaseRow, fallbackReadAtMs: number): number | null {
-  if (row.state !== 'online' || row.bay === null) return null;
-  const hours = fuelHoursLeft(row.typeId, row.bay.fuelBlocks);
-  return hours === null ? null : (row.bayReadAtMs ?? fallbackReadAtMs) + hours * HOUR_MS;
-}
-
-/** Due soon's view of the towers: each fuel clock and each reinforcement or unanchor timer. */
-export function toBoardStarbases(feed: CorpStarbasesFeed, nowMs: number): BoardStarbaseSource[] {
-  const readAtMs = feed.fetchedAt?.getTime() ?? nowMs;
-  return feed.starbases.map((row) => ({
-    starbaseId: row.starbaseId,
-    name: towerName(feed, row),
-    fuelExpiresMs: fuelExpiresMs(row, readAtMs),
-    reinforcedUntilMs: row.reinforcedUntilMs,
-    unanchorsAtMs: row.unanchorsAtMs,
-  }));
-}
-
-function towerName(feed: CorpStarbasesFeed, row: CorpStarbaseRow): string {
-  const system = feed.systemNames.get(row.systemId);
-  const type = feed.typeNames.get(row.typeId) ?? `#${row.typeId}`;
-  // A tower has no name of its own, and " - " would be cut as a structure's system prefix.
-  return system === undefined ? type : `${type} (${system})`;
-}
+export { toBoardStarbases, toStructureSources } from './towerSources';
 
 interface Tower {
   row: CorpStarbaseRow;

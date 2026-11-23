@@ -99,6 +99,15 @@ describe('parseLayout', () => {
     expect(out!.widgets[0].view).toBe('number');
   });
 
+  it('keeps a corporation scope and repairs a malformed one', () => {
+    expect(parseLayout(wrap(good({ scope: 'corp:98000001' })))!.widgets[0].scope).toBe(
+      'corp:98000001'
+    );
+    for (const scope of ['corp:', 'corp:abc', 'corp:0', 'corp:-5', 'corp:1.5']) {
+      expect(parseLayout(wrap(good({ scope })))!.widgets[0].scope).toBe('header');
+    }
+  });
+
   it('repairs scope, showOnPhone, range and title', () => {
     const out = parseLayout(
       wrap(good({ kind: 'wallet', scope: 'everyone', showOnPhone: 'yes', range: 12, title: 4 }))

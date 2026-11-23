@@ -232,17 +232,28 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   };
 }
 
+/** A Miner's `leftOn` map (character id → day it left), or nothing when there is none. */
+function readLeftOn(raw: unknown): Record<number, string> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const entries = Object.entries(raw).filter(
+    ([id, day]) => Number.isSafeInteger(Number(id)) && typeof day === 'string'
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 export function readMiner(id: string, d: Data): Miner | null {
   const characterIds = Array.isArray(d.characterIds)
     ? d.characterIds.filter((x): x is number => typeof x === 'number')
     : [];
   if (characterIds.length === 0) return null;
   const paidThrough = str(d.paidThrough);
+  const leftOn = readLeftOn(d.leftOn);
   return {
     id,
     characterIds,
     mainCharacterId: num(d.mainCharacterId) ?? characterIds[0],
     ...(paidThrough ? { paidThrough } : {}),
+    ...(leftOn ? { leftOn } : {}),
   };
 }
 

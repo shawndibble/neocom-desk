@@ -204,7 +204,10 @@ describe('SplitDialog — the same Payee at a second rate', () => {
     await pickJita();
 
     expect(screen.getByRole('alert')).toHaveTextContent(/merge straight back/);
-    expect(screen.getByRole('button', { name: 'Split · move 40 units' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Split · move 40 units' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('fills the rate box from a rate chip built from earlier Assignments', async () => {

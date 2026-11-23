@@ -29,5 +29,10 @@ type Story = StoryObj<typeof meta>;
 /** @summary `danger` (default): the action button is red, for a destructive confirm. */
 export const Danger: Story = {};
 
+/** @summary `children`: a field the confirm asks for, below the body. */
+export const WithField: Story = {
+  args: { children: <input type="date" aria-label="Left on" defaultValue="2026-11-10" /> },
+};
+
 /** @summary `danger={false}`: a plain primary action. */
 export const Plain: Story = { args: { danger: false, actionLabel: 'Continue' } };

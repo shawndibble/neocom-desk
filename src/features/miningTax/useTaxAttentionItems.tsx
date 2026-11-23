@@ -283,7 +283,7 @@ export function useTaxAttentionItems({
         <NeedsConnection>
           <Button
             size="sm"
-            disabled={claiming !== null}
+            aria-disabled={claiming !== null || undefined}
             onClick={() =>
               void handleClaim(
                 claim.payment.characterId,

@@ -52,6 +52,7 @@ export function SkillPlans() {
   const {
     catalog,
     attributesResult,
+    loaded,
     implants,
     attributeBaseline,
     remapInfo,
@@ -251,6 +252,7 @@ export function SkillPlans() {
           {isDesktop ? (
             <AttributesPane
               result={attributesResult}
+              loading={!loaded}
               implantBonuses={implants}
               attributeBaseline={attributeBaseline}
               remapInfo={remapInfo}
@@ -275,6 +277,7 @@ export function SkillPlans() {
               attributes={
                 <PlanAttributeChips
                   result={attributesResult}
+                  loading={!loaded}
                   implantBonuses={implants}
                   attributeBaseline={attributeBaseline}
                 />

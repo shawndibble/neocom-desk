@@ -3,6 +3,7 @@
  * how fast, and when it will be gone. Pure — the scans arrive already parsed
  * (and, for a shared Survey, already fetched); nothing here reads a clock.
  */
+import type { GapAxis } from './gapAxis';
 
 export interface SurveyRock {
   /** Ore name as the scanner printed it, e.g. "Glistening Sylvite". */
@@ -44,6 +45,8 @@ export interface SurveyInterval {
    * `added`, not as negative mining.
    */
   minedByOre: Record<string, number>;
+  /** Set by `compressGaps`: a squeezed gap. `from`/`to` are axis positions, and the figures above are the net change between two scans far apart, not a rate anyone mined at. */
+  gap?: true;
 }
 
 export interface SurveyOre {
@@ -98,6 +101,8 @@ export interface SurveySummary {
   elapsedMs: number;
   firstAt: number;
   lastAt: number;
+  /** Set by `compressGaps`: the times above are positions on a squeezed axis, and this maps them back. */
+  axis?: GapAxis;
 }
 
 /** How many of the latest intervals the pace is averaged over. */

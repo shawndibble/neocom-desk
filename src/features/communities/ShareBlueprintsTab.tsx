@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { permissionsForEndpoints } from '@/esi/registry';
 import {
+  LiveNote,
   Button,
   Checkbox,
   EmptyState,
@@ -218,11 +219,11 @@ export function ShareBlueprintsTab({
           />
           {t('communities.blueprints.shareAll')}
         </label>
-        <span role="status" className="text-xs text-text-dim">
+        <LiveNote as="span" className="text-xs text-text-dim">
           {share.choice.all
             ? t('communities.blueprints.allShared', { count: sharedTypes.length })
             : t('communities.share.count', { count: sharedTypes.length, total: types.length })}
-        </span>
+        </LiveNote>
         <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
           {t('communities.blueprints.add')}
         </Button>
@@ -311,14 +312,14 @@ export function ShareBlueprintsTab({
         </p>
       )}
       {published?.outcome === 'unavailable' && (
-        <p role="status" className="text-xs text-warning">
+        <LiveNote className="text-xs text-warning">
           {t('communities.blueprints.unpublished')}
-        </p>
+        </LiveNote>
       )}
       {published !== null && published.outcome !== 'unavailable' && published.skipped > 0 && (
-        <p role="status" className="text-xs text-warning">
+        <LiveNote className="text-xs text-warning">
           {t('communities.blueprints.skipped', { count: published.skipped })}
-        </p>
+        </LiveNote>
       )}
       {failed && <InlineError>{t('communities.share.saveFailed')}</InlineError>}
       <ToastStack

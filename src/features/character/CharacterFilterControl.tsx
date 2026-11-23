@@ -92,6 +92,7 @@ import { ICON_SIZE } from '@/components/ui/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -117,9 +118,16 @@ import { useResolvedCharacterFilter, type CharacterFilterValue } from './charact
 /** The picker's value when a page offers a Corporation option: the Character filter plus `'corporation'`. */
 export type CharacterScopeChoice = CharacterFilterValue | 'corporation';
 
-export interface CharacterFilterControlProps<
-  V extends CharacterScopeChoice = CharacterFilterValue,
-> {
+/**
+ * One named corporation (`corporations` below), by id. Not `'corporation'`, which is the
+ * active Character's own: a page that lists corporations (the Corp Board) offers each.
+ */
+export type NamedCorporationChoice = `corp:${number}`;
+
+/** Every value the picker can hold: `corp:<id>` only on a page that passes `corporations`. */
+export type PickerChoice = CharacterScopeChoice | NamedCorporationChoice;
+
+export interface CharacterFilterControlProps<V extends PickerChoice = CharacterFilterValue> {
   /** Null with no active Character — `resolveCharacterFilter` then reads `'current'` as `'all'`, so the trigger and its "This character" option both fall away on their own. */
   activeCharacterId: number | null;
   value: V;
@@ -169,6 +177,18 @@ export interface CharacterFilterControlProps<
    * it the stack is the device roster.
    */
   allCharacterIds?: readonly number[];
+  /**
+   * Corporations to choose among by name, each emitting `corp:<id>` (the Corp Board, whose
+   * widgets can each read one). Listed under a "Corporations" heading after the Character
+   * options; the trigger shows the chosen one's logo. Absent: the picker is as it always was.
+   */
+  corporations?: readonly { id: number; name: string }[];
+  /**
+   * The page's items disagree (widgets scoped one by one): no option is checked, the trigger
+   * says Mixed in its name and tooltip and carries a dot, and the menu explains it. Picking an
+   * option sets them all again. Display only; `value` is ignored while it is set.
+   */
+  mixed?: boolean;
 }
 
 /**
@@ -195,7 +215,7 @@ const triggerBaseClassName =
   `${interactiveClassName} ${focusRingClassName} ` +
   `bg-panel-2 text-text-dim hover:border-line-bright hover:text-text active:bg-panel`;
 
-export function CharacterFilterControl<V extends CharacterScopeChoice = CharacterFilterValue>({
+export function CharacterFilterControl<V extends PickerChoice = CharacterFilterValue>({
   activeCharacterId,
   value,
   onChange,
@@ -209,13 +229,25 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   missingNames,
   loading = false,
   allCharacterIds,
+  corporations,
+  mixed = false,
 }: CharacterFilterControlProps<V>) {
   const { t, i18n } = useTranslation();
   // In a `PageHeader` cluster the header's touch tier wins, so the trigger is
   // always level with the `IconButton`s beside it.
   const size = useContext(PageHeaderClusterContext) ? 'md' : sizeProp;
+  const namedId =
+    corporations && typeof value === 'string' && value.startsWith('corp:')
+      ? Number(value.slice(5))
+      : null;
+  const named =
+    namedId === null
+      ? undefined
+      : (corporations?.find((c) => c.id === namedId) ?? { id: namedId, name: String(namedId) });
   const resolved = useResolvedCharacterFilter(
-    value === 'corporation' ? 'current' : value,
+    value === 'corporation' || named !== undefined || mixed
+      ? 'current'
+      : (value as CharacterFilterValue),
     activeCharacterId
   );
   // The roster in the order it was added, for the "All" faces: Dexie only, no ESI call.
@@ -228,8 +260,9 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     [characters]
   );
   const isNarrow = useIsNarrow();
-  const isCorporation = corporation && value === 'corporation';
-  const isAll = !isCorporation && resolved === 'all';
+  const isCorporation = !mixed && corporation && value === 'corporation';
+  const isNamed = !mixed && named !== undefined;
+  const isAll = !mixed && !isCorporation && !isNamed && resolved === 'all';
   const allLabel =
     characterCount === undefined
       ? t('character.filter.allCharacters')
@@ -241,11 +274,15 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
         })
       : null;
   const corporationLabel = t('character.filter.corporation');
-  const label = isCorporation
-    ? corporationLabel
-    : isAll
-      ? allLabel
-      : t('character.filter.thisCharacter');
+  const label = mixed
+    ? t('character.filter.mixed')
+    : isNamed
+      ? named!.name
+      : isCorporation
+        ? corporationLabel
+        : isAll
+          ? allLabel
+          : t('character.filter.thisCharacter');
   // What there is to choose among. "All" sums Characters, so it needs more than one
   // (an unknown count keeps it, as every caller before `corporation` expected).
   const soloCharacter = characterCount !== undefined && characterCount <= 1;
@@ -257,7 +294,17 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   const options = (
     <DropdownMenuContent align="start" className={unreadByCharacter ? 'w-60' : 'w-48'}>
       <DropdownMenuRadioGroup
-        value={isCorporation ? 'corporation' : isAll ? 'all' : 'current'}
+        value={
+          mixed
+            ? ''
+            : isNamed
+              ? `corp:${named!.id}`
+              : isCorporation
+                ? 'corporation'
+                : isAll
+                  ? 'all'
+                  : 'current'
+        }
         onValueChange={(next) => onChange(next as V)}
       >
         {showCurrent && (
@@ -269,7 +316,24 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
         {corporation && (
           <DropdownMenuRadioItem value="corporation">{corporationLabel}</DropdownMenuRadioItem>
         )}
+        {corporations && corporations.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{t('character.filter.corporations')}</DropdownMenuLabel>
+            {corporations.map((c) => (
+              <DropdownMenuRadioItem key={c.id} value={`corp:${c.id}`}>
+                {c.name}
+              </DropdownMenuRadioItem>
+            ))}
+          </>
+        )}
       </DropdownMenuRadioGroup>
+      {mixed && (
+        <>
+          <DropdownMenuSeparator />
+          <p className="px-2 py-1.5 text-xs text-text-dim">{t('character.filter.mixedHint')}</p>
+        </>
+      )}
       {/* Only for "All", like the dot: "This character" never says who it leaves out. */}
       {isPartial && (
         <>
@@ -323,7 +387,9 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
 
   const accessibleName = isPartial
     ? t('character.scope.triggerPartial', { label, missing: missingNote })
-    : label;
+    : mixed
+      ? t('character.scope.triggerPartial', { label, missing: t('character.filter.mixedHint') })
+      : label;
   // Below `md` the stack draws one face fewer, so a phone header keeps its title.
   const maxFaces = isNarrow ? STACK_MAX_FACES_NARROW : STACK_MAX_FACES;
   const stack = isAll
@@ -347,7 +413,16 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
       +{extra}
     </span>
   );
-  const faces = isCorporation ? (
+  const faces = isNamed ? (
+    <CorporationLogoGlyph
+      characterId={null}
+      corporationId={named!.id}
+      size="sm"
+      boxClassName={FACE_BOX}
+    />
+  ) : mixed ? (
+    <Icon.AllCharacters size={ICON_SIZE.md} />
+  ) : isCorporation ? (
     <CorporationLogoGlyph characterId={activeCharacterId} size="sm" boxClassName={FACE_BOX} />
   ) : stack && stack.faces.length > 0 ? (
     <>
@@ -399,6 +474,14 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
               )}
             </span>
             <Icon.Expanded aria-hidden="true" className="size-3 shrink-0" />
+            {mixed && (
+              // Neutral, not the warning colour: widgets set apart on purpose are not a fault.
+              <span
+                data-mixed-dot
+                aria-hidden="true"
+                className="absolute top-0.5 right-0.5 size-2 rounded-full bg-text-dim ring-2 ring-panel-2 group-active:ring-panel"
+              />
+            )}
             {isPartial && (
               // The trigger has no words, so the dot is the visible cue. Inset inside the
               // trigger box: as the last control on a phone header it must not spill past the edge.

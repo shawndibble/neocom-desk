@@ -49,6 +49,8 @@ import { loadSkyhookRaids } from './calendarSkyhooks';
 import { loadSharedPopsRead } from './calendarSharedPopsRead';
 import { toSharedPopSources, type SharedPopEntry } from './calendarSharedPops';
 import { loadCharacterDenRows } from './mercenaryDens';
+import { fanOutAllCharacters } from './allCharactersFanOut';
+import { mergeCalendarBoards, type CharacterCalendarBoard } from './calendarBoardAcross';
 import type { SkyhookRaid } from './calendarBoardSources';
 import {
   toCalendarEventSources,
@@ -340,4 +342,20 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     events: [...(events ?? [])],
     loadedAtMs,
   };
+}
+
+/**
+ * Every Character's board folded into one. No scope pre-check: each source of a board already
+ * answers "not granted" for itself, so a Character missing one scope still gives its other clocks.
+ */
+export async function loadAllCalendarBoard(): Promise<CalendarBoardData> {
+  const { entries } = await fanOutAllCharacters<CharacterCalendarBoard>({
+    load: async ({ characterId, name }) => ({
+      characterId,
+      name,
+      data: await loadCalendarBoard(characterId),
+    }),
+  });
+  if (entries.length === 0) throw new Error('The calendar could not be read');
+  return mergeCalendarBoards(entries);
 }

@@ -78,7 +78,11 @@ export function ShareShell({
   const loginControls = (
     <div className="flex flex-col items-end gap-1">
       <EveSsoButton size="small" pending={loggingIn} onClick={logIn} label={t('share.logIn')} />
-      <button type="button" className={plainTextActionClassName()} onClick={choosePermissions}>
+      <button
+        type="button"
+        className={plainTextActionClassName('-my-1 py-1')}
+        onClick={choosePermissions}
+      >
         {t('share.choosePermissions')}
       </button>
       <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
@@ -99,7 +103,7 @@ export function ShareShell({
   // The login stays in the header; the page's own action rides in the notice strip.
   return (
     <div
-      className={`mx-auto flex min-h-screen ${wide ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
+      className={`safe-inset mx-auto flex min-h-dvh ${wide ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg text-text [--safe-x:0.5rem] [--safe-y:0.5rem] sm:[--safe-x:1.5rem] sm:[--safe-y:1.5rem]`}
     >
       <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
         <Link

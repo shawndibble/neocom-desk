@@ -1,5 +1,6 @@
 import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
@@ -273,9 +274,9 @@ export function PopularFitsPanel({
     losses === null ? (
       <Spinner size="sm" delayMs={200} label={t('fittings.popular.loading')} />
     ) : !losses.ok ? (
-      <p role="status" className="text-xs text-warning">
+      <LiveNote className="text-xs text-warning">
         {t(zkillFailureKey(losses.reason, 'fittings.popular.failed'))}
-      </p>
+      </LiveNote>
     ) : losses.fits.length === 0 && (filter === 'loss' || rows.length === 0) ? (
       <p className="text-xs text-text-dim">{t('fittings.popular.empty')}</p>
     ) : null;
@@ -283,9 +284,7 @@ export function PopularFitsPanel({
     guides.status === 'loading' ? (
       <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
     ) : guides.status === 'failed' ? (
-      <p role="status" className="text-xs text-warning">
-        {t('fittings.popular.workbench.failed')}
-      </p>
+      <LiveNote className="text-xs text-warning">{t('fittings.popular.workbench.failed')}</LiveNote>
     ) : guides.status === 'empty' && (filter === 'guide' || rows.length === 0) ? (
       <p className="text-xs text-text-dim">{t('fittings.popular.workbench.empty')}</p>
     ) : null;

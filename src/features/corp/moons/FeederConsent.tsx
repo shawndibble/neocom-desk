@@ -1,7 +1,7 @@
 import { parsePercent } from '@/lib/parsePercent';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextInput } from '@/components/ui';
+import { Button, Panel, TextInput, Tooltip } from '@/components/ui';
 import { useEntityName } from '@/features/character/useEntityName';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { callableErrorReason } from '@/lib/callableError';
@@ -94,14 +94,16 @@ export function FeederConsent({
           <Button variant="ghost" onClick={onBack}>
             {t('corpTaxBook.moons.setup.back')}
           </Button>
-          <Button
-            variant="primary"
-            loading={busy}
-            disabled={!valid || preview === 'invalid'}
-            onClick={() => onContinue(rate.trim() === '' ? undefined : pct)}
-          >
-            {t('corpTaxBook.moons.consent.continue')}
-          </Button>
+          <Tooltip content={!valid ? t('corpTaxBook.moons.consent.rateInvalid') : null}>
+            <Button
+              variant="primary"
+              loading={busy}
+              aria-disabled={!valid || preview === 'invalid' || undefined}
+              onClick={() => onContinue(rate.trim() === '' ? undefined : pct)}
+            >
+              {t('corpTaxBook.moons.consent.continue')}
+            </Button>
+          </Tooltip>
         </div>
       </div>
     </Panel>

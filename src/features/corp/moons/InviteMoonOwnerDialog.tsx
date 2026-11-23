@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, Modal, TextInput, Tooltip } from '@/components/ui';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
   createFeederInvite,
@@ -126,9 +126,11 @@ export function InviteMoonOwnerDialog({
         <Label text={t(k('offer'))}>
           <TextInput inputMode="decimal" value={offer} onChange={(e) => setOffer(e.target.value)} />
         </Label>
-        <Button onClick={() => void make()} disabled={!canMake}>
-          {t(k('make'))}
-        </Button>
+        <Tooltip content={offered === null ? t(k('offerInvalid')) : null}>
+          <Button onClick={() => void make()} loading={busy} aria-disabled={!canMake || undefined}>
+            {t(k('make'))}
+          </Button>
+        </Tooltip>
         {link !== null && (
           <div className="space-y-2">
             <InviteLinkField url={link.url} />

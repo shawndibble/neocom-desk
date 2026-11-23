@@ -133,6 +133,23 @@ export function EntryList({
 
   const { announcements } = useMemo(() => buildRowAnnouncer(rows, nameFor, t), [rows, nameFor, t]);
   const sortableIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  // Phone: a level whose row sits directly under another level of the same
+  // skill (no band header between) folds into that skill's group.
+  const continuationIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (isDesktop) return ids;
+    rows.forEach((row, i) => {
+      const prev = rows[i - 1];
+      if (
+        row.kind === 'entry' &&
+        prev?.kind === 'entry' &&
+        prev.entry.skillTypeID === row.entry.skillTypeID &&
+        !bandsAt.has(row.id)
+      )
+        ids.add(row.id);
+    });
+    return ids;
+  }, [rows, bandsAt, isDesktop]);
 
   if (rows.length === 0) {
     return <EmptyState title={t('plans.yourEntriesEmpty')} className="py-4" />;
@@ -183,6 +200,7 @@ export function EntryList({
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
+                      continuation={continuationIds.has(row.id)}
                       onRemove={onRemove}
                       onStageSkillDetail={onStageSkillDetail}
                       removalBlockedReason={removalBlockedReason}

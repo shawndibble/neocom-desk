@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Field, Fields, Modal, TextInput } from '@/components/ui';
+import { Button, Field, Fields, Modal, TextInput, Tooltip } from '@/components/ui';
 import { createCommunity } from './communityStore';
 import { callableErrorCode } from './callableError';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -76,18 +76,20 @@ export function CreateCommunityDialog({
           </p>
         )}
         <DialogFooter className="mt-3">
-          <Button size="sm" disabled={working} onClick={onClose}>
+          <Button size="sm" aria-disabled={working || undefined} onClick={onClose}>
             {t('communities.cancel')}
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            type="submit"
-            loading={working}
-            disabled={!trimmed || !characterName}
-          >
-            {t('communities.createAction')}
-          </Button>
+          <Tooltip content={!trimmed || !characterName ? t('common.needsInput') : null}>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              loading={working}
+              aria-disabled={!trimmed || !characterName || undefined}
+            >
+              {t('communities.createAction')}
+            </Button>
+          </Tooltip>
         </DialogFooter>
       </form>
     </Modal>

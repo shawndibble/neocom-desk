@@ -39,6 +39,9 @@ import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
 import { readScope, WidgetBoardContext } from '@/features/overview/widgets/board';
 import { CORP_DEFS } from '@/features/overview/widgets/data/corpModels';
 import { registerKindDefs } from '@/features/overview/widgets/data/models';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { usePageScopeControl } from '@/features/overview/widgets/usePageScopeControl';
+import { AccountCorporationsProvider } from '@/features/corp/AccountCorporationsProvider';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';
@@ -85,6 +88,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
+  const pageScope = usePageScopeControl();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
 
   return (
@@ -97,17 +101,18 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
       <PageHeader
         title={t('nav.corpBoard')}
         meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
+        scope={pageScope && <CharacterFilterControl {...pageScope} />}
         actions={<OverviewCustomize />}
       />
       {characterId !== null && <WarBanner characterId={characterId} />}
       <OverviewCachedNotice summary={summary} />
       {editing && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
           <CustomizeBar onAdd={() => setGalleryOpen(true)} />
         </Suspense>
       )}
       {editing && isPhone && layout.widgets.length > 0 ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
           <PhoneCustomizeList />
         </Suspense>
       ) : (
@@ -187,7 +192,9 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
       <OverviewRefreshProvider>
         <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
           <WidgetDataProvider kinds={kinds} widgets={shown}>
-            <CorpGrid layout={layout} />
+            <AccountCorporationsProvider>
+              <CorpGrid layout={layout} />
+            </AccountCorporationsProvider>
           </WidgetDataProvider>
         </OverviewEditProvider>
       </OverviewRefreshProvider>

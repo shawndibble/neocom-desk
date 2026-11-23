@@ -7,7 +7,7 @@ import { toBoardJobs } from '@/features/corp/boardSources';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
 import type { CorpDeadlinesSlice } from './corpFeeds';
 import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
-import { toBoardStarbases } from './corpStarbaseModels';
+import { toBoardStarbases } from './towerSources';
 
 /** The Due soon sources a corporation's slice can carry. */
 export type CorpDeadlineSource = Exclude<keyof CorpDeadlinesSlice, 'corporationId' | 'failed'>;

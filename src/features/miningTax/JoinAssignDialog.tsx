@@ -13,6 +13,7 @@ import {
   SelectValue,
   TextInput,
   Checkbox,
+  Tooltip,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { combine, type JoinMemberInput } from './ledgerActions';
@@ -306,14 +307,17 @@ export function JoinAssignDialog({
 
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canJoin || saving || busy}
-            onClick={() => void handleJoin()}
-          >
-            {t('miningTax.joinConfirmAction')}
-          </Button>
+          <Tooltip content={!canJoin ? t('common.needsInput') : null}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saving || busy}
+              aria-disabled={!canJoin || undefined}
+              onClick={() => void handleJoin()}
+            >
+              {t('miningTax.joinConfirmAction')}
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={onClose}>
             {t('filters.cancel')}
           </Button>

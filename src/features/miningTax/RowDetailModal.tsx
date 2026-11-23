@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   InfoTooltip,
+  LiveNote,
   Modal,
   StatChip,
 } from '@/components/ui';
@@ -268,9 +269,9 @@ export function RowDetailModal({
     >
       <div className="space-y-3 text-sm">
         {copied && (
-          <p role="status" className="text-xs text-text-dim">
+          <LiveNote className="text-xs text-text-dim">
             {t('miningTax.detail.breakdown.copied')}
-          </p>
+          </LiveNote>
         )}
         {/* Who it's owed to and how much lead, the same way the combined
             view does; the pilot and the paperwork sit on the line below. */}
@@ -446,7 +447,7 @@ export function RowDetailModal({
             )}
             <div className="flex">
               <Button
-                disabled={busy}
+                aria-disabled={busy || undefined}
                 onClick={onEdit}
                 className={moreMenu ? 'rounded-r-none' : undefined}
               >

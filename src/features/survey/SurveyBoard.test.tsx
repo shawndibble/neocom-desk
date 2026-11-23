@@ -236,17 +236,14 @@ describe('SurveyBoard', () => {
     const WITH_IDS = SCANS.map((s, i) => ({ ...s, id: `scan${i}` }));
 
     it('shows the scan list only when the caller offers removal, and as the last thing on the page', () => {
-      const { container, unmount } = render(
-        <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} />
-      );
-      expect(container.querySelector('details')).toBeNull();
+      const { unmount } = render(<SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} />);
+      expect(screen.queryByText('2 scans', { selector: 'h2' })).toBeNull();
       unmount();
       const owner = render(
         <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={() => {}} />
       );
-      const list = screen.getByText('2 scans', { selector: 'summary' }).closest('details');
+      const list = screen.getByText('2 scans', { selector: 'h2' }).closest('section');
       expect(list).toBeTruthy();
-      expect(owner.container.querySelector('details')).toBe(list);
       expect(owner.container.firstElementChild?.lastElementChild).toBe(list);
     });
 
@@ -255,7 +252,7 @@ describe('SurveyBoard', () => {
       render(
         <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={onSetIgnored} />
       );
-      await userEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+      await userEvent.click(screen.getByText('2 scans', { selector: 'h2' }));
       // Newest first.
       await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
       expect(onSetIgnored).toHaveBeenCalledWith('scan1', true);
@@ -263,7 +260,7 @@ describe('SurveyBoard', () => {
 
     it("shows a scan's ores, rock counts and volume in a details popover", async () => {
       render(<SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={() => {}} />);
-      await userEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+      await userEvent.click(screen.getByText('2 scans', { selector: 'h2' }));
       // Newest first: the second scan, whose 29,000 m3 rock shrank to 3,000.
       await userEvent.click(screen.getAllByRole('button', { name: 'Details' })[0]);
       const dialog = await screen.findByRole('dialog');
@@ -286,8 +283,8 @@ describe('SurveyBoard', () => {
       // One counted scan: nothing mined yet, no chart.
       expect(screen.getByText('0% mined')).toBeTruthy();
       expect(screen.queryByTestId('charts')).toBeNull();
-      expect(screen.getByText('2 scans · 1 removed', { selector: 'summary' })).toBeTruthy();
-      await userEvent.click(screen.getByText(/^2 scans/, { selector: 'summary' }));
+      expect(screen.getByText('2 scans · 1 removed', { selector: 'h2' })).toBeTruthy();
+      await userEvent.click(screen.getByText(/^2 scans/, { selector: 'h2' }));
       await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
       expect(onSetIgnored).toHaveBeenCalledWith('scan1', false);
     });
@@ -304,7 +301,7 @@ describe('SurveyBoard', () => {
         />
       );
       expect(screen.getByText('No survey yet')).toBeTruthy();
-      await userEvent.click(screen.getByText(/^2 scans/, { selector: 'summary' }));
+      await userEvent.click(screen.getByText(/^2 scans/, { selector: 'h2' }));
       await userEvent.click(screen.getAllByRole('button', { name: 'Restore' })[0]);
       expect(onSetIgnored).toHaveBeenCalledWith('scan1', false);
     });

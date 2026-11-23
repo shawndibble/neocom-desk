@@ -28,6 +28,7 @@ import {
   Checkbox,
   ColumnPickerMenu,
   DataTable,
+  DisabledMenuItem,
   EmptyState,
   FilterBar,
   FilterField,
@@ -44,6 +45,7 @@ import {
   SlideOver,
   Spinner,
   Toast,
+  Tooltip,
   type ActiveFilter,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -617,21 +619,27 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           total: progress.total,
         });
   const copyButton = (size: 'sm' | 'md', className: string) => (
-    <Button
-      variant="primary"
-      size={size}
-      className={className}
-      disabled={plan.totals.items === 0}
-      onClick={() => void copyMultibuy()}
-    >
-      {t('market.hauling.copyMultibuy')}
-    </Button>
+    <Tooltip content={plan.totals.items === 0 ? t('market.hauling.copyMultibuyEmpty') : null}>
+      <Button
+        variant="primary"
+        size={size}
+        className={className}
+        aria-disabled={plan.totals.items === 0 || undefined}
+        onClick={() => void copyMultibuy()}
+      >
+        {t('market.hauling.copyMultibuy')}
+      </Button>
+    </Tooltip>
   );
   const tripMenu = (
     <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport} size="md">
-      <MenuItem disabled={overrides.size === 0} onSelect={resetOverrides}>
-        {t('market.hauling.fillHold')}
-      </MenuItem>
+      {overrides.size === 0 ? (
+        <DisabledMenuItem reason={t('market.hauling.fillHoldNothing')}>
+          {t('market.hauling.fillHold')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={resetOverrides}>{t('market.hauling.fillHold')}</MenuItem>
+      )}
       <MenuItem onSelect={clearAll}>{t('market.hauling.clearAll')}</MenuItem>
       <MenuItem onSelect={() => setShowList((open) => !open)}>
         {t(listShown ? 'market.hauling.hideMultibuyList' : 'market.hauling.showMultibuyList')}

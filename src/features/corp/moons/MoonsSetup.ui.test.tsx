@@ -82,8 +82,14 @@ describe('MoonsSetup', () => {
   it('disables the book choices for a non-Director', async () => {
     renderSetup(undefined, '', { ...verdict, isDirector: false });
     await screen.findByText("Run your corporation's book");
-    expect(screen.getByRole('button', { name: 'Turn on the book' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Start collecting' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Turn on the book' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Start collecting' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('walks a pasted link through the consent screen to the EVE login with the rate', async () => {
@@ -138,7 +144,10 @@ describe('MoonsSetup', () => {
     );
     renderSetup(undefined, '?invite=abc123DEF456');
     expect(await screen.findByRole('alert')).toHaveTextContent(/not valid/);
-    expect(screen.getByRole('button', { name: 'Continue to EVE' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continue to EVE' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it("starts a former moon owner's own book on the day its coverage ended", async () => {
@@ -205,6 +214,6 @@ describe('MoonsSetup', () => {
     await user.click(screen.getAllByRole('button', { name: 'Leave' }).at(-1)!);
     await waitFor(() => expect(leaveFeeder).toHaveBeenCalledWith(7, 98));
     expect(await screen.findByText("Run your corporation's book")).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/You have left/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/You have left/));
   });
 });

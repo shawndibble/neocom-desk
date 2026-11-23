@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { InsuranceLossModal } from './InsuranceLossModal';
@@ -82,6 +82,6 @@ describe('InsuranceLossModal', () => {
   it('says so when zKillboard cannot be read', async () => {
     history.mockResolvedValue({ ok: false, reason: 'offline' });
     renderModal();
-    expect(await screen.findByRole('status')).toHaveTextContent(/zKillboard/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/zKillboard/));
   });
 });

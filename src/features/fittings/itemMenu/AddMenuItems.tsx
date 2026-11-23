@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { MenuItem, MenuSeparator } from '@/components/ui';
+import { MenuSeparator } from '@/components/ui';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
   BuildPlanMenuItems,
@@ -9,7 +9,7 @@ import {
 import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import { useFittingItemActions } from '../fittingItemActions';
 import { CargoMenuItems } from './CargoMenuItems';
-import { ChargeLoadItems } from './shared';
+import { ChargeLoadItems, GuardedMenuItem } from './shared';
 
 /**
  * An Add panel Cargo result's actions: put the asked quantity in the hold,
@@ -32,9 +32,12 @@ export function AddCargoMenuItems({
   const { t } = useTranslation();
   return (
     <>
-      <MenuItem disabled={count < 1} onSelect={() => onAddCargo(typeId, count)}>
+      <GuardedMenuItem
+        reason={count < 1 ? t('fittings.add.cargoAddNone') : null}
+        onSelect={() => onAddCargo(typeId, count)}
+      >
         {t('fittings.add.cargoAddMenu', { count: Math.max(count, 0) })}
-      </MenuItem>
+      </GuardedMenuItem>
       <MenuSeparator />
       {inHold ? <CargoMenuItems typeId={typeId} /> : <AddItemMenuItems typeId={typeId} />}
     </>
@@ -57,12 +60,12 @@ export function AddItemMenuItems({
   return (
     <>
       {rack !== undefined ? (
-        <MenuItem
-          disabled={!actions.canFitFirstFree(typeId, rack)}
+        <GuardedMenuItem
+          reason={actions.canFitFirstFree(typeId, rack) ? null : t('fittings.item.noFreeSlot')}
           onSelect={() => actions.fitFirstFree(typeId, rack)}
         >
           {rack === 'drone' ? t('fittings.item.addToBay') : t('fittings.item.fitFirstFree')}
-        </MenuItem>
+        </GuardedMenuItem>
       ) : (
         <ChargeLoadItems actions={actions} typeId={typeId} fromCargo={false} />
       )}

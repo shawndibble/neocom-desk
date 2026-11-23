@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
+  LiveNote,
   Button,
   FieldError,
   LiveStatus,
@@ -10,6 +11,7 @@ import {
   Checkbox,
   TextArea,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import {
   MAX_LINES_PER_REQUEST,
@@ -367,9 +369,9 @@ export function ComposeRequestDialog({
         {!standingMode && (
           <>
             {linesLocked && (
-              <p role="status" className="text-xs text-text-dim">
+              <LiveNote className="text-xs text-text-dim">
                 {t('communities.board.compose.linesLockedNote')}
-              </p>
+              </LiveNote>
             )}
             {!linesLocked && (
               <label className="block space-y-1">
@@ -528,13 +530,23 @@ export function ComposeRequestDialog({
           <Button size="sm" variant="ghost" aria-disabled={busy || undefined} onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>
-            {editing
-              ? t('communities.board.compose.save')
-              : t(
-                  standingMode ? 'communities.board.buyback.post' : 'communities.board.compose.post'
-                )}
-          </Button>
+          <Tooltip content={!canSubmit ? t('common.needsInput') : null}>
+            <Button
+              size="sm"
+              variant="primary"
+              type="submit"
+              loading={busy}
+              aria-disabled={!canSubmit || undefined}
+            >
+              {editing
+                ? t('communities.board.compose.save')
+                : t(
+                    standingMode
+                      ? 'communities.board.buyback.post'
+                      : 'communities.board.compose.post'
+                  )}
+            </Button>
+          </Tooltip>
         </DialogFooter>
       </form>
     </Modal>

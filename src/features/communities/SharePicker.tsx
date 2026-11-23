@@ -3,7 +3,15 @@ import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { permissionsForEndpoints } from '@/esi/registry';
-import { Button, Caret, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
+import {
+  LiveNote,
+  Button,
+  Caret,
+  Checkbox,
+  EmptyState,
+  SearchInput,
+  Spinner,
+} from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   buildShareTree,
@@ -163,9 +171,9 @@ export function SharePicker({
         <Button onClick={() => onChange(selectAll(owned))}>{t('communities.share.all')}</Button>
         <Button onClick={() => onChange(new Set())}>{t('communities.share.none')}</Button>
       </div>
-      <p role="status" className="text-xs text-text-dim">
+      <LiveNote className="text-xs text-text-dim">
         {t('communities.share.count', { count, total: owned.length })}
-      </p>
+      </LiveNote>
       {shown.length === 0 ? (
         <EmptyState title={t('communities.share.noMatch')} />
       ) : (

@@ -9,6 +9,7 @@ import { grantCovers } from '@/app/grantCovers';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import {
   Button,
+  buttonClassName,
   Checkbox,
   CharacterAvatar,
   EmptyState,
@@ -18,6 +19,7 @@ import {
   LogoMark,
   Panel,
   Spinner,
+  Tooltip,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
@@ -183,7 +185,7 @@ export function CommunityJoin() {
   const anyJoined = Object.values(results).some((r) => r === 'joined' || r === 'alreadyMember');
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
+    <div className="safe-inset mx-auto flex min-h-dvh max-w-xl [--safe-x:0.5rem] [--safe-y:0.5rem] flex-col gap-4 bg-bg text-text sm:[--safe-x:1.5rem] sm:[--safe-y:1.5rem]">
       <header>
         <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
           <LogoMark className="size-9" />
@@ -197,7 +199,15 @@ export function CommunityJoin() {
 
         {state.status === 'loading' && <Spinner label={t('communities.loading')} />}
         {state.status === 'gone' && (
-          <EmptyState title={t('communities.join.gone')} hint={t('communities.join.goneHint')} />
+          <EmptyState
+            title={t('communities.join.gone')}
+            hint={t('communities.join.goneHint')}
+            action={
+              <Link to="/" className={buttonClassName({ variant: 'primary' })}>
+                {t('share.openInApp')}
+              </Link>
+            }
+          />
         )}
         {state.status === 'unavailable' && (
           <LoadFailedState
@@ -271,7 +281,7 @@ export function CommunityJoin() {
                             <Button
                               size="sm"
                               aria-expanded={pickerFor === character.characterId}
-                              disabled={working}
+                              aria-disabled={working || undefined}
                               onClick={() =>
                                 setPickerFor(
                                   pickerFor === character.characterId ? null : character.characterId
@@ -322,14 +332,16 @@ export function CommunityJoin() {
                 </ul>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <NeedsConnection>
-                    <Button
-                      variant="primary"
-                      loading={working}
-                      disabled={chosen.length === 0}
-                      onClick={() => void join()}
-                    >
-                      {t('communities.join.joinAction', { count: totalShared })}
-                    </Button>
+                    <Tooltip content={chosen.length === 0 ? t('communities.join.chooseOne') : null}>
+                      <Button
+                        variant="primary"
+                        loading={working}
+                        aria-disabled={chosen.length === 0 || undefined}
+                        onClick={() => void join()}
+                      >
+                        {t('communities.join.joinAction', { count: totalShared })}
+                      </Button>
+                    </Tooltip>
                   </NeedsConnection>
                   <NeedsConnection>
                     <Button onClick={logIn} loading={loggingIn || working}>

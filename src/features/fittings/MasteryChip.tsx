@@ -8,6 +8,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  SegmentedControl,
   sortRows,
   Toast,
 } from '@/components/ui';
@@ -166,14 +167,14 @@ export function MasteryChip({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        {TIERS.map((n) => (
-          <FilterChip
-            key={n}
-            label={romanLevel(n + 1)}
-            selected={tier === n}
-            onToggle={() => setTier(n)}
-          />
-        ))}
+        <SegmentedControl<string>
+          size="sm"
+          label={t('fittings.mastery.tierLabel')}
+          uppercase={false}
+          options={TIERS.map((n) => ({ value: String(n), label: romanLevel(n + 1) }))}
+          value={String(tier)}
+          onChange={(v) => setTier(Number(v))}
+        />
         <FilterChip
           label={t('fittings.mastery.hideCompleted')}
           selected={hideCompleted}

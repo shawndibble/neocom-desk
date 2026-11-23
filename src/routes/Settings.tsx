@@ -4,7 +4,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
 import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
-import { visibleSettingsGroups, type SettingsGroup } from '@/features/settings/sections';
+import {
+  settingsSectionLabelKey,
+  visibleSettingsGroups,
+  type SettingsGroup,
+} from '@/features/settings/sections';
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
@@ -14,7 +18,12 @@ import { checkForUpdate } from '@/app/updateAvailable';
 import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
-import { CheckboxField, ChipRow, SettingsScopeHint } from '@/features/settings/settingsFields';
+import {
+  CheckboxField,
+  ChipRow,
+  SegmentedRow,
+  SettingsScopeHint,
+} from '@/features/settings/settingsFields';
 import { ActivityLogPanel } from '@/features/settings/ActivityLogPanel';
 import { DataAgePanel } from '@/features/settings/DataAgePanel';
 import { ExportPanel } from '@/features/settings/ExportPanel';
@@ -124,7 +133,11 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-page space-y-4">
-      <PageHeader title={t('settings.title')} actions={<SettingsBackLink />} />
+      <PageHeader
+        title={t('settings.title')}
+        meta={<span className="text-sm text-text-dim">{t(settingsSectionLabelKey(section))}</span>}
+        actions={<SettingsBackLink />}
+      />
       <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
         <SettingsNav groups={groups} value={section} />
         <div className="min-w-0 space-y-4" data-settings-section={section}>
@@ -158,7 +171,7 @@ export function Settings() {
                   rendered string would file a late-evening event under the wrong
                   day.
                 */}
-                    <ChipRow
+                    <SegmentedRow
                       label={t('settings.timeFormatLabel')}
                       hint={t('settings.timeFormatHint')}
                       options={TIME_FORMATS}
@@ -179,7 +192,7 @@ export function Settings() {
                       }
                     />
                     {weekStartHydrated && (
-                      <ChipRow
+                      <SegmentedRow
                         label={t('settings.weekStartLabel')}
                         hint={t('settings.weekStartHint')}
                         options={CALENDAR_WEEK_START_DAYS}

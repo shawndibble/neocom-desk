@@ -3220,6 +3220,54 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           expect(await stored('m-a')).toBeUndefined();
         });
 
+        it('a dated unlink keeps the grouping, its snapshot and its account; the day it left is recorded', async () => {
+          await seed();
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50, 52],
+            mainCharacterId: 50,
+          });
+          await record(checkpoint('m-a', '2026-07-31', { characterIds: [50, 52] }));
+          await expect(
+            edit(ACCOUNTANT, {
+              action: 'unlink',
+              minerId: 'm-a',
+              characterId: 52,
+              leftOn: '2020-01-01',
+            })
+          ).rejects.toThrow();
+          await edit(ACCOUNTANT, {
+            action: 'unlink',
+            minerId: 'm-a',
+            characterId: 52,
+            leftOn: '2026-10-18',
+          });
+          expect((await stored('m-a'))?.snapshot).toBeDefined();
+          const miner = await book().collection('miners').doc('m-a').get();
+          expect(miner.get('characterIds')).toEqual([50]);
+          expect(miner.get('leftOn')).toEqual({ 52: '2026-10-18' });
+          // Another edit of the grouping (make main) keeps it; grouping the character again drops it.
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50],
+            mainCharacterId: 50,
+          });
+          expect((await book().collection('miners').doc('m-a').get()).get('leftOn')).toEqual({
+            52: '2026-10-18',
+          });
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50, 52],
+            mainCharacterId: 50,
+          });
+          expect(
+            (await book().collection('miners').doc('m-a').get()).get('leftOn')
+          ).toBeUndefined();
+        });
+
         it('a fix dated today keeps it: a correction, a write-off, a payment', async () => {
           await seed();
           await edit(ACCOUNTANT, {

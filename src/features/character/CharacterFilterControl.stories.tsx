@@ -134,3 +134,17 @@ export const Partial: Story = { args: { missingNames: ['Pilot 2'] } };
 
 /** @summary `loading`: a spinner over the faces, the trigger's width unchanged. */
 export const Loading: Story = { args: { loading: true } };
+
+/** @summary The Corp Board's form: named corporations after the Character options. */
+export const WithCorporations: Story = {
+  args: {
+    value: 'corp:98000002',
+    corporations: [
+      { id: 98000001, name: 'Amarr Control Tech' },
+      { id: 98000002, name: 'Acme Mining Co' },
+    ],
+  },
+};
+
+/** @summary Widgets scoped one by one: nothing checked, a dot on the trigger. */
+export const Mixed: Story = { args: { mixed: true } };

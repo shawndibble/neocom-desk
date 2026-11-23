@@ -5,7 +5,7 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret, IconButton } from '@/components/ui';
+import { Caret, IconButton, isRowOwnEvent } from '@/components/ui';
 import {
   groupByOrganization,
   type CorporationGroup,
@@ -113,7 +113,22 @@ function OrgSectionView({
     (section.kind === 'corporation' ? standingVia(section.rows, 'corporation') : null);
   return (
     <section className="space-y-2">
-      <h3 className={SECTION_TITLE}>
+      <h3
+        className={cx(SECTION_TITLE, isPhone && 'cursor-pointer')}
+        // A phone folds the section from anywhere on its heading, bar the links in it.
+        onClick={isPhone ? (event) => isRowOwnEvent(event) && onToggle() : undefined}
+      >
+        {isPhone && (
+          <IconButton
+            size="sm"
+            icon={<Caret expanded={open} />}
+            label={t(open ? 'travel.pilot.list.org.fold' : 'travel.pilot.list.org.unfold', {
+              name,
+            })}
+            aria-expanded={open}
+            onClick={onToggle}
+          />
+        )}
         <OrgLogo kind={section.kind} id={section.id} size="md" />
         <OrgLink kind={section.kind} id={section.id}>
           {name}
@@ -128,18 +143,6 @@ function OrgSectionView({
         )}
         {standing !== null && <PilotStandingTag standing={standing} />}
         <Counts rows={section.rows} threatOf={threatOf} />
-        {isPhone && (
-          <IconButton
-            className="ml-auto"
-            size="sm"
-            icon={<Caret expanded={open} />}
-            label={t(open ? 'travel.pilot.list.org.fold' : 'travel.pilot.list.org.unfold', {
-              name,
-            })}
-            aria-expanded={open}
-            onClick={onToggle}
-          />
-        )}
       </h3>
       {shown &&
         (section.kind === 'alliance' ? (

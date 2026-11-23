@@ -375,6 +375,11 @@ describe('VerifyPage', () => {
     api.read.mockResolvedValue(payload({ accountClosed: true }));
     renderPage();
     expect(await screen.findByText(/account is closed/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('status').some((el) => /account is closed/.test(el.textContent ?? ''))
+      ).toBe(true)
+    );
   });
 
   it('explains a link that is not valid', async () => {
@@ -434,7 +439,10 @@ describe('VerifyPage', () => {
       renderPage();
       await userEvent.click(await screen.findByRole('button', { name: 'Confirm Quiet Alt' }));
       expect(api.confirm).toHaveBeenCalledWith(61, 98000001);
-      expect(await screen.findByText(/Quiet Alt is now part of this account/)).toBeInTheDocument();
+      // LiveNote renders the text twice (visible + live region)
+      expect(await screen.findAllByText(/Quiet Alt is now part of this account/)).not.toHaveLength(
+        0
+      );
     });
 
     it('lets the link decline, naming the character and the token', async () => {
@@ -442,7 +450,8 @@ describe('VerifyPage', () => {
       renderPage();
       await userEvent.click(await screen.findByRole('button', { name: 'Not mine, remove it' }));
       expect(api.decline).toHaveBeenCalledWith('tok', 61);
-      expect(await screen.findByText(/Quiet Alt was removed/)).toBeInTheDocument();
+      // LiveNote renders the text twice (visible + live region)
+      expect(await screen.findAllByText(/Quiet Alt was removed/)).not.toHaveLength(0);
     });
 
     it('says so when saving fails', async () => {

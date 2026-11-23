@@ -404,7 +404,10 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
     await clickTool(user, 'Select');
 
-    expect(screen.getByRole('button', { name: 'Deselect all' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Deselect all' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });
 

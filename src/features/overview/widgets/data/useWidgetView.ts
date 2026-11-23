@@ -10,6 +10,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { useSharedPopTime } from '@/features/character/calendarSharedPopTime';
 import type { FeedStore } from './feedStore';
 import { useFeedStore } from './feedStoreContext';
+import { narrowFeedsToCorporation } from './corpNarrow';
 import { buildView, builderEpoch, feedsOf, subscribeBuilders } from './models';
 import { OVERVIEW_TICK_MS } from './tick';
 import type { BuildContext, FeedId, KindView } from './types';
@@ -68,7 +69,11 @@ function cachedView(
   ];
   const hit = cache.get(id);
   if (hit && sameItems(hit.deps, deps)) return hit.view;
-  const feeds = store.get();
+  const all = store.get();
+  const feeds =
+    request.corporationId === undefined
+      ? all
+      : narrowFeedsToCorporation(all, request.corporationId);
   const built = buildView(request.kind, feeds, {
     ...ctx,
     scopeAll: request.scopeAll,
@@ -160,7 +165,12 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
 }
 
 /** The view for one widget. */
-export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSettings): KindView {
+export function useWidgetView(
+  kind: string,
+  scopeAll: boolean,
+  settings: ViewSettings,
+  corporationId?: number
+): KindView {
   const {
     range,
     plexPer30Days,
@@ -178,6 +188,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
     () => ({
       kind,
       scopeAll,
+      corporationId,
       range,
       plexPer30Days,
       calendarEvents,
@@ -193,6 +204,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
     [
       kind,
       scopeAll,
+      corporationId,
       range,
       plexPer30Days,
       calendarEvents,

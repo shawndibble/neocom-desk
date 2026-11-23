@@ -129,9 +129,16 @@ export function ChargePickerMenuItems({
                 return (
                   <MenuItem
                     key={c.typeId}
-                    disabled={c.skillMissing}
-                    onSelect={() => load(c)}
-                    className={cx(worse !== null && 'opacity-60')}
+                    // Focusable so the skill tag on the row can be read; selecting does nothing.
+                    aria-disabled={c.skillMissing || undefined}
+                    onSelect={(event) => {
+                      if (c.skillMissing) event.preventDefault();
+                      else load(c);
+                    }}
+                    className={cx(
+                      worse !== null && 'opacity-60',
+                      'aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
+                    )}
                   >
                     <span className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-3">
                       <span className={cx('truncate', c.typeId === loaded && 'font-semibold')}>

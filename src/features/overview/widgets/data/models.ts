@@ -39,7 +39,13 @@ const KINDS: Record<string, KindDef> = {
   ...ACCOUNT_DEFS,
   training: { feeds: ['skills', 'accelerator'], scope: 'character', build: training },
   sp: { feeds: ['skills', 'spExtras'], scope: 'character', build: sp },
-  comingUp: { feeds: ['calendar'], scope: 'character', build: comingUp },
+  comingUp: {
+    feeds: ['calendar'],
+    allFeeds: ['calendarAll'],
+    scope: 'account',
+    build: (feeds, ctx) =>
+      comingUp(ctx.scopeAll ? { ...feeds, calendar: feeds.calendarAll } : feeds, ctx),
+  },
   ...WORLD_DEFS,
   ...KIND_DEFS,
 };
@@ -72,8 +78,8 @@ export function feedsOf(
   const reads = resolved(kind, settings);
   // Only a widget whose settings sum across reads the All feed (the corp wallet's Flow does not).
   if (scopeAll && reads?.scope === 'account') {
-    const def = KINDS[kind];
-    if (def?.allFeeds) return def.allFeeds;
+    const all = reads.allFeeds ?? KINDS[kind]?.allFeeds;
+    if (all) return all;
   }
   return reads?.feeds;
 }
@@ -91,7 +97,7 @@ export function feedsFor(readers: readonly FeedReader[]): FeedId[] {
     const feeds =
       typeof reader === 'string'
         ? feedsOf(reader)
-        : feedsOf(reader.kind, reader, reader.scope === 'all');
+        : feedsOf(reader.kind, reader, reader.scope !== undefined && reader.scope !== 'header');
     for (const feed of feeds ?? []) out.add(feed);
   }
   return [...out];

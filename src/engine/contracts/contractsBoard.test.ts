@@ -176,4 +176,22 @@ describe('summarizeContractsBoard', () => {
     const s = summarizeContractsBoard([courier({ contract_id: 1 }), listing], ME, NOW);
     expect(s.soonest).toMatchObject({ contractId: 2, kind: 'listing' });
   });
+
+  it('reads several pilots at once: a contract between two of them counts once', () => {
+    const ALT = 90000002;
+    const summary = summarizeContractsBoard(
+      [
+        contract({ contract_id: 1, issuer_id: ME, assignee_id: ALT }),
+        contract({ contract_id: 2, issuer_id: ALT }),
+        courier({ contract_id: 3, acceptor_id: ALT }),
+        courier({ contract_id: 4, acceptor_id: 7 }),
+      ],
+      new Set([ME, ALT]),
+      NOW
+    );
+    expect(summary.outstanding).toBe(2);
+    expect(summary.exchanges).toBe(2);
+    expect(summary.inProgress).toBe(1);
+    expect(summary.rows.map((r) => r.contractId).sort()).toEqual([1, 2, 3]);
+  });
 });

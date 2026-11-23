@@ -14,6 +14,7 @@ import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { SyncErrorNote } from './SyncErrorNote';
+import { ShellStatusStrip } from './ShellStatusStrip';
 import { OfflineBanner } from './OfflineBanner';
 import { useSyncStatus } from './useSyncStatus';
 import {
@@ -341,7 +342,7 @@ export const Layout = memo(function Layout() {
   return (
     <UnreadAlertsContext.Provider value={alertBadge}>
       <AlertsPanelProvider>
-        <div className="flex min-h-screen bg-bg text-text">
+        <div className="flex min-h-dvh bg-bg text-text">
           {/* Only where the rail shows: below `md` there is nothing to skip. */}
           {isDesktop && <SkipLink />}
           {/* Desktop left rail */}
@@ -411,9 +412,11 @@ export const Layout = memo(function Layout() {
               <MailQueueMount />
               <OfflineBanner />
               <AlertCharacterSwitch />
-              <AuthFailureNotice />
               <StandingsScopeNotice />
-              <SyncErrorBanner />
+              <ShellStatusStrip>
+                <AuthFailureNotice />
+                <SyncErrorBanner />
+              </ShellStatusStrip>
               <RouteOutlet />
             </PageHeaderSlotProvider>
           </main>

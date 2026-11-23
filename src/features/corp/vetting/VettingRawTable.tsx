@@ -35,6 +35,7 @@ import { formatCount } from '@/lib/formatCount';
 import { signedIsk } from '@/lib/signedIsk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
+import { SkillLink } from '@/features/entities';
 import { VettingEntity } from './VettingEntity';
 import type { RawRows } from './useVettingRawRows';
 import type { SkillNames } from './useSkillNames';
@@ -289,9 +290,14 @@ export function VettingRawTable({
           minWidth: '28ch',
           sortValue: (item) =>
             skills.get(item.row.skillId ?? -1)?.name ?? String(item.row.skillId ?? ''),
-          render: (item) =>
-            skills.get(item.row.skillId ?? -1)?.name ??
-            t('vetting.data.unknownSkill', { id: item.row.skillId }),
+          render: (item) => {
+            const name = skills.get(item.row.skillId ?? -1)?.name;
+            return name && item.row.skillId != null ? (
+              <SkillLink typeId={item.row.skillId}>{name}</SkillLink>
+            ) : (
+              t('vetting.data.unknownSkill', { id: item.row.skillId })
+            );
+          },
         },
         {
           id: 'group',
@@ -499,8 +505,8 @@ export function VettingRawTable({
           shown: formatCount(scope.length),
         })}
         action={
-          <Button onClick={() => setFilters(NO_RAW_FILTERS)}>
-            {t('vetting.data.clearFilters')}
+          <Button size="sm" onClick={() => setFilters(NO_RAW_FILTERS)}>
+            {t('common.resetFilters')}
           </Button>
         }
       />

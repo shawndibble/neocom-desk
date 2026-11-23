@@ -13,6 +13,8 @@ import {
   SelectValue,
   StatChip,
   StatChips,
+  Tooltip,
+  LiveNote,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
@@ -475,23 +477,25 @@ export function LateNoticeRun() {
                   </fieldset>
                   {!inline && minerPicker}
                   {corporationName === null && (
-                    <p role="status" className="text-text-dim">
+                    <LiveNote className="text-text-dim">
                       {t('corpTaxBook.moons.run.loadingCorporation')}
-                    </p>
+                    </LiveNote>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="primary"
-                      onClick={() => setStep('send')}
-                      disabled={!canEdit || total === 0}
-                    >
-                      {t('corpTaxBook.moons.run.continue')}
-                    </Button>
+                    <Tooltip content={canEdit && total === 0 ? t('common.nothingToDo') : null}>
+                      <Button
+                        variant="primary"
+                        onClick={() => setStep('send')}
+                        aria-disabled={!canEdit || total === 0 || undefined}
+                      >
+                        {t('corpTaxBook.moons.run.continue')}
+                      </Button>
+                    </Tooltip>
                     {previewItem && !inline && (
                       <Button
                         variant="ghost"
                         onClick={() => setPreviewOpen(true)}
-                        disabled={corporationName === null}
+                        aria-disabled={corporationName === null || undefined}
                       >
                         {t('corpTaxBook.moons.run.preview')}
                       </Button>
@@ -509,9 +513,9 @@ export function LateNoticeRun() {
                   </p>
                   <MailLimitNotice count={total} senderName={names.character(characterId)} />
                   {corporationName === null && (
-                    <p role="status" className="text-text-dim">
+                    <LiveNote className="text-text-dim">
                       {t('corpTaxBook.moons.run.loadingCorporation')}
-                    </p>
+                    </LiveNote>
                   )}
                   {error && (
                     <p role="alert" className="text-danger">

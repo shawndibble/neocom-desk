@@ -2,7 +2,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Button, buttonClassName, EmptyState, SearchInput, Spinner } from '@/components/ui';
+import {
+  LiveNote,
+  Button,
+  buttonClassName,
+  EmptyState,
+  SearchInput,
+  Spinner,
+} from '@/components/ui';
 import { db, type SkillPlanRecord } from '@/db';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
@@ -105,9 +112,9 @@ export function ShareSkillPlansTab({
     <div className="space-y-2">
       <p className="text-xs text-text-dim">{t('communities.plans.hint')}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <p role="status" className="text-xs text-text-dim">
+        <LiveNote className="text-xs text-text-dim">
           {t('communities.plans.count', { count: loaded.shared.size })}
-        </p>
+        </LiveNote>
         <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
           {t('communities.plans.add')}
         </Button>

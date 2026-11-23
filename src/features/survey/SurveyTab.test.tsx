@@ -430,7 +430,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
       loadSurvey.mockResolvedValue(twoScans('Shawn Dibble'));
       await useCurrentSurveyId.getState().setValue(ID);
       renderTab();
-      fireEvent.click(await screen.findByText('2 scans', { selector: 'summary' }));
+      fireEvent.click(await screen.findByText('2 scans', { selector: 'h2' }));
       fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
       await waitFor(() =>
         expect(setSurveyScanIgnored).toHaveBeenCalledWith({
@@ -448,7 +448,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
       setSurveyScanIgnored.mockRejectedValue(new Error('permission-denied'));
       await useCurrentSurveyId.getState().setValue(ID);
       renderTab();
-      fireEvent.click(await screen.findByText('2 scans', { selector: 'summary' }));
+      fireEvent.click(await screen.findByText('2 scans', { selector: 'h2' }));
       fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
       expect((await screen.findByRole('alert')).textContent).toContain("Couldn't change that scan");
     });

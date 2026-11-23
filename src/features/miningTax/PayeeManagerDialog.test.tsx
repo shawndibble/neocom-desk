@@ -463,7 +463,7 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     ).toBeInTheDocument();
 
     const moveButton = screen.getByRole('button', { name: 'Move and delete' });
-    expect(moveButton).toBeDisabled();
+    expect(moveButton).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(screen.getByRole('combobox', { name: 'Move them to…' }));
     await userEvent.click(screen.getByRole('option', { name: 'Plenitude Highsec Police' }));
     await userEvent.click(moveButton);

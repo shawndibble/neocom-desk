@@ -325,7 +325,7 @@ describe('LateNoticeRun (late notices, #6294)', () => {
     corpName.value = null;
     const first = renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    expect(screen.getByText('Loading corporation name…')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading corporation name…');
     expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toHaveAttribute(
       'aria-disabled',
       'true'
@@ -408,7 +408,10 @@ describe('LateNoticeRun (late notices, #6294)', () => {
   it('leaves Send off until at least one Miner is ticked', async () => {
     renderBook(<LateNoticeRun />, behind);
     for (const box of screen.getAllByRole('checkbox')) await userEvent.click(box);
-    expect(screen.getByRole('button', { name: 'Continue to send' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continue to send' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it("sends the officer's edit of one Miner's mail, the other mail as standard", async () => {
@@ -479,7 +482,10 @@ describe('LateNoticeRun (late notices, #6294)', () => {
     await userEvent.click(within(preview).getByRole('button', { name: 'Edit mail' }));
     const body = within(preview).getByRole('textbox', { name: 'Message' });
     await userEvent.clear(body);
-    expect(within(preview).getByRole('button', { name: 'Save mail' })).toBeDisabled();
+    expect(within(preview).getByRole('button', { name: 'Save mail' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     await userEvent.type(body, 'Pay up.');
     expect(within(preview).getByText(/no longer has the verify link/)).toBeInTheDocument();
     await userEvent.click(within(preview).getByRole('button', { name: 'Save mail' }));

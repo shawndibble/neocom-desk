@@ -612,4 +612,56 @@ describe('CharacterFilterControl', () => {
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
     });
   });
+
+  describe('named corporations (the Corp Board)', () => {
+    const CORPS = [
+      { id: 98000001, name: 'Amarr Control Tech' },
+      { id: 98000002, name: 'Acme Mining Co' },
+    ];
+
+    it('lists each corporation under a heading and emits corp:<id>', async () => {
+      const onChange = vi.fn();
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="all"
+          onChange={onChange}
+          corporations={CORPS}
+        />
+      );
+      const user = await openMenu();
+      expect(screen.getByText('Corporations')).toBeInTheDocument();
+      await user.click(screen.getByRole('menuitemradio', { name: 'Acme Mining Co' }));
+      expect(onChange).toHaveBeenCalledWith('corp:98000002');
+    });
+
+    it("names the chosen corporation in the trigger's accessible name, and checks it", async () => {
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="corp:98000002"
+          onChange={() => {}}
+          corporations={CORPS}
+        />
+      );
+      const trigger = screen.getByRole('button', { name: 'Acme Mining Co' });
+      await userEvent.click(trigger);
+      expect(screen.getByRole('menuitemradio', { name: 'Acme Mining Co' })).toBeChecked();
+      expect(screen.getByRole('menuitemradio', { name: 'This character' })).not.toBeChecked();
+    });
+  });
+
+  describe('mixed', () => {
+    it('says Mixed in the name, draws a neutral dot, and checks no option', async () => {
+      render(
+        <CharacterFilterControl activeCharacterId={1} value="current" mixed onChange={() => {}} />
+      );
+      const trigger = screen.getByRole('button', { name: /^Mixed/ });
+      expect(trigger.querySelector('[data-mixed-dot]')).toBeInTheDocument();
+      expect(trigger).toHaveTextContent('');
+      await userEvent.click(trigger);
+      for (const option of screen.getAllByRole('menuitemradio')) expect(option).not.toBeChecked();
+      expect(screen.getByText('Widgets differ. Pick one to set them all.')).toBeInTheDocument();
+    });
+  });
 });

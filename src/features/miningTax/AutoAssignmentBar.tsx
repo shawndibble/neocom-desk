@@ -8,11 +8,12 @@
  * Only one connection runs at a time (`startSurveyConnection`), so this is
  * one row; a list synced from an older device can briefly hold two.
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { isConnectionLive, type SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -67,26 +68,27 @@ export function AutoAssignmentBar({
         ].filter((part) => part !== undefined);
         const detail = parts.join(' · ');
         return (
-          <section
-            key={`${c.surveyId}:${c.characterId}`}
-            role="status"
-            aria-label={t('miningTax.surveyConnections.title')}
-            className="flex min-h-9 items-center gap-2 rounded-xs border border-accent/60 bg-accent/10 px-2.5 py-1 text-xs md:min-h-0"
-          >
-            {/* The eyebrow's type in accent, not its dim colour: the bar's one tone, as warning is the attention strip's. */}
-            <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-              {t('miningTax.surveyConnections.title')}
-            </span>
-            {/* Cut short on a phone: the full line is a tap away. */}
-            <span className="min-w-0 flex-1 truncate text-text-dim">
-              <HintText content={detail} onlyWhenTruncated>
-                {detail}
-              </HintText>
-            </span>
-            <Button size="sm" className="shrink-0" onClick={() => stop(c)}>
-              {t('survey.moonTax.stop')}
-            </Button>
-          </section>
+          <Fragment key={`${c.surveyId}:${c.characterId}`}>
+            <LiveStatus>{detail}</LiveStatus>
+            <section
+              aria-label={t('miningTax.surveyConnections.title')}
+              className="flex min-h-9 items-center gap-2 rounded-xs border border-accent/60 bg-accent/10 px-2.5 py-1 text-xs md:min-h-0"
+            >
+              {/* The eyebrow's type in accent, not its dim colour: the bar's one tone, as warning is the attention strip's. */}
+              <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                {t('miningTax.surveyConnections.title')}
+              </span>
+              {/* Cut short on a phone: the full line is a tap away. */}
+              <span className="min-w-0 flex-1 truncate text-text-dim">
+                <HintText content={detail} onlyWhenTruncated>
+                  {detail}
+                </HintText>
+              </span>
+              <Button size="sm" className="shrink-0" onClick={() => stop(c)}>
+                {t('survey.moonTax.stop')}
+              </Button>
+            </section>
+          </Fragment>
         );
       })}
       {failed && <InlineError>{t('miningTax.surveyConnections.stopFailed')}</InlineError>}

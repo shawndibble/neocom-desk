@@ -6,7 +6,7 @@
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SegmentedControl, TextArea, TextInput } from '@/components/ui';
+import { SegmentedControl, TextArea, TextInput, LiveNote } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import {
   FORFEIT_NO_REPLY_DAYS,
@@ -198,9 +198,9 @@ export function CloseAccountDialog({
                 </Label>
               )}
               {!forfeitOk && (
-                <p role="status" className="text-xs text-warning">
+                <LiveNote className="text-xs text-warning">
                   {t('corpTaxBook.moons.dialogs.close.notYet', { days: FORFEIT_NO_REPLY_DAYS })}
-                </p>
+                </LiveNote>
               )}
             </>
           ) : (

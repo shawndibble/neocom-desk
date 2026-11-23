@@ -454,11 +454,17 @@ export const eveTime: Builder = (_feeds, { t, now }) => ({
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   eveTime: { feeds: [], scope: 'character', build: eveTime },
   industry: { feeds: ['industry'], scope: 'account', build: industry },
-  planetary: { feeds: ['planetary'], scope: 'character', build: planetary },
+  planetary: {
+    feeds: ['planetary'],
+    allFeeds: ['planetaryAll'],
+    scope: 'account',
+    build: (feeds, ctx) =>
+      planetary(ctx.scopeAll ? { ...feeds, planetary: feeds.planetaryAll } : feeds, ctx),
+  },
   mercenaryDens: { feeds: ['mercenaryDens'], scope: 'account', build: mercenaryDens },
   structures: {
-    feeds: ['structures'],
-    allFeeds: ['structuresAll'],
+    feeds: ['structures', 'corpStarbases'],
+    allFeeds: ['structuresAll', 'corpStarbasesAll'],
     scope: 'account',
     build: structures,
   },

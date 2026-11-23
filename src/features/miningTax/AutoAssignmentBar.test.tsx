@@ -55,14 +55,14 @@ describe('AutoAssignmentBar', () => {
   it('is one Auto Assignment row: payee at rate · system · until, then Stop', async () => {
     useSurveyConnections.setState({ value: [connection()] });
     renderPanel();
-    const bar = screen.getByRole('status', { name: 'Auto Assignment' });
+    const bar = screen.getByRole('region', { name: 'Auto Assignment' });
     expect(bar.textContent).toMatch(/^Auto AssignmentMoon Corp at 10% · Jita · until .+Stop$/);
     expect(screen.queryByText(/Bitumens/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(useSurveyConnections.getState().value).toEqual([]));
   });
 
-  it('names the Character only when more than one is tracked', () => {
+  it('names the Character only when more than one is tracked', async () => {
     useSurveyConnections.setState({ value: [connection()] });
     render(
       <AutoAssignmentBar
@@ -72,6 +72,6 @@ describe('AutoAssignmentBar', () => {
         nowMs={NOW}
       />
     );
-    expect(screen.getByRole('status').textContent).toContain(' · Pilot');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain(' · Pilot'));
   });
 });

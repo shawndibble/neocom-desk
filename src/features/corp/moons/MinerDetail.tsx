@@ -19,6 +19,7 @@ import {
   SegmentedControl,
   Tooltip,
   type DataTableColumn,
+  LiveNote,
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -575,9 +576,9 @@ export function MinerDetail({ id }: { id: string }) {
         {notice ?? noticeParam.notFound}
       </p>
       {closedAt && (
-        <p role="status" className="text-xs text-text-dim">
+        <LiveNote className="text-xs text-text-dim">
           {t('corpTaxBook.moons.miner.closedNote', { date: atDate(closedAt, zone) })}
-        </p>
+        </LiveNote>
       )}
       <EntityHeader
         label={t(

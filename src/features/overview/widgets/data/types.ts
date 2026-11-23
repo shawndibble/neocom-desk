@@ -57,6 +57,7 @@ import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
   ClonesWidgetData,
   JournalData,
+  WalletAllData,
   LocationWidgetData,
   LpWidgetData,
   HaulingWidgetData,
@@ -330,10 +331,18 @@ export interface FeedMap {
   orders: OpenOrdersPageSnapshot;
   mining: MiningTaxBoardData;
   planetary: PlanetaryBoardData;
+  /** Every Character's colonies regrouped as one board (the Planetary widget on All characters). */
+  planetaryAll: PlanetaryBoardData;
   industry: IndustryBoardData;
   contracts: ContractsBoardData;
+  /** Every Character's mail folded into one board (the Mail widget on All characters). */
+  mailAll: MailBoardData;
+  /** Every Character's contracts as one board (the Contracts widget on All characters). */
+  contractsAll: ContractsBoardData;
   /** The Calendar page's whole board read: every clock the Character can read. */
   calendar: CalendarBoardData;
+  /** Every Character's calendar board folded into one (the Calendar widget on All characters). */
+  calendarAll: CalendarBoardData;
   mail: MailBoardData;
   priceAlerts: PriceAlertsBoardData;
   /** `board` is null when the pilot stocks no market. */
@@ -353,8 +362,14 @@ export interface FeedMap {
   /** Every Character's typed-in accelerator, a hook not a load (Training's expiry). */
   accelerator: ReadonlyMap<number, TypedAccelerator>;
   journal: JournalData;
+  /** Every Character's wallet balance (the Wallet's All characters read). */
+  walletAll: WalletAllData;
+  /** Every Character's journal merged (Wallet flow's All characters read). */
+  journalAll: JournalData;
   netWorth: NetWorthWidgetData;
   profit: ProfitWidgetData;
+  /** Every Character's logged runs (Profit's Builds source on All characters). */
+  profitAll: ProfitWidgetData;
   miningYield: MiningYieldWidgetData;
   lp: LpWidgetData;
   survey: SurveyWidgetData;
@@ -388,6 +403,10 @@ export interface FeedMap {
   corpSovereigntyAll: CorpSovereigntyFeed;
   corpContractsAll: CorpContractsFeed;
   corpOrdersAll: CorpOrdersFeed;
+  corpAssetsAll: CorpAllFeed<CorpAssetsFeed>;
+  corpSrpAll: CorpSrpFeed;
+  corpMembersAll: CorpMembersFeed;
+  corpRoleAuditAll: CorpRoleAuditFeed;
   corpKills: CorpKillsFeed;
   corpSrp: CorpSrpFeed;
 }

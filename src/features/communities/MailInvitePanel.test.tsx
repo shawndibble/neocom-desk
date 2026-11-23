@@ -95,7 +95,7 @@ describe('Invite by mail panel', () => {
     expect(body).toContain('Boss');
     expect(body).toMatch(/<a href="[^"]*\/communities\/join\/CODE1">[^<]*<\/a>/);
     await waitFor(() => expect(store.confirmMailInvite).toHaveBeenCalledWith(ME, 'c1', 42, 'Bob'));
-    expect(await screen.findByText('19 mail invites left today')).toBeInTheDocument();
+    expect((await screen.findAllByText('19 mail invites left today')).at(-1)).toBeInTheDocument();
   });
 
   it('sends nothing when the name matches no Character', async () => {
@@ -150,7 +150,7 @@ describe('Invite by mail panel', () => {
     const user = await typeName();
     await user.click(screen.getByRole('button', { name: m.send }));
     await waitFor(() => expect(store.confirmMailInvite).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText('Invite sent to Bob.')).toBeInTheDocument();
+    expect((await screen.findAllByText('Invite sent to Bob.')).at(-1)).toBeInTheDocument();
   });
 
   it('strips markup from names before they go into the mail', async () => {
@@ -185,7 +185,7 @@ describe('Invite by mail panel', () => {
     expect(await screen.findByText(m.grantTitle)).toBeInTheDocument();
     // The note and the panel read the grant through separate live queries.
     await waitFor(() => expect(screen.getByLabelText(m.nameLabel)).toBeDisabled());
-    expect(screen.getByRole('button', { name: m.send })).toBeDisabled();
+    expect(screen.getByRole('button', { name: m.send })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('disables sending once the day’s invites are used', async () => {

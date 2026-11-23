@@ -220,6 +220,7 @@ describe('PlayersView', () => {
         action: 'unlink',
         minerId: 'solo:1',
         characterId: 2,
+        leftOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       })
     );
   });

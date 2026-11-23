@@ -89,7 +89,11 @@ export function CommunityPopSharers({
               )}
             </span>
             <NeedsConnection>
-              <Button size="sm" disabled={busy !== null} onClick={() => void toggle(s)}>
+              <Button
+                size="sm"
+                aria-disabled={busy !== null || undefined}
+                onClick={() => void toggle(s)}
+              >
                 {t(s.blocked ? 'communities.popSharing.unblock' : 'communities.popSharing.block')}
               </Button>
             </NeedsConnection>

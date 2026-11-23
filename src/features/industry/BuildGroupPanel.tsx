@@ -16,7 +16,16 @@
 import { useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, LiveStatus, Panel, Spinner, Toast } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  IconButton,
+  LiveStatus,
+  Panel,
+  Spinner,
+  Toast,
+  Tooltip,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -265,7 +274,8 @@ export function BuildGroupPanel({
                     : t('industry.copyShoppingList')
               }
               onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
-              disabled={!canCopy}
+              aria-disabled={!canCopy || undefined}
+              tooltip={!canCopy ? t('industry.copyShoppingListNothing') : undefined}
             />
           </>
         }
@@ -313,19 +323,33 @@ export function BuildGroupPanel({
           </p>
           <div className="flex flex-wrap gap-2">
             {rollup.shoppingByHub.map((block) => (
-              <Button
+              <Tooltip
                 key={block.hubId}
-                size="sm"
-                onClick={() => void handleCopy(block.hubId, block.materials)}
-                // Same rules as the whole-group control: a hub whose every
-                // material is already owned would copy an empty string, and
-                // one still missing a member would copy a short list.
-                disabled={incompleteHubs.has(block.hubId) || !hasShoppingList(block.materials)}
+                content={
+                  incompleteHubs.has(block.hubId)
+                    ? t('industry.copyHubShoppingListIncomplete')
+                    : !hasShoppingList(block.materials)
+                      ? t('industry.copyHubShoppingListNothing')
+                      : null
+                }
               >
-                {copyStatusFor(block.hubId) === 'copied'
-                  ? t('industry.copyHubShoppingListDone', { hub: hubLabel(block.hubId) })
-                  : t('industry.copyHubShoppingList', { hub: hubLabel(block.hubId) })}
-              </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void handleCopy(block.hubId, block.materials)}
+                  // Same rules as the whole-group control: a hub whose every
+                  // material is already owned would copy an empty string, and
+                  // one still missing a member would copy a short list.
+                  aria-disabled={
+                    incompleteHubs.has(block.hubId) ||
+                    !hasShoppingList(block.materials) ||
+                    undefined
+                  }
+                >
+                  {copyStatusFor(block.hubId) === 'copied'
+                    ? t('industry.copyHubShoppingListDone', { hub: hubLabel(block.hubId) })
+                    : t('industry.copyHubShoppingList', { hub: hubLabel(block.hubId) })}
+                </Button>
+              </Tooltip>
             ))}
           </div>
         </div>

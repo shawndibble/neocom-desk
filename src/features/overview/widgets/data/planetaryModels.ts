@@ -8,7 +8,7 @@ import { highlightHref } from '@/lib/highlightParam';
 import { formatCountdown } from '@/lib/duration';
 import { planetarySeverity } from '../../data/boardSeverity';
 import { planetarySummary } from '../../data/boardSummary';
-import type { PlanetaryBoardData } from '../../data/boardData';
+import type { BoardColony, PlanetaryBoardData } from '../../data/boardData';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import type { NumberModel, NumberSecondary, TableModel } from './types';
@@ -19,7 +19,10 @@ const C = 'overview.widgets.chart';
 // --- Planetary --------------------------------------------------------------------
 
 interface ColonyFacts {
+  /** Unique on the board: two Characters can each hold a colony on one planet. */
   key: string;
+  /** The planet's id, which the Colonies page highlights by. */
+  planetId: number;
   name: string;
   kind: 'running' | 'expired' | 'idle';
   expiryMs: number | null;
@@ -29,13 +32,23 @@ interface ColonyFacts {
 
 const COLONY_ORDER = { expired: 0, running: 1, idle: 2 } as const;
 
+/** The planet's name, with its owner when the board reads every Character. */
+function colonyLabel(t: Translate, colony: BoardColony): string {
+  const name = colony.name ?? t('overview.widgets.planetary.unnamed', { id: colony.planetId });
+  return colony.ownerName === undefined ? name : `${name} · ${colony.ownerName}`;
+}
+
 function colonyFacts(data: PlanetaryBoardData, t: Translate): ColonyFacts[] {
   const out: ColonyFacts[] = [];
   for (const batch of data.batches) {
     for (const colony of batch.colonies) {
       out.push({
-        key: String(colony.planetId),
-        name: colony.name ?? t('overview.widgets.planetary.unnamed', { id: colony.planetId }),
+        key:
+          colony.ownerId === undefined
+            ? String(colony.planetId)
+            : `${colony.ownerId}:${colony.planetId}`,
+        planetId: colony.planetId,
+        name: colonyLabel(t, colony),
         kind: batch.kind,
         expiryMs: colony.status.soonestExpiryMs,
         severity: batch.severity,
@@ -86,9 +99,7 @@ export const planetary: Builder = (feeds, { t, now }) => {
             }
           : nextBatch.colonies[0]
             ? {
-                text:
-                  nextBatch.colonies[0].name ??
-                  t('overview.widgets.planetary.unnamed', { id: nextBatch.colonies[0].planetId }),
+                text: colonyLabel(t, nextBatch.colonies[0]),
               }
             : undefined;
     number = {
@@ -128,7 +139,7 @@ export const planetary: Builder = (feeds, { t, now }) => {
         colony.programs === undefined ? UNKNOWN : count(colony.programs),
       ],
       tone: colony.severity,
-      to: highlightHref(`${to}/colonies`, colony.key),
+      to: highlightHref(`${to}/colonies`, String(colony.planetId)),
     })),
   };
 
@@ -142,7 +153,13 @@ export const planetary: Builder = (feeds, { t, now }) => {
     rows: data.batches.map((batch) => ({
       key: `${batch.kind}:${batch.expiryMs ?? 'none'}`,
       title: t(`overview.board.batch.${batch.kind}`, { count: batch.colonies.length }),
-      detail: batch.colonies.map((colony) => colony.name ?? `#${colony.planetId}`).join(', '),
+      detail: batch.colonies
+        .map((colony) =>
+          colony.ownerName === undefined
+            ? (colony.name ?? `#${colony.planetId}`)
+            : colonyLabel(t, colony)
+        )
+        .join(', '),
       value:
         batch.kind === 'idle'
           ? t('overview.board.noProgram')

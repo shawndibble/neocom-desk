@@ -18,12 +18,15 @@ import type { JobSlotJob, JobSlotSkills } from '@/engine/industry/jobSlots';
 import { toJobSlotJobs } from '@/features/character/jobSlotSkills';
 import { loadJobSlotSkills } from '@/features/industry/planJobSlots';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import type { IndustryJob } from '@/esi/endpoints';
+import type { Contract, IndustryJob } from '@/esi/endpoints';
+import { ESI_REGISTRY } from '@/esi/registry';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { mergePlanetaryBoards, type CharacterPlanetaryBoard } from './planetaryAcross';
+import { INBOX_ROWS, mergeMailBoards, RECENT_ROWS } from './mailAcross';
 import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
 import {
@@ -33,6 +36,7 @@ import {
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
+import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
 import { tradeHubIdFor } from '@/features/market/hub';
@@ -77,6 +81,9 @@ export interface BoardColony {
   status: ColonyStatus;
   /** Extractor programs on the colony; absent on data built before the widget read it. */
   programCount?: number;
+  /** The Character who owns it, set only when the board reads every Character. */
+  ownerId?: number;
+  ownerName?: string;
 }
 
 export interface PlanetaryBoardData {
@@ -152,6 +159,34 @@ export async function loadPlanetaryBoard(
     programCount,
     batches: groupColoniesIntoBatches(colonies, (colony) => colony.status, loadedAt),
   };
+}
+
+/**
+ * Every Character's colonies as one board, each read as that Character's own board is. Only
+ * Characters holding the planets scope are read, so an alt that never granted it raises no
+ * re-auth banner; with none of them granted, the widget asks for the permission.
+ */
+export async function loadAllPlanetaryBoard(
+  _characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<PlanetaryBoardData> {
+  const { fanOutAllCharacters } = await import('@/features/character/allCharactersFanOut');
+  const scope = ESI_REGISTRY.getCharacterPlanets.scope;
+  const { entries } = await fanOutAllCharacters<CharacterPlanetaryBoard>({
+    scope,
+    load: async ({ characterId, name }) => ({
+      characterId,
+      name,
+      data: await loadPlanetaryBoard(characterId, signal),
+    }),
+  });
+  if (entries.length === 0) {
+    if (await nobodyGranted(scope)) {
+      return { ...EMPTY_PLANETARY, needsReauth: true, loadedAt: Date.now() };
+    }
+    throw new Error('Colonies could not be read');
+  }
+  return mergePlanetaryBoards(entries);
 }
 
 // --- Mining tax -----------------------------------------------------------
@@ -346,8 +381,77 @@ export interface ContractsBoardData {
 export async function loadContractsBoard(characterId: number): Promise<ContractsBoardData> {
   const { cached, needsReauth } = await loadContracts(characterId);
   if (!cached && !needsReauth) throw new Error('Contracts could not be read');
+  return contractsBoardOf(
+    cached?.data ?? [],
+    characterId,
+    characterId,
+    needsReauth,
+    cached?.fetchedAt ?? null
+  );
+}
+
+/**
+ * Every Character's contracts as one board: each contract once (one between two of your
+ * Characters is not counted twice), read by the Characters that hold the contracts scope.
+ */
+export async function loadAllContractsBoard(): Promise<ContractsBoardData> {
+  const [{ fanOutAllCharacters }, { mergeCharacterContracts }] = await Promise.all([
+    import('@/features/character/allCharactersFanOut'),
+    import('@/features/contracts/allContractsSnapshot'),
+  ]);
+  const scope = ESI_REGISTRY.getCharacterContracts.scope;
+  const { entries } = await fanOutAllCharacters({
+    scope,
+    load: async ({ characterId, name }) => {
+      const { cached, needsReauth } = await loadContracts(characterId);
+      return {
+        characterId,
+        characterName: name,
+        contracts: cached?.data ?? [],
+        needsReauth,
+        truncated: cached?.truncated ?? false,
+        fetchedAt: cached?.fetchedAt.getTime() ?? 0,
+        fromCache: cached?.fromCache ?? false,
+      };
+    },
+  });
+  // Nobody granted the contracts scope: a permission to ask for, never "no contracts".
+  if (entries.length === 0) {
+    if (!(await nobodyGranted(scope))) throw new Error('Contracts could not be read');
+    return {
+      summary: summarizeContractsBoard([], 0, Date.now()),
+      route: null,
+      needsReauth: true,
+      fetchedAt: null,
+    };
+  }
+  const read = entries.filter((entry) => entry.fetchedAt > 0);
+  if (read.length === 0 && !entries.some((entry) => entry.needsReauth)) {
+    throw new Error('Contracts could not be read');
+  }
+  const { contracts } = mergeCharacterContracts(entries);
+  return contractsBoardOf(
+    contracts,
+    new Set(entries.map((entry) => entry.characterId)),
+    entries[0]!.characterId,
+    read.length === 0,
+    read.length === 0 ? null : new Date(Math.min(...read.map((entry) => entry.fetchedAt)))
+  );
+}
+
+/**
+ * The board over `contracts` as seen by `pilot`; `lookupCharacterId` is the Character whose
+ * token resolves a courier's location names (any of them can: names are public).
+ */
+async function contractsBoardOf(
+  contracts: readonly Contract[],
+  pilot: number | ReadonlySet<number>,
+  lookupCharacterId: number,
+  needsReauth: boolean,
+  fetchedAt: Date | null
+): Promise<ContractsBoardData> {
   const loadedAt = Date.now();
-  const summary = summarizeContractsBoard(cached?.data ?? [], characterId, loadedAt);
+  const summary = summarizeContractsBoard(contracts, pilot, loadedAt);
   const { soonest } = summary;
   // Names are cached lookups; a failed one leaves that row without a route, never the board.
   const routes: Record<number, readonly [string, string]> = {};
@@ -360,8 +464,8 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
         if (!startLocationId || !endLocationId) return;
         try {
           const [from, to] = await Promise.all([
-            loadContractLocationName(characterId, startLocationId),
-            loadContractLocationName(characterId, endLocationId),
+            loadContractLocationName(lookupCharacterId, startLocationId),
+            loadContractLocationName(lookupCharacterId, endLocationId),
           ]);
           if (from && to) routes[item.contractId] = [from, to];
         } catch {
@@ -371,7 +475,7 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   );
   const soonestRoute = soonest ? routes[soonest.contractId] : undefined;
   const route = soonestRoute ? `${soonestRoute[0]} → ${soonestRoute[1]}` : null;
-  return { summary, route, routes, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
+  return { summary, route, routes, needsReauth, fetchedAt };
 }
 
 // --- SP extraction ----------------------------------------------------------
@@ -393,9 +497,6 @@ export interface SpExtractionBoardData {
 
 // --- Mail -------------------------------------------------------------------
 
-/** Mail rows the Table view can show at its tallest size. */
-const INBOX_ROWS = 12;
-
 export interface BoardMail {
   mailId: number;
   subject: string;
@@ -404,6 +505,8 @@ export interface BoardMail {
   atMs: number | null;
   /** Set on `inbox` rows: false for mail already read. */
   unread?: boolean;
+  /** The Character whose mailbox holds it, so a row opens in the right inbox on All characters. */
+  ownerId?: number;
 }
 
 export interface MailBoardData {
@@ -437,7 +540,9 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
       atMs: header.timestamp ? Date.parse(header.timestamp) : Number.NaN,
     }))
     .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs));
-  const unreadHeaders = newestFirst.filter(({ header }) => header.is_read === false).slice(0, 4);
+  const unreadHeaders = newestFirst
+    .filter(({ header }) => header.is_read === false)
+    .slice(0, RECENT_ROWS);
   const inboxHeaders = newestFirst.slice(0, INBOX_ROWS);
   const senderIds = [...new Set([...unreadHeaders, ...inboxHeaders])].flatMap(({ header }) =>
     header.from === undefined ? [] : [header.from]
@@ -456,6 +561,7 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     from: header.from === undefined ? null : (names.get(header.from) ?? null),
     atMs: Number.isNaN(atMs) ? null : atMs,
     unread: header.is_read === false,
+    ownerId: characterId,
   });
   return {
     unread:
@@ -470,6 +576,32 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
         .filter((date): date is Date => date instanceof Date)
         .sort((a, b) => a.getTime() - b.getTime())[0] ?? null,
   };
+}
+
+/**
+ * Why an All read came back with no Character: nobody holds `scope` (a permission to ask
+ * for), or every read that was tried failed (an outage, which must not read as a missing grant).
+ */
+async function nobodyGranted(scope: string): Promise<boolean> {
+  return (await characterIdsWithScopes([scope])).length === 0;
+}
+
+/** Every Character's mail folded into one board: the unread counts added, the newest rows interleaved. */
+export async function loadAllMailBoard(): Promise<MailBoardData> {
+  const { fanOutAllCharacters } = await import('@/features/character/allCharactersFanOut');
+  const scope = ESI_REGISTRY.getCharacterMailHeaders.scope;
+  const { entries } = await fanOutAllCharacters<MailBoardData>({
+    scope,
+    load: ({ characterId }) => loadMailBoard(characterId),
+  });
+  if (entries.length === 0) {
+    // No Character granted mail: a permission to ask for, never "no mail".
+    if (await nobodyGranted(scope)) {
+      return { unread: 0, recent: [], inbox: [], needsReauth: true, fetchedAt: null };
+    }
+    throw new Error('Mail could not be read');
+  }
+  return mergeMailBoards(entries);
 }
 
 // --- Price alerts -----------------------------------------------------------

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render as renderBare, screen } from '@testing-library/react';
 import '@/i18n';
 import { StartLinkHelp } from './StartLinkHelp';
 import { ShortLinkLimited } from './shortStartLink';
@@ -9,6 +9,13 @@ vi.mock('./shortStartLink', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./shortStartLink')>()),
   makeShortLink,
 }));
+
+/** The help starts folded; open it the way a pilot does, by pressing its header. */
+function render(ui: Parameters<typeof renderBare>[0]) {
+  const result = renderBare(ui);
+  fireEvent.click(screen.getByText('How to make a start link'));
+  return result;
+}
 
 beforeEach(() => {
   makeShortLink.mockReset();

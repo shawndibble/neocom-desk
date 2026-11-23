@@ -20,7 +20,7 @@ dev`) — Shawn frequently has another agent working there at the same
   Dev and production share one Firebase project and its data, so Firestore changes from
   `develop` stay additive and backward-compatible (docs/context/decisions/).
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
-- **Reuse before writing: docs/SHARED-CODE.md** lists the shared helpers (guards, `chunk`, time constants, `utcDay`, `Translate`, test seeds). Grep and check it before adding a helper; a private copy of a listed one is a defect. Add a row when you add a shared helper.
+- **Reuse before writing: docs/SHARED-CODE.md** lists the shared helpers (guards, `chunk`, time constants, `utcDay`, `Translate`, test seeds). Grep and check it before adding a helper; a private copy of a listed one is a defect. Add a row when you add a shared helper. Loading an async value in a component is never a new `useEffect` + `cancelled` flag + `useState`: use `useKeyedLoad` / `useAsyncLoad`, and convert an existing one when you touch its file (its "Known remainders" entry says which to leave).
 - `GLOSSARY.md` is the glossary. Use its terms exactly. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md` for the terms in your task.
 - **Never append a scope decision to `GLOSSARY.md`.** Scope decisions live one
   per file in `docs/context/decisions/`, named `YYYYMMDD-HHMMSS-<slug>.md`.

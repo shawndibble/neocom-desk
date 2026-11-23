@@ -20,6 +20,8 @@ const ROW_CONTROL_SELECTOR = [
   '[role="link"]',
   '[role="menuitem"]',
   '[role="switch"]',
+  '[role="tab"]',
+  '[role="combobox"]',
   '[data-row-control]',
 ].join(',');
 

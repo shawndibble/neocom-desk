@@ -53,14 +53,20 @@ export interface ContractsBoardSummary {
 }
 
 /** An offer the pilot made themselves, or one sent to them (never a corporation's). */
-const isOwnOffer = (c: Contract, characterId: number) =>
-  (c.issuer_id === characterId && !c.for_corporation) || c.assignee_id === characterId;
+const isOwnOffer = (c: Contract, owns: (id: number) => boolean) =>
+  (owns(c.issuer_id) && !c.for_corporation) || owns(c.assignee_id);
 
+/**
+ * `pilot` is one Character, or several for an All characters read (pass each contract once:
+ * one between two of them is then counted once, not per Character).
+ */
 export function summarizeContractsBoard(
   contracts: readonly Contract[],
-  characterId: number,
+  pilot: number | ReadonlySet<number>,
   nowMs: number
 ): ContractsBoardSummary {
+  const owns =
+    typeof pilot === 'number' ? (id: number) => id === pilot : (id: number) => pilot.has(id);
   let inProgress = 0;
   let exchanges = 0;
   let outstanding = 0;
@@ -81,7 +87,7 @@ export function summarizeContractsBoard(
   });
 
   for (const c of contracts) {
-    if (c.status === 'outstanding' && isOwnOffer(c, characterId)) {
+    if (c.status === 'outstanding' && isOwnOffer(c, owns)) {
       const expiresMs = parseInstant(c.date_expired);
       if (expiresMs !== null && expiresMs > nowMs) {
         outstanding += 1;
@@ -97,11 +103,11 @@ export function summarizeContractsBoard(
         });
       }
     }
-    if (c.type === 'item_exchange' && c.status === 'outstanding' && isOwnOffer(c, characterId)) {
+    if (c.type === 'item_exchange' && c.status === 'outstanding' && isOwnOffer(c, owns)) {
       exchanges += 1;
     }
     // Only hauls this pilot is carrying: the feed also lists couriers they issued for someone else to deliver.
-    if (c.type === 'courier' && c.status === 'in_progress' && c.acceptor_id === characterId) {
+    if (c.type === 'courier' && c.status === 'in_progress' && owns(c.acceptor_id)) {
       // Keep the offer expiry rather than guess, as the other courier surfaces do.
       const atMs = courierDeliveryDeadlineMs(c) ?? parseInstant(c.date_expired);
       inProgress += 1;
@@ -120,7 +126,7 @@ export function summarizeContractsBoard(
       };
       consider(haul);
       rows.push({ ...haul, state: 'in_progress' });
-    } else if (c.status === 'outstanding' && c.issuer_id === characterId && !c.for_corporation) {
+    } else if (c.status === 'outstanding' && owns(c.issuer_id) && !c.for_corporation) {
       const atMs = parseInstant(c.date_expired);
       // An expired listing is stale, not a deadline.
       if (atMs === null || atMs < nowMs || atMs > nowMs + LISTING_WINDOW_MS) continue;

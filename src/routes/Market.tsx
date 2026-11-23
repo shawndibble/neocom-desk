@@ -16,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
-  FilterChip,
   IconButton,
   LiveNote,
   LiveStatus,
@@ -24,6 +23,7 @@ import {
   Panel,
   RegionSelect,
   SearchInput,
+  SegmentedControl,
   Spinner,
   TabPanel,
   Tabs,
@@ -627,7 +627,7 @@ export function Market() {
             usesHubPicker(tab) ? (
               <>
                 {/* The mode chip and the picker next to it printed the same words
-                  twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected chip
+                  twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected segment
                   *is* the picker's label, so the picker keeps the string as its
                   `aria-label` only: still announced, no longer duplicated on
                   screen.
@@ -636,20 +636,16 @@ export function Market() {
                   station, so it has no Region mode to toggle into, and its hub
                   picker sits in the panel beside Price %. */}
                 {tab === 'browser' && (
-                  <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
-                    <FilterChip
-                      label={t('market.modeHub')}
-                      size="md"
-                      selected={effectiveLocation.mode === 'hub'}
-                      onToggle={() => handleModeChange('hub')}
-                    />
-                    <FilterChip
-                      label={t('market.modeRegion')}
-                      size="md"
-                      selected={effectiveLocation.mode === 'region'}
-                      onToggle={() => handleModeChange('region')}
-                    />
-                  </div>
+                  <SegmentedControl
+                    label={t('market.locationMode')}
+                    size="md"
+                    options={[
+                      { value: 'hub', label: t('market.modeHub') },
+                      { value: 'region', label: t('market.modeRegion') },
+                    ]}
+                    value={effectiveLocation.mode}
+                    onChange={handleModeChange}
+                  />
                 )}
                 {tab === 'appraisal' ? null : effectiveLocation.mode === 'hub' ? (
                   <HubField
@@ -716,7 +712,7 @@ export function Market() {
         />
 
         <TabPanel tabsId={viewsTabsId} tabId={tab}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
             {tab === 'orders' && <OrdersTab headerSlots={headerSlots} />}
             {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
@@ -921,10 +917,11 @@ export function Market() {
                             {t('market.contextMenu.showInfo')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            disabled={!selectedBlueprintTypeId}
-                            onSelect={() =>
-                              navigate(`${industryTabHref('plans')}?product=${selectedTypeId}`)
-                            }
+                            aria-disabled={!selectedBlueprintTypeId || undefined}
+                            onSelect={() => {
+                              if (selectedBlueprintTypeId)
+                                navigate(`${industryTabHref('plans')}?product=${selectedTypeId}`);
+                            }}
                           >
                             {selectedBlueprintTypeId === undefined
                               ? t('industry.contextMenu.buildPlanChecking')

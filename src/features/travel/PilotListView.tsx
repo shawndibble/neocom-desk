@@ -20,6 +20,8 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  LiveNote,
+  LiveStatus,
   Panel,
   SegmentedControl,
   Spinner,
@@ -432,15 +434,18 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           </p>
         )}
         {settled < checked.length && (
-          <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
+          <p className="flex items-center gap-2 text-xs text-text-dim">
+            <LiveStatus>
+              {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
+            </LiveStatus>
             <Spinner label={t('common.loading')} />
             {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
           </p>
         )}
         {settled === checked.length && unreachable > 0 && (
-          <p role="status" className="text-xs text-text-dim">
+          <LiveNote className="text-xs text-text-dim">
             {t('travel.pilot.list.unreachableSummary', { count: unreachable })}
-          </p>
+          </LiveNote>
         )}
         {byOrganization ? (
           <>

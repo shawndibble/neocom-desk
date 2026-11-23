@@ -6,7 +6,7 @@ import { LogoMark } from '@/components/ui';
 export function VettingPublicFrame({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-bg text-text">
+    <div className="min-h-dvh bg-bg text-text">
       <header className="flex items-center gap-2 border-b border-line px-4 py-3">
         <LogoMark className="size-6" />
         <span className="text-sm font-semibold tracking-wide">{t('app.name')}</span>

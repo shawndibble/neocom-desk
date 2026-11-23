@@ -25,7 +25,7 @@ import {
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { UnlinkConfirm } from './moons/UnlinkConfirm';
 import { InlineError } from '@/components/ui/InlineError';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
@@ -360,22 +360,21 @@ export function PlayersView({
         />
       </div>
       {removing?.group && (
-        <ConfirmDialog
-          open
+        <UnlinkConfirm
           title={t('corp.members.players.removeTitle', {
             name: removing.name,
             main: grouping.source.name(removing.group.mainCharacterId),
           })}
           body={t('corp.members.players.removeBody', { name: removing.name })}
           actionLabel={t('corp.members.players.removeAction')}
-          cancelLabel={t('common.cancel')}
           failedLabel={t('corp.members.players.removeFailed')}
           onClose={() => setRemoving(null)}
-          onConfirm={async () => {
+          onUnlink={async (leftOn) => {
             await editAndClear({
               action: 'unlink',
               minerId: removing.group!.id,
               characterId: removing.characterId,
+              leftOn,
             });
           }}
         />
@@ -536,7 +535,13 @@ function PlayerLineMenu({
         ) : blocked ? (
           inert(t('corpTaxBook.moons.grouping.makeMain'), t('corp.members.players.makeMainOutside'))
         ) : (
-          <MenuItem disabled={busy} onSelect={() => onMakeMain(line)}>
+          <MenuItem
+            aria-disabled={busy || undefined}
+            onSelect={(event) => {
+              if (busy) event.preventDefault();
+              else onMakeMain(line);
+            }}
+          >
             {t('corpTaxBook.moons.grouping.makeMain')}
           </MenuItem>
         )}

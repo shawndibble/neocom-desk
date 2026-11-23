@@ -88,7 +88,7 @@ describe('ShareSkillPlansTab', () => {
     await waitFor(() =>
       expect(store.sharePlan).toHaveBeenCalledWith(1, 'c1', expect.objectContaining({ id: 'b' }))
     );
-    expect(await screen.findByText('1 plan shared')).toBeInTheDocument();
+    expect((await screen.findAllByText('1 plan shared')).at(-1)).toBeInTheDocument();
   });
 
   it('stops sharing a plan from its row', async () => {

@@ -13,7 +13,7 @@ import { useAccountCharacters } from '@/features/character/useCharacters';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   Button,
-  Caret,
+  CaretToggle,
   DataAgeBadge,
   DataTable,
   DropdownMenu,
@@ -751,7 +751,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   /**
    * Last-updated, Export and Refresh. With a list to fold they live inside the
    * accordion body, on the filter row's far right, so the title bar stays just
-   * the summary, the slot readout and the caret. With no list (idle, loading,
+   * the summary and the slot readout. With no list (idle, loading,
    * re-auth, nothing cached) there is no body to hold them, so they fall back
    * to the header — an idle panel must still be refreshable.
    */
@@ -783,19 +783,21 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         <span className="flex items-center gap-2">
           {/* In `actions` (rather than `meta`, beside "N running · N done") so
               it doesn't read as a description of what's currently running;
-              the caret keeps the literal last slot as the primary affordance. */}
+              the caret leads the title instead. */}
           {jobSlotSummaryElement}
           {!collapsible && listActions}
-          {collapsible && (
-            <IconButton
-              size="sm"
-              icon={<Caret expanded={listExpanded} />}
-              label={listExpanded ? t('industry.jobsHideList') : t('industry.jobsShowList')}
-              aria-expanded={listExpanded}
-              onClick={() => setExpanded(!listExpanded)}
-            />
-          )}
         </span>
+      }
+      // Leading caret, whole header toggles (DESIGN.md §6c); the far right is for actions.
+      onHeaderToggle={collapsible ? () => setExpanded(!listExpanded) : undefined}
+      leading={
+        collapsible && (
+          <CaretToggle
+            expanded={listExpanded}
+            label={listExpanded ? t('industry.jobsHideList') : t('industry.jobsShowList')}
+            onClick={() => setExpanded(!listExpanded)}
+          />
+        )
       }
       // Nothing renders below with the list folded and no per-character note
       // to make, so the panel sheds its padding and collapses to the header.

@@ -23,6 +23,7 @@ import {
   duplicateWidgetUndoable,
   moveToWidget,
   moveWidget,
+  newWidget,
   removeWidgetUndoable,
   renameWidget,
   resetLayoutUndoable,
@@ -40,6 +41,7 @@ import {
   setHiddenLayers,
   setTrendItems,
   setScope,
+  setAllScopesUndoable,
   setShow,
   setShowOnPhone,
   setView,
@@ -47,10 +49,17 @@ import {
   stepWidget,
   type OverviewLayout,
   type UndoableResult,
+  type WidgetShow,
 } from './layout';
 import { useWidgetBoard } from './board';
 import { kindSumsAcrossCharacters } from './data/models';
 import { visibleWidgets } from './visibility';
+
+/** Whether a widget of `kind` would sum across Characters with the settings it is created with. */
+function sumsAsCreated(kind: string, show?: WidgetShow): boolean {
+  const created = newWidget(kind, 'new', show);
+  return created !== null && kindSumsAcrossCharacters(kind, created);
+}
 
 export const FLASH_MS = 1600;
 const ROLES_UNDO_LABEL = 'overview.customize.undo.roles';
@@ -170,10 +179,12 @@ export function OverviewEditProvider({
         if (before !== null) commit(restoreLayout(before));
       },
       add: (kind, init) => {
-        // A preset that reads one corporation (the corp wallet on Flow) stays on it.
+        // A new widget opens on All characters wherever its kind can sum them (the Overview's
+        // default; the Corp Board's named kinds). A preset that reads one corporation (the
+        // corp wallet on Flow) stays on it.
         const opensOnAll =
-          boardRef.current.opensOnAll.has(kind) &&
-          kindSumsAcrossCharacters(kind, { show: init?.show });
+          (boardRef.current.id === 'overview' || boardRef.current.opensOnAll.has(kind)) &&
+          sumsAsCreated(kind, init?.show);
         const result = addWidgetUndoable(
           layoutRef.current,
           kind,
@@ -220,6 +231,19 @@ export function OverviewEditProvider({
       moveEdge: (id, edge) => commit(moveWidget(layoutRef.current, id, edge)),
       setView: (id, view) => commit(setView(layoutRef.current, id, view)),
       setScope: (id, scope) => commit(setScope(layoutRef.current, id, scope)),
+      setAllScopes: (scope) =>
+        void commitUndoable(
+          setAllScopesUndoable(
+            layoutRef.current,
+            scope,
+            // On the Overview a kind that cannot sum stays where it is; on the Corp Board it is
+            // put on All too, so it asks which corporation instead of quietly reading one.
+            (w) =>
+              scope !== 'all' ||
+              boardRef.current.id === 'corp' ||
+              kindSumsAcrossCharacters(w.kind, w)
+          )
+        ),
       setRange: (id, range) => commit(setRange(layoutRef.current, id, range)),
       setRowsPerPage: (id, rows) => commit(setRowsPerPage(layoutRef.current, id, rows)),
       setPlexPer30Days: (id, plex) => commit(setPlexPer30Days(layoutRef.current, id, plex)),

@@ -63,6 +63,7 @@ import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   DataAgeBadge,
   EmptyState,
+  LiveNote,
   PageHeader,
   Panel,
   Spinner,
@@ -645,24 +646,18 @@ function RouteBody({
               />
             )}
             {holesState.kind === 'loading' && (
-              <p role="status" className="text-sm text-text-dim">
-                {t('travel.holes.loading')}
-              </p>
+              <LiveNote className="text-sm text-text-dim">{t('travel.holes.loading')}</LiveNote>
             )}
             {holesState.kind === 'unavailable' && (
-              <p role="status" className="text-sm text-text-dim">
-                {t('travel.holes.unavailable')}
-              </p>
+              <LiveNote className="text-sm text-text-dim">{t('travel.holes.unavailable')}</LiveNote>
             )}
             {state.activityLoading && (
-              <p role="status" className="text-sm text-text-dim">
-                {t('travel.activityLoading')}
-              </p>
+              <LiveNote className="text-sm text-text-dim">{t('travel.activityLoading')}</LiveNote>
             )}
             {state.activityUnavailable && (
-              <p role="status" className="text-sm text-text-dim">
+              <LiveNote className="text-sm text-text-dim">
                 {t('travel.activityUnavailable')}
-              </p>
+              </LiveNote>
             )}
             {!multiStop && onlyLeg?.rows ? (
               <LegBody

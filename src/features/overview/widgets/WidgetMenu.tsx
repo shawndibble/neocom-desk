@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
+  DisabledMenuItem,
   MenuCheckboxItem,
   MenuItem,
   MenuLabel,
@@ -35,6 +36,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import { kindSumsAcrossCharacters } from './data/models';
+import { useAccountCorporations } from '@/features/corp/accountCorporationsContext';
 import { boardKey, readScope, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
@@ -56,6 +58,7 @@ import {
   RAIDS_RADII,
   RAIDS_WHERES,
   type RaidsWhere,
+  corpScope,
   LEGACY_PROFIT_SOURCE,
   PROFIT_SOURCES,
   type ProfitSource,
@@ -187,7 +190,12 @@ function PlexPlanDialog({
           <Button type="button" onClick={onClose}>
             {t('overview.menu.plexPlanCancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={!valid}>
+          <Button
+            type="submit"
+            variant="primary"
+            aria-disabled={!valid || undefined}
+            aria-describedby={hintId}
+          >
             {t('overview.menu.plexPlanSave')}
           </Button>
         </DialogFooter>
@@ -234,15 +242,20 @@ function CalendarTypesSub({ widget }: { widget: Widget }) {
           </MenuCheckboxItem>
         ))}
         <MenuSeparator />
-        <MenuItem
-          disabled={hidden.length === 0}
-          onSelect={(event) => {
-            event.preventDefault();
-            edit.setHiddenKinds(widget.id, []);
-          }}
-        >
-          {t('calendar.filter.showAll')}
-        </MenuItem>
+        {hidden.length === 0 ? (
+          <DisabledMenuItem reason={t('overview.menu.showAllNothingHidden')}>
+            {t('calendar.filter.showAll')}
+          </DisabledMenuItem>
+        ) : (
+          <MenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              edit.setHiddenKinds(widget.id, []);
+            }}
+          >
+            {t('calendar.filter.showAll')}
+          </MenuItem>
+        )}
       </MenuSubContent>
     </MenuSub>
   );
@@ -265,6 +278,7 @@ export function WidgetMenu({
   const navigate = useNavigate();
   const edit = useOverviewEdit();
   const board = useWidgetBoard();
+  const corporations = useAccountCorporations();
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [renaming, setRenaming] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -280,7 +294,7 @@ export function WidgetMenu({
     board.characterScope === 'always' || (canSum && board.allScopeOffered(widget.kind));
   const scopeKey = board.id === 'corp' ? 'corp.grid.menu' : 'overview.menu';
   // Read across every corporation, a Show that cannot sum is disabled with its reason (DESIGN §6c).
-  const onAll = offersScope && canSum && readScope(board, widget) === 'all';
+  const onAll = offersScope && canSum && readScope(board, widget) !== 'header';
   const showSums = (show: WidgetShow) =>
     !onAll || kindSumsAcrossCharacters(widget.kind, { ...widget, show });
   const someShowsOff = kind.shows.some((show) => !showSums(show));
@@ -347,6 +361,12 @@ export function WidgetMenu({
             <MenuRadioItem value="all" disabled={!canSum}>
               {t(`${scopeKey}.all`)}
             </MenuRadioItem>
+            {board.id === 'corp' &&
+              corporations.map((corporation) => (
+                <MenuRadioItem key={corporation.id} value={corpScope(corporation.id)}>
+                  {corporation.label.name}
+                </MenuRadioItem>
+              ))}
           </MenuRadioGroup>
           {!canSum && (
             <p className="px-2 pb-1 text-xs text-text-dim">{t('overview.menu.nameOnly')}</p>
@@ -494,21 +514,33 @@ export function WidgetMenu({
       <MenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
         {t('overview.menu.rename')}
       </MenuItem>
-      <MenuItem
-        disabled={edit.layout.widgets.length >= MAX_WIDGETS}
-        onSelect={() => edit.duplicate(widget.id)}
-      >
-        {t('overview.menu.duplicate')}
-      </MenuItem>
-      <MenuItem disabled={index <= 0} onSelect={() => edit.moveEdge(widget.id, 'top')}>
-        {t('overview.menu.top')}
-      </MenuItem>
-      <MenuItem
-        disabled={index < 0 || index >= last}
-        onSelect={() => edit.moveEdge(widget.id, 'bottom')}
-      >
-        {t('overview.menu.bottom')}
-      </MenuItem>
+      {edit.layout.widgets.length >= MAX_WIDGETS ? (
+        <DisabledMenuItem reason={t('overview.menu.duplicateAtLimit')}>
+          {t('overview.menu.duplicate')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={() => edit.duplicate(widget.id)}>
+          {t('overview.menu.duplicate')}
+        </MenuItem>
+      )}
+      {index <= 0 ? (
+        <DisabledMenuItem reason={t('overview.menu.alreadyTop')}>
+          {t('overview.menu.top')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={() => edit.moveEdge(widget.id, 'top')}>
+          {t('overview.menu.top')}
+        </MenuItem>
+      )}
+      {index < 0 || index >= last ? (
+        <DisabledMenuItem reason={t('overview.menu.alreadyBottom')}>
+          {t('overview.menu.bottom')}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem onSelect={() => edit.moveEdge(widget.id, 'bottom')}>
+          {t('overview.menu.bottom')}
+        </MenuItem>
+      )}
       <MenuCheckboxItem
         checked={widget.showOnPhone}
         onCheckedChange={(next) => edit.setShowOnPhone(widget.id, next === true)}

@@ -69,26 +69,15 @@ describe('Lines chart', () => {
     expect(screen.getByText('Tritanium').closest('li')).not.toHaveAttribute('tabindex');
   });
 
-  it('fills a single line with a gradient and drops the legend and low/high row', () => {
+  it('fills a single line with a flat tint (no gradient) and drops the legend and low/high row', () => {
     const single: LinesChartModel = { ...model, series: [model.series[0]!] };
     const { container } = render(<Chart model={single} size="M" />);
     const fill = container.querySelector('polygon')!;
-    const id = container.querySelector('linearGradient')!.id;
-    expect(fill.getAttribute('fill')).toBe(`url(#${id})`);
+    expect(container.querySelector('linearGradient')).toBeNull();
+    expect(fill.getAttribute('fill')).not.toMatch(/^url\(/);
+    expect(fill.getAttribute('fill-opacity')).toBe('0.14');
     expect(container.querySelector('li')).toBeNull();
     expect(screen.queryByText('+8.4%')).toBeNull();
     expect(screen.getByText('Two items over 7 days.')).toBeInTheDocument();
-  });
-
-  it('gives each single-line chart its own gradient id', () => {
-    const single: LinesChartModel = { ...model, series: [model.series[0]!] };
-    const { container } = render(
-      <>
-        <Chart model={single} size="M" />
-        <Chart model={single} size="M" />
-      </>
-    );
-    const ids = [...container.querySelectorAll('linearGradient')].map((g) => g.id);
-    expect(new Set(ids).size).toBe(2);
   });
 });

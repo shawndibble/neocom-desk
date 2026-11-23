@@ -5,9 +5,8 @@
  * used up (`tradingProfit`), each drawn exactly as its own widget was; Both
  * adds them up here, with the summing in `profitCombine.ts`.
  *
- * Scope: Builds reads the header Character's logged runs only, so Both does
- * too, and narrows Trading to the same Character; only Trading alone can pool
- * every Character (`KindDef.bySettings` in `kindModels.ts`).
+ * Scope: every Source can read All characters: Builds the logged runs of each
+ * Character, Trading its pooled fills (`KindDef.bySettings` in `kindModels.ts`).
  */
 import { formatIskCompactSigned } from '@/lib/isk';
 import { WALLET_TRADE_ENDPOINTS } from '../kinds';
@@ -26,7 +25,9 @@ const C = 'overview.widgets.chart.profit';
 /** The chart strings every bar chart shares. */
 const CS = 'overview.widgets.chart';
 
-export const profit: Builder = (feeds, ctx) => {
+export const profit: Builder = (allFeeds, ctx) => {
+  // On All characters the builds read is every Character's runs, drawn by the same builders.
+  const feeds = ctx.scopeAll ? { ...allFeeds, profit: allFeeds.profitAll } : allFeeds;
   if (ctx.profitSource === 'trading') return tradingProfit(feeds, ctx);
   if (ctx.profitSource === 'both') return bothProfit(feeds, ctx);
   return buildProfit(feeds, ctx);

@@ -19,7 +19,7 @@ describe('scopePresentation', () => {
   });
 
   it('falls back to the header Character, and says so, for a kind that cannot sum', () => {
-    expect(scopePresentation('mail', 'all')).toEqual({
+    expect(scopePresentation('location', 'all')).toEqual({
       scopeAll: false,
       chip: false,
       fallbackNote: true,
@@ -36,5 +36,27 @@ describe('scopePresentation', () => {
 
   it('never notes a fallback for a placeholder kind with no data', () => {
     expect(scopePresentation('netWorth', 'all').fallbackNote).toBe(false);
+  });
+
+  it('narrows a kind that can sum to the one corporation, with the chip', () => {
+    expect(scopePresentation('orders', 'corp:7')).toEqual({
+      scopeAll: true,
+      chip: true,
+      fallbackNote: false,
+      corporationId: 7,
+    });
+  });
+
+  it('asks a kind that reads one corporation which one, on the Corp Board', () => {
+    expect(scopePresentation('location', 'all', undefined, true)).toEqual({
+      scopeAll: false,
+      chip: false,
+      fallbackNote: false,
+      needsOneCorporation: true,
+    });
+    expect(scopePresentation('location', 'corp:7', undefined, true)).toMatchObject({
+      needsOneCorporation: true,
+      wantedCorporationId: 7,
+    });
   });
 });

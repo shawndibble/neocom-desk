@@ -190,7 +190,7 @@ export function Toast({
       className={`toast-in bg-panel-2 border-line-bright text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ${
         stacked
           ? 'pointer-events-auto max-w-full'
-          : 'fixed bottom-32 left-1/2 z-40 w-[95vw] -translate-x-1/2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]'
+          : 'fixed bottom-[calc(8rem+env(safe-area-inset-bottom))] left-1/2 z-40 w-[95vw] -translate-x-1/2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]'
       }`}
       // Mouse only: a tap emulates mouseenter and nothing ever sends the leave.
       onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}

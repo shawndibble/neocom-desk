@@ -269,8 +269,10 @@ function ShipTab({
             <li key={hull.typeId}>
               <button
                 type="button"
-                disabled={disabled}
-                onClick={() => onChoose(hull.typeId, hull.name)}
+                aria-disabled={disabled || undefined}
+                onClick={() => {
+                  if (!disabled) onChoose(hull.typeId, hull.name);
+                }}
                 className={`flex w-full items-baseline justify-between gap-2 rounded-xs px-2 py-1.5 text-left text-sm ${tappableRowClassName} ${rowInteractiveClassName} ${focusRingInsetClassName} ${disabledClassName}`}
               >
                 <span>{hull.name}</span>
@@ -306,8 +308,10 @@ function FittingTab({
         <li key={row.id}>
           <button
             type="button"
-            disabled={disabled}
-            onClick={() => onChoose(row.record)}
+            aria-disabled={disabled || undefined}
+            onClick={() => {
+              if (!disabled) onChoose(row.record);
+            }}
             className={`flex w-full items-baseline justify-between gap-2 rounded-xs px-2 py-1.5 text-left text-sm ${tappableRowClassName} ${rowInteractiveClassName} ${focusRingInsetClassName} ${disabledClassName}`}
           >
             <span>{row.name}</span>

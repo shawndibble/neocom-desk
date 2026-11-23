@@ -15,7 +15,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import { useTranslation } from 'react-i18next';
-import { TextArea } from '@/components/ui';
+import { LiveNote, TextArea } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import {
@@ -301,14 +301,10 @@ export default function RichMailBodyEditor({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {dropped && !inSource && (
-        <p role="status" className="text-xs text-text-dim">
-          {t('mail.format.sourceDropped')}
-        </p>
+        <LiveNote className="text-xs text-text-dim">{t('mail.format.sourceDropped')}</LiveNote>
       )}
       {inSource && droppedMarkup(source) && (
-        <p role="status" className="text-xs text-text-dim">
-          {t('mail.format.sourceWillDrop')}
-        </p>
+        <LiveNote className="text-xs text-text-dim">{t('mail.format.sourceWillDrop')}</LiveNote>
       )}
       {/* One card: the bar is its top strip, then the surface. */}
       <div

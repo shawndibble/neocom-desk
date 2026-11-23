@@ -640,7 +640,13 @@ export type EditAction =
   /** Flags an Extraction Fully Mined (who and when kept) or clears it (#5257). Both are audited. */
   | { action: 'setFullyMined'; extractionId: string; fullyMined: boolean }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
-  | { action: 'unlink'; minerId: string; characterId: number }
+  | {
+      /** `leftOn`: the day the Character left (a sale); mining and donations before it stay put. */
+      action: 'unlink';
+      minerId: string;
+      characterId: number;
+      leftOn?: string;
+    }
   | {
       /** Folds stored Miners into one, atomically (#4194): the "Group with…" dialog's single call. */
       action: 'regroupMiner';
@@ -1020,6 +1026,7 @@ export function parseEditAction(data: unknown): EditAction {
         action,
         minerId: docId(d.minerId, 'minerId'),
         characterId: int(d.characterId, 'characterId'),
+        ...(d.leftOn !== undefined ? { leftOn: dateString(d.leftOn, 'leftOn') } : {}),
       };
     case 'addAdjustment':
       return {

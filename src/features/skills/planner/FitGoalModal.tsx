@@ -67,10 +67,12 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
               <li key={option.id}>
                 <button
                   type="button"
-                  disabled={!isFitGoalPickable(option)}
-                  onClick={() => choose(option)}
+                  aria-disabled={!isFitGoalPickable(option) || undefined}
+                  onClick={() => {
+                    if (isFitGoalPickable(option)) choose(option);
+                  }}
                   className={cx(
-                    'flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left hover:bg-panel-2 disabled:cursor-default disabled:hover:bg-transparent',
+                    'flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left hover:bg-panel-2 aria-disabled:cursor-default aria-disabled:hover:bg-transparent',
                     focusRingClassName
                   )}
                 >

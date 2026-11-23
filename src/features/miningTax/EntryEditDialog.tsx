@@ -13,6 +13,7 @@ import {
   SelectValue,
   IskInput,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
@@ -447,13 +448,16 @@ export function EntryEditDialog({
 
         <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button
-            variant="primary"
-            disabled={saving || !payeeId || !pctValid}
-            onClick={() => void handleSave()}
-          >
-            {t('miningTax.entryEdit.save', { count: current.length })}
-          </Button>
+          <Tooltip content={!payeeId || !pctValid ? t('common.needsInput') : null}>
+            <Button
+              variant="primary"
+              loading={saving}
+              aria-disabled={!payeeId || !pctValid || undefined}
+              onClick={() => void handleSave()}
+            >
+              {t('miningTax.entryEdit.save', { count: current.length })}
+            </Button>
+          </Tooltip>
           <Button className="ml-auto" onClick={onClose}>
             {t('filters.cancel')}
           </Button>

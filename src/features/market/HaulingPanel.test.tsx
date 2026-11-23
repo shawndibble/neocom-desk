@@ -676,7 +676,7 @@ describe('HaulingPanel fill the free space', () => {
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
-    expect(screen.getByRole('button', { name: /^Add 0/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Add 0/ })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('keeps what earlier batches found addable when a batch fails', async () => {

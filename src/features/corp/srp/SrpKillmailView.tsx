@@ -8,7 +8,7 @@ import { type ReactNode } from 'react';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { TypeIconLabel } from '@/components/TypeIconLabel';
-import { Spinner, Tooltip } from '@/components/ui';
+import { Spinner, Tooltip, LiveNote } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -162,11 +162,7 @@ function Fit({
   const rackOf = useRackLookup();
   if (killmail === 'loading' || rackOf === undefined) return <Spinner size="sm" delayMs={200} />;
   if (killmail === 'failed' || killmail === null) {
-    return (
-      <p role="status" className="text-xs text-warning">
-        {t('srpKillmail.fitFailed')}
-      </p>
-    );
+    return <LiveNote className="text-xs text-warning">{t('srpKillmail.fitFailed')}</LiveNote>;
   }
   const groups = fitGroups(killmail.victim.items ?? [], check, rackOf ?? undefined);
   const checked = check !== undefined && check.status !== 'not-checked';

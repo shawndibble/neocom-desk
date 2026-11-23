@@ -404,7 +404,7 @@ describe('BuildPlanDetail Break Even button', () => {
 
     await user.click(await breakEvenButton());
 
-    expect(await screen.findByText(/No break even found up to/)).toBeInTheDocument();
+    expect(await screen.findAllByText(/No break even found up to/)).not.toHaveLength(0);
     expect(onUpdate).not.toHaveBeenCalled();
     expect(valueOf(runsInput())).toBe('10');
   });
@@ -416,7 +416,7 @@ describe('BuildPlanDetail Break Even button', () => {
     render(<Harness plan={{ runs: 10 }} />);
     await openSetup(user);
     await user.click(await breakEvenButton());
-    expect(await screen.findByText(/No break even found up to/)).toBeInTheDocument();
+    expect(await screen.findAllByText(/No break even found up to/)).not.toHaveLength(0);
 
     await user.clear(runsInput());
     await user.type(runsInput(), '20');

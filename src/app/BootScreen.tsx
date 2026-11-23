@@ -72,7 +72,7 @@ export function BootScreen({ gate }: { gate?: BootGate }) {
   }, [gate]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg p-6 text-center text-text">
+    <main className="safe-inset flex min-h-dvh [--safe-x:1.5rem] [--safe-y:1.5rem] flex-col items-center justify-center gap-3 bg-bg text-center text-text">
       <LogoMark className="size-10" />
       <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
       <Spinner label={t('common.loading')} />
@@ -98,7 +98,7 @@ export function BootScreen({ gate }: { gate?: BootGate }) {
               dead button and invites a second tap, which starts a second flow. */}
           <Button
             size="sm"
-            disabled={recovering}
+            loading={recovering}
             onClick={() => {
               recoveringRef.current = true;
               setRecovering(true);

@@ -112,7 +112,7 @@ const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg text-text">
+    <main className="flex min-h-dvh items-center justify-center bg-bg text-text">
       <Spinner label={t('common.loading')} />
     </main>
   );

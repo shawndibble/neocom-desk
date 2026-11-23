@@ -355,6 +355,7 @@ export function RouteSystemsTable({
       }
       rowClassName={(row) => (isHoleStep(row) ? 'bg-panel-2' : undefined)}
       expandableRow={{
+        leadingIcon: true,
         renderDetail: (row) =>
           isHoleStep(row) ? null : <RowDetail row={row} cell={killsOf(row.systemId)} />,
       }}

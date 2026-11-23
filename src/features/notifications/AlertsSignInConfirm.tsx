@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox } from '@/components/ui';
+import { Button, Checkbox, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
@@ -89,14 +89,16 @@ export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }
         <Button size="sm" variant="ghost" onClick={onCancel} aria-disabled={busy || undefined}>
           {t(key('back'))}
         </Button>
-        <Button
-          size="sm"
-          loading={busy}
-          disabled={steps.length === 0}
-          onClick={() => onContinue(include)}
-        >
-          {t(key('continue'))}
-        </Button>
+        <Tooltip content={steps.length === 0 ? t('common.nothingToDo') : null}>
+          <Button
+            size="sm"
+            loading={busy}
+            aria-disabled={steps.length === 0 || undefined}
+            onClick={() => onContinue(include)}
+          >
+            {t(key('continue'))}
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );

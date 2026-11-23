@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button, Spinner } from '@/components/ui';
+import { Button, LiveNote, Spinner } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -61,9 +61,7 @@ function KillmailFit({
   }
   if (!read.ok) {
     return (
-      <p role="status" className="text-xs text-warning">
-        {t('travel.pilot.recent.fitFailed')}
-      </p>
+      <LiveNote className="text-xs text-warning">{t('travel.pilot.recent.fitFailed')}</LiveNote>
     );
   }
   if (read.fitting === null) {

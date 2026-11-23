@@ -1,6 +1,5 @@
 import { useCallback, useRef, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
-import { Tooltip } from './Tooltip';
 import { AlertsBell } from './AlertsBell';
 import { PageHeaderClusterContext } from './pageHeaderCluster';
 import { usePageHeaderSlot } from './pageHeaderSlot';
@@ -128,7 +127,7 @@ export function PageHeader({
       tabIndex={-1}
       className={cx(
         'max-w-full text-xl font-semibold tracking-widest uppercase focus:outline-none',
-        singleLine ? 'min-w-0 truncate' : 'min-w-0 shrink-0 break-words'
+        singleLine ? 'min-w-12 truncate' : 'min-w-0 shrink-0 break-words'
       )}
     >
       {title}
@@ -155,15 +154,7 @@ export function PageHeader({
         )}
       >
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
-        {singleLine ? (
-          // The tooltip's trigger is a wrapper, not the `h1`: route focus lands on the
-          // `h1`, and a focused trigger would pop the bubble after every keyboard navigation.
-          <Tooltip content={title}>
-            <span className="flex min-w-12 max-w-full shrink">{h1}</span>
-          </Tooltip>
-        ) : (
-          h1
-        )}
+        {h1}
         {singleLine
           ? meta && (
               // Shrinks before the title does (the larger factor), and clips.

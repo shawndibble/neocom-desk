@@ -75,7 +75,9 @@ function SharedBlueprintMenu({
             {t('communities.library.openInSourcing')}
           </MenuItem>
           {systemId === undefined ? (
-            <MenuItem disabled>{t('communities.library.viewRouteChecking')}</MenuItem>
+            <MenuItem aria-disabled onSelect={(event) => event.preventDefault()}>
+              {t('communities.library.viewRouteChecking')}
+            </MenuItem>
           ) : systemId === null ? (
             <DisabledMenuItem reason={t('communities.library.systemUnknown')}>
               {t('travel.waypoints.viewRoute')}

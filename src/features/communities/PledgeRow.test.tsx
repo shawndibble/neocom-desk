@@ -61,7 +61,10 @@ describe('PledgeRow delivery', () => {
       '11'
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a whole number from 0 up to 10.');
-    expect(screen.getByRole('button', { name: 'Save delivered' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save delivered' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(onSaveDelivered).not.toHaveBeenCalled();
   });
 

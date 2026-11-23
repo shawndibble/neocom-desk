@@ -56,6 +56,7 @@ import { AlertsSignInConfirm } from './AlertsSignInConfirm';
 import { useNotificationPreferences } from './preferencesStore';
 import { QuietTimeRows } from './QuietTimeRows';
 import { DividedList } from '@/components/ui/DividedList';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { useGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 interface CharacterRef {
@@ -288,7 +289,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                 <Button
                   size="sm"
                   onClick={() => setConfirming(walking.map((need) => need.characterId))}
-                  disabled={busyId !== null}
+                  aria-disabled={busyId !== null || undefined}
                 >
                   {t('settings.notifications.alertsWhenClosed.signInAll', {
                     count: summaryNeeds.characters,
@@ -297,8 +298,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
               </NeedsConnection>
             )}
             {notice && (
-              <p
-                role="status"
+              <LiveNote
                 className={
                   notice.tone === 'warning'
                     ? 'rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning'
@@ -306,7 +306,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                 }
               >
                 {notice.text}
-              </p>
+              </LiveNote>
             )}
             <DividedList surface="none" as="ul">
               {characters.map((character) => {
@@ -353,7 +353,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                           size="sm"
                           variant={state === 'needs-reauth' ? 'primary' : 'ghost'}
                           loading={busy}
-                          disabled={busyId !== null}
+                          aria-disabled={busyId !== null || undefined}
                           aria-label={t(
                             state === 'needs-reauth'
                               ? 'settings.notifications.alertsWhenClosed.reauthorizeFor'
@@ -374,7 +374,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                       <Button
                         size="sm"
                         loading={busy && !need?.needsWalk}
-                        disabled={busyId !== null}
+                        aria-disabled={busyId !== null || undefined}
                         aria-label={t('settings.notifications.alertsWhenClosed.turnOffFor', {
                           name: character.name,
                         })}

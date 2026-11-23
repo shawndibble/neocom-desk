@@ -370,7 +370,11 @@ export function ItemDetailModal({
       // jumps the box and a name stays close to its value. An abyssal roll
       // table wider than that scrolls sideways in its own box.
       placement="detail"
-      title={itemName}
+      title={
+        <span className="text-sm font-semibold tracking-normal text-text normal-case">
+          {itemName}
+        </span>
+      }
       titleActions={
         // One header action, so a plain button at every width. The Market
         // Browser link lives in the Market tab: the tab is this modal's one

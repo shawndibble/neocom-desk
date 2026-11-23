@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret } from '@/components/ui';
+import { Button, Caret, Tooltip, isRowOwnEvent } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
@@ -88,7 +88,7 @@ export function CertificateRow({
     action = <span className="text-text-dim">{t('skills.certificates.complete')}</span>;
   } else if (capped) {
     action = (
-      <Button size="sm" disabled>
+      <Button size="sm" aria-disabled>
         {t('skills.certificates.omegaOnly')}
       </Button>
     );
@@ -96,30 +96,36 @@ export function CertificateRow({
     action = <span className="text-text-dim">{t('skills.certificates.inPlan')}</span>;
   } else {
     action = (
-      <Button
-        size="sm"
-        aria-label={t('skills.certificates.addLabel', {
-          grade: nextGrade,
-          name: certificate.name,
-        })}
-        disabled={!onAdd}
-        onClick={
-          onAdd
-            ? () => {
-                onAdd();
-                focusAfterCommit(expanderRef);
-              }
-            : undefined
-        }
-      >
-        {t('skills.certificates.add')}
-      </Button>
+      <Tooltip content={onAdd ? null : t('skills.certificates.addLoading')}>
+        <Button
+          size="sm"
+          aria-label={t('skills.certificates.addLabel', {
+            grade: nextGrade,
+            name: certificate.name,
+          })}
+          aria-disabled={!onAdd || undefined}
+          onClick={
+            onAdd
+              ? () => {
+                  onAdd();
+                  focusAfterCommit(expanderRef);
+                }
+              : undefined
+          }
+        >
+          {t('skills.certificates.add')}
+        </Button>
+      </Tooltip>
     );
   }
 
   return (
     <li className="border-t border-line text-xs">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]">
+      <div
+        // The whole row opens its detail, bar the buttons and links inside it.
+        onClick={(event) => isRowOwnEvent(event) && onToggle()}
+        className="cursor-pointer grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]"
+      >
         {/* Every row opens, Elite included: the description is there for all. */}
         <button
           ref={expanderRef}

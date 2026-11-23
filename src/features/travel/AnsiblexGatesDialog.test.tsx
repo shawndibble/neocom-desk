@@ -30,6 +30,9 @@ describe('AnsiblexGatesDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add Ansiblex' }));
 
     expect(await screen.findByText('Added 1 Ansiblex.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/^Added 1 Ansiblex\. Line 2/)
+    );
     expect(screen.getByText('Line 2: no system named Nowhere.')).toBeInTheDocument();
     expect(
       screen.getByText("Line 3: Jita isn't in nullsec, where Ansiblex stand.")

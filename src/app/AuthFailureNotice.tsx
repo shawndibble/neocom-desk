@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, LiveStatus, ReauthBanner } from '@/components/ui';
+import { Button, LiveStatus, NeedsConnection, ReauthBanner } from '@/components/ui';
 import { useAuthFailure, useNeedsLogin, type AuthFailure } from '@/stores/authFailure';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -141,10 +141,15 @@ export function AuthFailureNotice() {
       </LiveStatus>
       {shown && <AuthFailureBlock failure={shown} title={title} onDismiss={dismiss} />}
       {role && (
-        <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-2 text-xs">
-          <p className="font-semibold text-warning">{role}</p>
-          <p className="text-text-dim">{t('reauth.roleHint')}</p>
-          <Button size="sm" className="mt-2" onClick={dismiss}>
+        <div
+          data-status-item
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-xs"
+        >
+          <p className="min-w-0 flex-1">
+            <span className="font-semibold text-warning">{role}</span>
+            <span className="text-text-dim"> {t('reauth.roleHint')}</span>
+          </p>
+          <Button size="sm" onClick={dismiss}>
             {t('reauth.dismiss')}
           </Button>
         </div>
@@ -163,27 +168,38 @@ function AuthFailureBlock({
   onDismiss: () => void;
 }) {
   const { t } = useTranslation();
+  // One row of the shell's status strip (`ShellStatusStrip`): words, then the actions, wrapping
+  // only when a phone has no room, rather than a stacked card of title, hint and two buttons.
   return (
-    <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
-      <ReauthBanner
-        title={title}
-        hint={t('reauth.refusedHint')}
-        actionLabel={t('reauth.loginAction')}
-        // The Permission behind the refused request, when it is known. A
-        // refusal for a scope the grant never held (a mail send on a token that
-        // predates `send_mail`) is only fixed by asking for it; a stale grant
-        // is unaffected, since the stored scopes are unioned in regardless.
-        onLogin={() =>
-          void beginEveLogin({
-            characterId: failure.characterId,
-            groups: failure.endpointId ? permissionsForEndpoints([failure.endpointId]) : [],
-          })
-        }
-        // Renders above a route that may have its own primary button
-        // (docs/DESIGN.md §5, one per view).
-        variant="ghost"
-      />
-      <div className="pb-2">
+    <div
+      data-status-item
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-1.5"
+    >
+      <p className="min-w-48 flex-1 text-xs">
+        <span className="font-semibold text-warning">{title}</span>
+        <span className="text-text-dim"> {t('reauth.refusedHint')}</span>
+      </p>
+      <div className="flex items-center gap-1.5">
+        <NeedsConnection>
+          <Button
+            // Renders above a route that may have its own primary button
+            // (docs/DESIGN.md §5, one per view).
+            variant="ghost"
+            size="sm"
+            // The Permission behind the refused request, when it is known. A
+            // refusal for a scope the grant never held (a mail send on a token that
+            // predates `send_mail`) is only fixed by asking for it; a stale grant
+            // is unaffected, since the stored scopes are unioned in regardless.
+            onClick={() =>
+              void beginEveLogin({
+                characterId: failure.characterId,
+                groups: failure.endpointId ? permissionsForEndpoints([failure.endpointId]) : [],
+              })
+            }
+          >
+            {t('reauth.loginAction')}
+          </Button>
+        </NeedsConnection>
         <Button size="sm" onClick={onDismiss}>
           {t('reauth.dismiss')}
         </Button>

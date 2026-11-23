@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, LiveNote } from '@/components/ui';
 
 export interface HullSearchResult {
   scope: 'hull' | 'class';
@@ -25,9 +25,7 @@ export function HullSearchResults({
   const { t } = useTranslation();
   if (results.length === 0)
     return (
-      <p role="status" className="text-sm text-text-dim">
-        {t('srp.settings.hullRules.noResults')}
-      </p>
+      <LiveNote className="text-sm text-text-dim">{t('srp.settings.hullRules.noResults')}</LiveNote>
     );
   return (
     <ul

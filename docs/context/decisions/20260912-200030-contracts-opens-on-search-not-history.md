@@ -1,6 +1,6 @@
 # Scope decisions — Contracts opens on Search, not History
 
-_Recorded 2026-09-12._
+_Recorded 2026-09-12. Superseded 2026-11-22: Contracts now opens on My contracts (`20261122-142548-contracts-opens-on-my-contracts-not-item-search`)._
 
 - **Search is the Contracts page's landing tab, and History is second.** This
   reverses issue #908's original order, which put History first on the grounds

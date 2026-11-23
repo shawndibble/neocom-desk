@@ -88,7 +88,10 @@ describe('a Shared Appraisal with refine figures', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Shared with you')).toBeInTheDocument();
     expect(within(dialog).getByText('Pyerite')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Use my numbers' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Use my numbers' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(within(dialog).getByText(/Log in with a Character/)).toBeInTheDocument();
   });
 

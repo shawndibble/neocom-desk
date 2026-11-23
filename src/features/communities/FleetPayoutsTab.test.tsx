@@ -141,7 +141,7 @@ describe('FleetPayoutsTab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'New payout' }));
     const dialog = await screen.findByRole('dialog');
     const create = within(dialog).getByRole('button', { name: 'Create payout' });
-    expect(create).toBeDisabled();
+    expect(create).toHaveAttribute('aria-disabled', 'true');
 
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Havens');
     await userEvent.type(
@@ -193,6 +193,9 @@ describe('FleetPayoutsTab', () => {
       await within(dialog).findByText(/Couldn't check the pilots/, undefined, { timeout: 3000 })
     ).toBeInTheDocument();
     await within(dialog).findByText('Loot value: 1,000,000 ISK', undefined, { timeout: 3000 });
-    expect(within(dialog).getByRole('button', { name: 'Create payout' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Create payout' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   }, 9000);
 });

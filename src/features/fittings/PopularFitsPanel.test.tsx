@@ -274,7 +274,7 @@ describe('PopularFitsPanel', () => {
 
   it('says so, without blocking anything, when zKillboard fails', async () => {
     renderPanel({ ok: false, reason: 'http' });
-    expect((await screen.findByRole('status')).textContent).toMatch(/Couldn't load popular fits/);
+    expect((await screen.findAllByText(/Couldn't load popular fits/)).length).toBeGreaterThan(0);
   });
 
   it('shows a spinner while loading', async () => {

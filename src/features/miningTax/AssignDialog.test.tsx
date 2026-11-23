@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -256,7 +256,9 @@ describe('AssignDialog — prices unreachable (offline)', () => {
       pricesFor: unpriced,
     });
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Prices couldn't be loaded.*Zeolites/);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/Prices couldn't be loaded.*Zeolites/)
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Assign anyway' }));
 
     expect(mockedCreate).toHaveBeenCalledWith(expect.objectContaining({ estimatedValue: 0 }));

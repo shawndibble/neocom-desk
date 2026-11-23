@@ -4,7 +4,7 @@ import { MINUTE_MS } from '@/lib/age';
  * hours, half hours, five minutes), with a step chosen so no more than about
  * six ticks fit the span.
  */
-const STEPS_MIN = [5, 10, 15, 30, 60, 120, 240];
+const STEPS_MIN = [5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
 
 export function timeTicks(from: number, to: number): number[] {
   const steps = STEPS_MIN.map((m) => m * MINUTE_MS);

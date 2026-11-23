@@ -1,7 +1,7 @@
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
-import { corpStarbases, toBoardStarbases } from './corpStarbaseModels';
+import { corpStarbases, toBoardStarbases, toStructureSources } from './corpStarbaseModels';
 import type { BuildContext, FeedState } from './types';
 
 const t = (key: string, options?: Record<string, unknown>) =>
@@ -253,5 +253,39 @@ describe('corpStarbases row detail', () => {
 
   it('has no place for a system it cannot name', () => {
     expect(detailOf(tower({ systemId: 999 })).place).toBeUndefined();
+  });
+});
+
+describe('toStructureSources', () => {
+  it('lists a tower as a structure with its bay, burn rate, owner and timers', () => {
+    const [source] = toStructureSources(
+      feedOf([tower({ reinforcedUntilMs: NOW + DAY_MS })], {
+        corporationOf: new Map([['1', 77]]),
+      }),
+      NOW
+    );
+    expect(source).toEqual({
+      structureId: 1,
+      name: 'Caldari Control Tower (Efa)',
+      fuelExpiresMs: NOW + 100 * HOUR_MS,
+      state: 'online',
+      stateTimerEndMs: NOW + DAY_MS,
+      unanchorsAtMs: null,
+      services: [],
+      corporationId: 77,
+      systemId: 100,
+      typeId: LARGE,
+      tower: { blocks: 4000, perDay: 960 },
+    });
+  });
+
+  it('keeps an unread bay and an unknown tower type unknown rather than empty', () => {
+    const [unread, unknown] = toStructureSources(
+      feedOf([tower({ starbaseId: 2, bay: null }), tower({ starbaseId: 3, typeId: 1 })]),
+      NOW
+    );
+    expect(unread?.tower).toEqual({ blocks: null, perDay: 960 });
+    expect(unread?.fuelExpiresMs).toBeNull();
+    expect(unknown?.tower).toEqual({ blocks: 4000, perDay: null });
   });
 });

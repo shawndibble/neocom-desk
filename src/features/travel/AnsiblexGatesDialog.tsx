@@ -12,7 +12,15 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { Button, Modal, NeedsConnection, TextArea, textActionClassName } from '@/components/ui';
+import {
+  Button,
+  LiveStatus,
+  Modal,
+  NeedsConnection,
+  TextArea,
+  textActionClassName,
+  Tooltip,
+} from '@/components/ui';
 import { type CharacterRecord } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { parseGateList, type GateListError, type SystemLookup } from '@/engine/route/ansiblex';
@@ -50,12 +58,13 @@ type SearchStatus = 'running' | FindGatesOutcome | undefined;
 function CharacterSearchRow({
   character,
   status,
-  disabled,
+  disabledReason,
   onFind,
 }: {
   character: CharacterRecord;
   status: SearchStatus;
-  disabled: boolean;
+  /** Why Find is unavailable right now, or null when it can run. */
+  disabledReason: string | null;
   onFind: () => void;
 }) {
   const { t } = useTranslation();
@@ -88,17 +97,21 @@ function CharacterSearchRow({
           </NeedsConnection>
         </>
       ) : (
-        <Button
-          size="sm"
-          disabled={disabled || status === 'running'}
-          aria-label={t('travel.bridges.findLabel', { character: character.name })}
-          onClick={onFind}
-        >
-          {t('travel.bridges.find')}
-        </Button>
+        <Tooltip content={disabledReason}>
+          <Button
+            size="sm"
+            loading={status === 'running'}
+            aria-disabled={disabledReason !== null || undefined}
+            aria-label={t('travel.bridges.findLabel', { character: character.name })}
+            onClick={onFind}
+          >
+            {t('travel.bridges.find')}
+          </Button>
+        </Tooltip>
       )}
       {lines.length > 0 && (
-        <span role="status" className="flex flex-wrap gap-x-1 text-text-dim">
+        <span className="flex flex-wrap gap-x-1 text-text-dim">
+          <LiveStatus>{lines.join(' ')}</LiveStatus>
           {lines.map((line) => (
             <span key={line}>{line}</span>
           ))}
@@ -138,6 +151,12 @@ export function AnsiblexGatesDialog({
   } | null>(null);
   const [searches, setSearches] = useState<ReadonlyMap<number, SearchStatus>>(new Map());
   const searching = [...searches.values()].includes('running');
+  const findReason =
+    lookup === null
+      ? t('travel.bridges.lookupLoading')
+      : searching
+        ? t('travel.bridges.searchBusy')
+        : null;
 
   async function findWith(characterId: number) {
     if (lookup === null) return;
@@ -187,19 +206,21 @@ export function AnsiblexGatesDialog({
                     key={character.characterId}
                     character={character}
                     status={searches.get(character.characterId)}
-                    disabled={lookup === null || searching}
+                    disabledReason={findReason}
                     onFind={() => void findWith(character.characterId)}
                   />
                 ))}
               </ul>
               {characters.length > 1 && (
-                <Button
-                  size="sm"
-                  disabled={lookup === null || searching}
-                  onClick={() => void findWithEvery()}
-                >
-                  {t('travel.bridges.findAll')}
-                </Button>
+                <Tooltip content={findReason}>
+                  <Button
+                    size="sm"
+                    aria-disabled={findReason !== null || undefined}
+                    onClick={() => void findWithEvery()}
+                  >
+                    {t('travel.bridges.findAll')}
+                  </Button>
+                </Tooltip>
               )}
             </>
           )}
@@ -218,16 +239,34 @@ export function AnsiblexGatesDialog({
               if (pasted.trim() !== '' && lookup !== null) void addPasted();
             }}
           />
-          <Button
-            size="sm"
-            disabled={pasted.trim() === '' || lookup === null}
-            onClick={() => void addPasted()}
+          <Tooltip
+            content={
+              lookup === null
+                ? t('travel.bridges.lookupLoading')
+                : pasted.trim() === ''
+                  ? t('travel.bridges.pasteEmpty')
+                  : null
+            }
           >
-            {t('travel.bridges.pasteAdd')}
-          </Button>
+            <Button
+              size="sm"
+              aria-disabled={pasted.trim() === '' || lookup === null || undefined}
+              onClick={() => void addPasted()}
+            >
+              {t('travel.bridges.pasteAdd')}
+            </Button>
+          </Tooltip>
           {pasteResult && (
-            <div role="status" className="space-y-1">
-              <p>{t('travel.bridges.pasteAdded', { count: pasteResult.added })}</p>
+            <div className="space-y-1">
+              <p>
+                <LiveStatus>
+                  {[
+                    t('travel.bridges.pasteAdded', { count: pasteResult.added }),
+                    ...pasteResult.errors.map((error) => pasteErrorText(error, t)),
+                  ].join(' ')}
+                </LiveStatus>
+                {t('travel.bridges.pasteAdded', { count: pasteResult.added })}
+              </p>
               {pasteResult.errors.length > 0 && (
                 <ul className="list-disc space-y-0.5 pl-5 text-danger">
                   {pasteResult.errors.map((error) => (

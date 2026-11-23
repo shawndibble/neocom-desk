@@ -93,11 +93,11 @@ describe('StockTargetsDialog', () => {
     seed({ [CORP]: { '34': 1000 } });
     useCorpStockTargetsStore.setState({ hydrated: false });
     renderDialog();
-    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('offers no edits without a corporation', () => {
     render(<StockTargetsDialog corporationId={null} open onOpenChange={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveAttribute('aria-disabled', 'true');
   });
 });

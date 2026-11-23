@@ -32,9 +32,9 @@ import { SPACE_BAR, SPACE_RULE, SPACE_TEXT } from './pilotListStyles';
 import { usePilotKillHistory, type PilotKillHistoryState } from './usePilotKillHistory';
 
 /** `2026-05` -> "May", read in UTC like the buckets. */
-function monthName(key: string): string {
+function monthName(key: string, locale: string): string {
   const [year, month] = key.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleString(undefined, {
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleString(locale, {
     month: 'short',
     timeZone: 'UTC',
   });
@@ -60,7 +60,7 @@ export function PilotKillActivityView({
   /** zKillboard's other reads failed: an empty list here is unknown, not "no kills". */
   unknown?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const kills = history.kind === 'ready' ? history.kills : null;
   const now = useNow();
@@ -161,7 +161,7 @@ export function PilotKillActivityView({
               const parts = KILL_SPACES.filter((sp) => m[sp] > 0).map(
                 (sp) => `${m[sp]} ${t(`common.spaceOption.${sp}`).toLowerCase()}`
               );
-              return `${monthName(m.key)}: ${monthTotal(m)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}`;
+              return `${monthName(m.key, i18n.language)}: ${monthTotal(m)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}`;
             })
             .join(', '),
         })}
@@ -201,7 +201,7 @@ export function PilotKillActivityView({
         </div>
         <div aria-hidden className="grid grid-cols-6 gap-2 text-center text-xs text-text-dim">
           {months.map((m) => (
-            <span key={m.key}>{monthName(m.key)}</span>
+            <span key={m.key}>{monthName(m.key, i18n.language)}</span>
           ))}
         </div>
       </div>

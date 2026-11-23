@@ -868,6 +868,18 @@ describe('setFullyMined', () => {
   });
 });
 
+describe('unlink', () => {
+  it('takes an optional day it left, and refuses a bad one', () => {
+    const base = { action: 'unlink', minerId: 'm', characterId: 5 };
+    expect(parseEditAction(base)).toEqual(base);
+    expect(parseEditAction({ ...base, leftOn: '2026-11-10' })).toEqual({
+      ...base,
+      leftOn: '2026-11-10',
+    });
+    expect(() => parseEditAction({ ...base, leftOn: 'yesterday' })).toThrow();
+  });
+});
+
 describe('linkSurvey', () => {
   it('parses a link and an unlink, and refuses a path-escaping id', () => {
     expect(

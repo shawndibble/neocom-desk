@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, TextInput } from '@/components/ui';
+import { Button, Panel, TextInput, Tooltip, LiveNote } from '@/components/ui';
 import { parseInviteInput } from '../taxBook/feederClient';
 
 export type SetupChoice = 'own' | 'consent' | 'collect';
@@ -32,9 +32,7 @@ export function MoonsChoices({
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       {left && (
-        <p role="status" className="text-center text-sm">
-          {t('corpTaxBook.moons.setup.left')}
-        </p>
+        <LiveNote className="text-center text-sm">{t('corpTaxBook.moons.setup.left')}</LiveNote>
       )}
       {error && (
         <p role="alert" className="text-center text-sm text-danger">
@@ -49,7 +47,7 @@ export function MoonsChoices({
           </div>
           <Button
             variant={canOwn ? 'primary' : 'ghost'}
-            disabled={!canOwn}
+            aria-disabled={!canOwn || undefined}
             onClick={() => onChoose('own')}
             className="shrink-0 self-start sm:self-center"
           >
@@ -74,13 +72,21 @@ export function MoonsChoices({
                 <TextInput value={paste} onChange={(e) => onPaste(e.target.value)} />
               </label>
               {/* With the book choices off, this is the one way forward, so it leads. */}
-              <Button
-                variant={canOwn ? 'ghost' : 'primary'}
-                disabled={parseInviteInput(paste) === null}
-                onClick={() => onChoose('consent')}
+              <Tooltip
+                content={
+                  parseInviteInput(paste) === null
+                    ? t('corpTaxBook.moons.setup.handled.needsLink')
+                    : null
+                }
               >
-                {t('corpTaxBook.moons.setup.handled.action')}
-              </Button>
+                <Button
+                  variant={canOwn ? 'ghost' : 'primary'}
+                  aria-disabled={parseInviteInput(paste) === null || undefined}
+                  onClick={() => onChoose('consent')}
+                >
+                  {t('corpTaxBook.moons.setup.handled.action')}
+                </Button>
+              </Tooltip>
             </div>
           </div>
         </Panel>
@@ -92,7 +98,11 @@ export function MoonsChoices({
               </h2>
               <p className="text-text-dim">{t('corpTaxBook.moons.setup.collect.hint')}</p>
             </div>
-            <Button disabled={!canOwn} onClick={() => onChoose('collect')} className="self-start">
+            <Button
+              aria-disabled={!canOwn || undefined}
+              onClick={() => onChoose('collect')}
+              className="self-start"
+            >
               {t('corpTaxBook.moons.setup.collect.action')}
             </Button>
           </div>

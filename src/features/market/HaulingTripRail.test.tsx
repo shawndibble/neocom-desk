@@ -449,7 +449,7 @@ describe('HaulingFillList', () => {
 
   it('disables Add with nothing ticked', () => {
     renderFill({ ticked: new Set(), tickedTotals: { count: 0, volumeM3: 0, cost: 0, profit: 0 } });
-    expect(screen.getByRole('button', { name: /Add 0/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Add 0/ })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('leaves out the hold-after line without a Cargo Space', () => {

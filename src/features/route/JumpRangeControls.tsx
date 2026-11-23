@@ -10,6 +10,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  LiveNote,
   Select,
   SelectContent,
   SelectItem,
@@ -120,8 +121,8 @@ export function JumpRangeNote({ status }: { status: JumpRangeStatus }) {
   const { t } = useTranslation();
   if (status !== 'no-origin' && status !== 'unknown') return null;
   return (
-    <p role="status" className="text-text-dim">
+    <LiveNote className="text-text-dim">
       {t(status === 'no-origin' ? 'jumpRange.noOrigin' : 'jumpRange.graphUnavailable')}
-    </p>
+    </LiveNote>
   );
 }

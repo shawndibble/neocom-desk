@@ -225,7 +225,7 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
             <Button
               size="sm"
               variant="ghost"
-              disabled={showing}
+              loading={showing}
               onClick={() => void showToMembers()}
             >
               {t('corpTaxBook.moons.health.showToMembers')}

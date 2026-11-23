@@ -54,7 +54,7 @@ describe('RemapMarkerModal', () => {
     expect(screen.getByLabelText('Intelligence')).toHaveValue(20);
     expect(screen.getByLabelText('Charisma')).toHaveValue(19);
     // The baseline sheet is already legal (sums to 99), so Save starts enabled.
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
   });
 
   it("seeds the fields from the optimizer's computed spread when there is no manual override yet", () => {
@@ -107,7 +107,7 @@ describe('RemapMarkerModal', () => {
     expect(status).toHaveTextContent('3 points left to allocate');
     expect(status.className).toContain('text-warning');
     expect(status.className).not.toContain('text-danger');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('disables Save and shows danger once the total goes over budget', async () => {
@@ -120,7 +120,7 @@ describe('RemapMarkerModal', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('5 points over budget');
     expect(status.className).toContain('text-danger');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('flags an out-of-range value even when the total already balances to 99', () => {
@@ -139,7 +139,7 @@ describe('RemapMarkerModal', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('outside 17–27');
     expect(status.className).toContain('text-danger');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('saves the drafted attributes and closes', async () => {

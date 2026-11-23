@@ -36,8 +36,8 @@ export function DataTableGroupHeader({
             allWidths && 'sm:min-h-0'
           )}
         >
-          <span className="min-w-0 flex-1">{children}</span>
           <Chevron aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
+          <span className="min-w-0 flex-1">{children}</span>
         </button>
       </td>
     </tr>

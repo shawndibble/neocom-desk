@@ -28,7 +28,13 @@ export function PlanToolAction({
   tooltip?: string;
 }) {
   const button = (
-    <Button size="md" align="start" className="w-full" onClick={onClick} disabled={disabled}>
+    <Button
+      size="md"
+      align="start"
+      className="w-full"
+      onClick={onClick}
+      aria-disabled={disabled || undefined}
+    >
       {/* Decorative: the label beside it is the accessible name (DESIGN.md §5). */}
       <span aria-hidden="true" className="shrink-0 text-text-dim">
         {icon}

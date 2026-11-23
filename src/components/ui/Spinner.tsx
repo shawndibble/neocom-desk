@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type SpinnerSize = 'sm' | 'md' | 'lg';
 
@@ -35,12 +36,8 @@ export function Spinner({ block, ...props }: SpinnerProps) {
   );
 }
 
-function SpinnerArc({
-  size = 'md',
-  label = 'Loading',
-  className = '',
-  delayMs,
-}: Omit<SpinnerProps, 'block'>) {
+function SpinnerArc({ size = 'md', label, className = '', delayMs }: Omit<SpinnerProps, 'block'>) {
+  const { t } = useTranslation();
   const [shown, setShown] = useState(!delayMs);
 
   useEffect(() => {
@@ -54,7 +51,11 @@ function SpinnerArc({
   }
 
   return (
-    <span role="status" aria-label={label} className={`inline-flex ${className}`}>
+    <span
+      role="status"
+      aria-label={label ?? t('common.loading')}
+      className={`inline-flex ${className}`}
+    >
       <svg
         viewBox="0 0 24 24"
         fill="none"

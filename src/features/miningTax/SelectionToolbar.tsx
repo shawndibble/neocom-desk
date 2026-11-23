@@ -143,7 +143,7 @@ export function SelectionToolbar({
       // accepted size for an ordinary secondary bulk action (issue #1175).
       size={action.primary ? 'md' : 'sm'}
       variant={action.primary ? 'primary' : undefined}
-      disabled={action.blockedReason !== null}
+      aria-disabled={action.blockedReason !== null || undefined}
       aria-describedby={action.describedOnly && action.blockedReason ? reasonId(action) : undefined}
       onClick={action.onRun}
     >

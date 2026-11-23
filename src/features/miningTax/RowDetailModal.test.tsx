@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -317,7 +317,7 @@ describe('RowDetailModal — price breakdown', () => {
     expect(screen.queryByRole('button', { name: 'Copy pricing as text' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy pricing as text' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Copied');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Copied'));
     const text = write.mock.calls[0][0] as string;
     expect(text).toContain('Veldspar: 250 × 10 = 2,500 ISK (Saved snapshot)');
     expect(text).toContain('10% tax');

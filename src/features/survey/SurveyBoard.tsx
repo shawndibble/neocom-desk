@@ -19,7 +19,14 @@ import {
 } from 'react';
 import { lazyNamed } from '@/app/lazyNamed';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
+import {
+  CollapsiblePanel,
+  DataAgeBadge,
+  EmptyState,
+  Panel,
+  Spinner,
+  textActionClassName,
+} from '@/components/ui';
 import { canFinishSurvey } from '@/engine/survey/finish';
 import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/chatMessage';
 import { availableChartViews, type SurveyChartView } from '@/engine/survey/chartViews';
@@ -127,6 +134,7 @@ export function SurveyBoard({
   // Copying happens outside the config dialog, so the saved choices load with the board.
   useHydratedStore(useSurveyChatOptions);
   const [configuring, setConfiguring] = useState(false);
+  const [howToOpen, setHowToOpen] = useState(false);
   const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
   const [view, setView] = useState<SurveyChartView>('ore');
   const views = summary === null ? ['ore' as const] : availableChartViews(summary);
@@ -194,14 +202,13 @@ export function SurveyBoard({
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
         {emptyExtra}
-        <details className="group rounded-xs border border-line bg-panel/60">
-          <summary className="cursor-pointer select-none px-3 py-2 text-sm text-text-dim touch:py-3">
-            {t('survey.start.howToCopy')}
-          </summary>
-          <div className="border-t border-line py-3">
-            <SurveyHowTo heading={false} />
-          </div>
-        </details>
+        <CollapsiblePanel
+          title={t('survey.start.howToCopy')}
+          expanded={howToOpen}
+          onToggle={() => setHowToOpen((v) => !v)}
+        >
+          <SurveyHowTo heading={false} />
+        </CollapsiblePanel>
         {footerActions}
         {scanList}
       </div>
@@ -283,8 +290,8 @@ export function SurveyBoard({
                         key="finish"
                         type="button"
                         className={textActionClassName()}
-                        disabled={finishing === 'busy'}
-                        onClick={() => void finish()}
+                        aria-disabled={finishing === 'busy' || undefined}
+                        onClick={finishing === 'busy' ? undefined : () => void finish()}
                       >
                         {t('survey.markCleared')}
                       </button>,

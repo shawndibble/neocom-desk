@@ -140,7 +140,8 @@ export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
   const raw = summary.intervals.map((i) => {
     const percents: Record<string, number> = {};
     let sum = 0;
-    for (const [ore, volume] of Object.entries(i.minedByOre)) {
+    // A squeezed gap is net change between two far-apart scans, not a stretch of mining: no bar.
+    for (const [ore, volume] of Object.entries(i.gap ? {} : i.minedByOre)) {
       const start = startOf.get(ore) ?? 0;
       // A start of 0 cannot come out of summarizeSurvey with mining against it; skip rather than divide.
       if (volume <= 0 || start <= 0) continue;
@@ -154,7 +155,7 @@ export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
     if (sum > 0)
       for (const [ore, percent] of Object.entries(percents)) shares[ore] = (percent / sum) * 100;
     const progress =
-      summary.startVolume > 0 ? clampPercent((i.mined / summary.startVolume) * 100) : 0;
+      summary.startVolume > 0 && !i.gap ? clampPercent((i.mined / summary.startVolume) * 100) : 0;
     return { from: i.from, to: i.to, percents, shares, progress };
   });
   const intervals: PaceInterval[] = raw;

@@ -21,7 +21,7 @@ import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret, textActionClassName } from '@/components/ui';
+import { Caret, LiveNote, textActionClassName } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingInsetClassName,
@@ -343,11 +343,7 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
         });
   return (
     <div className="space-y-2">
-      {note && (
-        <p role="status" className="text-sm text-text-dim">
-          {note}
-        </p>
-      )}
+      {note && <LiveNote className="text-sm text-text-dim">{note}</LiveNote>}
       {/* Beside the rows only when this panel, not the screen, has room: the rules column and the nav rail both eat into it. */}
       <div className="@container">
         <div

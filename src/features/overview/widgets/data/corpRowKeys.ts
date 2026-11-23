@@ -1,0 +1,18 @@
+/**
+ * The key each merged All read files a row's corporation under (`corporationOf`), once: the
+ * loaders merge with it (`corpFeedLoaders.ts`) and `corpNarrow.ts` narrows with it, so the two
+ * cannot drift apart and quietly empty a widget on one corporation.
+ */
+export const customsOfficeKey = (office: { office_id: number }) => String(office.office_id);
+export const starbaseKey = (row: { starbaseId: number }) => String(row.starbaseId);
+export const sovereigntyRowKey = (row: { key: string }) => row.key;
+export const contractKey = (contract: { contract_id: number }) => String(contract.contract_id);
+export const orderKey = (order: { order_id: number }) => String(order.order_id);
+export const srpClaimKey = (claim: { killmailId: number }) => String(claim.killmailId);
+/** A member, a role holder: one character belongs to one corporation, so the id is the key. */
+export const characterKey = (row: { characterId: number }) => String(row.characterId);
+/** The roster's joined and left rows, filed by the id of the character who joined or left. */
+export const joinedKey = (id: number) => `joined:${id}`;
+export const leftKey = (id: number) => `left:${id}`;
+/** A role change, filed by the character it changed, as the audit's change count reads it. */
+export const changeKey = (characterId: number) => `change:${characterId}`;

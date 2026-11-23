@@ -195,6 +195,8 @@ export interface CorpSrpFeed extends CorpFeedBase {
   /** A Director (or the CEO) may turn it on: the tile offers Set up SRP. */
   canSetUp: boolean;
   claims: SrpClaimRow[];
+  /** Read across several corporations: each one's own switch and setup right, for a widget narrowed to one. */
+  byCorporation?: ReadonlyMap<number, { enabled: boolean; canSetUp: boolean }>;
   /** Hull names by type id; a missing one degrades one cell to the killmail id. */
   typeNames: ReadonlyMap<number, string>;
   /** System names from the static data. */
@@ -287,6 +289,26 @@ export async function loadCorpJobsAllFeed(): Promise<CorpAllFeed<CorpJobsFeed>> 
 export async function loadCorpKillsAllFeed(): Promise<CorpAllFeed<CorpKillsFeed>> {
   const { loadCorpKillsAll } = await import('./corpFeedLoaders');
   return loadCorpKillsAll();
+}
+
+export async function loadCorpAssetsAllFeed(): Promise<CorpAllFeed<CorpAssetsFeed>> {
+  const { loadCorpAssetsAll } = await import('./corpFeedLoaders');
+  return loadCorpAssetsAll();
+}
+
+export async function loadCorpSrpAllFeed(): Promise<CorpSrpFeed> {
+  const { loadCorpSrpAll } = await import('./corpFeedLoaders');
+  return loadCorpSrpAll();
+}
+
+export async function loadCorpMembersAllFeed(): Promise<CorpMembersFeed> {
+  const { loadCorpMembersAll } = await import('./corpFeedLoaders');
+  return loadCorpMembersAll();
+}
+
+export async function loadCorpRoleAuditAllFeed(): Promise<CorpRoleAuditFeed> {
+  const { loadCorpRoleAuditAll } = await import('./corpFeedLoaders');
+  return loadCorpRoleAuditAll();
 }
 
 export async function loadCorpDeadlinesAllFeed(): Promise<CorpDeadlinesAllFeed> {

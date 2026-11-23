@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { RouteSafetyRow } from '@/engine/route/routeSafety';
 import type { TheraConnection } from '@/engine/route/theraConnections';
@@ -129,30 +129,32 @@ export function HoleStepLine({
           </span>
         </>
       )}
-      <Button
-        size="sm"
-        disabled={signature === null}
-        onClick={() => void copy()}
-        aria-label={
-          copied ? t('travel.holes.copiedLabel', names) : t('travel.holes.copyLabel', names)
-        }
-      >
-        {copied ? (
-          <Icon.Done size={Icon.ICON_SIZE.sm} />
-        ) : (
-          <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} />
-        )}
-        {copied ? (
-          t('travel.holes.copied')
-        ) : (
-          <>
-            <span className="hidden sm:inline">
-              {t('travel.holes.copy', { signature: shownSignature })}
-            </span>
-            <span className="sm:hidden">{t('travel.holes.copyShort')}</span>
-          </>
-        )}
-      </Button>
+      <Tooltip content={signature === null ? t('travel.holes.copyNoSignature') : null}>
+        <Button
+          size="sm"
+          aria-disabled={signature === null || undefined}
+          onClick={() => void copy()}
+          aria-label={
+            copied ? t('travel.holes.copiedLabel', names) : t('travel.holes.copyLabel', names)
+          }
+        >
+          {copied ? (
+            <Icon.Done size={Icon.ICON_SIZE.sm} />
+          ) : (
+            <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} />
+          )}
+          {copied ? (
+            t('travel.holes.copied')
+          ) : (
+            <>
+              <span className="hidden sm:inline">
+                {t('travel.holes.copy', { signature: shownSignature })}
+              </span>
+              <span className="sm:hidden">{t('travel.holes.copyShort')}</span>
+            </>
+          )}
+        </Button>
+      </Tooltip>
       <MassNote hole={hole} />
     </div>
   );

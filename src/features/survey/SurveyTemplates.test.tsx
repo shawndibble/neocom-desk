@@ -132,7 +132,7 @@ describe('Templates in the info panel', () => {
 
     const dialog = await screen.findByRole('dialog');
     const save = within(dialog).getByRole('button', { name: 'Save template' }) as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
+    expect(save.getAttribute('aria-disabled')).toBe('true');
     await user.click(within(dialog).getByRole('checkbox', { name: /Notes/ }));
     await user.type(within(dialog).getByLabelText('Name'), 'Efa run');
     await user.click(save);
@@ -209,7 +209,7 @@ describe('SurveyStartTemplates', () => {
     expect(screen.getByText(/After the first scan you can save/)).toBeTruthy();
   });
 
-  it('lists templates as chips that pick and unpick one, and says what will happen', () => {
+  it('lists templates as chips that pick and unpick one, and says what will happen', async () => {
     const onSelect = vi.fn();
     const { rerender } = render(
       <SurveyStartTemplates templates={[EFA, BELT]} selectedId={null} onSelect={onSelect} />
@@ -219,7 +219,9 @@ describe('SurveyStartTemplates', () => {
     expect(onSelect).toHaveBeenLastCalledWith('efa');
 
     rerender(<SurveyStartTemplates templates={[EFA, BELT]} selectedId="efa" onSelect={onSelect} />);
-    expect(screen.getByRole('status').textContent).toMatch(/Starting with “Efa moon 4”/);
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toMatch(/Starting with “Efa moon 4”/)
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Efa moon 4' }));
     expect(onSelect).toHaveBeenLastCalledWith(null);
   });

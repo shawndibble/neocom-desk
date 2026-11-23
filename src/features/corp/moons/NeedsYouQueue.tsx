@@ -4,6 +4,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
+import { LiveNote } from '@/components/ui/LiveStatus';
 import { Pill } from '@/components/ui/Pill';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
@@ -299,11 +300,7 @@ export function NeedsYouQueue() {
 
   return (
     <Panel title={t('corpTaxBook.moons.needs.title', { count })} padded={false}>
-      {notice && (
-        <p role="status" className="px-3 py-2 text-xs text-text-dim">
-          {notice}
-        </p>
-      )}
+      {notice && <LiveNote className="px-3 py-2 text-xs text-text-dim">{notice}</LiveNote>}
       {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
       )}
@@ -450,8 +447,8 @@ export function NeedsYouQueue() {
                           <button
                             type="button"
                             className={secondaryActionClassName}
-                            disabled={busy}
-                            onClick={() => void countDivision(divisionToCount)}
+                            aria-disabled={busy || undefined}
+                            onClick={busy ? undefined : () => void countDivision(divisionToCount)}
                           >
                             {t('corpTaxBook.moons.needs.declaration.count', {
                               division: divisionToCount,
@@ -488,7 +485,7 @@ export function NeedsYouQueue() {
                         <Button
                           size="sm"
                           onClick={() => void remind(item)}
-                          disabled={corporationName === null}
+                          aria-disabled={corporationName === null || undefined}
                         >
                           {t('corpTaxBook.moons.needs.overdue.remind')}
                         </Button>
@@ -585,7 +582,7 @@ export function NeedsYouQueue() {
                         <Button
                           size="sm"
                           onClick={() => void remind(item)}
-                          disabled={corporationName === null}
+                          aria-disabled={corporationName === null || undefined}
                         >
                           {t('corpTaxBook.moons.needs.leaver.remind')}
                         </Button>
@@ -717,8 +714,8 @@ export function NeedsYouQueue() {
                   <button
                     type="button"
                     className={secondaryActionClassName}
-                    disabled={busy}
-                    onClick={() => void dismissDeclined(a.characterId)}
+                    aria-disabled={busy || undefined}
+                    onClick={busy ? undefined : () => void dismissDeclined(a.characterId)}
                   >
                     {t('corpTaxBook.moons.needs.declinedGrouping.dismiss')}
                   </button>
@@ -756,8 +753,8 @@ export function NeedsYouQueue() {
                   <button
                     type="button"
                     className={secondaryActionClassName}
-                    disabled={busy}
-                    onClick={() => void answerUncounted(u, 'notTax')}
+                    aria-disabled={busy || undefined}
+                    onClick={busy ? undefined : () => void answerUncounted(u, 'notTax')}
                   >
                     {t('corpTaxBook.moons.needs.uncounted.notTax')}
                   </button>

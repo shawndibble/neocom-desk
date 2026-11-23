@@ -259,6 +259,47 @@ describe('structures row link', () => {
   });
 });
 
+describe('structures with a control tower', () => {
+  const feeds = (): Feeds => ({
+    structures: ok({
+      structures: [],
+      structureCount: 0,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    }),
+    corpStarbases: ok({
+      readable: true,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+      fromCache: false,
+      starbases: [
+        {
+          starbaseId: 5,
+          systemId: 100,
+          typeId: 12235,
+          state: 'online',
+          reinforcedUntilMs: null,
+          unanchorsAtMs: null,
+          // 40 blocks an hour: 960 blocks is 24 hours of fuel.
+          bay: { fuelBlocks: 960, strontium: 0 },
+          bayReadAtMs: NOW,
+        },
+      ],
+      typeNames: new Map([[12235, 'Caldari Control Tower']]),
+      systemNames: new Map([[100, 'Efa']]),
+    }),
+  });
+
+  it('lists the tower with its fuel clock, and flags it as low fuel', () => {
+    const view = buildView('structures', feeds(), ctx({ show: 'all' }));
+    const row = view.table!.rows[0]!;
+    expect(row.cells[0]).toBe('Caldari Control Tower (Efa)');
+    expect(row.tone).not.toBe('clear');
+    expect(stateOf(view)).not.toBe('empty');
+    expect(buildView('structures', feeds(), ctx({ show: 'problems' })).table!.rows).toHaveLength(1);
+  });
+});
+
 describe('stock', () => {
   it('is empty with no Stock List', () => {
     const feeds: Feeds = { stock: ok({ board: null }) };

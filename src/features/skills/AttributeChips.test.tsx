@@ -88,4 +88,10 @@ describe('AttributeChips', () => {
     render(<AttributeChips attributes={null} implantBonuses={{}} boosterBonus={4} />);
     expect(screen.getByText('—')).toBeInTheDocument();
   });
+
+  it('shows a spinner, not unknown, while the sheet is still loading', () => {
+    render(<AttributeChips attributes={null} implantBonuses={{}} loading />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+  });
 });

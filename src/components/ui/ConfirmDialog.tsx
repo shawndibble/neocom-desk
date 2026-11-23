@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { Modal } from './Modal';
@@ -17,6 +17,7 @@ export function ConfirmDialog({
   cancelLabel,
   failedLabel,
   closeOnBack,
+  children,
 }: {
   open: boolean;
   title: string;
@@ -33,6 +34,8 @@ export function ConfirmDialog({
   failedLabel?: string;
   /** `Modal`'s: false when a Back press already led here and the confirm must not own a history entry. */
   closeOnBack?: boolean;
+  /** A field the confirm asks for, below the body. */
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [working, setWorking] = useState(false);
@@ -62,6 +65,7 @@ export function ConfirmDialog({
       closeOnBack={closeOnBack}
     >
       <p className="text-xs text-text-dim">{body}</p>
+      {children}
       {failed && (
         <p role="alert" className="mt-2 text-xs text-danger">
           {failedLabel ?? t('communities.actionFailed')}

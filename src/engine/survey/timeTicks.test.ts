@@ -20,6 +20,12 @@ describe('timeTicks', () => {
     expect(ticks.every((t) => t % (5 * MINUTE_MS) === 0)).toBe(true);
   });
 
+  it('steps by half days across a multi-day span, still at most six ticks', () => {
+    const ticks = timeTicks(at(0), at(0) + 47 * 60 * MINUTE_MS);
+    expect(ticks.length).toBeLessThanOrEqual(6);
+    expect(ticks.every((t) => t % (12 * 60 * MINUTE_MS) === 0)).toBe(true);
+  });
+
   it('is empty for an empty span', () => {
     expect(timeTicks(at(18), at(18))).toEqual([at(18)]);
   });

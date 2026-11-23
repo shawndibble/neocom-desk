@@ -3,7 +3,7 @@
  * courier, which is most of them — its route (system to system), so three in-progress hauls
  * don't all read "Courier" (issue #1706). The names come from the same
  * resolver the detail modal uses. Until both resolve (or if either can't) the
- * generic type label stands, as before; collateral rides on a meta line.
+ * generic type label stands, as before; collateral rides inline after it.
  */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,10 +67,10 @@ export function ContractIdentity({
       ? t('contracts.courierRoute', { start: route.start, end: route.end })
       : t(CONTRACT_TYPE_KEY[contract.type]);
   return (
-    <span className="min-w-0">
-      <span className="block break-words">{label}</span>
+    <span className="min-w-0 break-words">
+      {label}
       {contract.collateral !== undefined && (
-        <span className="block text-xs font-normal text-text-dim">
+        <span className="ml-2 text-xs font-normal text-text-dim">
           {t('contracts.collateralMeta', {
             value: formatIskAuto(contract.collateral, CONTRACT_ISK_CENTS_BELOW),
           })}

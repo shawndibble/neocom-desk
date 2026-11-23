@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, LiveNote, Panel } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { currentRouterPath } from '@/app/routerPath';
@@ -87,16 +87,16 @@ export function GroupingQuestions({
             <li key={id} className="space-y-1">
               <p className="text-sm font-semibold">{name}</p>
               {answered ? (
-                <p className="text-sm text-text-dim" role="status">
+                <LiveNote className="text-sm text-text-dim">
                   {t(`corpTaxBook.verify.grouping.${answered}`, { name })}
-                </p>
+                </LiveNote>
               ) : (
                 <>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant="primary"
-                      disabled={busy !== null}
+                      aria-disabled={busy !== null || undefined}
                       onClick={() => void run(id, signedIn.has(id) ? 'confirmed' : 'login')}
                     >
                       {signedIn.has(id)
@@ -106,7 +106,7 @@ export function GroupingQuestions({
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={busy !== null}
+                      aria-disabled={busy !== null || undefined}
                       onClick={() => void run(id, 'declined')}
                     >
                       {t('corpTaxBook.verify.grouping.decline')}

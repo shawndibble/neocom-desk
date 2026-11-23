@@ -9,7 +9,7 @@ import {
   CachedEmptyState,
   ColumnPickerMenu,
   EmptyState,
-  FilterChip,
+  SegmentedControl,
   IconButton,
   Panel,
   Spinner,
@@ -651,13 +651,15 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               actions={
                 <>
                   {/* A view, not a filter: it changes the table's row grain (DESIGN.md §6c). */}
-                  <FilterChip
-                    label={t('wallet.viewByStation')}
-                    size="md"
-                    selected={filter.view === 'station'}
-                    onToggle={() =>
-                      setFilter({ ...filter, view: filter.view === 'station' ? 'flat' : 'station' })
-                    }
+                  <SegmentedControl
+                    label={t('wallet.viewLabel')}
+                    uppercase={false}
+                    options={[
+                      { value: 'flat', label: t('wallet.viewFlat') },
+                      { value: 'station', label: t('wallet.viewByStation') },
+                    ]}
+                    value={filter.view}
+                    onChange={(view) => setFilter({ ...filter, view })}
                   />
                   {filter.view === 'station' && (
                     <StationSortMenu

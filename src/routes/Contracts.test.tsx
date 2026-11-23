@@ -10,10 +10,6 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY, useTimeFormat } from '@/lib/timeFormat';
-import {
-  DEFAULT_CONTRACT_SEARCH_MODE,
-  useContractSearchMode,
-} from '@/features/contractSearch/contractSearchModePref';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
@@ -170,10 +166,6 @@ beforeEach(async () => {
   // preference set by one test leaves the rest rendering UTC, and a leaked
   // `hydrated: true` makes App's `hydrate()` early-return.
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
-  // Same reset, same reason: a mode picked in one case (issue #1719) must not
-  // survive into the next as a remembered default that overrides a bare
-  // `/contracts` visit's own "lands on Items" assertion.
-  useContractSearchMode.setState({ value: DEFAULT_CONTRACT_SEARCH_MODE, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -195,7 +187,7 @@ describe('Contracts', () => {
     renderContracts();
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Contracts' });
-    expect(within(table).getByText('Courier')).toBeInTheDocument();
+    expect(within(table).getAllByText('Courier')[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Some Trader/).length).toBe(2);
     expect(within(table).getByText('Outstanding')).toBeInTheDocument();
     expect(within(table).getByText('Finished')).toBeInTheDocument();
@@ -252,7 +244,7 @@ describe('Contracts', () => {
 
     // Finished, with a deadline in the past — not flagged (issue: was
     // status-blind, so almost every completed contract dimmed).
-    const finishedRow = within(table).getByText('Courier').closest('tr');
+    const finishedRow = within(table).getAllByText('Courier')[0].closest('tr');
     expect(cue(finishedRow)).not.toBeInTheDocument();
   });
 
@@ -356,7 +348,7 @@ describe('Contracts', () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts/search/items?highlight=1');
     renderContracts();
-    await user.click(await screen.findByRole('tab', { name: 'History' }));
+    await user.click(await screen.findByRole('tab', { name: 'My contracts' }));
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -481,7 +473,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
-    expect(within(table).getByText('Courier')).toBeInTheDocument();
+    expect(within(table).getAllByText('Courier')[0]).toBeInTheDocument();
 
     // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
     // The status chips sit behind the funnel; a phone-only copy of them is gone.
@@ -529,7 +521,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
     const table = await screen.findByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
-    expect(within(table).getByText('Courier')).toBeInTheDocument();
+    expect(within(table).getAllByText('Courier')[0]).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search issuer, receiver or title…')).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
       'aria-pressed',
@@ -985,44 +977,24 @@ describe('Contracts tab strip (issue #908)', () => {
   // The loaders are mocked to read nothing, so the Search tab says R2 was unreachable.
   const SEARCH_UNAVAILABLE = "Can't reach contract search, and nothing is saved yet";
 
-  it('lands on Item search with no tab in the URL', async () => {
+  it('lands on My contracts with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');
     renderContracts();
-    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
-    expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'My contracts' })).toHaveAttribute(
       'aria-selected',
       'true'
     );
-    expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
-    expect(window.location.pathname).toBe('/contracts/search/items');
+    expect(window.location.pathname).toBe('/contracts/history');
   });
 
-  it('remembers the last-used Courier tab across a fresh visit (issue #1719)', async () => {
-    useContractSearchMode.setState({ value: 'courier', hydrated: true });
-    window.history.pushState({}, '', '/contracts');
-    renderContracts();
-    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
-    await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
-  });
-
-  it('never overrides an explicit deep link to Item search with a remembered Courier tab', async () => {
-    // `tabId` reads identically for this and a bare `/contracts` visit
-    // (issue #1719) — only `TabRoute`'s own `tabRouteDefaulted` marker tells
-    // them apart, and a URL that already names a real tab never gets one.
-    useContractSearchMode.setState({ value: 'courier', hydrated: true });
-    window.history.pushState({}, '', '/contracts/search/items');
-    renderContracts();
-    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
-    expect(window.location.pathname).toBe('/contracts/search/items');
-  });
-
-  it('swaps the public search for the contracts table when History is picked', async () => {
+  it('swaps the public search for the contracts table when My contracts is picked', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/contracts');
+    window.history.pushState({}, '', '/contracts/search/items');
     renderContracts();
     await screen.findAllByText(SEARCH_UNAVAILABLE);
 
-    await user.click(screen.getByRole('tab', { name: 'History' }));
+    await user.click(screen.getByRole('tab', { name: 'My contracts' }));
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/contracts/history');
@@ -1033,7 +1005,10 @@ describe('Contracts tab strip (issue #908)', () => {
     renderContracts();
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'My contracts' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
@@ -1045,12 +1020,8 @@ describe('Contracts tab strip (issue #908)', () => {
     window.history.pushState({}, '', '/contracts?tab=search');
     renderContracts();
 
-    expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
-    expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    expect(window.location.pathname).toBe('/contracts/search/items');
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/contracts/history');
   });
 
   it('reaches Item search even when this character has no contracts of its own', async () => {
@@ -1141,7 +1112,7 @@ describe('Contracts Search tab page header', () => {
       within(tabs)
         .getAllByRole('tab')
         .map((tab) => tab.textContent)
-    ).toEqual(['Item search', 'Courier', 'History']);
+    ).toEqual(['My contracts', 'Item search', 'Courier']);
     expect(screen.queryByRole('group', { name: 'Contract kind' })).not.toBeInTheDocument();
 
     await user.click(within(tabs).getByRole('tab', { name: 'Courier' }));
@@ -1151,7 +1122,6 @@ describe('Contracts Search tab page header', () => {
       'true'
     );
     expect(window.location.pathname).toBe('/contracts/search/courier');
-    expect(useContractSearchMode.getState().value).toBe('courier');
   });
 });
 

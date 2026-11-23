@@ -168,7 +168,7 @@ describe('SurveyShareScreen as its signed-in owner', () => {
     setSurveyScanIgnored.mockResolvedValue(undefined);
     renderScreen();
     expect(await screen.findByLabelText('Notes (markdown supported)')).toBeTruthy();
-    fireEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+    fireEvent.click(screen.getByText('2 scans', { selector: 'h2' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
     await waitFor(() =>
       expect(setSurveyScanIgnored).toHaveBeenCalledWith({
@@ -188,7 +188,7 @@ describe('SurveyShareScreen as its signed-in owner', () => {
     loadSurvey.mockResolvedValue(twoScans('Someone Else'));
     setSurveyScanIgnored.mockResolvedValue(undefined);
     renderScreen();
-    fireEvent.click(await screen.findByText('2 scans', { selector: 'summary' }));
+    fireEvent.click(await screen.findByText('2 scans', { selector: 'h2' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
     await waitFor(() =>
       expect(setSurveyScanIgnored).toHaveBeenCalledWith({
@@ -209,7 +209,7 @@ describe('SurveyShareScreen as its signed-in owner', () => {
     renderScreen();
     await openDetails();
     expect(await screen.findByLabelText('Notes (markdown supported)')).toBeTruthy();
-    fireEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+    fireEvent.click(screen.getByText('2 scans', { selector: 'h2' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
     await waitFor(() =>
       expect(setSurveyScanIgnored).toHaveBeenCalledWith(expect.objectContaining({ characterId: 7 }))

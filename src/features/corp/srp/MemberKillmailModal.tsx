@@ -101,7 +101,7 @@ export function MemberKillmailModal({
             <Button
               variant="primary"
               className="w-full sm:w-auto"
-              disabled={busy}
+              loading={busy}
               onClick={() => onFile(ready?.check)}
             >
               {t('srpKillmail.file')}
