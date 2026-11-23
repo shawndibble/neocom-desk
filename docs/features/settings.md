@@ -103,7 +103,7 @@ Default / storage / sync for every control. "Local" = device-only.
 - Corporation row: hidden when Corp Access is `none` (no corp role). Shows `not-granted` note ("roles unknown") or the corp roles held (`corpRoleLabel`). Grantable for `not-granted` and `roles-without-grant`.
 - No Remove: revoke is on CCP's authorized-apps site (external link in hint).
 - Grant buttons are `ghost`/default, not primary (page already spends its one primary on Notifications Enable).
-- Related, outside Settings: "Customize permissions" at sign-in (`CustomizePermissionsDialog.tsx`, Login + Characters add flow): Core Grant rows locked, all 25 Permissions, every read ticked by default, only the Write to EVE ones tagged opt-in. Selection stored device-local on submit (`customizeSelection.ts`, key via `useCustomizePermissionsSelection`).
+- Related, outside Settings: "Customize permissions" at sign-in (`CustomizePermissionsDialog.tsx`, Login + Characters add flow): Core Grant rows locked, all 26 Permissions, every read ticked by default, only the Write to EVE ones tagged opt-in. Selection stored device-local on submit (`customizeSelection.ts`, key via `useCustomizePermissionsSelection`).
 - Data: JWT scopes from Dexie `tokens`; `useCorpAccess` reads `GET /characters/{id}/roles` (scope `esi-characters.read_corporation_roles.v1`). No other ESI call.
 
 ### Industry (`/settings/industry`) — three panels

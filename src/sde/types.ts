@@ -623,3 +623,55 @@ export interface NpcCorporationsFile {
   factions: { id: number; name: string }[];
   corporations: NpcCorporationEntry[];
 }
+
+/** One Military Campaign in `militaryCampaigns.json` (`scripts/lib/militaryCampaigns.mjs`). */
+export interface MilitaryCampaignEntry {
+  /** UUID; the same id ESI's `/military-campaigns` uses. */
+  id: string;
+  title: string;
+  /** The faction running it; null if the SDE named none. */
+  factionId: number | null;
+  /** How many of its Campaign Objectives complete it. */
+  targetProgress: number;
+}
+
+/** A reward of `amount` per `interval` progress (one item turned in is one progress). */
+export interface CampaignRewardRate {
+  amount: number;
+  interval: number;
+}
+
+/** One Campaign Objective in `militaryCampaigns.json`. Its live state is ESI's. */
+export interface CampaignObjectiveEntry {
+  /** UUID; the same id ESI's objective reads use. */
+  id: string;
+  campaignId: string;
+  /** English title, e.g. "Deliver Shield Failover Report in Onnamon". */
+  title: string;
+  /** CCP's contribution method: `ItemTraded` is a turn-in; `MineOre`, `KillNPC`, ... are kept too. */
+  method: string;
+  /** The community target, in progress units. */
+  targetProgress: number;
+  /** The most progress one Character may contribute; absent when the SDE sets none. */
+  maxPerParticipant?: number;
+  isk?: CampaignRewardRate;
+  /** LP, paid per full `interval` (the LP block), by `corporationId`. */
+  lp?: CampaignRewardRate & { corporationId: number };
+  /** Only on an `ItemTraded` objective. */
+  turnIn?: {
+    typeId: number;
+    /** The Item Trader's type; unpublished, hence the baked name. */
+    traderTypeId: number;
+    traderName: string;
+    /** The trader's solar system, from the objective's own subtitle link (`traderSystemSource`). */
+    systemId: number | null;
+  };
+}
+
+/** `militaryCampaigns.json`: every Military Campaign and Campaign Objective in the SDE. */
+export interface MilitaryCampaignsFile {
+  /** Where each `turnIn.systemId` was read from. */
+  traderSystemSource: string;
+  campaigns: MilitaryCampaignEntry[];
+  objectives: CampaignObjectiveEntry[];
+}
