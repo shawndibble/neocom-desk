@@ -5024,7 +5024,10 @@
       "thisCharacter": "This character",
       "allCharacters": "All characters",
       "unreadFor": "{{name}} · {{count}} unread",
-      "corporation": "Corporation"
+      "corporation": "Corporation",
+      "corporations": "Corporations",
+      "mixed": "Mixed",
+      "mixedHint": "Widgets differ. Pick one to set them all."
     }
   },
   "characters": {
@@ -6164,6 +6167,12 @@
       "loading": "Loading",
       "needsPermission": "Needs permission",
       "needsPermissionHint": "{{title}} needs a permission this Character has not given yet.",
+      "oneCorporation": {
+        "title": "Pick one corporation",
+        "hint": "{{title}} reads one corporation at a time, so it cannot show all of them.",
+        "hintOther": "{{title}} can only read {{corporation}} through a Character in it. Switch to that Character, or pick another corporation.",
+        "use": "Use {{corporation}}"
+      },
       "failed": {
         "title": "Could not load",
         "lastGood": "Last updated {{age}}.",
@@ -6703,6 +6712,7 @@
         "resized": "Widget resized",
         "duplicated": "Widget duplicated",
         "reset": "Layout reset",
+        "scoped": "Scope set for all widgets",
         "roles": "Layout replaced"
       },
       "phone": {
@@ -6964,9 +6974,9 @@
         "chart": "Chart",
         "table": "Table"
       },
-      "character": "Character",
-      "header": "Header",
-      "all": "All",
+      "character": "Characters",
+      "header": "This character",
+      "all": "All characters",
       "nameOnly": "This widget shows the header Character only.",
       "range": "Range",
       "rangeDays": "{{days}}d",
@@ -16259,9 +16269,9 @@
       "menu": {
         "remove": "Remove from Corp Board",
         "character": "Corporations",
-        "header": "This corporation",
-        "all": "All my corporations",
-        "showsOnOne": "Flow and Sources read one corporation: pick This corporation for them."
+        "header": "This character's corporation",
+        "all": "All characters",
+        "showsOnOne": "Flow and Sources read one corporation: pick This character's corporation or a named one for them."
       },
       "header": {
         "breakdownCaption": "When each widget on the Corp Board last read its data"

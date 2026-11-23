@@ -19,6 +19,7 @@ export type CharacterScopeReadoutProps = (
   | { scope: 'all'; total: number; missing?: readonly string[] }
   | { scope: 'one'; characterId: number; characterName: string }
   | { scope: 'corp'; division: string }
+  | { scope: 'corporation'; name: string }
 ) & {
   /**
    * Just the glyph, with the words as its accessible name and tooltip: for a
@@ -35,6 +36,9 @@ export function CharacterScopeReadout(props: CharacterScopeReadoutProps) {
   if (props.scope === 'one') {
     label = t('character.scope.one', { name: props.characterName });
     glyph = <CharacterAvatar characterId={props.characterId} size="sm" className="rounded-full" />;
+  } else if (props.scope === 'corporation') {
+    label = props.name;
+    glyph = <Icon.Corporation size={Icon.ICON_SIZE.sm} aria-hidden="true" />;
   } else if (props.scope === 'corp') {
     label = t('character.scope.corp', { division: props.division });
     glyph = <Icon.Corporation size={Icon.ICON_SIZE.sm} aria-hidden="true" />;

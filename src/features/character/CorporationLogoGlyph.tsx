@@ -27,21 +27,25 @@ const BOX: Record<CharacterAvatarSize, string> = {
  */
 export function CorporationLogoGlyph({
   characterId,
+  corporationId: givenCorporationId,
   size,
   boxClassName,
   className,
 }: {
   characterId: number | null;
+  /** A corporation named outright (the Corp Board's scope control); `characterId` is then not read. */
+  corporationId?: number;
   size: CharacterAvatarSize;
   /** Replaces the portrait box `size` gives, for a caller that steps the box per breakpoint. */
   boxClassName?: string;
   className?: string;
 }) {
-  const corporationId = useLiveQuery(
+  const ofCharacter = useLiveQuery(
     async () =>
       characterId === null ? null : ((await db.characters.get(characterId))?.corporationId ?? null),
     [characterId]
   );
+  const corporationId = givenCorporationId ?? ofCharacter;
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src =

@@ -22,6 +22,7 @@ import {
   DEFAULT_RANGE,
   DEFAULT_RAIDS_RADIUS,
   isPlexPlan,
+  isWidgetScope,
   isRaidsRadius,
   rangesOf,
   type OverviewLayout,
@@ -50,7 +51,7 @@ function parseWidget(stored: unknown): Widget | null {
   // The List view became Table: a layout saved before the rename keeps its choice.
   if (raw.view === 'list') out.view = 'table';
   if (!def.views.includes(out.view as never)) out.view = def.defaultView;
-  if (raw.scope !== 'header' && raw.scope !== 'all') out.scope = 'header';
+  if (!isWidgetScope(raw.scope)) out.scope = 'header';
   if (typeof raw.showOnPhone !== 'boolean') out.showOnPhone = true;
   if (typeof raw.title !== 'string') delete out.title;
   if (rangesOf(def.id).includes(raw.range as WidgetRange)) {

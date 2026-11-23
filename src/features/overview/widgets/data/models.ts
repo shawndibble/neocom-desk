@@ -91,7 +91,7 @@ export function feedsFor(readers: readonly FeedReader[]): FeedId[] {
     const feeds =
       typeof reader === 'string'
         ? feedsOf(reader)
-        : feedsOf(reader.kind, reader, reader.scope === 'all');
+        : feedsOf(reader.kind, reader, reader.scope !== undefined && reader.scope !== 'header');
     for (const feed of feeds ?? []) out.add(feed);
   }
   return [...out];

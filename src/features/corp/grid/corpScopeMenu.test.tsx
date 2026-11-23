@@ -64,7 +64,7 @@ function setup(
   );
 }
 
-const ALL = 'All my corporations';
+const ALL = 'All characters';
 
 describe('Corp Board scope choice', () => {
   it.each(ACROSS)('offers %s every corporation, chosen, when two can be read', async (kind) => {
@@ -93,7 +93,9 @@ describe('Corp Board scope choice', () => {
       expect(screen.getByRole('menuitemradio', { name })).toHaveAttribute('aria-disabled', 'true');
     }
     expect(
-      screen.getByText('Flow and Sources read one corporation: pick This corporation for them.')
+      screen.getByText(
+        "Flow and Sources read one corporation: pick This character's corporation or a named one for them."
+      )
     ).toBeInTheDocument();
   });
 
