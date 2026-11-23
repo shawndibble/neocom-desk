@@ -253,7 +253,10 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
   const current = useCurrentSystem();
   const fromId = params.from ?? current.systemId;
-  const fromIsCurrent = params.from === null && current.systemId !== null;
+  // Only the game's own location is "current": a system the pilot picked is
+  // marked as picked, so it is not mistaken for where the pilot is.
+  const fromIsGame = params.from === null && current.source === 'game';
+  const fromIsPicked = params.from === null && current.source === 'picked';
   const fromName = useSystemName(fromId);
   const systems = useSolarSystemIndex();
   const refsKey = serializeStopRefs(stopsFromLink(params.stops, params.to)) ?? '';
@@ -393,9 +396,11 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const fromTrigger =
     fromId === null
       ? t('travel.pickSystem')
-      : fromIsCurrent
+      : fromIsGame
         ? t('travel.currentSystem', { system: fromName ?? '…' })
-        : (fromName ?? '…');
+        : fromIsPicked
+          ? t('travel.pickedSystem', { system: fromName ?? '…' })
+          : (fromName ?? '…');
   const stationOf = new Map(stopRefs.map((stop) => [stop.systemId, stop.stationId]));
   const nameOf = (systemId: number) => {
     const stationId = stationOf.get(systemId);
@@ -430,6 +435,15 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
             fromTrigger={fromTrigger}
             // A new start is a new first leg: its pin no longer applies.
             onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
+            // Back to the game location: drop the link's start and any pick.
+            onFromReset={
+              params.from !== null || current.source === 'picked'
+                ? () => {
+                    current.clearPick();
+                    setParams({ from: null, pin: [] }, { push: true });
+                  }
+                : undefined
+            }
             stops={stopRefs}
             onStopsChange={(next, picked) => {
               if (picked) rememberStation(picked.id, picked.name);

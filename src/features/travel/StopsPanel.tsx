@@ -34,6 +34,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
+  Button,
   Checkbox,
   CollapsiblePanel,
   IconButton,
@@ -170,6 +171,7 @@ export function StopsPanel({
   fromName,
   fromTrigger,
   onFromChange,
+  onFromReset,
   stops,
   onStopsChange,
   settings,
@@ -185,6 +187,8 @@ export function StopsPanel({
   /** The start's trigger text: its name, marked when it is the Current System. */
   fromTrigger: string;
   onFromChange: (systemId: number) => void;
+  /** Set when the start is not the game location: puts it back. */
+  onFromReset?: () => void;
   /** In the order typed. */
   stops: readonly StopRef[];
   /** `picked` is the station just added, so the page can name it before the link round-trips. */
@@ -269,6 +273,19 @@ export function StopsPanel({
               <SolarSystemPicker
                 value={fromId}
                 onChange={onFromChange}
+                footer={(close) =>
+                  onFromReset && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onFromReset();
+                        close();
+                      }}
+                    >
+                      {t('jumpRange.useGameLocation')}
+                    </Button>
+                  )
+                }
                 ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
                 triggerLabel={fromTrigger}
               />

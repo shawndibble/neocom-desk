@@ -17509,6 +17509,7 @@
     },
     "pickSystem": "Pick a system",
     "currentSystem": "{{system}} (current system)",
+    "pickedSystem": "{{system}} (set by you)",
     "changeFrom": "Change starting system — {{current}}",
     "stops": {
       "title": "Stops",
