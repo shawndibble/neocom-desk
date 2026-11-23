@@ -6,7 +6,8 @@
  */
 import type { EsiEndpointId } from '@/esi/registry';
 import { byShow, type KindDef } from './builderKit';
-import { corpAssets } from './corpAssetsModels';
+import { acrossFeed } from './corpAcrossKit';
+import { corpAssets, corpAssetsAcross } from './corpAssetsModels';
 import { corpContracts } from './corpContractsModels';
 import { corpOrders } from './corpOrdersModels';
 import { corpDeadlines, corpJobs } from './corpClockModels';
@@ -51,7 +52,12 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
     scope: 'account',
     build: corpCustomsOffices,
   },
-  corpRoleAudit: { feeds: ['corpRoleAudit'], scope: 'character', build: corpRoleAudit },
+  corpRoleAudit: {
+    feeds: ['corpRoleAudit'],
+    allFeeds: ['corpRoleAuditAll'],
+    scope: 'account',
+    build: acrossFeed(corpRoleAudit, 'corpRoleAudit', 'corpRoleAuditAll'),
+  },
   corpWallet: {
     feeds: ['corpWallet'],
     allFeeds: ['corpWalletAll'],
@@ -64,8 +70,18 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
       endpoints: CORP_WALLET_ENDPOINTS,
     }),
   },
-  corpMembers: { feeds: ['corpMembers'], scope: 'character', build: corpMembers },
-  corpInactive: { feeds: ['corpMembers'], scope: 'character', build: corpInactive },
+  corpMembers: {
+    feeds: ['corpMembers'],
+    allFeeds: ['corpMembersAll'],
+    scope: 'account',
+    build: acrossFeed(corpMembers, 'corpMembers', 'corpMembersAll'),
+  },
+  corpInactive: {
+    feeds: ['corpMembers'],
+    allFeeds: ['corpMembersAll'],
+    scope: 'account',
+    build: acrossFeed(corpInactive, 'corpMembers', 'corpMembersAll'),
+  },
   corpMining: { feeds: ['corpMining'], scope: 'character', build: corpMining },
   corpOrders: {
     feeds: ['corpOrders'],
@@ -79,12 +95,22 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
     scope: 'account',
     build: corpContracts,
   },
-  corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], scope: 'character', build: corpAssets },
+  corpAssets: {
+    feeds: ['corpAssets', 'corpStockTargets'],
+    allFeeds: ['corpAssetsAll', 'corpStockTargets'],
+    scope: 'account',
+    build: (feeds, ctx) => (ctx.scopeAll ? corpAssetsAcross(feeds, ctx) : corpAssets(feeds, ctx)),
+  },
   corpKills: {
     feeds: ['corpKills'],
     allFeeds: ['corpKillsAll'],
     scope: 'account',
     build: corpKills,
   },
-  corpSrp: { feeds: ['corpSrp'], scope: 'character', build: corpSrp },
+  corpSrp: {
+    feeds: ['corpSrp'],
+    allFeeds: ['corpSrpAll'],
+    scope: 'account',
+    build: acrossFeed(corpSrp, 'corpSrp', 'corpSrpAll'),
+  },
 };

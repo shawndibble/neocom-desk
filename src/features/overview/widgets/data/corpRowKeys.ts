@@ -8,3 +8,9 @@ export const starbaseKey = (row: { starbaseId: number }) => String(row.starbaseI
 export const sovereigntyRowKey = (row: { key: string }) => row.key;
 export const contractKey = (contract: { contract_id: number }) => String(contract.contract_id);
 export const orderKey = (order: { order_id: number }) => String(order.order_id);
+export const srpClaimKey = (claim: { killmailId: number }) => String(claim.killmailId);
+/** A member, a role holder: one character belongs to one corporation, so the id is the key. */
+export const characterKey = (row: { characterId: number }) => String(row.characterId);
+/** The roster's joined and left rows, filed by the id of the character who joined or left. */
+export const joinedKey = (id: number) => `joined:${id}`;
+export const leftKey = (id: number) => `left:${id}`;

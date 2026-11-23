@@ -289,6 +289,26 @@ export async function loadCorpKillsAllFeed(): Promise<CorpAllFeed<CorpKillsFeed>
   return loadCorpKillsAll();
 }
 
+export async function loadCorpAssetsAllFeed(): Promise<CorpAllFeed<CorpAssetsFeed>> {
+  const { loadCorpAssetsAll } = await import('./corpFeedLoaders');
+  return loadCorpAssetsAll();
+}
+
+export async function loadCorpSrpAllFeed(): Promise<CorpSrpFeed> {
+  const { loadCorpSrpAll } = await import('./corpFeedLoaders');
+  return loadCorpSrpAll();
+}
+
+export async function loadCorpMembersAllFeed(): Promise<CorpMembersFeed> {
+  const { loadCorpMembersAll } = await import('./corpFeedLoaders');
+  return loadCorpMembersAll();
+}
+
+export async function loadCorpRoleAuditAllFeed(): Promise<CorpRoleAuditFeed> {
+  const { loadCorpRoleAuditAll } = await import('./corpFeedLoaders');
+  return loadCorpRoleAuditAll();
+}
+
 export async function loadCorpDeadlinesAllFeed(): Promise<CorpDeadlinesAllFeed> {
   const { loadCorpDeadlinesAll } = await import('./corpFeedLoaders');
   return loadCorpDeadlinesAll();

@@ -8,13 +8,23 @@
  * corporation, share the one feed. Pure: it never fetches.
  */
 import {
+  characterKey,
   contractKey,
   customsOfficeKey,
+  joinedKey,
+  leftKey,
   orderKey,
+  srpClaimKey,
   sovereigntyRowKey,
   starbaseKey,
 } from './corpRowKeys';
-import type { CorpAllFeed, CorpDeadlinesAllFeed, CorpFeedBase } from './corpFeeds';
+import type {
+  CorpAllFeed,
+  CorpDeadlinesAllFeed,
+  CorpFeedBase,
+  CorpMembersFeed,
+  CorpRoleAuditFeed,
+} from './corpFeeds';
 import type { FeedId, FeedState, Feeds } from './types';
 
 type Narrow = (data: never, corporationId: number) => unknown;
@@ -57,6 +67,40 @@ function merged<F extends CorpFeedBase, K extends keyof F>(
   };
 }
 
+/** The merged roster: one corporation's members, and the joins and leaves filed under it. */
+function membersOf(data: CorpMembersFeed, corporationId: number): CorpMembersFeed {
+  const own = (key: string) => data.corporationOf?.get(key) === corporationId;
+  const narrowed = merged<CorpMembersFeed, 'members'>('members', characterKey as never)(
+    data,
+    corporationId
+  );
+  return {
+    ...narrowed,
+    diff: data.diff && {
+      joined: data.diff.joined.filter((id) => own(joinedKey(id))),
+      left: data.diff.left.filter((id) => own(leftKey(id))),
+    },
+  };
+}
+
+/** The merged audit: one corporation's holders, and the changes of those holders. */
+function roleAuditOf(data: CorpRoleAuditFeed, corporationId: number): CorpRoleAuditFeed {
+  const narrowed = merged<CorpRoleAuditFeed, never>('audit' as never, characterKey as never)(
+    data,
+    corporationId
+  );
+  if (!data.audit) return narrowed;
+  const own = (id: number) => data.corporationOf?.get(String(id)) === corporationId;
+  return {
+    ...narrowed,
+    audit: {
+      ...data.audit,
+      holders: data.audit.holders.filter((holder) => own(holder.characterId)),
+      changes: data.audit.changes?.filter((change) => own(change.characterId)) ?? null,
+    },
+  };
+}
+
 const NARROW: { readonly [K in FeedId]?: Narrow } = {
   corpWalletAll: perCorporation as Narrow,
   corpJobsAll: perCorporation as Narrow,
@@ -67,6 +111,10 @@ const NARROW: { readonly [K in FeedId]?: Narrow } = {
   corpSovereigntyAll: merged('rows', sovereigntyRowKey) as Narrow,
   corpContractsAll: merged('contracts', contractKey) as Narrow,
   corpOrdersAll: merged('orders', orderKey) as Narrow,
+  corpAssetsAll: perCorporation as Narrow,
+  corpSrpAll: merged('claims', srpClaimKey) as Narrow,
+  corpMembersAll: membersOf as Narrow,
+  corpRoleAuditAll: roleAuditOf as Narrow,
   structuresAll: ((
     data: {
       structures: { corporationId?: number }[] | null;

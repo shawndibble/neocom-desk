@@ -4,9 +4,9 @@
  * Pure, like every builder.
  */
 import type { CorpLabel } from '@/features/corp/corpTicker';
-import { blank, corpUnreadable, statusOf } from './builderKit';
+import { acrossCorporations, blank, corpUnreadable, statusOf, type Builder } from './builderKit';
 import type { CorpAllFeed, CorpFeedBase } from './corpFeeds';
-import type { FeedState, KindView } from './types';
+import type { FeedId, FeedState, KindView } from './types';
 import type { Translate } from '@/lib/translate';
 
 /** One corporation's readable read, named for its rows. */
@@ -66,5 +66,19 @@ export function oldestRead(reads: readonly CorpRead<CorpFeedBase>[]): {
   return {
     fetchedAt: dates.length === 0 ? null : dates.reduce((a, b) => (b < a ? b : a)),
     fromCache: reads.some(({ feed }) => feed.fromCache),
+  };
+}
+
+/**
+ * A widget whose All read is one merged feed (`corporationOf` files each row under its
+ * corporation): on All it draws the same builder over that feed, then names each row's
+ * corporation and flags a corporation that could not be read.
+ */
+export function acrossFeed(build: Builder, one: FeedId, all: FeedId): Builder {
+  return (feeds, ctx) => {
+    if (!ctx.scopeAll) return build(feeds, ctx);
+    const state = feeds[all] as FeedState<CorpFeedBase> | undefined;
+    const view = build({ ...feeds, [one]: state }, ctx);
+    return state?.data ? acrossCorporations(view, state.data, ctx.t) : view;
   };
 }

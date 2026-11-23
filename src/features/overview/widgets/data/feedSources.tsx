@@ -71,7 +71,11 @@ import {
   loadSovRaidsWidget,
 } from './kindLoaders';
 import {
+  loadCorpAssetsAllFeed,
   loadCorpAssetsFeed,
+  loadCorpMembersAllFeed,
+  loadCorpRoleAuditAllFeed,
+  loadCorpSrpAllFeed,
   loadCorpCustomsFeed,
   loadCorpJobsFeed,
   loadCorpKillsFeed,
@@ -300,6 +304,12 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
     accountWide: true,
   }),
   corpOrdersAll: snapshot(loadCorpOrdersAllFeed, 'corp:orders-all', { accountWide: true }),
+  corpAssetsAll: snapshot(loadCorpAssetsAllFeed, 'corp:assets-all', { accountWide: true }),
+  corpSrpAll: snapshot(loadCorpSrpAllFeed, 'corp:srp-all', { accountWide: true }),
+  corpMembersAll: snapshot(loadCorpMembersAllFeed, 'corp:members-all', { accountWide: true }),
+  corpRoleAuditAll: snapshot(loadCorpRoleAuditAllFeed, 'corp:role-audit-all', {
+    accountWide: true,
+  }),
   corpKills: snapshot(loadCorpKillsFeed, 'corp:kills'),
   corpWalletAll: snapshot(loadCorpWalletAllFeed, 'corp:wallet-all', { accountWide: true }),
   corpJobsAll: snapshot(loadCorpJobsAllFeed, 'corp:jobs-all', { accountWide: true }),
