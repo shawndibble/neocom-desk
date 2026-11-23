@@ -620,7 +620,7 @@ describe('ShipTreeTab — ladder', () => {
   it('clears the filters from the empty state, leaving a clean URL', async () => {
     const user = userEvent.setup();
     renderTab('/ships/tree?mastery=4');
-    await user.click(await screen.findByRole('button', { name: 'Clear filters' }));
+    await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
     expect(screen.getByTestId('location')).not.toHaveTextContent(/mastery|fly=/);
     expect(await screen.findByRole('button', { name: /Merlin/ })).toBeVisible();
   });

@@ -421,7 +421,7 @@ export function BuildPlanList({
             className="py-6"
             action={
               <Button size="sm" onClick={() => setFilter(DEFAULT_BUILD_PLAN_FILTER)}>
-                {t('industry.planFilters.clear')}
+                {t('common.resetFilters')}
               </Button>
             }
           />
