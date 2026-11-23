@@ -7,7 +7,7 @@ import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severit
 import type { CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
-import { toBoardStarbases, toStructureSources } from './corpStarbaseModels';
+import { toBoardStarbases, toStructureSources } from './towerSources';
 import {
   shortStructureName,
   structureRows,
