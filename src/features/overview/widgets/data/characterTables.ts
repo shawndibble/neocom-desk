@@ -217,7 +217,7 @@ export function calendarTable(t: Translate, rows: readonly CalendarTableRow[]): 
     columns: [
       { key: 'item', label: t(`${W}.comingUp.col.item`), priority: 0 },
       { key: 'in', label: t(`${W}.comingUp.col.in`), align: 'end', priority: 1 },
-      { key: 'kind', label: t(`${W}.comingUp.col.kind`), priority: 2 },
+      { key: 'kind', label: t(`${W}.comingUp.col.kind`), priority: 2, grow: true },
     ],
     rows: rows.map((row) => ({
       key: row.key,
