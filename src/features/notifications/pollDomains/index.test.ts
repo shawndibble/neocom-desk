@@ -16,6 +16,7 @@ import {
   deriveMarketOrderEntries,
 } from './marketOrders';
 import { eveNotificationDomain } from './eveNotifications';
+import { loadCorporationStarbases, loadStarbaseDetails } from '@/features/corp/starbases';
 import {
   structureFuelDomain,
   corpIndustryJobDomain,
@@ -81,6 +82,10 @@ vi.mock('@/features/corp/boardData', () => ({
   loadCorporationId: vi.fn(),
   loadCorporationStructures: vi.fn(),
   MASTER_WALLET_DIVISION: 1,
+}));
+vi.mock('@/features/corp/starbases', () => ({
+  loadCorporationStarbases: vi.fn(),
+  loadStarbaseDetails: vi.fn(),
 }));
 vi.mock('@/features/corp/jobs', () => ({ loadCorporationIndustryJobs: vi.fn() }));
 vi.mock('@/features/corp/members', () => ({ loadCorporationMemberIds: vi.fn() }));
@@ -1183,6 +1188,8 @@ describe('corp domains', () => {
     vi.mocked(loadCorporationId).mockReset();
     vi.mocked(loadCharacterRoles).mockReset();
     vi.mocked(loadCorporationStructures).mockReset();
+    vi.mocked(loadCorporationStarbases).mockReset();
+    vi.mocked(loadStarbaseDetails).mockReset();
     vi.mocked(loadCorporationIndustryJobs).mockReset();
     vi.mocked(loadCorporationMemberIds).mockReset();
     vi.mocked(loadCorporationWallets).mockReset();
@@ -1229,6 +1236,53 @@ describe('corp domains', () => {
     vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Director']), false));
     vi.mocked(loadCorporationStructures).mockResolvedValue(statusResult([], false));
     expect(await structureFuelDomain.load(1)).toEqual([]);
+  });
+
+  describe('structureFuelDomain towers', () => {
+    const tower = {
+      starbase_id: 77,
+      system_id: 30000142,
+      type_id: 12235,
+      state: 'online' as const,
+    };
+
+    async function directorWithStarbaseGrant(): Promise<void> {
+      await db.tokens.put({
+        characterId: 1,
+        scopes: ['esi-corporations.read_starbases.v1'],
+      } as never);
+      vi.mocked(loadCorporationId).mockResolvedValue(2);
+      vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Director']), false));
+      vi.mocked(loadCorporationStructures).mockResolvedValue(statusResult([], false));
+      vi.mocked(loadCorporationStarbases).mockResolvedValue(statusResult([tower], false));
+    }
+
+    it('lists an online tower beside the structures, its fuel clock from the bay', async () => {
+      await directorWithStarbaseGrant();
+      vi.mocked(loadStarbaseDetails).mockResolvedValue(
+        new Map([
+          [77, statusResult({ state: 'online', fuels: [{ type_id: 4051, quantity: 0 }] }, false)],
+        ])
+      );
+      const entries = await structureFuelDomain.load(1);
+      expect(entries).toHaveLength(1);
+      expect(entries![0]).toMatchObject({ structureId: 77, thresholdMs: 7 * 86_400_000 });
+      // Bay empty at read time: the fuel runs out when it was read.
+      expect(entries![0]).toHaveProperty('fuelExpiresMs', expect.any(Number));
+    });
+
+    it('skips the poll when an online tower’s bay cannot be read', async () => {
+      await directorWithStarbaseGrant();
+      vi.mocked(loadStarbaseDetails).mockResolvedValue(new Map());
+      expect(await structureFuelDomain.load(1)).toBeNull();
+    });
+
+    it('reads no towers without the starbases grant', async () => {
+      await directorWithStarbaseGrant();
+      await db.tokens.put({ characterId: 1, scopes: [] } as never);
+      expect(await structureFuelDomain.load(1)).toEqual([]);
+      expect(loadCorporationStarbases).not.toHaveBeenCalled();
+    });
   });
 
   it('corpIndustryJobDomain never calls the endpoint without Factory_Manager (or Director)', async () => {

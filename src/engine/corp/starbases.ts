@@ -6,6 +6,8 @@
  * comes from CCP's static data.
  */
 
+import { HOUR_MS } from '../../../functions/src/timeConstants';
+
 /** A tower with less fuel than this many hours left is a warning (the Number's tone). */
 export const STARBASE_FUEL_WARNING_HOURS = 48;
 
@@ -95,4 +97,23 @@ export function summariseBay(
 export function fuelHoursLeft(towerTypeId: number, fuelBlocks: number): number | null {
   const rate = TOWER_FUEL_PER_HOUR.get(towerTypeId);
   return rate === undefined ? null : fuelBlocks / rate;
+}
+
+/**
+ * When an online tower's fuel runs out, from the moment its bay was read; null when the tower is
+ * not online, its bay was not read, or its burn rate is unknown. The one rule the Starbases
+ * widget, the Calendar and the fuel alert all share.
+ */
+export function towerFuelExpiresMs(
+  tower: { typeId: number; state: string; bay: StarbaseBay | null },
+  readAtMs: number
+): number | null {
+  if (tower.state !== 'online' || tower.bay === null) return null;
+  const hours = fuelHoursLeft(tower.typeId, tower.bay.fuelBlocks);
+  return hours === null ? null : readAtMs + hours * HOUR_MS;
+}
+
+/** A tower has no name of its own: its type, and its system when known (" - " would be cut as a structure's system prefix). */
+export function towerLabel(typeName: string, systemName: string | undefined): string {
+  return systemName === undefined ? typeName : `${typeName} (${systemName})`;
 }

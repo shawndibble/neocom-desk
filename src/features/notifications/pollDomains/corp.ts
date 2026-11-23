@@ -4,6 +4,10 @@ import {
   MASTER_WALLET_DIVISION,
 } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
+import { loadCorporationStarbases, loadStarbaseDetails } from '@/features/corp/starbases';
+import { loadGrantedScopes } from '@/app/grantedScopes';
+import { CORP_SCOPES_FOR_CAPABILITY } from '@/features/corp/corpScopes';
+import { summariseBay, towerFuelExpiresMs, towerLabel } from '@/engine/corp/starbases';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import { loadCorporationSkyhooks, loadSkyhookDetails } from '@/features/corp/sovereignty';
 import { loadPlanetName } from '@/features/pi/names';
@@ -90,6 +94,56 @@ const isStructureFuelEntrySnapshot = shapeGuard<StructureFuelEntrySnapshot>({
   thresholdMs: is.number,
 });
 
+/**
+ * A Director's control towers (POS) as fuel entries beside the Upwell structures: a tower id and a
+ * structure id never collide, so one snapshot and one alert cover both. Empty when this Character
+ * cannot read towers (no Director role or no starbases grant); null when it can and the read
+ * failed, so the poll is skipped rather than a baseline written without them — a tower missing
+ * from it would announce as new once it reads again.
+ */
+async function loadTowerFuel(
+  characterId: number,
+  corporationId: number,
+  thresholdMs: number
+): Promise<StructureFuelEntrySnapshot[] | null> {
+  const granted = await loadGrantedScopes(characterId);
+  if (!CORP_SCOPES_FOR_CAPABILITY.canReadStarbases.every((scope) => granted.has(scope))) return [];
+  const rolesResult = await loadCharacterRoles(characterId);
+  if (rolesResult.needsReauth || rolesResult.cached === null) return null;
+  if (!corpCapabilities(corpWideRoles(rolesResult.cached.data)).canReadStarbases) return [];
+  const list = await loadCorporationStarbases(characterId, corporationId);
+  if (list.needsReauth || list.cached === null) return null;
+  const online = list.cached.data.filter((tower) => tower.state === 'online');
+  const details = await loadStarbaseDetails(characterId, corporationId, online);
+  const [systems, typeNames] = await Promise.all([
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+    resolveProjectionNames(
+      online.map((tower) => tower.type_id),
+      universeTypeName
+    ),
+  ]);
+  const entries: StructureFuelEntrySnapshot[] = [];
+  for (const tower of list.cached.data) {
+    const read = details.get(tower.starbase_id);
+    // An online tower whose bay cannot be read has no fuel clock this poll: skip, don't guess.
+    if (tower.state === 'online' && (read === undefined || read.cached === null)) return null;
+    const bay = read?.cached ? summariseBay(read.cached.data.fuels) : null;
+    entries.push({
+      structureId: tower.starbase_id,
+      name: towerLabel(
+        typeNames.get(tower.type_id) ?? `#${tower.type_id}`,
+        systems?.get(tower.system_id)?.name
+      ),
+      fuelExpiresMs: towerFuelExpiresMs(
+        { typeId: tower.type_id, state: tower.state ?? 'unknown', bay },
+        read?.cached?.fetchedAt.getTime() ?? 0
+      ),
+      thresholdMs,
+    });
+  }
+  return entries;
+}
+
 export const structureFuelDomain = defineDomain<
   StructureFuelEntrySnapshot,
   StructureFuelSnapshot,
@@ -109,12 +163,14 @@ export const structureFuelDomain = defineDomain<
     // Reuses the board's own ESI-to-engine adaptation (`boardSources.ts`)
     // rather than re-parsing `fuel_expires` here — same underlying data the
     // board already loads, per the ticket brief.
-    return toBoardStructures(result.cached.data).map((structure) => ({
+    const structures = toBoardStructures(result.cached.data).map((structure) => ({
       structureId: structure.structureId,
       name: structure.name,
       fuelExpiresMs: structure.fuelExpiresMs,
       thresholdMs,
     }));
+    const towers = await loadTowerFuel(characterId, context.corporationId, thresholdMs);
+    return towers === null ? null : [...structures, ...towers];
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   // Same split as the colony domain: the baseline's baked-in `thresholdMs`
