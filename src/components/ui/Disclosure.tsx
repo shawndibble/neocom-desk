@@ -1,5 +1,5 @@
 import { eyebrowClassName } from './eyebrowClassName';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { cx } from '@/lib/cx';
 import {
   focusRingClassName,
@@ -41,6 +41,36 @@ export function Caret({ expanded, opensUp = false }: { expanded: boolean; opensU
       aria-hidden="true"
       className={`shrink-0 text-text-faint ${expanded && opensUp ? 'rotate-180' : ''}`}
     />
+  );
+}
+
+/**
+ * The caret of a header whose whole row toggles (`Panel`'s `onHeaderToggle`):
+ * the keyboard and screen-reader handle for the fold, drawn bare (no box, no
+ * hover fill) at the header's left edge.
+ */
+export function CaretToggle({
+  expanded,
+  label,
+  onClick,
+  toggleRef,
+}: {
+  expanded: boolean;
+  label: string;
+  onClick: () => void;
+  toggleRef?: Ref<HTMLButtonElement>;
+}) {
+  return (
+    <button
+      ref={toggleRef}
+      type="button"
+      aria-label={label}
+      aria-expanded={expanded}
+      onClick={onClick}
+      className={`flex size-9 shrink-0 items-center justify-center ${focusRingClassName}`}
+    >
+      <Caret expanded={expanded} />
+    </button>
   );
 }
 
