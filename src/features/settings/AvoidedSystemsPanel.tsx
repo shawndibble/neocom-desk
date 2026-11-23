@@ -32,7 +32,6 @@ export function AvoidedSystemsPanel() {
       wrapMeta
       expanded={fold.expanded}
       collapsible={fold.phone}
-      caretSize="row"
       onToggle={fold.toggle}
       labels={{ show: t('settings.avoidedSystems.show'), hide: t('settings.avoidedSystems.hide') }}
     >
