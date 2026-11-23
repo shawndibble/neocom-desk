@@ -18,7 +18,8 @@ import type { JobSlotJob, JobSlotSkills } from '@/engine/industry/jobSlots';
 import { toJobSlotJobs } from '@/features/character/jobSlotSkills';
 import { loadJobSlotSkills } from '@/features/industry/planJobSlots';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import type { IndustryJob } from '@/esi/endpoints';
+import type { Contract, IndustryJob } from '@/esi/endpoints';
+import { ESI_REGISTRY } from '@/esi/registry';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
 import { loadPlanetName } from '@/features/pi/names';
@@ -346,8 +347,75 @@ export interface ContractsBoardData {
 export async function loadContractsBoard(characterId: number): Promise<ContractsBoardData> {
   const { cached, needsReauth } = await loadContracts(characterId);
   if (!cached && !needsReauth) throw new Error('Contracts could not be read');
+  return contractsBoardOf(
+    cached?.data ?? [],
+    characterId,
+    characterId,
+    needsReauth,
+    cached?.fetchedAt ?? null
+  );
+}
+
+/**
+ * Every Character's contracts as one board: each contract once (one between two of your
+ * Characters is not counted twice), read by the Characters that hold the contracts scope.
+ */
+export async function loadAllContractsBoard(): Promise<ContractsBoardData> {
+  const [{ fanOutAllCharacters }, { mergeCharacterContracts }] = await Promise.all([
+    import('@/features/character/allCharactersFanOut'),
+    import('@/features/contracts/allContractsSnapshot'),
+  ]);
+  const { entries, skipped } = await fanOutAllCharacters({
+    scope: ESI_REGISTRY.getCharacterContracts.scope,
+    load: async ({ characterId, name }) => {
+      const { cached, needsReauth } = await loadContracts(characterId);
+      return {
+        characterId,
+        characterName: name,
+        contracts: cached?.data ?? [],
+        needsReauth,
+        truncated: cached?.truncated ?? false,
+        fetchedAt: cached?.fetchedAt.getTime() ?? 0,
+        fromCache: cached?.fromCache ?? false,
+      };
+    },
+  });
+  const read = entries.filter((entry) => entry.fetchedAt > 0);
+  if (read.length === 0 && entries.length === 0 && skipped.length > 0) {
+    // Nobody granted the contracts scope: a permission to ask for, never "no contracts".
+    return {
+      summary: summarizeContractsBoard([], 0, Date.now()),
+      route: null,
+      needsReauth: true,
+      fetchedAt: null,
+    };
+  }
+  if (read.length === 0 && !entries.some((entry) => entry.needsReauth)) {
+    throw new Error('Contracts could not be read');
+  }
+  const { contracts } = mergeCharacterContracts(entries);
+  return contractsBoardOf(
+    contracts,
+    new Set(entries.map((entry) => entry.characterId)),
+    entries[0]!.characterId,
+    read.length === 0,
+    read.length === 0 ? null : new Date(Math.min(...read.map((entry) => entry.fetchedAt)))
+  );
+}
+
+/**
+ * The board over `contracts` as seen by `pilot`; `lookupCharacterId` is the Character whose
+ * token resolves a courier's location names (any of them can: names are public).
+ */
+async function contractsBoardOf(
+  contracts: readonly Contract[],
+  pilot: number | ReadonlySet<number>,
+  lookupCharacterId: number,
+  needsReauth: boolean,
+  fetchedAt: Date | null
+): Promise<ContractsBoardData> {
   const loadedAt = Date.now();
-  const summary = summarizeContractsBoard(cached?.data ?? [], characterId, loadedAt);
+  const summary = summarizeContractsBoard(contracts, pilot, loadedAt);
   const { soonest } = summary;
   // Names are cached lookups; a failed one leaves that row without a route, never the board.
   const routes: Record<number, readonly [string, string]> = {};
@@ -360,8 +428,8 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
         if (!startLocationId || !endLocationId) return;
         try {
           const [from, to] = await Promise.all([
-            loadContractLocationName(characterId, startLocationId),
-            loadContractLocationName(characterId, endLocationId),
+            loadContractLocationName(lookupCharacterId, startLocationId),
+            loadContractLocationName(lookupCharacterId, endLocationId),
           ]);
           if (from && to) routes[item.contractId] = [from, to];
         } catch {
@@ -371,7 +439,7 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   );
   const soonestRoute = soonest ? routes[soonest.contractId] : undefined;
   const route = soonestRoute ? `${soonestRoute[0]} → ${soonestRoute[1]}` : null;
-  return { summary, route, routes, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
+  return { summary, route, routes, needsReauth, fetchedAt };
 }
 
 // --- SP extraction ----------------------------------------------------------

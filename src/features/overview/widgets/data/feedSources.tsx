@@ -25,6 +25,7 @@ import {
 import { useExtractionPrices } from '@/features/character/useExtractionPrices';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import {
+  loadAllContractsBoard,
   loadContractsBoard,
   loadIndustryBoard,
   loadMailBoard,
@@ -226,6 +227,7 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   planetary: snapshot(loadPlanetaryBoard, 'overview:planetary'),
   industry: snapshot(loadIndustryBoard, 'overview:industry'),
   contracts: snapshot(loadContractsBoard, 'overview:contracts'),
+  contractsAll: snapshot(loadAllContractsBoard, 'overview:contracts-all', { accountWide: true }),
   // A new key: a snapshot saved under the old one holds the events-only shape.
   calendar: snapshot(loadCalendarBoard, 'overview:calendar-board'),
   mail: snapshot(loadMailBoard, 'overview:mail'),

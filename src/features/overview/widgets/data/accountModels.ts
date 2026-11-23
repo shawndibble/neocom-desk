@@ -563,7 +563,13 @@ export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
   },
   mail: { feeds: ['mail'], scope: 'character', build: mail },
   orders: { feeds: ['orders', 'skills'], scope: 'account', build: orders },
-  contracts: { feeds: ['contracts'], scope: 'character', build: contracts },
+  contracts: {
+    feeds: ['contracts'],
+    allFeeds: ['contractsAll'],
+    scope: 'account',
+    build: (feeds, ctx) =>
+      contracts(ctx.scopeAll ? { ...feeds, contracts: feeds.contractsAll } : feeds, ctx),
+  },
   miningTax: { feeds: ['mining'], scope: 'account', build: miningTax },
   stock: { feeds: ['stock'], scope: 'account', build: stock },
   priceWatch: { feeds: ['priceAlerts'], scope: 'account', build: priceWatch },
