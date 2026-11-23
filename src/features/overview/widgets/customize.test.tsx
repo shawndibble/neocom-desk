@@ -259,7 +259,7 @@ describe('Widget menu', () => {
     expect(seen.current.widgets[0].show).toBe('problems');
   });
 
-  it('offers Source to Profit, and All characters only on Trading', async () => {
+  it('offers Source to Profit, with All characters on every Source', async () => {
     const profit: OverviewLayout = {
       version: 1,
       widgets: [w('p', 'profit', { view: 'chart', profitSource: 'both' })],
@@ -267,7 +267,7 @@ describe('Widget menu', () => {
     const { user, seen } = setup({ initial: profit });
     await user.click(screen.getByRole('button', { name: 'Settings for Profit' }));
     expect(screen.getByRole('menuitemradio', { name: 'Both' })).toBeChecked();
-    expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toHaveAttribute(
+    expect(screen.getByRole('menuitemradio', { name: 'All characters' })).not.toHaveAttribute(
       'aria-disabled',
       'true'
     );
@@ -328,7 +328,7 @@ describe('Widget menu', () => {
 
   it('disables All characters for a kind that reads the header Character only, with the reason', async () => {
     const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));
+    await user.click(screen.getByRole('button', { name: 'Settings for Training' }));
     expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toHaveAttribute(
       'aria-disabled',
       'true'

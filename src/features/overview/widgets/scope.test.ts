@@ -19,7 +19,7 @@ describe('scopePresentation', () => {
   });
 
   it('falls back to the header Character, and says so, for a kind that cannot sum', () => {
-    expect(scopePresentation('mail', 'all')).toEqual({
+    expect(scopePresentation('location', 'all')).toEqual({
       scopeAll: false,
       chip: false,
       fallbackNote: true,
@@ -48,13 +48,13 @@ describe('scopePresentation', () => {
   });
 
   it('asks a kind that reads one corporation which one, on the Corp Board', () => {
-    expect(scopePresentation('mail', 'all', undefined, true)).toEqual({
+    expect(scopePresentation('location', 'all', undefined, true)).toEqual({
       scopeAll: false,
       chip: false,
       fallbackNote: false,
       needsOneCorporation: true,
     });
-    expect(scopePresentation('mail', 'corp:7', undefined, true)).toMatchObject({
+    expect(scopePresentation('location', 'corp:7', undefined, true)).toMatchObject({
       needsOneCorporation: true,
       wantedCorporationId: 7,
     });
