@@ -41,6 +41,12 @@ export interface StructureFuelLowFire {
 }
 
 /**
+ * A control tower's fuel end is worked out from its bay (whole blocks, read about hourly), so it
+ * drifts by minutes between polls while the countdown is the same one. A refuel moves it by days.
+ */
+const SAME_COUNTDOWN_MS = 2 * 3_600_000;
+
+/**
  * Fires per structure whose remaining fuel has newly crossed under the
  * Character's chosen lead time (issue #299) — additive to CCP's own
  * `StructureFuelAlert`, which fires at its own fixed, late point (#274/#300),
@@ -89,7 +95,8 @@ export function diffStructureFuelLow(
     if (remainingNow <= 0) continue;
     const prevEntry = prevByStructure.get(entry.structureId);
     const observedBefore =
-      prevEntry !== undefined && prevEntry.fuelExpiresMs === entry.fuelExpiresMs;
+      prevEntry?.fuelExpiresMs != null &&
+      Math.abs(prevEntry.fuelExpiresMs - entry.fuelExpiresMs) <= SAME_COUNTDOWN_MS;
     if (observedBefore && prevEntry.fuelExpiresMs !== null) {
       const remainingPrev = prevEntry.fuelExpiresMs - prev.nowMs;
       if (remainingPrev <= prevEntry.thresholdMs) continue;
