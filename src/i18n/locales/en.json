@@ -9826,6 +9826,7 @@
         "hull_reinforce": "hull reinforcement ends",
         "hull_vulnerable": "hull vulnerability ends",
         "onlining_vulnerable": "onlining vulnerability ends",
+        "reinforced": "reinforcement ends",
         "shield_vulnerable": "shield vulnerability ends",
         "unanchoring": "unanchors",
         "unknown": "timer ends"

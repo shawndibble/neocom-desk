@@ -38,8 +38,17 @@ const NOTHING_READABLE: CorpCalendarRead = {
   fromCache: false,
 };
 
-/** Starbases and sovereignty windows are not Calendar kinds yet, so they are not read. */
-const CALENDAR_SOURCES: readonly CorpDeadlineSource[] = ['structures', 'moonChunks', 'jobs'];
+/**
+ * Towers ride the structure kinds (their fuel is a Structure fuel clock, a reinforcement or
+ * unanchor a Structure timer, as on Due soon). Sovereignty windows are not a Calendar kind yet,
+ * so they are not read.
+ */
+const CALENDAR_SOURCES: readonly CorpDeadlineSource[] = [
+  'structures',
+  'starbases',
+  'moonChunks',
+  'jobs',
+];
 
 export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead> {
   // Lazy: the corp loaders are a chunk of their own, and most pilots read no corporation.
@@ -77,11 +86,13 @@ export async function loadCorpCalendar(nowMs: number): Promise<CorpCalendarRead>
     ),
     corporations
   );
-  const readable = (source: 'structures' | 'extractions' | 'jobs') =>
+  const readable = (source: 'structures' | 'starbases' | 'extractions' | 'jobs') =>
     reads.some(({ read }) => read.sources[source] !== undefined);
+  // Structure clocks come from Upwell structures and towers alike: readable if either was.
+  const structureClocks = readable('structures') || readable('starbases');
   return {
-    structureFuel: readable('structures') ? sources.structureFuel : undefined,
-    structureTimers: readable('structures') ? sources.structureTimers : undefined,
+    structureFuel: structureClocks ? sources.structureFuel : undefined,
+    structureTimers: structureClocks ? sources.structureTimers : undefined,
     moonChunks: readable('extractions') ? sources.moonChunks : undefined,
     corpJobs: readable('jobs') ? sources.corpJobs : undefined,
     corporations: [...corporations.values()].sort((a, b) => a.name.localeCompare(b.name)),
