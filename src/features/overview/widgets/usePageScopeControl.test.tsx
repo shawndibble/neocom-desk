@@ -100,7 +100,7 @@ describe('the page scope control on the Corp Board', () => {
   it('lists each corporation by name and writes the chosen one onto the widgets', async () => {
     corporations.value = names;
     const onLayoutChange = setup(
-      [widget('a', 'corpJobs', 'all'), widget('b', 'corpMembers', 'header')],
+      [widget('a', 'corpJobs', 'all'), widget('b', 'corpMining', 'header')],
       board
     );
     await userEvent.click(screen.getByRole('button', { name: /^All characters/ }));
@@ -114,7 +114,7 @@ describe('the page scope control on the Corp Board', () => {
   it('puts a kind that reads one corporation on All too, so it asks which', async () => {
     corporations.value = names;
     const onLayoutChange = setup(
-      [widget('a', 'corpJobs', 'corp:98000001'), widget('b', 'corpMembers', 'header')],
+      [widget('a', 'corpJobs', 'corp:98000001'), widget('b', 'corpMining', 'header')],
       board
     );
     await userEvent.click(screen.getByRole('button', { name: 'Amarr Control Tech' }));

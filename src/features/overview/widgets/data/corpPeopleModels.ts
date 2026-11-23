@@ -8,6 +8,7 @@ import { DAY_MS } from '@/lib/age';
 import { formatNumber } from '@/lib/numberLocale';
 import { ageText, blank, corpUnreadable, count, statusOf, type Builder } from './builderKit';
 import { fractionBar } from './cellKit';
+import { joinedKey, leftKey } from './corpRowKeys';
 import { hbarsFromRows } from './chartBuilders';
 import type { BarsChartModel } from '../charts/types';
 import type { TableModel } from './types';
@@ -108,12 +109,12 @@ export const corpMembers: Builder = (feeds, { t, now }) => {
       ? []
       : [
           ...diff.joined.map((id) => ({
-            key: `joined:${id}`,
+            key: joinedKey(id),
             to: rosterPath('/roster?', id),
             cells: [nameOf(names, id), { text: t(`${M}.joined`), tone: 'good' as const }],
           })),
           ...diff.left.map((id) => ({
-            key: `left:${id}`,
+            key: leftKey(id),
             cells: [nameOf(names, id), { text: t(`${M}.left`), tone: 'caution' as const }],
           })),
         ];

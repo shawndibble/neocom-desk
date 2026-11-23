@@ -75,6 +75,7 @@ import {
 } from '../../data/corpBoard';
 import { mergeCorpRows, mergeLookups } from '@/engine/corp/corpMerge';
 import type { CorpFeedBody } from './corpFeedRead';
+import { mergeMembersReads, mergeRoleAuditReads, mergeSrpReads } from './corpAllMerges';
 import {
   contractKey,
   customsOfficeKey,
@@ -875,6 +876,36 @@ export function loadCorpSovereigntyAll(): Promise<CorpSovereigntyFeed> {
         },
       };
     },
+  });
+}
+
+/** Assets keep each corporation's counts apart: the stock targets that decide Below target are per corporation. */
+export const loadCorpAssetsAll = () => loadEveryCorp('canReadAssets', 'assets', loadCorpAssets);
+
+export function loadCorpSrpAll(): Promise<CorpSrpFeed> {
+  return readAllCorps<CorpSrpFeed>({
+    capability: 'canManageSrp',
+    what: 'SRP claims',
+    load: loadCorpSrp,
+    merge: mergeSrpReads,
+  });
+}
+
+export function loadCorpMembersAll(): Promise<CorpMembersFeed> {
+  return readAllCorps<CorpMembersFeed>({
+    capability: 'canReadMembers',
+    what: 'members',
+    load: loadCorpMembers,
+    merge: mergeMembersReads,
+  });
+}
+
+export function loadCorpRoleAuditAll(): Promise<CorpRoleAuditFeed> {
+  return readAllCorps<CorpRoleAuditFeed>({
+    capability: 'canReadRoleAudit',
+    what: 'role audit',
+    load: loadCorpRoleAudit,
+    merge: mergeRoleAuditReads,
   });
 }
 

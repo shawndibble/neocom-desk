@@ -8,13 +8,25 @@
  * corporation, share the one feed. Pure: it never fetches.
  */
 import {
+  changeKey,
+  characterKey,
   contractKey,
   customsOfficeKey,
+  joinedKey,
+  leftKey,
   orderKey,
+  srpClaimKey,
   sovereigntyRowKey,
   starbaseKey,
 } from './corpRowKeys';
-import type { CorpAllFeed, CorpDeadlinesAllFeed, CorpFeedBase } from './corpFeeds';
+import type {
+  CorpAllFeed,
+  CorpDeadlinesAllFeed,
+  CorpFeedBase,
+  CorpMembersFeed,
+  CorpRoleAuditFeed,
+  CorpSrpFeed,
+} from './corpFeeds';
 import type { FeedId, FeedState, Feeds } from './types';
 
 type Narrow = (data: never, corporationId: number) => unknown;
@@ -57,6 +69,51 @@ function merged<F extends CorpFeedBase, K extends keyof F>(
   };
 }
 
+/** The merged roster: one corporation's members, and the joins and leaves filed under it. */
+function membersOf(data: CorpMembersFeed, corporationId: number): CorpMembersFeed {
+  const own = (key: string) => data.corporationOf?.get(key) === corporationId;
+  const narrowed = merged<CorpMembersFeed, 'members'>('members', characterKey as never)(
+    data,
+    corporationId
+  );
+  return {
+    ...narrowed,
+    diff: data.diff && {
+      joined: data.diff.joined.filter((id) => own(joinedKey(id))),
+      left: data.diff.left.filter((id) => own(leftKey(id))),
+    },
+  };
+}
+
+/** The merged audit: one corporation's holders and role changes, and only its label. */
+function roleAuditOf(data: CorpRoleAuditFeed, corporationId: number): CorpRoleAuditFeed {
+  const own = (key: string) => data.corporationOf?.get(key) === corporationId;
+  const label = data.corporations?.get(corporationId);
+  return {
+    ...data,
+    audit: data.audit && {
+      ...data.audit,
+      holders: data.audit.holders.filter((holder) => own(characterKey(holder))),
+      changes: data.audit.changes?.filter((change) => own(changeKey(change.characterId))) ?? null,
+    },
+    corporations: new Map(label ? [[corporationId, label]] : []),
+    // Another corporation's failed read is not this one's: flag only when this one is missing.
+    partlyFailed: data.partlyFailed === true && label === undefined,
+    corporationOf: new Map(
+      [...(data.corporationOf ?? [])].filter(([, corporation]) => corporation === corporationId)
+    ),
+  };
+}
+
+/** The merged SRP read: one corporation's claims, and its own switch and setup right. */
+function srpOf(data: CorpSrpFeed, corporationId: number): CorpSrpFeed {
+  const own = data.byCorporation?.get(corporationId);
+  return {
+    ...merged<CorpSrpFeed, 'claims'>('claims', srpClaimKey as never)(data, corporationId),
+    ...(own && { enabled: own.enabled, canSetUp: own.canSetUp }),
+  };
+}
+
 const NARROW: { readonly [K in FeedId]?: Narrow } = {
   corpWalletAll: perCorporation as Narrow,
   corpJobsAll: perCorporation as Narrow,
@@ -67,6 +124,10 @@ const NARROW: { readonly [K in FeedId]?: Narrow } = {
   corpSovereigntyAll: merged('rows', sovereigntyRowKey) as Narrow,
   corpContractsAll: merged('contracts', contractKey) as Narrow,
   corpOrdersAll: merged('orders', orderKey) as Narrow,
+  corpAssetsAll: perCorporation as Narrow,
+  corpSrpAll: srpOf as Narrow,
+  corpMembersAll: membersOf as Narrow,
+  corpRoleAuditAll: roleAuditOf as Narrow,
   structuresAll: ((
     data: {
       structures: { corporationId?: number }[] | null;

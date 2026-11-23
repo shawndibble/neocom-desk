@@ -403,6 +403,10 @@ export interface FeedMap {
   corpSovereigntyAll: CorpSovereigntyFeed;
   corpContractsAll: CorpContractsFeed;
   corpOrdersAll: CorpOrdersFeed;
+  corpAssetsAll: CorpAllFeed<CorpAssetsFeed>;
+  corpSrpAll: CorpSrpFeed;
+  corpMembersAll: CorpMembersFeed;
+  corpRoleAuditAll: CorpRoleAuditFeed;
   corpKills: CorpKillsFeed;
   corpSrp: CorpSrpFeed;
 }
