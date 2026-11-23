@@ -17,8 +17,14 @@ import type { LiveProgress } from './useAppraisalLive';
 
 const AGE_TICK_MS = 5_000;
 
-/** Both lines claim the done line's width, so the title bar wraps the same way while checking and when done: no layout shift when the text swaps. */
-const STATUS_LINE = 'inline-block min-w-[19rem]';
+/**
+ * Both lines claim the done line's width, so the title bar wraps the same way
+ * while checking and when done: no layout shift when the text swaps. 13rem fits
+ * "Live prices · checked 59 s ago"; a wider floor (19rem) pushed the result
+ * header's hub chip and status onto two lines at 1024 (#6674). The rarer
+ * "Live prices for 59 of 60 rows" line simply grows past it.
+ */
+const STATUS_LINE = 'inline-block min-w-[13rem]';
 
 /** The bar alone, for the caller to lay along a card's top edge. */
 export function LivePriceBar({ live, className }: { live: LiveProgress; className?: string }) {
