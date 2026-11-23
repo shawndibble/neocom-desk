@@ -10,7 +10,12 @@
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { BoardStarbaseSource } from '@/engine/corp/board';
-import { STARBASE_FUEL_WARNING_HOURS, fuelHoursLeft } from '@/engine/corp/starbases';
+import {
+  STARBASE_FUEL_WARNING_HOURS,
+  TOWER_FUEL_PER_HOUR,
+  fuelHoursLeft,
+} from '@/engine/corp/starbases';
+import type { StructureSource } from '@/features/corp/structures/structureRows';
 import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
@@ -49,6 +54,34 @@ export function toBoardStarbases(feed: CorpStarbasesFeed, nowMs: number): BoardS
     reinforcedUntilMs: row.reinforcedUntilMs,
     unanchorsAtMs: row.unanchorsAtMs,
   }));
+}
+
+/**
+ * The towers as Structures rows: a control tower is a structure that needs
+ * fuel, so it lists beside the Upwell ones. Its board clocks come from
+ * `toBoardStarbases`, the same instant for both.
+ */
+export function toStructureSources(feed: CorpStarbasesFeed, nowMs: number): StructureSource[] {
+  const readAtMs = feed.fetchedAt?.getTime() ?? nowMs;
+  return feed.starbases.map((row) => {
+    const perHour = TOWER_FUEL_PER_HOUR.get(row.typeId);
+    return {
+      structureId: row.starbaseId,
+      name: towerName(feed, row),
+      fuelExpiresMs: fuelExpiresMs(row, readAtMs),
+      state: row.state === 'unknown' ? null : row.state,
+      stateTimerEndMs: row.reinforcedUntilMs,
+      unanchorsAtMs: row.unanchorsAtMs,
+      services: [],
+      corporationId: feed.corporationOf?.get(String(row.starbaseId)),
+      systemId: row.systemId,
+      typeId: row.typeId,
+      tower: {
+        blocks: row.bay?.fuelBlocks ?? null,
+        perDay: perHour === undefined ? null : perHour * 24,
+      },
+    };
+  });
 }
 
 function towerName(feed: CorpStarbasesFeed, row: CorpStarbaseRow): string {

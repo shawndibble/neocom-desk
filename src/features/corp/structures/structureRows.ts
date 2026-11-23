@@ -27,8 +27,26 @@ export function structureWhen(item: CorpBoardItem, t: Translate): string {
   return formatCountdown(Math.max(0, item.remainingMs ?? 0) / 1000);
 }
 
+/**
+ * What a control tower adds to a structure row: its fuel bay as ESI's per-tower
+ * read gave it, and the burn rate CCP's static data gives its type.
+ */
+export interface TowerFacts {
+  /** Blocks in the bay when read; null when no bay was read (unknown, not empty). */
+  blocks: number | null;
+  /** Blocks burned a day; null for a tower type newer than the rate table. */
+  perDay: number | null;
+}
+
+/**
+ * A row's structure. A control tower is one too: it is fuelled, can be
+ * reinforced and unanchors; it has no services. Its `structureId` is the
+ * starbase id, and `tower` marks it (its board items are keyed `sb<id>`).
+ */
+export type StructureSource = BoardStructureSource & { tower?: TowerFacts };
+
 export interface StructureRow {
-  source: BoardStructureSource;
+  source: StructureSource;
   fuel: CorpBoardItem | undefined;
   /** The state timer (reinforcement, vulnerability); absent when none runs. */
   timer: CorpBoardItem | undefined;
@@ -47,11 +65,11 @@ export interface StructureRow {
 }
 
 export function structureRows(
-  structures: readonly BoardStructureSource[],
+  structures: readonly StructureSource[],
   items: readonly CorpBoardItem[]
 ): StructureRow[] {
   return structures.map((source) => {
-    const id = source.structureId;
+    const id = source.tower ? `sb${source.structureId}` : source.structureId;
     const fuel = items.find((item) => item.id === `fuel:${id}`);
     const timer = items.find((item) => item.id === `state:${id}`);
     const offline = items.filter((item) => item.id.startsWith(`service:${id}:`));

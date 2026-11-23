@@ -149,3 +149,25 @@ export function fuelPlan(input: FuelPlanInput): FuelPlan {
     : (perDay * (untilMs - fuelExpiresMs)) / DAY_MS;
   return { perDay, needed: Math.ceil(raw - 1e-9), rateSource, ratePending };
 }
+
+export interface StarbaseFuelPlanInput {
+  /** Blocks burned a day, from the tower type's static rate; null when the type has none. */
+  perDay: number | null;
+  /** When the bay runs dry; null when it is not known. */
+  fuelExpiresMs: number | null;
+  untilMs: number;
+}
+
+/**
+ * A control tower's plan: unlike an Upwell structure its burn rate is known
+ * (CCP's static data), so the blocks to add are that rate over the time from
+ * the dry date to the target. `rateSource` is null: nothing here is measured.
+ */
+export function starbaseFuelPlan(input: StarbaseFuelPlanInput): FuelPlan {
+  const { perDay, fuelExpiresMs, untilMs } = input;
+  const known = perDay !== null && fuelExpiresMs !== null;
+  const needed = known
+    ? Math.max(0, Math.ceil((perDay * (untilMs - fuelExpiresMs)) / DAY_MS - 1e-9))
+    : null;
+  return { perDay, needed, rateSource: null, ratePending: false };
+}
