@@ -63,6 +63,7 @@ Repo-specific hard rules to check (from `CLAUDE.md`):
 - ESI calls send `X-Compatibility-Date` and a descriptive `X-User-Agent`; they respect `X-Ratelimit-*` and `Retry-After`.
 - Refresh tokens live in Dexie only — never sent to Firebase or logs.
 - All user-facing strings go through i18next (`src/i18n/locales/en.json`).
+- No new hand-rolled async load (`useEffect` + `let cancelled` + `useState`): `useKeyedLoad` / `useAsyncLoad` (`docs/SHARED-CODE.md`). A hunk that edits an existing one for a value load should convert it. Don't flag untouched ones.
 
 ### 4. Run both axes
 
