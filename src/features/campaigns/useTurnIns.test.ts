@@ -85,6 +85,27 @@ describe('loadTurnInOffers', () => {
     expect(mocks.rates).toHaveBeenCalledWith([1000035], jita);
   });
 
+  it('prices the LP of every Active turn-in, so LP can decide which objective wins an item', async () => {
+    const report = FILE.objectives[0]!;
+    const lpRich = {
+      ...report,
+      id: 'lp-rich',
+      isk: { amount: 1, interval: 1 },
+      lp: { amount: 100_000, interval: 100, corporationId: 1000180 },
+    };
+    mocks.file.mockResolvedValue({ ...FILE, objectives: [...FILE.objectives, lpRich] });
+    mocks.state.mockResolvedValue({
+      ...STATE,
+      objectivesById: new Map([
+        ...STATE.objectivesById,
+        ['lp-rich', { state: 'Active', progress: 0 }],
+      ]),
+    });
+    const offers = await loadTurnInOffers(jita);
+    expect(mocks.rates).toHaveBeenCalledWith([1000035, 1000180], jita);
+    expect(offers.offerFor(97545)?.objectiveId).toBe('lp-rich');
+  });
+
   it('throws when the live state cannot be read: no offers is not "no campaign"', async () => {
     mocks.state.mockResolvedValue(null);
     await expect(loadTurnInOffers(jita)).rejects.toThrow();
@@ -110,6 +131,8 @@ describe('loadParticipation', () => {
     const participation = await loadParticipation(7);
     expect(participation.stateOf('report')).toBe('participating');
     expect(participation.stateOf('mine')).toBe('notParticipating');
+    expect(participation.contributedTo('report')).toBe(5);
+    expect(participation.contributedTo('mine')).toBeNull();
   });
 });
 

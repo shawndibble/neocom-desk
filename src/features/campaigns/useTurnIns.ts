@@ -74,11 +74,17 @@ function lpValueSource(
 export async function loadTurnInOffers(hub: TradeHub): Promise<TurnInOffers> {
   const [file, state] = await Promise.all([loadMilitaryCampaigns(), loadCampaignState()]);
   if (state === null) throw new Error('Military Campaign state could not be read');
-  // Which corporations need an LP Value: only those paying LP on an open turn-in.
-  const open = activeTurnInOffers(file.objectives, state.objectivesById, () => null);
-  const corporations = [...open.values()].flatMap((o) =>
-    o.lpCorporationId === null ? [] : [o.lpCorporationId]
-  );
+  // Which corporations need an LP Value: every one paying LP on an Active turn-in,
+  // not only the winners per item, since LP can change which objective wins.
+  const corporations = [
+    ...new Set(
+      file.objectives.flatMap((o) =>
+        o.turnIn && o.lp && state.objectivesById.get(o.id)?.state === 'Active'
+          ? [o.lp.corporationId]
+          : []
+      )
+    ),
+  ];
   const [rateFor, systems] = await Promise.all([
     corporations.length > 0 ? loadLpRates(corporations, hub) : null,
     loadSolarSystemsById(),
@@ -123,6 +129,8 @@ export interface Participation {
   read: JoinedObjectivesRead;
   /** `unknown` unless the read succeeded. */
   stateOf: (objectiveId: string) => ParticipateState;
+  /** The Character's own contribution to an objective (for `turnInReward`'s cap); null when unread or not joined. */
+  contributedTo: (objectiveId: string) => number | null;
 }
 
 export async function loadParticipation(characterId: number): Promise<Participation> {
@@ -132,6 +140,7 @@ export async function loadParticipation(characterId: number): Promise<Participat
     characterId,
     read,
     stateOf: (objectiveId) => participateState(objectiveId, joined),
+    contributedTo: (objectiveId) => joined?.get(objectiveId)?.contributed ?? null,
   };
 }
 

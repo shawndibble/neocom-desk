@@ -19,12 +19,13 @@ describe('walkCursorPages', () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it('stops on a cursor that does not move, and at the page cap', async () => {
+  it('throws on a cursor that does not move, and past the page cap, never returning a short list', async () => {
     const stuck = vi.fn(async () => ({ cursor: { after: 'same' }, items: [1] }));
-    await expect(walkCursorPages(stuck)).resolves.toEqual([1, 1]);
+    await expect(walkCursorPages(stuck)).rejects.toThrow(/did not move/);
     let n = 0;
     const endless = vi.fn(async () => ({ cursor: { after: String((n += 1)) }, items: [n] }));
-    await expect(walkCursorPages(endless, 3)).resolves.toHaveLength(3);
+    await expect(walkCursorPages(endless, 3)).rejects.toThrow(/3 pages/);
+    expect(endless).toHaveBeenCalledTimes(3);
   });
 
   it('throws when a page fails, so no half list is kept', async () => {
