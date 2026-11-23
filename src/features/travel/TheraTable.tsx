@@ -231,9 +231,9 @@ function HoleDetail({
     <ExternalLink
       key="zkill"
       href={systemZkillUrl(row.exitSystemId)}
-      aria-label={t('travel.thera.detail.zkillboardLabel', { system: row.exitSystemName ?? DASH })}
+      aria-label={t('travel.zkillboardLabel', { system: row.exitSystemName ?? DASH })}
     >
-      {t('travel.thera.detail.zkillboard')}
+      {t('travel.zkillboard')}
     </ExternalLink>,
     onUse === undefined || !canUseInRoute(row) ? null : (
       <UseInRoute key="use-in-route" row={row} onUse={onUse} />

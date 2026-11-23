@@ -242,7 +242,9 @@ describe('Travel › Route Safety', () => {
     await user.click(fold);
     expect(fold).toHaveAttribute('aria-expanded', 'true');
     expect(within(table).getByText('Niyabainen')).toBeInTheDocument();
-    expect(within(table).getByRole('button', { name: 'Avoid Muvolailen' })).toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: 'More actions for Muvolailen' })
+    ).toBeInTheDocument();
   });
 
   it("fills in each system's zKillboard kills by location, one row at a time", async () => {

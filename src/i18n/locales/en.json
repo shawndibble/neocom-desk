@@ -17670,9 +17670,11 @@
         "avoided": "Avoided Systems"
       }
     },
+    "zkillboard": "zKillboard",
+    "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)",
     "note": {
-      "add": "Note",
-      "addLabel": "Add a note on {{name}}",
+      "add": "Add note",
+      "edit": "Edit note",
       "openLabel": "Open your note on {{name}}",
       "label": "Your note on {{name}}",
       "placeholder": "What you know about this system",
@@ -17681,7 +17683,6 @@
     },
     "avoid": {
       "action": "Avoid",
-      "actionLabel": "Avoid {{name}}",
       "title": "Avoid {{name}}?",
       "becomes_one": "The route becomes {{count}} jump ({{delta}})",
       "becomes_other": "The route becomes {{count}} jumps ({{delta}})",
@@ -17975,9 +17976,7 @@
       "jumpsUnit_other": "jumps",
       "detail": {
         "type": "Type {{type}}",
-        "signatures": "enter at {{hubSignature}} in {{hub}}, leave at {{exitSignature}}",
-        "zkillboard": "zKillboard",
-        "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
+        "signatures": "enter at {{hubSignature}} in {{hub}}, leave at {{exitSignature}}"
       },
       "noGateRoute": "No gate route",
       "noOrigin": "Open holes from EVE-Scout. Pick a From system on Route Safety to count jumps.",

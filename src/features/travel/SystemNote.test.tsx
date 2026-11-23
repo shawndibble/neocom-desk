@@ -1,17 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SystemNote } from './SystemNote';
+import { useState } from 'react';
+import { SystemNote, SystemNoteAnchor } from './SystemNote';
 import { useSystemNotes } from './systemNotes';
 import '@/i18n';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 
 function Row() {
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <SystemNote systemId={30002813} name="Tama" face="indicator" />
-      <SystemNote systemId={30002813} name="Tama" face="add" />
+      <SystemNote systemId={30002813} name="Tama" />
+      <SystemNoteAnchor systemId={30002813} name="Tama" open={open} onOpenChange={setOpen}>
+        <button type="button" onClick={() => setOpen(true)}>
+          More
+        </button>
+      </SystemNoteAnchor>
     </>
   );
 }
@@ -22,12 +28,12 @@ describe('SystemNote', () => {
     await useSystemNotes.getState().setValue({});
   });
 
-  it('offers Add note, and saves what is typed on blur', async () => {
+  it('saves a note opened from the row menu on blur, then shows the indicator', async () => {
     const user = userEvent.setup();
     render(<Row />);
     expect(screen.queryByRole('button', { name: /Open your note/ })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Add a note on Tama' }));
+    await user.click(screen.getByRole('button', { name: 'More' }));
     await user.type(screen.getByRole('textbox'), 'gate camp seen');
     await user.click(document.body);
 
@@ -35,7 +41,6 @@ describe('SystemNote', () => {
       expect(useSystemNotes.getState().value[30002813]?.text).toBe('gate camp seen')
     );
     expect(screen.getByRole('button', { name: 'Open your note on Tama' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add a note on Tama' })).toBeNull();
   });
 
   it('opens an existing note by click, with its updated date, as literal text', async () => {
@@ -67,7 +72,7 @@ describe('SystemNote', () => {
   it('caps the text at 500 characters', async () => {
     const user = userEvent.setup();
     render(<Row />);
-    await user.click(screen.getByRole('button', { name: 'Add a note on Tama' }));
+    await user.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByRole('textbox')).toHaveAttribute('maxlength', '500');
   });
 
