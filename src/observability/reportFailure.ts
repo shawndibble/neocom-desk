@@ -46,10 +46,13 @@ export function isNetworkFailure(error: unknown): boolean {
   if (typeof code === 'string' && NETWORK_CODES.has(code.replace(/^[a-z]+\//, ''))) return true;
   // Firestore Lite's own wrap of a fetch that threw (no response at all): the
   // missing status maps to `unknown`, the missing statusText to "undefined".
+  // The same wrap when the thrown fetch error's own text is kept ("TypeError: Failed to fetch").
   if (
     code === 'unknown' &&
     error instanceof Error &&
-    error.message === 'Request failed with error: undefined'
+    /^(request failed with error: undefined$|typeerror: (failed to fetch|load failed|networkerror))/i.test(
+      error.message
+    )
   )
     return true;
   return status === 0;
@@ -183,13 +186,16 @@ const STRAY_REJECTION_VALUE =
  * here; only the ones nothing awaited do.
  */
 export function isStrayAbortEvent(event: {
-  exception?: { values?: { value?: string; mechanism?: { type?: string } }[] };
+  exception?: { values?: { type?: string; value?: string; mechanism?: { type?: string } }[] };
 }): boolean {
+  // A DOMException arrives as type `AbortError` with only its message as the value
+  // ("Promise was rejected because the browsing context is going away"), so the
+  // name is read from `type` as well as from the value's prefix.
   return (
     event.exception?.values?.some(
       (v) =>
         v.mechanism?.type === 'auto.browser.global_handlers.onunhandledrejection' &&
-        STRAY_REJECTION_VALUE.test(v.value ?? '')
+        (v.type === 'AbortError' || STRAY_REJECTION_VALUE.test(v.value ?? ''))
     ) ?? false
   );
 }

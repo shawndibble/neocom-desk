@@ -75,6 +75,12 @@ describe('reportFailure', () => {
     expect(captureException).toHaveBeenCalledTimes(1);
   });
 
+  it('skips a Firestore wrap that keeps the fetch error text', () => {
+    const wrapped = Object.assign(new Error('TypeError: Failed to fetch'), { code: 'unknown' });
+    reportFailure('sync', new AggregateError([wrapped, wrapped], 'x (and 1 more)'));
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
   it('still reports a pass where dropped fetches sit beside a refusal', () => {
     const dropped = Object.assign(new Error('Request failed with error: undefined'), {
       code: 'unknown',
@@ -211,6 +217,21 @@ describe('isStrayAbortEvent', () => {
       isStrayAbortEvent({
         exception: {
           values: [{ value: 'AbortError: AbortError', mechanism: { type: rejection } }],
+        },
+      })
+    ).toBe(true);
+  });
+  it('matches a DOMException whose name is only in the type', () => {
+    expect(
+      isStrayAbortEvent({
+        exception: {
+          values: [
+            {
+              type: 'AbortError',
+              value: 'Promise was rejected because the browsing context is going away',
+              mechanism: { type: rejection },
+            },
+          ],
         },
       })
     ).toBe(true);
