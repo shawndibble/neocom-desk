@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { db } from '@/db';
+import { useSystemNotes } from '@/features/travel/systemNotes';
 import { stubViewport } from '@/test/viewport';
 import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
@@ -100,7 +101,8 @@ describe('Travel › Route Safety › Stops', () => {
 
     const table = await screen.findByRole('table', { name: 'Systems on leg 1' });
     await user.click(await within(table).findByRole('button', { name: /^2 systems/ }));
-    await user.click(within(table).getByRole('button', { name: 'Avoid Niyabainen' }));
+    await user.click(within(table).getByRole('button', { name: 'More actions for Niyabainen' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Avoid' }));
     const dialog = await screen.findByRole('dialog', { name: 'Avoid Niyabainen?' });
 
     expect(
@@ -280,9 +282,17 @@ describe('Travel › Route Safety › Route rules', () => {
     clearPodKillsLoad();
   });
 
-  async function avoidButton(name: string) {
+  /** Opens a row's ⋮ menu; the menu lists what that system offers. */
+  async function openRowMenu(user: ReturnType<typeof userEvent.setup>, name: string) {
     const table = await screen.findByRole('table', { name: 'Systems on the route' });
-    return within(table).findByRole('button', { name: `Avoid ${name}` });
+    await user.click(
+      await within(table).findByRole('button', { name: `More actions for ${name}` })
+    );
+    return screen.findByRole('menu');
+  }
+  async function avoidButton(user: ReturnType<typeof userEvent.setup>, name: string) {
+    const menu = await openRowMenu(user, name);
+    return within(menu).getByRole('menuitem', { name: 'Avoid' });
   }
 
   it('saves the Route Preference as the pilot default and drops the link override', async () => {
@@ -333,12 +343,44 @@ describe('Travel › Route Safety › Route rules', () => {
   });
 
   it('offers Avoid on every row but the two ends', async () => {
+    const user = userEvent.setup({ delay: null });
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
-    await avoidButton('Perimeter');
-    const table = screen.getByRole('table', { name: 'Systems on the route' });
-    expect(within(table).queryByRole('button', { name: 'Avoid Jita' })).not.toBeInTheDocument();
-    expect(within(table).queryByRole('button', { name: 'Avoid Uedama' })).not.toBeInTheDocument();
+    expect(await avoidButton(user, 'Perimeter')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    const jita = await openRowMenu(user, 'Jita');
+    expect(within(jita).getByRole('menuitem', { name: 'Add note' })).toBeInTheDocument();
+    expect(within(jita).queryByRole('menuitem', { name: 'Avoid' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    const uedama = await openRowMenu(user, 'Uedama');
+    expect(within(uedama).queryByRole('menuitem', { name: 'Avoid' })).not.toBeInTheDocument();
+  });
+
+  it('opens a row note from its menu, anchored to the ⋮, and saves it', async () => {
+    const user = userEvent.setup({ delay: null });
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const menu = await openRowMenu(user, 'Perimeter');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Add note' }));
+    const editor = await screen.findByRole('textbox');
+    await user.type(editor, 'camp at 23:00');
+    await user.click(document.body);
+
+    await waitFor(() =>
+      expect(useSystemNotes.getState().value[PERIMETER]?.text).toBe('camp at 23:00')
+    );
+    const again = await openRowMenu(user, 'Perimeter');
+    expect(within(again).getByRole('menuitem', { name: 'Edit note' })).toBeInTheDocument();
+  });
+
+  it('links a row to its system on zKillboard', async () => {
+    const user = userEvent.setup({ delay: null });
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const menu = await openRowMenu(user, 'Perimeter');
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Perimeter on zKillboard (opens in a new tab)' })
+    ).toHaveAttribute('href', `https://zkillboard.com/system/${PERIMETER}/`);
   });
 
   it('offers no Avoid for a system already on the Avoided Systems', async () => {
@@ -347,16 +389,16 @@ describe('Travel › Route Safety › Route rules', () => {
 
     const table = await screen.findByRole('table', { name: 'Systems on the route' });
     await within(table).findByText('Perimeter');
-    expect(
-      within(table).queryByRole('button', { name: 'Avoid Perimeter' })
-    ).not.toBeInTheDocument();
+    const user = userEvent.setup({ delay: null });
+    const menu = await openRowMenu(user, 'Perimeter');
+    expect(within(menu).queryByRole('menuitem', { name: 'Avoid' })).not.toBeInTheDocument();
   });
 
   it('previews the route before saving, and says plainly when there is no way around', async () => {
     const user = userEvent.setup({ delay: null });
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
-    await user.click(await avoidButton('Perimeter'));
+    await user.click(await avoidButton(user, 'Perimeter'));
     const dialog = await screen.findByRole('dialog', { name: 'Avoid Perimeter?' });
     expect(
       await within(dialog).findByText('The route becomes 2 jumps (+0), lowest 0.5')
@@ -380,7 +422,7 @@ describe('Travel › Route Safety › Route rules', () => {
     const user = userEvent.setup({ delay: null });
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
-    await user.click(await avoidButton('Perimeter'));
+    await user.click(await avoidButton(user, 'Perimeter'));
     const dialog = await screen.findByRole('dialog', { name: 'Avoid Perimeter?' });
     expect(within(dialog).getByText(/Avoided Systems is switched off/)).toBeInTheDocument();
     await within(dialog).findByText(/The route becomes 2 jumps/);

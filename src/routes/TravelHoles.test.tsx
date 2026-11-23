@@ -254,7 +254,8 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       await waitFor(() => expect(routeFact('Jumps')).toBe('4'));
       const table = await screen.findByRole('table', { name: 'Systems on the route' });
       await user.click(await within(table).findByRole('button', { name: /^3 systems/ }));
-      await user.click(within(table).getByRole('button', { name: 'Avoid Muvolailen' }));
+      await user.click(within(table).getByRole('button', { name: 'More actions for Muvolailen' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'Avoid' }));
       const dialog = await screen.findByRole('dialog', { name: 'Avoid Muvolailen?' });
 
       // Gates only is pinned, and gates only has no way around Muvolailen: the
