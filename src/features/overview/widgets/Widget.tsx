@@ -275,33 +275,6 @@ function CorporationReadout({
 }
 
 /**
- * A widget on the header Character says so too, once the pilot has anything else it could have
- * read (a second Character, or on the Corp Board a second corporation): every widget on the
- * board names whose data it shows, so a mixed board is never read as one scope.
- */
-function HeaderScopeReadout({ compact }: { compact: boolean }) {
-  const board = useWidgetBoard();
-  const roster = useRosterNames();
-  const corporations = useAccountCorporations();
-  const ownCorporationId = useActiveCorporationId();
-  const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  if (board.id === 'corp') {
-    if (corporations.length < 2 || ownCorporationId === null) return null;
-    return <CorporationReadout corporationId={ownCorporationId} compact={compact} />;
-  }
-  const name = characterId === null ? undefined : roster?.get(characterId);
-  if (!roster || roster.size < 2 || characterId === null || name === undefined) return null;
-  return (
-    <CharacterScopeReadout
-      scope="one"
-      characterId={characterId}
-      characterName={name}
-      compact={compact}
-    />
-  );
-}
-
-/**
  * Corp Board: a kind that reads one corporation, through the header Character, under a scope
  * that asks for several (All) or for another corporation. It asks which, so the card never
  * shows one corporation's figure under a heading that says otherwise.
@@ -648,11 +621,6 @@ function WidgetFrame({
                 compact={widget.size === 'S'}
               />
             ))}
-          {!scope.chip &&
-            !scope.fallbackNote &&
-            !asksCorporation &&
-            menu !== undefined &&
-            !inertTitle && <HeaderScopeReadout compact={widget.size === 'S'} />}
           <span className="flex-1" />
           {menu && (
             // A card is not a row: the row tips wait for the first real table row.
