@@ -241,6 +241,16 @@ export async function loadProfitWidget(characterId: number): Promise<ProfitWidge
   return { runs: rows, names };
 }
 
+/** Every Character's logged runs, each read as that Character's own widget reads them. */
+export async function loadAllProfitWidget(): Promise<ProfitWidgetData> {
+  const characterIds = (await db.productionRuns.orderBy('characterId').uniqueKeys()) as number[];
+  const reads = await Promise.all(characterIds.map((id) => loadProfitWidget(id)));
+  return {
+    runs: reads.flatMap((read) => read.runs),
+    names: new Map(reads.flatMap((read) => [...read.names])),
+  };
+}
+
 // --- Mining yield --------------------------------------------------------------
 
 export interface MiningYieldDay {

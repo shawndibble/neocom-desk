@@ -114,6 +114,8 @@ export type KindScope = 'character' | 'account';
 /** What one widget of a kind reads under its settings (`KindDef.bySettings`). */
 export interface SettingsReads {
   feeds: readonly FeedId[];
+  /** The feeds read instead of `feeds` on All characters; the kind's own `allFeeds` when left out. */
+  allFeeds?: readonly FeedId[];
   scope: KindScope;
   /** The endpoints its "needs permission" state asks for. */
   endpoints: readonly EsiEndpointId[];

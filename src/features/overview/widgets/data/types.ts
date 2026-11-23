@@ -362,6 +362,8 @@ export interface FeedMap {
   journalAll: JournalData;
   netWorth: NetWorthWidgetData;
   profit: ProfitWidgetData;
+  /** Every Character's logged runs (Profit's Builds source on All characters). */
+  profitAll: ProfitWidgetData;
   miningYield: MiningYieldWidgetData;
   lp: LpWidgetData;
   survey: SurveyWidgetData;

@@ -1550,11 +1550,16 @@ describe('profit sources', () => {
     expect(endpointsOf('lp', {})).toEqual(['getCharacterLoyaltyPoints']);
   });
 
-  it('sums across Characters on Trading only: Builds and Both read the header Character', () => {
-    expect(kindSumsAcrossCharacters('profit', { profitSource: 'trading' })).toBe(true);
-    expect(kindSumsAcrossCharacters('profit', { profitSource: 'both' })).toBe(false);
-    expect(kindSumsAcrossCharacters('profit', { profitSource: 'builds' })).toBe(false);
-    expect(kindSumsAcrossCharacters('profit')).toBe(false);
+  it('sums across Characters on every Source, each reading only the feeds it needs', () => {
+    for (const profitSource of ['trading', 'both', 'builds'] as const) {
+      expect(kindSumsAcrossCharacters('profit', { profitSource })).toBe(true);
+    }
+    expect(kindSumsAcrossCharacters('profit')).toBe(true);
+    const allFeeds = (profitSource: 'trading' | 'both' | 'builds') =>
+      feedsOf('profit', { profitSource }, true);
+    expect(allFeeds('trading')).toEqual(['tradingProfit']);
+    expect(allFeeds('builds')).toEqual(['profitAll']);
+    expect(allFeeds('both')).toEqual(['profitAll', 'tradingProfit']);
   });
 });
 
@@ -1684,9 +1689,22 @@ describe('profit on Both', () => {
     ]);
   });
 
-  it('narrows trades to the header Character even when the widget asks for All characters', () => {
+  it('reads every Character when the widget asks for All characters', () => {
     const scoped = scopePresentation('profit', 'all', { profitSource: 'both' });
-    expect(scoped).toMatchObject({ scopeAll: false, fallbackNote: true });
+    expect(scoped).toMatchObject({ scopeAll: true, chip: true, fallbackNote: false });
+  });
+
+  it("adds every Character's builds to the pooled trades on All characters", () => {
+    const view = buildView(
+      'profit',
+      {
+        profit: builds([run('own', DAY_MS, 100)]),
+        profitAll: builds([run('own', DAY_MS, 100), run('alt', DAY_MS, 400)]),
+        tradingProfit: ok(trading([])),
+      },
+      ctx({ profitSource: 'both', scopeAll: true })
+    );
+    expect(view.number.iskAmount).toBe(500);
   });
 
   it('waits for the trading read, and says when it failed', () => {
