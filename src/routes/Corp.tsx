@@ -41,7 +41,7 @@ import { CORP_DEFS } from '@/features/overview/widgets/data/corpModels';
 import { registerKindDefs } from '@/features/overview/widgets/data/models';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { usePageScopeControl } from '@/features/overview/widgets/usePageScopeControl';
-import { AccountCorporationsProvider } from '@/features/corp/accountCorporations';
+import { AccountCorporationsProvider } from '@/features/corp/AccountCorporationsProvider';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';

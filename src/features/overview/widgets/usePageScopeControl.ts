@@ -12,7 +12,7 @@ import type {
   PickerChoice,
 } from '@/features/character/CharacterFilterControl';
 import { useCharacters } from '@/features/character/useCharacters';
-import { useAccountCorporations } from '@/features/corp/accountCorporations';
+import { useAccountCorporations } from '@/features/corp/accountCorporationsContext';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { readScope, useWidgetBoard } from './board';

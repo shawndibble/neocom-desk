@@ -36,7 +36,7 @@ import {
   useOpenAfterMenu,
 } from '@/components/ui';
 import { kindSumsAcrossCharacters } from './data/models';
-import { useAccountCorporations } from '@/features/corp/accountCorporations';
+import { useAccountCorporations } from '@/features/corp/accountCorporationsContext';
 import { boardKey, readScope, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';

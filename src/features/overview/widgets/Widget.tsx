@@ -49,7 +49,7 @@ import type { Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
 import { corpScope } from './layout';
 import { useActiveCorporationId } from '@/features/corp/owner';
-import { useAccountCorporations } from '@/features/corp/accountCorporations';
+import { useAccountCorporations } from '@/features/corp/accountCorporationsContext';
 import { readScope, useWidgetBoard } from './board';
 import { OVERVIEW_TICK_MS } from './data/tick';
 import { resolveWidget } from './state';

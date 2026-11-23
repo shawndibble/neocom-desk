@@ -26,7 +26,7 @@ vi.mock('@/features/character/useCharacters', () => ({
 const corporations = vi.hoisted(() => ({
   value: [] as { id: number; label: { ticker: string; name: string } }[],
 }));
-vi.mock('@/features/corp/accountCorporations', () => ({
+vi.mock('@/features/corp/accountCorporationsContext', () => ({
   useAccountCorporations: () => corporations.value,
 }));
 
