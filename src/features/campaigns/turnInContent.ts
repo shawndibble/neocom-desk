@@ -39,6 +39,11 @@ export function rewardSplitText(offer: TurnInOffer, t: TFunction): string {
   return parts.join(' + ');
 }
 
+/** "Secure Strength Trader · Onnamon"; the trader alone when its system is unknown. */
+export function traderPlace(traderName: string, systemName: string | null): string {
+  return systemName ? `${traderName} · ${systemName}` : traderName;
+}
+
 /** "LP paid per full 100 items · + faction tokens"; only the tokens when it pays no LP. */
 export function lpBlockText(offer: TurnInOffer, t: TFunction): string {
   return offer.lpBlockSize === null || offer.lpPerBlock === 0

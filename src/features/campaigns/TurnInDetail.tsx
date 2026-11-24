@@ -46,6 +46,7 @@ import {
   filledPercent,
   lpBlockText,
   rewardSplitText,
+  traderPlace,
   type DestinationBlock,
   type ParticipateLine,
 } from './turnInContent';
@@ -256,7 +257,7 @@ export function TurnInDetailView({
       {surfaceLine && <p className="text-xs">{surfaceLine}</p>}
       <p className="flex items-center gap-1 text-xs">
         <Icon.Faction size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-dim" />
-        {offer.systemName ? `${offer.traderName} · ${offer.systemName}` : offer.traderName}
+        {traderPlace(offer.traderName, offer.systemName)}
       </p>
       <div className="flex items-center gap-2 text-xs">
         <ProgressBar

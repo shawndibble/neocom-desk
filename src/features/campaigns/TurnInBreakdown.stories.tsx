@@ -128,3 +128,23 @@ export const Phone: Story = {
     <Breakdown participate={{ kind: 'perItem' }} states={{ 'obj-intel': 'notParticipating' }} />
   ),
 };
+
+/** @summary Autopilot waypoints dismissed: Set destination disabled, its tooltip names the Permission. */
+export const WaypointsDismissed: Story = {
+  render: () => (
+    <Breakdown
+      participate={{ kind: 'perItem' }}
+      destination={{ kind: 'reason', reason: 'dismissed' }}
+    />
+  ),
+};
+
+/** @summary No Character: the caveat alone, Set destination disabled with "Log in a character…". */
+export const NoCharacter: Story = {
+  render: () => (
+    <Breakdown
+      participate={{ kind: 'paysOnlyIf', mark: false }}
+      destination={{ kind: 'reason', reason: 'noCharacter' }}
+    />
+  ),
+};

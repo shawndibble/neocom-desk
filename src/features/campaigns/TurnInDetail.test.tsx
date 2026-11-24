@@ -201,7 +201,7 @@ describe('TurnInBreakdown', () => {
         />
       </MemoryRouter>
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Turn in: 30M' });
+    const dialog = await screen.findByRole('dialog', { name: 'Turn in: ~30M' });
     expect(within(dialog).getByText('Secure Strength Trader · Onnamon')).toBeInTheDocument();
     expect(within(dialog).getByText('Trail of Silence Trader · Amo')).toBeInTheDocument();
     // Active Character granted and joined: the per-item column.

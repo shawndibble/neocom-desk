@@ -12,9 +12,9 @@
  * Never a predicted close date, a token count or "multiples of N" advice.
  * `TurnInBreakdownView` is the modal with every read made, for stories.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, Modal, type DataTableColumn } from '@/components/ui';
+import { Button, DataTable, LiveStatus, Modal, type DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { ParticipateState } from '@/engine/campaigns/participation';
 import {
@@ -24,7 +24,6 @@ import {
   type TurnInTraderGroup,
 } from '@/engine/market/turnInPile';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { TurnInDestination, TurnInParticipateLine } from './TurnInDetail';
@@ -32,6 +31,7 @@ import {
   approxIsk,
   filledPercent,
   rewardSplitText,
+  traderPlace,
   turnInGroupMultibuy,
   type PileParticipate,
 } from './turnInContent';
@@ -48,29 +48,40 @@ export interface TurnInBreakdownItem extends TurnInPileItem<TurnInOfferDetail> {
 type Line = TurnInPileLine<TurnInOfferDetail> & { note?: ReactNode };
 type Group = TurnInTraderGroup<TurnInOfferDetail> & { lines: Line[] };
 
+/** A group's system name: every line shares the trader's system. */
+function systemNameOf(group: Group): string | null {
+  return group.lines[0]?.offer.systemName ?? null;
+}
+
 function CopyListButton({ group }: { group: Group }) {
   const { t } = useTranslation();
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
+  // Bumped on every copy, so a second "Copied" is read out again.
+  const [copies, setCopies] = useState(0);
+  const result =
+    copied === 'copied'
+      ? t('campaigns.turnIn.breakdown.copied')
+      : copied === 'failed'
+        ? t('campaigns.turnIn.breakdown.copyFailed')
+        : null;
   return (
-    <Button
-      size="sm"
-      aria-label={t('campaigns.turnIn.breakdown.copyListFor', { trader: group.traderName })}
-      onClick={() => {
-        writeToClipboard(turnInGroupMultibuy(group)).then(
-          () => flash('copied'),
-          () => flash('failed')
-        );
-      }}
-    >
-      <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      <span aria-live="polite">
-        {copied === 'copied'
-          ? t('campaigns.turnIn.breakdown.copied')
-          : copied === 'failed'
-            ? t('campaigns.turnIn.breakdown.copyFailed')
-            : t('campaigns.turnIn.breakdown.copyList')}
-      </span>
-    </Button>
+    <>
+      <Button
+        size="sm"
+        aria-label={t('campaigns.turnIn.breakdown.copyListFor', { trader: group.traderName })}
+        onClick={() => {
+          writeToClipboard(turnInGroupMultibuy(group)).then(
+            () => flash('copied'),
+            () => flash('failed')
+          );
+          setCopies((n) => n + 1);
+        }}
+      >
+        <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        {result ?? t('campaigns.turnIn.breakdown.copyList')}
+      </Button>
+      <LiveStatus announceKey={copies}>{result}</LiveStatus>
+    </>
   );
 }
 
@@ -161,7 +172,7 @@ export function TurnInBreakdownView({
         align: 'right',
         render: (line) => (
           <span className="flex flex-col items-end tabular-nums max-sm:items-start">
-            <span className="font-semibold">{formatIskCompact(line.reward.total)}</span>
+            <span className="font-semibold">{approxIsk(line.reward.total)}</span>
             {line.note && <span className="text-[0.6875rem]">{line.note}</span>}
           </span>
         ),
@@ -194,7 +205,7 @@ export function TurnInBreakdownView({
     <Modal
       open={open}
       onClose={onClose}
-      title={t('campaigns.turnIn.breakdown.title', { total: formatIskCompact(pile.total) })}
+      title={t('campaigns.turnIn.breakdown.title', { total: approxIsk(pile.total) })}
       placement="wide"
     >
       <div className="flex flex-col gap-5">
@@ -217,10 +228,8 @@ export function TurnInBreakdownView({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="flex items-center gap-1.5 text-sm font-semibold">
                 <Icon.Faction size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                {group.lines[0]?.offer.systemName
-                  ? `${group.traderName} · ${group.lines[0].offer.systemName}`
-                  : group.traderName}
-                <span className="ml-1.5 tabular-nums">{formatIskCompact(group.subtotal)}</span>
+                {traderPlace(group.traderName, systemNameOf(group))}
+                <span className="ml-1.5 tabular-nums">{approxIsk(group.subtotal)}</span>
               </h3>
               <div className="flex flex-wrap items-center gap-2">
                 {destinationFor(group)}
@@ -285,10 +294,10 @@ export function TurnInBreakdown({
       participateMark={participate.mark}
       destinationFor={(group) =>
         group.systemId !== null &&
-        group.lines[0]?.offer.systemName && (
+        systemNameOf(group) !== null && (
           <TurnInDestination
             systemId={group.systemId}
-            systemName={group.lines[0].offer.systemName}
+            systemName={systemNameOf(group) ?? ''}
             characterId={character}
             characterName={participate.name}
           />

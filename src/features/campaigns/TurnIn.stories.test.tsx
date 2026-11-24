@@ -27,6 +27,6 @@ describe('turn-in stories', () => {
 
   it.each(Object.entries(breakdown))('draws the %s breakdown', (_name, Story) => {
     render(<Story />);
-    expect(screen.getByRole('dialog', { name: 'Turn in: 39.6M' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Turn in: ~39.6M' })).toBeInTheDocument();
   });
 });

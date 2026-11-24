@@ -3,6 +3,7 @@
  * since the views there take every read already made (`GrantCellMark` wires
  * it up in the app).
  */
+import { useTranslation } from 'react-i18next';
 import { PermissionCellMark } from '@/components/ui';
 
 const noop = () => {};
@@ -18,6 +19,7 @@ export function TurnInSampleMark({
   why: string;
   defaultOpen?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <PermissionCellMark
       status="missing"
@@ -26,7 +28,7 @@ export function TurnInSampleMark({
       why={why}
       onGrant={noop}
       onDismiss={noop}
-      settingsLink={<span className="text-accent">Grant missing Permissions</span>}
+      settingsLink={<span className="text-accent">{t('permissions.grantMissing')}</span>}
       defaultOpen={defaultOpen}
     />
   );

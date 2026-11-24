@@ -9745,7 +9745,7 @@
         "copyList": "Copy list",
         "copyListFor": "Copy the list for {{trader}}",
         "copied": "Copied",
-        "copyFailed": "Couldn't copy"
+        "copyFailed": "Copy failed"
       }
     }
   },
