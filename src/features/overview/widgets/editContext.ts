@@ -13,6 +13,7 @@ import { createContext, useContext } from 'react';
 import type {
   CalendarEventsChoice,
   ProfitSource,
+  CampaignFaction,
   RaidsWhere,
   OverviewLayout,
   WidgetRange,
@@ -52,6 +53,7 @@ export interface OverviewEditActions {
   setRaidsWhere: (id: string, where: RaidsWhere) => void;
   setRaidsRadius: (id: string, radius: number) => void;
   setProfitSource: (id: string, source: ProfitSource) => void;
+  setCampaignFaction: (id: string, faction: CampaignFaction) => void;
   setTrendItems: (id: string, items: number[]) => void;
   setTrendHubs: (id: string, hubs: string[]) => void;
   setHiddenLayers: (id: string, layers: LayerId[]) => void;
@@ -100,6 +102,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setHiddenKinds: none,
   setRaidsWhere: none,
   setProfitSource: none,
+  setCampaignFaction: none,
   setRaidsRadius: none,
   setTrendItems: none,
   setTrendHubs: none,

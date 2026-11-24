@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CampaignObjectiveEntry, MilitaryCampaignEntry } from '@/sde/types';
 import {
   campaignCompletions,
+  objectiveEarned,
   participateState,
   participatingObjectives,
   type JoinedObjective,
@@ -121,5 +122,30 @@ describe('campaignCompletions', () => {
         fraction: 1,
       },
     ]);
+  });
+});
+
+describe('objectiveEarned', () => {
+  const mine = objective('obj-mine', {
+    isk: { amount: 30, interval: 1 },
+    lp: { amount: 1000, interval: 36000, corporationId: 1000084 },
+  });
+
+  it('pays ISK per interval and LP per full block of the contribution', () => {
+    expect(objectiveEarned(mine, 80000)).toEqual({ isk: 2_400_000, lp: 2000 });
+  });
+
+  it('pays no LP short of a full block', () => {
+    expect(objectiveEarned(mine, 35999)).toEqual({ isk: 1_079_970, lp: 0 });
+  });
+
+  it('caps the contribution at the per-Character maximum', () => {
+    const capped = objective('obj-cap', { maxPerParticipant: 10, isk: { amount: 5, interval: 2 } });
+    expect(objectiveEarned(capped, 25)).toEqual({ isk: 25, lp: 0 });
+  });
+
+  it('earns nothing for an objective without rewards or a non-positive contribution', () => {
+    expect(objectiveEarned(objective('obj-none'), 500)).toEqual({ isk: 0, lp: 0 });
+    expect(objectiveEarned(mine, -4)).toEqual({ isk: 0, lp: 0 });
   });
 });

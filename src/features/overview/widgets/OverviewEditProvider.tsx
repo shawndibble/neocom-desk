@@ -37,6 +37,7 @@ import {
   setRaidsRadius,
   setRaidsWhere,
   setProfitSource,
+  setCampaignFaction,
   setTrendHubs,
   setHiddenLayers,
   setTrendItems,
@@ -252,6 +253,8 @@ export function OverviewEditProvider({
       setRaidsWhere: (id, where) => commit(setRaidsWhere(layoutRef.current, id, where)),
       setRaidsRadius: (id, radius) => commit(setRaidsRadius(layoutRef.current, id, radius)),
       setProfitSource: (id, source) => commit(setProfitSource(layoutRef.current, id, source)),
+      setCampaignFaction: (id, faction) =>
+        commit(setCampaignFaction(layoutRef.current, id, faction)),
       setTrendItems: (id, items) => commit(setTrendItems(layoutRef.current, id, items)),
       setTrendHubs: (id, hubs) => commit(setTrendHubs(layoutRef.current, id, hubs)),
       setHiddenLayers: (id, layers) => commit(setHiddenLayers(layoutRef.current, id, layers)),

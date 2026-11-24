@@ -33,6 +33,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
+import { GrantCellMark } from '@/app/GrantCellMark';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -45,6 +46,7 @@ import { useWidgetView } from './data/useWidgetView';
 import { getKind, widgetKeys } from './kinds';
 import { endpointsOf } from './data/models';
 import { Chart } from './charts/Chart';
+import { Donut } from './charts/Donut';
 import type { Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
 import { corpScope } from './layout';
@@ -123,10 +125,41 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   );
 }
 
+/** Rings beside the figure: one with the figure, or several (each named) in its place. */
+function NumberRings({ rings }: { rings: NonNullable<NumberModel['rings']> }) {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+      {rings.map((ring) => (
+        <li key={ring.key} className="flex items-center gap-1.5 text-sm tabular-nums">
+          <Donut model={ring.donut} size={24} legend={false} />
+          <span aria-hidden="true">{ring.label}</span>
+          <span className="sr-only">{ring.donut.summary}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: boolean }) {
   const toned = model.tone !== 'clear';
-  return (
-    <div className="grid gap-1 px-3 py-2.5">
+  const rings = model.rings ?? [];
+  // Several rings say it all (one per faction): they stand in for the figure.
+  if (rings.length > 1) {
+    return (
+      <div className="grid gap-1.5 px-3 py-2.5">
+        <NumberRings rings={rings} />
+        {model.secondary && <SecondaryLine secondary={model.secondary} />}
+        {model.notes?.map((note) => (
+          <p key={note} className="text-xs text-text-dim">
+            {note}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  const only = rings[0];
+  const figure = (
+    <div className={only ? 'grid min-w-0 flex-1 gap-1' : 'grid gap-1 px-3 py-2.5'}>
       <div
         className={cx(
           'flex flex-wrap items-baseline gap-x-1.5 text-2xl leading-tight font-semibold tabular-nums',
@@ -167,6 +200,14 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
         </Link>
       )}
+    </div>
+  );
+  if (!only) return figure;
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      {figure}
+      <Donut model={only.donut} size={56} legend={false} />
+      <span className="sr-only">{only.donut.summary}</span>
     </div>
   );
 }
@@ -611,6 +652,24 @@ function WidgetFrame({
               <span className="block truncate text-text">{title}</span>
             )}
           </h2>
+          {view.headerMark && (state === 'ok' || state === 'empty') && (
+            <GrantCellMark
+              characterId={view.headerMark.characterId}
+              characterName={view.headerMark.characterName}
+              permission={view.headerMark.permission}
+              why={view.headerMark.why}
+              grantLabel={t('reauth.grantActionFor', { name: view.headerMark.characterName })}
+              title={
+                view.headerMark.count > 1
+                  ? (permissions) =>
+                      t('permissions.mark.severalTitle', {
+                        count: view.headerMark!.count,
+                        permissions,
+                      })
+                  : undefined
+              }
+            />
+          )}
           {scope.chip &&
             !asksCorporation &&
             (scope.corporationId === undefined ? (

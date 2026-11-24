@@ -925,6 +925,26 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       ],
     },
+    militaryCampaigns: {
+      value: t('overview.widgets.militaryCampaigns.ofTarget', { completed: 1, target: 4 }),
+      unit: t('overview.widgets.militaryCampaigns.objectivesComplete', { count: 4 }),
+      note: t('overview.widgets.militaryCampaigns.waiting', { isk: '~73.1M' }),
+      rows: [
+        [
+          t('overview.widgets.militaryCampaigns.turnInTitle', { name: 'Shield Failover Report' }),
+          t('overview.widgets.militaryCampaigns.youHold', { held: '640', reward: '~37.1M' }),
+          t('overview.widgets.militaryCampaigns.filled', { percent: 17 }),
+        ],
+        [
+          'Mine Pyroxeres',
+          t('overview.widgets.militaryCampaigns.contributed', {
+            name: 'Kestrel Vane',
+            amount: '48,200',
+          }),
+          t('overview.widgets.militaryCampaigns.filled', { percent: 41 }),
+        ],
+      ],
+    },
     sovRaids: {
       value: '2',
       unit: t('travel.sovRaids.unit', { count: 2 }),

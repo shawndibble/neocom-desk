@@ -14,6 +14,10 @@ export type GrantCellMarkProps = PermissionNeed & {
   /** One short line on what it is needed for; the Permission's own caption when omitted. */
   why?: string;
   defaultOpen?: boolean;
+  /** The popover's title, given the missing Permissions' labels (a mark about several Characters). */
+  title?: (permissions: string) => string;
+  /** Grant in EVE's label in place of the plain one (to name whose grant it starts). */
+  grantLabel?: string;
 };
 
 /**
@@ -31,6 +35,8 @@ export function GrantCellMark({
   characterName,
   why,
   defaultOpen,
+  title,
+  grantLabel,
   ...need
 }: GrantCellMarkProps) {
   const { t } = useTranslation();
@@ -39,11 +45,14 @@ export function GrantCellMark({
   if (state?.status !== 'missing') return null;
   const { asking } = state;
   const first = asking[0];
+  const labels = asking.map((group) => t(PERMISSIONS[group].labelKey));
   return (
     <PermissionCellMark
       status="missing"
       character={characterName ?? state.storedName ?? t('reauth.unknownCharacter')}
-      permissions={asking.map((group) => t(PERMISSIONS[group].labelKey))}
+      permissions={labels}
+      title={title?.(labels.join(', '))}
+      grantLabel={grantLabel}
       why={why ?? (first ? t(PERMISSIONS[first].captionKey) : '')}
       // `beginGrant`'s own call, minus its endpoints-to-groups step: the mark may name a
       // Permission directly, and asks only for the ones not dismissed.

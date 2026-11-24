@@ -70,6 +70,7 @@ export default function DemoBoard() {
       setRaidsWhere: none,
       setRaidsRadius: none,
       setProfitSource: none,
+      setCampaignFaction: none,
       setTrendItems: none,
       setTrendHubs: none,
       setHiddenLayers: none,

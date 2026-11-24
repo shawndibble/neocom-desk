@@ -75,6 +75,15 @@ export const SeveralPermissions: Story = {
 };
 
 /** @summary 390px: still a popover (three lines, anchored to its cell), capped to the screen. */
+/** @summary About several Characters (a widget header): the title counts them, the button names whose grant it starts. */
+export const SeveralCharacters: Story = {
+  args: {
+    title: '3 Characters: grant Military Campaigns',
+    grantLabel: 'Grant in EVE for Mira Solenne',
+    defaultOpen: true,
+  },
+};
+
 export const Phone: Story = {
   args: { defaultOpen: true },
   globals: { viewport: { value: 'phone390', isRotated: false } },
