@@ -463,7 +463,11 @@ export function TableBody({
           : sorted.slice(0, rowLimit);
   const more = paged ? 0 : sorted.length - shown.length;
   const cuttable = !paged && !pageable && sorted.length > rowLimit;
-  if (shown.length === 0) return null;
+  if (shown.length === 0) {
+    return table.emptyLine === undefined ? null : (
+      <p className={cx('px-3 py-2 text-sm text-text-dim', className)}>{table.emptyLine}</p>
+    );
+  }
   const hasHeader = columns.some((column) => column.label !== '');
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);

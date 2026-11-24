@@ -658,6 +658,16 @@ function WidgetFrame({
               characterName={view.headerMark.characterName}
               permission={view.headerMark.permission}
               why={view.headerMark.why}
+              grantLabel={t('reauth.grantActionFor', { name: view.headerMark.characterName })}
+              title={
+                view.headerMark.count > 1
+                  ? (permissions) =>
+                      t('permissions.mark.severalTitle', {
+                        count: view.headerMark!.count,
+                        permissions,
+                      })
+                  : undefined
+              }
             />
           )}
           {scope.chip &&

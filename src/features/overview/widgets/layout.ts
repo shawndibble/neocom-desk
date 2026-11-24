@@ -25,6 +25,7 @@ import {
 export type { WidgetKindId, WidgetShow, WidgetSize, WidgetView };
 
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
+import type { EmpireFaction } from '@/engine/empireFactions';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 
 /**
@@ -75,7 +76,7 @@ export const isProfitSource = (value: unknown): value is ProfitSource =>
   PROFIT_SOURCES.includes(value as ProfitSource);
 
 /** Military Campaigns: whose campaign it shows. All is the default and is never stored. */
-export type CampaignFaction = 'all' | 'amarr' | 'caldari' | 'gallente' | 'minmatar';
+export type CampaignFaction = 'all' | EmpireFaction;
 export const CAMPAIGN_FACTIONS: readonly CampaignFaction[] = [
   'all',
   'amarr',

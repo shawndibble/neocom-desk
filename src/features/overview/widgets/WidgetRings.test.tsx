@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
@@ -89,7 +90,7 @@ describe('Widget number rings', () => {
     expect(screen.getByText('~73.1M waiting to turn in')).toBeInTheDocument();
   });
 
-  it('puts one Military Campaigns mark in the header for the Characters lacking it', async () => {
+  it('puts one Military Campaigns mark in the header, its grant naming whose it is', async () => {
     await seedCharacter(9, 'Mira Solenne');
     render(
       <MemoryRouter>
@@ -99,6 +100,7 @@ describe('Widget number rings', () => {
             headerMark: {
               characterId: 9,
               characterName: 'Mira Solenne',
+              count: 3,
               permission: 'militaryCampaigns',
               why: 'Lets this widget list them.',
             },
@@ -106,6 +108,11 @@ describe('Widget number rings', () => {
         />
       </MemoryRouter>
     );
-    expect(await screen.findByRole('button', { name: /Mira Solenne/ })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /Mira Solenne/ }));
+    expect(await screen.findByText('3 Characters: grant Military Campaigns')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Grant in EVE for Mira Solenne' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Grant missing Permissions' })).toBeInTheDocument();
   });
 });

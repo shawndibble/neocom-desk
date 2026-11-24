@@ -205,6 +205,11 @@ export const NeedsPermission: Story = {
   ),
 };
 
+/** @summary Campaigns running, nothing joined or held: a plain line under the rings. */
+export const NothingJoined: Story = {
+  render: () => <Campaigns feed={data({ rows: [] })} view="table" />,
+};
+
 /** @summary No Active campaign: "No Military Campaign running". */
 export const Empty: Story = {
   render: () => <Campaigns feed={data({ campaigns: [], rows: [] })} view="table" />,

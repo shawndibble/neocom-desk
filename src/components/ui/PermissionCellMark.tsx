@@ -27,6 +27,10 @@ export interface PermissionCellMarkProps {
   settingsLink: ReactNode;
   /** Opens on mount, for a story or a screenshot. */
   defaultOpen?: boolean;
+  /** The popover's title in place of "<Character>: grant <Permissions>" (a mark about several Characters). */
+  title?: string;
+  /** Grant in EVE's label, to name whose grant it starts ("Grant in EVE for <Character>"). */
+  grantLabel?: string;
 }
 
 /**
@@ -65,6 +69,8 @@ export function PermissionCellMark({
   onDismiss,
   settingsLink,
   defaultOpen = false,
+  title,
+  grantLabel,
 }: PermissionCellMarkProps) {
   const { t } = useTranslation();
   const titleId = useId();
@@ -111,7 +117,7 @@ export function PermissionCellMark({
         {...stopRowEvents}
       >
         <p id={titleId} className="font-semibold text-warning">
-          {t('reauth.missingTitle', { character, permissions: named })}
+          {title ?? t('reauth.missingTitle', { character, permissions: named })}
         </p>
         <p id={whyId} className="mt-1 text-xs text-text-dim">
           {why}
@@ -119,7 +125,7 @@ export function PermissionCellMark({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <NeedsConnection>
             <Button variant="primary" size="sm" onClick={onGrant}>
-              {t('reauth.grantAction')}
+              {grantLabel ?? t('reauth.grantAction')}
             </Button>
           </NeedsConnection>
           <Button size="sm" onClick={dismiss}>

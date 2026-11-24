@@ -58,3 +58,19 @@ describe('TableBody turn-in rows', () => {
     expect(screen.queryByRole('button', { name: /Mine Pyroxeres/ })).toBeNull();
   });
 });
+
+describe('TableBody empty line', () => {
+  it('draws the table’s empty line in place of no rows', () => {
+    render(
+      <MemoryRouter>
+        <TableBody
+          table={{ ...table, rows: [], emptyLine: 'Nothing joined or held' }}
+          columnsFor="L"
+          rowLimit={10}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Nothing joined or held')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+});

@@ -101,6 +101,7 @@
     "missingTitle": "{{character}}: grant {{permissions}}",
     "loginTitle": "{{character}}: log in again",
     "grantAction": "Grant in EVE",
+    "grantActionFor": "Grant in EVE for {{name}}",
     "loginAction": "Log in",
     "unknownCharacter": "This character",
     "refusedHint": "EVE no longer accepts the saved login.",
@@ -5960,8 +5961,10 @@
         "earnedIsk": "{{isk}} ISK earned",
         "earnedLp": "{{lp}} LP earned",
         "filled": "{{percent}}% filled",
-        "missingMore": "{{name}} and {{count}} more",
         "whyMark": "Lets this widget list the Campaign Objectives they pressed Participate on.",
+        "whyMarkSeveral": "Lets this widget list the Campaign Objectives they pressed Participate on. Grant in EVE signs in {{name}}; Grant missing Permissions grants the rest together.",
+        "noRows": "Nothing joined or held for a running campaign",
+        "noRowsFaction": "Nothing joined or held for the {{faction}} campaign",
         "unread_one": "{{count}} Character couldn't be loaded.",
         "unread_other": "{{count}} Characters couldn't be loaded."
       },
@@ -14759,6 +14762,8 @@
     "grantMissing": "Grant missing Permissions",
     "mark": {
       "label": "{{character}}: {{permissions}} not granted",
+      "severalTitle_one": "{{count}} Character: grant {{permissions}}",
+      "severalTitle_other": "{{count}} Characters: grant {{permissions}}",
       "dontAsk": "Don't ask again"
     },
     "writeSection": "Write to EVE",

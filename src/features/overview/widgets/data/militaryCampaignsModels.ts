@@ -18,34 +18,17 @@ import type { CampaignCompletion } from '@/engine/campaigns/participation';
 import { formatIskCompact } from '@/lib/isk';
 import { formatNumber } from '@/lib/numberLocale';
 import type { Translate } from '@/lib/translate';
-import type { CampaignFaction } from '../layout';
+import { EMPIRE_FACTION_IDS, empireFactionOf } from '@/engine/empireFactions';
 import type { DonutChartModel } from '../charts/types';
 import { blank, statusOf, type Builder } from './builderKit';
 import type { KindView, NumberModel, TableModel, TableRowModel } from './types';
 
 const k = (key: string) => `overview.widgets.militaryCampaigns.${key}`;
 
-type Faction = Exclude<CampaignFaction, 'all'>;
-
-/** The four empire factions' ids, as the SDE names a campaign's runner. */
-export const CAMPAIGN_FACTION_IDS: Readonly<Record<Faction, number>> = {
-  amarr: 500003,
-  caldari: 500001,
-  gallente: 500004,
-  minmatar: 500002,
-};
-
-const FACTION_OF_ID = new Map(
-  (Object.entries(CAMPAIGN_FACTION_IDS) as [Faction, number][]).map(([faction, id]) => [
-    id,
-    faction,
-  ])
-);
-
 /** "Caldari"; null for a faction the setting does not offer. */
 function factionName(t: Translate, factionId: number | null): string | null {
-  const faction = factionId === null ? undefined : FACTION_OF_ID.get(factionId);
-  return faction === undefined ? null : t(`overview.menu.factionChoice.${faction}`);
+  const faction = empireFactionOf(factionId);
+  return faction === null ? null : t(`overview.menu.factionChoice.${faction}`);
 }
 
 function ring(
@@ -206,7 +189,7 @@ export const militaryCampaigns: Builder = (
     granted.filter((character) => character.status === 'ok').map((c) => c.characterId)
   );
   const faction = campaignFaction ?? 'all';
-  const factionId = faction === 'all' ? null : CAMPAIGN_FACTION_IDS[faction];
+  const factionId = faction === 'all' ? null : EMPIRE_FACTION_IDS[faction];
   const active = data.campaigns.filter(
     (campaign) =>
       campaign.state === 'Active' && (factionId === null || campaign.factionId === factionId)
@@ -236,12 +219,13 @@ export const militaryCampaigns: Builder = (
         ? undefined
         : {
             characterId: missing[0].characterId,
-            characterName:
-              missing.length > 1
-                ? t(k('missingMore'), { name: missing[0].name, count: missing.length - 1 })
-                : missing[0].name,
+            characterName: missing[0].name,
+            count: missing.length,
             permission: 'militaryCampaigns',
-            why: t(k('whyMark')),
+            why:
+              missing.length > 1
+                ? t(k('whyMarkSeveral'), { name: missing[0].name })
+                : t(k('whyMark')),
           },
   };
   if (active.length === 0) {
@@ -260,13 +244,20 @@ export const militaryCampaigns: Builder = (
     0
   );
   const number = numberOf(t, active, waiting, factionId !== null);
+  const factionLabel = factionName(t, factionId);
   // A Character whose own read failed drops its rows: say so, never a silent gap.
   const unread = granted.length - read.size;
   const unreadNote = unread > 0 ? t(k('unread'), { count: unread }) : undefined;
   return {
     ...base,
     number: unreadNote ? { ...number, notes: [unreadNote] } : number,
-    table: { ...tableOf(t, rows, everyone && read.size > 1), footer: unreadNote },
+    table: {
+      ...tableOf(t, rows, everyone && read.size > 1),
+      footer: unreadNote,
+      // Campaigns are running, but nobody in view joined or holds anything for them.
+      emptyLine:
+        factionLabel === null ? t(k('noRows')) : t(k('noRowsFaction'), { faction: factionLabel }),
+    },
     summary: [number.value, number.secondary?.text].filter(Boolean).join(' · '),
   };
 };

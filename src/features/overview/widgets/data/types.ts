@@ -290,6 +290,8 @@ export interface TableModel {
   fitWidth?: true;
   /** One quiet line under the rows ("38 of 49 slots"), when the table has a fact that is not a row. */
   footer?: string;
+  /** One plain line drawn in place of the rows when there are none, so a table never draws blank. */
+  emptyLine?: string;
 }
 
 export interface KindView {
@@ -327,9 +329,16 @@ export interface KindView {
   grantCharacterName?: string;
   /**
    * Some Characters in the widget's scope lack a Permission the rest have: one `GrantCellMark`
-   * in the header, for the first of them, naming how many more there are.
+   * in the header. Grant in EVE is for the first of them (`characterId`, named on the button);
+   * with `count` over one, the title counts them and Grant missing Permissions covers the rest.
    */
-  headerMark?: { characterId: number; characterName: string; permission: ScopeGroup; why: string };
+  headerMark?: {
+    characterId: number;
+    characterName: string;
+    count: number;
+    permission: ScopeGroup;
+    why: string;
+  };
   /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
   emptyLinkLabel?: string;
   /**

@@ -11,7 +11,9 @@
  * A Turn-in Reward is never a price (scope decision 20261123-164921): the
  * widget's "waiting to turn in" figure stays out of every total but its own.
  */
+import { loadGrantedScopes } from '@/app/grantedScopes';
 import { db } from '@/db';
+import { ESI_REGISTRY } from '@/esi/registry';
 import {
   campaignCompletions,
   objectiveEarned,
@@ -168,11 +170,40 @@ async function heldTypes(
   return held;
 }
 
+const JOINED_SCOPE = ESI_REGISTRY.getCharacterMilitaryCampaignObjectives.scope;
+
+/**
+ * The public campaign state could not be read. With no Character granted
+ * Military Campaigns, that is the answer the pilot can act on: every Character
+ * reads `needsPermission`, so the widget asks for the grant rather than
+ * offering Retry. Otherwise it throws, keeping the last good read and Retry.
+ */
+async function unreadState(
+  stored: readonly { characterId: number; name: string }[]
+): Promise<MilitaryCampaignsWidgetData> {
+  const scopes = await Promise.all(stored.map((c) => loadGrantedScopes(c.characterId)));
+  if (scopes.some((granted) => granted.has(JOINED_SCOPE))) {
+    throw new Error('Military Campaign state could not be read');
+  }
+  return {
+    campaigns: [],
+    characters: stored.map((c) => ({
+      characterId: c.characterId,
+      name: c.name,
+      status: 'needsPermission' as const,
+    })),
+    rows: [],
+    fetchedAt: new Date(),
+    fromCache: false,
+  };
+}
+
 /**
  * Every stored Character's campaign rows. `characterId` is the header
  * Character, whose Market hub the LP is counted at. Throws when the public
- * campaign state cannot be read and nothing is cached, so the widget keeps
- * its last good read and offers Retry.
+ * campaign state cannot be read and nothing is cached (unless no Character is
+ * granted: see `unreadState`), so the widget keeps its last good read and
+ * offers Retry.
  */
 export async function loadMilitaryCampaignsWidget(
   characterId: number
@@ -184,7 +215,7 @@ export async function loadMilitaryCampaignsWidget(
     db.characters.toArray(),
     tradeHubIdFor(characterId).catch(() => DEFAULT_TRADE_HUB.id),
   ]);
-  if (state === null) throw new Error('Military Campaign state could not be read');
+  if (state === null) return unreadState(stored);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const [offers, overviews] = await Promise.all([
     // No offers (the LP rates failed) is a widget without turn-in rows, not a failed one.

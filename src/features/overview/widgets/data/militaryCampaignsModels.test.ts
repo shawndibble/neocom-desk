@@ -134,6 +134,15 @@ describe('militaryCampaigns builder', () => {
     expect(view.number.value).toContain('factionLine');
   });
 
+  it('draws a plain line, never a bare headline, when campaigns run but nothing is joined or held', () => {
+    const all = militaryCampaigns(feeds({ rows: [] }), ctx());
+    expect(all.status.isEmpty).toBe(false);
+    expect(all.table!.rows).toEqual([]);
+    expect(all.table!.emptyLine).toBe('overview.widgets.militaryCampaigns.noRows');
+    const caldari = militaryCampaigns(feeds({ rows: [] }), ctx({ campaignFaction: 'caldari' }));
+    expect(caldari.table!.emptyLine).toContain('noRowsFaction');
+  });
+
   it('notes a Character whose own read failed instead of dropping its rows silently', () => {
     const view = militaryCampaigns(
       feeds({ characters: [pilot(1), pilot(2, 'failed')] }),
@@ -174,8 +183,13 @@ describe('militaryCampaigns builder', () => {
     );
     expect(view.status.needsPermission).toBe(false);
     expect(view.table!.rows).toHaveLength(1);
-    expect(view.headerMark).toMatchObject({ characterId: 2, permission: 'militaryCampaigns' });
-    expect(view.headerMark!.characterName).toContain('missingMore');
+    expect(view.headerMark).toMatchObject({
+      characterId: 2,
+      characterName: 'Pilot 2',
+      count: 2,
+      permission: 'militaryCampaigns',
+    });
+    expect(view.headerMark!.why).toContain('whyMarkSeveral');
   });
 
   it('fails when every granted Character’s read failed', () => {
