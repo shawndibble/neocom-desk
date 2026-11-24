@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { InlineError } from '@/components/ui/InlineError';
 import { Button, Panel } from '@/components/ui';
 import { addCorpsErrorText } from '../addCorpsErrorText';
-import { needsThePlayer, offersGrantAgain, type NeedsYouItem } from './addCorpsStatus';
+import {
+  needsThePlayer,
+  offersGrantAgain,
+  offersLoginAgain,
+  type NeedsYouItem,
+} from './addCorpsStatus';
 import { CorpCeo, CorpStatePill } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
@@ -11,7 +16,7 @@ const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
 /**
  * "Needs you (N)": every corp of the player's that did not end up connected,
  * with the one-line reason and the fix that applies. Gone quiet is removed from
- * here; sign-in problems start that corp's sign-in again; a corp with its own
+ * here (or logged in again as its CEO, when the player leads it); sign-in problems start that corp's sign-in again; a corp with its own
  * book has only the instruction, because moving a book is not built yet. A moon
  * owner read without refinery names offers Grant again when it is the player's
  * own, and otherwise only says whose officer can; that one is not counted. One of
@@ -68,15 +73,27 @@ export function CorpStatusPanel({
                 {item.ceoName && <CorpCeo name={item.ceoName} />}
               </span>
               {item.state === 'gone-quiet' ? (
-                <Button
-                  size="sm"
-                  variant="danger"
-                  loading={removing === item.corporationId}
-                  aria-label={t(k('removeNamed'), { name: item.name })}
-                  onClick={() => remove(item.corporationId)}
-                >
-                  {t(k('gone-quiet.action'))}
-                </Button>
+                <span className="flex shrink-0 items-center gap-2">
+                  {offersLoginAgain(item) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={t(k('signInNamed'), { name: item.name })}
+                      onClick={() => onGrantAgain(item.corporationId)}
+                    >
+                      {t(k('gone-quiet.login'))}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    loading={removing === item.corporationId}
+                    aria-label={t(k('removeNamed'), { name: item.name })}
+                    onClick={() => remove(item.corporationId)}
+                  >
+                    {t(k('gone-quiet.action'))}
+                  </Button>
+                </span>
               ) : offersGrantAgain(item) ? (
                 <Button
                   size="sm"

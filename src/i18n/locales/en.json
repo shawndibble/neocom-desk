@@ -19478,6 +19478,7 @@
           "gone-quiet": {
             "text": "This corp could not be read. Its login may have lapsed, or the corp may be closed.",
             "keeps": "Removing keeps its past mining and billing records.",
+            "login": "Log in again",
             "action": "Remove"
           },
           "needs-names": {

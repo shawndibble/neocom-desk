@@ -89,6 +89,10 @@ const lacksOre = (row: OwnerRowLike): boolean =>
 export const offersGrantAgain = (item: Pick<NeedsYouItem, 'state'>): boolean =>
   item.state === 'needs-names' || item.state === 'needs-ore';
 
+/** Whether a gone-quiet own corp can be logged in again here: the player leads it, so there is a CEO to name. */
+export const offersLoginAgain = (item: Pick<NeedsYouItem, 'state' | 'ceoName'>): boolean =>
+  item.state === 'gone-quiet' && item.ceoName !== undefined;
+
 /** Whether an item is the player's to fix (counted), rather than information about another officer's. */
 export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'names-not-shared';
 
@@ -134,10 +138,13 @@ export function needsYou(
   }
   for (const r of rows) {
     if (isGoneQuiet(r)) {
+      // The player's own corp: logging in again as its CEO replaces the lost grant.
+      const ceoName = grantCeo(r);
       items.set(r.corporationId, {
         corporationId: r.corporationId,
         name: name(r.corporationId),
         state: 'gone-quiet',
+        ...(ceoName === undefined ? {} : { ceoName }),
       });
     } else if (lacksNames(r) && !items.has(r.corporationId)) {
       const ceoName = grantCeo(r);
