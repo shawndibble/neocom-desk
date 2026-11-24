@@ -289,6 +289,7 @@ async function reconnectCore(
       patch.coveragePeriods = coveragePeriods;
       patch.disconnectedAt = FieldValue.delete();
       patch.staleSince = FieldValue.delete();
+      patch.staleReason = FieldValue.delete();
     }
     tx.update(ref, patch);
     return {
@@ -309,6 +310,7 @@ async function reconnectCore(
 /** The fields a reconnect's first pull writes (`recordFeederRead`). */
 const FIRST_PULL_FIELDS = [
   'staleSince',
+  'staleReason',
   'lastSyncResult',
   'lastReadWellAt',
   'extractionsRefusedAt',
@@ -528,7 +530,10 @@ async function putBackGrant(
   const ref = grantRef(deps.db, feederCorp);
   const current = (await ref.get()).data() as CorpSyncGrantDoc | undefined;
   if (previous) await ref.set(previous);
-  else if (current) await ref.delete();
+  else if (current) {
+    await ref.delete();
+    deps.log('Moon owner grant dropped', { feederCorporationId: feederCorp, why: 'save refused' });
+  }
   if (current && current.encryptedRefreshToken !== previous?.encryptedRefreshToken) {
     await revokeStored(deps, current);
   }
@@ -567,7 +572,14 @@ async function unwindAccept(
     );
   });
   // The rotated token the sync stored; the caller revokes the originally rotated one.
-  if (held && held.kind === 'feeder') await revokeStored(deps, held);
+  if (held && held.kind === 'feeder') {
+    // Logged here, not in the transaction, which may retry.
+    deps.log('Moon owner grant dropped', {
+      feederCorporationId: feederCorp,
+      why: 'accept unwound',
+    });
+    await revokeStored(deps, held);
+  }
   // The refused first pull rebuilt the view; put it back, or drop it with the record it described.
   try {
     if (undo.priorRecord) await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
@@ -775,6 +787,7 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
       removalLinkId: FieldValue.delete(),
       // The feed's sync state and a dismissed history belong to this feed, not the next.
       staleSince: FieldValue.delete(),
+      staleReason: FieldValue.delete(),
       disconnectedAt: FieldValue.delete(),
       lastSyncResult: FieldValue.delete(),
       viewDismissedAt: FieldValue.delete(),
@@ -802,7 +815,14 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
     });
     return grant?.kind === 'feeder' ? grant : undefined;
   });
-  if (dropped) await revokeStored(deps, dropped);
+  if (dropped) {
+    deps.log('Moon owner grant dropped', {
+      feederCorporationId: feederCorp,
+      why: 'feed ended',
+      action: input.action,
+    });
+    await revokeStored(deps, dropped);
+  }
   if (input.rebuildView !== false) {
     await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
     // A moon owner the book no longer handles shares no pops through it (#6223).

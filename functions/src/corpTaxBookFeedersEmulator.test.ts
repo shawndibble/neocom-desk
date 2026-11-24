@@ -350,6 +350,7 @@ emulatorSuite('feeder invites', () => {
       for (const gone of [
         'leftAt',
         'staleSince',
+        'staleReason',
         'disconnectedAt',
         'lastSyncResult',
         'viewDismissedAt',
@@ -363,6 +364,22 @@ emulatorSuite('feeder invites', () => {
         (await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'stale', reason: 'x' }))
           ?.status
       ).toBe('active');
+    });
+
+    it('keeps the first refusal of a stale spell as its reason, and clears it on a good read', async () => {
+      await accept((await invite()).code);
+      await recordFeederRead(deps(), COLLECTOR, FEEDER, {
+        outcome: 'stale',
+        reason: 'token-revoked',
+      });
+      now += 3_600_000;
+      await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'stale', reason: 'no-grant' });
+      expect(await feederRecord()).toMatchObject({
+        staleReason: 'token-revoked',
+        lastSyncResult: { reason: 'no-grant' },
+      });
+      await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'ok' });
+      expect(await feederRecord()).not.toHaveProperty('staleReason');
     });
 
     it('takes a disconnected moon owner back only with a new grant', async () => {

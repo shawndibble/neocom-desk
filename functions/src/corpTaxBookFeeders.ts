@@ -66,6 +66,8 @@ export interface FeederRecord {
   lastReadWellAt?: number;
   /** When ESI first refused the ledger in the current spell (ms); absent when the ledger reads fine. */
   staleSince?: number;
+  /** Why the read that began the current stale spell was refused (`lastSyncResult.reason` of that read); later refusals do not overwrite it. */
+  staleReason?: string;
   /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
   /** The `staleSince` whose "we can't read your ledger" mail an officer's client claimed (#6210). */
@@ -431,6 +433,7 @@ export interface AcceptUndo {
 const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'leftAt',
   'staleSince',
+  'staleReason',
   'staleMailedFor',
   'staleMailClaimedAt',
   'staleMailSentFor',
