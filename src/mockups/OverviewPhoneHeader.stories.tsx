@@ -47,7 +47,11 @@ function ProposedHeader() {
     <div className="mx-auto max-w-page space-y-2 pt-3">
       <NewComponent name="IdentityBlock">
         <div className="flex items-start gap-3">
-          <button type="button" aria-label="Switch character" className="shrink-0">
+          <button
+            type="button"
+            aria-label="Switch character"
+            className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
             <CharacterAvatar characterId={SAMPLE_ACTIVE_CHARACTER.characterId} size="md" alt="" />
           </button>
           <div className="min-w-0 flex-1">
