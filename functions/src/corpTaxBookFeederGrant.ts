@@ -289,6 +289,7 @@ async function reconnectCore(
       patch.coveragePeriods = coveragePeriods;
       patch.disconnectedAt = FieldValue.delete();
       patch.staleSince = FieldValue.delete();
+      patch.staleReason = FieldValue.delete();
     }
     tx.update(ref, patch);
     return {
@@ -309,6 +310,7 @@ async function reconnectCore(
 /** The fields a reconnect's first pull writes (`recordFeederRead`). */
 const FIRST_PULL_FIELDS = [
   'staleSince',
+  'staleReason',
   'lastSyncResult',
   'lastReadWellAt',
   'extractionsRefusedAt',
@@ -559,13 +561,7 @@ async function unwindAccept(
       acceptedAt: FieldValue.delete(),
       acceptedByCorporationId: FieldValue.delete(),
     });
-    if (held && held.kind === 'feeder') {
-      tx.delete(grantRef(deps.db, feederCorp));
-      deps.log('Moon owner grant dropped', {
-        feederCorporationId: feederCorp,
-        why: 'accept unwound',
-      });
-    }
+    if (held && held.kind === 'feeder') tx.delete(grantRef(deps.db, feederCorp));
     appendAudit(
       tx,
       bookDeps(deps),
@@ -576,7 +572,14 @@ async function unwindAccept(
     );
   });
   // The rotated token the sync stored; the caller revokes the originally rotated one.
-  if (held && held.kind === 'feeder') await revokeStored(deps, held);
+  if (held && held.kind === 'feeder') {
+    // Logged here, not in the transaction, which may retry.
+    deps.log('Moon owner grant dropped', {
+      feederCorporationId: feederCorp,
+      why: 'accept unwound',
+    });
+    await revokeStored(deps, held);
+  }
   // The refused first pull rebuilt the view; put it back, or drop it with the record it described.
   try {
     if (undo.priorRecord) await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);

@@ -420,6 +420,11 @@ export async function dropCorpSyncGrant(deps: CorpSyncDeps, corporationId: numbe
     CorpSyncGrantDoc | undefined;
   if (!grant) return;
   await grantRef(deps.db, corporationId).delete();
+  deps.log('Corp sync grant dropped', {
+    corporationId,
+    kind: grant.kind ?? 'book',
+    why: 'book deleted',
+  });
   await revokeStored(deps, grant);
 }
 
