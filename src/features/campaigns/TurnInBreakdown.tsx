@@ -197,12 +197,9 @@ export function TurnInBreakdownView({
   );
   // The pile-wide "press Participate" line only when it is true of every row: over a mixed
   // pile it read as if the Participating rows were not (each row's cell says its own state).
+  const states = pile.groups.flatMap((g) => g.lines.map((l) => stateOf(l.offer.objectiveId)));
   const noneParticipating =
-    perItem &&
-    pile.groups.length > 0 &&
-    pile.groups.every((g) =>
-      g.lines.every((l) => stateOf(l.offer.objectiveId) === 'notParticipating')
-    );
+    perItem && states.includes('notParticipating') && !states.includes('participating');
 
   return (
     <Modal

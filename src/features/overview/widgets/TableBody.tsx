@@ -166,7 +166,7 @@ function Row({
   compact,
   rowHeader,
   growKey,
-  firstCap,
+  firstCellClass,
   iconSlot,
   onOpen,
 }: {
@@ -181,7 +181,7 @@ function Row({
   /** The visible column that truncates in the first one's place, when a table has one. */
   growKey: string | undefined;
   /** The first column's cap while `growKey` is set: 10rem, or a share of the box beside a `capped` column. */
-  firstCap: string;
+  firstCellClass: string;
   /** Whether the first cell keeps a leading icon column (some row of the table draws an icon). */
   iconSlot: boolean;
   /** Opens the row's detail modal or Show info; set only for a row with a `detail` or `info`. */
@@ -227,7 +227,7 @@ function Row({
                 : first
                   ? growKey === undefined
                     ? cx('w-full max-w-0', column.nameFloor && 'min-w-28')
-                    : firstCap
+                    : firstCellClass
                   : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
               Cell === 'th' && 'text-left',
@@ -478,7 +478,7 @@ export function TableBody({
   // A `capped` column grows like a `grow` one, but leaves the first column a larger share.
   const growColumn = columns.find((column, i) => i > 0 && (column.grow || column.capped));
   const growKey = growColumn?.key;
-  const firstCap = !growColumn?.capped
+  const firstCellClass = !growColumn?.capped
     ? 'max-w-40'
     : growColumn.hideNarrow
       ? FIRST_BESIDE_NARROW_CAPPED
@@ -554,7 +554,7 @@ export function TableBody({
               compact={columnsFor === 'S'}
               rowHeader={!hasHeader}
               growKey={growKey}
-              firstCap={firstCap}
+              firstCellClass={firstCellClass}
               iconSlot={iconSlot}
               onOpen={
                 row.detail !== undefined
