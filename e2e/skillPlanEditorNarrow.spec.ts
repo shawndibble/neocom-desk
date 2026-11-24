@@ -290,12 +290,19 @@ test('a long milestone name does not overflow the header chip or squeeze the ent
     name: 'More actions for Gallente Drone Specialization IV',
   });
   await expect(removeButton).toBeVisible();
-  const nameSpan = page
-    .locator('li', { has: removeButton })
-    .getByText('Gallente Drone Specialization');
-  await expect(nameSpan).toBeVisible();
-  const nameWidth = await nameSpan.evaluate((el) => el.getBoundingClientRect().width);
+  // The plan holds one row per level and the phone folds levels of one skill
+  // under the first row, which alone names the skill (#6562); the row that
+  // carries the milestone (level IV) shows just its numeral. So the name to
+  // keep un-squeezed is the group's skill link, and the milestone row's
+  // numeral must stay visible beside the long milestone name.
+  const nameLink = page.getByRole('link', { name: 'Gallente Drone Specialization' }).first();
+  await expect(nameLink).toBeVisible();
+  const nameWidth = await nameLink.evaluate((el) => el.getBoundingClientRect().width);
   expect(nameWidth).toBeGreaterThan(20);
+  const numeral = page.locator('li', { has: removeButton }).getByText('IV', { exact: true });
+  await expect(numeral).toBeVisible();
+  const numeralWidth = await numeral.evaluate((el) => el.getBoundingClientRect().width);
+  expect(numeralWidth).toBeGreaterThan(4);
 });
 
 /**

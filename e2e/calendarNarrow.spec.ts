@@ -59,12 +59,11 @@ test('"Show all days" keeps its plain text-link size at and above md (1280px)', 
   await expect(clearDay).toBeVisible();
 
   const height = await clearDay.evaluate((el) => el.getBoundingClientRect().height);
-  // `md:min-h-0` drops the floor rather than pinning back to a fixed value
-  // — pinned to the real measured content-driven height, not just "< 36",
-  // so a loose upper bound can't miss a partial regression toward the
-  // touch-tier height.
-  expect(height).toBeGreaterThanOrEqual(10);
-  expect(height).toBeLessThanOrEqual(20);
+  // `md:min-h-6` drops the 36px touch floor to WCAG 2.5.8's 24px pointer
+  // target (#6559) — pinned to that measured height, not just "< 36", so a
+  // loose upper bound can't miss a partial regression toward the touch tier.
+  expect(height).toBeGreaterThanOrEqual(24);
+  expect(height).toBeLessThanOrEqual(28);
 });
 
 test('period-nav controls meet the 36px touch floor at 390px (#2107)', async ({ page }) => {

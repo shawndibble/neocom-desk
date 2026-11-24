@@ -69,6 +69,7 @@ test('the current sub-nav tab is fully inside the strip at 390px', async ({ page
   }).toPass();
 
   // The data-age badge sits outside the scroller, so it stays on screen too.
-  const badge = page.getByText('Data updated');
+  // The "Data updated" word is hidden on a phone (#6560); the age badge itself stays.
+  const badge = scroller.locator('..').locator('time');
   await expect(badge).toBeInViewport({ ratio: 1 });
 });

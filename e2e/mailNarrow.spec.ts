@@ -128,6 +128,10 @@ test('reading pane: Reply/Forward meet the 36px touch target floor at 390px', as
   // `md:size-7` pointer height `size="sm"` already had, unlike `size="md"`
   // which would have widened it from 28px to 36px above `md` (768px).
   await page.setViewportSize({ width: 1024, height: 800 });
+  // Reply/Forward swap from the phone's sticky bar (#6565) to the header icon buttons once
+  // the breakpoint flips, so wait for the swap instead of measuring the instant of the resize.
+  await expect(reply).toBeVisible();
+  await expect(forward).toBeVisible();
   const [replyDesktopBox, forwardDesktopBox] = await Promise.all([
     reply.boundingBox(),
     forward.boundingBox(),

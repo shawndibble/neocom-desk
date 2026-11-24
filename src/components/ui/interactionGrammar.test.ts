@@ -203,6 +203,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/travel/StopsPanel.tsx',
       // Character card: the row's trailing ⋮ (hints off), placed in #6565.
       'src/features/character/CharacterCard.tsx',
+      // Route Safety rows: note, avoid, set waypoint and zKillboard, with no other route from the row (#6710).
+      'src/features/travel/RouteSystemsTable.tsx',
     ];
     // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');

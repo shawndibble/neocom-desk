@@ -31,7 +31,7 @@
 import { fixed1 } from '@/lib/fixedFormat';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalMark } from '@/components/ui/ExternalLink';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { SystemNote, SystemNoteAnchor, SystemNoteMenuItem } from './SystemNote';
 import { SetWaypointMenuItem } from './SetWaypointMenuItem';
 import { systemZkillUrl } from '@/lib/zkillboard';
@@ -287,15 +287,13 @@ function RowMenuItems({
       </MenuGroup>
       <MenuGroup id="other">
         <MenuItem asChild>
-          <a
+          <ExternalLink
+            variant="bare"
             href={systemZkillUrl(row.systemId)}
-            target="_blank"
-            rel="noopener noreferrer"
             aria-label={t('travel.zkillboardLabel', { system: name })}
           >
             {t('travel.zkillboard')}
-            <ExternalMark />
-          </a>
+          </ExternalLink>
         </MenuItem>
       </MenuGroup>
     </>
