@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { recordOutcome } from '@/engine/corpTaxBook/addCorpsRun';
-import { connectedInRun, needsThePlayer, needsYou, stateOfOutcome } from './addCorpsStatus';
+import {
+  connectedInRun,
+  needsThePlayer,
+  needsYou,
+  offersLoginAgain,
+  stateOfOutcome,
+} from './addCorpsStatus';
 import { corpName, CORPS, freshRun } from './addCorpsFixtures';
 
 /** Own corps the player is CEO of, each with its CEO's name. */
@@ -106,6 +112,23 @@ describe('needsYou', () => {
     // Grant again names the CEO to log in as; another officer's corp has none to name.
     expect(items.find((i) => i.corporationId === 10)?.ceoName).toBe('CEO 10');
     expect(items.find((i) => i.corporationId === 11)).not.toHaveProperty('ceoName');
+  });
+
+  it('names the CEO to log in as for an own corp that went quiet, when the player leads it', () => {
+    const quiet = { status: 'cant-read', sameOwner: true };
+    const rows = [
+      { ...quiet, corporationId: 30 },
+      // The player has no CEO character for it: only Remove, no login to offer.
+      { ...quiet, corporationId: 31 },
+      { ...quiet, corporationId: 32, status: 'disconnected' },
+    ];
+    const items = needsYou(null, rows, corpName, ceos(30, 32));
+    expect(items.map((i) => [i.corporationId, i.state, i.ceoName])).toEqual([
+      [30, 'gone-quiet', 'CEO 30'],
+      [31, 'gone-quiet', undefined],
+      [32, 'gone-quiet', 'CEO 32'],
+    ]);
+    expect(items.map(offersLoginAgain)).toEqual([true, false, true]);
   });
 
   it('asks an own corp whose grant reads no Extraction notices to grant again for the ore', () => {

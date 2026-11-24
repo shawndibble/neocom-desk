@@ -72,6 +72,29 @@ describe('CorpStatusPanel', () => {
     expect(onRemove).toHaveBeenCalledWith(4);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not remove this corp');
   });
+
+  it('offers Log in again beside Remove for a quiet corp the player leads, and only Remove otherwise', async () => {
+    const onGrantAgain = vi.fn();
+    render(
+      <CorpStatusPanel
+        items={[
+          { corporationId: 4, name: 'Wren Hollow Corp', state: 'gone-quiet', ceoName: 'Mira Voss' },
+          { corporationId: 5, name: 'Dusk Anchor Group', state: 'gone-quiet' },
+        ]}
+        onSignInAgain={() => {}}
+        onGrantAgain={onGrantAgain}
+        onRemove={() => Promise.resolve(true)}
+      />
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Log in again for Wren Hollow Corp' })
+    );
+    expect(onGrantAgain).toHaveBeenCalledWith(4);
+    expect(screen.getByRole('button', { name: 'Remove Wren Hollow Corp' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log in again for Dusk Anchor Group' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove Dusk Anchor Group' })).toBeInTheDocument();
+  });
+
   it('shows a failed connection with its reason and Try again, not "log in again"', async () => {
     const onSignInAgain = vi.fn();
     render(
