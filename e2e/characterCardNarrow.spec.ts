@@ -48,7 +48,8 @@ async function measure(page: Page) {
   const card = page.getByRole('listitem').filter({ hasText: LONG_NAME }).first();
   const name = card.getByText(LONG_NAME, { exact: true });
   const star = card.getByRole('button', { name: /^(Star|Unstar) /i });
-  const remove = card.getByRole('button', { name: `Remove ${LONG_NAME}` });
+  // Remove lives in the card's trailing ⋮ menu (#6565), so the ⋮ is the control to keep inside.
+  const remove = card.getByRole('button', { name: `More actions for ${LONG_NAME}` });
   await expect(name).toBeVisible();
   const [cardBox, nameBox, starBox, removeBox, overflow] = await Promise.all([
     card.boundingBox(),

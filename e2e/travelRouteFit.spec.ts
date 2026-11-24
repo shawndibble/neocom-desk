@@ -25,8 +25,12 @@ for (const width of [1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`./travel/route?from=${JITA}&stops=${AMARR},${PERIMETER}`);
 
-    const avoid = page.getByRole('button', { name: /^Avoid/ });
-    await expect(avoid.first()).toBeVisible({ timeout: 15000 });
+    // Avoid lives in each row's ⋮ menu (#6710): the ⋮ must sit inside the page.
+    const more = page
+      .getByRole('main')
+      .getByRole('table')
+      .getByRole('button', { name: /^More actions for / });
+    await expect(more.first()).toBeVisible({ timeout: 15000 });
     await expectNoPageOverflow(page);
     // One in-page pass: the rows keep re-rendering as kills/jumps land, so a
     // snapshot of locators goes stale.
@@ -34,11 +38,15 @@ for (const width of [1024, 1280, 1440]) {
       .poll(() =>
         page.evaluate(() =>
           [...document.querySelectorAll('button')]
-            .filter((b) => /^Avoid/.test(b.getAttribute('aria-label') ?? b.textContent ?? ''))
+            .filter((b) => /^More actions for /.test(b.getAttribute('aria-label') ?? ''))
             .every((b) => b.getBoundingClientRect().right <= window.innerWidth)
         )
       )
       .toBe(true);
+    // The start and the stops cannot be avoided, so open a way-point's menu.
+    await more.nth(1).click();
+    await expect(page.getByRole('menuitem', { name: /^Avoid/ })).toBeVisible();
+    await page.keyboard.press('Escape');
 
     const main = page.getByRole('main');
     const rules = main.getByText('Route rules', { exact: true }).first();
