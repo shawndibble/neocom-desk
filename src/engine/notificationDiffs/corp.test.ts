@@ -37,6 +37,15 @@ describe('diffStructureFuelLow', () => {
     expect(diffStructureFuelLow(1, undefined, next)).toEqual([]);
   });
 
+  it('does not fire again when a tower fuel end drifts by minutes between bay reads', () => {
+    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 3 * DAY_MS })], T0);
+    const next = fuelSnapshot(
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 3 * DAY_MS + 5 * 60_000 })],
+      T0 + 3_600_000
+    );
+    expect(diffStructureFuelLow(7, prev, next)).toEqual([]);
+  });
+
   it('fires when remaining fuel newly crosses the threshold', () => {
     const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 8 * DAY_MS })], T0);
     const next = fuelSnapshot(

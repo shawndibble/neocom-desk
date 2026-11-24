@@ -40,6 +40,7 @@ const ALL_IDS = [
   'moonChunks',
   'incursions',
   'sovRaids',
+  'militaryCampaigns',
   'routeSafety',
   'hauling',
   'kills',
@@ -75,7 +76,7 @@ const CORP_SOON: string[] = [];
 const overviewKinds = () => boardKinds('overview');
 
 describe('widget kind catalogue', () => {
-  it('offers the Overview exactly the 31 kinds the mockups define', () => {
+  it('offers the Overview exactly the 32 kinds the mockups define', () => {
     expect(
       overviewKinds()
         .map((k) => k.id)

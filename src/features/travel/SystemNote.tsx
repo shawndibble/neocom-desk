@@ -1,17 +1,18 @@
 /**
  * The pilot's own note on one solar system, on a Route Safety row.
  *
- * Two faces of one popover editor: `indicator` is the icon beside the system
- * name when a note exists (tooltip = first line, tap/click opens it, so touch
- * works with no hover), `add` is the row action when it does not. Saved on
+ * One popover editor, reached two ways: the icon beside the system name when
+ * a note exists (tooltip = first line, tap/click opens it, so touch works
+ * with no hover), and the row menu's Add/Edit note, which anchors it to the
+ * row's ⋮ button (`SystemNoteAnchor`). Saved on
  * blur; empty text deletes. The text is a plain string rendered as text, never
  * markup, and is shown with its "updated" date so a stale "camp at 23:00"
  * reads as the pilot's own past observation beside live kill data.
  */
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
+import { MenuItem } from '@/components/ui/RowActions';
 import { TextArea } from '@/components/ui/TextArea';
 import { Tooltip } from '@/components/ui/Tooltip';
 import * as Icon from '@/components/ui/icons';
@@ -72,24 +73,15 @@ function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
   );
 }
 
-export function SystemNote({
-  systemId,
-  name,
-  face,
-}: {
-  systemId: number;
-  name: string;
-  face: 'indicator' | 'add';
-}) {
+/** The icon beside the system name when a note exists: tooltip = first line, tap/click opens the editor. */
+export function SystemNote({ systemId, name }: { systemId: number; name: string }) {
   const { t } = useTranslation();
   const note = useSystemNotes((s) => s.value[systemId]);
   const [open, setOpen] = useState(false);
-
-  if (face === 'indicator' ? note === undefined : note !== undefined) return null;
-
-  const trigger =
-    face === 'indicator' ? (
-      <Tooltip content={noteFirstLine(note?.text ?? '')}>
+  if (note === undefined) return null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip content={noteFirstLine(note.text)}>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -100,20 +92,72 @@ export function SystemNote({
           </button>
         </PopoverTrigger>
       </Tooltip>
-    ) : (
-      <PopoverTrigger asChild>
-        <Button size="sm" aria-label={t('travel.note.addLabel', { name })}>
-          {t('travel.note.add')}
-        </Button>
-      </PopoverTrigger>
-    );
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      {trigger}
       <PopoverContent align="start" aria-label={t('travel.note.label', { name })}>
         <NoteEditor systemId={systemId} name={name} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * The note editor opened from a row's menu. A menu item closes its menu, so
+ * the editor cannot hang off the item: it anchors to `children` (the row's ⋮
+ * button) and its open state is the row's, set by `SystemNoteMenuItem`.
+ */
+export function SystemNoteAnchor({
+  systemId,
+  name,
+  open,
+  onOpenChange,
+  children,
+}: {
+  systemId: number;
+  name: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  // The row can unmount (a fold collapsing) with the editor open, which fires no close.
+  const closeRef = useRef(onOpenChange);
+  useEffect(() => {
+    closeRef.current = onOpenChange;
+  });
+  useEffect(() => (open ? () => closeRef.current(false) : undefined), [open]);
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverAnchor asChild>
+        <span ref={anchorRef} className="inline-flex">
+          {children}
+        </span>
+      </PopoverAnchor>
+      <PopoverContent
+        align="end"
+        aria-label={t('travel.note.label', { name })}
+        // An anchor is not a trigger, so Radix returns focus nowhere: hand it back to the ⋮.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          anchorRef.current?.querySelector('button')?.focus();
+        }}
+      >
+        <NoteEditor systemId={systemId} name={name} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** "Add note", or "Edit note" once one exists. */
+export function SystemNoteMenuItem({
+  systemId,
+  onSelect,
+}: {
+  systemId: number;
+  onSelect: () => void;
+}) {
+  const { t } = useTranslation();
+  const exists = useSystemNotes((s) => s.value[systemId] !== undefined);
+  return (
+    <MenuItem onSelect={onSelect}>{t(exists ? 'travel.note.edit' : 'travel.note.add')}</MenuItem>
   );
 }

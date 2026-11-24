@@ -47,12 +47,16 @@ import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
 import type {
   CalendarEventsChoice,
+  CampaignFaction,
   ProfitSource,
   RaidsWhere,
   WidgetRange,
   WidgetShow,
 } from '../layout';
-import type { ChartModel } from '../charts/types';
+import type { ChartModel, DonutChartModel } from '../charts/types';
+import type { ScopeGroup } from '@/esi/registry';
+import type { TurnInOfferDetail } from '@/features/campaigns/useTurnIns';
+import type { MilitaryCampaignsWidgetData } from '@/features/campaigns/militaryCampaignsWidget';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
   ClonesWidgetData,
@@ -107,6 +111,11 @@ export interface NumberModel {
   tone: DeadlineSeverity;
   /** A follow-on link under the figure, the Number view only (Open orders' "Work through (N)"). */
   link?: { label: string; to: string };
+  /**
+   * Progress rings beside the figure, each a `donut` chart (Military Campaigns: how complete a
+   * campaign is). One ring sits beside `value`; several replace it, each with its `label`.
+   */
+  rings?: { key: string; label: string; donut: DonutChartModel }[];
 }
 
 export interface ListRow {
@@ -160,6 +169,12 @@ export interface TableColumn {
    */
   grow?: boolean;
   /**
+   * A secondary free-text column that truncates past 8rem (5rem while the table's own box is
+   * under 24rem, a phone), so the first column keeps the rest of the row (Military Campaigns'
+   * holdings beside the objective). Not with `grow`.
+   */
+  capped?: boolean;
+  /**
    * Hidden until the table's own box is at least 28rem across (a container query on the
    * table wrapper, so it follows the box, not the viewport). For a column the row reads fine
    * without, such as an order's side or station, so a narrow box keeps the first column's text.
@@ -198,6 +213,23 @@ export interface TableRowModel {
   detail?: RowDetailModel;
   /** The row is an item: it opens that type's Show info (the app-wide Item Detail). Never with `to` or `detail`. */
   info?: { typeId: number };
+  /** A short tag before the first cell's text (a campaign's faction). */
+  badge?: string;
+  /**
+   * A campaign turn-in: the row opens `TurnInDetail` for the item, not a modal (DESIGN §6c).
+   * Never with `to`, `detail` or `info`.
+   */
+  turnIn?: TurnInRowModel;
+}
+
+/** What a turn-in row's `TurnInDetail` shows: the item, its offer, and whose Participate. */
+export interface TurnInRowModel {
+  name: string;
+  offer: TurnInOfferDetail;
+  characterId: number;
+  characterName: string;
+  /** "You hold 640 · ~37.1M turned in"; left out when nothing is held. */
+  surfaceLine?: string;
 }
 
 /** What a widget row's modal shows: plain data, drawn by the widget shell. */
@@ -258,6 +290,8 @@ export interface TableModel {
   fitWidth?: true;
   /** One quiet line under the rows ("38 of 49 slots"), when the table has a fact that is not a row. */
   footer?: string;
+  /** One plain line drawn in place of the rows when there are none, so a table never draws blank. */
+  emptyLine?: string;
 }
 
 export interface KindView {
@@ -293,6 +327,18 @@ export interface KindView {
   grantCharacterId?: number;
   /** That Character's name, for the Grant access title, when `grantCharacterId` is set. */
   grantCharacterName?: string;
+  /**
+   * Some Characters in the widget's scope lack a Permission the rest have: one `GrantCellMark`
+   * in the header. Grant in EVE is for the first of them (`characterId`, named on the button);
+   * with `count` over one, the title counts them and Grant missing Permissions covers the rest.
+   */
+  headerMark?: {
+    characterId: number;
+    characterName: string;
+    count: number;
+    permission: ScopeGroup;
+    why: string;
+  };
   /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
   emptyLinkLabel?: string;
   /**
@@ -378,6 +424,7 @@ export interface FeedMap {
   clones: ClonesWidgetData;
   jumpTimers: JumpTimersWidgetData;
   mercenaryDens: MercenaryDensWidgetData;
+  militaryCampaigns: MilitaryCampaignsWidgetData;
   location: LocationWidgetData;
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;
@@ -440,6 +487,8 @@ export interface BuildContext {
   profitSource?: ProfitSource;
   /** Net worth: the layers switched off; left out, all show. */
   hiddenLayers?: LayerId[];
+  /** Military Campaigns: whose campaign it shows; left out, All. */
+  campaignFaction?: CampaignFaction;
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */

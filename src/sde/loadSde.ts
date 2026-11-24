@@ -7,6 +7,7 @@ import type {
   InventionData,
   MarketWideTreeMap,
   MasteryMap,
+  MilitaryCampaignsFile,
   MutaplasmidData,
   NpcCorporationsFile,
   PiData,
@@ -170,6 +171,12 @@ export const loadAgentsFile = cached<AgentsFile>('agents.json');
  * gzipped, and a corporation's faction is wanted wherever its standing is.
  */
 export const loadNpcCorporationsFile = cached<NpcCorporationsFile>('npcCorporations.json');
+/**
+ * Military Campaigns and their Campaign Objectives (issue #6703), turn-ins
+ * included. Precached: ~60 KB raw. Read through `features/campaigns`, which
+ * joins it to ESI's live objective state.
+ */
+export const loadMilitaryCampaigns = cached<MilitaryCampaignsFile>('militaryCampaigns.json');
 /**
  * Published hull typeId -> [name, groupID, mass in kg, base jump drive?], for
  * the same check. The drive (issue #3147) is `[rangeLy, fuelTypeId, fuelPerLy]`

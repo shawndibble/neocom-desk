@@ -20,6 +20,7 @@ import {
   setRaidsRadius,
   setRaidsWhere,
   setProfitSource,
+  setCampaignFaction,
   setHiddenLayers,
   setHiddenKinds,
   setTrendHubs,
@@ -338,6 +339,22 @@ describe('setProfitSource', () => {
     expect(setProfitSource(l, 'a', 'builds')).toBe(l);
     expect(setProfitSource(l, 'b', 'trading')).toBe(l);
     expect(setProfitSource(l, 'a', 'everything' as never)).toBe(l);
+  });
+});
+
+describe('setCampaignFaction', () => {
+  it('stores a faction and drops the field on All, the default', () => {
+    const l = layoutOf(w('a', 'militaryCampaigns'));
+    const caldari = setCampaignFaction(l, 'a', 'caldari');
+    expect(caldari.widgets[0].campaignFaction).toBe('caldari');
+    expect('campaignFaction' in setCampaignFaction(caldari, 'a', 'all').widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the current choice, an unknown faction, or another kind', () => {
+    const l = layoutOf(w('a', 'militaryCampaigns'), w('b', 'orders'));
+    expect(setCampaignFaction(l, 'a', 'all')).toBe(l);
+    expect(setCampaignFaction(l, 'b', 'amarr')).toBe(l);
+    expect(setCampaignFaction(l, 'a', 'jove' as never)).toBe(l);
   });
 });
 

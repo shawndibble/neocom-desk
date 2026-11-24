@@ -5,6 +5,8 @@ import {
   TOWER_FUEL_PER_HOUR,
   fuelHoursLeft,
   summariseBay,
+  towerFuelExpiresMs,
+  towerLabel,
 } from './starbases';
 
 describe('summariseBay', () => {
@@ -45,5 +47,29 @@ describe('the baked tables', () => {
       expect(Number.isInteger(rate) && rate > 0).toBe(true);
     }
     expect([...FUEL_BLOCK_TYPE_IDS].sort()).toEqual([4051, 4246, 4247, 4312]);
+  });
+});
+
+describe('towerFuelExpiresMs', () => {
+  const [typeId, perHour] = [...TOWER_FUEL_PER_HOUR][0];
+  const bay = { fuelBlocks: perHour * 10, strontium: 0 };
+
+  it('runs out the burn time after the bay was read', () => {
+    expect(towerFuelExpiresMs({ typeId, state: 'online', bay }, 1_000)).toBe(
+      1_000 + 10 * 3_600_000
+    );
+  });
+
+  it('has no clock for an offline tower, an unread bay or an unknown tower type', () => {
+    expect(towerFuelExpiresMs({ typeId, state: 'offline', bay }, 0)).toBeNull();
+    expect(towerFuelExpiresMs({ typeId, state: 'online', bay: null }, 0)).toBeNull();
+    expect(towerFuelExpiresMs({ typeId: 1, state: 'online', bay }, 0)).toBeNull();
+  });
+});
+
+describe('towerLabel', () => {
+  it('adds the system when known', () => {
+    expect(towerLabel('Amarr Control Tower', 'Efa')).toBe('Amarr Control Tower (Efa)');
+    expect(towerLabel('Amarr Control Tower', undefined)).toBe('Amarr Control Tower');
   });
 });

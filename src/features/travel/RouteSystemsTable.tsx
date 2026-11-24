@@ -12,8 +12,12 @@
  * along the route. NPC kills and kills anywhere else in the system open in
  * the row's detail.
  *
+ * Each row's actions (Add/Edit note, Avoid, Set waypoint, zKillboard) live in
+ * one menu, the right-click menu and the ⋮ button that closes the row. The
+ * note editor opens anchored to that ⋮, since a menu item closes its menu.
+ *
  * On a phone the row is a dense card: the system and its security on line
- * one, and region · last hour · zKillboard below with Avoid closing it. A
+ * one, and region · last hour · zKillboard below with the ⋮ closing it. A
  * zero kill count is left off that line, so a quiet system reads
  * "Khanid · 87 jumps" rather than a string of zeros.
  *
@@ -25,17 +29,23 @@
  * lists it.
  */
 import { fixed1 } from '@/lib/fixedFormat';
-import { useEffect } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SystemNote } from './SystemNote';
+import { ExternalMark } from '@/components/ui/ExternalLink';
+import { SystemNote, SystemNoteAnchor, SystemNoteMenuItem } from './SystemNote';
+import { SetWaypointMenuItem } from './SetWaypointMenuItem';
+import { systemZkillUrl } from '@/lib/zkillboard';
 import { useSystemNotes } from './systemNotes';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { HintText } from '@/components/ui/HintText';
 import {
-  Button,
   DataTable,
   DataTableDenseCell,
   InfoTooltip,
+  MenuGroup,
+  MenuItem,
+  RowActionsMenu,
+  RowMoreActions,
   Tooltip,
   type DataTableColumn,
   type DataTableGroupBy,
@@ -164,7 +174,8 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
 
 function useColumns(
   killsOf: (systemId: number) => RouteKillsCell,
-  avoidAction: (row: RouteSafetyRow) => (() => void) | null
+  noteOpen: number | null,
+  setNoteOpen: Dispatch<SetStateAction<number | null>>
 ): DataTableColumn<TableRow>[] {
   const { t } = useTranslation();
   const columns: DataTableColumn<RouteSafetyRow>[] = [
@@ -175,7 +186,7 @@ function useColumns(
       render: (row) => (
         <DataTableDenseCell>
           <span className="font-semibold whitespace-nowrap">{row.name ?? DASH}</span>
-          <SystemNote systemId={row.systemId} name={routeSystemName(row)} face="indicator" />
+          <SystemNote systemId={row.systemId} name={routeSystemName(row)} />
           {row.chokepoint && (
             <HintText
               content={t('travel.chokepointHint')}
@@ -232,27 +243,63 @@ function useColumns(
       headerClassName: 'sr-only',
       align: 'right',
       stackEdge: 'end',
-      render: (row) => {
-        const onAvoid = avoidAction(row);
-        const name = routeSystemName(row);
-        return (
-          <span className="inline-flex items-center gap-2">
-            <SystemNote systemId={row.systemId} name={name} face="add" />
-            {onAvoid !== null && (
-              <Button
-                size="sm"
-                onClick={onAvoid}
-                aria-label={t('travel.avoid.actionLabel', { name })}
-              >
-                {t('travel.avoid.action')}
-              </Button>
-            )}
-          </span>
-        );
-      },
+      render: (row) => (
+        <SystemNoteAnchor
+          systemId={row.systemId}
+          name={routeSystemName(row)}
+          open={noteOpen === row.systemId}
+          // Closing only clears this row's own editor: a stale close must not shut another row's.
+          onOpenChange={(open) =>
+            setNoteOpen((current) =>
+              open ? row.systemId : current === row.systemId ? null : current
+            )
+          }
+        >
+          <RowMoreActions />
+        </SystemNoteAnchor>
+      ),
     },
   ];
   return columns.map(systemColumn);
+}
+
+/** One system's actions: the same items behind the right-click menu and the ⋮ button. */
+function RowMenuItems({
+  row,
+  onAvoid,
+  onNote,
+}: {
+  row: RouteSafetyRow;
+  /** `null` for a row with nothing to avoid: either end, or a system already avoided. */
+  onAvoid: (() => void) | null;
+  onNote: () => void;
+}) {
+  const { t } = useTranslation();
+  const name = routeSystemName(row);
+  return (
+    <>
+      <MenuGroup id="primary" size={onAvoid ? 2 : 1}>
+        <SystemNoteMenuItem systemId={row.systemId} onSelect={onNote} />
+        {onAvoid && <MenuItem onSelect={onAvoid}>{t('travel.avoid.action')}</MenuItem>}
+      </MenuGroup>
+      <MenuGroup id="game" size={1}>
+        <SetWaypointMenuItem locationId={row.systemId} placeName={name} withViewRoute={false} />
+      </MenuGroup>
+      <MenuGroup id="other">
+        <MenuItem asChild>
+          <a
+            href={systemZkillUrl(row.systemId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t('travel.zkillboardLabel', { system: name })}
+          >
+            {t('travel.zkillboard')}
+            <ExternalMark />
+          </a>
+        </MenuItem>
+      </MenuGroup>
+    </>
+  );
 }
 
 function RowDetail({ row, cell }: { row: RouteSafetyRow; cell: RouteKillsCell }) {
@@ -292,7 +339,9 @@ export function RouteSystemsTable({
   label: string;
 } & HoleRowProps) {
   const { t } = useTranslation();
-  const columns = useColumns(killsOf, avoidAction);
+  // The system whose note editor is open, anchored to its row's ⋮ button.
+  const [noteOpen, setNoteOpen] = useState<number | null>(null);
+  const columns = useColumns(killsOf, noteOpen, setNoteOpen);
   useEffect(() => {
     void useSystemNotes.getState().hydrate();
   }, []);
@@ -354,6 +403,28 @@ export function RouteSystemsTable({
         )
       }
       rowClassName={(row) => (isHoleStep(row) ? 'bg-panel-2' : undefined)}
+      rowContextMenu={(row, tr) =>
+        isHoleStep(row) ? (
+          tr
+        ) : (
+          <RowActionsMenu
+            name={routeSystemName(row)}
+            // The editor takes focus itself; the menu handing it back to the ⋮ would dismiss it.
+            onCloseAutoFocus={(event) => {
+              if (noteOpen !== null) event.preventDefault();
+            }}
+            items={
+              <RowMenuItems
+                row={row}
+                onAvoid={avoidAction(row)}
+                onNote={() => setNoteOpen(row.systemId)}
+              />
+            }
+          >
+            {tr}
+          </RowActionsMenu>
+        )
+      }
       expandableRow={{
         leadingIcon: true,
         renderDetail: (row) =>

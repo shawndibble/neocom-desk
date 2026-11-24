@@ -48,6 +48,7 @@ import {
 } from '@/components/ui';
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
+import { PermissionCellMark } from '@/components/ui/PermissionCellMark';
 import {
   activeOptionClassName,
   controlHeightClassName,
@@ -225,6 +226,22 @@ export function InteractionGrammar() {
         </Cue>
         <Cue rule={k('rules.missingGrantMark')}>
           <MissingGrantBadge labelKey="settings.notifications.missingGrantBadge.base" />
+        </Cue>
+        <Cue rule={k('rules.permissionCellMark')}>
+          <span className="inline-flex items-center gap-1 text-text">
+            {k('samples.permissionCellMarkFigure')}
+            <PermissionCellMark
+              status="missing"
+              character="Kestrel Vane"
+              permissions={[k('samples.permissionCellMarkPermission')]}
+              why={k('samples.permissionCellMarkWhy')}
+              onGrant={() => {}}
+              onDismiss={() => {}}
+              settingsLink={
+                <span className="text-accent">{k('samples.permissionCellMarkLink')}</span>
+              }
+            />
+          </span>
         </Cue>
         <Cue rule={k('rules.needsLogin')}>
           <NeedsLoginSample />

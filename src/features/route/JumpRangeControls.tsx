@@ -9,7 +9,6 @@
  */
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   LiveNote,
   Select,
   SelectContent,
@@ -20,6 +19,7 @@ import {
 import { JUMP_RANGES, type JumpRange } from '@/engine/route/jumpRange';
 import type { CurrentSystemState, JumpRangeStatus } from './currentSystem';
 import { SolarSystemPicker } from './SolarSystemPicker';
+import { UseGameLocationButton } from './UseGameLocationButton';
 import { useSystemName } from './useSolarSystems';
 
 interface JumpRangeSelectProps {
@@ -101,15 +101,7 @@ export function CurrentSystemPicker({ current }: CurrentSystemPickerProps) {
       }
       footer={(close) =>
         current.source === 'picked' && (
-          <Button
-            size="sm"
-            onClick={() => {
-              current.clearPick();
-              close();
-            }}
-          >
-            {t('jumpRange.useGameLocation')}
-          </Button>
+          <UseGameLocationButton onReset={current.clearPick} close={close} />
         )
       }
     />

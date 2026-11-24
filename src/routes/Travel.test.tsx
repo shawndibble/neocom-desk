@@ -6,7 +6,8 @@ import { http, HttpResponse } from 'msw';
 import en from '@/i18n/locales/en.json';
 import { App } from '@/app/App';
 import { useDefaultRoutePreference } from '@/features/route/routeRules';
-import { ESI, server, routeFact, visit, installTravelHarness } from '@/test/travelPage';
+import { CHAR_ID, ESI, server, routeFact, visit, installTravelHarness } from '@/test/travelPage';
+import { usePickedSystems } from '@/features/route/currentSystem';
 import {
   JITA,
   PERIMETER,
@@ -241,7 +242,9 @@ describe('Travel › Route Safety', () => {
     await user.click(fold);
     expect(fold).toHaveAttribute('aria-expanded', 'true');
     expect(within(table).getByText('Niyabainen')).toBeInTheDocument();
-    expect(within(table).getByRole('button', { name: 'Avoid Muvolailen' })).toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: 'More actions for Muvolailen' })
+    ).toBeInTheDocument();
   });
 
   it("fills in each system's zKillboard kills by location, one row at a time", async () => {
@@ -272,6 +275,33 @@ describe('Travel › Route Safety', () => {
 
     expect(await screen.findByRole('table', { name: 'Systems on the route' })).toBeInTheDocument();
     expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
+  });
+
+  it('marks a picked start as set by the pilot and offers the game location back', async () => {
+    const user = userEvent.setup({ delay: null });
+    await usePickedSystems.getState().hydrate();
+    await usePickedSystems
+      .getState()
+      .setValue({ [String(CHAR_ID)]: { systemId: PERIMETER, gameSystemId: JITA } });
+    visit(`?to=${UEDAMA}`);
+
+    const trigger = await screen.findByRole('button', { name: /Perimeter \(set by you\)/ });
+    expect(screen.queryByText(/\(current system\)/)).toBeNull();
+    await user.click(trigger);
+    await user.click(await screen.findByRole('button', { name: 'Use game location' }));
+
+    expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
+  });
+
+  it('offers the game location back from a start the link named', async () => {
+    const user = userEvent.setup({ delay: null });
+    visit(`?from=${PERIMETER}&to=${UEDAMA}`);
+
+    await user.click(await screen.findByRole('button', { name: /Perimeter/ }));
+    await user.click(await screen.findByRole('button', { name: 'Use game location' }));
+
+    expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('from')).toBeNull();
   });
 
   it('says so when start and destination are the same system', async () => {

@@ -1,0 +1,8 @@
+# Scope decisions — Turn-in views: whose client Set destination targets, and the breakdown's Participate words (issue #6705)
+
+_Recorded 2026-11-23 · issue #6705._
+
+- **Set destination in `TurnInDetail` / `TurnInBreakdown` goes to the row's Character's client, not the active one.** The Participate line and both `GrantCellMark`s are already about that Character (an Open Orders or Assets row belongs to it), and the Autopilot waypoints mark must name the same Character the button sends for. `useSetDestination` takes an optional Character id for this; omitted, it stays the active Character. A surface with no row Character omits `characterId` and gets the active one.
+- **The breakdown's per-item column reads "Participating" / "Not participating" under a "Participate" header**, with the full "Not participating: press Participate now in the Opportunities window" once above the groups when any item is not participating (the issue's "Not signed up" was reworded: GLOSSARY lists "sign up" under _Avoid_ for Participate). The column shows only once Military Campaigns is granted and the read answered; otherwise one "Pays only if you've pressed Participate on the opportunity" line (with the mark while missing) replaces it.
+- **Reward figures use the app's compact ISK with a tilde ("~60K", "~19.1M")**, not a private "~60k" formatter: the Turn-in Reward is an estimate (LP at an LP Value), and `formatIskCompact` is the shared helper.
+- **The breakdown counts only what pays**: each line's quantity is `turnInReward`'s counted quantity (capped by the objective and the Character's own cap), shown as "150 of 300" when cut; the Copy list copies the counted quantities. A line paying nothing more is left out.

@@ -28,6 +28,7 @@ import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPla
 import { USER_AGENT as ESI_USER_AGENT } from './lib/constants.mjs';
 import { bakeCharacterTitles } from './lib/characterTitles.mjs';
 import { bakeShipFlight, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
+import { bakeMilitaryCampaigns } from './lib/militaryCampaigns.mjs';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { bakeAgents, bakeNpcCorporations } from './lib/npcAgents.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
@@ -61,6 +62,8 @@ async function main() {
       'npcCharacters.jsonl',
       'npcCorporations.jsonl',
       'npcCorporationDivisions.jsonl',
+      'militaryCampaignObjectives.jsonl',
+      'militaryCampaigns.jsonl',
       ...MAP_FILES,
     ],
     ESI_USER_AGENT
@@ -244,6 +247,26 @@ async function main() {
     parseJsonl(ccpStaticData['npcCorporations.jsonl']),
     parseJsonl(ccpStaticData['factions.jsonl'])
   );
+  // --- militaryCampaigns.json: Military Campaigns and their Campaign
+  // Objectives, turn-ins included (issue #6703); see lib/militaryCampaigns.mjs ---
+  const militaryCampaigns = bakeMilitaryCampaigns(
+    parseJsonl(ccpStaticData['militaryCampaignObjectives.jsonl']),
+    parseJsonl(ccpStaticData['militaryCampaigns.jsonl']),
+    ccpTypes
+  );
+  {
+    const campaignIds = new Set(militaryCampaigns.campaigns.map((c) => c.id));
+    const systemIds = new Set(map.systems.map((s) => s.id));
+    const turnIns = militaryCampaigns.objectives.filter((o) => o.turnIn);
+    const orphan = militaryCampaigns.objectives.find((o) => !campaignIds.has(o.campaignId));
+    const noSystem = turnIns.find((o) => !systemIds.has(o.turnIn.systemId));
+    if (militaryCampaigns.campaigns.length === 0 || orphan || noSystem) {
+      throw new Error(
+        `militaryCampaigns.json looks wrong: ${militaryCampaigns.campaigns.length} campaigns, ` +
+          `objective ${orphan?.id ?? '-'} has no campaign, turn-in ${noSystem?.id ?? '-'} has no known system`
+      );
+    }
+  }
   await writeOutputs({
     lpCorporations,
     npcStations,
@@ -278,6 +301,7 @@ async function main() {
     characterTitles,
     agents,
     npcCorporationData,
+    militaryCampaigns,
     marketGroups,
     marketTypes,
     solarSystems,

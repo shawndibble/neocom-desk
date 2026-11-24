@@ -16,7 +16,7 @@ import {
   DEFAULT_RANGE,
   LEGACY_PROFIT_SOURCE,
 } from '../layout';
-import type { CalendarEventsChoice, ProfitSource, WidgetRange } from '../layout';
+import type { CalendarEventsChoice, CampaignFaction, ProfitSource, WidgetRange } from '../layout';
 import type { LayerId } from '@/engine/netWorth/series';
 import type { CharacterBoardItemKind } from '@/engine/character/board';
 import type { BuildContext } from './types';
@@ -38,6 +38,8 @@ export interface ViewSettings {
   profitSource?: ProfitSource;
   /** Net worth: the layers switched off; left out, all show. */
   hiddenLayers?: LayerId[];
+  /** Military Campaigns: one faction's campaign; left out, All. */
+  campaignFaction?: Exclude<CampaignFaction, 'all'>;
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
@@ -66,6 +68,7 @@ export type SettingsContext = Pick<
   | 'raidsRadius'
   | 'profitSource'
   | 'hiddenLayers'
+  | 'campaignFaction'
   | 'trendItems'
   | 'trendHubs'
   | 'show'
@@ -117,6 +120,11 @@ export const VIEW_SETTINGS = {
     enabledFor: (k) => k.hasLayerPicker,
     fields: ['hiddenLayers'],
     resolve: (s) => ({ hiddenLayers: cleanHiddenLayers(s.hiddenLayers) }),
+  },
+  campaignFaction: {
+    enabledFor: (k) => k.hasCampaignFaction,
+    fields: ['campaignFaction'],
+    resolve: (s) => ({ campaignFaction: s.campaignFaction ?? 'all' }),
   },
   trend: {
     enabledFor: (k) => k.hasTrendSources,

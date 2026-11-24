@@ -101,6 +101,7 @@
     "missingTitle": "{{character}}: grant {{permissions}}",
     "loginTitle": "{{character}}: log in again",
     "grantAction": "Grant in EVE",
+    "grantActionFor": "Grant in EVE for {{name}}",
     "loginAction": "Log in",
     "unknownCharacter": "This character",
     "refusedHint": "EVE no longer accepts the saved login.",
@@ -3636,10 +3637,10 @@
     "blueprintAcquisitionLpOffer": "{{corp}} — {{isk}} ISK + {{lp}} LP",
     "blueprintAcquisitionLpQuantity_one": "{{count}} copy per redemption",
     "blueprintAcquisitionLpQuantity_other": "{{count}} copies per redemption",
-    "blueprintAcquisitionLpRequiredItems_one": "plus {{count}} turn-in item",
-    "blueprintAcquisitionLpRequiredItems_other": "plus {{count}} turn-in items",
-    "blueprintAcquisitionLpTurnInsToBuy": "{{isk}} ISK of turn-ins still to buy, included",
-    "blueprintAcquisitionLpTurnInsUnpriced": "turn-ins not priced",
+    "blueprintAcquisitionLpRequiredItems_one": "plus {{count}} required item",
+    "blueprintAcquisitionLpRequiredItems_other": "plus {{count}} required items",
+    "blueprintAcquisitionLpTurnInsToBuy": "{{isk}} ISK of required items still to buy, included",
+    "blueprintAcquisitionLpTurnInsUnpriced": "required items not priced",
     "blueprintAcquisitionManualHeading": "Manual tier",
     "blueprintAcquisitionManualHint": "For a copy this app can't see, such as a private contract or a trade in person.",
     "blueprintAcquisitionManualMe": "ME",
@@ -3689,7 +3690,7 @@
     "bpAcqAtHub": "At {{hub}}",
     "bpAcqLpPriced": "{{isk}} ISK with LP at your {{rate}} ISK/LP",
     "bpAcqLpFree": "{{isk}} ISK, LP counted as already earned",
-    "bpAcqLpValueHint": "Blank (0) counts your LP as already earned, so a copy costs only the store’s ISK and the turn-ins you still need. Type a rate to charge for the LP too.",
+    "bpAcqLpValueHint": "Blank (0) counts your LP as already earned, so a copy costs only the store’s ISK and the required items you still need. Type a rate to charge for the LP too.",
     "bpAcqLpLoading": "Loading LP Store offers…",
     "bpAcqLpUnavailable": "Couldn't load LP Store offers.",
     "bpAcqNoLpOffers": "No LP Store you have LP with offers this blueprint.",
@@ -5940,6 +5941,33 @@
           "programs": "Programs"
         }
       },
+      "militaryCampaigns": {
+        "title": "Military campaigns",
+        "description": "Campaign Objectives your Characters Participate in, and turn-ins for items they hold",
+        "empty": "No Military Campaign running",
+        "emptyFaction": "No {{faction}} Military Campaign running",
+        "complete": "Complete",
+        "ringSummary": "{{label}}: {{completed}} of {{target}} objectives complete",
+        "ofTarget": "{{completed}} of {{target}}",
+        "objectivesComplete_one": "objective complete",
+        "objectivesComplete_other": "objectives complete",
+        "factionLine": "{{faction}} {{completed}}/{{target}}",
+        "waiting": "{{isk}} waiting to turn in",
+        "turnInTitle": "Turn in {{name}}",
+        "youHold": "You hold {{held}} · {{reward}} turned in",
+        "holds": "{{name}} holds {{held}} · {{reward}} turned in",
+        "contributed": "{{name}} · {{amount}} contributed",
+        "earnedBoth": "{{isk}} ISK + {{lp}} LP earned",
+        "earnedIsk": "{{isk}} ISK earned",
+        "earnedLp": "{{lp}} LP earned",
+        "filled": "{{percent}}% filled",
+        "whyMark": "Lets this widget list the Campaign Objectives they pressed Participate on.",
+        "whyMarkSeveral": "Lets this widget list the Campaign Objectives they pressed Participate on. Grant in EVE signs in {{name}}; Grant missing Permissions grants the rest together.",
+        "noRows": "Nothing joined or held for a running campaign",
+        "noRowsFaction": "Nothing joined or held for the {{faction}} campaign",
+        "unread_one": "{{count}} Character couldn't be loaded.",
+        "unread_other": "{{count}} Characters couldn't be loaded."
+      },
       "mercenaryDens": {
         "title": "Mercenary dens",
         "description": "Your dens: reinforcement, operations and Anarchy",
@@ -7062,6 +7090,14 @@
         "builds": "Builds",
         "trading": "Trading",
         "both": "Both"
+      },
+      "faction": "Faction",
+      "factionChoice": {
+        "all": "All",
+        "amarr": "Amarr",
+        "caldari": "Caldari",
+        "gallente": "Gallente",
+        "minmatar": "Minmatar"
       },
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
@@ -9707,6 +9743,47 @@
     "recipientSearchOffline": "Search needs a connection.",
     "bodyNotDownloadedOnline": "This mail hasn't been downloaded yet.",
     "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
+  },
+  "campaigns": {
+    "turnIn": {
+      "dialogLabel": "{{name}}: turn-in reward",
+      "openDetail": "Turn-in reward for {{name}}",
+      "eachTurnedIn": "each turned in",
+      "splitIsk": "{{isk}} ISK",
+      "splitLp": "{{lp}} LP ({{value}})",
+      "splitLpUnpriced": "{{lp}} LP (LP unpriced)",
+      "filled": "{{percent}}% filled",
+      "filledLabel": "Campaign Objective filled",
+      "participating": "{{name}} pressed Participate",
+      "notParticipating": "Not participating: press Participate now in the Opportunities window",
+      "paysOnlyIf": "Pays only if you've pressed Participate on the opportunity",
+      "whyParticipate": "Lets Neocom Desk see whether {{name}} pressed Participate, so it can tell you if this turn-in pays.",
+      "lpBlock_one": "LP paid per item · + faction tokens",
+      "lpBlock_other": "LP paid per full {{count}} items · + faction tokens",
+      "tokensOnly": "+ faction tokens",
+      "setDestination": "Set destination",
+      "setDestinationTo": "Set destination to {{system}}",
+      "needsPermission": "Needs the {{permission}} Permission",
+      "whyWaypoints": "Lets Neocom Desk set {{name}}'s autopilot destination in the EVE client.",
+      "breakdown": {
+        "title": "Turn in: {{total}}",
+        "intro": "Grouped by Item Trader. LP is paid per full block, at each corporation's LP Value. + faction tokens, not counted.",
+        "tableLabel": "{{trader}}: items to turn in",
+        "item": "Item",
+        "quantity": "Qty",
+        "each": "Each",
+        "turnedIn": "Turned in",
+        "filled": "Filled",
+        "participate": "Participate",
+        "participating": "Participating",
+        "notParticipating": "Not participating",
+        "ofAsked": "of {{asked}}",
+        "copyList": "Copy list",
+        "copyListFor": "Copy the list for {{trader}}",
+        "copied": "Copied",
+        "copyFailed": "Copy failed"
+      }
+    }
   },
   "calendar": {
     "title": "Calendar",
@@ -12598,7 +12675,7 @@
       "colTimes": "Times",
       "colLp": "LP",
       "colIskCost": "ISK cost",
-      "colTurnIns": "Turn-ins",
+      "colTurnIns": "Required",
       "colIncome": "Instant income",
       "ownedUsed_one": "{{count}} owned",
       "ownedUsed_other": "{{count}} owned",
@@ -12704,8 +12781,8 @@
       "jumpsShort": "{{count}}j",
       "noRoute": "No route",
       "noRouteHelp": "No stargate route from your system to this corporation's stations.",
-      "colTurnIns": "Turn-ins",
-      "turnInsPrefix": "Turn-ins: ",
+      "colTurnIns": "Required",
+      "turnInsPrefix": "Required: ",
       "turnInsNone": "None",
       "turnInsCount_one": "{{count}} item",
       "turnInsCount_other": "{{count}} items",
@@ -12726,8 +12803,8 @@
       "noLpHeld": "This Character holds no LP.",
       "hideFactionWarfare": "Hide Faction Warfare",
       "hideFactionWarfareHelp": "Hides the Faction Warfare militia stores, whose LP Value swings with the warzone.",
-      "noTurnIns": "No turn-ins",
-      "noTurnInsHelp": "Only offers that want nothing handed in besides LP and ISK (no tags, no base hull).",
+      "noTurnIns": "No required items",
+      "noTurnInsHelp": "Only offers that need nothing besides LP and ISK (no tags, no base hull).",
       "affordable": "I can afford",
       "affordableHelp": "Only offers this Character holds enough of that store's LP for.",
       "categoryLabel": "Category",
@@ -14683,6 +14760,12 @@
   },
   "permissions": {
     "grantMissing": "Grant missing Permissions",
+    "mark": {
+      "label": "{{character}}: {{permissions}} not granted",
+      "severalTitle_one": "{{count}} Character: grant {{permissions}}",
+      "severalTitle_other": "{{count}} Characters: grant {{permissions}}",
+      "dontAsk": "Don't ask again"
+    },
     "writeSection": "Write to EVE",
     "writeSectionHint": "These change things in EVE or open windows in your game. They are off until you use one, and Neocom Desk asks first.",
     "wallet": {
@@ -14784,6 +14867,10 @@
     "mercenaryDens": {
       "label": "Mercenary dens",
       "caption": "Your Mercenary Dens and their operations, for the Overview widget and den alerts."
+    },
+    "militaryCampaigns": {
+      "label": "Military Campaigns",
+      "caption": "Which Campaign Objectives you pressed Participate on, and how much you have turned in."
     },
     "core": {
       "skills": {
@@ -15145,7 +15232,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, the moon surveys you connected to a payee with Assign Taxes, and the ledger days you unassigned so a payee's default systems leave them alone. Assets: the refining rate you type for your own structure, and its reprocessing tax, and the nicknames you gave your stations and structures (shown on the Assets page only). Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates, and the corporations you hid from Add my other corps.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, and pages hidden from the navigation.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, and pages hidden from the navigation. Permissions: the Permissions you said not to ask for again.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -15738,11 +15825,15 @@
       "grantSelected": "Grant selected ({{count}})",
       "corpRoles": "Roles: {{roles}}",
       "corpRolesUnknown": "Corporation roles show once granted.",
+      "notAsked": "Not asked for on other pages.",
+      "askAgain": "Ask again",
+      "askAgainAria": "Ask again for {{permission}}",
       "unlocks": {
         "corp": "Unlocks Corp Board, Members, Corp Wallet, Corp Assets, Moons, SRP officer view",
         "corpProjects": "Unlocks Corp projects in Build Opportunities",
         "killmails": "Unlocks the SRP lost-ship list",
-        "mercenaryDens": "Unlocks the Mercenary dens Overview widget and den alerts"
+        "mercenaryDens": "Unlocks the Mercenary dens Overview widget and den alerts",
+        "militaryCampaigns": "Shows whether a turn-in pays you, and the Military Campaigns Overview widget"
       }
     }
   },
@@ -15889,6 +15980,7 @@
       "noAccessHint": "None of your Characters can read a corporation's structures. EVE opens them to a Director or Station Manager.",
       "loadFailedHint": "EVE did not send the structure list. Try again in a moment.",
       "partlyFailed": "One or more corporations could not be read; their structures are missing.",
+      "towersNeedGrant": "Control towers are not listed until this Character grants the starbases permission.",
       "col": {
         "corp": "Corporation",
         "structure": "Structure",
@@ -17509,6 +17601,7 @@
     },
     "pickSystem": "Pick a system",
     "currentSystem": "{{system}} (current system)",
+    "pickedSystem": "{{system}} (set by you)",
     "changeFrom": "Change starting system — {{current}}",
     "stops": {
       "title": "Stops",
@@ -17668,9 +17761,11 @@
         "avoided": "Avoided Systems"
       }
     },
+    "zkillboard": "zKillboard",
+    "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)",
     "note": {
-      "add": "Note",
-      "addLabel": "Add a note on {{name}}",
+      "add": "Add note",
+      "edit": "Edit note",
       "openLabel": "Open your note on {{name}}",
       "label": "Your note on {{name}}",
       "placeholder": "What you know about this system",
@@ -17679,7 +17774,6 @@
     },
     "avoid": {
       "action": "Avoid",
-      "actionLabel": "Avoid {{name}}",
       "title": "Avoid {{name}}?",
       "becomes_one": "The route becomes {{count}} jump ({{delta}})",
       "becomes_other": "The route becomes {{count}} jumps ({{delta}})",
@@ -17973,9 +18067,7 @@
       "jumpsUnit_other": "jumps",
       "detail": {
         "type": "Type {{type}}",
-        "signatures": "enter at {{hubSignature}} in {{hub}}, leave at {{exitSignature}}",
-        "zkillboard": "zKillboard",
-        "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
+        "signatures": "enter at {{hubSignature}} in {{hub}}, leave at {{exitSignature}}"
       },
       "noGateRoute": "No gate route",
       "noOrigin": "Open holes from EVE-Scout. Pick a From system on Route Safety to count jumps.",
@@ -20793,6 +20885,7 @@
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a permission the Character hasn't given",
+      "permissionCellMark": "Amber warning mark after a figure or control: the row's Character lacks a Permission; press to grant it for that Character or stop asking",
       "needsLogin": "Small warning \"Log in again\" button on a Character: its login is dead; press to log in again",
       "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "absenceNote": "Small dim text at a row's right edge: the row's item has none of something here; the row is not dimmed and stays clickable",
@@ -20882,6 +20975,10 @@
       "communityMark": "Shared in a Community",
       "channelOffLabel": "Device",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
+      "permissionCellMarkFigure": "Set destination",
+      "permissionCellMarkPermission": "Autopilot waypoints",
+      "permissionCellMarkWhy": "Sends the route to your EVE client.",
+      "permissionCellMarkLink": "Grant missing Permissions",
       "chartLast": "This week",
       "chartPrev": "Last week",
       "chartNet": "Net",

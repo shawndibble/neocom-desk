@@ -7,7 +7,8 @@
  * before the first cell of a toned row, the first column truncated, and the
  * whole row a link when it has a `to` (the trailing caret is the §6c cue), or
  * a button that opens `RowDetailModal` when it has a `detail`, or the item's Show
- * info when it has an `info` (the first cell's accent name is the cue either way, §6c "Widget rows"). No row buttons and no other
+ * info when it has an `info`, or `TurnInDetail` when it is a campaign turn-in (`turnIn`) (the first
+ * cell's accent name is the cue every way, §6c "Widget rows"). No row buttons and no other
  * chrome: the widget's title link and the row's own link or modal are the only
  * ways out. Columns are chosen by `visibleColumns` from the width budget the
  * caller passes, never from the viewport, then by `fitColumns` for a
@@ -16,7 +17,7 @@
  * phone's full-width widget drops it and a half-width one on a desktop does
  * too).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -36,6 +37,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
 import { ShareMark } from '@/components/ui/ShareMark';
+import { Pill } from '@/components/ui/Pill';
 import { openItemInfo } from '@/stores/itemInfoModal';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
@@ -43,6 +45,7 @@ import type { WidgetSize } from './kinds';
 import { fractionBar, type CellTone } from './data/cellKit';
 import { RowDetailModal } from './RowDetailModal';
 import { fitColumns, visibleColumns } from './tableModel';
+import { ROW_TARGET_CLASS } from './rowTarget';
 import {
   ROWS_PER_PAGE_OPTIONS,
   clampPage,
@@ -53,6 +56,9 @@ import {
   sortTableRows,
   type RowsPerPage,
 } from './tableSortPage';
+
+/** A turn-in row's opener, with the popover's reads: loaded only when a table has one. */
+const TurnInRowTrigger = lazy(() => import('./TurnInRowTrigger'));
 
 export interface TableBodyProps {
   table: TableModel;
@@ -144,6 +150,9 @@ const CARET_WIDTH = 20;
 /** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
 
+/** A `capped` column: truncated at 5rem under a 24rem box, else 8rem (see `TableColumn.capped`). */
+const CAPPED = 'max-w-20 @sm:max-w-32 truncate whitespace-nowrap';
+
 function Row({
   row,
   columns,
@@ -174,7 +183,9 @@ function Row({
   const toned = row.tone !== undefined && row.tone !== 'clear';
   const flagged = isFlagged(row);
   const linked = row.to !== undefined;
-  const opens = onOpen !== undefined;
+  const turnIn = row.turnIn;
+  // The row is a target (row styling): it opens a modal, Show info or TurnInDetail.
+  const opens = onOpen !== undefined || turnIn !== undefined;
   return (
     <tr
       className={cx(
@@ -209,7 +220,9 @@ function Row({
                   ? growKey === undefined
                     ? cx('w-full max-w-0', column.nameFloor && 'min-w-28')
                     : 'max-w-40'
-                  : 'whitespace-nowrap',
+                  : column.capped
+                    ? CAPPED
+                    : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
               Cell === 'th' && 'text-left',
               first && 'font-semibold',
@@ -228,15 +241,14 @@ function Row({
                     {flagged && row.tone && <SeverityIcon severity={row.tone} size="0.875rem" />}
                   </span>
                 )}
-                {linked && row.to !== undefined ? (
+                {row.badge !== undefined && <Pill className="shrink-0">{row.badge}</Pill>}
+                {turnIn !== undefined ? (
+                  <Suspense fallback={<span className="min-w-0 truncate">{text}</span>}>
+                    <TurnInRowTrigger turnIn={turnIn} text={text} />
+                  </Suspense>
+                ) : linked && row.to !== undefined ? (
                   <RowTappableContext.Provider value>
-                    <Link
-                      to={row.to}
-                      className={cx(
-                        'min-w-0 truncate outline-none after:absolute after:inset-0 after:content-[""]',
-                        'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent'
-                      )}
-                    >
+                    <Link to={row.to} className={ROW_TARGET_CLASS}>
                       {text}
                     </Link>
                   </RowTappableContext.Provider>
@@ -246,12 +258,7 @@ function Row({
                       type="button"
                       aria-haspopup="dialog"
                       onClick={onOpen}
-                      className={entityLinkClassName(
-                        cx(
-                          'min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:content-[""]',
-                          'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent'
-                        )
-                      )}
+                      className={entityLinkClassName(cx(ROW_TARGET_CLASS, 'text-left'))}
                     >
                       {text}
                     </button>
@@ -456,7 +463,11 @@ export function TableBody({
           : sorted.slice(0, rowLimit);
   const more = paged ? 0 : sorted.length - shown.length;
   const cuttable = !paged && !pageable && sorted.length > rowLimit;
-  if (shown.length === 0) return null;
+  if (shown.length === 0) {
+    return table.emptyLine === undefined ? null : (
+      <p className={cx('px-3 py-2 text-sm text-text-dim', className)}>{table.emptyLine}</p>
+    );
+  }
   const hasHeader = columns.some((column) => column.label !== '');
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);

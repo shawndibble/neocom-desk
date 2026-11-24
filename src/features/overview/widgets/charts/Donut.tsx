@@ -2,9 +2,26 @@ import { donutSegments } from './geometry';
 import { CHART_COLOR } from './palette';
 import type { DonutChartModel } from './types';
 
-/** A ring split into parts, the total in the hole and a legend that names every part. */
-export function Donut({ model, size }: { model: DonutChartModel; size: number }) {
-  const segments = donutSegments(model.parts.map((part) => part.value));
+/**
+ * A ring split into parts, the total in the hole and a legend that names every part. With
+ * `legend={false}` the ring stands alone, for a caller that names it beside the ring (the
+ * Military Campaigns figure's progress rings).
+ */
+export function Donut({
+  model,
+  size,
+  legend = true,
+}: {
+  model: DonutChartModel;
+  size: number;
+  legend?: boolean;
+}) {
+  const values = model.parts.map((part) => part.value);
+  const sum = values.reduce((total, value) => total + Math.max(0, value), 0);
+  // Out of `of`: a trailing share for the rest, never drawn, so the track shows through.
+  const segments = donutSegments(
+    model.of === undefined ? values : [...values, Math.max(0, model.of - sum)]
+  ).slice(0, values.length);
   return (
     <div aria-hidden="true" className="flex items-center gap-3">
       <div className="relative flex-none" style={{ width: size, height: size }}>
@@ -43,19 +60,21 @@ export function Donut({ model, size }: { model: DonutChartModel; size: number })
           </span>
         </div>
       </div>
-      <ul className="grid min-w-0 gap-0.5 text-xs text-text-dim">
-        {model.parts.map((part) => (
-          <li key={part.key} className="flex items-center gap-1.5">
-            <i
-              className="inline-block size-2 flex-none rounded-[1px]"
-              style={{ backgroundColor: CHART_COLOR[part.color] }}
-            />
-            <span className="min-w-0 truncate">
-              {part.label} <span className="tabular-nums">{part.value}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {legend && (
+        <ul className="grid min-w-0 gap-0.5 text-xs text-text-dim">
+          {model.parts.map((part) => (
+            <li key={part.key} className="flex items-center gap-1.5">
+              <i
+                className="inline-block size-2 flex-none rounded-[1px]"
+                style={{ backgroundColor: CHART_COLOR[part.color] }}
+              />
+              <span className="min-w-0 truncate">
+                {part.label} <span className="tabular-nums">{part.value}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

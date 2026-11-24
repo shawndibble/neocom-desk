@@ -194,6 +194,8 @@ export const touchCheckboxLabelClassName =
  * ⋮ or remove button) is right beside it, while vertically a touch row is
  * already 36px tall, so the area stays inside the grip's own row and column and
  * can never cover a sibling control. The grip keeps `touch-none` itself.
+ * `PermissionCellMark` uses it too, for the same reason: the mark sits right
+ * after the figure or control it is about.
  */
 export const gripHitAreaClassName =
   "touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-9 touch:before:-translate-y-1/2 touch:before:content-['']";

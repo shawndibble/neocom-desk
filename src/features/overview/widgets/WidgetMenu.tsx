@@ -62,6 +62,8 @@ import {
   LEGACY_PROFIT_SOURCE,
   PROFIT_SOURCES,
   type ProfitSource,
+  CAMPAIGN_FACTIONS,
+  type CampaignFaction,
   rangesOf,
   type CalendarEventsChoice,
   type Widget,
@@ -457,6 +459,22 @@ export function WidgetMenu({
           </MenuRadioGroup>
         </>
       )}
+      {kind.hasCampaignFaction && (
+        <>
+          <MenuSeparator />
+          <MenuLabel>{t('overview.menu.faction')}</MenuLabel>
+          <MenuRadioGroup
+            value={widget.campaignFaction ?? 'all'}
+            onValueChange={(next) => edit.setCampaignFaction(widget.id, next as CampaignFaction)}
+          >
+            {CAMPAIGN_FACTIONS.map((faction) => (
+              <MenuRadioItem key={faction} value={faction}>
+                {t(`overview.menu.factionChoice.${faction}`)}
+              </MenuRadioItem>
+            ))}
+          </MenuRadioGroup>
+        </>
+      )}
       {kind.hasLayerPicker && (
         <>
           <MenuSeparator />
@@ -508,6 +526,7 @@ export function WidgetMenu({
         kind.hasCalendarEvents ||
         kind.hasRaidsWhere ||
         kind.hasProfitSource ||
+        kind.hasCampaignFaction ||
         kind.hasLayerPicker ||
         kind.hasTrendSources ||
         kind.hasPlexPlan) && <MenuSeparator />}

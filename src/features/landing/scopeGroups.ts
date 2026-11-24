@@ -33,6 +33,7 @@ export const LANDING_SCOPE_GROUPS: readonly { id: string; rows: readonly ScopeRo
       { kind: 'group', group: 'marketOrders' },
       { kind: 'group', group: 'contracts' },
       { kind: 'group', group: 'assets' },
+      { kind: 'group', group: 'militaryCampaigns' },
     ],
   },
   {
