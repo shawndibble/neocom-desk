@@ -296,12 +296,17 @@ export async function revokeAtSso(
   if (!res.ok) throw new Error(`SSO revoke failed (${res.status})`);
 }
 
-/** An SSO refresh refusal. Carries the status and error code only — never a token. */
+/** The longest `error_description` kept: enough to tell the refusals apart, too short to carry a payload. */
+const SSO_DESCRIPTION_MAX = 200;
+
+/** An SSO refresh refusal. Carries the status, error code and SSO's own wording only — never a token. */
 export class SsoRefreshError extends Error {
   constructor(
     readonly status: number,
     /** True when SSO answered `invalid_grant`: the token is dead (revoked, expired, wrong client). */
-    readonly invalidGrant: boolean
+    readonly invalidGrant: boolean,
+    /** SSO's `error_description` ("Unable to migrate grant", a revoked token, ...): what a log line can say. */
+    readonly description?: string
   ) {
     super(`SSO refresh failed (${status})`);
   }
@@ -324,8 +329,16 @@ export async function refreshAtSso(
     signal: AbortSignal.timeout(SSO_TIMEOUT_MS),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
-    throw new SsoRefreshError(res.status, body?.error === 'invalid_grant');
+    const body = (await res.json().catch(() => null)) as {
+      error?: unknown;
+      error_description?: unknown;
+    } | null;
+    const description =
+      typeof body?.error_description === 'string' && body.error_description !== ''
+        ? // Never let a refusal carry the token back out, whatever SSO echoes.
+          body.error_description.split(refreshToken).join('[token]').slice(0, SSO_DESCRIPTION_MAX)
+        : undefined;
+    throw new SsoRefreshError(res.status, body?.error === 'invalid_grant', description);
   }
   const json = (await res.json()) as { access_token?: unknown; refresh_token?: unknown };
   if (typeof json.access_token !== 'string' || typeof json.refresh_token !== 'string') {
