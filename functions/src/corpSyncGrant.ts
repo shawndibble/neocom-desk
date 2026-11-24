@@ -161,8 +161,8 @@ export interface CorpSyncDeps {
    */
   esi?: SyncEsi;
   /**
-   * How long to wait before re-reading a grant SSO just refused (default 1000 ms): a refresh
-   * that won a race writes its rotated token back within that time.
+   * The pause before each of `RECHECK_LOOKS` re-reads of a grant SSO just refused (default 1000
+   * ms): a refresh that won a race writes its rotated token back within that time.
    */
   invalidGrantRecheckMs?: number;
   /** Receives only messages and ids — never a token. */
@@ -755,7 +755,7 @@ export async function syncOneFeeder(
     // A dead or unreadable token cannot be sent to SSO to revoke.
     await dropFeederGrant(
       deps,
-      grant,
+      refreshed.grant,
       refreshed.kind === 'dead' ? 'SSO refused the token' : 'stored token unreadable',
       false
     );
@@ -850,10 +850,14 @@ async function dropFeederGrant(
   if (removed && revoke) await revokeStored(deps, grant);
 }
 
+/** How many times a refused grant is re-read for a rotated token before it is called dead. */
+const RECHECK_LOOKS = 3;
+
 type RefreshOutcome =
   | { kind: 'ok'; accessToken: string; grant: CorpSyncGrantDoc }
-  | { kind: 'dead' }
-  | { kind: 'unreadable' }
+  // The grant last tried: after a retry that is the newer one, so a drop guards on its token.
+  | { kind: 'dead'; grant: CorpSyncGrantDoc }
+  | { kind: 'unreadable'; grant: CorpSyncGrantDoc }
   | { kind: 'skip' };
 
 // SSO rotates the token, so the SSO call must not run inside a retryable
@@ -872,7 +876,7 @@ async function refreshGrant(
     current = decryptRefreshToken(grant.encryptedRefreshToken, grant.characterId, key, PURPOSE);
   } catch {
     // The saved blob cannot be read (a rotated key, a damaged doc): it will never work again.
-    return { kind: 'unreadable' };
+    return { kind: 'unreadable', grant };
   }
   let tokens: RefreshedTokens;
   try {
@@ -882,15 +886,19 @@ async function refreshGrant(
       // Under rotation a second refresh of the same token is refused. If a concurrent one won and
       // wrote its rotated token back, this grant is alive: retry once with that token.
       if (!rechecked) {
-        await new Promise((resolve) => setTimeout(resolve, deps.invalidGrantRecheckMs ?? 1000));
-        const latest = (await grantRef(deps.db, grant.corporationId).get()).data() as
-          CorpSyncGrantDoc | undefined;
-        if (latest && latest.encryptedRefreshToken !== grant.encryptedRefreshToken) {
-          deps.log('SSO refusal followed a rotation: retrying with the newer token', {
-            corporationId: grant.corporationId,
-            kind: grant.kind ?? 'book',
-          });
-          return refreshGrant(deps, latest, true);
+        // The winner's write-back is one transaction after its SSO call: poll a few times for it.
+        for (let look = 0; look < RECHECK_LOOKS; look += 1) {
+          await new Promise((resolve) => setTimeout(resolve, deps.invalidGrantRecheckMs ?? 1000));
+          const latest = (await grantRef(deps.db, grant.corporationId).get()).data() as
+            CorpSyncGrantDoc | undefined;
+          if (!latest) break;
+          if (latest.encryptedRefreshToken !== grant.encryptedRefreshToken) {
+            deps.log('SSO refusal followed a rotation: retrying with the newer token', {
+              corporationId: grant.corporationId,
+              kind: grant.kind ?? 'book',
+            });
+            return refreshGrant(deps, latest, true);
+          }
         }
       }
       // SSO's own wording is what tells a revoked app from an already-used rotated token.
@@ -900,7 +908,7 @@ async function refreshGrant(
         ssoStatus: err.status,
         ...(err.description !== undefined ? { ssoDescription: err.description } : {}),
       });
-      return { kind: 'dead' };
+      return { kind: 'dead', grant };
     }
     throw err;
   }
@@ -969,8 +977,8 @@ async function runOne(
 ): Promise<BookSyncResult> {
   const refreshed = await refreshGrant(deps, initial);
   if (refreshed.kind === 'skip') return { kind: 'skipped', reason: 'esi-unavailable' };
-  if (refreshed.kind === 'dead') return stopGrant(deps, initial, 'token-revoked');
-  if (refreshed.kind === 'unreadable') return stopGrant(deps, initial, 'grant-unreadable');
+  if (refreshed.kind === 'dead') return stopGrant(deps, refreshed.grant, 'token-revoked');
+  if (refreshed.kind === 'unreadable') return stopGrant(deps, refreshed.grant, 'grant-unreadable');
   const { accessToken, grant } = refreshed;
 
   const claims = await deps.verify(accessToken);

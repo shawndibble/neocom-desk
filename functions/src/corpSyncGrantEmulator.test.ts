@@ -110,6 +110,7 @@ const syncDeps = (): CorpSyncDeps => ({
   db,
   now: () => now,
   key: () => KEY,
+  invalidGrantRecheckMs: 0,
   verify: async (token) => claimsFor(token),
   refresh: async (_clientId, refreshToken) => {
     if (refreshFailure) throw refreshFailure;
