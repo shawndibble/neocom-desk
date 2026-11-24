@@ -71,3 +71,14 @@ export const ThirteenDigits: Story = {
 export const NoNetFigures: Story = {
   args: { net: null },
 };
+
+/** @summary Items worth more turned in than sold now: the Turn in total sits beside Refine in the facts row, its figure opens `TurnInBreakdown`. */
+export const WithTurnIn: Story = {
+  args: {
+    showRefine: true,
+    refineValue: 8_100_000,
+    refineEfficiency: '68.3%',
+    onOpenRefine: () => {},
+    turnIn: { total: 39_600_000, count: 3, onOpen: () => {} },
+  },
+};
