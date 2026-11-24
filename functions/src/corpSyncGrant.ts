@@ -438,6 +438,10 @@ export async function deleteCorpSyncGrantsHeldBy(
     if (grant.kind === 'feeder') {
       // A feeder grant has no book status or audit entry here: drop the token and revoke it.
       await doc.ref.delete();
+      deps.log('Moon owner grant dropped', {
+        feederCorporationId: grant.corporationId,
+        why: 'holder account purged',
+      });
       await revokeStored(deps, grant);
       count += 1;
       continue;
@@ -709,13 +713,22 @@ export async function syncOneFeeder(
     }
     const status = recorded?.status ?? null;
     // At 30 days stale the feeder disconnects; its token has no further use.
-    if (status === 'disconnected' && grant) await dropFeederGrant(deps, grant);
+    if (status === 'disconnected' && grant)
+      await dropFeederGrant(deps, grant, 'disconnected after 30 days');
     return { outcome: read.outcome, status, budget };
   };
 
   const grantSnap = await grantRef(deps.db, feederCorporationId).get();
   const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
-  if (!grant || grant.kind !== 'feeder') return finish({ outcome: 'stale', reason: 'no-grant' });
+  if (!grant || grant.kind !== 'feeder') {
+    // Whether a token is still stored under another kind (recoverable) or none is.
+    deps.log('Moon owner has no feeder grant', {
+      feederCorporationId,
+      collectorCorporationId,
+      held: grant ? (grant.kind ?? 'book') : 'none',
+    });
+    return finish({ outcome: 'stale', reason: 'no-grant' });
+  }
   if (skipEsi || storm.tripped) {
     return finish(
       { outcome: 'none', reason: skipEsi ? 'esi-budget' : 'esi-backoff' },
@@ -730,7 +743,12 @@ export async function syncOneFeeder(
   }
   if (refreshed.kind === 'dead' || refreshed.kind === 'unreadable') {
     // A dead or unreadable token cannot be sent to SSO to revoke.
-    await dropFeederGrant(deps, grant, false);
+    await dropFeederGrant(
+      deps,
+      grant,
+      refreshed.kind === 'dead' ? 'SSO refused the token' : 'stored token unreadable',
+      false
+    );
     return finish({
       outcome: 'stale',
       reason: refreshed.kind === 'dead' ? 'token-revoked' : 'grant-unreadable',
@@ -807,6 +825,7 @@ export async function syncOneFeeder(
 async function dropFeederGrant(
   deps: CorpSyncDeps,
   grant: CorpSyncGrantDoc,
+  why: string,
   revoke = true
 ): Promise<void> {
   const removed = await deps.db.runTransaction(async (tx) => {
@@ -816,6 +835,8 @@ async function dropFeederGrant(
     tx.delete(ref);
     return true;
   });
+  if (removed)
+    deps.log('Moon owner grant dropped', { feederCorporationId: grant.corporationId, why });
   if (removed && revoke) await revokeStored(deps, grant);
 }
 

@@ -378,6 +378,10 @@ export async function recordFeederRead(
       },
       staleSince: next.staleSince ? Date.parse(next.staleSince) : FieldValue.delete(),
     };
+    // The reason is the spell's first one: `lastSyncResult` holds only the latest, and a dead token
+    // makes every later run read `no-grant`.
+    if (next.staleSince === undefined) update.staleReason = FieldValue.delete();
+    else if (record.staleSince === undefined) update.staleReason = read.reason ?? 'unknown';
     if (read.outcome === 'ok') update.lastReadWellAt = now;
     if (next.status === 'disconnected') {
       const grace = Number(book.get('graceHours') ?? BOOK_DEFAULTS.graceHours);

@@ -19445,7 +19445,7 @@
             "action": "Try again"
           },
           "gone-quiet": {
-            "text": "EVE has not answered for this corp for a while. It may be closed.",
+            "text": "This corp could not be read. Its sign-in may have lapsed, or the corp may be closed.",
             "keeps": "Removing keeps its past mining and billing records.",
             "action": "Remove"
           },

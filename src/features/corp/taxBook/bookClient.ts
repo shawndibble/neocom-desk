@@ -519,6 +519,8 @@ export interface BookFeeder extends FeederReadClock {
   lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
   /** When ESI first refused the ledger in the current spell (ms). */
   staleSince?: number;
+  /** Why the read that began the current stale spell was refused. */
+  staleReason?: string;
   /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
   payeeChangedAt?: number;

@@ -36,6 +36,7 @@ export function moonOwnerDebugDump(
         grantHolder: f.grantHolder ?? null,
         lastReadWellAt: f.lastReadWellAt ?? null,
         staleSince: iso(f.staleSince),
+        staleReason: f.staleReason ?? null,
         disconnectedAt: iso(f.disconnectedAt),
         lastSyncAt: iso(f.lastSyncResult?.at),
         lastSyncOutcome: f.lastSyncResult?.outcome ?? null,
