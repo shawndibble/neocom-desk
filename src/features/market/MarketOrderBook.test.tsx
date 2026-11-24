@@ -6,7 +6,21 @@ import { MemoryRouter } from 'react-router-dom';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { fakeItemActions, withItemActions } from './__fixtures__/itemActions';
 import { ItemContextMenu } from './ItemContextMenu';
-import { BookSideToggle, HubComparisonLine, OrderSideCard } from './MarketOrderBook';
+import {
+  BookSideToggle,
+  HubComparisonLine,
+  OrderBookSummaryStrip,
+  OrderSideCard,
+} from './MarketOrderBook';
+import { FAILOVER } from '@/features/campaigns/turnInStoryData';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
+
+const turnIns = vi.hoisted(() => ({ offers: vi.fn() }));
+vi.mock('@/features/campaigns/useTurnIns', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/campaigns/useTurnIns')>()),
+  useTurnInOffers: turnIns.offers,
+  useParticipation: () => ({ status: 'idle', data: undefined, retry: vi.fn() }),
+}));
 
 const summary = (bestSell: number | null, bestBuy: number | null) => ({
   bestSell,
@@ -335,5 +349,62 @@ describe('OrderSideCard', () => {
       renderHarness([make(1, 1000, 1)]);
       expect(await screen.findByText('1 unit')).toBeInTheDocument();
     });
+  });
+});
+
+describe('OrderBookSummaryStrip turn-in', () => {
+  const ready = {
+    status: 'ready',
+    data: { offerFor: (typeId: number) => (typeId === FAILOVER.typeId ? FAILOVER : null) },
+    retry: vi.fn(),
+  };
+
+  it('puts "Turn in ~60K" after the spread, opening the turn-in detail', async () => {
+    turnIns.offers.mockReturnValue(ready);
+    const amarr = getTradeHub('amarr')!;
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <OrderBookSummaryStrip
+          bestSell={58_000}
+          bestBuy={55_200}
+          item={{ typeId: FAILOVER.typeId, name: 'Shield Failover Report' }}
+          hub={amarr}
+        />
+      </MemoryRouter>
+    );
+    // LP counts at the browsed hub's LP Value.
+    expect(turnIns.offers).toHaveBeenCalledWith(amarr);
+    const labels = screen.getAllByText(/^(Spread|Turn in)$/).map((node) => node.textContent);
+    expect(labels).toEqual(['Spread', 'Turn in']);
+    await user.click(
+      screen.getByRole('button', { name: /Turn-in reward for Shield Failover Report/ })
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Shield Failover Report: turn-in reward' })
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing for an item no Campaign Objective takes, or while the offers load', () => {
+    turnIns.offers.mockReturnValue(ready);
+    const { rerender } = render(
+      <OrderBookSummaryStrip
+        bestSell={1}
+        bestBuy={1}
+        item={{ typeId: 34, name: 'Tritanium' }}
+        hub={DEFAULT_TRADE_HUB}
+      />
+    );
+    expect(screen.queryByText('Turn in')).not.toBeInTheDocument();
+    turnIns.offers.mockReturnValue({ status: 'loading', data: undefined, retry: vi.fn() });
+    rerender(
+      <OrderBookSummaryStrip
+        bestSell={1}
+        bestBuy={1}
+        item={{ typeId: FAILOVER.typeId, name: 'Shield Failover Report' }}
+        hub={DEFAULT_TRADE_HUB}
+      />
+    );
+    expect(screen.queryByText('Turn in')).not.toBeInTheDocument();
   });
 });
