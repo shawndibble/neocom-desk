@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { openOrderRow } from './__fixtures__/openOrderRow';
-import { orderShowsTurnIn, turnInSurfaceLine } from './orderTurnIn';
+import { bidTurnInPays, orderShowsTurnIn, turnInSurfaceLine } from './orderTurnIn';
 
 const t = (key: string, options?: Record<string, unknown>) => `${key} ${JSON.stringify(options)}`;
 
@@ -39,5 +39,18 @@ describe('turnInSurfaceLine', () => {
     expect(turnInSurfaceLine(t, openOrderRow({ isBuyOrder: true, price: 60_000 }), 60_000)).toBe(
       undefined
     );
+  });
+});
+
+describe('bidTurnInPays', () => {
+  it('is true only for a buy order whose reward each is above its bid', () => {
+    expect(bidTurnInPays(openOrderRow({ isBuyOrder: true, price: 500, turnInEach: 600 }))).toBe(
+      true
+    );
+    expect(bidTurnInPays(openOrderRow({ isBuyOrder: true, price: 600, turnInEach: 600 }))).toBe(
+      false
+    );
+    expect(bidTurnInPays(openOrderRow({ isBuyOrder: true, price: 500 }))).toBe(false);
+    expect(bidTurnInPays(openOrderRow({ price: 500, turnInEach: 600 }))).toBe(false);
   });
 });

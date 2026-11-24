@@ -12,6 +12,7 @@ import { OrderProblemBadge } from './OrderProblemBadge';
 import { rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
 import { TurnInGlyph } from '@/features/campaigns/TurnInDetail';
+import { bidTurnInPays } from './orderTurnIn';
 
 interface OpenOrdersListProps {
   rows: readonly OpenOrderRow[];
@@ -93,9 +94,9 @@ export function OpenOrdersList({
                   <OrderDoThisText row={row} interactive={false} />
                 </span>
               </button>
-              {/* Beside the button, not in it — buttons don't nest. A buy order on a
-                  turn-in item says so; it opens the same detail the card does. */}
-              {row.isBuyOrder && row.turnInEach !== undefined && (
+              {/* Beside the button, not in it — buttons don't nest. A buy order a turn-in
+                  pays more for says so; it opens the same detail the card does. */}
+              {bidTurnInPays(row) && (
                 <TurnInGlyph
                   name={row.typeName}
                   onClick={() => onOpen(row)}

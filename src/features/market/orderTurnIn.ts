@@ -19,6 +19,13 @@ export function orderShowsTurnIn(row: Pick<OpenOrderRow, 'isBuyOrder' | 'problem
   return row.isBuyOrder || row.problems.includes('turnInPays');
 }
 
+/** A buy order whose turn-in pays more than its bid: the only buy order that gets the turn-in glyph. */
+export function bidTurnInPays(
+  row: Pick<OpenOrderRow, 'isBuyOrder' | 'price' | 'turnInEach'>
+): boolean {
+  return row.isBuyOrder && row.turnInEach !== undefined && row.turnInEach > row.price;
+}
+
 /**
  * What the turn-in pays over the order's price: "Pays ~2K each over your price
  * (57,990)" for a sell order, "Pays you ~950K per 100 over this bid" for a buy

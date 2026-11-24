@@ -22,6 +22,7 @@ import { OPEN_ORDER_COLUMN_IDS, type OpenOrderColumnId } from './openOrdersColum
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
+import { bidTurnInPays } from './orderTurnIn';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { WorkThroughTableSlot } from './WorkThroughControls';
 
@@ -49,11 +50,10 @@ export interface OpenOrderTableColumns {
   optional: Record<OpenOrderColumnId, DataTableColumn<OpenOrderRow>>;
 }
 
-/** A buy order on a turn-in item: the glyph that opens its turn-in. */
+/** A buy order whose turn-in pays more than its bid: the glyph that opens its turn-in. */
 function buyTurnInGlyph(row: OpenOrderRow, onOpenTurnIn?: (row: OpenOrderRow) => void) {
   return (
-    row.isBuyOrder &&
-    row.turnInEach !== undefined &&
+    bidTurnInPays(row) &&
     onOpenTurnIn && <TurnInGlyph name={row.typeName} onClick={() => onOpenTurnIn(row)} />
   );
 }
