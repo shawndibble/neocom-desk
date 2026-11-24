@@ -32,6 +32,10 @@ import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
 import { useItemActions } from '@/features/market/itemActions';
+import { TurnInDetail, TurnInGlyph } from '@/features/campaigns/TurnInDetail';
+import { approxIsk } from '@/features/campaigns/turnInContent';
+import { turnInReward } from '@/engine/market/turnIn';
+import { formatCount } from '@/lib/formatCount';
 import {
   assetHref,
   characterBadgeFor,
@@ -110,6 +114,7 @@ export function NodeItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  afterValue,
   askEstimate,
   stockUnitCost,
   showStockCost,
@@ -129,6 +134,7 @@ export function NodeItemRow({
   unitVolume: number | undefined;
   estimatedValue: number;
   valueHint?: string;
+  afterValue?: ReactNode;
   askEstimate?: AskEstimateFigure;
   stockUnitCost: ComponentProps<typeof ItemRow>['stockUnitCost'];
   showStockCost: boolean;
@@ -146,6 +152,7 @@ export function NodeItemRow({
       unitVolume={unitVolume}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      afterValue={afterValue}
       askEstimate={askEstimate}
       stockUnitCost={stockUnitCost}
       showStockCost={showStockCost}
@@ -414,6 +421,10 @@ function NodeRowView({
       : planTargetForItem(pageActions.blueprints, asset.type_id);
   const blueprintTypeID =
     planTarget === undefined ? undefined : (planTarget?.blueprintTypeID ?? null);
+  const turnInOffer = actions.turnInOfferFor(asset.type_id);
+  // The stack's own Character: whose Participate the detail shows, whose client Set destination steers.
+  const ownerId =
+    characterBadges.idByItemId.get(asset.item_id) ?? characterBadges.activeCharacterId;
   const onViewInIndustryAsMaterial = actions.materialPlanMap?.has(asset.type_id)
     ? () => actions.onViewInIndustryAsMaterial(asset.type_id)
     : undefined;
@@ -426,6 +437,21 @@ function NodeRowView({
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      afterValue={
+        turnInOffer && (
+          <TurnInDetail
+            name={label}
+            offer={turnInOffer}
+            characterId={ownerId}
+            characterName={ownerId === null ? undefined : characterBadges.nameById.get(ownerId)}
+            surfaceLine={t('campaigns.turnIn.youHold', {
+              quantity: formatCount(asset.quantity),
+              amount: approxIsk(turnInReward(turnInOffer, asset.quantity).total),
+            })}
+            trigger={<TurnInGlyph name={label} />}
+          />
+        )
+      }
       askEstimate={askEstimateFigure(asset, actions.askEstimateByTypeId, estimatedValue, t)}
       stockUnitCost={actions.stockCostByTypeId?.get(asset.type_id)?.unitCost}
       showStockCost={actions.stockCostByTypeId !== null}

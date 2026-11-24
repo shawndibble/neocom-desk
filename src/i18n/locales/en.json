@@ -9748,6 +9748,8 @@
     "turnIn": {
       "dialogLabel": "{{name}}: turn-in reward",
       "openDetail": "Turn-in reward for {{name}}",
+      "paysEach": "Turn-in pays {{amount}} each",
+      "youHold": "You hold {{quantity}} · {{amount}} turned in",
       "eachTurnedIn": "each turned in",
       "splitIsk": "{{isk}} ISK",
       "splitLp": "{{lp}} LP ({{value}})",
@@ -14676,7 +14678,8 @@
       "bestSell": "Best sell",
       "bestBuy": "Best buy",
       "spread": "Spread",
-      "spreadHint": "Best sell minus best buy, and that gap as a share of the best buy."
+      "spreadHint": "Best sell minus best buy, and that gap as a share of the best buy.",
+      "turnIn": "Turn in"
     },
     "hubCompare": {
       "label": "{{place}} compared with the best in range",

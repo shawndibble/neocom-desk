@@ -6,6 +6,7 @@ import type { CharacterAsset } from '@/esi/endpoints';
 import type { ContractAskEstimate } from '@/engine/contracts/askEstimate';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import type { BuildPlanRecord } from '@/db';
+import type { TurnInOfferDetail } from '@/features/campaigns/useTurnIns';
 
 /**
  * A drill-down href that keeps the page's whole query string: its filters
@@ -84,6 +85,12 @@ export interface AssetItemActions {
   stockCostByTypeId: ReadonlyMap<number, HeldStockCost> | null;
   /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
   blueprintTypeIds: ReadonlySet<number> | null;
+  /**
+   * The Active campaign turn-in for a type, its LP at the Assets page hub's LP
+   * Value; null for none. A glyph after the stack's value only: a Turn-in
+   * Reward never joins a value or total.
+   */
+  turnInOfferFor: (typeId: number) => TurnInOfferDetail | null;
 }
 
 export const AssetItemActionsContext = createContext<AssetItemActions | null>(null);

@@ -62,7 +62,8 @@ import {
   type RememberedDefaults,
   type UrlParamValues,
 } from '@/lib/useUrlState';
-import type { TradeHub } from '@/market/hubs';
+import { DAILY_JOB_HUBS, type TradeHub } from '@/market/hubs';
+import { useTurnInOffersByHub } from '@/features/campaigns/useTurnIns';
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -578,6 +579,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     addedFromOf,
   });
 
+  // Turn-ins at the hub each row sells at: the lane's To hub, or with Any hub
+  // there, whichever of the daily hubs the row picked. LP counts at that hub's LP Value.
+  const turnIns = useTurnInOffersByHub(to === ANY_HUB ? DAILY_JOB_HUBS : [to]);
+  const turnInOfferFor = (row: HaulingViewRow) =>
+    turnIns.data?.get(row.toHub.id)?.offerFor(row.typeId) ?? null;
+
   const { columnVisibility, hideableColumnsById, availableColumnIds, visibleColumns } =
     useHaulingTable({
       instant,
@@ -591,6 +598,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       patchOverride,
       addedFromOf,
       limitTextOf,
+      turnInOfferFor,
     });
 
   // Max price hides at both ends: the scan's price pass drops most, the row filter what a lot pushes over it.

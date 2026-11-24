@@ -1,7 +1,14 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { MilitaryCampaignsFile } from '@/sde/types';
-import { loadMilitaryCampaignsOverview, loadParticipation, loadTurnInOffers } from './useTurnIns';
+import { renderHook, waitFor } from '@testing-library/react';
+import {
+  loadMilitaryCampaignsOverview,
+  loadParticipation,
+  loadTurnInOffers,
+  useTurnInOffersByHub,
+} from './useTurnIns';
 
 const mocks = vi.hoisted(() => ({
   file: vi.fn(),
@@ -109,6 +116,32 @@ describe('loadTurnInOffers', () => {
   it('throws when the live state cannot be read: no offers is not "no campaign"', async () => {
     mocks.state.mockResolvedValue(null);
     await expect(loadTurnInOffers(jita)).rejects.toThrow();
+  });
+});
+
+describe('useTurnInOffersByHub', () => {
+  beforeEach(() => {
+    mocks.file.mockReset().mockResolvedValue(FILE);
+    mocks.state.mockReset().mockResolvedValue(STATE);
+    mocks.rates
+      .mockReset()
+      .mockImplementation(async (_corporations: number[], hub: { id: string }) => () => ({
+        rate: hub.id === 'jita' ? 1_000 : 500,
+        source: 'market',
+      }));
+  });
+
+  it("answers each hub's offers, LP at that hub's LP Value", async () => {
+    const amarr = TRADE_HUBS.find((hub) => hub.id === 'amarr')!;
+    const { result } = renderHook(() => useTurnInOffersByHub([jita, amarr]));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.data?.get('jita')?.offerFor(97545)?.lpIskPerItem).toBe(40_000);
+    expect(result.current.data?.get('amarr')?.offerFor(97545)?.lpIskPerItem).toBe(20_000);
+  });
+
+  it('stays idle for no hub', () => {
+    const { result } = renderHook(() => useTurnInOffersByHub([]));
+    expect(result.current.status).toBe('idle');
   });
 });
 

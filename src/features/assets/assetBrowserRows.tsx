@@ -539,6 +539,8 @@ interface ItemRowProps {
   estimatedValue: number;
   /** Tooltip note on the value. */
   valueHint?: string;
+  /** Drawn right after the value: a turn-in stack's `TurnInGlyph`. */
+  afterValue?: ReactNode;
   /** A contract ask estimate for a type with no market price; shown marked, not totalled. */
   askEstimate?: AskEstimateFigure;
   /** Stock Cost Basis per unit; absent when the history does not cover every held unit. */
@@ -647,6 +649,7 @@ export function ItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  afterValue,
   askEstimate,
   stockUnitCost,
   showStockCost = false,
@@ -733,10 +736,13 @@ export function ItemRow({
               <span
                 className={cx(
                   estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos',
-                  ITEM_VALUE_CELL
+                  ITEM_VALUE_CELL,
+                  // Its own clip would cut the glyph's focus ring.
+                  afterValue !== undefined && 'md:overflow-visible'
                 )}
               >
                 <ValueFigure value={estimatedValue} hint={valueHint} ask={askEstimate} t={t} />
+                {afterValue}
               </span>
               {stockUnitCost !== undefined && (
                 <>

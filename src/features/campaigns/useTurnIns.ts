@@ -30,7 +30,7 @@ import type { LpRate } from '@/engine/loyalty/marketLpValue';
 import { loadLpRates } from '@/features/loyalty/lpRates';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useKeyedLoad, type AsyncLoad } from '@/lib/useAsyncLoad';
-import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadMilitaryCampaigns } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadCampaignState, loadJoinedObjectives, type JoinedObjectivesRead } from './campaignData';
@@ -127,6 +127,26 @@ export function useTurnInOffers(hub: TradeHub | null, enabled = true): AsyncLoad
   // Never called for no hub: the null key below keeps the load idle.
   const loader = useCallback(() => loadTurnInOffers(hub ?? DEFAULT_TRADE_HUB), [hub]);
   return useKeyedLoad(hub === null || !enabled ? null : `${hub.id}:${ownLpValue}`, loader);
+}
+
+/**
+ * `useTurnInOffers` at several hubs at once, keyed by hub id: Hauling's Any
+ * hub To end, where each row sells at its own hub. Keyed on the hub ids, so a
+ * new array naming the same hubs does not reload.
+ */
+export function useTurnInOffersByHub(
+  hubs: readonly TradeHub[]
+): AsyncLoad<ReadonlyMap<TradeHub['id'], TurnInOffers>> {
+  const ownLpValue = useLpValue((state) => state.value);
+  const ids = hubs.map((hub) => hub.id).join(',');
+  const loader = useCallback(async () => {
+    const list = ids.split(',').flatMap((id) => getTradeHub(id) ?? []);
+    const entries = await Promise.all(
+      list.map(async (hub) => [hub.id, await loadTurnInOffers(hub)] as const)
+    );
+    return new Map(entries);
+  }, [ids]);
+  return useKeyedLoad(ids === '' ? null : `${ids}:${ownLpValue}`, loader);
 }
 
 /** One Character's Participate answers. */

@@ -1090,6 +1090,8 @@ export function Market() {
                           <OrderBookSummaryStrip
                             bestSell={loadedView?.summary.bestSell ?? null}
                             bestBuy={loadedView?.summary.bestBuy ?? null}
+                            item={selectedItem}
+                            hub={effectiveHub}
                           />
                           <BookSideToggle
                             side={phoneSide}

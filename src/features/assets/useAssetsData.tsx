@@ -63,6 +63,9 @@ import {
 import { locationLabel, matchAssets } from './assetsLogic';
 import { loadStockCostBases, type HeldStockCost } from './stockCostBasis';
 import { NO_ASSET_NAMES } from '@/engine/assetNames';
+import { useTurnInOffers } from '@/features/campaigns/useTurnIns';
+import { useHubFor } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 
 /**
  * Query-string view state (ADR 0015), beside the drill-down path. The
@@ -539,6 +542,15 @@ export function useAssetsData() {
     },
   };
 
+  // Turn-ins price their LP at the Assets page hub, the one its hauls price at.
+  const { hubId: assetsHubId } = useHubFor('assets');
+  const turnIns = useTurnInOffers(getTradeHub(assetsHubId) ?? DEFAULT_TRADE_HUB);
+  const turnInOffers = turnIns.data;
+  const turnInOfferFor = useCallback(
+    (typeId: number) => turnInOffers?.offerFor(typeId) ?? null,
+    [turnInOffers]
+  );
+
   const assetItemActions = useMemo<AssetItemActions>(
     () => ({
       priceByTypeId,
@@ -550,6 +562,7 @@ export function useAssetsData() {
       materialPlanMap,
       onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
       blueprintTypeIds,
+      turnInOfferFor,
     }),
     [
       priceByTypeId,
@@ -561,6 +574,7 @@ export function useAssetsData() {
       materialPlanMap,
       handleViewInIndustryAsMaterial,
       blueprintTypeIds,
+      turnInOfferFor,
     ]
   );
 
