@@ -1,6 +1,6 @@
 # Scope decisions — Campaign turn-ins: rewards from campaign objectives, one popover, dismissible permission mark
 
-_Recorded 2026-11-23. Grilling session with Shawn; mockups in `docs/design/mockups/campaign-turn-ins/`._
+_Recorded 2026-11-23. Grilling session with Shawn; mockups were in `docs/design/mockups/campaign-turn-ins/` (removed once the build shipped; see git history)._
 
 - **Turn-in Rewards come from CCP's data, not a hand table.** The SDE's `militaryCampaignObjectives` (contribution method `ItemTraded`: traded item, trader, ISK per item, LP per block, issuer) is baked; ESI `/military-campaigns/{id}/objectives` gives each objective's live state and progress. An objective's reward shows only while it is Active, so nothing is curated when it fills or its campaign ends. The Item Trader is not an LP Store (no store lists these items).
 - **Faction tokens stay out of every figure.** Trader recipes (items per token) are in neither ESI nor the SDE and CCP changed them mid-event (17 Nov 2026). Shown as "+ faction tokens" only. The reward alone already beats selling in the cases seen, so leaving tokens out never flips a verdict the wrong way.
