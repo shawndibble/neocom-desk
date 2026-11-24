@@ -27,7 +27,7 @@ Implement the work described in the spec or ticket you were given. Do not reopen
    the real result of the last one, so splitting it across sub-agent calls
    would pay a fresh sub-agent-startup cost per cycle instead of once.
 3. Typecheck often (`npm run typecheck`); run single test files as you go (`npx vitest run <path>`). Never run the full suite (`npm run test:run`) or `npm run build` locally — CI runs those on the PR.
-4. Run `/code-review` against the merge-base with `develop` — its four axes (Standards, Spec, Ponytail, Thermo-nuclear) run as parallel sub-agents, never inline. Address hard Standards violations, missing/wrong Spec findings, Ponytail bugs/risks/missing tests, and Thermo-nuclear blockers.
+4. Run `/code-review` against the merge-base with `origin/develop` — its axes run as parallel sub-agents, never inline. Act on the findings as `/code-review`'s "Acting on the findings" says.
 5. Commit to the current branch. Conventional Commit subject; body ends with `Closes #<n>`. A pre-commit hook (`lint-staged`: eslint --fix + prettier --write on staged files, then `npm run typecheck`) runs automatically — if it rejects the commit, fix the reported issue and re-commit.
 
 ## Keeping the context small

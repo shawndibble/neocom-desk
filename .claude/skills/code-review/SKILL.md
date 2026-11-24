@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: 'Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo''s documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".'
+description: 'Review the changes since a fixed point (commit, branch, tag, or merge-base) along four axes: Standards (does the code follow this repo''s documented coding standards?), Spec (does the code match what the originating issue/spec asked for?), Ponytail (correct, safe, tested, lean?) and Thermo-nuclear (is the structure as simple as it could be?). Runs the four reviews as parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".'
 ---
 
 Four-axis review of the diff between `HEAD` and a fixed point:
@@ -31,7 +31,7 @@ Confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is
 Look for the originating spec, in order:
 
 1. Issue references in the commit messages (`#123`, `Closes #45`), fetched via `docs/agents/issue-tracker.md` (`gh issue view <n> --comments`).
-2. A path passed as an argument.
+2. A path or pasted description passed as an argument (a description is used as the spec as-is).
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, the **Spec** axis reports "no spec available".
 
@@ -85,6 +85,6 @@ Present the reports under `## Standards`, `## Spec`, `## Ponytail` and `## Therm
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_.
 
-## Inside /next-ticket
+## Acting on the findings
 
-`code-review` here is advisory, not a gate. Address any **hard** Standards violation, any **missing/wrong** Spec finding, any Ponytail bug/risk/missing-test finding, and any Thermo-nuclear `blocker` before pushing. Judgement-call smells, Ponytail lean/speed suggestions and Thermo-nuclear `suggestion`s: fix if cheap, otherwise note them in the PR body under "Review notes". The gate that actually blocks the PR is CI (`npm run format:check`, `lint`, `typecheck`, `test:run`, `build`, e2e).
+This is the one place that says what to fix; `/implement`, `/do-it` and `/next-ticket` point here rather than restating it. The review is advisory, not a gate. Address any **hard** Standards violation, any **missing/wrong** Spec finding, any Ponytail bug/risk/missing-test finding, and any Thermo-nuclear `blocker` before pushing. The Ponytail axis is best-effort: if it reports "ponytail not installed", note that in the PR body instead of treating the review as four-axis. Judgement-call smells, Ponytail lean/speed suggestions and Thermo-nuclear `suggestion`s: fix if cheap, otherwise note them in the PR body under "Review notes". The gate that actually blocks the PR is CI (`npm run format:check`, `lint`, `typecheck`, `test:run`, `build`, e2e).
