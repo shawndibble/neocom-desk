@@ -4,10 +4,12 @@
  */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import type { BookFeeder } from '../taxBook/bookClient';
+import { isGoneQuiet } from './addCorps/addCorpsStatus';
 import { useBook } from './useBook';
 
-export const DEBUG_PARAM = 'debug';
+const DEBUG_PARAM = 'debug';
 
 const iso = (ms: number | undefined) => (ms === undefined ? null : new Date(ms).toISOString());
 
@@ -15,29 +17,36 @@ const iso = (ms: number | undefined) => (ms === undefined ? null : new Date(ms).
 export function moonOwnerDebugDump(
   bookCorporationId: number,
   feeders: readonly BookFeeder[],
+  rows: readonly MoonOwnerRow[],
   now: number
 ) {
   return {
     bookCorporationId,
     at: iso(now),
-    owners: feeders.map((f) => ({
-      corporationId: f.corporationId,
-      status: f.status,
-      sameOwner: f.sameOwner === true,
-      joinedAt: iso(f.joinedAt),
-      grantHolder: f.grantHolder ?? null,
-      lastReadWellAt: f.lastReadWellAt ?? null,
-      staleSince: iso(f.staleSince),
-      disconnectedAt: iso(f.disconnectedAt),
-      lastSyncAt: iso(f.lastSyncResult?.at),
-      lastSyncOutcome: f.lastSyncResult?.outcome ?? null,
-      lastSyncReason: f.lastSyncResult?.reason ?? null,
-    })),
+    owners: feeders.map((f) => {
+      const row = rows.find((r) => r.corporationId === f.corporationId);
+      return {
+        corporationId: f.corporationId,
+        status: f.status,
+        /** What the page shows: a stale `active` record reads `cant-read`. */
+        shownAs: row?.status ?? null,
+        goneQuiet: row !== undefined && isGoneQuiet(row),
+        sameOwner: f.sameOwner === true,
+        joinedAt: iso(f.joinedAt),
+        grantHolder: f.grantHolder ?? null,
+        lastReadWellAt: f.lastReadWellAt ?? null,
+        staleSince: iso(f.staleSince),
+        disconnectedAt: iso(f.disconnectedAt),
+        lastSyncAt: iso(f.lastSyncResult?.at),
+        lastSyncOutcome: f.lastSyncResult?.outcome ?? null,
+        lastSyncReason: f.lastSyncResult?.reason ?? null,
+      };
+    }),
   };
 }
 
 /** Logs the dump once per load of the book when the URL carries `?debug=1`. */
-export function useMoonOwnerDebugDump(): void {
+export function useMoonOwnerDebugDump(rows: readonly MoonOwnerRow[]): void {
   const [params] = useSearchParams();
   const { corporationId, data } = useBook();
   const on = params.get(DEBUG_PARAM) === '1';
@@ -45,7 +54,7 @@ export function useMoonOwnerDebugDump(): void {
   useEffect(() => {
     if (!on || !feeders) return;
     console.log(
-      'neocom-debug ' + JSON.stringify(moonOwnerDebugDump(corporationId, feeders, Date.now()))
+      'neocom-debug ' + JSON.stringify(moonOwnerDebugDump(corporationId, feeders, rows, Date.now()))
     );
-  }, [on, corporationId, feeders]);
+  }, [on, corporationId, feeders, rows]);
 }

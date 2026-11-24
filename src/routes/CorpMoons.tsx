@@ -115,7 +115,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   // A moon owner's ledger that can't be read is mailed to both sides once per spell (#6210).
   useStaleLedgerMail(moonOwnerRows);
   useMoonsAttentionPublisher();
-  useMoonOwnerDebugDump();
+  useMoonOwnerDebugDump(moonOwnerRows);
   const syncing = sync.run.phase === 'syncing' || moonOwnersSync.busy;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
