@@ -16,8 +16,8 @@ const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
 /**
  * "Needs you (N)": every corp of the player's that did not end up connected,
  * with the one-line reason and the fix that applies. Gone quiet is removed from
- * here (or logged in again as its CEO, when the player leads it); sign-in problems start that corp's sign-in again; a corp with its own
- * book has only the instruction, because moving a book is not built yet. A moon
+ * here, or logged in again as its CEO when the player leads it; sign-in problems start
+ * that corp's sign-in again; a corp with its own book has only the instruction, because moving a book is not built yet. A moon
  * owner read without refinery names offers Grant again when it is the player's
  * own, and otherwise only says whose officer can; that one is not counted. One of
  * the player's own read without each chunk's ore offers Grant again too. A row whose
@@ -66,14 +66,23 @@ export function CorpStatusPanel({
       <ul className="divide-y divide-line">
         {items.map((item) => (
           <li key={item.corporationId} className="space-y-1 py-2 text-sm">
-            <div className="flex items-start justify-between gap-2 sm:items-center">
+            <div
+              className={`flex items-start justify-between gap-2 sm:items-center ${
+                // Two buttons would squeeze the name and pills on a phone: they take their own line.
+                offersLoginAgain(item) ? 'flex-wrap sm:flex-nowrap' : ''
+              }`}
+            >
               <span className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
                 <span className="max-w-full truncate font-medium">{item.name}</span>
                 <CorpStatePill state={item.state} />
                 {item.ceoName && <CorpCeo name={item.ceoName} />}
               </span>
               {item.state === 'gone-quiet' ? (
-                <span className="flex shrink-0 items-center gap-2">
+                <span
+                  className={`flex shrink-0 items-center gap-2 ${
+                    offersLoginAgain(item) ? 'w-full justify-end sm:w-auto' : ''
+                  }`}
+                >
                   {offersLoginAgain(item) && (
                     <Button
                       size="sm"

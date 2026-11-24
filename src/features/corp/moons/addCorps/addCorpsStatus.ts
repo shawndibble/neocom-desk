@@ -63,7 +63,10 @@ export interface NeedsYouItem {
   reason?: string;
   /** `needs-names` whose grant also reads no chunk ore: the one Grant again fixes both. */
   alsoOre?: true;
-  /** The CEO to log in as, when the fix is a login and the player's character leads the corp. */
+  /**
+   * The CEO to log in as, when the fix is a login and the player's character leads the corp.
+   * Its presence also means the corp is the player's own, so a login here can replace its grant.
+   */
   ceoName?: string;
 }
 
