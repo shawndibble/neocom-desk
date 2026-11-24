@@ -45,9 +45,7 @@ import type { WidgetSize } from './kinds';
 import { fractionBar, type CellTone } from './data/cellKit';
 import { RowDetailModal } from './RowDetailModal';
 import { fitColumns, visibleColumns } from './tableModel';
-
-/** A turn-in row's opener, with the popover's reads: loaded only when a table has one. */
-const TurnInRowTrigger = lazy(() => import('./TurnInRowTrigger'));
+import { ROW_TARGET_CLASS } from './rowTarget';
 import {
   ROWS_PER_PAGE_OPTIONS,
   clampPage,
@@ -58,6 +56,9 @@ import {
   sortTableRows,
   type RowsPerPage,
 } from './tableSortPage';
+
+/** A turn-in row's opener, with the popover's reads: loaded only when a table has one. */
+const TurnInRowTrigger = lazy(() => import('./TurnInRowTrigger'));
 
 export interface TableBodyProps {
   table: TableModel;
@@ -149,8 +150,8 @@ const CARET_WIDTH = 20;
 /** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
 
-/** A `capped` column: truncated at 8rem, hidden under a 24rem box (see `TableColumn.capped`). */
-const CAPPED = 'hidden @sm:table-cell max-w-32 truncate whitespace-nowrap';
+/** A `capped` column: truncated at 5rem under a 24rem box, else 8rem (see `TableColumn.capped`). */
+const CAPPED = 'max-w-20 @sm:max-w-32 truncate whitespace-nowrap';
 
 function Row({
   row,
@@ -183,6 +184,7 @@ function Row({
   const flagged = isFlagged(row);
   const linked = row.to !== undefined;
   const turnIn = row.turnIn;
+  // The row is a target (row styling): it opens a modal, Show info or TurnInDetail.
   const opens = onOpen !== undefined || turnIn !== undefined;
   return (
     <tr
@@ -246,13 +248,7 @@ function Row({
                   </Suspense>
                 ) : linked && row.to !== undefined ? (
                   <RowTappableContext.Provider value>
-                    <Link
-                      to={row.to}
-                      className={cx(
-                        'min-w-0 truncate outline-none after:absolute after:inset-0 after:content-[""]',
-                        'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent'
-                      )}
-                    >
+                    <Link to={row.to} className={ROW_TARGET_CLASS}>
                       {text}
                     </Link>
                   </RowTappableContext.Provider>
@@ -262,12 +258,7 @@ function Row({
                       type="button"
                       aria-haspopup="dialog"
                       onClick={onOpen}
-                      className={entityLinkClassName(
-                        cx(
-                          'min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:content-[""]',
-                          'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent'
-                        )
-                      )}
+                      className={entityLinkClassName(cx(ROW_TARGET_CLASS, 'text-left'))}
                     >
                       {text}
                     </button>
@@ -503,7 +494,6 @@ export function TableBody({
                       // Replaces `cellPad`, never adds to it: two `pl-*` classes would race on stylesheet order.
                       i === 0 && iconSlot ? ICON_SLOT_INDENT : cellPad,
                       column.hideNarrow && HIDE_NARROW,
-                      column.capped && 'hidden @sm:table-cell',
                       'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
                       i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
                     )}

@@ -128,6 +128,21 @@ describe('militaryCampaigns builder', () => {
     expect(view.table!.rows.map((row) => row.key)).toEqual([`1:${FAILOVER.objectiveId}`]);
   });
 
+  it('on All, keeps the per-faction line and ring even with one campaign running', () => {
+    const view = militaryCampaigns(feeds({ campaigns: [CALDARI] }), ctx());
+    expect(view.number.rings).toHaveLength(1);
+    expect(view.number.value).toContain('factionLine');
+  });
+
+  it('notes a Character whose own read failed instead of dropping its rows silently', () => {
+    const view = militaryCampaigns(
+      feeds({ characters: [pilot(1), pilot(2, 'failed')] }),
+      ctx({ scopeAll: true })
+    );
+    expect(view.number.notes?.[0]).toContain('unread');
+    expect(view.table!.footer).toContain('unread');
+  });
+
   it('is empty with "No Military Campaign running" when nothing is Active', () => {
     const view = militaryCampaigns(feeds({ campaigns: [] }), ctx());
     expect(view.status.isEmpty).toBe(true);

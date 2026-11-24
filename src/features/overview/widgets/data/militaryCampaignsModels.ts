@@ -87,7 +87,7 @@ function earnedText(t: Translate, joined: NonNullable<CampaignWidgetRow['joined'
 }
 
 /** The second cell: what the Character holds and what it pays, or what it has put in and earned. */
-function whoText(t: Translate, row: CampaignWidgetRow, named: boolean): string {
+function whoText(t: Translate, row: CampaignWidgetRow, multiCharacter: boolean): string {
   const turnIn = row.turnIn;
   if (turnIn && turnIn.held > 0) {
     const values = {
@@ -95,7 +95,7 @@ function whoText(t: Translate, row: CampaignWidgetRow, named: boolean): string {
       held: formatNumber(turnIn.held),
       reward: approxIsk(turnIn.reward),
     };
-    return named ? t(k('holds'), values) : t(k('youHold'), values);
+    return multiCharacter ? t(k('holds'), values) : t(k('youHold'), values);
   }
   const joined = row.joined;
   if (!joined) return row.characterName;
@@ -107,7 +107,11 @@ function whoText(t: Translate, row: CampaignWidgetRow, named: boolean): string {
   return earned === null ? contributed : `${contributed} · ${earned}`;
 }
 
-function tableOf(t: Translate, rows: readonly CampaignWidgetRow[], named: boolean): TableModel {
+function tableOf(
+  t: Translate,
+  rows: readonly CampaignWidgetRow[],
+  multiCharacter: boolean
+): TableModel {
   return {
     // No header row (the cells say what they are), so the first cell names the row.
     columns: [
@@ -117,7 +121,7 @@ function tableOf(t: Translate, rows: readonly CampaignWidgetRow[], named: boolea
       { key: 'filled', label: '', align: 'end', priority: 1, minWidth: 80 },
     ],
     rows: rows.map((row): TableRowModel => {
-      const who = whoText(t, row, named);
+      const who = whoText(t, row, multiCharacter);
       const turnIn = row.turnIn;
       return {
         key: row.key,
@@ -144,13 +148,15 @@ function tableOf(t: Translate, rows: readonly CampaignWidgetRow[], named: boolea
 function numberOf(
   t: Translate,
   active: readonly CampaignCompletion[],
-  waiting: number
+  waiting: number,
+  /** One faction chosen: its campaign is the figure. All factions get one line and ring each. */
+  oneFaction: boolean
 ): NumberModel {
   const secondary =
     waiting > 0 ? { text: t(k('waiting'), { isk: approxIsk(waiting) }) } : undefined;
   const labelOf = (campaign: CampaignCompletion) =>
     factionName(t, campaign.factionId) ?? campaign.title;
-  const only = active.length === 1 ? active[0] : undefined;
+  const only = oneFaction && active.length === 1 ? active[0] : undefined;
   if (only) {
     return {
       value: t(k('ofTarget'), { completed: only.completed, target: only.target }),
@@ -253,11 +259,14 @@ export const militaryCampaigns: Builder = (
     (sum, row) => sum + (row.turnIn && row.turnIn.held > 0 ? row.turnIn.reward : 0),
     0
   );
-  const number = numberOf(t, active, waiting);
+  const number = numberOf(t, active, waiting, factionId !== null);
+  // A Character whose own read failed drops its rows: say so, never a silent gap.
+  const unread = granted.length - read.size;
+  const unreadNote = unread > 0 ? t(k('unread'), { count: unread }) : undefined;
   return {
     ...base,
-    number,
-    table: tableOf(t, rows, everyone && read.size > 1),
+    number: unreadNote ? { ...number, notes: [unreadNote] } : number,
+    table: { ...tableOf(t, rows, everyone && read.size > 1), footer: unreadNote },
     summary: [number.value, number.secondary?.text].filter(Boolean).join(' · '),
   };
 };

@@ -5961,7 +5961,9 @@
         "earnedLp": "{{lp}} LP earned",
         "filled": "{{percent}}% filled",
         "missingMore": "{{name}} and {{count}} more",
-        "whyMark": "Lets this widget list the Campaign Objectives they pressed Participate on."
+        "whyMark": "Lets this widget list the Campaign Objectives they pressed Participate on.",
+        "unread_one": "{{count}} Character couldn't be loaded.",
+        "unread_other": "{{count}} Characters couldn't be loaded."
       },
       "mercenaryDens": {
         "title": "Mercenary dens",

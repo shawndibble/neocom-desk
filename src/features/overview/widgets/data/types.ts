@@ -169,9 +169,9 @@ export interface TableColumn {
    */
   grow?: boolean;
   /**
-   * A secondary free-text column that truncates past 8rem, so the first column keeps the rest
-   * of the row, and is hidden while the table's own box is under 24rem (a phone), where the
-   * first column needs it all (Military Campaigns' holdings beside the objective). Not with `grow`.
+   * A secondary free-text column that truncates past 8rem (5rem while the table's own box is
+   * under 24rem, a phone), so the first column keeps the rest of the row (Military Campaigns'
+   * holdings beside the objective). Not with `grow`.
    */
   capped?: boolean;
   /**

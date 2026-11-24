@@ -652,7 +652,7 @@ function WidgetFrame({
               <span className="block truncate text-text">{title}</span>
             )}
           </h2>
-          {view.headerMark && state === 'ok' && (
+          {view.headerMark && (state === 'ok' || state === 'empty') && (
             <GrantCellMark
               characterId={view.headerMark.characterId}
               characterName={view.headerMark.characterName}

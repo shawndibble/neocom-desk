@@ -11,6 +11,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { cx } from '@/lib/cx';
 import type { TurnInRowModel } from './data/types';
+import { ROW_TARGET_CLASS } from './rowTarget';
 
 /** The row-wide opener, the same look as a row that opens its modal. */
 const RowOpener = forwardRef<HTMLButtonElement, ComponentProps<'button'>>(function RowOpener(
@@ -22,13 +23,7 @@ const RowOpener = forwardRef<HTMLButtonElement, ComponentProps<'button'>>(functi
       ref={ref}
       type="button"
       {...props}
-      className={entityLinkClassName(
-        cx(
-          'min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:content-[""]',
-          'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent',
-          className
-        )
-      )}
+      className={entityLinkClassName(cx(ROW_TARGET_CLASS, 'text-left', className))}
     />
   );
 });
