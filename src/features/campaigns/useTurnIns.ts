@@ -118,13 +118,15 @@ export async function loadTurnInOffers(hub: TradeHub): Promise<TurnInOffers> {
 
 /**
  * `loadTurnInOffers` for a component; reloads when the hub or the pilot's LP
- * Value changes. Idle for a `null` hub (not settled yet, or no turn-ins wanted).
+ * Value changes. Idle (no campaign request) for a `null` hub (not settled
+ * yet, or no turn-ins wanted) or while `enabled` is false, e.g. while the
+ * surface has nothing to look up.
  */
-export function useTurnInOffers(hub: TradeHub | null): AsyncLoad<TurnInOffers> {
+export function useTurnInOffers(hub: TradeHub | null, enabled = true): AsyncLoad<TurnInOffers> {
   const ownLpValue = useLpValue((state) => state.value);
   // Never called for no hub: the null key below keeps the load idle.
   const loader = useCallback(() => loadTurnInOffers(hub ?? DEFAULT_TRADE_HUB), [hub]);
-  return useKeyedLoad(hub === null ? null : `${hub.id}:${ownLpValue}`, loader);
+  return useKeyedLoad(hub === null || !enabled ? null : `${hub.id}:${ownLpValue}`, loader);
 }
 
 /** One Character's Participate answers. */
