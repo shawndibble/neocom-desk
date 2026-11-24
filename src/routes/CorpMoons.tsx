@@ -83,6 +83,7 @@ import { useMoonOwners } from '@/features/corp/moons/useMoonOwners';
 import { useMoonOwnersSyncNow } from '@/features/corp/moons/useMoonOwnersSyncNow';
 import { useStaleLedgerMail } from '@/features/corp/moons/useStaleLedgerMail';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
+import { useMoonOwnerDebugDump } from '@/features/corp/moons/moonOwnerDebugDump';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -114,6 +115,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   // A moon owner's ledger that can't be read is mailed to both sides once per spell (#6210).
   useStaleLedgerMail(moonOwnerRows);
   useMoonsAttentionPublisher();
+  useMoonOwnerDebugDump();
   const syncing = sync.run.phase === 'syncing' || moonOwnersSync.busy;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
