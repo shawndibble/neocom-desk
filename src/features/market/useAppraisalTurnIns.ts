@@ -58,7 +58,8 @@ export function useAppraisalTurnIns({
   refineBasis: RefineBasis;
 }): AppraisalTurnIns {
   const { t } = useTranslation();
-  const offers = useTurnInOffers(hub);
+  // No campaign request until something is appraised.
+  const offers = useTurnInOffers(hub, rows.length > 0);
   const offerFor = offers.status === 'ready' ? offers.data.offerFor : null;
   const any = offerFor !== null && rows.some((row) => offerFor(row.typeId) !== null);
   // Read only once something pasted can be turned in.
