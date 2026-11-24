@@ -869,7 +869,16 @@ async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promis
   try {
     tokens = await deps.refresh(grant.clientId, current);
   } catch (err) {
-    if (err instanceof SsoRefreshError && err.invalidGrant) return { kind: 'dead' };
+    if (err instanceof SsoRefreshError && err.invalidGrant) {
+      // SSO's own wording is what tells a revoked app from an already-used rotated token.
+      deps.log('SSO refused a stored token', {
+        corporationId: grant.corporationId,
+        kind: grant.kind ?? 'book',
+        ssoStatus: err.status,
+        ...(err.description !== undefined ? { ssoDescription: err.description } : {}),
+      });
+      return { kind: 'dead' };
+    }
     throw err;
   }
   const rotated = rotateStoredToken(

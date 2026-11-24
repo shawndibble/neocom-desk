@@ -10,6 +10,8 @@ import {
   deleteAlertGrant,
   parseSaveAlertGrantInput,
   refreshAtSso,
+  sanitiseSsoDescription,
+  SsoRefreshError,
   revokeAtSso,
   saveAlertGrant,
   type AlertGrantDeps,
@@ -322,6 +324,56 @@ describe('refreshAtSso', () => {
     await expect(refreshAtSso('c', REFRESH, odd as unknown as typeof fetch)).rejects.toThrow(
       /malformed/
     );
+  });
+});
+
+describe('sanitiseSsoDescription', () => {
+  it('redacts the token, any other token-shaped run and JWTs, then bounds the length', () => {
+    const jwt = 'aaaaaaaaaaaa.bbbbbbbbbbbb.cccccccccccc';
+    const other = 'Zm9vYmFyYmF6cXV4cXV1eHF1dXg_-Zm9v';
+    expect(sanitiseSsoDescription(`bad ${REFRESH} / ${other} / ${jwt}`, REFRESH)).toBe(
+      'bad [token] / [token] / [token]'
+    );
+    expect(sanitiseSsoDescription('Unable to migrate grant', REFRESH)).toBe(
+      'Unable to migrate grant'
+    );
+    expect(sanitiseSsoDescription('y'.repeat(500) + ' end', REFRESH)?.length).toBeLessThanOrEqual(
+      200
+    );
+  });
+
+  it('survives an empty token and a blank description', () => {
+    expect(sanitiseSsoDescription('plain', '')).toBe('plain');
+    expect(sanitiseSsoDescription('   ', REFRESH)).toBeUndefined();
+  });
+});
+
+describe('refreshAtSso refusal detail', () => {
+  const refused = (body: unknown) =>
+    vi.fn(async () => Response.json(body, { status: 400 })) as unknown as typeof fetch;
+
+  it("keeps SSO's error_description on an invalid_grant, bounded and without the token", async () => {
+    const err = await refreshAtSso(
+      'c',
+      REFRESH,
+      refused({
+        error: 'invalid_grant',
+        error_description: `Invalid refresh token ${REFRESH}. ${'x'.repeat(500)}`,
+      })
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SsoRefreshError);
+    const { status, invalidGrant, description } = err as SsoRefreshError;
+    expect({ status, invalidGrant }).toEqual({ status: 400, invalidGrant: true });
+    expect(description).not.toContain(REFRESH);
+    expect(description?.length).toBeLessThanOrEqual(200);
+    expect(description).toMatch(/^Invalid refresh token \[token\]\./);
+  });
+
+  it('has no description when SSO sends none', async () => {
+    const err = await refreshAtSso('c', REFRESH, refused({ error: 'invalid_grant' })).catch(
+      (e: unknown) => e
+    );
+    expect((err as SsoRefreshError).description).toBeUndefined();
   });
 });
 
