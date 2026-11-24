@@ -307,8 +307,8 @@ Use WebFetch / WebSearch for external API facts (ESI, Fuzzwork) if needed.
 
 This is the longest phase, so the token discipline above matters most here:
 batch the exploration reads, and make one edit per file rather than a stream of
-small ones. `/code-review` runs its two axes as parallel sub-agents — do not
-run them inline.
+small ones. `/code-review` runs its axes as parallel sub-agents — do not run them inline. For work that
+isn't from a ticket, `/do-it` is the equivalent of steps 5-7.
 
 ## 6. Sync with main
 
