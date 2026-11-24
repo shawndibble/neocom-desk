@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -76,10 +76,25 @@ async function choose(name: string) {
   await user.click(await screen.findByRole('menuitem', { name }));
 }
 
+/**
+ * The notice's live region (`LiveStatus`) mounts empty and fills a tick later, so
+ * `findByRole('status')` can return it still empty: wait for the text itself.
+ */
+async function expectStatus(text: string) {
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(text));
+}
+
+// Settled, so the hub menu's first open (`useMarketHub.hydrate`) never reads Dexie for the
+// active Character: that read lands after a test has picked one and resets it to null.
+beforeEach(() => {
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+});
+
 afterEach(() => {
   configureClipboard(null);
-  vi.mocked(createShareLink).mockClear();
-  useActiveCharacter.setState({ activeCharacterId: null });
+  // Reset, not clear: drops a queued mockRejectedValueOnce and restores each factory default.
+  vi.mocked(createShareLink).mockReset();
+  vi.mocked(existingShareLink).mockReset();
 });
 
 describe('FittingExportMenu', () => {
@@ -126,9 +141,7 @@ describe('FittingExportMenu', () => {
     expect(call.payload).toEqual({ v: 1, code: call.reuseKey });
     const decoded = await decodeFittingShare(call.reuseKey);
     expect(decoded.ok && decoded.value.hullTypeId).toBe(587);
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Share Link copied — it works for 7 days'
-    );
+    await expectStatus('Share Link copied — it works for 7 days');
   });
 
   it('copies a link already made for this fit without storing another', async () => {
@@ -138,7 +151,6 @@ describe('FittingExportMenu', () => {
     await choose('Copy Share Link');
     await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/s/made2e']));
     expect(createShareLink).not.toHaveBeenCalled();
-    vi.mocked(existingShareLink).mockReturnValue(null);
   });
 
   it('copies the permanent link, and says so, when offline instead of waiting on the share store', async () => {
@@ -150,7 +162,7 @@ describe('FittingExportMenu', () => {
       await waitFor(() => expect(copied).toHaveLength(1));
       expect(copied[0]).toContain('/share/fitting?f=');
       expect(createShareLink).not.toHaveBeenCalled();
-      expect(await screen.findByRole('status')).toHaveTextContent(
+      await expectStatus(
         'Offline: permanent link copied instead. The short Share Link needs a connection.'
       );
     } finally {
@@ -163,7 +175,7 @@ describe('FittingExportMenu', () => {
     vi.mocked(createShareLink).mockRejectedValueOnce(new Error('permission-denied'));
     const copied = setup();
     await choose('Copy Share Link');
-    expect(await screen.findByRole('status')).toHaveTextContent(
+    await expectStatus(
       "Couldn't make the short Share Link, so the permanent link was copied instead."
     );
     expect(copied).toHaveLength(1);
@@ -219,6 +231,6 @@ describe('FittingExportMenu — EVE XML', () => {
     expect(text).toContain('<shipType value="Rifter"/>');
     expect(text).toContain('<hardware slot="hi slot 0" type="200mm AutoCannon II"/>');
     expect(mime).toMatch(/xml/);
-    expect(await screen.findByRole('status')).toHaveTextContent('Fitting XML downloaded');
+    await expectStatus('Fitting XML downloaded');
   });
 });
