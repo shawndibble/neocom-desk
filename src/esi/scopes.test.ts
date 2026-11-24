@@ -111,6 +111,8 @@ describe('SCOPES (Base Grant)', () => {
         'esi-killmails.read_killmails.v1',
         'esi-activities.read_character.v1',
         'esi-structures.read_character.v1',
+        // militaryCampaigns
+        'esi.activity.char:read',
       ].sort()
     );
   });
@@ -176,6 +178,11 @@ describe('scopesForGroup', () => {
   it("lists exactly the killmails group's scopes", () => {
     expect([...scopesForGroup('killmails')]).toEqual(['esi-killmails.read_killmails.v1']);
     expect(SCOPES).toContain('esi-killmails.read_killmails.v1');
+  });
+
+  it("lists exactly the militaryCampaigns group's scopes (issue #6703)", () => {
+    expect([...scopesForGroup('militaryCampaigns')]).toEqual(['esi.activity.char:read']);
+    expect(SCOPES).toContain('esi.activity.char:read');
   });
 
   it("lists exactly the corpProjects group's scopes (issue #4786)", () => {

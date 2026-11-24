@@ -24,10 +24,15 @@ export interface CharacterPermissionCount extends PermissionCount {
 /**
  * The Permissions the count covers: every one but Corporation and the Write to
  * EVE section, which is off by default on purpose — a Character that never
- * opted in to a write is not missing anything.
+ * opted in to a write is not missing anything. Military Campaigns is left out
+ * too: every Character signed in before it shipped lacks it, and the scope
+ * decision (20261123-164921) is that they are never pushed to re-login for it;
+ * a count turning every roster amber would be that push. Its own figures carry
+ * the missing-Permission mark instead.
  */
 export const COUNTED_PERMISSIONS = SCOPE_GROUPS.filter(
-  (group) => group !== 'corp' && PERMISSIONS[group].section !== 'write'
+  (group) =>
+    group !== 'corp' && group !== 'militaryCampaigns' && PERMISSIONS[group].section !== 'write'
 );
 
 export function countGrantedPermissions(scopes: readonly string[]): PermissionCount {

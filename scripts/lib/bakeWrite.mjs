@@ -41,6 +41,7 @@ export async function writeOutputs({
   characterTitles,
   agents,
   npcCorporationData,
+  militaryCampaigns,
   marketGroups,
   marketTypes,
   solarSystems,
@@ -123,6 +124,8 @@ export async function writeOutputs({
     // NPC agents and corporations for the Contacts standings view; lazy, see lib/npcAgents.mjs.
     ['agents.json', agents],
     ['npcCorporations.json', npcCorporationData],
+    // Military Campaigns and their objectives (turn-ins); small, so precached.
+    ['militaryCampaigns.json', militaryCampaigns],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {

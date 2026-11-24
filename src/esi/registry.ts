@@ -25,8 +25,11 @@ export type PublicAccess = typeof PUBLIC;
 /**
  * Shape check only — catches a malformed scope string, not a misspelled one.
  * The spelling backstop is the hand-written literal list in `scopes.test.ts`.
+ * Two shapes: the classic `esi-<area>.<verb>.v<n>`, and the newer
+ * `esi.<area>.<owner>:<verb>` CCP uses from the 2026 routes on (Military
+ * Campaigns' `esi.activity.char:read`).
  */
-export type EsiScopeName = `esi-${string}.v${number}`;
+export type EsiScopeName = `esi-${string}.v${number}` | `esi.${string}:${string}`;
 
 export type ScopeRequirement = EsiScopeName | PublicAccess;
 
@@ -76,6 +79,7 @@ export const SCOPE_GROUPS = [
   'corpProjects',
   'killmails',
   'mercenaryDens',
+  'militaryCampaigns',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -232,6 +236,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
     captionKey: 'permissions.mercenaryDens.caption',
     defaultOn: true,
   },
+  militaryCampaigns: {
+    labelKey: 'permissions.militaryCampaigns.label',
+    captionKey: 'permissions.militaryCampaigns.caption',
+    defaultOn: true,
+  },
 };
 
 export interface EsiEndpointSpec {
@@ -245,7 +254,7 @@ export interface EsiEndpointSpec {
    * structure lookup and search) — so leaving it off is the rare case,
    * reserved for those.
    *
-   * Every other endpoint declares one of the 25 `SCOPE_GROUPS`: the nineteen
+   * Every other endpoint declares one of the 26 `SCOPE_GROUPS`: the twenty
    * default-on (read) ones together with the Core Grant make up the **Base
    * Grant** (`SCOPES` in `scopes.ts`), and the six Write to EVE ones stay opt-in.
    *
@@ -1001,6 +1010,25 @@ export const ESI_REGISTRY = {
   getSovereigntySystems: {
     route: '/sovereignty/systems',
     scope: PUBLIC,
+  },
+  /**
+   * Military Campaigns (issue #6703): live campaign and objective state, and
+   * which objectives a Character pressed Participate on. A Permission of its
+   * own, in the Base Grant; a Character that signed in before it shipped is
+   * never prompted for it — reads answer "unknown" until it is granted.
+   */
+  getMilitaryCampaigns: {
+    route: '/military-campaigns',
+    scope: PUBLIC,
+  },
+  getMilitaryCampaignObjectives: {
+    route: '/military-campaigns/{campaign_id}/objectives',
+    scope: PUBLIC,
+  },
+  getCharacterMilitaryCampaignObjectives: {
+    route: '/characters/{character_id}/military-campaigns/objectives',
+    scope: 'esi.activity.char:read',
+    group: 'militaryCampaigns',
   },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 

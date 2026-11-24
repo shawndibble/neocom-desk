@@ -61,6 +61,7 @@ const UNLOCKS_TOOLTIP: Partial<Record<ScopeGroup, string>> = {
   corpProjects: 'settings.permissions.unlocks.corpProjects',
   killmails: 'settings.permissions.unlocks.killmails',
   mercenaryDens: 'settings.permissions.unlocks.mercenaryDens',
+  militaryCampaigns: 'settings.permissions.unlocks.militaryCampaigns',
 };
 
 /** `?grant=a,b` from a "Grant missing Permissions" link: the Permissions whose button should flash. */

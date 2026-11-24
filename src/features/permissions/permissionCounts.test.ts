@@ -103,3 +103,9 @@ describe('orderForPicker', () => {
     expect(needs.map((r) => r.name)).toEqual(['Ann', 'Bea']);
   });
 });
+
+describe('COUNTED_PERMISSIONS', () => {
+  it('leaves Military Campaigns out, so Characters from before it shipped stay complete', () => {
+    expect(COUNTED_PERMISSIONS).not.toContain('militaryCampaigns');
+  });
+});

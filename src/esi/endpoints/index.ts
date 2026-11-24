@@ -24,6 +24,7 @@ export * from './industry';
 export * from './mail';
 export * from './market';
 export * from './mercenaryDens';
+export * from './militaryCampaigns';
 export * from './pi';
 export * from './ui';
 export * from './universe';

@@ -58,7 +58,9 @@ describe('scope declarations', () => {
   it('declares either a well-formed ESI scope or the explicit PUBLIC marker', () => {
     for (const [id, spec] of entries) {
       if (spec.scope === PUBLIC) continue;
-      expect(spec.scope, id).toMatch(/^esi-[a-z_]+\.[a-z_]+\.v\d+$/);
+      expect(spec.scope, id).toMatch(
+        /^(esi-[a-z_]+\.[a-z_]+\.v\d+|esi\.[a-z_]+\.[a-z_]+:[a-z_]+)$/
+      );
     }
   });
 });

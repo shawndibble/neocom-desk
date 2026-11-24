@@ -14789,6 +14789,10 @@
       "label": "Mercenary dens",
       "caption": "Your Mercenary Dens and their operations, for the Overview widget and den alerts."
     },
+    "militaryCampaigns": {
+      "label": "Military Campaigns",
+      "caption": "Which Campaign Objectives you pressed Participate on, and how much you have turned in."
+    },
     "core": {
       "skills": {
         "label": "Skills & skill queue",
@@ -15749,7 +15753,8 @@
         "corp": "Unlocks Corp Board, Members, Corp Wallet, Corp Assets, Moons, SRP officer view",
         "corpProjects": "Unlocks Corp projects in Build Opportunities",
         "killmails": "Unlocks the SRP lost-ship list",
-        "mercenaryDens": "Unlocks the Mercenary dens Overview widget and den alerts"
+        "mercenaryDens": "Unlocks the Mercenary dens Overview widget and den alerts",
+        "militaryCampaigns": "Shows whether a turn-in pays you, and the Military Campaigns Overview widget"
       }
     }
   },
