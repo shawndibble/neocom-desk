@@ -64,6 +64,7 @@ import {
 import {
   worstProblem,
   allProblems,
+  isRealProblem,
   ORDER_PROBLEMS,
   type OrderProblem,
   type OrderProblemFacts,
@@ -148,6 +149,12 @@ export interface OpenOrderRow {
    * as an undercut sample. Absent means checked.
    */
   competitionUnchecked?: boolean;
+  /**
+   * The Active campaign Turn-in Reward per item for this order's type (issue
+   * #6708): ISK plus LP at LP Value. Absent when nothing turns it in. A sell
+   * order it beats reads `turnInPays`; a buy order keeps its state.
+   */
+  turnInEach?: number;
 }
 
 export interface CharacterSkills {
@@ -221,6 +228,11 @@ export interface BuildRowsInput {
    * never a flag the samples cannot back up.
    */
   problemSamples?: ReadonlyMap<number, readonly OrderProblemSample[]>;
+  /**
+   * The Active Turn-in Reward per item, keyed typeId (`TurnInOfferDetail.totalPerItem`).
+   * Absent or missing a type means no turn-in: the row reads as it would without one.
+   */
+  turnInPerItem?: ReadonlyMap<number, number>;
 }
 
 /** The trap: my own order sits inside the aggregate, so a rival price EQUAL to mine is not beating me — only strictly better counts. */
@@ -438,6 +450,7 @@ function buildRow(
   const belowFloor = floor !== null && !isBuyOrder && order.price < floor.relist;
 
   const expiry = orderExpiry(order.issued, order.duration, now);
+  const turnInEach = input.turnInPerItem?.get(order.type_id);
 
   const facts: OrderProblemFacts = {
     isBuyOrder,
@@ -447,6 +460,7 @@ function buildRow(
     volumeRemain: order.volume_remain,
     daysWithoutSale: daysWithoutSale?.get(order.order_id) ?? null,
     outlastsOrder: false,
+    turnInBeatsPrice: turnInEach !== undefined && turnInEach > order.price,
   };
   const problem = worstProblem(facts);
   const problems = allProblems(facts);
@@ -484,6 +498,7 @@ function buildRow(
     // `loadStationBestPrices` returns an entry for every type of a station it
     // reached (null prices for "no orders"), so a missing one is a failed read.
     competitionUnchecked: aggregate === undefined && deepUndercut === null,
+    ...(turnInEach !== undefined ? { turnInEach } : {}),
   };
 }
 
@@ -554,9 +569,9 @@ export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
     .length;
 }
 
-/** Orders that are not `healthy`. */
+/** Orders with a real problem: neither `healthy` nor only a turn-in that pays (never "needs you"). */
 export function needsAttentionCount(rows: readonly OpenOrderRow[]): number {
-  return rows.filter((row) => row.problem !== 'healthy').length;
+  return rows.filter((row) => isRealProblem(row.problem)).length;
 }
 
 /** Every order id across every Character's orders — the "never undercut an alt" set. */

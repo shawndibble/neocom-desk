@@ -208,4 +208,42 @@ describe('militaryCampaigns builder', () => {
     );
     expect(caldari.table!.rows).toEqual([]);
   });
+
+  it('titles a joined turn-in with nothing held by its objective, not "Turn in …"', () => {
+    const joinedTurnIn: CampaignWidgetRow = {
+      ...turnInRow(1, 0),
+      joined: { contributed: 0, isk: 0, lp: 0 },
+    };
+    const view = militaryCampaigns(feeds({ rows: [joinedTurnIn] }), ctx());
+    const row = view.table!.rows[0]!;
+    expect(row.cells[0]).toBe(FAILOVER.objectiveTitle);
+    expect(row.turnIn).toBeDefined();
+  });
+
+  it('counts the holdings of a Character without Military Campaigns, in its rows and the waiting total', () => {
+    const view = militaryCampaigns(
+      feeds({
+        characters: [pilot(1), pilot(3, 'needsPermission')],
+        rows: [turnInRow(1, 640), turnInRow(3, 10)],
+      }),
+      ctx({ scopeAll: true })
+    );
+    const rows = view.table!.rows;
+    expect(rows.map((row) => row.key)).toEqual([
+      `1:${FAILOVER.objectiveId}`,
+      `3:${FAILOVER.objectiveId}`,
+    ]);
+    expect(rows[1]!.cells[1]).toContain('holds');
+    expect(rows[1]!.turnIn).toMatchObject({ characterId: 3 });
+    // 650 × 60K.
+    expect(view.number.secondary?.text).toContain('~39M');
+    // Still asks for the grant.
+    expect(view.headerMark).toMatchObject({ characterId: 3 });
+  });
+
+  it('names the chosen faction in the figure', () => {
+    const view = militaryCampaigns(feeds(), ctx({ campaignFaction: 'caldari' }));
+    expect(view.number.value).toContain('factionOfTarget');
+    expect(view.number.value).toContain('overview.menu.factionChoice.caldari');
+  });
 });

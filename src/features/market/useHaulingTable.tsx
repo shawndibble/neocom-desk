@@ -21,6 +21,9 @@ import { formatSignedPct, formatTripM3, formatVolume } from './format';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 import { hubAtAnyEnd, type HaulingAnyEnd } from './haulingHubs';
 import { iskGains, signedIsk } from '@/lib/signedIsk';
+import { TurnInDetail, TurnInGlyph } from '@/features/campaigns/TurnInDetail';
+import { approxIsk } from '@/features/campaigns/turnInContent';
+import type { TurnInOfferDetail } from '@/features/campaigns/useTurnIns';
 
 /**
  * The list's optional (non-identity) columns, for `ColumnPickerMenu`
@@ -89,6 +92,8 @@ interface HaulingTableInput {
   /** The category a row was added from by the fill, or null. */
   addedFromOf: (typeId: number) => string | null;
   limitTextOf: (row: HaulingViewRow) => string | undefined;
+  /** The Active turn-in for a row's item at its To hub, or null: a dim glyph after its sell price. */
+  turnInOfferFor: (row: HaulingViewRow) => TurnInOfferDetail | null;
 }
 
 /** The Hauling list's columns, which of them show, and the picker's catalog. */
@@ -104,6 +109,7 @@ export function useHaulingTable({
   patchOverride,
   addedFromOf,
   limitTextOf,
+  turnInOfferFor,
 }: HaulingTableInput) {
   const { t } = useTranslation();
   const columnVisibility = useColumnVisibility(useHaulingColumns, DEFAULT_VISIBLE_COLUMN_IDS);
@@ -233,7 +239,32 @@ export function useHaulingTable({
         before: `${t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected')} `,
       },
       sortValue: (row) => row.price,
-      render: (row) => price(row.price),
+      render: (row) => {
+        // The item stays listed: a turn-in is only a glyph after the price, opening its detail.
+        const offer = turnInOfferFor(row);
+        if (!offer) return price(row.price);
+        // The detail's headline already says what one pays; the line adds how that compares
+        // with this sale, and only when the turn-in pays more.
+        const gain = offer.totalPerItem - row.price;
+        return (
+          <>
+            {price(row.price)}
+            <TurnInDetail
+              name={row.name}
+              offer={offer}
+              surfaceLine={
+                gain > 0
+                  ? t('campaigns.turnIn.overSale', {
+                      gain: approxIsk(gain),
+                      price: formatMarketIsk(row.price),
+                    })
+                  : undefined
+              }
+              trigger={<TurnInGlyph name={row.name} />}
+            />
+          </>
+        );
+      },
     },
     {
       // This trip's profit on the row: what Bring loads of it. The margin

@@ -1190,7 +1190,7 @@ describe('AppraisalPanel — Copy lists', () => {
       controller: controller({ result: outcome({ appraisal: { ...APPRAISAL, items: [] } }) }),
     });
     await userEvent.click(menuButton());
-    for (const name of [/^Sell now/, /^List at undercut/, /^Refine/, /^Multibuy/]) {
+    for (const name of [/^Sell now/, /^List at undercut/, /^Refine/, /^Turn in/, /^Multibuy/]) {
       expect(await screen.findByRole('menuitem', { name })).toHaveAttribute(
         'aria-disabled',
         'true'

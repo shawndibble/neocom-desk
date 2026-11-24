@@ -76,7 +76,7 @@ export interface MilitaryCampaignsWidgetData {
   fromCache: boolean;
 }
 
-/** One granted Character's reads, as `campaignWidgetRows` needs them. */
+/** One Character's reads, as `campaignWidgetRows` needs them (none joined without the Permission). */
 export interface CampaignCharacterReads {
   characterId: number;
   name: string;
@@ -148,6 +148,26 @@ export function campaignWidgetRows(
         a.title.localeCompare(b.title)
     );
   });
+}
+
+/**
+ * The item types the rows name: every held type, and the item each joined
+ * objective takes (a joined turn-in with nothing held still names its item).
+ */
+export function turnInTypeIds(
+  characters: readonly CampaignCharacterReads[],
+  offers: ReadonlyMap<number, TurnInOfferDetail>
+): Set<number> {
+  const typeByObjective = new Map([...offers.values()].map((o) => [o.objectiveId, o.typeId]));
+  const ids = new Set<number>();
+  for (const character of characters) {
+    for (const typeId of character.held.keys()) ids.add(typeId);
+    for (const p of character.participating) {
+      const typeId = typeByObjective.get(p.objective.id);
+      if (typeId !== undefined) ids.add(typeId);
+    }
+  }
+  return ids;
 }
 
 /** Rows with items to hand in come first. */
@@ -240,25 +260,27 @@ export async function loadMilitaryCampaignsWidget(
         name: character.name,
         status: kind === 'ok' ? 'ok' : kind === 'needsPermission' ? 'needsPermission' : 'failed',
       };
-      if (!overview || overview.participating === null) return;
+      // A Character without Military Campaigns still holds turn-in items: those rows count,
+      // with its Participate unknown (its TurnInDetail says it pays only after Participate).
+      // A Character whose own read failed shows nothing (the widget notes it).
+      if (!overview || (overview.participating === null && kind !== 'needsPermission')) return;
       reads[i] = {
         characterId: character.characterId,
         name: character.name,
-        participating: overview.participating,
+        participating: overview.participating ?? [],
         contributedTo: overview.participation.contributedTo,
         held: await heldTypes(character.characterId, wanted),
       };
     })
   );
-  const granted = reads.filter((read): read is CampaignCharacterReads => read !== undefined);
-  const heldTypeIds = [...new Set(granted.flatMap((read) => [...read.held.keys()]))];
-  const typeNames =
-    heldTypeIds.length === 0 ? new Map<number, string>() : await loadTypeNames(heldTypeIds);
+  const readable = reads.filter((read): read is CampaignCharacterReads => read !== undefined);
+  const typeIds = [...turnInTypeIds(readable, byType)];
+  const typeNames = typeIds.length === 0 ? new Map<number, string>() : await loadTypeNames(typeIds);
   const factions = new Map(file.campaigns.map((c) => [c.id, c.factionId]));
   return {
     campaigns: campaignCompletions(file.campaigns, state.campaigns),
     characters,
-    rows: campaignWidgetRows(granted, byType, typeNames, (id) => factions.get(id) ?? null),
+    rows: campaignWidgetRows(readable, byType, typeNames, (id) => factions.get(id) ?? null),
     fetchedAt: state.fetchedAt,
     fromCache: state.fromCache,
   };

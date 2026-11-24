@@ -7,6 +7,7 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedGrant } from '@/test/seed';
 import { OrderDetailContent } from './OrderDetailModal';
+import { FAILOVER } from '@/features/campaigns/turnInStoryData';
 import { relistFees } from './orderDetailView';
 import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
@@ -1313,5 +1314,61 @@ describe('OrderDetailModal — Open in EVE (#4025)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /Open in EVE/ })).not.toBeInTheDocument()
     );
+  });
+});
+
+describe('OrderDetailContent — campaign turn-in (#6708)', () => {
+  it('shows the turn-in in the main area for a sell order it beats, about its own Character', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      price: 57_990,
+      problem: 'turnInPays',
+      problems: ['turnInPays'],
+      turnInEach: 60_000,
+    };
+    renderModal({ row, turnIn: FAILOVER });
+    const dialog = screen.getByRole('dialog', { name: 'Tritanium' });
+    expect(within(dialog).getByText('Turn in')).toBeInTheDocument();
+    expect(within(dialog).getByText('Pays ~2K each over your price (57,990)')).toBeInTheDocument();
+    expect(within(dialog).getByText('Secure Strength Trader · Onnamon')).toBeInTheDocument();
+  });
+
+  it('shows a buy order what 100 turned in pay over its bid', () => {
+    const row: OpenOrderRow = { ...BASE_ROW, isBuyOrder: true, price: 50_500, turnInEach: 60_000 };
+    renderModal({ row, turnIn: FAILOVER });
+    expect(screen.getByText('Pays you ~950K per 100 over this bid')).toBeInTheDocument();
+  });
+
+  it('a top bid the turn-in beats: the bid line says the turn-in pays more, not "Nothing", and the turn-in is its own block', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      isBuyOrder: true,
+      price: 50_500,
+      turnInEach: 60_000,
+      station: { bestPrice: 50_500, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    };
+    renderModal({ row, turnIn: FAILOVER });
+    expect(screen.queryByText('Nothing. This one is doing fine.')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Nothing to fix on the bid. Turning the items in pays more: see Turn-in.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Turn-in' })).toBeInTheDocument();
+  });
+
+  it('a top bid the turn-in does not beat keeps "Nothing. This one is doing fine."', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      isBuyOrder: true,
+      price: 70_000,
+      turnInEach: 60_000,
+      station: { bestPrice: 70_000, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    };
+    renderModal({ row, turnIn: FAILOVER });
+    expect(screen.getByText('Nothing. This one is doing fine.')).toBeInTheDocument();
+  });
+
+  it('leaves the turn-in out of a sell order it does not beat', () => {
+    renderModal({ row: { ...BASE_ROW, turnInEach: 400 }, turnIn: FAILOVER });
+    expect(screen.queryByText('Secure Strength Trader · Onnamon')).not.toBeInTheDocument();
   });
 });

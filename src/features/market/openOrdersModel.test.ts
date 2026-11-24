@@ -234,6 +234,57 @@ describe('buildOpenOrderRows — competition not checked (prices unreachable)', 
   });
 });
 
+describe('buildOpenOrderRows — campaign turn-ins', () => {
+  const STATION = new Map([
+    ['60003760:100', { sellMin: 1000, buyMax: 900, sellVolume: 5, buyVolume: 5 }],
+  ]);
+
+  it('files a sell order under turnInPays when the Turn-in Reward each beats its price', () => {
+    const row = firstRow(
+      baseInput({ stationPrices: STATION, turnInPerItem: new Map([[100, 1500]]) })
+    );
+    expect(row.turnInEach).toBe(1500);
+    expect(row.problem).toBe('turnInPays');
+    expect(row.problems).toEqual(['turnInPays']);
+  });
+
+  it('stays healthy when the reward does not beat the price', () => {
+    const row = firstRow(
+      baseInput({ stationPrices: STATION, turnInPerItem: new Map([[100, 1000]]) })
+    );
+    expect(row.turnInEach).toBe(1000);
+    expect(row.problem).toBe('healthy');
+  });
+
+  it('keeps a buy order on its own state while carrying the reward', () => {
+    const row = firstRow(
+      baseInput({
+        snapshot: makeSnapshot([
+          makeEntry({ orders: [makeOrder({ is_buy_order: true, price: 900 })] }),
+        ]),
+        stationPrices: STATION,
+        turnInPerItem: new Map([[100, 1500]]),
+      })
+    );
+    expect(row.turnInEach).toBe(1500);
+    expect(row.problem).toBe('healthy');
+  });
+
+  it('carries no reward for an item with no Active turn-in', () => {
+    const row = firstRow(baseInput({ stationPrices: STATION, turnInPerItem: new Map() }));
+    expect(row.turnInEach).toBeUndefined();
+    expect(row.problem).toBe('healthy');
+  });
+
+  it('never counts a turnInPays order as needing attention', () => {
+    const rows = buildOpenOrderRows(
+      baseInput({ stationPrices: STATION, turnInPerItem: new Map([[100, 1500]]) })
+    );
+    expect(rows[0].problem).toBe('turnInPays');
+    expect(needsAttentionCount(rows)).toBe(0);
+  });
+});
+
 describe('notCheckedCount', () => {
   it('counts only unchecked rows that would otherwise read healthy', () => {
     const base = firstRow(baseInput({ stationPrices: new Map() }));

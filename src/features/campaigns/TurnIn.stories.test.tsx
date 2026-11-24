@@ -25,6 +25,16 @@ describe('turn-in stories', () => {
     expect(screen.getByText('28,000 ISK + 40 LP (LP unpriced)')).toBeInTheDocument();
   });
 
+  it('says where to press Participate above the pile only when no row participates', () => {
+    const line = 'Not participating: press Participate now in the Opportunities window';
+    const { unmount } = render(<breakdown.SomeNotParticipating />);
+    expect(screen.queryByText(line)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Not participating').length).toBeGreaterThan(0);
+    unmount();
+    render(<breakdown.NotParticipating />);
+    expect(screen.getByText(line)).toBeInTheDocument();
+  });
+
   it.each(Object.entries(breakdown))('draws the %s breakdown', (_name, Story) => {
     render(<Story />);
     expect(screen.getByRole('dialog', { name: 'Turn in: ~39.6M' })).toBeInTheDocument();

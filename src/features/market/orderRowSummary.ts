@@ -36,6 +36,7 @@ export type OrderAdviceInput = Pick<
   | 'frequentlyUndercut'
   | 'competitionUnchecked'
   | 'volumeRemain'
+  | 'turnInEach'
 >;
 
 /** What undercutting the rival's price would do to a unit, once the fees are paid. Only ever known when the order has a cost basis. */

@@ -7,7 +7,7 @@ import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandi
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { type RefineBasis, type appraisalNet } from '@/engine/market/appraisal';
 import { pileFigures } from '@/engine/market/appraisalRowFigures';
-import { AppraisalHeaderStats } from './AppraisalHeaderStats';
+import { AppraisalHeaderStats, type AppraisalTurnInTotal } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { HubCompareCards } from './HubCompareCards';
 import { LivePriceBar, LivePriceStatus } from './LivePriceStatus';
@@ -40,6 +40,8 @@ interface AppraisalSummaryProps {
   onOpenRefine?: () => void;
   /** The remembered price basis the Refine figures are on. */
   refineBasis: RefineBasis;
+  /** The facts row's Turn in total (`AppraisalHeaderStats`); null hides it. */
+  turnIn?: AppraisalTurnInTotal | null;
 }
 
 export function AppraisalSummary({
@@ -61,6 +63,7 @@ export function AppraisalSummary({
   refineEfficiency,
   onOpenRefine,
   refineBasis,
+  turnIn = null,
 }: AppraisalSummaryProps) {
   const { t } = useTranslation();
   const totals = result.appraisal.totals;
@@ -83,6 +86,7 @@ export function AppraisalSummary({
           implantBonusPct={implantBonusPct}
           refineEfficiency={refineEfficiency}
           onOpenRefine={onOpenRefine}
+          turnIn={turnIn}
           pricesUnavailable={result.pricesUnreachable}
         />
         {loading && <Spinner label={t('common.loading')} size="sm" />}

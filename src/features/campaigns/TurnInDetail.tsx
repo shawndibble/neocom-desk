@@ -34,7 +34,11 @@ import {
   ProgressBar,
   Tooltip,
 } from '@/components/ui';
-import { figureOpenerClassName, focusRingClassName } from '@/components/ui/controlStyles';
+import {
+  figureOpenerClassName,
+  focusRingClassName,
+  gripHitAreaClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { PERMISSIONS } from '@/esi/registry';
 import { useSetDestination } from '@/features/travel/useSetDestination';
@@ -396,7 +400,11 @@ export function TurnInGlyph({ name, className, onClick, ...props }: TriggerProps
       {...props}
       onClick={stopThen(onClick)}
       className={cx(
-        'ml-1 inline-flex shrink-0 cursor-pointer items-center rounded-xs align-[-0.125em] text-text-dim hover:text-accent',
+        // A 24px target around the 14px glyph, pulled back so the row keeps its height; on touch
+        // 36px tall (DESIGN.md §3), only vertically, so it never covers the figure beside it
+        // (as `PermissionCellMark`).
+        gripHitAreaClassName,
+        '-my-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-xs align-middle text-text-dim hover:text-accent',
         focusRingClassName,
         className
       )}
@@ -423,7 +431,8 @@ export function TurnInFigureButton({
       type="button"
       {...props}
       onClick={stopThen(onClick)}
-      className={cx(figureOpenerClassName, 'tabular-nums', className)}
+      // On touch 36px tall around the short figure (DESIGN.md §3), never wider than it.
+      className={cx(figureOpenerClassName, gripHitAreaClassName, 'tabular-nums', className)}
     >
       <span className="sr-only">{t('campaigns.turnIn.openDetail', { name })} </span>
       {children}

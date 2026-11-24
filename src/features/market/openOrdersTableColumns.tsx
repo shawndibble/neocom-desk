@@ -3,6 +3,12 @@
  * always; the five `OPEN_ORDER_COLUMN_IDS` between Do this and ISK tied up
  * when the Columns menu turns them on. Every figure is in full ISK
  * (`formatMarketIsk`) except the ISK tied up total (`IskAmount`).
+ *
+ * A buy order an Active campaign turn-in pays more than its bid, or a sell
+ * order it beats whose column an undercut won, keeps its state and gets a dim
+ * `TurnInGlyph` after its price (after Do this while the Price column is off);
+ * it and a sell order's "Turn in instead" open the order's Order Detail, which
+ * shows the turn-in (#6708).
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,11 +17,13 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { DEFAULT_PROBLEM_THRESHOLDS } from '@/engine/market/orderProblems';
 import { formatMarketIsk } from '@/lib/isk';
 import { CharacterBadge } from '@/features/assets/assetBrowserRows';
+import { TurnInGlyph } from '@/features/campaigns/TurnInDetail';
 import { problemRank, type OpenOrderRow } from './openOrdersModel';
 import { OPEN_ORDER_COLUMN_IDS, type OpenOrderColumnId } from './openOrdersColumns';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
+import { orderTurnInGlyph } from './orderTurnIn';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { WorkThroughTableSlot } from './WorkThroughControls';
 
@@ -43,15 +51,27 @@ export interface OpenOrderTableColumns {
   optional: Record<OpenOrderColumnId, DataTableColumn<OpenOrderRow>>;
 }
 
+/** A row whose turn-in pays more but its column says something else (`orderTurnInGlyph`): the glyph that opens it. */
+function turnInGlyph(row: OpenOrderRow, onOpenTurnIn?: (row: OpenOrderRow) => void) {
+  return (
+    orderTurnInGlyph(row) &&
+    onOpenTurnIn && <TurnInGlyph name={row.typeName} onClick={() => onOpenTurnIn(row)} />
+  );
+}
+
 export function useOpenOrderTableColumns({
   showCharacter,
   visible,
+  onOpenTurnIn,
 }: {
   /** More than one Character has orders: tag each row with its owner. */
   showCharacter: boolean;
   visible: readonly OpenOrderColumnId[];
+  /** Opens a row's turn-in in its Order Detail: "Turn in instead" and a buy order's glyph. */
+  onOpenTurnIn?: (row: OpenOrderRow) => void;
 }): OpenOrderTableColumns {
   const { t } = useTranslation();
+  const priceShown = visible.includes('price');
   const defs = useMemo(() => {
     const fixed: DataTableColumn<OpenOrderRow>[] = [
       {
@@ -99,7 +119,15 @@ export function useOpenOrderTableColumns({
         header: t('market.orders.fixList.colDoThis'),
         className: 'font-semibold',
         render: (row) => (
-          <WorkThroughTableSlot row={row} fallback={<OrderDoThisText row={row} />} />
+          <WorkThroughTableSlot
+            row={row}
+            fallback={
+              <>
+                <OrderDoThisText row={row} onOpenTurnIn={onOpenTurnIn} />
+                {!priceShown && turnInGlyph(row, onOpenTurnIn)}
+              </>
+            }
+          />
         ),
       },
     ];
@@ -110,7 +138,12 @@ export function useOpenOrderTableColumns({
         header: t('market.orders.fixList.colPrice'),
         ...figure,
         sortValue: (row) => row.price,
-        render: (row) => formatMarketIsk(row.price),
+        render: (row) => (
+          <>
+            {formatMarketIsk(row.price)}
+            {turnInGlyph(row, onOpenTurnIn)}
+          </>
+        ),
       },
       stationCheapest: {
         id: 'stationCheapest',
@@ -178,7 +211,7 @@ export function useOpenOrderTableColumns({
     };
 
     return { fixed, optional, tiedUp };
-  }, [t, showCharacter]);
+  }, [t, showCharacter, priceShown, onOpenTurnIn]);
 
   return useMemo(
     () => ({

@@ -13,6 +13,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
+import { badgeDetailText } from './orderBadgeKind';
 
 export type OrderBadgeKind =
   | 'belowFloor'
@@ -21,6 +22,7 @@ export type OrderBadgeKind =
   | 'undercutRegion'
   | 'expiring'
   | 'outbid'
+  | 'turnIn'
   | 'frequentlyUndercut'
   | 'best'
   | 'topBid'
@@ -46,6 +48,7 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
   undercutRegion: 'accent',
   expiring: 'neutral',
   outbid: 'neutral',
+  turnIn: 'neutral',
   frequentlyUndercut: 'neutral',
   best: 'success',
   topBid: 'success',
@@ -55,7 +58,7 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
 
 interface OrderProblemBadgeProps {
   kind: OrderBadgeKind;
-  /** Short trailing detail already formatted by the caller, e.g. "-8.4%" or "7 jumps". */
+  /** Short trailing detail already formatted by the caller, e.g. "-8.4%" or "7 jumps"; `turnIn` adds "more" to its "~2K". */
   detail?: string;
   className?: string;
   /**
@@ -93,7 +96,9 @@ export function OrderProblemBadge({
       )}
     >
       <span>{label}</span>
-      {detail && <span className="normal-case tracking-normal">{detail}</span>}
+      {detail && (
+        <span className="normal-case tracking-normal">{badgeDetailText(t, kind, detail)}</span>
+      )}
       {interactive && (
         <InfoTooltip
           label={t('common.aboutLabel', { label })}

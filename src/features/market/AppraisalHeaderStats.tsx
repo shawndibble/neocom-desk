@@ -22,9 +22,17 @@ import type { AppraisalNetTotals, AppraisalTotals, RefineBasis } from '@/engine/
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { RefineChipValue } from './RefineChipValue';
+import { approxIsk } from '@/features/campaigns/turnInContent';
 
 /** How long the "copied" bubble stays by the area that copied. */
 const COPIED_FEEDBACK_MS = 2000;
+
+/** The facts row's Turn in total: the items turning in beats selling, their reward, and its breakdown. */
+export interface AppraisalTurnInTotal {
+  total: number;
+  count: number;
+  onOpen: () => void;
+}
 
 interface AppraisalHeaderStatsProps {
   totals: AppraisalTotals;
@@ -40,6 +48,12 @@ interface AppraisalHeaderStatsProps {
   refineEfficiency?: string | null;
   /** Opens the refine breakdown on the whole pile; absent, the chip has no control. */
   onOpenRefine?: () => void;
+  /**
+   * The items whose Turn-in Reward beats selling them now: their reward and
+   * count, and the control that opens `TurnInBreakdown`. Null hides the chip.
+   * Never part of the Buy/Sell totals above it.
+   */
+  turnIn?: AppraisalTurnInTotal | null;
   /**
    * The price source could not be reached: the price-derived groups show a
    * placeholder instead of 0 ISK totals. Volume and item count need no price.
@@ -214,6 +228,7 @@ export function AppraisalHeaderStats({
   implantBonusPct,
   refineEfficiency = null,
   onOpenRefine,
+  turnIn = null,
   pricesUnavailable = false,
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
@@ -238,6 +253,21 @@ export function AppraisalHeaderStats({
               ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
               : t('market.appraisal.refineTotalHelp')
           }
+        />
+      )}
+      {!pricesUnavailable && turnIn !== null && turnIn.count > 0 && (
+        <StatChip
+          label={t('market.appraisal.turnIn.chip')}
+          value={
+            <RefineChipValue
+              amount={approxIsk(turnIn.total)}
+              basis={t('market.appraisal.turnIn.items', { count: turnIn.count })}
+              efficiency={null}
+              onOpen={turnIn.onOpen}
+              openLabel={t('market.appraisal.turnIn.openBreakdown')}
+            />
+          }
+          tooltip={t('market.appraisal.turnIn.chipHelp')}
         />
       )}
       {!pricesUnavailable && showCheapest && (

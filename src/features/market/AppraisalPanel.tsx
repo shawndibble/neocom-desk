@@ -63,6 +63,8 @@ import { useAppraisalCopyLists } from './useAppraisalCopyLists';
 import { useAppraisalJanice } from './useAppraisalJanice';
 import { useAppraisalShare } from './useAppraisalShare';
 import { RefineBreakdownModal } from './RefineBreakdownModal';
+import { TurnInBreakdown } from '@/features/campaigns/TurnInBreakdown';
+import { useAppraisalTurnIns } from './useAppraisalTurnIns';
 import { efficiencyText } from './refineFormat';
 import { useRefineMineralNames } from './useRefineMineralNames';
 import { useAltChord } from '@/lib/useChord';
@@ -168,6 +170,14 @@ export function AppraisalPanel({
   const refineBasis: RefineBasis =
     result !== null && basisAvailable(result.appraisal, storedBasis) ? storedBasis : 'buy';
   const mineralNames = useRefineMineralNames(result?.appraisal.items ?? NO_ITEMS);
+  // Campaign turn-ins, LP counted at this hub; never part of the Buy/Sell totals.
+  const turnIns = useAppraisalTurnIns({
+    rows: result?.appraisal.rows,
+    hub,
+    characterId,
+    refineBasis,
+  });
+  const [turnInOpen, setTurnInOpen] = useState(false);
 
   const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
@@ -211,6 +221,7 @@ export function AppraisalPanel({
     onOpenRefine: (typeId) => setRefineModal({ typeId }),
     refineBasis,
     refineReady: basisReady,
+    turnIns,
   });
   const { share, handleShare, handleCopyShareUrl, shareItemCount } = useAppraisalShare({
     result,
@@ -223,6 +234,7 @@ export function AppraisalPanel({
     owned,
     settleLive: controller.settleLive,
     refineBasis,
+    turnIn: turnIns.lookup,
   });
   const { janice, handleOpenInJanice, dismissJanice } = useAppraisalJanice({
     text,
@@ -430,6 +442,15 @@ export function AppraisalPanel({
             refineEfficiency={refineEfficiency}
             refineBasis={refineBasis}
             onOpenRefine={() => setRefineModal({ typeId: null })}
+            turnIn={
+              turnIns.pile.length > 0
+                ? {
+                    total: turnIns.total,
+                    count: turnIns.pile.length,
+                    onOpen: () => setTurnInOpen(true),
+                  }
+                : null
+            }
           />
         )}
 
@@ -565,6 +586,14 @@ export function AppraisalPanel({
             onYield: (fraction) => void refiningSetup.setYieldRate(fraction),
             onTax: (fraction) => void refiningSetup.setTaxRate(fraction),
           }}
+        />
+      )}
+      {turnInOpen && turnIns.pile.length > 0 && (
+        <TurnInBreakdown
+          open
+          onClose={() => setTurnInOpen(false)}
+          items={turnIns.pile}
+          surfaceLine={t('market.appraisal.turnIn.breakdownLine')}
         />
       )}
       {janice.status === 'fetching' && <Toast message={t('market.appraisal.janiceFetching')} />}

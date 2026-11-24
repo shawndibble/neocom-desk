@@ -5949,6 +5949,7 @@
         "complete": "Complete",
         "ringSummary": "{{label}}: {{completed}} of {{target}} objectives complete",
         "ofTarget": "{{completed}} of {{target}}",
+        "factionOfTarget": "{{faction}} · {{completed}} of {{target}}",
         "objectivesComplete_one": "objective complete",
         "objectivesComplete_other": "objectives complete",
         "factionLine": "{{faction}} {{completed}}/{{target}}",
@@ -7091,7 +7092,7 @@
         "trading": "Trading",
         "both": "Both"
       },
-      "faction": "Faction",
+      "factionCurrent": "Faction: {{faction}}",
       "factionChoice": {
         "all": "All",
         "amarr": "Amarr",
@@ -9748,6 +9749,8 @@
     "turnIn": {
       "dialogLabel": "{{name}}: turn-in reward",
       "openDetail": "Turn-in reward for {{name}}",
+      "overSale": "Pays {{gain}} each over selling here ({{price}})",
+      "youHold": "You hold {{quantity}} · {{amount}} turned in",
       "eachTurnedIn": "each turned in",
       "splitIsk": "{{isk}} ISK",
       "splitLp": "{{lp}} LP ({{value}})",
@@ -13797,6 +13800,7 @@
         "sellNow": "Sell now",
         "list": "List at undercut",
         "refine": "Refine",
+        "turnIn": "Turn in",
         "multibuy": "Multibuy"
       },
       "openInJanice": "Open in Janice",
@@ -13869,6 +13873,20 @@
       "columnSellTotal": "Sell total",
       "columnRefineTotal": "Refine total",
       "columnRefineWithLeftover": "Refine + ore",
+      "columnTurnIn": "Turn in",
+      "columnTurnInHelp": "What the active Character gets handing the item to a Military Campaign's Item Trader: ISK plus LP at its LP Value. Pays only after Participate, while the objective is open. Never counted in Buy or Sell. Bold where it beats selling now.",
+      "turnIn": {
+        "chip": "Turn in",
+        "chipHelp": "Items worth more handed in to an Item Trader than sold now (or refined, where refining wins): ISK plus LP at its LP Value. Pays only after Participate, while the objective is open, so it is never counted in Buy or Sell.",
+        "items_one": "{{count}} item",
+        "items_other": "{{count}} items",
+        "openBreakdown": "Open the turn-in breakdown",
+        "breakdownLine": "Items worth more handed in than sold now.",
+        "overSellNow": "+{{amount}} over Sell now",
+        "sellNowPaysMore": "Sell now pays {{amount}} more",
+        "refinePaysMore": "Refining pays more",
+        "withCounted": "{{against}} · counts {{counted}} of {{asked}}, all that still pays"
+      },
       "columnLpTotal": "LP store",
       "columnVolume": "Volume (m³)",
       "columnIskPerM3": "ISK/m³",
@@ -14370,6 +14388,10 @@
         "outbid": "Outbid",
         "outbidHelp": "This is a buy order and someone bids higher, so sellers go to them first.",
         "outbidAction": "Bid higher to get filled first, or wait.",
+        "turnIn": "Turn in",
+        "turnInMore": "{{gain}} more",
+        "turnInHelp": "A Campaign Objective pays more per item than this sell order's price, counting its LP at your LP Value.",
+        "turnInAction": "Turn the stock in to the Item Trader instead. It pays only if the order's character pressed Participate.",
         "frequentlyUndercut": "Often undercut",
         "frequentlyUndercutHelp": "Nobody is cheaper right now, but someone has been under you most of the times we checked.",
         "frequentlyUndercutAction": "Drop the price by more than usual, or move the stock. Small cuts keep getting beaten.",
@@ -14379,12 +14401,18 @@
         "topBid": "Top bid",
         "topBidHelp": "This is a buy order and nobody bids higher where it sits, so sellers come to you first.",
         "topBidAction": "Nothing. This one is doing fine.",
+        "topBidTurnInAction": "Nothing to fix on the bid. Turning the items in pays more: see Turn-in.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order and your wallet buys don't cover it, so we can't work out your lowest safe price.",
         "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first.",
         "notChecked": "Not checked",
         "notCheckedHelp": "Market prices didn't load (you may be offline), so we can't tell whether anyone beats this order.",
         "notCheckedAction": "Nothing to do. It is checked again when prices load."
+      },
+      "turnIn": {
+        "heading": "Turn-in",
+        "overPrice": "Pays {{gain}} each over your price ({{price}})",
+        "overBid": "Pays you {{gain}} per {{quantity}} over this bid"
       },
       "legendTitle": "What the badges mean",
       "legendOpen": "What do these badges mean?",
@@ -14416,6 +14444,7 @@
         "undercutRegion": "Undercut in my region",
         "expiringOrStale": "Expiring or stale",
         "outbid": "Outbid buy order",
+        "turnInPays": "A turn-in pays more",
         "healthy": "Healthy",
         "notChecked": "Not checked"
       },
@@ -14627,7 +14656,8 @@
           "doNotChase": "Do not chase this one",
           "relist": "Relist it",
           "leaveItAlone": "Leave it alone",
-          "nothingYet": "Nothing to do yet"
+          "nothingYet": "Nothing to do yet",
+          "turnIn": "Turn in instead"
         },
         "healthy_one": "{{count}} healthy order",
         "healthy_other": "{{count}} healthy orders",
@@ -14666,7 +14696,8 @@
       "bestSell": "Best sell",
       "bestBuy": "Best buy",
       "spread": "Spread",
-      "spreadHint": "Best sell minus best buy, and that gap as a share of the best buy."
+      "spreadHint": "Best sell minus best buy, and that gap as a share of the best buy.",
+      "turnIn": "Turn in"
     },
     "hubCompare": {
       "label": "{{place}} compared with the best in range",
@@ -19445,7 +19476,7 @@
             "action": "Try again"
           },
           "gone-quiet": {
-            "text": "EVE has not answered for this corp for a while. It may be closed.",
+            "text": "This corp could not be read. Its login may have lapsed, or the corp may be closed.",
             "keeps": "Removing keeps its past mining and billing records.",
             "action": "Remove"
           },

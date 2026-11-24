@@ -39,7 +39,8 @@ export interface WorkThroughState {
 
 export const EMPTY_WORK_THROUGH: WorkThroughState = { handled: new Map(), skipped: new Set() };
 
-const OUTSIDE_QUEUE: ReadonlySet<OrderGroupKey> = new Set(['healthy', 'notChecked']);
+/** Nothing to reprice: fine, unread, or a turn-in that pays more than any sale (#6708). */
+const OUTSIDE_QUEUE: ReadonlySet<OrderGroupKey> = new Set(['healthy', 'notChecked', 'turnInPays']);
 
 /**
  * Every order that needs a fix, Needs you first and then Watch (system and

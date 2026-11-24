@@ -32,6 +32,10 @@ import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
 import { useItemActions } from '@/features/market/itemActions';
+import { TurnInDetail, TurnInGlyph } from '@/features/campaigns/TurnInDetail';
+import { approxIsk } from '@/features/campaigns/turnInContent';
+import { turnInReward } from '@/engine/market/turnIn';
+import { formatCount } from '@/lib/formatCount';
 import {
   assetHref,
   characterBadgeFor,
@@ -110,6 +114,7 @@ export function NodeItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  afterValue,
   askEstimate,
   stockUnitCost,
   showStockCost,
@@ -129,6 +134,7 @@ export function NodeItemRow({
   unitVolume: number | undefined;
   estimatedValue: number;
   valueHint?: string;
+  afterValue?: ReactNode;
   askEstimate?: AskEstimateFigure;
   stockUnitCost: ComponentProps<typeof ItemRow>['stockUnitCost'];
   showStockCost: boolean;
@@ -146,6 +152,7 @@ export function NodeItemRow({
       unitVolume={unitVolume}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      afterValue={afterValue}
       askEstimate={askEstimate}
       stockUnitCost={stockUnitCost}
       showStockCost={showStockCost}
@@ -252,6 +259,42 @@ function useAbyssalValueHint(
   return abyssalValueHint(abyssal.estimates.get(itemId), t);
 }
 
+/**
+ * A turn-in stack's glyph and popover: for the stack's own Character (whose
+ * Participate the detail shows, whose client Set destination steers) and what
+ * the stack turns in. Null for a stack no Active objective takes.
+ */
+function StackTurnIn({
+  asset,
+  label,
+  characterBadges,
+  t,
+}: {
+  asset: Pick<CharacterAsset, 'item_id' | 'type_id' | 'quantity'>;
+  label: string;
+  characterBadges: CharacterBadgeContext;
+  t: Translate;
+}) {
+  const actions = useAssetItemActions();
+  const offer = actions.turnInOfferFor(asset.type_id);
+  if (!offer) return null;
+  const ownerId =
+    characterBadges.idByItemId.get(asset.item_id) ?? characterBadges.activeCharacterId;
+  return (
+    <TurnInDetail
+      name={label}
+      offer={offer}
+      characterId={ownerId}
+      characterName={ownerId === null ? undefined : characterBadges.nameById.get(ownerId)}
+      surfaceLine={t('campaigns.turnIn.youHold', {
+        quantity: formatCount(asset.quantity),
+        amount: approxIsk(turnInReward(offer, asset.quantity).total),
+      })}
+      trigger={<TurnInGlyph name={label} />}
+    />
+  );
+}
+
 /** Split out so it can call `useAssetItemActions` — a heading/location row does not. */
 function SearchMatchRow({
   match,
@@ -312,6 +355,9 @@ function SearchMatchRow({
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       valueHint={valueHint}
+      // Outside the row's link (a button never nests in an anchor): often the only place another
+      // Character's stack shows, so its turn-in would otherwise be out of reach.
+      afterLink={<StackTurnIn asset={asset} label={name} characterBadges={characterBadges} t={t} />}
       wrap={(children) => (
         <OreItemMenu
           quantity={asset.quantity}
@@ -426,6 +472,9 @@ function NodeRowView({
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      afterValue={
+        <StackTurnIn asset={asset} label={label} characterBadges={characterBadges} t={t} />
+      }
       askEstimate={askEstimateFigure(asset, actions.askEstimateByTypeId, estimatedValue, t)}
       stockUnitCost={actions.stockCostByTypeId?.get(asset.type_id)?.unitCost}
       showStockCost={actions.stockCostByTypeId !== null}

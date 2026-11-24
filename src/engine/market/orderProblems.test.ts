@@ -4,6 +4,7 @@ import {
   DEFAULT_PROBLEM_THRESHOLDS,
   worstProblem,
   allProblems,
+  isRealProblem,
   type OrderProblemFacts,
 } from './orderProblems';
 
@@ -34,8 +35,33 @@ describe('ORDER_PROBLEMS', () => {
       'undercutRegion',
       'expiringOrStale',
       'outbid',
+      'turnInPays',
       'healthy',
     ]);
+  });
+});
+
+describe('turnInPays — a Turn-in Reward that beats a sell price', () => {
+  it('files a sell order whose turn-in beats its price under turnInPays', () => {
+    expect(worstProblem(healthySellFacts({ turnInBeatsPrice: true }))).toBe('turnInPays');
+    expect(allProblems(healthySellFacts({ turnInBeatsPrice: true }))).toEqual(['turnInPays']);
+  });
+
+  it('is the lowest problem: a real one still wins, and it is listed after it', () => {
+    const facts = healthySellFacts({ turnInBeatsPrice: true, undercutScope: 'region' });
+    expect(worstProblem(facts)).toBe('undercutRegion');
+    expect(allProblems(facts)).toEqual(['undercutRegion', 'turnInPays']);
+    expect(worstProblem(healthySellFacts({ turnInBeatsPrice: true, daysLeft: 1 }))).toBe(
+      'expiringOrStale'
+    );
+  });
+
+  it('never applies to a buy order, even if the flag is set', () => {
+    expect(worstProblem(healthyBuyFacts({ turnInBeatsPrice: true }))).toBe('healthy');
+  });
+
+  it('is absent when the fact is left out', () => {
+    expect(worstProblem(healthySellFacts({ turnInBeatsPrice: undefined }))).toBe('healthy');
   });
 });
 
@@ -196,5 +222,11 @@ describe('allProblems', () => {
   it('lists outbid + expiringOrStale for a buy order hit by both', () => {
     const facts = healthyBuyFacts({ undercutScope: 'region', daysLeft: 1, volumeRemain: 1 });
     expect(allProblems(facts)).toEqual(['outbid', 'expiringOrStale']);
+  });
+});
+
+describe('isRealProblem', () => {
+  it('is false for healthy and turnInPays only', () => {
+    expect(ORDER_PROBLEMS.filter((p) => !isRealProblem(p))).toEqual(['turnInPays', 'healthy']);
   });
 });

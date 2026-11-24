@@ -462,17 +462,28 @@ export function WidgetMenu({
       {kind.hasCampaignFaction && (
         <>
           <MenuSeparator />
-          <MenuLabel>{t('overview.menu.faction')}</MenuLabel>
-          <MenuRadioGroup
-            value={widget.campaignFaction ?? 'all'}
-            onValueChange={(next) => edit.setCampaignFaction(widget.id, next as CampaignFaction)}
-          >
-            {CAMPAIGN_FACTIONS.map((faction) => (
-              <MenuRadioItem key={faction} value={faction}>
-                {t(`overview.menu.factionChoice.${faction}`)}
-              </MenuRadioItem>
-            ))}
-          </MenuRadioGroup>
+          {/* A submenu, like Calendar's Types: five choices inline pushed the menu off a laptop screen. */}
+          <MenuSub>
+            <MenuSubTrigger>
+              {t('overview.menu.factionCurrent', {
+                faction: t(`overview.menu.factionChoice.${widget.campaignFaction ?? 'all'}`),
+              })}
+            </MenuSubTrigger>
+            <MenuSubContent>
+              <MenuRadioGroup
+                value={widget.campaignFaction ?? 'all'}
+                onValueChange={(next) =>
+                  edit.setCampaignFaction(widget.id, next as CampaignFaction)
+                }
+              >
+                {CAMPAIGN_FACTIONS.map((faction) => (
+                  <MenuRadioItem key={faction} value={faction}>
+                    {t(`overview.menu.factionChoice.${faction}`)}
+                  </MenuRadioItem>
+                ))}
+              </MenuRadioGroup>
+            </MenuSubContent>
+          </MenuSub>
         </>
       )}
       {kind.hasLayerPicker && (

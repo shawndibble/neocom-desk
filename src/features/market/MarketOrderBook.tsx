@@ -42,6 +42,10 @@ import {
   type OrderHeadingFigureId,
 } from './marketOrderColumns';
 import { PlaceJumpsLink } from '@/features/route/JumpsLink';
+import { TurnInDetail, TurnInFigureButton } from '@/features/campaigns/TurnInDetail';
+import { approxIsk } from '@/features/campaigns/turnInContent';
+import { useTurnInOffers } from '@/features/campaigns/useTurnIns';
+import type { TradeHub } from '@/market/hubs';
 import { formatCount } from '@/lib/formatCount';
 
 export type BookSide = 'sell' | 'buy';
@@ -61,27 +65,44 @@ function signedPercent(ratio: number): string {
   return ratio > 0 ? `+${text}` : ratio < 0 ? `−${text}` : text;
 }
 
+/**
+ * Best sell · best buy · spread, then "Turn in ~60K" when a Campaign
+ * Objective takes the item (issue #6707): the figure opens `TurnInDetail` for
+ * the active Character, its LP counted at the browsed hub's LP Value.
+ */
 export function OrderBookSummaryStrip({
   bestSell,
   bestBuy,
+  item,
+  hub,
 }: {
   bestSell: number | null;
   bestBuy: number | null;
+  /** The item on show; null while none is picked. */
+  item: { typeId: number; name: string } | null;
+  /** The browsed hub, whose LP Value prices the turn-in's LP. */
+  hub: TradeHub;
 }) {
   const { t } = useTranslation();
   const spread = priceComparison(bestBuy, bestSell);
+  const turnIns = useTurnInOffers(hub);
+  const offer = item === null ? null : (turnIns.data?.offerFor(item.typeId) ?? null);
+  // The phone's Sell | Buy toggle already carries both best prices; the turn-in stays.
+  const phoneHidden = 'max-sm:hidden';
   return (
-    // The phone's Sell | Buy toggle already carries both best prices.
-    <StatChips className="max-sm:hidden">
+    <StatChips className={offer ? undefined : phoneHidden}>
       <StatChip
+        className={phoneHidden}
         label={t('market.summary.bestSell')}
         value={bestSell === null ? '—' : formatMarketIsk(bestSell)}
       />
       <StatChip
+        className={phoneHidden}
         label={t('market.summary.bestBuy')}
         value={bestBuy === null ? '—' : formatMarketIsk(bestBuy)}
       />
       <StatChip
+        className={phoneHidden}
         label={t('market.summary.spread')}
         tooltip={t('market.summary.spreadHint')}
         value={
@@ -90,6 +111,22 @@ export function OrderBookSummaryStrip({
             : `${formatMarketIsk(spread.delta)} (${fixed1(spread.ratio * 100)}%)`
         }
       />
+      {offer && item && (
+        <StatChip
+          label={t('market.summary.turnIn')}
+          value={
+            <TurnInDetail
+              name={item.name}
+              offer={offer}
+              trigger={
+                <TurnInFigureButton name={item.name}>
+                  {approxIsk(offer.totalPerItem)}
+                </TurnInFigureButton>
+              }
+            />
+          }
+        />
+      )}
     </StatChips>
   );
 }
