@@ -1,9 +1,9 @@
 /**
  * Build Group detail's buy-materials table at 390px (issue #2215, reworked by
  * DESIGN.md §6c restraint): the figures are read across columns, so on a phone
- * it stays a plain table (`responsive="table"`) with the material name pinned
- * (`stickyStart`) and the low-value Volume column dropped
- * (`phoneHidden`); the table scrolls inside its own wrapper, never the page.
+ * it is a dense two-line card (`responsive="stack"`, `stackLayout="dense"`, #6561):
+ * material and Still to buy on line one, Qty and the Owned input on line two,
+ * the low-value Volume left off (`data-dense-omit`); never a sideways page scroll.
  *
  * A Rifter Blueprint (typeID 691) member at 20 runs supplies both edge cases:
  * Tritanium's quantity (640,000) is six digits, and only Tritanium has a
@@ -117,17 +117,21 @@ test.describe('Build Group detail — buy-materials table on a phone', () => {
     await seedGroupWithPlan(page);
   });
 
-  test('stays a table at 390px: Qty, Owned and Still to buy shown, Volume dropped', async ({
+  test('is a dense two-line card at 390px: Qty, Owned and Still to buy shown, Volume dropped', async ({
     page,
   }) => {
     await page.setViewportSize(PHONE);
     await page.goto(`./industry/groups/${GROUP_ID}`);
 
+    // `stackLayout="dense"` (#6561): the row is a flex card, not a table row.
     const { display, cells } = await readRow(page, TRITANIUM);
-    expect(display).toBe('table-row');
-    const visible = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
+    expect(display).toBe('flex');
+    const visible = cells
+      .filter((cell) => cell.width > 0)
+      .map((cell) => cell.label)
+      .sort();
     // The trailing blank cell is the row's More actions button.
-    expect(visible).toEqual(['Material', 'Qty', 'Owned', 'Still to buy', '']);
+    expect(visible).toEqual(['', 'Material', 'Owned', 'Qty', 'Still to buy']);
 
     // The six-digit case: Qty still holds its own figure without clipping it.
     const qty = cellFor(cells, 'Qty');
