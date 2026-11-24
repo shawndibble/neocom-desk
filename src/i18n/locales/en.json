@@ -9708,6 +9708,47 @@
     "bodyNotDownloadedOnline": "This mail hasn't been downloaded yet.",
     "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
   },
+  "campaigns": {
+    "turnIn": {
+      "dialogLabel": "{{name}}: turn-in reward",
+      "openDetail": "Turn-in reward for {{name}}",
+      "eachTurnedIn": "each turned in",
+      "splitIsk": "{{isk}} ISK",
+      "splitLp": "{{lp}} LP ({{value}})",
+      "splitLpUnpriced": "{{lp}} LP (LP unpriced)",
+      "filled": "{{percent}}% filled",
+      "filledLabel": "Campaign Objective filled",
+      "participating": "{{name}} pressed Participate",
+      "notParticipating": "Not participating: press Participate now in the Opportunities window",
+      "paysOnlyIf": "Pays only if you've pressed Participate on the opportunity",
+      "whyParticipate": "Lets Neocom Desk see whether {{name}} pressed Participate, so it can tell you if this turn-in pays.",
+      "lpBlock_one": "LP paid per item · + faction tokens",
+      "lpBlock_other": "LP paid per full {{count}} items · + faction tokens",
+      "tokensOnly": "+ faction tokens",
+      "setDestination": "Set destination",
+      "setDestinationTo": "Set destination to {{system}}",
+      "needsPermission": "Needs the {{permission}} Permission",
+      "whyWaypoints": "Lets Neocom Desk set {{name}}'s autopilot destination in the EVE client.",
+      "breakdown": {
+        "title": "Turn in: {{total}}",
+        "intro": "Grouped by Item Trader. LP is paid per full block, at each corporation's LP Value. + faction tokens, not counted.",
+        "tableLabel": "{{trader}}: items to turn in",
+        "item": "Item",
+        "quantity": "Qty",
+        "each": "Each",
+        "turnedIn": "Turned in",
+        "filled": "Filled",
+        "participate": "Participate",
+        "participating": "Participating",
+        "notParticipating": "Not participating",
+        "ofAsked": "of {{asked}}",
+        "copyList": "Copy list",
+        "copyListFor": "Copy the list for {{trader}}",
+        "copied": "Copied",
+        "copyFailed": "Copy failed"
+      }
+    }
+  },
   "calendar": {
     "title": "Calendar",
     "refresh": "Refresh",

@@ -1,6 +1,6 @@
 /**
  * Sends one place — an NPC station, a player structure or a solar system — to
- * the active Character's EVE client as its autopilot destination: one
+ * the active (or a given) Character's EVE client as its autopilot destination: one
  * waypoint, clearing the others, the in-game "Set Destination". Shared by the
  * order book's "Set destination" button (`market/SetDestinationButton.tsx`)
  * and the row menus' "Set waypoint in game" (`SetWaypointMenuItem.tsx`), so
@@ -39,10 +39,16 @@ export function useSetDestination(
   locationId: number,
   placeName: string,
   /** `false` adds the place to the end of the route instead of replacing the route. */
-  clearOthers = true
+  clearOthers = true,
+  /**
+   * Whose client to send it to: a row's own Character (a turn-in's, issue #6705).
+   * The active Character when omitted; `null` is no Character.
+   */
+  forCharacterId?: number | null
 ): SetDestination {
   const { t } = useTranslation();
-  const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const activeCharacterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const characterId = forCharacterId === undefined ? activeCharacterId : forCharacterId;
   const lacksScope = useCharacterLacksEndpoints(characterId, WAYPOINT_ENDPOINTS);
   const online = useOnline();
   const [sending, setSending] = useState(false);
