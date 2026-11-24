@@ -357,6 +357,13 @@ export function loadJumpTimersWidget(characterId: number) {
   return import('@/features/character/jumpTimers').then((m) => m.loadJumpTimersWidget(characterId));
 }
 
+/** Every Character's campaign rows; LP counted at the header Character's Market hub. */
+export function loadMilitaryCampaignsWidget(characterId: number) {
+  return import('@/features/campaigns/militaryCampaignsWidget').then((m) =>
+    m.loadMilitaryCampaignsWidget(characterId)
+  );
+}
+
 export function loadMercenaryDensWidget(characterId: number) {
   return import('@/features/character/mercenaryDens').then((m) =>
     m.loadMercenaryDensWidget(characterId)

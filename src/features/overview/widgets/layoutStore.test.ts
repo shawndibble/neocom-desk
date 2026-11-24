@@ -208,6 +208,15 @@ describe('parseLayout', () => {
     expect(wallet).not.toHaveProperty('profitSource');
   });
 
+  it('keeps a Military Campaigns faction, and drops All, an unknown one and one on another kind', () => {
+    const faction = (kind: string, value: unknown) =>
+      parseLayout(wrap(good({ kind, campaignFaction: value })))!.widgets[0];
+    expect(faction('militaryCampaigns', 'gallente').campaignFaction).toBe('gallente');
+    expect(faction('militaryCampaigns', 'all')).not.toHaveProperty('campaignFaction');
+    expect(faction('militaryCampaigns', 'jove')).not.toHaveProperty('campaignFaction');
+    expect(faction('wallet', 'amarr')).not.toHaveProperty('campaignFaction');
+  });
+
   it('keeps a valid Show, and drops the default, an unknown one and one on another kind', () => {
     const show = (kind: string, value: unknown) =>
       parseLayout(wrap(good({ kind, show: value })))!.widgets[0];

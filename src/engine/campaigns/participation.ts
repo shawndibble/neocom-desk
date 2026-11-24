@@ -118,3 +118,25 @@ export function campaignCompletions(
         a.title.localeCompare(b.title)
     );
 }
+
+/** What a Character's contribution to an objective has paid: ISK, and LP in full blocks. */
+export interface ObjectiveEarned {
+  isk: number;
+  lp: number;
+}
+
+/**
+ * What `contributed` progress on `objective` has earned so far: ISK per
+ * interval and LP per full block, the contribution cut to the per-Character
+ * cap. LP is left as LP: pricing it is the surface's call.
+ */
+export function objectiveEarned(
+  objective: CampaignObjectiveEntry,
+  contributed: number
+): ObjectiveEarned {
+  const raw = Number.isFinite(contributed) ? Math.max(0, Math.floor(contributed)) : 0;
+  const counted = Math.min(raw, objective.maxPerParticipant ?? Infinity);
+  const paid = (rate: { amount: number; interval: number } | undefined) =>
+    rate && rate.interval > 0 ? Math.floor(counted / rate.interval) * rate.amount : 0;
+  return { isk: paid(objective.isk), lp: paid(objective.lp) };
+}

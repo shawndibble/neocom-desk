@@ -95,6 +95,8 @@ export interface WidgetKindDef {
   hasProfitSource: boolean;
   /** Whether the pilot picks which net worth layers the widget draws (Net worth). */
   hasLayerPicker: boolean;
+  /** Whether the kind has the Faction setting (All / Amarr / Caldari / Gallente / Minmatar): Military Campaigns. */
+  hasCampaignFaction: boolean;
   /** The Show setting's options, the default first; empty for a kind without one. */
   shows: readonly WidgetShow[];
   /** Shows that read no time window, so Range does not apply to them. */
@@ -136,6 +138,7 @@ interface Spec {
   raidsWhere?: true;
   profitSource?: true;
   layerPicker?: true;
+  campaignFaction?: true;
   /** The Show options, the default first. */
   shows?: readonly WidgetShow[];
   /** Shows that read no window (a kind with `range` and a Show only some of whose options are ranged). */
@@ -355,6 +358,15 @@ const SPECS = {
     size: 'M',
     raidsWhere: true,
     endpoints: [],
+  },
+  // Gallery only, never on a default board: the campaigns run a few weeks at a time.
+  militaryCampaigns: {
+    category: 'conflict',
+    views: NT,
+    view: 'table',
+    size: 'M',
+    campaignFaction: true,
+    endpoints: ['getCharacterMilitaryCampaignObjectives'],
   },
   routeSafety: {
     category: 'travel',
@@ -583,6 +595,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   hasRaidsWhere: s.raidsWhere === true,
   hasProfitSource: s.profitSource === true,
   hasLayerPicker: s.layerPicker === true,
+  hasCampaignFaction: s.campaignFaction === true,
   shows: s.shows ?? [],
   rangelessShows: s.rangelessShows ?? [],
   hasNamedShows: s.namedShows === true,

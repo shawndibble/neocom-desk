@@ -462,6 +462,13 @@ export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
       planetary(ctx.scopeAll ? { ...feeds, planetary: feeds.planetaryAll } : feeds, ctx),
   },
   mercenaryDens: { feeds: ['mercenaryDens'], scope: 'account', build: mercenaryDens },
+  militaryCampaigns: {
+    feeds: ['militaryCampaigns'],
+    scope: 'account',
+    // Loading until the real builder lands: it reads the turn-in wording.
+    build: (feeds) => blank(null, statusOf(feeds.militaryCampaigns, { loading: true })),
+    loadBuild: () => import('./militaryCampaignsModels').then((m) => m.militaryCampaigns),
+  },
   structures: {
     feeds: ['structures', 'corpStarbases'],
     allFeeds: ['structuresAll', 'corpStarbasesAll'],

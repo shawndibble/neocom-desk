@@ -7,7 +7,8 @@
  * before the first cell of a toned row, the first column truncated, and the
  * whole row a link when it has a `to` (the trailing caret is the §6c cue), or
  * a button that opens `RowDetailModal` when it has a `detail`, or the item's Show
- * info when it has an `info` (the first cell's accent name is the cue either way, §6c "Widget rows"). No row buttons and no other
+ * info when it has an `info`, or `TurnInDetail` when it is a campaign turn-in (`turnIn`) (the first
+ * cell's accent name is the cue every way, §6c "Widget rows"). No row buttons and no other
  * chrome: the widget's title link and the row's own link or modal are the only
  * ways out. Columns are chosen by `visibleColumns` from the width budget the
  * caller passes, never from the viewport, then by `fitColumns` for a
@@ -16,7 +17,7 @@
  * phone's full-width widget drops it and a half-width one on a desktop does
  * too).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -36,6 +37,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
 import { ShareMark } from '@/components/ui/ShareMark';
+import { Pill } from '@/components/ui/Pill';
 import { openItemInfo } from '@/stores/itemInfoModal';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
@@ -43,6 +45,9 @@ import type { WidgetSize } from './kinds';
 import { fractionBar, type CellTone } from './data/cellKit';
 import { RowDetailModal } from './RowDetailModal';
 import { fitColumns, visibleColumns } from './tableModel';
+
+/** A turn-in row's opener, with the popover's reads: loaded only when a table has one. */
+const TurnInRowTrigger = lazy(() => import('./TurnInRowTrigger'));
 import {
   ROWS_PER_PAGE_OPTIONS,
   clampPage,
@@ -144,6 +149,9 @@ const CARET_WIDTH = 20;
 /** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
 
+/** A `capped` column: truncated at 8rem, hidden under a 24rem box (see `TableColumn.capped`). */
+const CAPPED = 'hidden @sm:table-cell max-w-32 truncate whitespace-nowrap';
+
 function Row({
   row,
   columns,
@@ -174,7 +182,8 @@ function Row({
   const toned = row.tone !== undefined && row.tone !== 'clear';
   const flagged = isFlagged(row);
   const linked = row.to !== undefined;
-  const opens = onOpen !== undefined;
+  const turnIn = row.turnIn;
+  const opens = onOpen !== undefined || turnIn !== undefined;
   return (
     <tr
       className={cx(
@@ -209,7 +218,9 @@ function Row({
                   ? growKey === undefined
                     ? cx('w-full max-w-0', column.nameFloor && 'min-w-28')
                     : 'max-w-40'
-                  : 'whitespace-nowrap',
+                  : column.capped
+                    ? CAPPED
+                    : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
               Cell === 'th' && 'text-left',
               first && 'font-semibold',
@@ -228,7 +239,12 @@ function Row({
                     {flagged && row.tone && <SeverityIcon severity={row.tone} size="0.875rem" />}
                   </span>
                 )}
-                {linked && row.to !== undefined ? (
+                {row.badge !== undefined && <Pill className="shrink-0">{row.badge}</Pill>}
+                {turnIn !== undefined ? (
+                  <Suspense fallback={<span className="min-w-0 truncate">{text}</span>}>
+                    <TurnInRowTrigger turnIn={turnIn} text={text} />
+                  </Suspense>
+                ) : linked && row.to !== undefined ? (
                   <RowTappableContext.Provider value>
                     <Link
                       to={row.to}
@@ -487,6 +503,7 @@ export function TableBody({
                       // Replaces `cellPad`, never adds to it: two `pl-*` classes would race on stylesheet order.
                       i === 0 && iconSlot ? ICON_SLOT_INDENT : cellPad,
                       column.hideNarrow && HIDE_NARROW,
+                      column.capped && 'hidden @sm:table-cell',
                       'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
                       i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
                     )}

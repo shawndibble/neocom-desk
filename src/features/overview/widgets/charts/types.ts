@@ -88,6 +88,8 @@ export interface DonutPart {
 export interface DonutChartModel extends ChartBase {
   kind: 'donut';
   parts: DonutPart[];
+  /** The whole the parts are shares of (a target); the rest of the ring is the empty track. Left out, the parts' sum. */
+  of?: number;
   /** Big text in the hole, and the small word under it. */
   centre: string;
   centreNote: string;

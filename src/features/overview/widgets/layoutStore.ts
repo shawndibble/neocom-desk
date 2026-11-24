@@ -23,6 +23,7 @@ import {
   DEFAULT_RAIDS_RADIUS,
   isPlexPlan,
   isWidgetScope,
+  isCampaignFaction,
   isRaidsRadius,
   rangesOf,
   type OverviewLayout,
@@ -76,6 +77,13 @@ function parseWidget(stored: unknown): Widget | null {
   }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
   if (!def.hasProfitSource) delete out.profitSource;
+  if (
+    !def.hasCampaignFaction ||
+    !isCampaignFaction(raw.campaignFaction) ||
+    raw.campaignFaction === 'all'
+  ) {
+    delete out.campaignFaction;
+  }
   const hiddenLayers = cleanHiddenLayers(raw.hiddenLayers);
   if (!def.hasLayerPicker || hiddenLayers.length === 0) delete out.hiddenLayers;
   else out.hiddenLayers = hiddenLayers;

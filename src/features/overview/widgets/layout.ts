@@ -74,6 +74,18 @@ export const LEGACY_PROFIT_SOURCE: ProfitSource = 'builds';
 export const isProfitSource = (value: unknown): value is ProfitSource =>
   PROFIT_SOURCES.includes(value as ProfitSource);
 
+/** Military Campaigns: whose campaign it shows. All is the default and is never stored. */
+export type CampaignFaction = 'all' | 'amarr' | 'caldari' | 'gallente' | 'minmatar';
+export const CAMPAIGN_FACTIONS: readonly CampaignFaction[] = [
+  'all',
+  'amarr',
+  'caldari',
+  'gallente',
+  'minmatar',
+];
+export const isCampaignFaction = (value: unknown): value is CampaignFaction =>
+  CAMPAIGN_FACTIONS.includes(value as CampaignFaction);
+
 export type WidgetRange = 7 | 30 | 90 | 365;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
 /** What a price-history kind offers: ESI keeps about 13 months of market history. */
@@ -126,6 +138,8 @@ export interface Widget {
   hiddenLayers?: LayerId[];
   /** Profit only: which earnings it adds up. Absent means Builds (a widget saved before the setting). */
   profitSource?: ProfitSource;
+  /** Military Campaigns only: one faction's campaign. Absent means All; never stored as 'all'. */
+  campaignFaction?: Exclude<CampaignFaction, 'all'>;
   /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
   trendItems?: number[];
   /** Market Trend only: the Trade Hubs it prices at. Absent means the pilot's Market hub. */
@@ -438,6 +452,26 @@ export function setProfitSource(
       return null;
     }
     return { ...w, profitSource: source };
+  });
+}
+
+/** All is the default, so choosing it drops the field. */
+export function setCampaignFaction(
+  layout: OverviewLayout,
+  id: string,
+  faction: CampaignFaction
+): OverviewLayout {
+  if (!isCampaignFaction(faction)) return layout;
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasCampaignFaction || faction === (w.campaignFaction ?? 'all')) {
+      return null;
+    }
+    if (faction === 'all') {
+      const { campaignFaction: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, campaignFaction: faction };
   });
 }
 

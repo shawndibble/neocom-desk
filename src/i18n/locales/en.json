@@ -5940,6 +5940,29 @@
           "programs": "Programs"
         }
       },
+      "militaryCampaigns": {
+        "title": "Military campaigns",
+        "description": "Campaign Objectives your Characters Participate in, and turn-ins for items they hold",
+        "empty": "No Military Campaign running",
+        "emptyFaction": "No {{faction}} Military Campaign running",
+        "complete": "Complete",
+        "ringSummary": "{{label}}: {{completed}} of {{target}} objectives complete",
+        "ofTarget": "{{completed}} of {{target}}",
+        "objectivesComplete_one": "objective complete",
+        "objectivesComplete_other": "objectives complete",
+        "factionLine": "{{faction}} {{completed}}/{{target}}",
+        "waiting": "{{isk}} waiting to turn in",
+        "turnInTitle": "Turn in {{name}}",
+        "youHold": "You hold {{held}} · {{reward}} turned in",
+        "holds": "{{name}} holds {{held}} · {{reward}} turned in",
+        "contributed": "{{name}} · {{amount}} contributed",
+        "earnedBoth": "{{isk}} ISK + {{lp}} LP earned",
+        "earnedIsk": "{{isk}} ISK earned",
+        "earnedLp": "{{lp}} LP earned",
+        "filled": "{{percent}}% filled",
+        "missingMore": "{{name}} and {{count}} more",
+        "whyMark": "Lets this widget list the Campaign Objectives they pressed Participate on."
+      },
       "mercenaryDens": {
         "title": "Mercenary dens",
         "description": "Your dens: reinforcement, operations and Anarchy",
@@ -7062,6 +7085,14 @@
         "builds": "Builds",
         "trading": "Trading",
         "both": "Both"
+      },
+      "faction": "Faction",
+      "factionChoice": {
+        "all": "All",
+        "amarr": "Amarr",
+        "caldari": "Caldari",
+        "gallente": "Gallente",
+        "minmatar": "Minmatar"
       },
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
