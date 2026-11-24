@@ -160,6 +160,11 @@ export interface CorpSyncDeps {
    * taking effect). Without it the feed ends on the last scheduled read.
    */
   esi?: SyncEsi;
+  /**
+   * How long to wait before re-reading a grant SSO just refused (default 1000 ms): a refresh
+   * that won a race writes its rotated token back within that time.
+   */
+  invalidGrantRecheckMs?: number;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
   /**
@@ -856,7 +861,11 @@ type RefreshOutcome =
 // invalid_grant). Read, call SSO once, then write the rotated token back in a
 // transaction that re-reads the doc: if a re-grant replaced the token in the
 // meantime, the rotated one is discarded instead of overwriting it.
-async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promise<RefreshOutcome> {
+async function refreshGrant(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  rechecked = false
+): Promise<RefreshOutcome> {
   const key = deps.key();
   let current: string;
   try {
@@ -870,6 +879,20 @@ async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promis
     tokens = await deps.refresh(grant.clientId, current);
   } catch (err) {
     if (err instanceof SsoRefreshError && err.invalidGrant) {
+      // Under rotation a second refresh of the same token is refused. If a concurrent one won and
+      // wrote its rotated token back, this grant is alive: retry once with that token.
+      if (!rechecked) {
+        await new Promise((resolve) => setTimeout(resolve, deps.invalidGrantRecheckMs ?? 1000));
+        const latest = (await grantRef(deps.db, grant.corporationId).get()).data() as
+          CorpSyncGrantDoc | undefined;
+        if (latest && latest.encryptedRefreshToken !== grant.encryptedRefreshToken) {
+          deps.log('SSO refusal followed a rotation: retrying with the newer token', {
+            corporationId: grant.corporationId,
+            kind: grant.kind ?? 'book',
+          });
+          return refreshGrant(deps, latest, true);
+        }
+      }
       // SSO's own wording is what tells a revoked app from an already-used rotated token.
       deps.log('SSO refused a stored token', {
         corporationId: grant.corporationId,

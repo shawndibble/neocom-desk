@@ -25,6 +25,7 @@ const dead = new Set<string>();
 let rotate = false;
 /** Runs while SSO is redeeming a token: a re-grant or a concurrent run landing mid-refresh. */
 let duringRefresh: (() => Promise<void>) | undefined;
+let duringDead: (() => Promise<void>) | undefined;
 const revokedAtSso: string[] = [];
 const logged: { message: string; data?: Record<string, unknown> }[] = [];
 
@@ -89,12 +90,14 @@ const syncDeps = (): CorpSyncDeps => ({
   db,
   now: () => now,
   key: () => KEY,
+  invalidGrantRecheckMs: 0,
   verify: async () => {
     throw new Error('not used for feeders');
   },
   refresh: async (_clientId, refreshToken) => {
     const match = /^rt-(\d+)-(\d+)$/.exec(refreshToken);
     if (!match || dead.has(refreshToken)) {
+      await duringDead?.();
       throw new SsoRefreshError(400, true, 'Invalid refresh token. Unable to migrate grant.');
     }
     await duringRefresh?.();
@@ -169,6 +172,7 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     dead.clear();
     rotate = false;
     duringRefresh = undefined;
+    duringDead = undefined;
     revokedAtSso.length = 0;
     logged.length = 0;
     esiState = {
@@ -454,6 +458,33 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
         ssoStatus: 400,
         ssoDescription: 'Invalid refresh token. Unable to migrate grant.',
       },
+    });
+  });
+
+  it('an invalid_grant that a concurrent refresh caused keeps the grant and reads on', async () => {
+    const token = await addFeeder(98000002);
+    dead.add(token);
+    // The refresh that won the race has rotated the token and written it back meanwhile.
+    duringDead = async () => {
+      await db
+        .collection(CORP_SYNC_GRANTS_COLLECTION)
+        .doc('98000002')
+        .update({
+          encryptedRefreshToken: encryptRefreshToken(
+            'rt-98001002-1',
+            98001002,
+            KEY,
+            'corpSyncGrant'
+          ),
+        });
+    };
+    await run();
+    expect(await grantDoc(98000002)).toBeDefined();
+    expect(await feederRecord(98000002)).toMatchObject({ lastReadWellAt: T0 });
+    expect(await feederRecord(98000002)).not.toHaveProperty('staleSince');
+    expect(logged).toContainEqual({
+      message: 'SSO refusal followed a rotation: retrying with the newer token',
+      data: { corporationId: 98000002, kind: 'feeder' },
     });
   });
 
