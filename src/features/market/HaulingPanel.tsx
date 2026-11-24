@@ -62,7 +62,7 @@ import {
   type RememberedDefaults,
   type UrlParamValues,
 } from '@/lib/useUrlState';
-import { DAILY_JOB_HUBS, type TradeHub } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import { useTurnInOffersByHub } from '@/features/campaigns/useTurnIns';
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
@@ -103,6 +103,7 @@ import { useMarketHub } from './hub';
 import {
   ANY_HUB,
   anyEndOf,
+  expandHaulingLane,
   HAULING_HUB_CHOICES,
   haulingEnd,
   haulingHubDefaults,
@@ -579,9 +580,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     addedFromOf,
   });
 
-  // Turn-ins at the hub each row sells at: the lane's To hub, or with Any hub
-  // there, whichever of the daily hubs the row picked. LP counts at that hub's LP Value.
-  const turnIns = useTurnInOffersByHub(to === ANY_HUB ? DAILY_JOB_HUBS : [to]);
+  // Turn-ins at the hub each row sells at: every To hub the scan's lanes reach
+  // (one, or the fan-out with Any hub there). LP counts at that hub's LP Value.
+  const turnIns = useTurnInOffersByHub([
+    ...new Set(expandHaulingLane(params.from, params.to).map((lane) => lane.to)),
+  ]);
   const turnInOfferFor = (row: HaulingViewRow) =>
     turnIns.data?.get(row.toHub.id)?.offerFor(row.typeId) ?? null;
 
