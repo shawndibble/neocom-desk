@@ -64,6 +64,7 @@ import {
 import {
   worstProblem,
   allProblems,
+  isRealProblem,
   ORDER_PROBLEMS,
   type OrderProblem,
   type OrderProblemFacts,
@@ -570,7 +571,7 @@ export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
 
 /** Orders with a real problem: neither `healthy` nor only a turn-in that pays (never "needs you"). */
 export function needsAttentionCount(rows: readonly OpenOrderRow[]): number {
-  return rows.filter((row) => row.problem !== 'healthy' && row.problem !== 'turnInPays').length;
+  return rows.filter((row) => isRealProblem(row.problem)).length;
 }
 
 /** Every order id across every Character's orders — the "never undercut an alt" set. */

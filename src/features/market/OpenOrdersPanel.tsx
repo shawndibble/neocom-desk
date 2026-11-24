@@ -190,9 +190,12 @@ export function OpenOrdersPanel({
    * every other Market figure prices. A Character's orders only: a
    * corporation's stock is no one Character's to turn in.
    */
-  const { hubId } = useHubFor('market');
-  const turnInLoad = useTurnInOffers(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB);
-  const turnIns = !corporation && turnInLoad.status === 'ready' ? turnInLoad.data : null;
+  const { hubId, hydrated: hubHydrated } = useHubFor('market');
+  // Idle until the hub settles (a first load at the default hub would flip rows) and for a corporation.
+  const turnInLoad = useTurnInOffers(
+    corporation || !hubHydrated ? null : (getTradeHub(hubId) ?? DEFAULT_TRADE_HUB)
+  );
+  const turnIns = turnInLoad.status === 'ready' ? turnInLoad.data : null;
   const turnInPerItem = useMemo(
     () =>
       turnIns
@@ -200,9 +203,12 @@ export function OpenOrdersPanel({
         : undefined,
     [turnIns]
   );
-  // Stable, so the table's columns are not rebuilt every render. Opens the
-  // order's Order Detail, where its turn-in shows.
-  const openTurnIn = useCallback((row: OpenOrderRow) => setDetailOrderId(row.orderId), []);
+  /**
+   * Opens an order's Order Detail (its turn-in shows there too). Stable, so the
+   * table's columns are not rebuilt every render. The modal loads what the
+   * order needs as it opens (`useOpenOrderDetail`).
+   */
+  const openDetails = useCallback((row: OpenOrderRow) => setDetailOrderId(row.orderId), []);
 
   const {
     visible: visibleColumnIds,
@@ -382,7 +388,7 @@ export function OpenOrdersPanel({
   const { columns, optional: optionalColumns } = useOpenOrderTableColumns({
     showCharacter: showCharacterStrip,
     visible: visibleColumnIds,
-    onOpenTurnIn: openTurnIn,
+    onOpenTurnIn: openDetails,
   });
 
   /** The header sort, dropped once the Columns menu hides its column. */
@@ -577,11 +583,6 @@ export function OpenOrdersPanel({
   const notShared = snapshot.openOrders.skipped;
   const pickerNamesMissing = showCharacterStrip && !corporation && characterFilterValue === 'all';
   const corpReauth = corporation && snapshot.corporation?.needsReauth === true;
-
-  // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
-  function openDetails(row: OpenOrderRow) {
-    setDetailOrderId(row.orderId);
-  }
 
   function pickView(next: OpenOrdersView) {
     setViewPicked(true);

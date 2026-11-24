@@ -71,6 +71,15 @@ export const UNDERCUT_PROBLEMS: readonly OrderProblem[] = [
   'undercutRegion',
 ];
 
+/**
+ * A problem the pilot has to fix: neither `healthy` nor `turnInPays`, which is
+ * a better way out, never a fault in the listing. "Needs attention" counts read
+ * this, so the next advisory problem is added in one place.
+ */
+export function isRealProblem(problem: OrderProblem): boolean {
+  return problem !== 'healthy' && problem !== 'turnInPays';
+}
+
 export interface OrderProblemFacts {
   isBuyOrder: boolean;
   /** True when my sell price is under my own floor — needs a cost basis; false when unknown. */

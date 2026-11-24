@@ -9,9 +9,10 @@
  *
  * Pure: reads only fields already computed onto `OpenOrderRow` by
  * `openOrdersModel.ts` (`problem`, `floor`, `station`, `deepUndercut`,
- * `expiry`, `worstScope`, `costBasis`). Formatting an ISK/percentage value
- * for i18n stays with the caller — this only decides *which* badge and what
- * short, already-formatted detail string (if any) goes beside it.
+ * `expiry`, `worstScope`, `costBasis`, `turnInEach`). Formatting an
+ * ISK/percentage value for i18n stays with the caller — this only decides
+ * *which* badge and what short, already-formatted detail string (if any) goes
+ * beside it; `badgeDetailText` adds `turnIn`'s translated "each".
  */
 import { approxIsk } from '@/features/campaigns/turnInContent';
 import { fixed1 } from '@/lib/fixedFormat';
@@ -46,7 +47,7 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
   'notChecked',
 ];
 
-/** A badge's detail as shown: `turnIn`'s "+~2K" reads "+~2K each"; every other detail as given. */
+/** A badge's detail as shown (the one place this module translates, so the row, card and CSV agree): `turnIn`'s "+~2K" reads "+~2K each"; every other detail as given. */
 export function badgeDetailText(
   t: Translate,
   kind: OrderBadgeKind,

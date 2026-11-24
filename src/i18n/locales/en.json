@@ -14372,7 +14372,7 @@
         "outbidAction": "Bid higher to get filled first, or wait.",
         "turnIn": "Turn in",
         "turnInEach": "{{gain}} each",
-        "turnInHelp": "A Military Campaign objective pays more per item than this sell order's price, counting its LP at your LP Value.",
+        "turnInHelp": "A Campaign Objective pays more per item than this sell order's price, counting its LP at your LP Value.",
         "turnInAction": "Turn the stock in to the Item Trader instead. It pays only if the order's character pressed Participate.",
         "frequentlyUndercut": "Often undercut",
         "frequentlyUndercutHelp": "Nobody is cheaper right now, but someone has been under you most of the times we checked.",
@@ -14392,7 +14392,7 @@
       },
       "turnIn": {
         "overPrice": "Pays {{gain}} each over your price ({{price}})",
-        "overBid": "Pays you {{gain}} per 100 over this bid"
+        "overBid": "Pays you {{gain}} per {{quantity}} over this bid"
       },
       "legendTitle": "What the badges mean",
       "legendOpen": "What do these badges mean?",

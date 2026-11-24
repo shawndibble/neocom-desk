@@ -30,7 +30,7 @@ import type { LpRate } from '@/engine/loyalty/marketLpValue';
 import { loadLpRates } from '@/features/loyalty/lpRates';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useKeyedLoad, type AsyncLoad } from '@/lib/useAsyncLoad';
-import type { TradeHub } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import { loadMilitaryCampaigns } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadCampaignState, loadJoinedObjectives, type JoinedObjectivesRead } from './campaignData';
@@ -116,11 +116,15 @@ export async function loadTurnInOffers(hub: TradeHub): Promise<TurnInOffers> {
   };
 }
 
-/** `loadTurnInOffers` for a component; reloads when the hub or the pilot's LP Value changes. */
-export function useTurnInOffers(hub: TradeHub): AsyncLoad<TurnInOffers> {
+/**
+ * `loadTurnInOffers` for a component; reloads when the hub or the pilot's LP
+ * Value changes. Idle for a `null` hub (not settled yet, or no turn-ins wanted).
+ */
+export function useTurnInOffers(hub: TradeHub | null): AsyncLoad<TurnInOffers> {
   const ownLpValue = useLpValue((state) => state.value);
-  const loader = useCallback(() => loadTurnInOffers(hub), [hub]);
-  return useKeyedLoad(`${hub.id}:${ownLpValue}`, loader);
+  // Never called for no hub: the null key below keeps the load idle.
+  const loader = useCallback(() => loadTurnInOffers(hub ?? DEFAULT_TRADE_HUB), [hub]);
+  return useKeyedLoad(hub === null ? null : `${hub.id}:${ownLpValue}`, loader);
 }
 
 /** One Character's Participate answers. */

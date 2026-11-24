@@ -4,6 +4,7 @@ import {
   DEFAULT_PROBLEM_THRESHOLDS,
   worstProblem,
   allProblems,
+  isRealProblem,
   type OrderProblemFacts,
 } from './orderProblems';
 
@@ -221,5 +222,11 @@ describe('allProblems', () => {
   it('lists outbid + expiringOrStale for a buy order hit by both', () => {
     const facts = healthyBuyFacts({ undercutScope: 'region', daysLeft: 1, volumeRemain: 1 });
     expect(allProblems(facts)).toEqual(['outbid', 'expiringOrStale']);
+  });
+});
+
+describe('isRealProblem', () => {
+  it('is false for healthy and turnInPays only', () => {
+    expect(ORDER_PROBLEMS.filter((p) => !isRealProblem(p))).toEqual(['turnInPays', 'healthy']);
   });
 });

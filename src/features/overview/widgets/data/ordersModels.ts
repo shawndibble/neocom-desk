@@ -27,7 +27,8 @@ const PROBLEM_TONE: Record<OrderProblem, DeadlineSeverity> = {
   undercutRegion: 'warning',
   outbid: 'warning',
   expiringOrStale: 'watch',
-  turnInPays: 'watch',
+  // Not a fault in the listing: read like healthy, as the state chart files it.
+  turnInPays: 'clear',
   healthy: 'clear',
 };
 
