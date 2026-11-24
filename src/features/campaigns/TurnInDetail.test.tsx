@@ -133,7 +133,7 @@ describe('TurnInDetail', () => {
     const { dialog } = await openDetail();
     expect(
       await within(dialog).findByText(
-        'Not signed up: press Participate now in the Opportunities window'
+        'Not participating: press Participate now in the Opportunities window'
       )
     ).toBeInTheDocument();
   });
@@ -205,7 +205,7 @@ describe('TurnInBreakdown', () => {
     expect(within(dialog).getByText('Secure Strength Trader · Onnamon')).toBeInTheDocument();
     expect(within(dialog).getByText('Trail of Silence Trader · Amo')).toBeInTheDocument();
     // Active Character granted and joined: the per-item column.
-    expect((await within(dialog).findAllByText('Pressed')).length).toBeGreaterThan(0);
+    expect((await within(dialog).findAllByText('Participating')).length).toBeGreaterThan(0);
 
     await user.click(
       within(dialog).getByRole('button', { name: 'Copy the list for Trail of Silence Trader' })

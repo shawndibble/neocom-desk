@@ -74,10 +74,10 @@ function Detail({ variant, openMark }: { variant: Variant; openMark?: 'participa
 }
 
 const VARIANTS: readonly Variant[] = [
-  { caption: 'Signed up', participate: { kind: 'participating' } },
+  { caption: 'Participating', participate: { kind: 'participating' } },
   {
-    caption: 'Granted, not signed up',
-    participate: { kind: 'notSignedUp' },
+    caption: 'Granted, not participating',
+    participate: { kind: 'notParticipating' },
     character: 'Orsa Tellemar',
   },
   {

@@ -58,7 +58,7 @@ export function filledPercent(offer: Pick<TurnInOffer, 'filled'>): number {
 
 export type ParticipateLine =
   | { kind: 'participating' }
-  | { kind: 'notSignedUp' }
+  | { kind: 'notParticipating' }
   /** The caveat line; `mark` puts the Military Campaigns `GrantCellMark` by it. */
   | { kind: 'paysOnlyIf'; mark: boolean };
 
@@ -84,7 +84,7 @@ export function participateLine({
     return { kind: 'paysOnlyIf', mark: characterId !== null && permission === 'missing' };
   }
   if (state === 'participating') return { kind: 'participating' };
-  if (state === 'notParticipating') return { kind: 'notSignedUp' };
+  if (state === 'notParticipating') return { kind: 'notParticipating' };
   return { kind: 'paysOnlyIf', mark: false };
 }
 

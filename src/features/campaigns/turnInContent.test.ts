@@ -77,13 +77,13 @@ describe('reward text', () => {
 });
 
 describe('participateLine', () => {
-  it('says signed up or not only once the Permission is granted and the read answered', () => {
+  it('says participating or not only once the Permission is granted and the read answered', () => {
     expect(
       participateLine({ characterId: 1, permission: 'granted', state: 'participating' })
     ).toEqual({ kind: 'participating' });
     expect(
       participateLine({ characterId: 1, permission: 'granted', state: 'notParticipating' })
-    ).toEqual({ kind: 'notSignedUp' });
+    ).toEqual({ kind: 'notParticipating' });
     expect(participateLine({ characterId: 1, permission: 'granted', state: 'unknown' })).toEqual({
       kind: 'paysOnlyIf',
       mark: false,

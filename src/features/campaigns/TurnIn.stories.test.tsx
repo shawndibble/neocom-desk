@@ -14,7 +14,7 @@ describe('turn-in stories', () => {
     render(<detail.AllVariants />);
     expect(screen.getAllByText('Kestrel Vane pressed Participate').length).toBeGreaterThan(0);
     expect(
-      screen.getByText('Not signed up: press Participate now in the Opportunities window')
+      screen.getByText('Not participating: press Participate now in the Opportunities window')
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Mira Solenne: Military Campaigns not granted' })

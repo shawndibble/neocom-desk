@@ -181,7 +181,7 @@ export function TurnInDestination({
 /* Participate                                                         */
 /* ------------------------------------------------------------------ */
 
-/** The Participate line: signed up, not signed up, or the caveat with an optional mark. */
+/** The Participate line: participating, not participating, or the caveat with an optional mark. */
 export function TurnInParticipateLine({
   line,
   characterName,
@@ -201,8 +201,8 @@ export function TurnInParticipateLine({
       </p>
     );
   }
-  if (line.kind === 'notSignedUp') {
-    return <p className="text-xs text-warning">{t('campaigns.turnIn.notSignedUp')}</p>;
+  if (line.kind === 'notParticipating') {
+    return <p className="text-xs text-warning">{t('campaigns.turnIn.notParticipating')}</p>;
   }
   return (
     // Plain inline text, so the mark follows the last word instead of wrapping onto a line of its own.

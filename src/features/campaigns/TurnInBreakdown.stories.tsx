@@ -93,11 +93,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Signed up for every objective: two Item Traders, subtotals, the Participate column. */
-export const SignedUp: Story = {};
+/** @summary Participating in every objective: two Item Traders, subtotals, the Participate column. */
+export const Participating: Story = {};
 
-/** @summary One objective not pressed: its cell in warning, and the line saying where to press it. */
-export const NotSignedUp: Story = {
+/** @summary Objectives not participated in: their cells in warning, and the line saying where to press Participate. */
+export const NotParticipating: Story = {
   render: () => (
     <Breakdown
       participate={{ kind: 'perItem' }}

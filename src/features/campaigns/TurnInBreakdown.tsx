@@ -91,12 +91,12 @@ function ParticipateCell({ state }: { state: ParticipateState | undefined }) {
     return (
       <span className="inline-flex items-center gap-1 text-success">
         <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-        {t('campaigns.turnIn.breakdown.pressed')}
+        {t('campaigns.turnIn.breakdown.participating')}
       </span>
     );
   }
   if (state === 'notParticipating') {
-    return <span className="text-warning">{t('campaigns.turnIn.breakdown.notPressed')}</span>;
+    return <span className="text-warning">{t('campaigns.turnIn.breakdown.notParticipating')}</span>;
   }
   return <span className="text-text-dim">—</span>;
 }
@@ -195,7 +195,7 @@ export function TurnInBreakdownView({
     ],
     [t, perItem, stateOf]
   );
-  const anyNotPressed =
+  const anyNotParticipating =
     perItem &&
     pile.groups.some((g) =>
       g.lines.some((l) => stateOf(l.offer.objectiveId) === 'notParticipating')
@@ -219,8 +219,11 @@ export function TurnInBreakdownView({
               mark={participateMark}
             />
           )}
-          {anyNotPressed && (
-            <TurnInParticipateLine line={{ kind: 'notSignedUp' }} characterName={characterName} />
+          {anyNotParticipating && (
+            <TurnInParticipateLine
+              line={{ kind: 'notParticipating' }}
+              characterName={characterName}
+            />
           )}
         </div>
         {pile.groups.map((group) => (
