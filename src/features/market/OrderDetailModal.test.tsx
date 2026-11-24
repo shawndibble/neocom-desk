@@ -1339,6 +1339,34 @@ describe('OrderDetailContent — campaign turn-in (#6708)', () => {
     expect(screen.getByText('Pays you ~950K per 100 over this bid')).toBeInTheDocument();
   });
 
+  it('a top bid the turn-in beats: the bid line says the turn-in pays more, not "Nothing", and the turn-in is its own block', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      isBuyOrder: true,
+      price: 50_500,
+      turnInEach: 60_000,
+      station: { bestPrice: 50_500, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    };
+    renderModal({ row, turnIn: FAILOVER });
+    expect(screen.queryByText('Nothing. This one is doing fine.')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Nothing to fix on the bid. Turning the items in pays more: see Turn-in.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Turn-in' })).toBeInTheDocument();
+  });
+
+  it('a top bid the turn-in does not beat keeps "Nothing. This one is doing fine."', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      isBuyOrder: true,
+      price: 70_000,
+      turnInEach: 60_000,
+      station: { bestPrice: 70_000, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    };
+    renderModal({ row, turnIn: FAILOVER });
+    expect(screen.getByText('Nothing. This one is doing fine.')).toBeInTheDocument();
+  });
+
   it('leaves the turn-in out of a sell order it does not beat', () => {
     renderModal({ row: { ...BASE_ROW, turnInEach: 400 }, turnIn: FAILOVER });
     expect(screen.queryByText('Secure Strength Trader · Onnamon')).not.toBeInTheDocument();

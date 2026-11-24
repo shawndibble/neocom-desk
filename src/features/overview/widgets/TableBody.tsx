@@ -150,8 +150,13 @@ const CARET_WIDTH = 20;
 /** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
 
-/** A `capped` column: truncated at 5rem under a 24rem box, else 8rem (see `TableColumn.capped`). */
-const CAPPED = 'max-w-20 @sm:max-w-32 truncate whitespace-nowrap';
+/**
+ * The first column beside a `capped` column: its full text up to 60% of the table's own box
+ * (container query units), the capped column taking the rest (see `TableColumn.capped`). While
+ * a `hideNarrow` capped column is hidden, the first column takes the whole leftover instead.
+ */
+const FIRST_BESIDE_CAPPED = 'max-w-[60cqw]';
+const FIRST_BESIDE_NARROW_CAPPED = 'w-full max-w-0 @md:w-auto @md:max-w-[60cqw]';
 
 function Row({
   row,
@@ -161,6 +166,7 @@ function Row({
   compact,
   rowHeader,
   growKey,
+  firstCellClass,
   iconSlot,
   onOpen,
 }: {
@@ -174,6 +180,8 @@ function Row({
   rowHeader: boolean;
   /** The visible column that truncates in the first one's place, when a table has one. */
   growKey: string | undefined;
+  /** The first column's cap while `growKey` is set: 10rem, or a share of the box beside a `capped` column. */
+  firstCellClass: string;
   /** Whether the first cell keeps a leading icon column (some row of the table draws an icon). */
   iconSlot: boolean;
   /** Opens the row's detail modal or Show info; set only for a row with a `detail` or `info`. */
@@ -219,10 +227,8 @@ function Row({
                 : first
                   ? growKey === undefined
                     ? cx('w-full max-w-0', column.nameFloor && 'min-w-28')
-                    : 'max-w-40'
-                  : column.capped
-                    ? CAPPED
-                    : 'whitespace-nowrap',
+                    : firstCellClass
+                  : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
               Cell === 'th' && 'text-left',
               first && 'font-semibold',
@@ -469,7 +475,14 @@ export function TableBody({
     );
   }
   const hasHeader = columns.some((column) => column.label !== '');
-  const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
+  // A `capped` column grows like a `grow` one, but leaves the first column a larger share.
+  const growColumn = columns.find((column, i) => i > 0 && (column.grow || column.capped));
+  const growKey = growColumn?.key;
+  const firstCellClass = !growColumn?.capped
+    ? 'max-w-40'
+    : growColumn.hideNarrow
+      ? FIRST_BESIDE_NARROW_CAPPED
+      : FIRST_BESIDE_CAPPED;
   const caret = shown.some((row) => row.to !== undefined);
   // The icon column exists only while a row of the table draws an icon (all rows, so "+N more" and paging never shift it), so a table without one starts its text flush with its header.
   const iconSlot = table.rows.some(isFlagged);
@@ -541,6 +554,7 @@ export function TableBody({
               compact={columnsFor === 'S'}
               rowHeader={!hasHeader}
               growKey={growKey}
+              firstCellClass={firstCellClass}
               iconSlot={iconSlot}
               onOpen={
                 row.detail !== undefined

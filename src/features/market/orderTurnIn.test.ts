@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { openOrderRow } from './__fixtures__/openOrderRow';
-import { bidTurnInPays, orderShowsTurnIn, turnInSurfaceLine } from './orderTurnIn';
+import {
+  bidTurnInPays,
+  orderShowsTurnIn,
+  orderTurnInGlyph,
+  turnInSurfaceLine,
+} from './orderTurnIn';
 
 const t = (key: string, options?: Record<string, unknown>) => `${key} ${JSON.stringify(options)}`;
 
@@ -52,5 +57,41 @@ describe('bidTurnInPays', () => {
     );
     expect(bidTurnInPays(openOrderRow({ isBuyOrder: true, price: 500 }))).toBe(false);
     expect(bidTurnInPays(openOrderRow({ price: 500, turnInEach: 600 }))).toBe(false);
+  });
+});
+
+describe('orderTurnInGlyph', () => {
+  it('marks a buy order whose turn-in pays more than its bid', () => {
+    expect(orderTurnInGlyph(openOrderRow({ isBuyOrder: true, price: 500, turnInEach: 600 }))).toBe(
+      true
+    );
+    expect(orderTurnInGlyph(openOrderRow({ isBuyOrder: true, price: 700, turnInEach: 600 }))).toBe(
+      false
+    );
+  });
+
+  it('marks a sell order the turn-in beats when a real problem wins the column', () => {
+    expect(
+      orderTurnInGlyph(
+        openOrderRow({
+          problem: 'undercutStation',
+          problems: ['undercutStation', 'turnInPays'],
+          turnInEach: 600,
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('leaves a sell order whose shown problem is the turn-in (its badge says so), or one it does not beat', () => {
+    expect(
+      orderTurnInGlyph(
+        openOrderRow({ problem: 'turnInPays', problems: ['turnInPays'], turnInEach: 600 })
+      )
+    ).toBe(false);
+    expect(
+      orderTurnInGlyph(
+        openOrderRow({ problem: 'undercutStation', problems: ['undercutStation'], turnInEach: 400 })
+      )
+    ).toBe(false);
   });
 });

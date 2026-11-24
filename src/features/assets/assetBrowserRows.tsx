@@ -787,6 +787,8 @@ interface SearchResultRowProps {
   askEstimate?: AskEstimateFigure;
   /** Wraps the row in its item menu; its More actions button sits at the row's far right. */
   wrap: (children: ReactElement) => ReactElement;
+  /** Drawn after the row's link, before its More actions: a turn-in stack's `TurnInGlyph`. */
+  afterLink?: ReactNode;
   t: Translate;
 }
 
@@ -811,6 +813,7 @@ export function SearchResultRow({
   valueHint,
   askEstimate,
   wrap,
+  afterLink,
   t,
 }: SearchResultRowProps) {
   return (
@@ -864,6 +867,7 @@ export function SearchResultRow({
               </span>
             </span>
           </Link>
+          {afterLink}
           <span className="shrink-0 px-2">
             <RowMoreActions />
           </span>

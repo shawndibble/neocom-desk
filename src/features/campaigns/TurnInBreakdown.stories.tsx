@@ -96,12 +96,26 @@ type Story = StoryObj<typeof meta>;
 /** @summary Participating in every objective: two Item Traders, subtotals, the Participate column. */
 export const Participating: Story = {};
 
-/** @summary Objectives not participated in: their cells in warning, and the line saying where to press Participate. */
-export const NotParticipating: Story = {
+/** @summary Some objectives not participated in: their cells in warning, and no pile-wide line. */
+export const SomeNotParticipating: Story = {
   render: () => (
     <Breakdown
       participate={{ kind: 'perItem' }}
       states={{ 'obj-intel': 'notParticipating', 'obj-signal': 'notParticipating' }}
+    />
+  ),
+};
+
+/** @summary No objective participated in: every cell in warning, and the line saying where to press Participate. */
+export const NotParticipating: Story = {
+  render: () => (
+    <Breakdown
+      participate={{ kind: 'perItem' }}
+      states={{
+        [FAILOVER.objectiveId]: 'notParticipating',
+        [STRATEGIC_INTEL.objectiveId]: 'notParticipating',
+        [STEREO.objectiveId]: 'notParticipating',
+      }}
     />
   ),
 };

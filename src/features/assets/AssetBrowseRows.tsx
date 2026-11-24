@@ -259,6 +259,42 @@ function useAbyssalValueHint(
   return abyssalValueHint(abyssal.estimates.get(itemId), t);
 }
 
+/**
+ * A turn-in stack's glyph and popover: for the stack's own Character (whose
+ * Participate the detail shows, whose client Set destination steers) and what
+ * the stack turns in. Null for a stack no Active objective takes.
+ */
+function StackTurnIn({
+  asset,
+  label,
+  characterBadges,
+  t,
+}: {
+  asset: Pick<CharacterAsset, 'item_id' | 'type_id' | 'quantity'>;
+  label: string;
+  characterBadges: CharacterBadgeContext;
+  t: Translate;
+}) {
+  const actions = useAssetItemActions();
+  const offer = actions.turnInOfferFor(asset.type_id);
+  if (!offer) return null;
+  const ownerId =
+    characterBadges.idByItemId.get(asset.item_id) ?? characterBadges.activeCharacterId;
+  return (
+    <TurnInDetail
+      name={label}
+      offer={offer}
+      characterId={ownerId}
+      characterName={ownerId === null ? undefined : characterBadges.nameById.get(ownerId)}
+      surfaceLine={t('campaigns.turnIn.youHold', {
+        quantity: formatCount(asset.quantity),
+        amount: approxIsk(turnInReward(offer, asset.quantity).total),
+      })}
+      trigger={<TurnInGlyph name={label} />}
+    />
+  );
+}
+
 /** Split out so it can call `useAssetItemActions` — a heading/location row does not. */
 function SearchMatchRow({
   match,
@@ -319,6 +355,9 @@ function SearchMatchRow({
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       valueHint={valueHint}
+      // Outside the row's link (a button never nests in an anchor): often the only place another
+      // Character's stack shows, so its turn-in would otherwise be out of reach.
+      afterLink={<StackTurnIn asset={asset} label={name} characterBadges={characterBadges} t={t} />}
       wrap={(children) => (
         <OreItemMenu
           quantity={asset.quantity}
@@ -421,10 +460,6 @@ function NodeRowView({
       : planTargetForItem(pageActions.blueprints, asset.type_id);
   const blueprintTypeID =
     planTarget === undefined ? undefined : (planTarget?.blueprintTypeID ?? null);
-  const turnInOffer = actions.turnInOfferFor(asset.type_id);
-  // The stack's own Character: whose Participate the detail shows, whose client Set destination steers.
-  const ownerId =
-    characterBadges.idByItemId.get(asset.item_id) ?? characterBadges.activeCharacterId;
   const onViewInIndustryAsMaterial = actions.materialPlanMap?.has(asset.type_id)
     ? () => actions.onViewInIndustryAsMaterial(asset.type_id)
     : undefined;
@@ -438,19 +473,7 @@ function NodeRowView({
       estimatedValue={estimatedValue}
       valueHint={valueHint}
       afterValue={
-        turnInOffer && (
-          <TurnInDetail
-            name={label}
-            offer={turnInOffer}
-            characterId={ownerId}
-            characterName={ownerId === null ? undefined : characterBadges.nameById.get(ownerId)}
-            surfaceLine={t('campaigns.turnIn.youHold', {
-              quantity: formatCount(asset.quantity),
-              amount: approxIsk(turnInReward(turnInOffer, asset.quantity).total),
-            })}
-            trigger={<TurnInGlyph name={label} />}
-          />
-        )
+        <StackTurnIn asset={asset} label={label} characterBadges={characterBadges} t={t} />
       }
       askEstimate={askEstimateFigure(asset, actions.askEstimateByTypeId, estimatedValue, t)}
       stockUnitCost={actions.stockCostByTypeId?.get(asset.type_id)?.unitCost}

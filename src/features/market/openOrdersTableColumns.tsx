@@ -4,10 +4,11 @@
  * when the Columns menu turns them on. Every figure is in full ISK
  * (`formatMarketIsk`) except the ISK tied up total (`IskAmount`).
  *
- * A buy order on an item an Active campaign turn-in takes keeps its state and
- * gets a dim `TurnInGlyph` after its price (after Do this while the Price
- * column is off); it and a sell order's "Turn in instead" open the order's
- * Order Detail, which shows the turn-in (#6708).
+ * A buy order an Active campaign turn-in pays more than its bid, or a sell
+ * order it beats whose column an undercut won, keeps its state and gets a dim
+ * `TurnInGlyph` after its price (after Do this while the Price column is off);
+ * it and a sell order's "Turn in instead" open the order's Order Detail, which
+ * shows the turn-in (#6708).
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +23,7 @@ import { OPEN_ORDER_COLUMN_IDS, type OpenOrderColumnId } from './openOrdersColum
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
-import { bidTurnInPays } from './orderTurnIn';
+import { orderTurnInGlyph } from './orderTurnIn';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { WorkThroughTableSlot } from './WorkThroughControls';
 
@@ -50,10 +51,10 @@ export interface OpenOrderTableColumns {
   optional: Record<OpenOrderColumnId, DataTableColumn<OpenOrderRow>>;
 }
 
-/** A buy order whose turn-in pays more than its bid: the glyph that opens its turn-in. */
-function buyTurnInGlyph(row: OpenOrderRow, onOpenTurnIn?: (row: OpenOrderRow) => void) {
+/** A row whose turn-in pays more but its column says something else (`orderTurnInGlyph`): the glyph that opens it. */
+function turnInGlyph(row: OpenOrderRow, onOpenTurnIn?: (row: OpenOrderRow) => void) {
   return (
-    bidTurnInPays(row) &&
+    orderTurnInGlyph(row) &&
     onOpenTurnIn && <TurnInGlyph name={row.typeName} onClick={() => onOpenTurnIn(row)} />
   );
 }
@@ -123,7 +124,7 @@ export function useOpenOrderTableColumns({
             fallback={
               <>
                 <OrderDoThisText row={row} onOpenTurnIn={onOpenTurnIn} />
-                {!priceShown && buyTurnInGlyph(row, onOpenTurnIn)}
+                {!priceShown && turnInGlyph(row, onOpenTurnIn)}
               </>
             }
           />
@@ -140,7 +141,7 @@ export function useOpenOrderTableColumns({
         render: (row) => (
           <>
             {formatMarketIsk(row.price)}
-            {buyTurnInGlyph(row, onOpenTurnIn)}
+            {turnInGlyph(row, onOpenTurnIn)}
           </>
         ),
       },

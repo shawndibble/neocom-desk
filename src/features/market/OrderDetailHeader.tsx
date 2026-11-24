@@ -10,6 +10,7 @@ import { OrderRowSummaryText } from './OrderRowSummaryText';
 import type { OrderAdvice } from './orderAdvice';
 import { doThisPrice, rowFixCall } from './orderDoThis';
 import { OrderDoThisText } from './OrderDoThisText';
+import { bidTurnInPays } from './orderTurnIn';
 import { isOffHubStation } from './hubStation';
 import { CopyPriceButton } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
@@ -35,6 +36,12 @@ export function OrderDetailHeader({
   const { call: fixCall } = rowFixCall(row);
   const shortCall = doThisPrice(fixCall) === null && fixCall.kind !== 'badgeAdvice';
   const offHub = isOffHubStation(row.stationName, row.locationId);
+  // A top bid is fine as a bid, but "Nothing" would contradict the turn-in block under it
+  // when turning the items in pays more than the bid.
+  const actionKey =
+    badge?.kind === 'topBid' && bidTurnInPays(row)
+      ? 'market.orders.badge.topBidTurnInAction'
+      : badge && `market.orders.badge.${badge.kind}Action`;
 
   return (
     <>
@@ -91,11 +98,7 @@ export function OrderDetailHeader({
             <p className="mt-2 text-xl font-semibold text-text">
               <OrderDoThisText row={row} interactive={false} />
             </p>
-            {badge && (
-              <p className="mt-1 text-sm text-text-dim">
-                {t(`market.orders.badge.${badge.kind}Action`)}
-              </p>
-            )}
+            {actionKey && <p className="mt-1 text-sm text-text-dim">{t(actionKey)}</p>}
             {summary && (
               <p className="mt-1">
                 <OrderRowSummaryText row={row} summary={summary} />
@@ -105,9 +108,7 @@ export function OrderDetailHeader({
         ) : (
           <>
             <p className="mt-2 text-base font-semibold text-text">
-              {badge
-                ? t(`market.orders.badge.${badge.kind}Action`)
-                : t('market.orders.scopeNotChecked')}
+              {actionKey ? t(actionKey) : t('market.orders.scopeNotChecked')}
             </p>
             {summary && (
               <p className="mt-1">

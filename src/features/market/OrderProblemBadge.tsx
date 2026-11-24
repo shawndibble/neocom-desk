@@ -58,7 +58,7 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
 
 interface OrderProblemBadgeProps {
   kind: OrderBadgeKind;
-  /** Short trailing detail already formatted by the caller, e.g. "-8.4%" or "7 jumps"; `turnIn` adds "each" to its "+~2K". */
+  /** Short trailing detail already formatted by the caller, e.g. "-8.4%" or "7 jumps"; `turnIn` adds "more" to its "~2K". */
   detail?: string;
   className?: string;
   /**

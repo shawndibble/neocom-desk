@@ -5949,6 +5949,7 @@
         "complete": "Complete",
         "ringSummary": "{{label}}: {{completed}} of {{target}} objectives complete",
         "ofTarget": "{{completed}} of {{target}}",
+        "factionOfTarget": "{{faction}} · {{completed}} of {{target}}",
         "objectivesComplete_one": "objective complete",
         "objectivesComplete_other": "objectives complete",
         "factionLine": "{{faction}} {{completed}}/{{target}}",
@@ -7091,7 +7092,7 @@
         "trading": "Trading",
         "both": "Both"
       },
-      "faction": "Faction",
+      "factionCurrent": "Faction: {{faction}}",
       "factionChoice": {
         "all": "All",
         "amarr": "Amarr",
@@ -9748,7 +9749,7 @@
     "turnIn": {
       "dialogLabel": "{{name}}: turn-in reward",
       "openDetail": "Turn-in reward for {{name}}",
-      "paysEach": "Turn-in pays {{amount}} each",
+      "overSale": "Pays {{gain}} each over selling here ({{price}})",
       "youHold": "You hold {{quantity}} · {{amount}} turned in",
       "eachTurnedIn": "each turned in",
       "splitIsk": "{{isk}} ISK",
@@ -14388,7 +14389,7 @@
         "outbidHelp": "This is a buy order and someone bids higher, so sellers go to them first.",
         "outbidAction": "Bid higher to get filled first, or wait.",
         "turnIn": "Turn in",
-        "turnInEach": "{{gain}} each",
+        "turnInMore": "{{gain}} more",
         "turnInHelp": "A Campaign Objective pays more per item than this sell order's price, counting its LP at your LP Value.",
         "turnInAction": "Turn the stock in to the Item Trader instead. It pays only if the order's character pressed Participate.",
         "frequentlyUndercut": "Often undercut",
@@ -14400,6 +14401,7 @@
         "topBid": "Top bid",
         "topBidHelp": "This is a buy order and nobody bids higher where it sits, so sellers come to you first.",
         "topBidAction": "Nothing. This one is doing fine.",
+        "topBidTurnInAction": "Nothing to fix on the bid. Turning the items in pays more: see Turn-in.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order and your wallet buys don't cover it, so we can't work out your lowest safe price.",
         "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first.",
@@ -14408,6 +14410,7 @@
         "notCheckedAction": "Nothing to do. It is checked again when prices load."
       },
       "turnIn": {
+        "heading": "Turn-in",
         "overPrice": "Pays {{gain}} each over your price ({{price}})",
         "overBid": "Pays you {{gain}} per {{quantity}} over this bid"
       },

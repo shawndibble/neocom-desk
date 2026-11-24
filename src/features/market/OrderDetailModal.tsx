@@ -25,10 +25,11 @@
  * in the modal's main area, about the order's own Character, with one line
  * on what it pays over the order's price.
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, StatChip, StatChips } from '@/components/ui';
 import { formatMarketIsk } from '@/lib/isk';
+import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useNow } from '@/lib/useNow';
 import type { OpenOrderRow } from './openOrdersModel';
@@ -52,6 +53,7 @@ import { OrderExitsSection } from './OrderExitsSection';
 import { WorkThroughModalNotes, WorkThroughNextButton } from './WorkThroughControls';
 import { useWalkCopyPrice } from './workThroughContext';
 import { DividedList } from '@/components/ui/DividedList';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { TurnInDetailBody } from '@/features/campaigns/TurnInDetail';
 import { orderShowsTurnIn, turnInSurfaceLine } from './orderTurnIn';
 import type { TurnInOfferDetail } from '@/features/campaigns/useTurnIns';
@@ -132,6 +134,7 @@ export function OrderDetailContent({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const nowTick = useNow();
+  const turnInHeadingId = useId();
   // All folded: verdict, Copy and the facts are the answer, each trailing read
   // its summary. A page remounts per orderId, but a work-through keeps one
   // modal across orders: the open set is tagged with its order, so Next folds
@@ -230,7 +233,12 @@ export function OrderDetailContent({
         </StatChips>
 
         {turnIn && orderShowsTurnIn(row) && (
-          <section className="rounded-xs border border-line">
+          // Its own titled block, apart from the order's verdict above: a bid that is fine as a
+          // bid can still be beaten by turning the items in.
+          <section aria-labelledby={turnInHeadingId} className="rounded-xs border border-line">
+            <h3 id={turnInHeadingId} className={cx(eyebrowClassName, 'px-3 pt-3')}>
+              {t('market.orders.turnIn.heading')}
+            </h3>
             <TurnInDetailBody
               name={row.typeName}
               offer={turnIn}

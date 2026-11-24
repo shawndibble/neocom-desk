@@ -243,15 +243,23 @@ export function useHaulingTable({
         // The item stays listed: a turn-in is only a glyph after the price, opening its detail.
         const offer = turnInOfferFor(row);
         if (!offer) return price(row.price);
+        // The detail's headline already says what one pays; the line adds how that compares
+        // with this sale, and only when the turn-in pays more.
+        const gain = offer.totalPerItem - row.price;
         return (
           <>
             {price(row.price)}
             <TurnInDetail
               name={row.name}
               offer={offer}
-              surfaceLine={t('campaigns.turnIn.paysEach', {
-                amount: approxIsk(offer.totalPerItem),
-              })}
+              surfaceLine={
+                gain > 0
+                  ? t('campaigns.turnIn.overSale', {
+                      gain: approxIsk(gain),
+                      price: formatMarketIsk(row.price),
+                    })
+                  : undefined
+              }
               trigger={<TurnInGlyph name={row.name} />}
             />
           </>
