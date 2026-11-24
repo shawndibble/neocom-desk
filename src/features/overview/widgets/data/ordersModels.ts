@@ -27,6 +27,7 @@ const PROBLEM_TONE: Record<OrderProblem, DeadlineSeverity> = {
   undercutRegion: 'warning',
   outbid: 'warning',
   expiringOrStale: 'watch',
+  turnInPays: 'watch',
   healthy: 'clear',
 };
 
@@ -190,7 +191,8 @@ const STATE_PARTS: readonly {
   problems: readonly OrderProblem[];
   color: StackPart['color'];
 }[] = [
-  { key: 'healthy', problems: ['healthy'], color: 'neutral' },
+  // A turn-in that pays more is no fault in the listing itself.
+  { key: 'healthy', problems: ['healthy', 'turnInPays'], color: 'neutral' },
   {
     key: 'undercut',
     problems: ['undercutStation', 'undercutSystem', 'undercutRegion'],

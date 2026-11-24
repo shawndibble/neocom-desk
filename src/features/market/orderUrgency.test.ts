@@ -18,6 +18,10 @@ describe('orderUrgency', () => {
     expect(orderUrgency(row('undercutRegion'))).toBe('watch');
   });
 
+  it('files a sell order a turn-in pays more for under Watch, never Needs you', () => {
+    expect(orderUrgency(row('turnInPays'))).toBe('watch');
+  });
+
   it('files an order nobody could check under Watch, never Fine', () => {
     expect(orderUrgency(row('healthy', { competitionUnchecked: true }))).toBe('watch');
   });

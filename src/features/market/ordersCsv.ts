@@ -2,6 +2,7 @@ import { isoTime } from '@/lib/exportSheets';
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { OpenOrderRow } from './openOrdersModel';
 import { orderDoThisText, rowFixCall } from './orderDoThis';
+import { badgeDetailText } from './orderBadgeKind';
 import { shownFloorPrice } from './orderRowFormat';
 
 /**
@@ -41,7 +42,8 @@ export function ordersCsvColumns(t: CsvTranslate): CsvColumn<OpenOrderRow>[] {
         const { badge } = rowFixCall(row).advice;
         if (!badge) return null;
         const label = t(`market.orders.badge.${badge.kind}`);
-        return badge.detail ? `${label} ${badge.detail}` : label;
+        const detail = badgeDetailText(t, badge.kind, badge.detail);
+        return detail ? `${label} ${detail}` : label;
       },
     },
     { header: t('market.orders.fixList.colDoThis'), value: (row) => orderDoThisText(t, row) },

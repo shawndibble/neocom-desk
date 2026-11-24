@@ -14370,6 +14370,10 @@
         "outbid": "Outbid",
         "outbidHelp": "This is a buy order and someone bids higher, so sellers go to them first.",
         "outbidAction": "Bid higher to get filled first, or wait.",
+        "turnIn": "Turn in",
+        "turnInEach": "{{gain}} each",
+        "turnInHelp": "A Military Campaign objective pays more per item than this sell order's price, counting its LP at your LP Value.",
+        "turnInAction": "Turn the stock in to the Item Trader instead. It pays only if the order's character pressed Participate.",
         "frequentlyUndercut": "Often undercut",
         "frequentlyUndercutHelp": "Nobody is cheaper right now, but someone has been under you most of the times we checked.",
         "frequentlyUndercutAction": "Drop the price by more than usual, or move the stock. Small cuts keep getting beaten.",
@@ -14385,6 +14389,10 @@
         "notChecked": "Not checked",
         "notCheckedHelp": "Market prices didn't load (you may be offline), so we can't tell whether anyone beats this order.",
         "notCheckedAction": "Nothing to do. It is checked again when prices load."
+      },
+      "turnIn": {
+        "overPrice": "Pays {{gain}} each over your price ({{price}})",
+        "overBid": "Pays you {{gain}} per 100 over this bid"
       },
       "legendTitle": "What the badges mean",
       "legendOpen": "What do these badges mean?",
@@ -14416,6 +14424,7 @@
         "undercutRegion": "Undercut in my region",
         "expiringOrStale": "Expiring or stale",
         "outbid": "Outbid buy order",
+        "turnInPays": "A turn-in pays more",
         "healthy": "Healthy",
         "notChecked": "Not checked"
       },
@@ -14627,7 +14636,8 @@
           "doNotChase": "Do not chase this one",
           "relist": "Relist it",
           "leaveItAlone": "Leave it alone",
-          "nothingYet": "Nothing to do yet"
+          "nothingYet": "Nothing to do yet",
+          "turnIn": "Turn in instead"
         },
         "healthy_one": "{{count}} healthy order",
         "healthy_other": "{{count}} healthy orders",

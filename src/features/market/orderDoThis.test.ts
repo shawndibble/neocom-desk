@@ -52,6 +52,15 @@ describe('orderDoThis', () => {
     expect(orderDoThis(row)).toEqual({ kind: 'bid', price: 3.95 });
   });
 
+  it('turns in a sell order a campaign turn-in pays more for', () => {
+    const row = openOrderRow({ problem: 'turnInPays', problems: ['turnInPays'], turnInEach: 600 });
+    expect(orderDoThis(row)).toEqual({ kind: 'turnIn' });
+    // A floor's "leave it alone" is for a healthy order only: the turn-in still speaks.
+    expect(orderDoThis({ ...row, floor: { relist: 300 } as OpenOrderRow['floor'] })).toEqual({
+      kind: 'turnIn',
+    });
+  });
+
   it('relists an expiring order', () => {
     const row = openOrderRow({ problem: 'expiringOrStale', problems: ['expiringOrStale'] });
     expect(orderDoThis(row)).toEqual({ kind: 'relist' });

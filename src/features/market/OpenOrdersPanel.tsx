@@ -88,6 +88,9 @@ import { OpenOrdersFilterFields } from './OpenOrdersFilterFields';
 import { useOpenOrdersFilterState } from './useOpenOrdersFilterState';
 import { useOpenOrdersWorkThrough } from './useOpenOrdersWorkThrough';
 import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts';
+import { useTurnInOffers } from '@/features/campaigns/useTurnIns';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
+import { useHubFor } from './hub';
 
 const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
   act: 'market.orders.fixList.tableAct',
@@ -182,6 +185,24 @@ export function OpenOrdersPanel({
   const orderDetail = useOrderDetail();
   const structureFees = useStructureFees((state) => state.value);
   useHydratedStore(useStructureFees);
+  /**
+   * Active campaign turn-ins (#6708), their LP at the Market page's hub as
+   * every other Market figure prices. A Character's orders only: a
+   * corporation's stock is no one Character's to turn in.
+   */
+  const { hubId } = useHubFor('market');
+  const turnInLoad = useTurnInOffers(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB);
+  const turnIns = !corporation && turnInLoad.status === 'ready' ? turnInLoad.data : null;
+  const turnInPerItem = useMemo(
+    () =>
+      turnIns
+        ? new Map([...turnIns.byType].map(([typeId, offer]) => [typeId, offer.totalPerItem]))
+        : undefined,
+    [turnIns]
+  );
+  // Stable, so the table's columns are not rebuilt every render. Opens the
+  // order's Order Detail, where its turn-in shows.
+  const openTurnIn = useCallback((row: OpenOrderRow) => setDetailOrderId(row.orderId), []);
 
   const {
     visible: visibleColumnIds,
@@ -248,6 +269,7 @@ export function OpenOrdersPanel({
       skillsByCharacter: snapshot.skillsByCharacter,
       standingsByOrder: snapshot.standingsByOrder,
       structureFees,
+      turnInPerItem,
       now: snapshot.now,
     });
   }, [
@@ -256,6 +278,7 @@ export function OpenOrdersPanel({
     orderDetail.caches.structureBooks,
     stationNames,
     structureFees,
+    turnInPerItem,
   ]);
 
   /**
@@ -359,6 +382,7 @@ export function OpenOrdersPanel({
   const { columns, optional: optionalColumns } = useOpenOrderTableColumns({
     showCharacter: showCharacterStrip,
     visible: visibleColumnIds,
+    onOpenTurnIn: openTurnIn,
   });
 
   /** The header sort, dropped once the Columns menu hides its column. */
@@ -837,6 +861,7 @@ export function OpenOrdersPanel({
               snapshot={snapshot}
               detail={orderDetail}
               walking={workCurrent !== null}
+              turnIn={turnIns?.offerFor(modalRow.typeId) ?? null}
               onClose={
                 workCurrent ? workThroughContext.workThrough.stop : () => setDetailOrderId(null)
               }

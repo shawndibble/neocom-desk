@@ -19,6 +19,11 @@
  *   could not be recovered from the region book (`openOrdersModel.ts`'s
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
+ *
+ * An order whose item an Active campaign turn-in takes (#6708) — a sell order
+ * filed `turnInPays`, or any buy order — shows the turn-in (`TurnInDetailBody`)
+ * in the modal's main area, about the order's own Character, with one line
+ * on what it pays over the order's price.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,6 +52,9 @@ import { OrderExitsSection } from './OrderExitsSection';
 import { WorkThroughModalNotes, WorkThroughNextButton } from './WorkThroughControls';
 import { useWalkCopyPrice } from './workThroughContext';
 import { DividedList } from '@/components/ui/DividedList';
+import { TurnInDetailBody } from '@/features/campaigns/TurnInDetail';
+import { orderShowsTurnIn, turnInSurfaceLine } from './orderTurnIn';
+import type { TurnInOfferDetail } from '@/features/campaigns/useTurnIns';
 
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
@@ -60,6 +68,8 @@ export interface OrderDetailModalProps {
   detail: OrderDetail;
   /** A work-through is showing this order: the modal adds the walk's notes and Next. */
   walking?: boolean;
+  /** The Active turn-in for the order's item, when one takes it. */
+  turnIn?: TurnInOfferDetail | null;
   onClose: () => void;
 }
 
@@ -69,6 +79,7 @@ export function OrderDetailModal({
   snapshot,
   detail,
   walking,
+  turnIn,
   onClose,
 }: OrderDetailModalProps) {
   const { view, checkDeeper } = useOpenOrderDetail(detail, row, snapshot);
@@ -77,6 +88,7 @@ export function OrderDetailModal({
       row={row}
       {...view}
       walking={walking}
+      turnIn={turnIn}
       onCheckDeeper={checkDeeper}
       onClose={onClose}
     />
@@ -86,6 +98,7 @@ export function OrderDetailModal({
 export type OrderDetailContentProps = OrderDetailView & {
   row: OpenOrderRow;
   walking?: boolean;
+  turnIn?: TurnInOfferDetail | null;
   onCheckDeeper: () => void;
   onClose: () => void;
 };
@@ -112,6 +125,7 @@ export function OrderDetailContent({
   relistFees,
   accountingLevel,
   walking = false,
+  turnIn = null,
   onCheckDeeper,
   onClose,
 }: OrderDetailContentProps) {
@@ -214,6 +228,18 @@ export function OrderDetailContent({
             />
           )}
         </StatChips>
+
+        {turnIn && orderShowsTurnIn(row) && (
+          <section className="rounded-xs border border-line">
+            <TurnInDetailBody
+              name={row.typeName}
+              offer={turnIn}
+              characterId={row.characterId}
+              characterName={row.characterName}
+              surfaceLine={turnInSurfaceLine(t, row, turnIn.totalPerItem)}
+            />
+          </section>
+        )}
 
         <DividedList surface="none">
           <OrderWhoCheaperSection

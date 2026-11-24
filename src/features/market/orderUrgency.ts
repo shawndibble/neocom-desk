@@ -2,7 +2,8 @@
  * Open Orders' three urgency buckets, the Needs you / Watch / All segments:
  * how soon an order needs the pilot, read off the one problem it is filed
  * under (`orderGroupKey`). Needs you is what costs ISK or sales now; Watch is
- * a rival further away, or a row nobody could check; Fine is healthy.
+ * a rival further away, a row nobody could check, or a sell order a campaign
+ * turn-in pays more for; Fine is healthy.
  */
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { orderGroupKey, type OpenOrderRow, type OrderGroupKey } from './openOrdersModel';
@@ -21,6 +22,8 @@ const URGENCY: Record<OrderGroupKey, OrderUrgency> = {
   undercutSystem: 'watch',
   undercutRegion: 'watch',
   notChecked: 'watch',
+  // A turn-in pays more than the sale: worth a look, never "needs you" (#6708).
+  turnInPays: 'watch',
   healthy: 'fine',
 };
 

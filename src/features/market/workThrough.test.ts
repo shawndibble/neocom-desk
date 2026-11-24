@@ -36,6 +36,11 @@ describe('workThroughQueue', () => {
   const regionUndercut = (orderId: number) =>
     openOrderRow({ orderId, problem: 'undercutRegion', problems: ['undercutRegion'] });
 
+  it('leaves out an order whose only call is to turn it in: there is no price to fix', () => {
+    const turnIn = openOrderRow({ orderId: 7, problem: 'turnInPays', problems: ['turnInPays'] });
+    expect(workThroughQueue([turnIn, undercut(3)]).map((r) => r.orderId)).toEqual([3]);
+  });
+
   it('keeps the table order, Needs you before Watch, and leaves out healthy and not-checked orders', () => {
     const rows = [
       belowFloor(2),
