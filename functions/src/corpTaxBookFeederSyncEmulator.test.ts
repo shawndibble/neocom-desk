@@ -25,7 +25,9 @@ const dead = new Set<string>();
 let rotate = false;
 /** Runs while SSO is redeeming a token: a re-grant or a concurrent run landing mid-refresh. */
 let duringRefresh: (() => Promise<void>) | undefined;
+let duringDead: (() => Promise<void>) | undefined;
 const revokedAtSso: string[] = [];
+const logged: { message: string; data?: Record<string, unknown> }[] = [];
 
 const ok = <T>(data: T): EsiRead<T> => ({
   kind: 'ok',
@@ -88,12 +90,16 @@ const syncDeps = (): CorpSyncDeps => ({
   db,
   now: () => now,
   key: () => KEY,
+  invalidGrantRecheckMs: 0,
   verify: async () => {
     throw new Error('not used for feeders');
   },
   refresh: async (_clientId, refreshToken) => {
     const match = /^rt-(\d+)-(\d+)$/.exec(refreshToken);
-    if (!match || dead.has(refreshToken)) throw new SsoRefreshError(400, true);
+    if (!match || dead.has(refreshToken)) {
+      await duringDead?.();
+      throw new SsoRefreshError(400, true, 'Invalid refresh token. Unable to migrate grant.');
+    }
     await duringRefresh?.();
     const next = rotate ? `rt-${match[1]}-${Number(match[2]) + 1}` : refreshToken;
     return { accessToken: `at-${match[1]}`, refreshToken: next };
@@ -104,7 +110,9 @@ const syncDeps = (): CorpSyncDeps => ({
   readIdentity: async () => {
     throw new Error('a feeder run never reads identity');
   },
-  log: () => undefined,
+  log: (message, data) => {
+    logged.push({ message, ...(data ? { data } : {}) });
+  },
 });
 
 const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
@@ -164,7 +172,9 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     dead.clear();
     rotate = false;
     duringRefresh = undefined;
+    duringDead = undefined;
     revokedAtSso.length = 0;
+    logged.length = 0;
     esiState = {
       mode: new Map(),
       structure: new Map(),
@@ -438,6 +448,43 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
       status: 'active',
       staleSince: T0,
       lastSyncResult: { outcome: 'stale', reason: 'token-revoked' },
+    });
+    // SSO's own words are what tell a revoked app from a used-up rotated token.
+    expect(logged).toContainEqual({
+      message: 'SSO refused a stored token',
+      data: {
+        corporationId: 98000002,
+        kind: 'feeder',
+        ssoStatus: 400,
+        ssoDescription: 'Invalid refresh token. Unable to migrate grant.',
+      },
+    });
+  });
+
+  it('an invalid_grant that a concurrent refresh caused keeps the grant and reads on', async () => {
+    const token = await addFeeder(98000002);
+    dead.add(token);
+    // The refresh that won the race has rotated the token and written it back meanwhile.
+    duringDead = async () => {
+      await db
+        .collection(CORP_SYNC_GRANTS_COLLECTION)
+        .doc('98000002')
+        .update({
+          encryptedRefreshToken: encryptRefreshToken(
+            'rt-98001002-1',
+            98001002,
+            KEY,
+            'corpSyncGrant'
+          ),
+        });
+    };
+    await run();
+    expect(await grantDoc(98000002)).toBeDefined();
+    expect(await feederRecord(98000002)).toMatchObject({ lastReadWellAt: T0 });
+    expect(await feederRecord(98000002)).not.toHaveProperty('staleSince');
+    expect(logged).toContainEqual({
+      message: 'SSO refusal followed a rotation: retrying with the newer token',
+      data: { corporationId: 98000002, kind: 'feeder' },
     });
   });
 

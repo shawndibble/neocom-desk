@@ -180,9 +180,15 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
     [own.corps]
   );
   const items = canEdit ? needsYou(run, rows, names.corporation, ceoByCorp) : [];
-  // Grant again is one guided pass over every own corp without names or ore, the clicked one first.
+  // The clicked corp first; see `wanted` for who rides along.
   const grantAgain = (id: number) => {
-    const wanted = items.filter(offersGrantAgain).map((i) => i.corporationId);
+    // Grant again is one pass over every own corp lacking names or ore; a gone-quiet corp's
+    // login stands alone, so the first one can be tried before the rest.
+    const clicked = items.find((i) => i.corporationId === id);
+    const wanted =
+      clicked && offersGrantAgain(clicked)
+        ? items.filter(offersGrantAgain).map((i) => i.corporationId)
+        : [];
     const queue = [id, ...wanted.filter((w) => w !== id)].flatMap((w) =>
       own.corps.filter((c) => c.corporationId === w)
     );

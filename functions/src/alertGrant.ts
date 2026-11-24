@@ -296,12 +296,32 @@ export async function revokeAtSso(
   if (!res.ok) throw new Error(`SSO revoke failed (${res.status})`);
 }
 
-/** An SSO refresh refusal. Carries the status and error code only — never a token. */
+/** The longest `error_description` kept: enough to tell the refusals apart, too short to carry a payload. */
+const SSO_DESCRIPTION_MAX = 200;
+
+/**
+ * SSO's `error_description`, made safe to log: the submitted token, and any run that looks like
+ * another token (24+ url-safe base64 characters, or a dotted JWT), become `[token]` before the
+ * length cap, so a cut can never leave half of one behind. Blank: undefined.
+ */
+export function sanitiseSsoDescription(raw: string, submittedToken: string): string | undefined {
+  const exact = submittedToken === '' ? raw : raw.split(submittedToken).join('[token]');
+  const safe = exact
+    .replace(/[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '[token]')
+    .replace(/[A-Za-z0-9_-]{24,}/g, '[token]')
+    .trim()
+    .slice(0, SSO_DESCRIPTION_MAX);
+  return safe === '' ? undefined : safe;
+}
+
+/** An SSO refresh refusal. Carries the status, error code and SSO's own wording (redacted): no token. */
 export class SsoRefreshError extends Error {
   constructor(
     readonly status: number,
     /** True when SSO answered `invalid_grant`: the token is dead (revoked, expired, wrong client). */
-    readonly invalidGrant: boolean
+    readonly invalidGrant: boolean,
+    /** SSO's `error_description` ("Unable to migrate grant", a revoked token, ...): what a log line can say. */
+    readonly description?: string
   ) {
     super(`SSO refresh failed (${status})`);
   }
@@ -324,8 +344,15 @@ export async function refreshAtSso(
     signal: AbortSignal.timeout(SSO_TIMEOUT_MS),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
-    throw new SsoRefreshError(res.status, body?.error === 'invalid_grant');
+    const body = (await res.json().catch(() => null)) as {
+      error?: unknown;
+      error_description?: unknown;
+    } | null;
+    const description =
+      typeof body?.error_description === 'string' && body.error_description !== ''
+        ? sanitiseSsoDescription(body.error_description, refreshToken)
+        : undefined;
+    throw new SsoRefreshError(res.status, body?.error === 'invalid_grant', description);
   }
   const json = (await res.json()) as { access_token?: unknown; refresh_token?: unknown };
   if (typeof json.access_token !== 'string' || typeof json.refresh_token !== 'string') {

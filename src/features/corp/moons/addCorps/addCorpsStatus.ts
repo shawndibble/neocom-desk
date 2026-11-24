@@ -63,7 +63,10 @@ export interface NeedsYouItem {
   reason?: string;
   /** `needs-names` whose grant also reads no chunk ore: the one Grant again fixes both. */
   alsoOre?: true;
-  /** The CEO to log in as, when the fix is a login and the player's character leads the corp. */
+  /**
+   * The CEO to log in as, when the fix is a login and the player's character leads the corp.
+   * Its presence also means the corp is the player's own, so a login here can replace its grant.
+   */
   ceoName?: string;
 }
 
@@ -88,6 +91,10 @@ const lacksOre = (row: OwnerRowLike): boolean =>
 /** Whether an item's fix is Grant again: an own corp read without names or without the ore. */
 export const offersGrantAgain = (item: Pick<NeedsYouItem, 'state'>): boolean =>
   item.state === 'needs-names' || item.state === 'needs-ore';
+
+/** Whether a gone-quiet own corp can be logged in again here: the player leads it, so there is a CEO to name. */
+export const offersLoginAgain = (item: Pick<NeedsYouItem, 'state' | 'ceoName'>): boolean =>
+  item.state === 'gone-quiet' && item.ceoName !== undefined;
 
 /** Whether an item is the player's to fix (counted), rather than information about another officer's. */
 export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'names-not-shared';
@@ -134,10 +141,13 @@ export function needsYou(
   }
   for (const r of rows) {
     if (isGoneQuiet(r)) {
+      // The player's own corp: logging in again as its CEO replaces the lost grant.
+      const ceoName = grantCeo(r);
       items.set(r.corporationId, {
         corporationId: r.corporationId,
         name: name(r.corporationId),
         state: 'gone-quiet',
+        ...(ceoName === undefined ? {} : { ceoName }),
       });
     } else if (lacksNames(r) && !items.has(r.corporationId)) {
       const ceoName = grantCeo(r);
