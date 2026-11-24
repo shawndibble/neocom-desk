@@ -134,10 +134,12 @@ export function useAppraisalColumns({
         ? t('market.appraisal.turnIn.sellNowPaysMore', { amount: formatIskCompact(-turnIn.over) })
         : t('market.appraisal.turnIn.refinePaysMore');
     if (turnIn.reward.quantity >= row.quantity) return against;
-    return `${against} · ${t('market.appraisal.turnIn.counted', {
-      count: formatVolume(turnIn.reward.quantity),
+    // Cut by the objective's remaining progress or the Character's own cap.
+    return t('market.appraisal.turnIn.withCounted', {
+      against,
+      counted: formatVolume(turnIn.reward.quantity),
       asked: formatVolume(row.quantity),
-    })}`;
+    });
   }
 
   const columns: DataTableColumn<OwnedRow>[] = [

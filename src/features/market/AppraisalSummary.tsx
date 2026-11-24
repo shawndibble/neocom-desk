@@ -7,7 +7,7 @@ import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandi
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { type RefineBasis, type appraisalNet } from '@/engine/market/appraisal';
 import { pileFigures } from '@/engine/market/appraisalRowFigures';
-import { AppraisalHeaderStats } from './AppraisalHeaderStats';
+import { AppraisalHeaderStats, type AppraisalTurnInTotal } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { HubCompareCards } from './HubCompareCards';
 import { LivePriceBar, LivePriceStatus } from './LivePriceStatus';
@@ -41,7 +41,7 @@ interface AppraisalSummaryProps {
   /** The remembered price basis the Refine figures are on. */
   refineBasis: RefineBasis;
   /** The facts row's Turn in total (`AppraisalHeaderStats`); null hides it. */
-  turnIn?: Parameters<typeof AppraisalHeaderStats>[0]['turnIn'];
+  turnIn?: AppraisalTurnInTotal | null;
 }
 
 export function AppraisalSummary({

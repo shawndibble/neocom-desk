@@ -13874,7 +13874,7 @@
       "columnTurnInHelp": "What the active Character gets handing the item to a Military Campaign's Item Trader: ISK plus LP at its LP Value. Pays only after Participate, while the objective is open. Never counted in Buy or Sell. Bold where it beats selling now.",
       "turnIn": {
         "chip": "Turn in",
-        "chipHelp": "Items worth more handed in to an Item Trader than sold now: ISK plus LP at its LP Value. Pays only after Participate, while the objective is open, so it is never counted in Buy or Sell.",
+        "chipHelp": "Items worth more handed in to an Item Trader than sold now (or refined, where refining wins): ISK plus LP at its LP Value. Pays only after Participate, while the objective is open, so it is never counted in Buy or Sell.",
         "items_one": "{{count}} item",
         "items_other": "{{count}} items",
         "openBreakdown": "Open the turn-in breakdown",
@@ -13882,7 +13882,7 @@
         "overSellNow": "+{{amount}} over Sell now",
         "sellNowPaysMore": "Sell now pays {{amount}} more",
         "refinePaysMore": "Refining pays more",
-        "counted": "Counts {{count}} of {{asked}}: the objective takes no more"
+        "withCounted": "{{against}} · counts {{counted}} of {{asked}}, all that still pays"
       },
       "columnLpTotal": "LP store",
       "columnVolume": "Volume (m³)",

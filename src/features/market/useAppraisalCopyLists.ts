@@ -28,7 +28,7 @@ export interface TraderCopyList {
 }
 
 /** Each list's line count and text; `turnIn` is the sum of `traders`, which hold the text. */
-export type CopyLists = Record<CopyList, { count: number; text: string }> & {
+export type CopyListTexts = Record<CopyList, { count: number; text: string }> & {
   traders: TraderCopyList[];
 };
 
@@ -46,7 +46,7 @@ function listsFor(
   owned: ReadonlyMap<number, number> | null,
   refineBasis: RefineBasis,
   turnIn: AppraisalTurnInLookup<TurnInOfferDetail> | null
-): CopyLists {
+): CopyListTexts {
   const sellGroups =
     result === null ? null : appraisalSellGroups(result.appraisal, refineBasis, turnIn);
   const items = result?.appraisal.items ?? [];
@@ -94,7 +94,7 @@ function traderListsFor(
 }
 
 /** The text one menu entry copies: a list, or one trader's turn-in list. */
-function textOf(lists: CopyLists, list: CopyList, trader?: string) {
+function textOf(lists: CopyListTexts, list: CopyList, trader?: string) {
   if (list !== 'turnIn' || trader === undefined) return lists[list];
   return lists.traders.find((entry) => entry.key === trader) ?? { count: 0, text: '' };
 }
