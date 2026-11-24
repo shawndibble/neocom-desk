@@ -122,33 +122,31 @@ export function AppraisalResultActions({
         onCloseAutoFocus={openAfterMenu.onCloseAutoFocus}
       >
         {COPY_LISTS.map((list) =>
-          list === 'turnIn' ? (
-            // Only with something worth turning in, split per Item Trader: each is handed in apart.
-            copyLists.traders.length > 0 && (
-              <MenuSub key={list}>
-                <MenuSubTrigger>
-                  {t('market.appraisal.copyList.turnIn')}
-                  <span className="ml-auto pl-3 text-text-dim">{copyLists.turnIn.count}</span>
-                </MenuSubTrigger>
-                <MenuSubContent>
-                  {copyLists.traders.map((trader) =>
-                    pending !== null ? (
-                      <DisabledMenuItem key={trader.key} reason={t('market.appraisal.copyBusy')}>
-                        {trader.label}
-                      </DisabledMenuItem>
-                    ) : (
-                      <MenuItem
-                        key={trader.key}
-                        onSelect={() => void handleCopy('turnIn', trader.key)}
-                      >
-                        {trader.label}
-                        <span className="ml-auto pl-3 text-text-dim">{trader.count}</span>
-                      </MenuItem>
-                    )
-                  )}
-                </MenuSubContent>
-              </MenuSub>
-            )
+          list === 'turnIn' && copyLists.traders.length > 0 ? (
+            // Split per Item Trader: each is handed in apart. Empty, it is disabled like the rest.
+            <MenuSub key={list}>
+              <MenuSubTrigger>
+                {t('market.appraisal.copyList.turnIn')}
+                <span className="ml-auto pl-3 text-text-dim">{copyLists.turnIn.count}</span>
+              </MenuSubTrigger>
+              <MenuSubContent>
+                {copyLists.traders.map((trader) =>
+                  pending !== null ? (
+                    <DisabledMenuItem key={trader.key} reason={t('market.appraisal.copyBusy')}>
+                      {trader.label}
+                    </DisabledMenuItem>
+                  ) : (
+                    <MenuItem
+                      key={trader.key}
+                      onSelect={() => void handleCopy('turnIn', trader.key)}
+                    >
+                      {trader.label}
+                      <span className="ml-auto pl-3 text-text-dim">{trader.count}</span>
+                    </MenuItem>
+                  )
+                )}
+              </MenuSubContent>
+            </MenuSub>
           ) : copyLists[list].count === 0 || pending !== null ? (
             <DisabledMenuItem
               key={list}

@@ -169,7 +169,7 @@ describe('AppraisalPanel — campaign turn-ins (issue #6706)', () => {
     expect(written).toEqual(['Stereo-Collapse Signal\t200']);
   });
 
-  it('shows no Turn in total, column or menu entry without an Active offer', async () => {
+  it('shows no Turn in total or column, and a disabled Turn in copy entry, without an Active offer', async () => {
     offers.current = [];
     renderPanel();
     expect(screen.queryByRole('button', { name: /Open the turn-in breakdown/ })).toBeNull();
@@ -177,6 +177,9 @@ describe('AppraisalPanel — campaign turn-ins (issue #6706)', () => {
     expect(within(table).queryByRole('columnheader', { name: /Turn in/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
     await screen.findByRole('menuitem', { name: /^Multibuy/ });
-    expect(screen.queryByRole('menuitem', { name: /^Turn in/ })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: /^Turn in/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });
