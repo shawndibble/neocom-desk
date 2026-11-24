@@ -12,6 +12,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1.5,
     colorScheme: 'dark',
+    actionTimeout: 15_000,
     launchOptions: process.env.VIDEO_CHROMIUM
       ? { executablePath: process.env.VIDEO_CHROMIUM }
       : undefined,

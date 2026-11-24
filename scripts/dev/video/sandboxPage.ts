@@ -12,11 +12,12 @@ import { installPersonalEsi } from '../sandbox/personalEsi';
 import { installOpenPrices } from '../sandbox/prices';
 import { scopesForGroup } from '../../../src/esi/scopes';
 import { SCOPE_GROUPS } from '../../../src/esi/registry';
+import { installVeteranPilot } from './veteranPilot';
 
 export async function openSandbox(
   page: Page,
   path: string,
-  options: { systemId?: number; before?: (page: Page) => Promise<void> } = {}
+  options: { systemId?: number; veteran?: boolean; before?: (page: Page) => Promise<void> } = {}
 ): Promise<void> {
   const scopes = [
     ...new Set([...SCOPES, ...SCOPE_GROUPS.flatMap((group) => scopesForGroup(group))]),
@@ -25,6 +26,8 @@ export async function openSandbox(
   await installEsiMock(page);
   await installPersonalEsi(page);
   await installOpenPrices(page);
+  // Real ship renders, icons and portraits: the e2e mock answers a blank SVG.
+  await page.route('https://images.evetech.net/**', (route) => route.continue());
   if (options.systemId !== undefined) {
     const systemId = options.systemId;
     await page.route(`https://esi.evetech.net/**/characters/${CHARACTER_ID}/location**`, (route) =>
@@ -35,6 +38,7 @@ export async function openSandbox(
       })
     );
   }
+  if (options.veteran) await installVeteranPilot(page);
   await options.before?.(page);
   await signInAndGoto(page, path, scopes);
 }
