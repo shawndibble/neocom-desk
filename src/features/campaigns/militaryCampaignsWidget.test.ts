@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ParticipatingObjective } from '@/engine/campaigns/participation';
 import type { CampaignObjectiveEntry } from '@/sde/types';
-import { campaignWidgetRows, type CampaignCharacterReads } from './militaryCampaignsWidget';
+import {
+  campaignWidgetRows,
+  turnInTypeIds,
+  type CampaignCharacterReads,
+} from './militaryCampaignsWidget';
 import { FAILOVER, STEREO } from './turnInStoryData';
 
 const objective = (
@@ -134,5 +138,24 @@ describe('campaignWidgetRows', () => {
       factionOf
     );
     expect(rows.map((row) => row.turnIn?.name)).toEqual([`#${STEREO.typeId}`]);
+  });
+});
+
+describe('turnInTypeIds', () => {
+  it('names the held types and the types of joined objectives an offer takes, even held by none', () => {
+    const ids = turnInTypeIds(
+      [
+        character({ held: new Map([[STEREO.typeId, 5]]) }),
+        character({
+          characterId: 2,
+          participating: [
+            joined(objective(FAILOVER.objectiveId, { method: 'ItemTraded' }), 0),
+            joined(objective('mine'), 1),
+          ],
+        }),
+      ],
+      offers
+    );
+    expect([...ids].sort()).toEqual([STEREO.typeId, FAILOVER.typeId].sort());
   });
 });

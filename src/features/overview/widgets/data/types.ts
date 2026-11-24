@@ -169,9 +169,9 @@ export interface TableColumn {
    */
   grow?: boolean;
   /**
-   * A secondary free-text column that truncates past 8rem (5rem while the table's own box is
-   * under 24rem, a phone), so the first column keeps the rest of the row (Military Campaigns'
-   * holdings beside the objective). Not with `grow`.
+   * A secondary free-text column that takes the leftover width and truncates, like `grow`,
+   * while the first column keeps its full text up to 60% of the table's own box (Military
+   * Campaigns' holdings beside the objective, whose item name comes first). Not with `grow`.
    */
   capped?: boolean;
   /**

@@ -65,7 +65,51 @@ function renderStack(asset: typeof FAILOVER_STACK) {
   );
 }
 
+function renderMatch(asset: typeof FAILOVER_STACK) {
+  const props = {
+    row: { kind: 'match', key: 'm', match: { asset, name: 'Shield Failover Report' } },
+    t: i18n.t,
+    typeNames: new Map(),
+    assetNames: {},
+    characterBadges: {
+      activeCharacterId: ACTIVE_ID,
+      idByItemId: new Map([[asset.item_id, ALT_ID]]),
+      nameById: new Map([[ALT_ID, 'Orsa Tellemar']]),
+    },
+    selectMode: false,
+    selectedIds: new Set(),
+    onToggleSelection: vi.fn(),
+    nodeLabel: () => 'Shield Failover Report',
+    securityForStation: () => 0.9,
+    trailFor: () => ['Jita IV - Moon 4'],
+    nodePathFor: () => null,
+    rootStationIdFor: () => 60003760,
+    placeNicknames: {},
+    query: 'failover',
+  } as unknown as ComponentProps<typeof BrowseRowView>;
+  render(
+    <MemoryRouter>
+      <AssetItemActionsContext.Provider value={actions}>
+        {withItemActions(<BrowseRowView {...props} />)}
+      </AssetItemActionsContext.Provider>
+    </MemoryRouter>
+  );
+}
+
 describe('Assets turn-in glyph', () => {
+  it("puts a search hit's glyph after its link, never inside it, for the stack's own Character", async () => {
+    participation.mockReturnValue({ status: 'idle', data: undefined, retry: vi.fn() });
+    const user = userEvent.setup();
+    renderMatch(FAILOVER_STACK);
+    const glyph = screen.getByRole('button', {
+      name: 'Turn-in reward for Shield Failover Report',
+    });
+    expect(glyph.closest('a')).toBeNull();
+    await user.click(glyph);
+    expect(await screen.findByText('You hold 340 · ~19.1M turned in')).toBeInTheDocument();
+    expect(participation).toHaveBeenCalledWith(ALT_ID);
+  });
+
   it("opens the turn-in after the stack's value, for the stack's own Character and what the stack turns in", async () => {
     participation.mockReturnValue({ status: 'idle', data: undefined, retry: vi.fn() });
     const user = userEvent.setup();

@@ -99,8 +99,9 @@ function tableOf(
     // No header row (the cells say what they are), so the first cell names the row.
     columns: [
       { key: 'objective', label: '', priority: 0 },
-      // The objective keeps the row; the holdings line truncates first.
-      { key: 'who', label: '', priority: 2, capped: true },
+      // The objective keeps the row; the holdings line truncates first, and goes on a phone
+      // (the row's TurnInDetail repeats it).
+      { key: 'who', label: '', priority: 2, capped: true, hideNarrow: true },
       { key: 'filled', label: '', align: 'end', priority: 1, minWidth: 80 },
     ],
     rows: rows.map((row): TableRowModel => {
@@ -110,7 +111,8 @@ function tableOf(
         key: row.key,
         badge: factionName(t, row.factionId) ?? undefined,
         cells: [
-          turnIn ? t(k('turnInTitle'), { name: turnIn.name }) : row.title,
+          // "Turn in …" only with items to hand in; a joined turn-in with none keeps its title.
+          turnIn && turnIn.held > 0 ? t(k('turnInTitle'), { name: turnIn.name }) : row.title,
           who,
           t(k('filled'), { percent: filledPercent(row) }),
         ],
@@ -142,7 +144,12 @@ function numberOf(
   const only = oneFaction && active.length === 1 ? active[0] : undefined;
   if (only) {
     return {
-      value: t(k('ofTarget'), { completed: only.completed, target: only.target }),
+      // "Caldari · 1 of 4": the figure names the faction the menu picked.
+      value: t(k('factionOfTarget'), {
+        faction: labelOf(only),
+        completed: only.completed,
+        target: only.target,
+      }),
       unit: t(k('objectivesComplete'), { count: only.target }),
       // With nothing to hand in, the line says which campaign the figure is.
       secondary: secondary ?? { text: only.title },
@@ -236,8 +243,10 @@ export const militaryCampaigns: Builder = (
     };
   }
 
+  // A Character without the Permission still shows what it holds (Participate unknown).
+  const shown = new Set([...read, ...missing.map((character) => character.characterId)]);
   const rows = data.rows.filter(
-    (row) => read.has(row.characterId) && (factionId === null || row.factionId === factionId)
+    (row) => shown.has(row.characterId) && (factionId === null || row.factionId === factionId)
   );
   const waiting = rows.reduce(
     (sum, row) => sum + (row.turnIn && row.turnIn.held > 0 ? row.turnIn.reward : 0),
@@ -252,7 +261,7 @@ export const militaryCampaigns: Builder = (
     ...base,
     number: unreadNote ? { ...number, notes: [unreadNote] } : number,
     table: {
-      ...tableOf(t, rows, everyone && read.size > 1),
+      ...tableOf(t, rows, everyone && shown.size > 1),
       footer: unreadNote,
       // Campaigns are running, but nobody in view joined or holds anything for them.
       emptyLine:

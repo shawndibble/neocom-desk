@@ -27,6 +27,19 @@ export function bidTurnInPays(
 }
 
 /**
+ * The rows that get the dim turn-in glyph after their price: a buy order the
+ * turn-in pays more than its bid, and a sell order filed `turnInPays` whose
+ * column a real problem (an undercut) won. A sell order whose shown problem is
+ * the turn-in already says so in its badge and "Turn in instead".
+ */
+export function orderTurnInGlyph(
+  row: Pick<OpenOrderRow, 'isBuyOrder' | 'price' | 'turnInEach' | 'problem' | 'problems'>
+): boolean {
+  if (row.isBuyOrder) return bidTurnInPays(row);
+  return row.problem !== 'turnInPays' && row.problems.includes('turnInPays');
+}
+
+/**
  * What the turn-in pays over the order's price: "Pays ~2K each over your price
  * (57,990)" for a sell order, "Pays you ~950K per 100 over this bid" for a buy
  * order. Nothing when it pays no more.

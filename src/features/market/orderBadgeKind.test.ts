@@ -292,12 +292,12 @@ describe('orderBadgeFor — buy orders (#1733)', () => {
 describe('orderBadgeFor — turnInPays', () => {
   it('wears Turn in with what one item pays over the price, approximate', () => {
     const row = { ...BASE_ROW, problem: 'turnInPays' as const, price: 57_990, turnInEach: 60_000 };
-    expect(orderBadgeFor(row)).toEqual({ kind: 'turnIn', detail: '+~2K' });
+    expect(orderBadgeFor(row)).toEqual({ kind: 'turnIn', detail: '~2K' });
   });
 
-  it('reads "+~2K each" through badgeDetailText; other details are unchanged', () => {
+  it('reads "~2K more" through badgeDetailText; other details are unchanged', () => {
     const t = (key: string, options?: Record<string, unknown>) => `${key}:${String(options?.gain)}`;
-    expect(badgeDetailText(t, 'turnIn', '+~2K')).toBe('market.orders.badge.turnInEach:+~2K');
+    expect(badgeDetailText(t, 'turnIn', '~2K')).toBe('market.orders.badge.turnInMore:~2K');
     expect(badgeDetailText(t, 'outbid', '+1.0%')).toBe('+1.0%');
     expect(badgeDetailText(t, 'turnIn', undefined)).toBeUndefined();
   });

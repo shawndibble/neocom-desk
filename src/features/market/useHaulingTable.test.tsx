@@ -53,7 +53,24 @@ describe('Hauling Sell column turn-in', () => {
       screen.getByRole('button', { name: 'Turn-in reward for Shield Failover Report' })
     );
     expect(onRowClick).not.toHaveBeenCalled();
-    expect(await screen.findByText('Turn-in pays ~60K each')).toBeInTheDocument();
+    // Not the headline's "~60K each turned in" again: what it pays over this sale price.
+    expect(await screen.findByText('Pays ~2K each over selling here (57,990)')).toBeInTheDocument();
+    expect(screen.queryByText(/Turn-in pays/)).not.toBeInTheDocument();
+  });
+
+  it('adds no line when selling here pays as much', async () => {
+    const render$ = sellCell((r) => (r.typeId === FAILOVER.typeId ? FAILOVER : null));
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        {render$({ ...row(FAILOVER.typeId, 'Shield Failover Report'), price: 70_000 })}
+      </MemoryRouter>
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Turn-in reward for Shield Failover Report' })
+    );
+    expect(await screen.findByText('each turned in')).toBeInTheDocument();
+    expect(screen.queryByText(/over selling here/)).not.toBeInTheDocument();
   });
 
   it('leaves an item no Campaign Objective takes as its price alone', () => {

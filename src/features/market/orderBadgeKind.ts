@@ -12,7 +12,7 @@
  * `expiry`, `worstScope`, `costBasis`, `turnInEach`). Formatting an
  * ISK/percentage value for i18n stays with the caller — this only decides
  * *which* badge and what short, already-formatted detail string (if any) goes
- * beside it; `badgeDetailText` adds `turnIn`'s translated "each".
+ * beside it; `badgeDetailText` adds `turnIn`'s translated "more".
  */
 import { approxIsk } from '@/features/campaigns/turnInContent';
 import { fixed1 } from '@/lib/fixedFormat';
@@ -47,14 +47,14 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
   'notChecked',
 ];
 
-/** A badge's detail as shown (the one place this module translates, so the row, card and CSV agree): `turnIn`'s "+~2K" reads "+~2K each"; every other detail as given. */
+/** A badge's detail as shown (the one place this module translates, so the row, card and CSV agree): `turnIn`'s "~2K" reads "~2K more"; every other detail as given. */
 export function badgeDetailText(
   t: Translate,
   kind: OrderBadgeKind,
   detail: string | undefined
 ): string | undefined {
   if (detail === undefined) return undefined;
-  return kind === 'turnIn' ? t('market.orders.badge.turnInEach', { gain: detail }) : detail;
+  return kind === 'turnIn' ? t('market.orders.badge.turnInMore', { gain: detail }) : detail;
 }
 
 /** The one badge a row wears, and the short detail beside it. Null renders no badge — never a false "best"/"noCostBasis" claim the data can't back up. */
@@ -85,9 +85,9 @@ export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
       return { kind: 'outbid', detail: pct !== undefined ? `+${fixed1(pct)}%` : undefined };
     }
     case 'turnInPays': {
-      // What turning one in pays over selling it here: "+~2K" (the badge adds "each").
+      // What turning one in pays over selling it here: "~2K" (the badge adds "more").
       const gain = row.turnInEach === undefined ? null : row.turnInEach - row.price;
-      return { kind: 'turnIn', detail: gain !== null ? `+${approxIsk(gain)}` : undefined };
+      return { kind: 'turnIn', detail: gain !== null ? approxIsk(gain) : undefined };
     }
     case 'healthy':
     default:

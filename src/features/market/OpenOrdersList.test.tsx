@@ -35,4 +35,17 @@ describe('OpenOrdersList — turn-in glyph (#6708)', () => {
     await userEvent.click(glyphs[0]);
     expect(onOpen).toHaveBeenCalledWith(buy);
   });
+
+  it('puts the glyph on a sell order the turn-in beats when an undercut wins its badge', async () => {
+    const undercut = openOrderRow({
+      typeName: 'Shield Failover Report',
+      problem: 'undercutStation',
+      problems: ['undercutStation', 'turnInPays'],
+      turnInEach: 60_000,
+    });
+    const onOpen = vi.fn();
+    render(<OpenOrdersList rows={[undercut]} label="Orders" highlightId={null} onOpen={onOpen} />);
+    await userEvent.click(screen.getByRole('button', { name: /Turn-in reward for/ }));
+    expect(onOpen).toHaveBeenCalledWith(undercut);
+  });
 });
