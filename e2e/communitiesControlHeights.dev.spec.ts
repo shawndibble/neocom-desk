@@ -63,7 +63,14 @@ for (const width of CONTROL_ROW_WIDTHS) {
     test(`communities ${name}: inline controls share one height (${width}px)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openWithSampleCommunities(page, path);
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      // A `mine` link opens the My sharing panel. On a phone it is modal (the
+      // page behind goes inert, so its h1 leaves the accessibility tree): the
+      // panel is what proves the surface rendered.
+      await expect(
+        name.endsWith('mine')
+          ? page.getByRole('dialog', { name: 'My sharing' })
+          : page.getByRole('heading', { level: 1 })
+      ).toBeVisible();
       await expectInlineControlsAligned(page, `${name} @${width}`);
     });
   }

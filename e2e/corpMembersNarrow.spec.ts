@@ -1,8 +1,9 @@
 /**
  * Corp Members on a phone: the roster is a table read across columns (last
- * seen, ship, location, joined), so it stays a plain table below `sm`
- * (`responsive="table"`) with the member column pinned, and its sort buttons
- * stay in the header row. No stacked cards, no "Sort by" picker.
+ * seen, ship, location, joined). Below `sm` it is a dense two-line card list
+ * (`responsive="stack"`, `stackLayout="dense"`, #6561) with a "Sort by" picker
+ * in place of the header row's sort buttons; from `sm` up it is the table with
+ * the member column pinned.
  *
  * `/corp/members` is Director-only (`canReadMembers` in
  * `engine/corpRoles.ts`), so the shared mock's default `{}` roles response
@@ -71,22 +72,22 @@ test.describe('Corp Members narrow table', () => {
     await signInAndGoto(page, './corp/members', [...SCOPES, ...scopesForGroup('corp')]);
   });
 
-  test('roster stays a plain sortable table at 390px', async ({ page }) => {
+  test('roster is a dense sortable card list at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/members');
 
-    const header = page.getByRole('columnheader', { name: /Ship/ });
-    await expect(header).toBeVisible();
-    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
-    // Still a table, not cards.
-    const rowDisplay = await page
-      .locator('table tbody tr:not(.dt-spacer)')
-      .first()
-      .evaluate((el) => getComputedStyle(el).display);
-    expect(rowDisplay).toBe('table-row');
+    // `responsive="stack"` + `stackLayout="dense"` + `mobileSort` (#6561): the
+    // header row and its sort buttons are gone, the "Sort by" picker above the
+    // list drives the same sort state.
+    const picker = page.getByLabel('Sort by', { exact: true });
+    await expect(picker).toBeAttached();
+    const row = page.locator('table tbody tr:not(.dt-spacer)').first();
+    await expect(row).toBeVisible();
+    const rowDisplay = await row.evaluate((el) => getComputedStyle(el).display);
+    expect(rowDisplay).toBe('flex');
     await expectNoPageOverflow(page);
-    await header.getByRole('button').click();
-    expect(new URL(page.url()).search).toContain('sort');
+    await picker.selectOption({ label: 'Ship ↑' });
+    await expect.poll(() => new URL(page.url()).search).toContain('sort');
   });
 
   test('pinned Member column matches the panel surface at 1440 and 1024', async ({ page }) => {
