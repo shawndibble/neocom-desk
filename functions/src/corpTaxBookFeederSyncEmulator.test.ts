@@ -26,6 +26,7 @@ let rotate = false;
 /** Runs while SSO is redeeming a token: a re-grant or a concurrent run landing mid-refresh. */
 let duringRefresh: (() => Promise<void>) | undefined;
 const revokedAtSso: string[] = [];
+const logged: { message: string; data?: Record<string, unknown> }[] = [];
 
 const ok = <T>(data: T): EsiRead<T> => ({
   kind: 'ok',
@@ -93,7 +94,9 @@ const syncDeps = (): CorpSyncDeps => ({
   },
   refresh: async (_clientId, refreshToken) => {
     const match = /^rt-(\d+)-(\d+)$/.exec(refreshToken);
-    if (!match || dead.has(refreshToken)) throw new SsoRefreshError(400, true);
+    if (!match || dead.has(refreshToken)) {
+      throw new SsoRefreshError(400, true, 'Invalid refresh token. Unable to migrate grant.');
+    }
     await duringRefresh?.();
     const next = rotate ? `rt-${match[1]}-${Number(match[2]) + 1}` : refreshToken;
     return { accessToken: `at-${match[1]}`, refreshToken: next };
@@ -104,7 +107,9 @@ const syncDeps = (): CorpSyncDeps => ({
   readIdentity: async () => {
     throw new Error('a feeder run never reads identity');
   },
-  log: () => undefined,
+  log: (message, data) => {
+    logged.push({ message, ...(data ? { data } : {}) });
+  },
 });
 
 const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
@@ -165,6 +170,7 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     rotate = false;
     duringRefresh = undefined;
     revokedAtSso.length = 0;
+    logged.length = 0;
     esiState = {
       mode: new Map(),
       structure: new Map(),
@@ -438,6 +444,16 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
       status: 'active',
       staleSince: T0,
       lastSyncResult: { outcome: 'stale', reason: 'token-revoked' },
+    });
+    // SSO's own words are what tell a revoked app from a used-up rotated token.
+    expect(logged).toContainEqual({
+      message: 'SSO refused a stored token',
+      data: {
+        corporationId: 98000002,
+        kind: 'feeder',
+        ssoStatus: 400,
+        ssoDescription: 'Invalid refresh token. Unable to migrate grant.',
+      },
     });
   });
 

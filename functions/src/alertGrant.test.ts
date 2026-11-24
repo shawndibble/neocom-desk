@@ -10,6 +10,7 @@ import {
   deleteAlertGrant,
   parseSaveAlertGrantInput,
   refreshAtSso,
+  sanitiseSsoDescription,
   SsoRefreshError,
   revokeAtSso,
   saveAlertGrant,
@@ -323,6 +324,27 @@ describe('refreshAtSso', () => {
     await expect(refreshAtSso('c', REFRESH, odd as unknown as typeof fetch)).rejects.toThrow(
       /malformed/
     );
+  });
+});
+
+describe('sanitiseSsoDescription', () => {
+  it('redacts the token, any other token-shaped run and JWTs, then bounds the length', () => {
+    const jwt = 'aaaaaaaaaaaa.bbbbbbbbbbbb.cccccccccccc';
+    const other = 'Zm9vYmFyYmF6cXV4cXV1eHF1dXg_-Zm9v';
+    expect(sanitiseSsoDescription(`bad ${REFRESH} / ${other} / ${jwt}`, REFRESH)).toBe(
+      'bad [token] / [token] / [token]'
+    );
+    expect(sanitiseSsoDescription('Unable to migrate grant', REFRESH)).toBe(
+      'Unable to migrate grant'
+    );
+    expect(sanitiseSsoDescription('y'.repeat(500) + ' end', REFRESH)?.length).toBeLessThanOrEqual(
+      200
+    );
+  });
+
+  it('survives an empty token and a blank description', () => {
+    expect(sanitiseSsoDescription('plain', '')).toBe('plain');
+    expect(sanitiseSsoDescription('   ', REFRESH)).toBeUndefined();
   });
 });
 

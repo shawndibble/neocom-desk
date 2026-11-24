@@ -299,7 +299,22 @@ export async function revokeAtSso(
 /** The longest `error_description` kept: enough to tell the refusals apart, too short to carry a payload. */
 const SSO_DESCRIPTION_MAX = 200;
 
-/** An SSO refresh refusal. Carries the status, error code and SSO's own wording only — never a token. */
+/**
+ * SSO's `error_description`, made safe to log: the submitted token, and any run that looks like
+ * another token (24+ url-safe base64 characters, or a dotted JWT), become `[token]` before the
+ * length cap, so a cut can never leave half of one behind. Blank: undefined.
+ */
+export function sanitiseSsoDescription(raw: string, submittedToken: string): string | undefined {
+  const exact = submittedToken === '' ? raw : raw.split(submittedToken).join('[token]');
+  const safe = exact
+    .replace(/[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '[token]')
+    .replace(/[A-Za-z0-9_-]{24,}/g, '[token]')
+    .trim()
+    .slice(0, SSO_DESCRIPTION_MAX);
+  return safe === '' ? undefined : safe;
+}
+
+/** An SSO refresh refusal. Carries the status, error code and SSO's own wording (redacted): no token. */
 export class SsoRefreshError extends Error {
   constructor(
     readonly status: number,
@@ -335,8 +350,7 @@ export async function refreshAtSso(
     } | null;
     const description =
       typeof body?.error_description === 'string' && body.error_description !== ''
-        ? // Never let a refusal carry the token back out, whatever SSO echoes.
-          body.error_description.split(refreshToken).join('[token]').slice(0, SSO_DESCRIPTION_MAX)
+        ? sanitiseSsoDescription(body.error_description, refreshToken)
         : undefined;
     throw new SsoRefreshError(res.status, body?.error === 'invalid_grant', description);
   }
