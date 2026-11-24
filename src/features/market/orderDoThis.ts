@@ -18,6 +18,8 @@ export type OrderDoThis =
   | { kind: 'relist' }
   | { kind: 'leaveItAlone' }
   | { kind: 'nothingYet' }
+  /** A campaign turn-in pays more than this sell order (#6708): opens the turn-in in Order Detail. */
+  | { kind: 'turnIn' }
   /** A fix-now row with no price in hand: the badge's own action text is the honest answer. */
   | { kind: 'badgeAdvice' };
 
@@ -54,6 +56,8 @@ export function orderDoThis(
         : { kind: 'badgeAdvice' };
     case 'expiringOrStale':
       return { kind: 'relist' };
+    case 'turnInPays':
+      return { kind: 'turnIn' };
     default:
       return { kind: 'leaveItAlone' };
   }

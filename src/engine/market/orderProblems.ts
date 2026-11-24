@@ -19,6 +19,11 @@
  *   tightest scope first); for a buy order it collapses to a single
  *   `outbid` — the buyer does not care *where* they were outbid, only that
  *   they were, so the three scopes are not worth telling apart there.
+ * - `turnInPays` (issue #6708) is the lowest problem, just above `healthy`:
+ *   an Active campaign Turn-in Reward pays more per item than this sell
+ *   order's price, so turning the stock in beats selling it. Sell orders
+ *   only (a buy order's turn-in is a reason to keep buying, not a problem),
+ *   and any real problem outranks it.
  *
  * `worstProblem` and `allProblems` are built from one shared, ordered walk
  * (`applicableProblems`) so `worstProblem === allProblems(...)[0] ?? 'healthy'`
@@ -33,6 +38,7 @@ export type OrderProblem =
   | 'undercutRegion'
   | 'expiringOrStale'
   | 'outbid'
+  | 'turnInPays'
   | 'healthy';
 
 /** Worst first. The UI renders its groups in exactly this order. */
@@ -43,6 +49,7 @@ export const ORDER_PROBLEMS: readonly OrderProblem[] = [
   'undercutRegion',
   'expiringOrStale',
   'outbid',
+  'turnInPays',
   'healthy',
 ];
 
@@ -64,6 +71,15 @@ export const UNDERCUT_PROBLEMS: readonly OrderProblem[] = [
   'undercutRegion',
 ];
 
+/**
+ * A problem the pilot has to fix: neither `healthy` nor `turnInPays`, which is
+ * a better way out, never a fault in the listing. "Needs attention" counts read
+ * this, so the next advisory problem is added in one place.
+ */
+export function isRealProblem(problem: OrderProblem): boolean {
+  return problem !== 'healthy' && problem !== 'turnInPays';
+}
+
 export interface OrderProblemFacts {
   isBuyOrder: boolean;
   /** True when my sell price is under my own floor — needs a cost basis; false when unknown. */
@@ -78,6 +94,8 @@ export interface OrderProblemFacts {
   daysWithoutSale: number | null;
   /** True when the remaining stock cannot clear before the order lapses. */
   outlastsOrder: boolean;
+  /** An Active Turn-in Reward per item beats my sell price; absent when no turn-in was read. Ignored on a buy order. */
+  turnInBeatsPrice?: boolean;
 }
 
 export interface ProblemThresholds {
@@ -128,6 +146,7 @@ function applicableProblems(
   }
 
   if (isExpiringOrStale(facts, thresholds)) problems.push('expiringOrStale');
+  if (!facts.isBuyOrder && facts.turnInBeatsPrice === true) problems.push('turnInPays');
 
   return problems;
 }

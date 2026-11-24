@@ -9,11 +9,14 @@
  *
  * Pure: reads only fields already computed onto `OpenOrderRow` by
  * `openOrdersModel.ts` (`problem`, `floor`, `station`, `deepUndercut`,
- * `expiry`, `worstScope`, `costBasis`). Formatting an ISK/percentage value
- * for i18n stays with the caller — this only decides *which* badge and what
- * short, already-formatted detail string (if any) goes beside it.
+ * `expiry`, `worstScope`, `costBasis`, `turnInEach`). Formatting an
+ * ISK/percentage value for i18n stays with the caller — this only decides
+ * *which* badge and what short, already-formatted detail string (if any) goes
+ * beside it; `badgeDetailText` adds `turnIn`'s translated "each".
  */
+import { approxIsk } from '@/features/campaigns/turnInContent';
 import { fixed1 } from '@/lib/fixedFormat';
+import type { Translate } from '@/lib/translate';
 import type { OrderAdviceInput } from './orderRowSummary';
 import type { OrderBadgeKind } from './OrderProblemBadge';
 
@@ -36,12 +39,23 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
   'undercutRegion',
   'expiring',
   'outbid',
+  'turnIn',
   'frequentlyUndercut',
   'best',
   'topBid',
   'noCostBasis',
   'notChecked',
 ];
+
+/** A badge's detail as shown (the one place this module translates, so the row, card and CSV agree): `turnIn`'s "+~2K" reads "+~2K each"; every other detail as given. */
+export function badgeDetailText(
+  t: Translate,
+  kind: OrderBadgeKind,
+  detail: string | undefined
+): string | undefined {
+  if (detail === undefined) return undefined;
+  return kind === 'turnIn' ? t('market.orders.badge.turnInEach', { gain: detail }) : detail;
+}
 
 /** The one badge a row wears, and the short detail beside it. Null renders no badge — never a false "best"/"noCostBasis" claim the data can't back up. */
 export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
@@ -69,6 +83,11 @@ export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
       const pct =
         row.worstScope === 'station' ? row.station.gapPct : row.deepUndercut?.worst?.gapPct;
       return { kind: 'outbid', detail: pct !== undefined ? `+${fixed1(pct)}%` : undefined };
+    }
+    case 'turnInPays': {
+      // What turning one in pays over selling it here: "+~2K" (the badge adds "each").
+      const gain = row.turnInEach === undefined ? null : row.turnInEach - row.price;
+      return { kind: 'turnIn', detail: gain !== null ? `+${approxIsk(gain)}` : undefined };
     }
     case 'healthy':
     default:

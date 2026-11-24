@@ -162,6 +162,14 @@ export async function installEsiMock(page: Page): Promise<void> {
     }
     // Route Safety's Incursions near you (issue #3540): none active unless a spec overrides.
     if (path === '/incursions') return json([]);
+    // Military Campaigns (campaign turn-ins, issue #6703): public, none listed unless a spec
+    // overrides, so every surface that reads turn-in offers (Appraisal, Market item, Hauling,
+    // Open Orders, Assets, the Overview widget) shows none.
+    if (path === '/military-campaigns') return json({ campaigns: [] });
+    if (/^\/military-campaigns\/[^/]+\/objectives\/?$/.test(path)) return json({ objectives: [] });
+    if (path === `/characters/${CHARACTER_ID}/military-campaigns/objectives`) {
+      return json({ objectives: [] });
+    }
     // The raidable skyhook list (issue #4784): public, none raidable unless a spec overrides.
     if (path === '/skyhooks/raidable') return json({ skyhooks: [] });
     if (path === '/industry/systems') return json(INDUSTRY_SYSTEMS);
