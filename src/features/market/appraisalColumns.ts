@@ -7,7 +7,7 @@
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
-/** In table column order — `AppraisalPanel.tsx` pushes each id's column in this sequence when both applicable (Refine/LP store only exist once a row has one) and visible. */
+/** In table column order — `AppraisalPanel.tsx` pushes each id's column in this sequence when both applicable (Refine, Turn in and LP store only exist once a row has one) and visible. */
 export const APPRAISAL_COLUMN_IDS = [
   'buyEach',
   'sellEach',
@@ -16,6 +16,7 @@ export const APPRAISAL_COLUMN_IDS = [
   'sellTotal',
   'refineTotal',
   'refineWithLeftover',
+  'turnIn',
   'lpTotal',
   'volume',
   'iskPerM3',

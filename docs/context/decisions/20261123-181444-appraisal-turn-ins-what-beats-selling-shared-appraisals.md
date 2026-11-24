@@ -1,0 +1,9 @@
+# Scope decisions — Appraisal turn-ins: what beats selling, the copy menu, Shared Appraisals (issue #6706)
+
+_Recorded 2026-11-23 · issue #6706._
+
+- **"Beats selling" weighs the Turn-in Reward against Sell now for the same units.** `appraisalRowTurnIn` (`engine/market/appraisalSellGroups.ts`) prices what the objective and the active Character's cap still take (`turnInReward`), and compares it with those units sold into the buy orders now (the row's buy price, never past what the buy orders take). A tie is not a win. Where refining already beats selling the item as is, turning in must also beat the refine figure (Refine + ore), so an ore objective never steals a better refine.
+- **`appraisalSellGroups` checks turn-in first**, then refine, list and sell now: every item lands in exactly one group. The Turn in total in the facts row counts the same items as the copy menu's Turn in entry, and neither ever enters the Buy/Sell totals.
+- **The Turn in column shows every row with an Active offer**, bold only where turning in beats selling; its `TurnInDetail` line says "+X over Sell now", "Sell now pays X more" or "Refining pays more", plus "Counts N of M" when a cap cuts the pile. The column is pickable and on by default, and like Refine it only exists once some pasted item has an Active offer.
+- **The copy menu's Turn in entry appears only when something beats selling**, as a submenu with one entry per Item Trader ("Trader · system"), each copying that trader's multibuy at the counted quantities. A disabled Turn in on every ordinary paste would be noise for a campaign-only feature.
+- **Shared Appraisals show no turn-ins.** A share is a frozen snapshot of prices; Turn-in Rewards are live (objectives fill and close, LP Values move) and pay only the Character that pressed Participate, so a viewer would read a stale, someone-else's figure. The share stores nothing about turn-ins.

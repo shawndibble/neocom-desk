@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import {
+  figureOpenerClassName,
   focusRingInsetClassName,
   hintCueClassName,
   rowInteractiveClassName,
@@ -22,6 +23,7 @@ import type { AppraisalNetTotals, AppraisalTotals, RefineBasis } from '@/engine/
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { RefineChipValue } from './RefineChipValue';
+import { approxIsk } from '@/features/campaigns/turnInContent';
 
 /** How long the "copied" bubble stays by the area that copied. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -40,6 +42,12 @@ interface AppraisalHeaderStatsProps {
   refineEfficiency?: string | null;
   /** Opens the refine breakdown on the whole pile; absent, the chip has no control. */
   onOpenRefine?: () => void;
+  /**
+   * The items whose Turn-in Reward beats selling them now: their reward and
+   * count, and the control that opens `TurnInBreakdown`. Null hides the chip.
+   * Never part of the Buy/Sell totals above it.
+   */
+  turnIn?: { total: number; count: number; onOpen: () => void } | null;
   /**
    * The price source could not be reached: the price-derived groups show a
    * placeholder instead of 0 ISK totals. Volume and item count need no price.
@@ -214,6 +222,7 @@ export function AppraisalHeaderStats({
   implantBonusPct,
   refineEfficiency = null,
   onOpenRefine,
+  turnIn = null,
   pricesUnavailable = false,
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
@@ -238,6 +247,24 @@ export function AppraisalHeaderStats({
               ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
               : t('market.appraisal.refineTotalHelp')
           }
+        />
+      )}
+      {!pricesUnavailable && turnIn !== null && turnIn.count > 0 && (
+        <StatChip
+          label={t('market.appraisal.turnIn.chip')}
+          value={
+            // A `StatChip` can't be pressed (§6c): the figure inside it opens the breakdown, like Refine's.
+            <span className="inline-flex items-center gap-1">
+              <button type="button" onClick={turnIn.onOpen} className={figureOpenerClassName}>
+                <span className="sr-only">{t('market.appraisal.turnIn.openBreakdown')}</span>
+                {approxIsk(turnIn.total)}
+              </button>
+              <span className="font-normal text-text-dim">
+                {t('market.appraisal.turnIn.items', { count: turnIn.count })}
+              </span>
+            </span>
+          }
+          tooltip={t('market.appraisal.turnIn.chipHelp')}
         />
       )}
       {!pricesUnavailable && showCheapest && (

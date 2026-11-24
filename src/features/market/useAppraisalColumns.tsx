@@ -22,6 +22,10 @@ import {
 } from './appraisalColumns';
 import { comparisonCell, eachCell, totalCell } from './appraisalCells';
 import { RefineFigureButton } from './RefineFigureButton';
+import { TurnInDetail, TurnInFigureButton } from '@/features/campaigns/TurnInDetail';
+import { approxIsk } from '@/features/campaigns/turnInContent';
+import { formatIskCompact } from '@/lib/isk';
+import type { AppraisalTurnIns, RowTurnIn } from './useAppraisalTurnIns';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
 import { formatVolume } from './format';
@@ -58,6 +62,7 @@ export function useAppraisalColumns({
   onOpenRefine,
   refineBasis,
   refineReady = true,
+  turnIns,
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
@@ -69,6 +74,8 @@ export function useAppraisalColumns({
   refineBasis: RefineBasis;
   /** False until the remembered basis has loaded, so the Refine figures do not show on buy first and then switch. */
   refineReady?: boolean;
+  /** The rows' campaign turn-ins; absent, there is no Turn in column. */
+  turnIns?: Pick<AppraisalTurnIns, 'rowTurnIn' | 'any'>;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
@@ -117,6 +124,21 @@ export function useAppraisalColumns({
   // the refine column, and also why this never shows with no active
   // Character (`appraisalData.ts` never sets `lpOption` then).
   const hasLpOption = rows.some((row) => row.lpCorpName !== undefined);
+  // Like Refine: only once a pasted item has an Active turn-in.
+  const hasTurnIn = turnIns?.any ?? false;
+  /** The Turn in detail's line about this row against selling it, and how many count. */
+  function turnInSurfaceLine(row: OwnedRow, turnIn: RowTurnIn) {
+    const against = turnIn.beats
+      ? t('market.appraisal.turnIn.overSellNow', { amount: formatIskCompact(turnIn.over) })
+      : turnIn.over <= 0
+        ? t('market.appraisal.turnIn.sellNowPaysMore', { amount: formatIskCompact(-turnIn.over) })
+        : t('market.appraisal.turnIn.refinePaysMore');
+    if (turnIn.reward.quantity >= row.quantity) return against;
+    return `${against} · ${t('market.appraisal.turnIn.counted', {
+      count: formatVolume(turnIn.reward.quantity),
+      asked: formatVolume(row.quantity),
+    })}`;
+  }
 
   const columns: DataTableColumn<OwnedRow>[] = [
     {
@@ -344,6 +366,33 @@ export function useAppraisalColumns({
       },
       sortValue: (row) => figures(row).refine.withLeftover,
     },
+    turnIn: {
+      id: 'turnIn',
+      header: t('market.appraisal.columnTurnIn'),
+      headerTooltip: t('market.appraisal.columnTurnInHelp'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      // What the units the objective still takes pay handed in, for the active Character;
+      // never part of the Buy/Sell totals. Bold when it beats selling them now.
+      render: (row) => {
+        const turnIn = turnIns?.rowTurnIn(row) ?? null;
+        if (turnIn === null) return '—';
+        return comparisonCell(
+          <TurnInDetail
+            name={row.name}
+            offer={turnIn.offer}
+            surfaceLine={turnInSurfaceLine(row, turnIn)}
+            trigger={
+              <TurnInFigureButton name={row.name}>
+                {approxIsk(turnIn.reward.total)}
+              </TurnInFigureButton>
+            }
+          />,
+          turnIn.beats
+        );
+      },
+      sortValue: (row) => turnIns?.rowTurnIn(row)?.reward.total,
+    },
     lpTotal: {
       id: 'lpTotal',
       header: t('market.appraisal.columnLpTotal'),
@@ -412,6 +461,7 @@ export function useAppraisalColumns({
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) =>
       ((id !== 'refineTotal' && id !== 'refineWithLeftover') || hasRefine) &&
+      (id !== 'turnIn' || hasTurnIn) &&
       (id !== 'lpTotal' || hasLpOption) &&
       (feeInputs !== null || (id !== 'salesTax' && id !== 'brokerFee' && id !== 'sellAfterFees'))
   );
