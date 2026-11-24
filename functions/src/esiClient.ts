@@ -11,7 +11,7 @@
 /** The host, unrouted: the raidable-skyhook list has no `/latest` route. */
 export const ESI_ROOT = 'https://esi.evetech.net';
 export const ESI_BASE = `${ESI_ROOT}/latest`;
-export const ESI_COMPATIBILITY_DATE = '2026-08-01';
+export const ESI_COMPATIBILITY_DATE = '2026-08-04';
 /** Descriptive and with a contact route, never an address: headers travel. */
 export const ESI_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 

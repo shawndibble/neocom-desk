@@ -70,6 +70,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-killmails.read_killmails.v1': 'killmails',
   'esi-structures.read_character.v1': 'mercenary dens',
   'esi-activities.read_character.v1': 'mercenary dens',
+  'esi.activity.char:read': 'Campaign Objectives you pressed Participate on',
 };
 
 /** The write scopes (opt-in, not in the Base Grant) — their disclosure goes in the "Six writes" trust card, not the read sentence, which it would otherwise contradict. */
@@ -400,7 +401,7 @@ describe('Login', () => {
       expect(trust.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
     }
     expect(trust.getByRole('button', { name: /money & market/i })).toHaveTextContent(
-      '4 permissions'
+      '5 permissions'
     );
   });
 
