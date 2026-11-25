@@ -85,6 +85,10 @@ export function CharacterHeader({
   const sp = (value: number | null | undefined): string =>
     value == null ? t('common.unknown') : formatCount(value);
   const showSp = totalSp !== undefined || unallocatedSp !== undefined;
+  // Each link keeps a 24px target (WCAG 2.5.8) in a line of its own height. Side by side the
+  // targets overlap their neighbours' lines harmlessly; stacked below `md` on the Overview they would
+  // overlap each other, so the negative margin applies from `md` up there.
+  const affiliationLinkClassName = cx('min-w-0 truncate py-1', overview ? 'md:-my-1' : '-my-1');
 
   return (
     <header
@@ -144,7 +148,7 @@ export function CharacterHeader({
           )}
         >
           {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
-            <CorporationLink id={publicInfo.corporationId} className="-my-1 min-w-0 truncate py-1">
+            <CorporationLink id={publicInfo.corporationId} className={affiliationLinkClassName}>
               {publicInfo.corporationName}
             </CorporationLink>
           ) : (
@@ -158,7 +162,7 @@ export function CharacterHeader({
                 {' / '}
               </span>
               {publicInfo.allianceId !== undefined ? (
-                <AllianceLink id={publicInfo.allianceId} className="-my-1 min-w-0 truncate py-1">
+                <AllianceLink id={publicInfo.allianceId} className={affiliationLinkClassName}>
                   {publicInfo.allianceName}
                 </AllianceLink>
               ) : (
