@@ -6,6 +6,7 @@ import { BootScreen } from '@/app/BootScreen';
 import { releaseLandingShell } from '@/app/landingShell';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
+import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { InlineError } from '@/components/ui/InlineError';
 import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
@@ -17,6 +18,8 @@ import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
+import { PromoVideo } from '@/features/landing/PromoVideo';
+import { PROMO_VIDEO, PROMO_VIDEO_ANCHOR } from '@/features/landing/promoVideo';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -126,6 +129,15 @@ export function Login() {
                 />
                 {loginFailed && <InlineError>{t('login.failed')}</InlineError>}
                 <CustomizeLink onClick={() => setCustomizing(true)} />
+                {PROMO_VIDEO.youtubeId !== null && (
+                  <a
+                    href={`#${PROMO_VIDEO_ANCHOR}`}
+                    className={plainTextActionClassName('gap-1.5')}
+                  >
+                    <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
+                    {t('login.video.heroLink', { length: PROMO_VIDEO.length })}
+                  </a>
+                )}
               </div>
             </div>
 
@@ -135,6 +147,12 @@ export function Login() {
 
         {belowFold && (
           <>
+            {PROMO_VIDEO.youtubeId !== null && (
+              <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')}>
+                <p className="mt-2 max-w-2xl text-text-dim">{t('login.video.lead')}</p>
+                <PromoVideo youtubeId={PROMO_VIDEO.youtubeId} length={PROMO_VIDEO.length} />
+              </LandingSection>
+            )}
             <LandingSection
               id="login-answers"
               heading={t('login.answersHeading')}

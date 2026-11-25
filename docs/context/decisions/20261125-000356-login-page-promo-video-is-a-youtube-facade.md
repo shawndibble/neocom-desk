@@ -1,0 +1,8 @@
+# Scope decisions — Login page promo video is a YouTube facade below the hero
+
+_Recorded 2026-11-25._
+
+- **The 1:38 narrated promo is hosted on YouTube, not in the repo.** The site is GitHub Pages: a 62 MB master (or a 10–15 MB web encode) would sit in git history once per re-cut, count against Pages' 1 GB site and soft 100 GB/month traffic, and lose adaptive bitrate and captions. YouTube gives all of those free, and the link is needed anyway for Reddit, Discord and the forums. Self-hosting and Vimeo's free plan were rejected.
+- **A click-to-load facade, never autoplay.** The page shows a local poster (`public/promo/`, kept out of the PWA precache like `screenshots/`) with a play button and the length; only the press swaps in the `youtube-nocookie.com` player, autoplaying because the press was the play. Nothing from YouTube loads for a visitor who never presses it, so the landing page's paint work (#3926, #3950) and its no-tracking stance are unchanged. Muted autoplay was rejected: the video is narrated, and a looping muted clip would compete with the Overview demo.
+- **Its own band right after the hero, plus a quiet "Watch the 1:38 tour" link under the login button.** The login button stays the one primary action, and the live Overview demo stays as the hero's proof. Mobbin's references (Tines, Headspace, Intercom, Contractbook) all use a large poster with a play button and a stated length. No header link: the hero link covers it, but `/login#login-video` still lands on it (`useBelowFold`).
+- **`PROMO_VIDEO.youtubeId` null hides both**, so a later swap or removal is a one-line change; the hero link is in the prerendered shell, so changing it regenerates `landingShell.snapshot.html`. Update `length` with each new cut.

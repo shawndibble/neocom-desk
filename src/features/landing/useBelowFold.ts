@@ -1,10 +1,14 @@
 import { startTransition, useEffect, useLayoutEffect, useState } from 'react';
 import { LANDING_ANCHORS } from './landingAnchors';
+import { PROMO_VIDEO_ANCHOR } from './promoVideo';
 
 /** The landing section a URL `#hash` names, or null. Compared raw: the ids are plain ASCII, and decoding throws on a stray `%`. */
 function anchorTarget(hash: string): string | null {
   const id = hash.slice(1);
-  return LANDING_ANCHORS.some((anchor) => anchor.id === id) ? id : null;
+  // The promo video has no header link (the hero's "Watch" link points at it), but a shared `/login#login-video` still lands on it.
+  return id === PROMO_VIDEO_ANCHOR || LANDING_ANCHORS.some((anchor) => anchor.id === id)
+    ? id
+    : null;
 }
 
 /**
