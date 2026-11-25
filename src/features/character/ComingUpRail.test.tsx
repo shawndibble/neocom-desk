@@ -1,9 +1,9 @@
 import { DAY_MS } from '@/lib/age';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { useTimeFormat } from '@/lib/timeFormat';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { ComingUpRail } from './ComingUpRail';
 
 const noop = () => {};
@@ -56,7 +56,7 @@ describe('ComingUpRail skyhook raids', () => {
   });
 });
 
-describe('ComingUpRail long-overdue items', () => {
+describe('ComingUpRail overdue-before-today items', () => {
   const extractor = (id: string, ageDays: number) => ({
     id: `planetExtraction:${id}`,
     sourceId: id,
@@ -68,6 +68,7 @@ describe('ComingUpRail long-overdue items', () => {
     response: null,
     important: false,
   });
+  afterEach(() => useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false }));
   // 12:00 UTC on the EVE clock: an item 1/24 of a day old went overdue today.
   const items = [extractor('Old A', 31), extractor('Old B', 1), extractor('Fresh', 1 / 24)];
 

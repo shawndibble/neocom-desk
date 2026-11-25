@@ -19,7 +19,7 @@ import {
   pastDeadlineLabelKey,
   type CharacterBoardItem,
 } from '@/engine/character/board';
-import { filterByKinds, splitLongOverdue } from '@/engine/character/deadlines';
+import { filterByKinds, splitOverdueBeforeToday } from '@/engine/character/deadlines';
 import { boardSourcesWithSharedPops } from '@/features/character/calendarSharedPops';
 import { DEFAULT_SHARED_POP_TIME } from '@/features/character/calendarSharedPopTime';
 import { shownKinds } from '@/features/character/calendarKindFilter';
@@ -283,7 +283,7 @@ export const comingUp: Builder = (
   });
   const all = calendarEvents === 'all';
   const shown = shownKinds(hiddenKinds);
-  const items = splitLongOverdue(
+  const items = splitOverdueBeforeToday(
     filterByKinds(board, shown).filter(
       (item) => all || item.kind !== 'calendarEvent' || isCommitted(item)
     ),

@@ -8,7 +8,8 @@ import {
   groupByDay,
   localMidnight,
   relativeDayFor,
-  splitLongOverdue,
+  splitOverdueBeforeToday,
+  calendarDaysBefore,
 } from './deadlines';
 
 /**
@@ -243,7 +244,7 @@ describe('countsByKind', () => {
   });
 });
 
-describe('splitLongOverdue', () => {
+describe('splitOverdueBeforeToday', () => {
   it('folds everything overdue from before today, in board order, oldest first', () => {
     const board = buildCharacterBoard({
       nowMs: NOW,
@@ -254,8 +255,8 @@ describe('splitLongOverdue', () => {
         clock('soon', NOW + DAY_MS),
       ],
     });
-    const { longOverdue, rest } = splitLongOverdue(board, NOW, undefined);
-    expect(longOverdue.map((i) => i.subject)).toEqual(['month-old', 'week-old', 'yesterday']);
+    const { beforeToday, rest } = splitOverdueBeforeToday(board, NOW, undefined);
+    expect(beforeToday.map((i) => i.subject)).toEqual(['month-old', 'week-old', 'yesterday']);
     expect(rest.map((i) => i.subject)).toEqual(['soon']);
   });
 
@@ -269,8 +270,8 @@ describe('splitLongOverdue', () => {
         clock('soon', NOW + DAY_MS),
       ],
     });
-    const { longOverdue, rest } = splitLongOverdue(board, NOW, undefined);
-    expect(longOverdue.map((i) => i.subject)).toEqual(['last-night']);
+    const { beforeToday, rest } = splitOverdueBeforeToday(board, NOW, undefined);
+    expect(beforeToday.map((i) => i.subject)).toEqual(['last-night']);
     expect(rest.map((i) => i.subject)).toEqual(['this-morning', 'just-now', 'soon']);
   });
 
@@ -281,8 +282,8 @@ describe('splitLongOverdue', () => {
       nowMs: now,
       planetExtractions: [clock('before', utcMidnight - 1), clock('after', utcMidnight + 1)],
     });
-    const { longOverdue, rest } = splitLongOverdue(board, now, 'UTC');
-    expect(longOverdue.map((i) => i.subject)).toEqual(['before']);
+    const { beforeToday, rest } = splitOverdueBeforeToday(board, now, 'UTC');
+    expect(beforeToday.map((i) => i.subject)).toEqual(['before']);
     expect(rest.map((i) => i.subject)).toEqual(['after']);
   });
 
@@ -291,6 +292,28 @@ describe('splitLongOverdue', () => {
       nowMs: NOW,
       planetExtractions: [clock('soon', NOW + DAY_MS)],
     });
-    expect(splitLongOverdue(board, NOW, undefined)).toEqual({ longOverdue: [], rest: board });
+    expect(splitOverdueBeforeToday(board, NOW, undefined)).toEqual({
+      beforeToday: [],
+      rest: board,
+    });
+  });
+});
+
+describe('calendarDaysBefore', () => {
+  it('counts calendar days, so a minute before midnight is already 1 day back', () => {
+    expect(calendarDaysBefore(localMidnight(NOW) - 1, NOW, undefined)).toBe(1);
+    expect(calendarDaysBefore(localMidnight(NOW) - 1, localMidnight(NOW) + 60_000, undefined)).toBe(
+      1
+    );
+    expect(calendarDaysBefore(NOW - 31 * DAY_MS, NOW, undefined)).toBe(31);
+  });
+
+  it('is 0 for a deadline on the same day', () => {
+    expect(calendarDaysBefore(localMidnight(NOW) + 1, NOW, undefined)).toBe(0);
+  });
+
+  it('cuts the day on the UTC clock when asked', () => {
+    const utcMidnight = Date.UTC(2026, 9, 7);
+    expect(calendarDaysBefore(utcMidnight - 1, utcMidnight + 5 * 3_600_000, 'UTC')).toBe(1);
   });
 });

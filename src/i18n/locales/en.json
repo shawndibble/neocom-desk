@@ -10006,8 +10006,8 @@
     "rail": {
       "sharedBy": "Shared by {{name}}",
       "title": "Coming up",
-      "longOverdue_one": "Overdue before today · oldest {{count}} day",
-      "longOverdue_other": "Overdue before today · oldest {{count}} days",
+      "overdueBeforeToday_one": "Overdue before today · oldest {{count}} day",
+      "overdueBeforeToday_other": "Overdue before today · oldest {{count}} days",
       "count_one": "{{count}} ahead",
       "count_other": "{{count}} ahead",
       "countForDay_one": "{{count}} ahead on this day",

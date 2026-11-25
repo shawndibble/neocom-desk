@@ -15,6 +15,7 @@
 
 import type { CharacterBoardItem, CharacterBoardItemKind } from './board';
 import { CHARACTER_BOARD_ITEM_KINDS } from './board';
+import { DAY_MS } from '@/lib/age';
 import { dayStart, localMidnight, nextDay, type DayZone } from '../localDay';
 
 export { localMidnight };
@@ -98,19 +99,28 @@ export function groupByDay(items: readonly CharacterBoardItem[], zone?: DayZone)
  * extractors nobody restarted would otherwise open the agenda above everything current, and
  * yesterday's missed event is history, not an agenda item; the rail folds these into one summary
  * row (and the Overview's Calendar widget leaves them out). Items that went overdue today stay in
- * place. Both halves keep board order, so `longOverdue` runs oldest first.
+ * place. Both halves keep board order, so `beforeToday` runs oldest first.
  */
-export function splitLongOverdue(
+export function splitOverdueBeforeToday(
   items: readonly CharacterBoardItem[],
   nowMs: number,
   zone: DayZone
-): { longOverdue: CharacterBoardItem[]; rest: CharacterBoardItem[] } {
+): { beforeToday: CharacterBoardItem[]; rest: CharacterBoardItem[] } {
   const todayStartMs = dayStart(nowMs, zone);
-  const longOverdue: CharacterBoardItem[] = [];
+  const beforeToday: CharacterBoardItem[] = [];
   const rest: CharacterBoardItem[] = [];
   for (const item of items)
-    (item.remainingMs <= 0 && item.deadlineMs < todayStartMs ? longOverdue : rest).push(item);
-  return { longOverdue, rest };
+    (item.remainingMs <= 0 && item.deadlineMs < todayStartMs ? beforeToday : rest).push(item);
+  return { beforeToday, rest };
+}
+
+/**
+ * How many calendar days before `nowMs`'s day the item's day falls (cut on `zone`): 1 for anything
+ * due yesterday, even a minute before midnight. Elapsed 24-hour periods would read 0 for an item
+ * the fold already treats as "before today". Rounded because a DST day is 23 or 25 hours.
+ */
+export function calendarDaysBefore(deadlineMs: number, nowMs: number, zone: DayZone): number {
+  return Math.round((dayStart(nowMs, zone) - dayStart(deadlineMs, zone)) / DAY_MS);
 }
 
 /**
