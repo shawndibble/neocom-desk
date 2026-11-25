@@ -7,7 +7,7 @@
  * (`npx vitest run src/features/landing/landingShell.test.tsx -u`).
  */
 export const PROMO_VIDEO = {
-  youtubeId: 'wl0xIgaw2SQ',
+  youtubeId: 'gIEbYbJ4b3k',
   /** Shown on the poster and the hero link, as m:ss. Update it with each new cut. */
   duration: '1:38',
 } as const;
