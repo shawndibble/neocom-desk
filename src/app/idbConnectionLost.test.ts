@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MINUTE_MS } from '@/lib/age';
-import { IDB_RELOAD_KEY, isIdbConnectionLost, reloadOnceForLostIdb } from './idbConnectionLost';
+import {
+  IDB_RELOAD_KEY,
+  characterRowCount,
+  isIdbConnectionLost,
+  reloadOnceForLostIdb,
+} from './idbConnectionLost';
 
 function unknownError(message: string): Error {
   const e = new Error(message);
@@ -60,5 +65,19 @@ describe('reloadOnceForLostIdb', () => {
     const reload = vi.fn();
     expect(reloadOnceForLostIdb(new Error('x'), 1, reload, storage)).toBe(false);
     expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('characterRowCount', () => {
+  it('returns the count', async () => {
+    expect(await characterRowCount(() => Promise.resolve(3))).toBe(3);
+  });
+
+  it('is unavailable when the read rejects', async () => {
+    expect(await characterRowCount(() => Promise.reject(new Error('x')))).toBe('unavailable');
+  });
+
+  it('is unavailable when the read never answers', async () => {
+    expect(await characterRowCount(() => new Promise<number>(() => {}), 10)).toBe('unavailable');
   });
 });
