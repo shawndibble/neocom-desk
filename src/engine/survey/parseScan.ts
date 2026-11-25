@@ -3,15 +3,17 @@
  * one row per rock, `ore  units  volume m3  value ISK  distance`, separated
  * by tabs (or runs of spaces after a round trip through a chat or a browser).
  *
- * Numbers are read in either locale: "5,100,000.00" and "5.100.000,00" are
- * the same figure. See `parseLocalizedNumber`.
+ * Numbers are read in any locale: "5,100,000.00", "5.100.000,00" and the Swiss
+ * "5’100’000.00" are the same figure. See `parseLocalizedNumber`.
  */
 import { parseLocalizedNumber } from '../numbers/parseLocalizedNumber';
 import type { SurveyRock } from './series';
 
 const METRES_PER: Record<string, number> = { m: 1, km: 1000, au: 149_597_870_700 };
 
-const NUMBER = '[\\d.,]+';
+// A Swiss client groups thousands with an apostrophe (straight or typographic):
+// "11’202", "8’370’000.00". `parseLocalizedNumber` strips it.
+const NUMBER = "[\\d.,'\\u2019]+";
 const ROW = new RegExp(
   `^(.+?)\\s+(${NUMBER})\\s+(${NUMBER})\\s*m(?:3|³)\\s+(?:(${NUMBER})\\s*ISK\\s+)?(${NUMBER})\\s*(km|m|AU)$`,
   'i'
