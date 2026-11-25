@@ -12,6 +12,7 @@ import { renderPageRoute } from '@/test/renderPage';
 import * as routeChunks from '@/app/routeChunks';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import {
   OVERVIEW_HIDDEN_CARDS_KEY,
   useOverviewCardOrder,
@@ -500,7 +501,36 @@ describe('Overview widget grid', () => {
  */
 describe('Overview widget grid on a phone', () => {
   beforeEach(() => {
-    stubViewport(PHONE_QUERY);
+    // The widget fold reads the phone query; the header reads the `md` one.
+    stubViewport((query) => query === PHONE_QUERY || query === NARROW_QUERY);
+  });
+
+  it('folds Customize and the data age into one More actions menu, off the tab row', async () => {
+    await seedLayout(widget('w', 'wallet', { size: 'S' }));
+    const user = userEvent.setup();
+    renderOverviewRoute();
+    await widgetCard('Wallet');
+
+    const more = await screen.findByRole('button', { name: 'More actions' });
+    expect(screen.queryByRole('button', { name: 'Customize' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Data updated/ })).not.toBeInTheDocument();
+
+    await user.click(more);
+    expect(
+      await screen.findByRole('menuitem', { name: /Refresh all widgets/ })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Customize' }));
+    expect(
+      await screen.findByRole('region', { name: 'Customize the Overview' })
+    ).toBeInTheDocument();
+  });
+
+  it('draws the Next deadline as one borderless row that goes where the clock lives', async () => {
+    await seedLayout(widget('b', 'training', { size: 'S' }));
+    renderOverviewRoute();
+    const next = await screen.findByRole('link', { name: /next skill finishes/i });
+    expect(next).toHaveAttribute('href', '/skills/plans');
+    expect(next).not.toHaveClass('border');
   });
 
   it('leaves out a widget set to Hide on phone, and keeps the rest', async () => {

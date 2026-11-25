@@ -1526,6 +1526,8 @@ A header action that opens a drawer for more input takes a plain label, no "…"
 
 **A figure measured against a baseline** (the Skills comparison drawer) reads as a signed number or a word, never colour alone: `+2` / `−3` beside the level, `missing` when the character has none of a skill the baseline has, `same` when equal. `isk-pos` / `isk-neg` tint the sign (§1) and the baseline column is labelled "Baseline", so a colour-blind reader loses nothing.
 
+The Overview's header applies the same below `md` (decision `20261125-204751`): the name takes its own full row beside the portrait and wraps, and one line under it holds [scope picker] → Next (a borderless row, trailing GoTo) → ⋮ → bell. The ⋮ holds Customize and Refresh all widgets (with the data age), which left the inline button and the tab row; from `md` up both are as before.
+
 The Fittings editor header applies tier 3: Compare and Copy stats sit in its ⋮ menu on desktop, and on a phone that menu also holds Rename, the Fittings menu's items, Export and the Alpha/Omega and Mastery badges as text (the icon badges stay in the header from `md` up). Its Save is the one primary control, and says where it saves.
 
 The Skill Plan editor header also applies tier 3 on a phone (below 40rem): Import and Export, which are two menu buttons from there up, become From skill queue, From text or file, Export to clipboard and Export table in its one ⋮. Below `md` its rows group consecutive levels of one skill under the skill's name; every level keeps its grip, and reordering stays drag-only.

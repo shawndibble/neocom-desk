@@ -36,11 +36,13 @@ import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { DangerBanner } from '@/features/notifications/DangerBanner';
 import { WarBanner } from '@/features/wars/WarBanner';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
   OverviewCachedNotice,
   OverviewCustomize,
   OverviewDataAge,
+  OverviewMoreMenu,
   OverviewNext,
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
@@ -103,6 +105,8 @@ function Board({ characterId, layout }: BoardProps) {
   const edit = useOverviewEdit();
   const { editing } = edit;
   const isPhone = useIsPhone();
+  // The header's phone layout follows the CSS `md` break, which is wider than `isPhone`.
+  const narrow = useIsNarrow();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
@@ -117,11 +121,15 @@ function Board({ characterId, layout }: BoardProps) {
         actions={
           <>
             <OverviewNext summary={summary} />
-            <OverviewCustomize />
+            {narrow && summary.fetchedAt && !editing ? (
+              <OverviewMoreMenu summary={summary} />
+            ) : (
+              <OverviewCustomize />
+            )}
           </>
         }
       />
-      <OverviewSubNav trailing={<OverviewDataAge summary={summary} />} />
+      <OverviewSubNav trailing={narrow ? undefined : <OverviewDataAge summary={summary} />} />
       <DangerBanner />
       <WarBanner characterId={characterId} />
       <OverviewCachedNotice summary={summary} />

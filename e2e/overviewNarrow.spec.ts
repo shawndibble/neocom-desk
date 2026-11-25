@@ -197,8 +197,11 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     ]);
 
     const main = page.locator('main');
-    const next = main.getByRole('link', { name: /^Next/ });
-    const customize = main.getByRole('button', { name: 'Customize' });
+    const phone = viewport.width < 768;
+    // Desktop's text says "Next ..."; the phone row leads with the countdown, so find it by where it goes.
+    const next = main.locator('header a[href*="/contracts"]');
+    // Below `md` Customize and the data age share one ⋮ menu, so the phone's control is that menu.
+    const customize = main.getByRole('button', { name: phone ? 'More actions' : 'Customize' });
     const bell = main.getByRole('button', { name: /^Alerts/ });
     await expect(next).toBeVisible({ timeout: FIRST_LOAD_MS });
     await expect(customize).toBeVisible();
@@ -213,19 +216,12 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     };
     expect(Math.abs(boxes.next.height - boxes.customize.height)).toBeLessThan(1);
     expect(Math.abs(boxes.bell.height - boxes.customize.height)).toBeLessThan(1);
-    if (viewport.width < 768) expect(boxes.customize.height).toBeGreaterThanOrEqual(36);
-    // Customize and the bell share a row, the bell last, top right.
+    if (phone) expect(boxes.customize.height).toBeGreaterThanOrEqual(36);
+    // One row, Next then Customize (or ⋮) then the bell, the bell last.
     expect(Math.abs(boxes.bell.y - boxes.customize.y)).toBeLessThan(2);
     expect(boxes.bell.x).toBeGreaterThan(boxes.customize.x);
-    if (viewport.width < 768) {
-      // Phone: Next is its own full-width line under Customize and the bell.
-      expect(boxes.next.y).toBeGreaterThanOrEqual(boxes.customize.y + boxes.customize.height - 1);
-      expect(boxes.next.width).toBeGreaterThan(viewport.width * 0.8);
-    } else {
-      // Desktop: one row, Next then Customize then the bell.
-      expect(Math.abs(boxes.next.y - boxes.customize.y)).toBeLessThan(2);
-      expect(boxes.next.x + boxes.next.width).toBeLessThanOrEqual(boxes.customize.x + 1);
-    }
+    expect(Math.abs(boxes.next.y - boxes.customize.y)).toBeLessThan(2);
+    expect(boxes.next.x + boxes.next.width).toBeLessThanOrEqual(boxes.customize.x + 1);
 
     // The button goes where the clock lives.
     await expect(next).toHaveAttribute('href', /\/contracts/);
@@ -292,7 +288,7 @@ for (const viewport of [
   { width: 1024, height: 900 },
   { width: 1280, height: 900 },
 ]) {
-  test(`a long corporation / alliance line ends before Customize, on one header row, at ${viewport.width}px`, async ({
+  test(`a long corporation / alliance line fits the header, with the controls beside it from 768px, at ${viewport.width}px`, async ({
     page,
   }) => {
     await mockLongAffiliation(page);
@@ -303,7 +299,10 @@ for (const viewport of [
     const header = page.locator('main header');
     const allianceLink = header.getByRole('link', { name: LONG_ALLIANCE });
     await expect(allianceLink).toBeVisible({ timeout: FIRST_LOAD_MS });
-    const customize = (await header.getByRole('button', { name: 'Customize' }).boundingBox())!;
+    const phone = viewport.width < 768;
+    const customize = (await header
+      .getByRole('button', { name: phone ? 'More actions' : 'Customize' })
+      .boundingBox())!;
     const bell = (await header.getByRole('button', { name: /^Alerts/ }).boundingBox())!;
     const name = (await header
       .getByRole('heading', { level: 1 })
@@ -312,13 +311,24 @@ for (const viewport of [
       .boundingBox())!;
     for (const link of [allianceLink, header.getByRole('link', { name: LONG_CORP })]) {
       const box = (await link.boundingBox())!;
-      // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
-      expect(box.x + box.width).toBeLessThanOrEqual(customize.x - HEADER_GAP_MIN);
+      if (phone) {
+        // Each affiliation has the name block's full width beside the portrait: nothing runs off the screen.
+        expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+      } else {
+        // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
+        expect(box.x + box.width).toBeLessThanOrEqual(customize.x - HEADER_GAP_MIN);
+      }
     }
-    // One row: the name block, Customize and the bell share a band; nothing wrapped under.
-    for (const control of [customize, bell]) {
-      expect(control.y).toBeLessThan(name.y + name.height);
-      expect(name.y).toBeLessThan(control.y + control.height);
+    if (phone) {
+      // The controls have a line of their own under the name block, the bell last on it.
+      expect(customize.y).toBeGreaterThanOrEqual(name.y + name.height - 1);
+      expect(Math.abs(bell.y - customize.y)).toBeLessThan(2);
+    } else {
+      // One row: the name block, Customize and the bell share a band; nothing wrapped under.
+      for (const control of [customize, bell]) {
+        expect(control.y).toBeLessThan(name.y + name.height);
+        expect(name.y).toBeLessThan(control.y + control.height);
+      }
     }
     // No target in the header overlaps another.
     const targets = header.locator('a:visible, button:visible');

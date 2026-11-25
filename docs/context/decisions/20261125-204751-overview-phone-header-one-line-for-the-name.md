@@ -1,0 +1,8 @@
+# Scope decisions — Overview phone header: one line for the name, controls on a line under it
+
+_Recorded 2026-11-25._
+
+- **Below `md` the Overview's name takes the full row beside the portrait, and wraps instead of truncating.** The scope picker, Next, ⋮ and the bell moved to a line of their own under it. Beside the name they left it about 90px, so a long Character name ended in an ellipsis. Corporation and alliance each get a line, so neither hides the other. From `md` the header is unchanged.
+- **Customize and the data age share one ⋮ menu on a phone.** The ⋮ holds Customize and "Refresh all widgets", the latter carrying the age ("2m ago") as its dim end text. The tab row now holds only the tabs: the data age chip clipped "Employment" there. This follows `20260905-132443`, which already took the data age out of phone headers. The per-widget breakdown table stays on the `md`+ chip; a phone has the age and Refresh all in the menu. The ⋮ needs two real actions (§6c), so while the edit bar owns Done, or before any read has landed, the single Customize button stays inline instead.
+- **Next is a borderless row on a phone**: countdown first, then the note, a trailing GoTo chevron, the whole row the link. It fills the controls' line beside the ⋮ and the bell. It no longer reserves a line before its clocks arrive, since that line is now always there (the controls). The remembered-shape store (`overview.nextShape.*`) is gone with it.
+- **The portrait does not open the scope picker.** The Overview's picker sets every widget's scope (This character or All characters); it is not a Character switcher, so a tappable portrait would promise something it does not do. The picker keeps its avatar-stack trigger, first on the controls' line.
