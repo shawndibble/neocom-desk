@@ -10,6 +10,7 @@ const summary = (over: Partial<BookSummary> = {}): BookSummary => ({
   corpName: 'Brass Meridian',
   startDate: '2026-10-01',
   credit: 0,
+  estimate: 0,
   account: { paidThrough: null, owes: null },
   miners: [],
   notices: [],

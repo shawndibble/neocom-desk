@@ -53,15 +53,33 @@ export function CorpBookSyncNote({
   const credit = summary.credit > 0;
   // A running account (#6294) says where the member stands: paid through a day, or how far behind.
   const account = summary.account;
+  // An open day owed at an estimate: in what the member owes now, billed once it closes.
+  const estimateFrom = summary.estimate > 0 ? book.estimateFrom : undefined;
+  const estimateClosesAt = estimateFrom
+    ? new Date(dayClosesAt(estimateFrom, loaded.graceHours))
+    : null;
+  const estimateWords = estimateFrom &&
+    estimateClosesAt && {
+      estimate: formatIsk(summary.estimate, 0),
+      date: shortDate(estimateFrom, i18n.language),
+      time: estimateClosesAt.toISOString().slice(11, 16),
+      closeDate: shortDate(utcDay(estimateClosesAt.getTime()), i18n.language),
+      corp: corpName,
+    };
   const standing =
-    showStanding && account?.owes
-      ? t('miningTax.corpBook.sync.behind', {
-          amount: formatIsk(account.owes.amount, 0),
-          count: account.owes.days,
-          date: shortDate(account.owes.oldest, i18n.language),
-          corp: corpName,
+    showStanding && estimateWords
+      ? t('miningTax.corpBook.sync.owesWithEstimate', {
+          ...estimateWords,
+          amount: formatIsk((account?.owes?.amount ?? 0) + summary.estimate, 0),
         })
-      : null;
+      : showStanding && account?.owes
+        ? t('miningTax.corpBook.sync.behind', {
+            amount: formatIsk(account.owes.amount, 0),
+            count: account.owes.days,
+            date: shortDate(account.owes.oldest, i18n.language),
+            corp: corpName,
+          })
+        : null;
   // The balance an officer rolled over from another system, until they reverse it.
   // A note of where the account started, so it shows only while a balance is open: owing it, or
   // holding credit.
@@ -80,8 +98,9 @@ export function CorpBookSyncNote({
 
   // A closed day whose ore is still Settling is not safe yet: more of it may still be billed.
   const settlingFrom = closedThrough !== undefined ? book.settlingFrom : undefined;
+  // Not "safe to pay" beside an open day it would pay too: the standing line says when it closes.
   const safe =
-    owedNow > 0 || book.pendingFrom !== undefined
+    (owedNow > 0 || book.pendingFrom !== undefined) && !(estimateWords && showStanding)
       ? settlingFrom
         ? t(`miningTax.corpBook.sync.settling${here}`, {
             date: shortDate(settlingFrom, i18n.language),
@@ -112,7 +131,15 @@ export function CorpBookSyncNote({
           {safe}
         </span>
       )}
-      {book.pendingFrom && closesAt && (
+      {estimateWords && !showStanding && (
+        <span className="text-text-dim">
+          {t(`miningTax.corpBook.sync.estimate${here}`, {
+            ...estimateWords,
+            amount: estimateWords.estimate,
+          })}
+        </span>
+      )}
+      {book.pendingFrom && closesAt && book.pendingFrom !== estimateFrom && (
         <span className="text-text-dim">
           {t(`miningTax.corpBook.sync.openDay${here}`, {
             date: shortDate(book.pendingFrom, i18n.language),

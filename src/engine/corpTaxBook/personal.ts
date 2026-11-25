@@ -36,7 +36,7 @@ import {
   isSameJournalTransfer,
   matchesStatedTransfer,
 } from '../../../functions/src/corpTaxBookTransferMatch';
-import { MinerRunningAccount, type RunningAccountOwes } from './minerRunningAccount';
+import { MinerRunningAccount, RESIDUE_ISK, type RunningAccountOwes } from './minerRunningAccount';
 import type { ToleranceExemption } from './toleranceExemptions';
 import type { BillableLine } from './billableLines';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
@@ -61,7 +61,13 @@ import { DAY_MS, HOUR_MS } from '@/lib/age';
  * while the refinery log may still be catching up on the day (`isSettled`). Never billed or
  * flagged; once the day settles the same ore is an `overListed` Conflict.
  */
-export type BookRowState = 'billed' | 'conflict' | 'settling' | 'dismissed' | 'waived' | 'paid';
+/**
+ * `estimate`: a day the book has not closed yet, owed by what the member listed for the
+ * corporation's own Payee (decision 20261125). Owed and payable, but the book bills it only when
+ * the day closes, so its figure may still change.
+ */
+export type BookRowState =
+  'billed' | 'estimate' | 'conflict' | 'settling' | 'dismissed' | 'waived' | 'paid';
 /**
  * Why a Conflict clashes. `otherPayee`: the member gave the ore to a Payee that is not this
  * corporation's. `overListed`: the member's entry for the corporation's own Payee lists more ore
@@ -393,6 +399,8 @@ export interface PersonalAccountStatus {
 export interface BookMinerRunningAccount {
   minerId: string;
   account: MinerRunningAccount;
+  /** What this Miner's open days' estimates still ask, after credit: owed on top of `account.owes`. */
+  estimate?: number;
   /** What the account bills: each Billable mined line and Adjustment, oldest first. */
   lines: BillableLine[];
   /** Its Late notices, oldest first. */
@@ -425,8 +433,10 @@ export interface BookSummary {
   lastSyncedAt?: string;
   /** The latest Billable day, or undefined with no sync after the grace. */
   closedThrough?: string;
-  /** Money ahead of every billed day, over the member's Miners. */
+  /** Money ahead of every billed day, over the member's Miners, after it paid any estimate. */
   credit: number;
+  /** What the open days' estimates still ask, after credit: owed on top of `account.owes`. */
+  estimate: number;
   /** Paid through a day, or what the member owes now. */
   account: PersonalAccountStatus;
   /** Each of the member's Miners' account in this book. */
@@ -541,6 +551,8 @@ interface Prepared {
   charges: PreparedCharge[];
   /** Observations nothing can bill yet: unrated or not Billable, lined up with an entry or not. */
   pending: { observed: ObservedMiningEntry; entry?: PersonalEntry }[];
+  /** Of `pending`, the priced charges of days not Billable yet: what an estimate is valued from. */
+  open: PreparedCharge[];
   /** Each of the member's Miners: the book's Running account, in-flight donations counted. */
   miners: ReadonlyMap<string, MinerSettlement>;
   /** Donations in flight the book synced past without crediting: they pay nothing now. */
@@ -596,6 +608,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
   const observedByKey = new Map(book.observed.map((o) => [observedEntryKey(o), o]));
   const prepared: PreparedCharge[] = [];
   const pending: Prepared['pending'] = [];
+  const openCharges: PreparedCharge[] = [];
   for (const charge of open.charges) {
     const observed = observedByKey.get(charge.key)!;
     const dismissal = activeDismissalFor(charge, book.dismissals);
@@ -603,6 +616,13 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     const entry = matchEntry(observed, entries);
     if (!billable) {
       pending.push({ observed, ...(entry ? { entry } : {}) });
+      openCharges.push({
+        charge,
+        observed,
+        ...(entry ? { entry } : {}),
+        ...(dismissal ? { dismissal } : {}),
+        oreLines: charge.oreLines,
+      });
       continue;
     }
     prepared.push({
@@ -621,6 +641,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     book,
     charges: prepared,
     pending,
+    open: openCharges,
     miners: open.miners,
     lost,
     billableThrough: open.billableThrough,
@@ -668,6 +689,10 @@ const overlapPool = (allocations: readonly PersonalAllocation[]): OverlapPool =>
 
 const linesOfLeft = (left: ReadonlyMap<number, number>): OreLine[] =>
   sumLines([...left].map(([typeId, quantity]) => ({ typeId, quantity })));
+
+/** What both hold of each ore type: the smaller quantity. */
+const intersectLines = (a: readonly OreLine[], b: readonly OreLine[]): OreLine[] =>
+  minusLines(a, minusLines(a, b));
 
 /**
  * The ore both the miner's allocations and one corporation line claim, capped at what the
@@ -1238,6 +1263,97 @@ export function overlayCorpBooks(input: {
     free.set(key, left);
   }
 
+  // 1b. A day the book has not closed: what the member listed for the corporation's own Payee is
+  // owed to it now, as an estimate. It is valued from what the book observed of the day so far,
+  // else from the member's own Assignment; ore listed beyond the observed is Settling. When the day
+  // closes the book bills it (step 1) and the estimate is gone, so nothing is counted twice.
+  for (const [key, entry] of entryByKey) {
+    for (const p of prepared) {
+      const { book } = p;
+      if (chargesOf(p, key).length > 0) continue;
+      if (p.billableThrough !== undefined && entry.date <= p.billableThrough) continue;
+      if (entry.date < book.startDate) continue;
+      if (book.characterIds !== undefined && !book.characterIds.includes(entry.characterId))
+        continue;
+      const done = absorbed.get(key);
+      const own = entry.allocations.filter(
+        (a) =>
+          a.id !== undefined &&
+          !done?.has(a.id) &&
+          isOwnPayee(book.ownPayeeIds, a) &&
+          isBilledStatus(a)
+      );
+      if (own.length === 0) continue;
+      const here = p.open.filter(
+        (c) =>
+          c.entry !== undefined &&
+          entryKey(c.entry.characterId, c.entry.date, c.entry.solarSystemId) === key
+      );
+      // An officer already dismissed the day: the book will not bill it, so nothing is estimated.
+      if (here.some((c) => c.dismissal)) continue;
+      if (here.length > 0) {
+        const pool = overlapPool(own);
+        const { lines: taken } = takeOwnAllocations(
+          pool,
+          book.ownPayeeIds,
+          sumLines(...here.map((c) => c.oreLines))
+        );
+        let left = taken;
+        for (const charge of here) {
+          const lines = intersectLines(left, charge.oreLines);
+          if (lines.length === 0) continue;
+          left = minusLines(left, lines);
+          const value = dayValue(charge);
+          const worth = computeAssignmentValue(lines, priceMap(value.unitPrices), value.taxPct);
+          pushRow({
+            ...commonOf(p, charge, value),
+            id: `${book.corporationId}:${charge.charge.key}:estimate`,
+            state: 'estimate',
+            oreLines: lines,
+            estimatedValue: worth.estimatedValue,
+            taxOwed: worth.taxOwed,
+            billed: worth.taxOwed,
+          });
+        }
+        for (const item of pool) {
+          const excess = linesOfLeft(item.left);
+          if (excess.length > 0) pushExcess(p, here[0]!, item.allocation, excess);
+        }
+      } else {
+        const { prices, sources } = book.pricesOn(entry.date);
+        for (const a of own) {
+          const lines = sumLines(a.oreLines);
+          const worth = computeAssignmentValue(lines, prices, a.taxPct);
+          const types = lines.map((l) => l.typeId);
+          pushRow({
+            id: `${book.corporationId}:${key}:estimate:${a.id}`,
+            corporationId: book.corporationId,
+            corpName: book.corpName,
+            characterId: entry.characterId,
+            date: entry.date,
+            solarSystemId: entry.solarSystemId,
+            state: 'estimate',
+            oreLines: lines,
+            personalOreLines: entry.oreLines,
+            unitPrices: Object.fromEntries(types.map((t) => [t, prices.get(t) ?? 0])),
+            priceSources: Object.fromEntries(
+              types.flatMap((t) => (sources.has(t) ? [[t, sources.get(t)!]] : []))
+            ),
+            taxPct: a.taxPct,
+            rateScope: 'corp',
+            estimatedValue: worth.estimatedValue,
+            taxOwed: worth.taxOwed,
+            billed: worth.taxOwed,
+            minerId: minerIdFor(entry.characterId, book.miners, entry.date),
+            hubId: book.hubId,
+            oreForm: book.oreForm,
+          });
+        }
+      }
+      absorbed.set(key, new Set([...(done ?? []), ...own.map((a) => a.id!)]));
+    }
+  }
+
   // 2. What no personal entry lines up with: the book alone decides.
   for (const p of prepared) {
     for (const charge of p.charges) {
@@ -1304,16 +1420,70 @@ export function overlayCorpBooks(input: {
     }
   }
 
+  // 4b. Money ahead of every billed day pays the estimates, oldest first: an estimate it covers
+  // reads Paid, and what it misses (ore mined after the payment, or a later price) stays owed.
+  const creditLeft = new Map<number, number>();
+  for (const p of prepared) {
+    const credit = new Map([...p.miners].map(([id, m]) => [id, m.account.credit]));
+    const estimates = (rowsByBook.get(p.book.corporationId) ?? [])
+      .filter((r) => r.state === 'estimate')
+      .sort((a, b) => a.date.localeCompare(b.date));
+    for (const row of estimates) {
+      const minerId = minerOfRow(p, row) ?? '';
+      const have = credit.get(minerId) ?? 0;
+      const tax = row.taxOwed ?? 0;
+      if (have < RESIDUE_ISK || tax <= 0) continue;
+      const pay = Math.min(have, tax);
+      credit.set(minerId, have - pay);
+      if (tax - pay < RESIDUE_ISK) {
+        Object.assign(row, { state: 'paid', taxOwed: 0 });
+        continue;
+      }
+      const share = pay / tax;
+      const paidLines = row.oreLines
+        .map((l) => ({ typeId: l.typeId, quantity: Math.floor(l.quantity * share) }))
+        .filter((l) => l.quantity > 0);
+      pushRow({
+        ...row,
+        id: `${row.id}:paid`,
+        state: 'paid',
+        oreLines: paidLines,
+        estimatedValue: row.estimatedValue * share,
+        taxOwed: 0,
+        billed: pay,
+      });
+      Object.assign(row, {
+        oreLines: minusLines(row.oreLines, paidLines),
+        estimatedValue: row.estimatedValue * (1 - share),
+        taxOwed: tax - pay,
+        billed: tax - pay,
+      });
+    }
+    creditLeft.set(
+      p.book.corporationId,
+      [...credit.values()].reduce((sum, c) => sum + c, 0)
+    );
+  }
+
   const summaries: BookSummary[] = prepared.map((p) => {
     const miners = minerRunningAccountsOf(p);
     const closedThrough = p.billableThrough;
+    const estimates = (rowsByBook.get(p.book.corporationId) ?? []).filter(
+      (r) => r.state === 'estimate'
+    );
+    const estimate = estimates.reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
+    for (const m of miners)
+      m.estimate = estimates
+        .filter((r) => minerOfRow(p, r) === m.minerId)
+        .reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
     return {
       corporationId: p.book.corporationId,
       corpName: p.book.corpName,
       startDate: p.book.startDate,
       ...(p.book.lastSyncedAt !== undefined ? { lastSyncedAt: p.book.lastSyncedAt } : {}),
       ...(closedThrough !== undefined ? { closedThrough } : {}),
-      credit: miners.reduce((sum, m) => sum + m.account.credit, 0),
+      credit: creditLeft.get(p.book.corporationId) ?? 0,
+      estimate,
       account: runningAccountStatusOf(miners),
       miners,
       notices: unpaidNotices(miners, p.book.declarations ?? []),

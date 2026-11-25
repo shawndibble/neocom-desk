@@ -29,7 +29,8 @@ export type RowMenuAction =
 function corpRowActions(dr: DisplayRow): RowMenuAction[][] {
   const state = dr.corp?.kind === 'row' ? dr.corp.view.state : null;
   const owing =
-    state === 'billed' && (dr.corp?.kind === 'row' ? (dr.corp.view.taxOwed ?? 0) > 0 : false);
+    (state === 'billed' || state === 'estimate') &&
+    (dr.corp?.kind === 'row' ? (dr.corp.view.taxOwed ?? 0) > 0 : false);
   return owing ? [[{ id: 'view' }, { id: 'corpPay' }]] : [[{ id: 'view' }]];
 }
 

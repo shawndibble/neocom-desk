@@ -8312,7 +8312,8 @@
       "state": {
         "notPayingStill": "{{corp}} still bills this",
         "pending": "Pending corp record",
-        "billed": "Billed",
+        "billed": "Outstanding",
+        "estimate": "Outstanding",
         "conflict": "Conflict",
         "settling": "Settling",
         "unattributed": "Unattributed",
@@ -8325,6 +8326,7 @@
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own Assignment applies and nothing is owed to the corp.",
         "billed": "{{corp}}'s Corp Tax Book sets what you owe for this day.",
+        "estimate": "An estimate: {{corp}}'s book bills this day once it closes (after 00:00 UTC and its next sync), so the amount may still change. Paying now is fine: it counts toward the bill.",
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed yet. On {{date}} it becomes owed to {{corp}} unless you sort it out first.",
         "settling": "{{corp}}'s refinery log hasn't caught up with your mining on {{day}} yet. This ore should appear after a later sync; nothing to do until then.",
         "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take the extra ore off your entry.",
@@ -8359,6 +8361,9 @@
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
         "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
         "settling": "{{date}} is still settling: {{corp}}'s refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
+        "owesWithEstimate": "You owe {{corp}} {{amount}} ISK, including {{estimate}} ISK estimated for {{date}} ({{corp}} bills it once it closes, after {{time}} UTC on {{closeDate}}, and its next sync).",
+        "estimate": "Includes {{amount}} ISK estimated for {{date}}: {{corp}} bills it once it closes, after {{time}} UTC on {{closeDate}} and its next sync.",
+        "estimateHere": "Includes {{amount}} ISK estimated for {{date}}: billed once it closes, after {{time}} UTC on {{closeDate}} and the book's next sync.",
         "settlingHere": "{{date}} is still settling: the refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
         "safeHere": "Safe to pay — {{date}} is closed (synced {{ago}}).",
         "safeOnceHere": "Safe to pay once the book syncs (last synced {{ago}}).",
@@ -8402,6 +8407,7 @@
         "feeder-member": "rate for the moon owner's own members",
         "record": "correction for this day"
       },
+      "estimated": "est.",
       "detail": {
         "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
         "bookAndYou": "{{book}} (corp) · {{you}} (you)",

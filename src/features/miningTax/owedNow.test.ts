@@ -169,7 +169,11 @@ describe("a Corp Tax Book's figures by the selected Characters", () => {
   const book = (id: string, characterIds: number[], amount: number, days: number) => ({
     payee: { id },
     loaded: { characterIds },
-    summary: { credit: amount / 10, account: { owes: { amount, days, oldest: '2026-11-03' } } },
+    summary: {
+      credit: amount / 10,
+      estimate: 0,
+      account: { owes: { amount, days, oldest: '2026-11-03' } },
+    },
   });
   const view = {
     books: [book('corp-book:1', [1, 2], 1_000, 2), book('corp-book:2', [3], 2_000, 5)],
@@ -187,6 +191,18 @@ describe("a Corp Tax Book's figures by the selected Characters", () => {
   it('leaves out a book none of the selected Characters is in, and keeps the others whole', () => {
     expect([...bookOwesOf(view, new Set([2]))]).toEqual([['corp-book:1', 1_000]]);
     expect([...bookCreditsOf(view, new Set([3]))]).toEqual([['corp-book:2', 200]]);
+  });
+
+  it("adds an open day's estimate to what the book's account owes", () => {
+    const withEstimate = {
+      books: [
+        {
+          ...book('corp-book:1', [1], 1_000, 1),
+          summary: { ...book('corp-book:1', [1], 1_000, 1).summary, estimate: 250 },
+        },
+      ],
+    } as unknown as Parameters<typeof bookOwesOf>[0];
+    expect([...bookOwesOf(withEstimate)]).toEqual([['corp-book:1', 1_250]]);
   });
 
   it("counts a book's entries and oldest unpaid day off its account, not the visible rows", () => {
