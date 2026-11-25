@@ -121,14 +121,43 @@ describe('CorpBookSyncNote', () => {
   it("says what it owes includes the open day's estimate, and when that day is billed", () => {
     render(
       <CorpBookSyncNote
-        book={book({ estimate: 666_000 }, { estimateFrom: '2026-10-18' })}
-        owedNow={666_000}
+        book={book(
+          {
+            estimate: 666_000,
+            account: {
+              paidThrough: null,
+              owes: { amount: 100_000, days: 1, oldest: '2026-10-17' },
+            },
+          },
+          { estimateFrom: '2026-10-18' }
+        )}
+        owedNow={766_000}
         now={NOW}
+        showStanding
       />
     );
     expect(
       screen.getByText(
-        'Includes 666,000 ISK estimated for 18 Oct: Brass Meridian Logistics bills it once it closes, after 06:00 UTC on 19 Oct and its next sync.'
+        'You owe Brass Meridian Logistics 766,000 ISK, including 666,000 ISK estimated for 18 Oct (Brass Meridian Logistics bills it once it closes, after 06:00 UTC on 19 Oct, and its next sync).'
+      )
+    ).toBeInTheDocument();
+    // Not "safe to pay" beside a day that is not closed yet.
+    expect(screen.queryByText(/Safe to pay/)).not.toBeInTheDocument();
+  });
+
+  it("in the pay dialog says the amount includes the open day's estimate", () => {
+    render(
+      <CorpBookSyncNote
+        book={book({ estimate: 666_000 }, { estimateFrom: '2026-10-18' })}
+        owedNow={666_000}
+        now={NOW}
+        showStanding={false}
+        inDialog
+      />
+    );
+    expect(
+      screen.getByText(
+        "Includes 666,000 ISK estimated for 18 Oct: billed once it closes, after 06:00 UTC on 19 Oct and the book's next sync."
       )
     ).toBeInTheDocument();
   });

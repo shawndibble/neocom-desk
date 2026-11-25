@@ -8357,6 +8357,7 @@
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
         "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
         "settling": "{{date}} is still settling: {{corp}}'s refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
+        "owesWithEstimate": "You owe {{corp}} {{amount}} ISK, including {{estimate}} ISK estimated for {{date}} ({{corp}} bills it once it closes, after {{time}} UTC on {{closeDate}}, and its next sync).",
         "estimate": "Includes {{amount}} ISK estimated for {{date}}: {{corp}} bills it once it closes, after {{time}} UTC on {{closeDate}} and its next sync.",
         "estimateHere": "Includes {{amount}} ISK estimated for {{date}}: billed once it closes, after {{time}} UTC on {{closeDate}} and the book's next sync.",
         "settlingHere": "{{date}} is still settling: the refinery log hasn't caught up with all your mining that day (synced {{ago}}). Paying now pays only what is billed so far.",
@@ -8402,6 +8403,7 @@
         "feeder-member": "rate for the moon owner's own members",
         "record": "correction for this day"
       },
+      "estimated": "est.",
       "detail": {
         "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
         "bookAndYou": "{{book}} (corp) · {{you}} (you)",
@@ -8446,7 +8448,6 @@
         "headerNotBilled": "Not billed · {{corp}}'s book did not record this ore",
         "countsFrom": "From {{date}} this app also counts it as owed to {{corp}}.",
         "cardBills": "On its date",
-        "estimated": "est.",
         "fixTitle": "To fix it",
         "fixedToast": "{{date}}: {{corp}} bills that ore now.",
         "bookRight": "If the book is right: take this ore off your entry.",

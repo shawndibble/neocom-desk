@@ -340,7 +340,7 @@ export function useTaxColumns({
                 <span className="block">
                   <span className="block">{`${formatIsk(taxOwedOf(dr))} ISK`}</span>
                   <span className="block text-[0.6875rem] font-normal text-text-dim">
-                    {t('miningTax.corpBook.conflict.estimated')}
+                    {t('miningTax.corpBook.estimated')}
                   </span>
                 </span>
               ) : (

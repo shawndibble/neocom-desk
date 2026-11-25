@@ -2639,6 +2639,22 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     expect(closed.books[0].estimate).toBe(0);
   });
 
+  it('estimates nothing on an open day an officer already dismissed', () => {
+    const dismissed = withToday(30_000, {
+      dismissals: [
+        {
+          id: 'd1',
+          scope: 'record' as const,
+          targetId: `${ME}:1000:${TODAY}`,
+          by: 1,
+          at: '2026-10-18T09:00:00Z',
+          reason: 'Fleet op',
+        },
+      ],
+    });
+    expect(ofToday(overlay([today(30_000)], [dismissed]))).toEqual([]);
+  });
+
   it('leaves free ore on an open day a Pending corp record, never owed', () => {
     const out = overlay([entry({ date: TODAY })], [withToday(41_200)]);
     expect(ofToday(out)).toEqual([]);

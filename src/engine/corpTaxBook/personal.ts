@@ -399,6 +399,8 @@ export interface PersonalAccountStatus {
 export interface BookMinerRunningAccount {
   minerId: string;
   account: MinerRunningAccount;
+  /** What this Miner's open days' estimates still ask, after credit: owed on top of `account.owes`. */
+  estimate?: number;
   /** What the account bills: each Billable mined line and Adjustment, oldest first. */
   lines: BillableLine[];
   /** Its Late notices, oldest first. */
@@ -618,6 +620,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
         charge,
         observed,
         ...(entry ? { entry } : {}),
+        ...(dismissal ? { dismissal } : {}),
         oreLines: charge.oreLines,
       });
       continue;
@@ -689,12 +692,7 @@ const linesOfLeft = (left: ReadonlyMap<number, number>): OreLine[] =>
 
 /** What both hold of each ore type: the smaller quantity. */
 const intersectLines = (a: readonly OreLine[], b: readonly OreLine[]): OreLine[] =>
-  sumLines(a)
-    .map((l) => ({
-      typeId: l.typeId,
-      quantity: Math.min(l.quantity, b.find((x) => x.typeId === l.typeId)?.quantity ?? 0),
-    }))
-    .filter((l) => l.quantity > 0);
+  minusLines(a, minusLines(a, b));
 
 /**
  * The ore both the miner's allocations and one corporation line claim, capped at what the
@@ -1291,6 +1289,8 @@ export function overlayCorpBooks(input: {
           c.entry !== undefined &&
           entryKey(c.entry.characterId, c.entry.date, c.entry.solarSystemId) === key
       );
+      // An officer already dismissed the day: the book will not bill it, so nothing is estimated.
+      if (here.some((c) => c.dismissal)) continue;
       if (here.length > 0) {
         const pool = overlapPool(own);
         const { lines: taken } = takeOwnAllocations(
@@ -1429,18 +1429,19 @@ export function overlayCorpBooks(input: {
       .filter((r) => r.state === 'estimate')
       .sort((a, b) => a.date.localeCompare(b.date));
     for (const row of estimates) {
-      const have = credit.get(row.minerId ?? '') ?? 0;
+      const minerId = minerOfRow(p, row) ?? '';
+      const have = credit.get(minerId) ?? 0;
       const tax = row.taxOwed ?? 0;
       if (have < RESIDUE_ISK || tax <= 0) continue;
       const pay = Math.min(have, tax);
-      credit.set(row.minerId ?? '', have - pay);
+      credit.set(minerId, have - pay);
       if (tax - pay < RESIDUE_ISK) {
         Object.assign(row, { state: 'paid', taxOwed: 0 });
         continue;
       }
       const share = pay / tax;
       const paidLines = row.oreLines
-        .map((l) => ({ typeId: l.typeId, quantity: Math.round(l.quantity * share) }))
+        .map((l) => ({ typeId: l.typeId, quantity: Math.floor(l.quantity * share) }))
         .filter((l) => l.quantity > 0);
       pushRow({
         ...row,
@@ -1467,9 +1468,14 @@ export function overlayCorpBooks(input: {
   const summaries: BookSummary[] = prepared.map((p) => {
     const miners = minerRunningAccountsOf(p);
     const closedThrough = p.billableThrough;
-    const estimate = (rowsByBook.get(p.book.corporationId) ?? [])
-      .filter((r) => r.state === 'estimate')
-      .reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
+    const estimates = (rowsByBook.get(p.book.corporationId) ?? []).filter(
+      (r) => r.state === 'estimate'
+    );
+    const estimate = estimates.reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
+    for (const m of miners)
+      m.estimate = estimates
+        .filter((r) => minerOfRow(p, r) === m.minerId)
+        .reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
     return {
       corporationId: p.book.corporationId,
       corpName: p.book.corpName,
