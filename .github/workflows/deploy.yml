@@ -25,6 +25,8 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      # Read this run's artifact list (the wait below).
+      actions: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -102,6 +104,24 @@ jobs:
           # Default excludes dotfiles/dotdirs, silently dropping
           # dist/.well-known/assetlinks.json (Play Store TWA verification).
           include-hidden-files: true
+      # deploy-pages looks the artifact up by name the moment it starts, and the
+      # run's artifact list can lag the upload by a few seconds: on 2026-11-25
+      # three attempts in a row failed "No artifacts named github-pages-N"
+      # while the list already held it. Wait until the list shows it.
+      - name: Wait for the Pages artifact to be listed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: github-pages-${{ github.run_attempt }}
+        run: |
+          for i in $(seq 1 30); do
+            if gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+                --jq '.artifacts[].name' | grep -qx "$NAME"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::warning::$NAME not listed after 60s; deploying anyway"
       - uses: actions/deploy-pages@v4
         id: deployment
         with:
