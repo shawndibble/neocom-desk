@@ -5,6 +5,7 @@ import { iconButtonClassName } from './iconButtonClassName';
 import { menuItemClassName } from './menuStyles';
 import {
   controlHeightClassName,
+  grabberClassName,
   gripHitAreaClassName,
   tappableRowClassName,
   resizeHandleTouchClassName,
@@ -143,10 +144,21 @@ describe('touch tier', () => {
     expect(gripHitAreaClassName).not.toMatch(/before:(size|w|-inset-x|-left|-right)/);
   });
 
-  it('makes the resize separator itself 36px tall on touch, with its hairline centred', () => {
+  it('grows the resize grip itself to 36px on touch, and draws nothing over it', () => {
     expect(resizeHandleTouchClassName).toContain('touch:h-9');
-    expect(resizeHandleTouchClassName).toContain('touch:after:top-1/2');
+    // It used to drop the real border and redraw the hairline centred in the
+    // band. The grip now carries a `grabberClassName` mark on that centre
+    // line, and the two sat on top of each other — so the border stays put and
+    // this only grows the band (§6c: no overhang to enlarge a hit area).
+    expect(resizeHandleTouchClassName).not.toContain('after:');
     expect(resizeHandleTouchClassName).not.toContain('before:');
+  });
+
+  it('draws one grabber mark for every draggable overlay edge', () => {
+    // `Modal`'s sheet and the CompareDrawer's resize grip both take this, so
+    // the mark §6c describes as one cue cannot drift into two.
+    expect(grabberClassName).toContain('rounded-full');
+    expect(grabberClassName).toContain('bg-line-bright');
   });
 
   it('declares the touch variant against a coarse pointer', () => {
