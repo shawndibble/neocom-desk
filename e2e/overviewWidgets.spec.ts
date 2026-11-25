@@ -201,7 +201,9 @@ test('phone Customize is a reorder and remove list with 36px targets', async ({ 
   await signInAndGoto(page, './overview', SCOPES, THREE);
   await expect(card(page, 'Training')).toBeVisible(FIRST_LOAD);
 
-  await page.locator('main').getByRole('button', { name: 'Customize' }).click();
+  // Below `md` Customize is an item of the header's ⋮ menu.
+  await page.locator('main').getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Customize' }).click();
   await expect(page.getByText(/set on a larger screen/i)).toBeVisible();
   const remove = page.getByRole('button', { name: 'Remove Training' });
   await expect(remove).toBeVisible();
