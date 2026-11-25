@@ -15,8 +15,8 @@
 
 import type { CharacterBoardItem, CharacterBoardItemKind } from './board';
 import { CHARACTER_BOARD_ITEM_KINDS } from './board';
-import { dayStart, localMidnight, nextDay, type DayZone } from '../localDay';
 import { DAY_MS } from '@/lib/age';
+import { dayStart, localMidnight, nextDay, type DayZone } from '../localDay';
 
 export { localMidnight };
 
@@ -94,28 +94,33 @@ export function groupByDay(items: readonly CharacterBoardItem[], zone?: DayZone)
 }
 
 /**
- * Overdue for longer than this, an item folds into the rail's one summary row (and the Overview's
- * Calendar widget leaves it out): a month of extractors nobody restarted must not open the agenda
- * above everything current.
+ * The rail's overdue items from before today, apart from the rest: past their deadline and due on
+ * an earlier calendar day than `nowMs`'s (cut on `zone`, the Time format clock). A month of PI
+ * extractors nobody restarted would otherwise open the agenda above everything current, and
+ * yesterday's missed event is history, not an agenda item; the rail folds these into one summary
+ * row (and the Overview's Calendar widget leaves them out). Items that went overdue today stay in
+ * place. Both halves keep board order, so `beforeToday` runs oldest first.
  */
-export const LONG_OVERDUE_MS = 2 * DAY_MS;
-
-/**
- * The rail's long-overdue items apart from the rest: past their deadline by more than
- * `windowMs`. A month of PI extractors nobody restarted would otherwise open the agenda above
- * everything current; the rail folds these into one summary row. Recently overdue items stay
- * in place. Both halves keep board order, so `longOverdue` runs oldest first.
- */
-export function splitLongOverdue(
+export function splitOverdueBeforeToday(
   items: readonly CharacterBoardItem[],
   nowMs: number,
-  windowMs: number
-): { longOverdue: CharacterBoardItem[]; rest: CharacterBoardItem[] } {
-  const longOverdue: CharacterBoardItem[] = [];
+  zone: DayZone
+): { beforeToday: CharacterBoardItem[]; rest: CharacterBoardItem[] } {
+  const todayStartMs = dayStart(nowMs, zone);
+  const beforeToday: CharacterBoardItem[] = [];
   const rest: CharacterBoardItem[] = [];
   for (const item of items)
-    (item.remainingMs <= 0 && nowMs - item.deadlineMs > windowMs ? longOverdue : rest).push(item);
-  return { longOverdue, rest };
+    (item.remainingMs <= 0 && item.deadlineMs < todayStartMs ? beforeToday : rest).push(item);
+  return { beforeToday, rest };
+}
+
+/**
+ * How many calendar days before `nowMs`'s day the item's day falls (cut on `zone`): 1 for anything
+ * due yesterday, even a minute before midnight. Elapsed 24-hour periods would read 0 for an item
+ * the fold already treats as "before today". Rounded because a DST day is 23 or 25 hours.
+ */
+export function calendarDaysBefore(deadlineMs: number, nowMs: number, zone: DayZone): number {
+  return Math.round((dayStart(nowMs, zone) - dayStart(deadlineMs, zone)) / DAY_MS);
 }
 
 /**

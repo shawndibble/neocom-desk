@@ -543,11 +543,11 @@ describe('comingUp (the Calendar widget)', () => {
     expect(subjects(view)).toEqual(['Event 1']);
   });
 
-  it('keeps a recently overdue clock with its past label, and drops one overdue for days', () => {
+  it('keeps a recently overdue clock with its past label, and drops one overdue from before today', () => {
     const feeds: Feeds = {
       calendar: board({ industryJobs: [job(7, -1), job(8, -72), job(9, 4)] }),
     };
-    const view = buildView('comingUp', feeds, ctx());
+    const view = buildView('comingUp', feeds, ctx({ zone: 'UTC' }));
     expect(subjects(view)).toEqual(['Job 7', 'Job 9']);
     expect(view.table?.rows[0]?.cells[1]).toBe('calendar.detail.industryJob.ready');
     // The headline is the next clock still ahead.

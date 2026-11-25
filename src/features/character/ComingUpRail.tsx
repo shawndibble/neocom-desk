@@ -8,8 +8,8 @@
  * a view switcher (see the scope decision).
  *
  * Grouping only; the ordering is `engine/character/board.ts`'s and is never
- * re-derived here. Items overdue for over `LONG_OVERDUE_MS` fold into one
- * summary row at the top ("Overdue over 2 days · oldest 31 days", with the
+ * re-derived here. Items overdue from before today fold into one
+ * summary row at the top ("Overdue before today · oldest 31 days", with the
  * count), which expands in place (§6c's leading caret); a picked day folds
  * nothing.
  */
@@ -19,13 +19,12 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure, EmptyState, LiveStatus, Panel, textActionClassName } from '@/components/ui';
 import type { CharacterBoardItem } from '@/engine/character/board';
-import { DAY_MS } from '@/lib/age';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
+  calendarDaysBefore,
   groupByDay,
   relativeDayFor,
-  LONG_OVERDUE_MS,
-  splitLongOverdue,
+  splitOverdueBeforeToday,
   type DayGroup,
 } from '@/engine/character/deadlines';
 import { CalendarClocks } from './CalendarClocks';
@@ -56,14 +55,14 @@ export function ComingUpRail({
 }: ComingUpRailProps) {
   const { t, i18n } = useTranslation();
   const zone = useTimeZone();
-  const [showLongOverdue, setShowLongOverdue] = useState(false);
+  const [showBeforeToday, setShowBeforeToday] = useState(false);
   // A picked day shows all of that day: the pilot asked for it.
-  const { longOverdue, rest } = useMemo(
+  const { beforeToday, rest } = useMemo(
     () =>
       selectedDayMs === null
-        ? splitLongOverdue(items, nowMs, LONG_OVERDUE_MS)
-        : { longOverdue: [], rest: [...items] },
-    [items, nowMs, selectedDayMs]
+        ? splitOverdueBeforeToday(items, nowMs, zone)
+        : { beforeToday: [], rest: [...items] },
+    [items, nowMs, selectedDayMs, zone]
   );
   // One sharing corporation across the list: name it once in the header, not on every row.
   const soleSharer = useMemo(() => {
@@ -71,7 +70,7 @@ export function ComingUpRail({
     return names.size === 1 ? [...names][0] : null;
   }, [items]);
   const groups = useMemo(() => groupByDay(rest, zone), [rest, zone]);
-  const longOverdueGroups = useMemo(() => groupByDay(longOverdue, zone), [longOverdue, zone]);
+  const beforeTodayGroups = useMemo(() => groupByDay(beforeToday, zone), [beforeToday, zone]);
 
   const dayHeading = useMemo(() => {
     const formatter = new Intl.DateTimeFormat(i18n.language, {
@@ -127,21 +126,22 @@ export function ComingUpRail({
     <EmptyState title={t('calendar.rail.noKinds')} hint={t('calendar.rail.noKindsHint')} />
   ) : items.length > 0 ? (
     <ul aria-label={t('calendar.rail.title')}>
-      {longOverdue.length > 0 && (
+      {beforeToday.length > 0 && (
         <li>
           <Disclosure
             className="border-b border-line"
-            label={t('calendar.rail.longOverdue', {
-              count: Math.floor(
-                (nowMs - Math.min(...longOverdue.map((i) => i.deadlineMs))) / DAY_MS
+            label={t('calendar.rail.overdueBeforeToday', {
+              count: calendarDaysBefore(
+                Math.min(...beforeToday.map((i) => i.deadlineMs)),
+                nowMs,
+                zone
               ),
-              windowDays: LONG_OVERDUE_MS / DAY_MS,
             })}
-            trailing={longOverdue.length}
-            expanded={showLongOverdue}
-            onToggle={() => setShowLongOverdue((open) => !open)}
+            trailing={beforeToday.length}
+            expanded={showBeforeToday}
+            onToggle={() => setShowBeforeToday((open) => !open)}
           >
-            <ul>{longOverdueGroups.map(dayGroup)}</ul>
+            <ul>{beforeTodayGroups.map(dayGroup)}</ul>
           </Disclosure>
         </li>
       )}

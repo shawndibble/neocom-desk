@@ -19,7 +19,7 @@ import {
   pastDeadlineLabelKey,
   type CharacterBoardItem,
 } from '@/engine/character/board';
-import { filterByKinds, LONG_OVERDUE_MS, splitLongOverdue } from '@/engine/character/deadlines';
+import { filterByKinds, splitOverdueBeforeToday } from '@/engine/character/deadlines';
 import { boardSourcesWithSharedPops } from '@/features/character/calendarSharedPops';
 import { DEFAULT_SHARED_POP_TIME } from '@/features/character/calendarSharedPopTime';
 import { shownKinds } from '@/features/character/calendarKindFilter';
@@ -266,12 +266,12 @@ const isCommitted = (item: CharacterBoardItem) =>
 
 /**
  * The Calendar widget (kind id `comingUp`): the Calendar page's agenda, the same rows as its
- * Coming Up Rail, less the kinds this widget hides and anything overdue for days (the rail folds
- * those away). The Events choice narrows calendar events only.
+ * Coming Up Rail, less the kinds this widget hides and anything overdue from before today (the rail
+ * folds those away). The Events choice narrows calendar events only.
  */
 export const comingUp: Builder = (
   feeds,
-  { t, now, calendarEvents, hiddenKinds = [], sharedPopTime = DEFAULT_SHARED_POP_TIME }
+  { t, now, zone, calendarEvents, hiddenKinds = [], sharedPopTime = DEFAULT_SHARED_POP_TIME }
 ) => {
   const feed = feeds.calendar;
   const data = feed?.data ?? null;
@@ -283,12 +283,12 @@ export const comingUp: Builder = (
   });
   const all = calendarEvents === 'all';
   const shown = shownKinds(hiddenKinds);
-  const items = splitLongOverdue(
+  const items = splitOverdueBeforeToday(
     filterByKinds(board, shown).filter(
       (item) => all || item.kind !== 'calendarEvent' || isCommitted(item)
     ),
     now,
-    LONG_OVERDUE_MS
+    zone
   ).rest;
   const next = items.find((item) => item.deadlineMs > now);
   const laterToday = items.filter(
