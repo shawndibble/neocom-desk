@@ -830,14 +830,22 @@ export function previewTakeover(
 
 /**
  * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
- * missing: the book holds the miner's ore at that refinery on a later day, or a day has passed
- * since the day ended. A sync soon after the day closes can predate the log's last writes.
+ * missing: the book holds the miner's ore on a later day at every refinery they mined at in that
+ * system that day (the excess can't be tied to one), or a day has passed since the day ended. A
+ * sync soon after the day closes can predate the log's last writes.
  */
 function isSettled(book: PersonalBook, charge: PreparedCharge, now: string): boolean {
-  const { characterId, structureId, date } = charge.observed;
+  const { characterId, solarSystemId, date } = charge.observed;
   if (Date.parse(now) >= Date.parse(dayClosesAt(date, 0)) + DAY_MS) return true;
-  return book.observed.some(
-    (o) => o.characterId === characterId && o.structureId === structureId && o.date > date
+  const mine = book.observed.filter((o) => o.characterId === characterId);
+  const refineries = new Set(
+    mine
+      .filter((o) => o.date === date && o.solarSystemId === solarSystemId)
+      .map((o) => o.structureId)
+  );
+  refineries.add(charge.observed.structureId);
+  return [...refineries].every((structureId) =>
+    mine.some((o) => o.structureId === structureId && o.date > date)
   );
 }
 

@@ -79,12 +79,12 @@ export function CorpBookSyncNote({
   if (!hasWords) return null;
 
   // A closed day whose ore is still Settling is not safe yet: more of it may still be billed.
-  const settling = closedThrough !== undefined && book.settlingFrom !== undefined;
+  const settlingFrom = closedThrough !== undefined ? book.settlingFrom : undefined;
   const safe =
     owedNow > 0 || book.pendingFrom !== undefined
-      ? settling
+      ? settlingFrom
         ? t(`miningTax.corpBook.sync.settling${here}`, {
-            date: shortDate(book.settlingFrom!, i18n.language),
+            date: shortDate(settlingFrom, i18n.language),
             corp: corpName,
             ago,
           })
@@ -105,7 +105,9 @@ export function CorpBookSyncNote({
     <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
       {safe && (
         <span
-          className={closedThrough && !settling ? 'font-semibold text-success' : 'text-text-dim'}
+          className={
+            closedThrough && !settlingFrom ? 'font-semibold text-success' : 'text-text-dim'
+          }
         >
           {safe}
         </span>

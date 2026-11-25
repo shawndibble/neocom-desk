@@ -1793,6 +1793,16 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         expect(statesOf(overlay([overListed()], [b]))).toEqual(['settling']);
       });
 
+      it('keeps Settling until every refinery the miner used that day has later ore', () => {
+        const other = { ...book().observed[0], structureId: 1001, oreLines: [] };
+        const b = (observed: PersonalBook['observed']) =>
+          book({ ownPayeeIds: ['bmw'], observed: [...book().observed, other, ...observed] });
+        expect(statesOf(overlay([overListed()], [b([later(1000)])]))).toEqual(['settling']);
+        expect(statesOf(overlay([overListed()], [b([later(1000), later(1001)])]))).toEqual([
+          'conflict',
+        ]);
+      });
+
       it('settles a day after the day ended, with no later ore', () => {
         expect(
           statesOf(
