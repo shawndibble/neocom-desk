@@ -290,36 +290,108 @@ describe('CompareDrawer', () => {
     expect(handle).toHaveFocus();
   });
 
-  it('expands to a full view and back', async () => {
+  it('offers no Expand or Restore button — the grip is the only pointer path to a height', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     renderDrawer();
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
 
-    await user.click(screen.getByRole('button', { name: 'Expand' }));
-    expect(region.style.height).toBe('80vh');
+    expect(within(region).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Clear all' })).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Restore' }));
-    expect(region.style.height).not.toBe('80vh');
+  it('clamps the drag to the viewport ceiling rather than letting it cover the handle', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    fireEvent.pointerDown(grip, { clientY: 400 });
+    fireEvent.pointerMove(window, { clientY: -5000 });
+    fireEvent.pointerUp(window);
+
+    const ceiling = Math.round(window.innerHeight * 0.8);
+    expect(region.style.height).toBe(`${ceiling}px`);
+    expect(grip).toHaveAttribute('aria-valuemax', String(ceiling));
+    expect(grip).toHaveAttribute('aria-valuenow', String(ceiling));
+  });
+
+  it('closes when the drag carries the commit distance past the minimum height', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    const handle = screen.getByRole('button', { name: 'Compare (1)' });
+    await user.click(handle);
+    const grip = await screen.findByRole('separator', { name: 'Resize the drawer' });
+
+    // Down 250px from the 280px default lands 130px under the 160px minimum.
+    fireEvent.pointerDown(grip, { clientY: 400 });
+    fireEvent.pointerMove(window, { clientY: 650 });
+    fireEvent.pointerUp(window);
+
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    // Focus comes back to the handle, which is where the grip's drag left it.
+    expect(handle).toHaveFocus();
+  });
+
+  it('stops shrinking at the minimum, slides toward the edge, and springs back under the commit distance', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    // Down 160px: the height floors at 160px and the rest becomes travel.
+    fireEvent.pointerDown(grip, { clientY: 400 });
+    fireEvent.pointerMove(window, { clientY: 560 });
+    expect(region.style.height).toBe('160px');
+    expect(region.style.transform).toBe('translateY(40px)');
+    expect(region.style.transition).toBe('none');
+
+    fireEvent.pointerUp(window);
+
+    expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
+    expect(region.style.transform).toBe('');
+    expect(region.style.transition).toBe('transform 240ms var(--motion-ease-out)');
+  });
+
+  it('resizes from the keyboard, and ArrowDown at the minimum never closes it (WCAG 2.5.7)', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    fireEvent.keyDown(grip, { key: 'ArrowUp' });
+    expect(region.style.height).toBe('304px');
+
+    fireEvent.keyDown(grip, { key: 'End' });
+    expect(region.style.height).toBe(`${Math.round(window.innerHeight * 0.8)}px`);
+
+    fireEvent.keyDown(grip, { key: 'Home' });
+    expect(region.style.height).toBe('160px');
+
+    fireEvent.keyDown(grip, { key: 'ArrowDown' });
+    expect(region.style.height).toBe('160px');
+    expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
   });
 
   it('publishes its clearance and bottom space on the root, and removes both on unmount (WCAG 2.4.11)', async () => {
-    const user = userEvent.setup();
     const rootStyle = document.documentElement.style;
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     const { unmount } = renderDrawer();
     expect(rootStyle.getPropertyValue('--compare-drawer-clearance')).not.toBe('');
-    // Normal state: the page reserves everything the bar covers.
-    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toBe(
-      'var(--compare-drawer-clearance, 0px)'
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
-    await user.click(await screen.findByRole('button', { name: 'Expand' }));
-    // Expand covers the page: real space shrinks to the handle, not 80vh.
+    // The page reserves what the bar covers, capped at the handle plus a
+    // default-height drawer: free dragging must not pad `main` by 80vh of
+    // blank scroll, and `min()` saturates instead of switching mid-drag.
     expect(rootStyle.getPropertyValue('--compare-drawer-space')).toMatch(
-      /^calc\(\d+(\.\d+)?px \+ 0\.75rem\)$/
+      /^min\(var\(--compare-drawer-clearance, 0px\), calc\(\d+(\.\d+)?px \+ 0\.75rem\)\)$/
     );
 
     unmount();
@@ -466,18 +538,21 @@ describe('CompareDrawer', () => {
     ).toBeInTheDocument();
   });
 
-  it('a later openIn call does not collapse an already-expanded drawer', async () => {
+  it('a later openIn call does not reset a height the reader has dragged', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     renderDrawer();
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
-    await user.click(within(region).getByRole('button', { name: 'Expand' }));
-    expect(region.style.height).toBe('80vh');
+    const grip = within(region).getByRole('separator', { name: 'Resize the drawer' });
+    fireEvent.pointerDown(grip, { clientY: 400 });
+    fireEvent.pointerMove(window, { clientY: 300 });
+    fireEvent.pointerUp(window);
+    expect(region.style.height).toBe('380px');
 
     act(() => useCompareSet.getState().openIn('attributes'));
 
-    expect(region.style.height).toBe('80vh');
+    expect(region.style.height).toBe('380px');
   });
 
   it('a handled open request does not reopen the drawer on a later remount (leaving Market and coming back)', async () => {
@@ -512,7 +587,7 @@ describe('CompareDrawer', () => {
   });
 
   describe('below md', () => {
-    it('opens as a full-screen sheet with no resize bar or Expand, Clear all in the overflow menu', async () => {
+    it('opens as a full-screen sheet with no resize grip, Clear all in the overflow menu', async () => {
       narrowState.narrow = true;
       const user = userEvent.setup();
       act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
@@ -525,7 +600,6 @@ describe('CompareDrawer', () => {
       expect(
         screen.queryByRole('separator', { name: 'Resize the drawer' })
       ).not.toBeInTheDocument();
-      expect(within(region).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
       expect(within(region).queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
       expect(within(region).getByText(/^Prices from /)).toBeInTheDocument();
 
