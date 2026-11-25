@@ -73,7 +73,7 @@ export function PromoVideo({ plays, onPlay }: { plays: number; onPlay: () => voi
             className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg/45 motion-safe:transition-[background-color] group-hover:bg-bg/25"
           >
             <span className="flex size-16 items-center justify-center rounded-full bg-accent text-bg shadow-lg motion-safe:transition-transform group-hover:scale-105 sm:size-20">
-              <PlayVideo size={ICON_SIZE.lg} />
+              <PlayVideo size={ICON_SIZE.lg} aria-hidden="true" />
             </span>
             <span className="rounded-xs bg-bg/80 px-2 py-0.5 font-mono text-xs text-text">
               {duration}
