@@ -15,14 +15,7 @@
 import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import {
@@ -40,14 +33,14 @@ import * as Icon from '@/components/ui/icons';
 import {
   controlHeightClassName,
   focusRingInsetClassName,
+  grabberClassName,
   resizeHandleTouchClassName,
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
-import { SWIPE_DISMISS_DISTANCE } from '@/components/ui/useSheetSwipe';
+import { useDrawerResize } from '@/components/ui/useDrawerResize';
 import { MarketItemLink } from './MarketItemLink';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
 import { useCompareSet } from './compareSet';
@@ -85,20 +78,6 @@ const STEP = 24;
  * button did (decision `20261125-211649-compare-drawer-is-dragged-to-size-with-no`).
  */
 const MAX_HEIGHT_FRACTION = 0.8;
-
-/**
- * Tallest the drawer may be drawn right now. Viewport-derived rather than the
- * fixed 560px ceiling this replaced: a fixed number either stops well short of
- * a tall monitor or, in a short window, lets the drawer cover its own handle.
- */
-function maxHeight(): number {
-  if (typeof window === 'undefined') return MIN_HEIGHT;
-  return Math.max(MIN_HEIGHT, Math.round(window.innerHeight * MAX_HEIGHT_FRACTION));
-}
-
-function clampHeight(value: number, max: number): number {
-  return Math.min(max, Math.max(MIN_HEIGHT, value));
-}
 
 const VIEW_LABEL_KEYS = {
   prices: 'viewPrices',
@@ -145,14 +124,6 @@ export function CompareDrawer({
   // drawer (a fresh Variations "Compare" click going from an empty Compare
   // Set), so it opens already open.
   const [open, setOpen] = useState(() => useCompareSet.getState().openRequest > 0);
-  const [heightPx, setHeightPx] = useState(DEFAULT_HEIGHT);
-  const [maxPx, setMaxPx] = useState(maxHeight);
-  // How far a drag has pulled the drawer past `MIN_HEIGHT`: it stops shrinking
-  // there and slides toward the bottom edge by this much instead, so one
-  // gesture covers "shorter" and "away" (§6c) without an Expand button.
-  const [pulled, setPulled] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const reducedMotion = usePrefersReducedMotion();
   // Below `md` an open drawer is a full-screen sheet, not a resizable strip:
   // a phone has no order book worth keeping in view beside it, and a 280px
   // strip above the bottom nav showed about one item.
@@ -161,47 +132,30 @@ export function CompareDrawer({
   const handleRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  // Removes the in-flight drag's window listeners — called on release, and on
-  // unmount for a drag the drawer never saw the end of.
-  const endDragRef = useRef<(() => void) | null>(null);
-  useEffect(() => () => endDragRef.current?.(), []);
-
-  // The ceiling follows the viewport, and a window shrunk under the current
-  // height brings the drawer down with it rather than leaving it off screen.
-  useEffect(() => {
-    const onResize = () => {
-      const max = maxHeight();
-      setMaxPx(max);
-      setHeightPx((h) => clampHeight(h, max));
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+  // The drag, and its keyboard equivalents. Disabled under the full-screen
+  // sheet, which has no grip and no height to pick.
+  const resize = useDrawerResize({
+    min: MIN_HEIGHT,
+    initial: DEFAULT_HEIGHT,
+    step: STEP,
+    maxFraction: MAX_HEIGHT_FRACTION,
+    onDismiss: () => close(),
+    enabled: open && !fullScreen,
+  });
   // Fixed over the page bottom: publish what it covers so focus scrolls clear
   // (WCAG 2.4.11).
   useStickyClearance(wrapperRef, 'compare-drawer');
-  // Real bottom space for `main` (Layout.tsx), so the page tail can scroll
-  // above the bar — but capped at the handle plus a default-height drawer.
-  // Dragging is free now, and reserving 80vh of empty page below the content
-  // for a drawer the reader has deliberately pulled over it is not what they
-  // asked for. `min()` saturates rather than switching at a threshold, so the
-  // page never re-lays-out mid-drag the way the old Expand mode made it.
+  // Real bottom space for `main` (Layout.tsx), so the page tail scrolls clear
+  // of the bar — all of what it covers, at every height. The old two-tier
+  // publish existed only because Expand jumped to 80vh in one click, and
+  // padding `main` by 80vh of blank scroll was not what that click asked for.
+  // With the height dragged by hand that case is gone: a reader who pulls the
+  // drawer over the page can pull it back, while capping the reservation left
+  // the content under a tall drawer impossible to scroll into view.
   useEffect(() => {
     const rootStyle = document.documentElement.style;
-    const publish = () => {
-      const handle = handleRef.current;
-      const covered = handle
-        ? Math.max(0, window.innerHeight - handle.getBoundingClientRect().top)
-        : 0;
-      rootStyle.setProperty(
-        '--compare-drawer-space',
-        `min(var(--compare-drawer-clearance, 0px), calc(${covered + DEFAULT_HEIGHT}px + 0.75rem))`
-      );
-    };
-    publish();
-    window.addEventListener('resize', publish);
+    rootStyle.setProperty('--compare-drawer-space', 'var(--compare-drawer-clearance, 0px)');
     return () => {
-      window.removeEventListener('resize', publish);
       rootStyle.removeProperty('--compare-drawer-space');
     };
   }, []);
@@ -310,54 +264,6 @@ export function CompareDrawer({
   function close() {
     focusHandleOnClose.current = true;
     setOpen(false);
-  }
-
-  /**
-   * The grip's drag: up and down sets any height between `MIN_HEIGHT` and the
-   * viewport ceiling, and carrying the pull `SWIPE_DISMISS_DISTANCE` past the
-   * minimum closes the drawer on release — the same 80px commit a sheet swipe
-   * uses, so the one gesture both resizes and dismisses. No velocity test: a
-   * sheet's flick is a thumb gesture, while this grip is aimed with a mouse,
-   * where a deliberate overshoot reads better than a fast one. The arrow keys
-   * below, the ✕, Escape and the handle all remain, so neither the resize nor
-   * the dismissal is drag-only (WCAG 2.5.7).
-   */
-  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const drag = { startY: event.clientY, startHeight: heightPx, max: maxPx, pulled: 0 };
-    setDragging(true);
-    function detach() {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      endDragRef.current = null;
-    }
-    function onMove(moveEvent: PointerEvent) {
-      const raw = drag.startHeight + (drag.startY - moveEvent.clientY);
-      drag.pulled = Math.max(0, MIN_HEIGHT - raw);
-      setHeightPx(clampHeight(raw, drag.max));
-      setPulled(drag.pulled);
-    }
-    function onUp() {
-      detach();
-      setDragging(false);
-      setPulled(0);
-      if (drag.pulled >= SWIPE_DISMISS_DISTANCE) close();
-    }
-    endDragRef.current = detach;
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  }
-
-  /** The non-dragging path to every height the grip can reach. */
-  function onHandleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    const resize = (next: number) => {
-      event.preventDefault();
-      setHeightPx(clampHeight(next, maxPx));
-    };
-    if (event.key === 'ArrowUp') resize(heightPx + STEP);
-    else if (event.key === 'ArrowDown') resize(heightPx - STEP);
-    else if (event.key === 'Home') resize(MIN_HEIGHT);
-    else if (event.key === 'End') resize(maxPx);
   }
 
   const marginFor = useCallback(
@@ -541,43 +447,47 @@ export function CompareDrawer({
               close();
             }
           }}
-          style={
-            fullScreen
-              ? undefined
-              : {
-                  height: heightPx,
-                  // Follows the pointer with no transition while the grip is
-                  // held; the snap back after a pull that didn't commit is
-                  // animated, and reduced motion takes neither.
-                  transform: pulled > 0 ? `translateY(${pulled}px)` : undefined,
-                  transition:
-                    dragging || reducedMotion ? 'none' : 'transform 240ms var(--motion-ease-out)',
-                }
-          }
+          style={fullScreen ? undefined : resize.style}
           className={`flex flex-col border-line bg-panel ${fullScreen ? 'motion-rise-full fixed inset-0 h-dvh pb-[env(safe-area-inset-bottom)]' : 'motion-rise border border-b-0'}`}
         >
           {!fullScreen && (
-            // The visible grip §6c's drag rule requires, and now the only
-            // pointer path to the drawer's height: a sheet's grabber mark on a
-            // band wide enough to aim at with a mouse, growing to a 36px one on
-            // touch (`resizeHandleTouchClassName`). Focusable, so it carries
-            // the shared focus ring.
+            // The visible grip §6c's drag rule requires, carrying a sheet's
+            // grabber mark (`grabberClassName`, the same mark `Modal` draws).
+            // 24px so a pointer can hit it without the pseudo-element overhang
+            // §6c forbids, 36px on touch; the header below is a drag zone too,
+            // so "drag the drawer" also works where the reader is looking.
+            // Focusable, so it carries the shared focus ring and the keys.
             <div
               role="separator"
               aria-orientation="horizontal"
               aria-label={t('market.compare.resize')}
-              aria-valuenow={heightPx}
+              aria-valuenow={resize.height}
               aria-valuemin={MIN_HEIGHT}
-              aria-valuemax={maxPx}
+              aria-valuemax={resize.max}
               tabIndex={0}
-              onPointerDown={startDrag}
-              onKeyDown={onHandleKeyDown}
-              className={`flex h-3 shrink-0 cursor-row-resize touch-none items-center justify-center border-b border-line hover:bg-panel-2 ${focusRingInsetClassName} ${resizeHandleTouchClassName}`}
+              {...resize.dragProps}
+              onKeyDown={resize.onKeyDown}
+              className={cx(
+                'flex h-6 shrink-0 cursor-row-resize touch-none items-center justify-center border-b border-line hover:bg-panel-2',
+                focusRingInsetClassName,
+                resizeHandleTouchClassName
+              )}
             >
-              <span aria-hidden="true" className="h-1 w-10 rounded-full bg-line-bright" />
+              <span aria-hidden="true" className={grabberClassName} />
             </div>
           )}
-          <header className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1">
+          <header
+            // A second drag zone, so the reader can grab the drawer's top edge
+            // rather than aim at the grip alone. Past §6c's 4px activation
+            // distance the gesture captures the pointer, so a press on a
+            // control in here still reaches it — the same trade `Modal` makes
+            // for a sheet's header. Never the scrolled body below.
+            {...(fullScreen ? {} : resize.dragProps)}
+            className={cx(
+              'flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1',
+              !fullScreen && 'touch-none'
+            )}
+          >
             <div className="flex items-center gap-2">
               <h2
                 ref={headingRef}

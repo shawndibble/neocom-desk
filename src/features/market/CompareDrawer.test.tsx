@@ -45,6 +45,16 @@ const mockedLoadModifiers = vi.mocked(loadCharacterModifiers);
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadSkills = vi.mocked(loadSkills);
 
+/**
+ * One drag, on the element itself: the gesture captures the pointer and
+ * handles it with React handlers, so firing on `window` reaches nothing.
+ */
+function drag(zone: HTMLElement, fromY: number, toY: number) {
+  fireEvent.pointerDown(zone, { clientY: fromY });
+  fireEvent.pointerMove(zone, { clientY: toY });
+  fireEvent.pointerUp(zone, { clientY: toY });
+}
+
 const REGION_ID = 10000002;
 const ITEM_A = { typeId: 34, itemName: 'Tritanium' };
 const ITEM_B = { typeId: 35, itemName: 'Pyerite' };
@@ -310,9 +320,7 @@ describe('CompareDrawer', () => {
     const region = await screen.findByRole('region', { name: 'Compare' });
     const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
 
-    fireEvent.pointerDown(grip, { clientY: 400 });
-    fireEvent.pointerMove(window, { clientY: -5000 });
-    fireEvent.pointerUp(window);
+    drag(grip, 400, -5000);
 
     const ceiling = Math.round(window.innerHeight * 0.8);
     expect(region.style.height).toBe(`${ceiling}px`);
@@ -329,11 +337,13 @@ describe('CompareDrawer', () => {
     const grip = await screen.findByRole('separator', { name: 'Resize the drawer' });
 
     // Down 250px from the 280px default lands 130px under the 160px minimum.
-    fireEvent.pointerDown(grip, { clientY: 400 });
-    fireEvent.pointerMove(window, { clientY: 650 });
-    fireEvent.pointerUp(window);
+    drag(grip, 400, 650);
 
-    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    // The committed pull slides the drawer off the bottom edge first — closing
+    // on release would unmount the box before the slide could be seen.
+    expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.queryByRole('region')).not.toBeInTheDocument());
     // Focus comes back to the handle, which is where the grip's drag left it.
     expect(handle).toHaveFocus();
   });
@@ -348,16 +358,47 @@ describe('CompareDrawer', () => {
 
     // Down 160px: the height floors at 160px and the rest becomes travel.
     fireEvent.pointerDown(grip, { clientY: 400 });
-    fireEvent.pointerMove(window, { clientY: 560 });
+    fireEvent.pointerMove(grip, { clientY: 560 });
     expect(region.style.height).toBe('160px');
     expect(region.style.transform).toBe('translateY(40px)');
     expect(region.style.transition).toBe('none');
 
-    fireEvent.pointerUp(window);
+    fireEvent.pointerUp(grip, { clientY: 560 });
 
     expect(screen.getByRole('region', { name: 'Compare' })).toBeInTheDocument();
     expect(region.style.transform).toBe('');
-    expect(region.style.transition).toBe('transform 240ms var(--motion-ease-out)');
+    // The snap back decelerates on the shared token, not a hardcoded 240ms.
+    expect(region.style.transition).toBe(
+      'transform var(--motion-slow-exit) var(--motion-ease-out)'
+    );
+  });
+
+  it('ignores a press that moves less than the activation distance (§6c)', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    const grip = screen.getByRole('separator', { name: 'Resize the drawer' });
+
+    // 3px, under the 4px slop: nothing latches, so a press on a drag zone
+    // still reaches whatever control it landed on.
+    drag(grip, 400, 397);
+
+    expect(region.style.height).toBe('280px');
+    expect(region.style.transform).toBe('');
+  });
+
+  it('drags from the header too, so the whole top edge of the drawer resizes it', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    drag(region.querySelector('header')!, 400, 300);
+
+    expect(region.style.height).toBe('380px');
   });
 
   it('resizes from the keyboard, and ArrowDown at the minimum never closes it (WCAG 2.5.7)', async () => {
@@ -387,11 +428,9 @@ describe('CompareDrawer', () => {
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     const { unmount } = renderDrawer();
     expect(rootStyle.getPropertyValue('--compare-drawer-clearance')).not.toBe('');
-    // The page reserves what the bar covers, capped at the handle plus a
-    // default-height drawer: free dragging must not pad `main` by 80vh of
-    // blank scroll, and `min()` saturates instead of switching mid-drag.
-    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toMatch(
-      /^min\(var\(--compare-drawer-clearance, 0px\), calc\(\d+(\.\d+)?px \+ 0\.75rem\)\)$/
+    // The page reserves everything the bar covers, at every height.
+    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toBe(
+      'var(--compare-drawer-clearance, 0px)'
     );
 
     unmount();
@@ -407,9 +446,7 @@ describe('CompareDrawer', () => {
     const region = await screen.findByRole('region', { name: 'Compare' });
     const handleBar = screen.getByRole('separator', { name: 'Resize the drawer' });
 
-    fireEvent.pointerDown(handleBar, { clientY: 400 });
-    fireEvent.pointerMove(window, { clientY: 300 });
-    fireEvent.pointerUp(window);
+    drag(handleBar, 400, 300);
 
     expect(region).toHaveStyle({ height: '380px' });
   });
@@ -545,9 +582,7 @@ describe('CompareDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
     const grip = within(region).getByRole('separator', { name: 'Resize the drawer' });
-    fireEvent.pointerDown(grip, { clientY: 400 });
-    fireEvent.pointerMove(window, { clientY: 300 });
-    fireEvent.pointerUp(window);
+    drag(grip, 400, 300);
     expect(region.style.height).toBe('380px');
 
     act(() => useCompareSet.getState().openIn('attributes'));

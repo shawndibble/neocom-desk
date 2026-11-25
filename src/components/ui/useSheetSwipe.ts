@@ -11,28 +11,37 @@ import {
 export const SWIPE_DISMISS_DISTANCE = 80;
 /** Release speed past which a short swipe still dismisses, in px/ms. */
 export const SWIPE_DISMISS_VELOCITY = 0.5;
-/** Movement before a press counts as a drag, so a tap on the ✕ still clicks. */
-const DRAG_SLOP = 4;
+/**
+ * Movement before a press counts as a drag, so a tap on the ✕ still clicks —
+ * DESIGN.md §6c's 4px activation distance. Shared with `useDrawerResize`, so
+ * both gestures latch at the same distance.
+ */
+export const DRAG_SLOP = 4;
 
 /** A release this long after the last move ignores velocity. */
 const VELOCITY_WINDOW_MS = 100;
 
-/** How long a released sheet takes to slide off the bottom before it closes: `--motion-slow-exit`. */
-const DISMISS_SLIDE_MS = 240;
+/**
+ * How long a released sheet takes to slide off the bottom before it closes.
+ * The CSS side of this is `--motion-slow-exit`, the same number; it also has
+ * to exist as a JS number, because a timer waits out the slide.
+ */
+export const DISMISS_SLIDE_MS = 240;
 
 /** After the close, how long before a sheet its parent kept open slides back. */
 const KEPT_OPEN_CHECK_MS = 300;
 
 function applyOffset(el: HTMLElement | null, px: number, animate: boolean, reduced: boolean) {
   if (!el) return;
-  el.style.transition = animate && !reduced ? 'transform 240ms var(--motion-ease-out)' : 'none';
+  el.style.transition =
+    animate && !reduced ? 'transform var(--motion-slow-exit) var(--motion-ease-out)' : 'none';
   el.style.transform = px === 0 ? '' : `translateY(${px}px)`;
 }
 
 /** Sends a released sheet off the bottom edge. */
 function slideOff(el: HTMLElement | null) {
   if (!el) return;
-  el.style.transition = `transform ${DISMISS_SLIDE_MS}ms var(--motion-ease-in)`;
+  el.style.transition = 'transform var(--motion-slow-exit) var(--motion-ease-in)';
   el.style.transform = 'translateY(100%)';
 }
 

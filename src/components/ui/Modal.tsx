@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
+import { grabberClassName } from './controlStyles';
 import { PortalContainerProvider } from './portalContainer';
 import { RowTappableContext } from './tooltipHold';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
@@ -278,7 +279,7 @@ export function Modal({
                   // Decorative: Escape, Back and the close button are the
                   // accessible ways out, so it is neither focusable nor read.
                   <div aria-hidden="true" className="flex justify-center pt-2">
-                    <span className="h-1 w-10 rounded-full bg-line-bright" />
+                    <span className={grabberClassName} />
                   </div>
                 )}
                 <header className="flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1">

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { cx } from '@/lib/cx';
 import { UNSAFE_LocationContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from './controlStyles';
@@ -62,9 +63,10 @@ interface ToastBaseProps {
    */
   stacked?: boolean;
   /**
-   * Tints the border and adds a glyph and a spoken word (`TOAST_TONE`). Leave
-   * unset for a routine confirmation; pass `success` where the outcome could
-   * have failed and didn't, `danger` where it failed.
+   * @summary Tints the border and adds a glyph and a spoken word.
+   * `TOAST_TONE` holds the three together. Leave unset for a routine
+   * confirmation; pass `success` where the outcome could have failed and
+   * didn't, `danger` where it failed.
    */
   tone?: ToastTone;
 }
@@ -226,13 +228,13 @@ export function Toast({
   const toast = (
     <div
       ref={rootRef}
-      className={`toast-in bg-panel-2 text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ${
-        toned?.border ?? 'border-line-bright'
-      } ${
+      className={cx(
+        'toast-in bg-panel-2 text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)]',
+        toned?.border ?? 'border-line-bright',
         stacked
           ? 'pointer-events-auto max-w-full'
           : 'fixed bottom-[calc(8rem+env(safe-area-inset-bottom))] left-1/2 z-40 w-[95vw] -translate-x-1/2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]'
-      }`}
+      )}
       // Mouse only: a tap emulates mouseenter and nothing ever sends the leave.
       onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
       onPointerLeave={(e) => e.pointerType === 'mouse' && setHeld(false)}
@@ -254,7 +256,7 @@ export function Toast({
         <ToneGlyph
           aria-hidden="true"
           size={Icon.ICON_SIZE.sm}
-          className={`shrink-0 ${toned.text}`}
+          className={cx('shrink-0', toned.text)}
         />
       )}
       {/* Visible copy is hidden from AT; the live region below announces it. The

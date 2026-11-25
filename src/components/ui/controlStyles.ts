@@ -201,12 +201,28 @@ export const gripHitAreaClassName =
   "touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-9 touch:before:-translate-y-1/2 touch:before:content-['']";
 
 /**
- * The CompareDrawer's resize separator on touch: the separator itself grows to
- * a 36px band (so it takes layout space instead of overlaying the header or the
- * content above it) and its hairline is redrawn centred in it.
+ * The CompareDrawer's resize grip on touch: the grip itself grows to a 36px
+ * band, so it takes layout space instead of overlaying the header or the
+ * content above it (§6c forbids an overhang that enlarges a hit area).
+ *
+ * It used to drop the real border and redraw the hairline centred in the band.
+ * The grip now carries a `grabberClassName` mark on that centre line, and the
+ * two sat on top of each other — so the border stays where it is, reading as
+ * the divider between the grip and the header it already was.
  */
-export const resizeHandleTouchClassName =
-  "touch:h-9 touch:border-b-0 touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:top-1/2 touch:after:h-px touch:after:bg-line touch:after:content-['']";
+export const resizeHandleTouchClassName = 'touch:h-9';
+
+/**
+ * The grabber mark on a draggable overlay's edge: a short bright pill, centred
+ * in whatever drag zone draws it. Decorative in every case — Escape, Back and
+ * a close button are the accessible ways out, and a resize grip carries its own
+ * `role="separator"` and keys — so the element taking this is `aria-hidden`.
+ *
+ * Shared by `Modal`'s sheet and the CompareDrawer's resize grip. §6c describes
+ * the mark as one gesture cue ("drag" and "swipe down" both want it), so it is
+ * one constant rather than the same five classes written out in two files.
+ */
+export const grabberClassName = 'h-1 w-10 rounded-full bg-line-bright';
 
 /** An inline text action beside a status message — an Undo, a "jump to it". */
 export const inlineLinkClassName = cx(
