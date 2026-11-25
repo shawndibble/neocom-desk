@@ -12,7 +12,9 @@ test('first login via mocked EVE SSO lands straight on the first-run Overview', 
   // Unlike RTL's getByText (exact by default), Playwright's matches
   // substrings — the permissions-hint paragraph also mentions "Neocom Desk".
   await expect(page.getByText('Neocom Desk', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /answers, not api dumps/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /everything you do outside the client/i })
+  ).toBeVisible();
 
   // The landing page repeats this CTA (hero + closing band) — .first() is the
   // hero button, the one actually in view on load.

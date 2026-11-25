@@ -8,13 +8,14 @@ import { SHOWCASE_TABS } from './showcaseTabs';
 describe('FeatureShowcase', () => {
   it('opens on the first area with its screenshot and what it does', () => {
     render(<FeatureShowcase />);
-    expect(screen.getByRole('tab', { name: 'Industry', selected: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Market & orders', selected: true })
+    ).toBeInTheDocument();
     const panel = within(screen.getByRole('tabpanel'));
-    expect(panel.getByRole('img', { name: /running and finished jobs/i })).toHaveAttribute(
+    expect(panel.getByRole('img', { name: /the wallet journal/i })).toHaveAttribute(
       'src',
-      '/screenshots/desktop-industry-jobs.webp'
+      '/screenshots/desktop-wallet-journal.webp'
     );
-    expect(panel.getByText(/costs materials, job cost and taxes/i)).toBeInTheDocument();
   });
 
   it('switches the screenshot and the bullets with the tab', async () => {
@@ -34,6 +35,7 @@ describe('FeatureShowcase', () => {
   it('lists only what a tab adds under "Also includes", never its own name', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Industry' }));
     expect(screen.queryByText('Also includes')).toBeNull();
     await user.click(screen.getByRole('tab', { name: 'Alerts' }));
     const panel = within(screen.getByRole('tabpanel'));
@@ -45,11 +47,9 @@ describe('FeatureShowcase', () => {
   it('enlarges a screenshot in a dialog and closes it again', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /enlarge: the industry page/i }));
+    await user.click(screen.getByRole('button', { name: /enlarge: the wallet journal/i }));
     const dialog = await screen.findByRole('dialog');
-    expect(
-      within(dialog).getByRole('img', { name: /running and finished jobs/i })
-    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('img', { name: /the wallet journal/i })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -57,11 +57,9 @@ describe('FeatureShowcase', () => {
   it('moves between tabs with the arrow keys', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    screen.getByRole('tab', { name: 'Industry' }).focus();
+    screen.getByRole('tab', { name: 'Market & orders' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(
-      screen.getByRole('tab', { name: 'Market & orders', selected: true })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Industry', selected: true })).toBeInTheDocument();
   });
 
   it('gives every tab at least three bullets with real copy', async () => {

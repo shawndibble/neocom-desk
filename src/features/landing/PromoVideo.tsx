@@ -36,7 +36,7 @@ export function PromoVideo({ plays, onPlay }: { plays: number; onPlay: () => voi
   }, [plays]);
 
   return (
-    <div className="relative mt-6 aspect-video w-full overflow-hidden border border-line bg-bg">
+    <div className="lp-hud relative mt-6 aspect-video w-full border border-accent/30 bg-bg">
       {plays > 0 ? (
         <iframe
           ref={player}

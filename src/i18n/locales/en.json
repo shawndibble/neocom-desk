@@ -4633,10 +4633,12 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets it read the data below, grouped by area. Open an area to see each permission and what it is used for.",
+    "permissionsHint": "Here is everything logging in grants, by area: what Neocom Desk reads, and the few things it can write. Open an area to see each permission and why it's needed.",
     "header": {
       "nav": "Page sections",
+      "overview": "Overview",
       "answers": "Answers",
+      "tour": "Tour",
       "features": "Features",
       "trust": "Trust",
       "community": "Community",
@@ -4644,8 +4646,30 @@
       "discord": "Join the Discord",
       "github": "View the source on GitHub"
     },
-    "eyebrow": "Free · Open source · Runs on your device",
-    "heading": "Answers, not API dumps.",
+    "eyebrow": "Free · Open source · Runs in your browser",
+    "heading": "Everything you do outside the client.",
+    "headingAccent": "In one place.",
+    "tagline": "Search every region's market by jumps, using your own route rules. See what to change in your fit and what to train next. Keep industry, orders, PI and corp tax in view, with alerts even when the game is closed. One login for every character.",
+    "trustLine": {
+      "device": "Your login stays on your device",
+      "writes": "Writes to EVE only when you act",
+      "revoke": "Revoke anytime"
+    },
+    "reticle": {
+      "locked": "Target locked",
+      "market": {
+        "title": "Market · all regions",
+        "line1": "Sorted by jumps from you",
+        "line2": "Using your route rules"
+      },
+      "fit": {
+        "title": "Improve fit",
+        "line1": "Swaps that fix your fit",
+        "line2": "What to train next"
+      }
+    },
+    "overviewHeading": "Everything that needs you, on one screen",
+    "overviewLead": "The first screen after you log in, with sample data: hauls worth flying, contracts under market, the prices you watch and colonies about to run dry.",
     "previewLabel": "Example — logged-in view",
     "previewCorp": "Deep Space Transport",
     "demo": {
@@ -4675,33 +4699,33 @@
     },
     "video": {
       "heading": "Take the tour",
-      "lead": "A narrated tour of what sets it apart, filled with sample data.",
+      "lead": "A {{duration}} narrated tour with sample data: market search by jumps, fit upgrades, skill plans and alerts while the game is closed.",
       "play": "Play the {{duration}} tour video",
       "playerTitle": "Neocom Desk tour video",
-      "heroLink": "Watch the {{duration}} tour"
+      "heroLink": "Watch the tour ({{duration}})"
     },
-    "answersHeading": "The questions it exists to answer",
+    "answersHeading": "Questions you'd alt-tab for",
     "answersPhoneEyebrow": "On your phone",
-    "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",
+    "answersLead": "Each of these is a screen from the app, filled with sample data. Open any screenshot to see it full size.",
     "answers": {
+      "marketRange": {
+        "eyebrow": "Market & route",
+        "question": "Where's the cheapest one without crossing lowsec?",
+        "answer": "Market searches every region and counts each order’s jumps from the system you pick, using your own route rules, such as avoiding lowsec. The same rules set every jump count in the app."
+      },
       "orders": {
         "eyebrow": "Orders",
         "question": "Which order is quietly losing ISK?",
-        "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what each exit would net after fees."
+        "answer": "Open Orders puts every order, across every character, under its worst problem, worst first. Open one to see what each option (undercut, hold, dump, haul) nets after fees."
       },
       "build": {
         "eyebrow": "Industry",
         "question": "Is this blueprint worth building?",
-        "answer": "A Build Plan costs materials, job cost and taxes at live hub prices, then says whether building beats buying and still profits."
-      },
-      "journal": {
-        "eyebrow": "Wallet",
-        "question": "Where did this ISK come from?",
-        "answer": "Each Wallet journal line links to the contract or item behind it, so a payment can be followed back to its source."
+        "answer": "A Build Plan adds up materials, job cost and taxes at live hub prices, then tells you whether building beats buying and still turns a profit."
       },
       "marketJumps": {
         "question": "What is for sale within 15 jumps?",
-        "answer": "Market shows every order for an item with its jump count from the system you pick, so you can see what a trip is worth before you make it."
+        "answer": "The same market search on your phone: every order with its jumps from you, so you know what a trip is worth before you undock."
       },
       "routeSafety": {
         "question": "Is this route safe right now?",
@@ -4711,30 +4735,20 @@
         "question": "Who is this pilot?",
         "answer": "Pilot Lookup reads a character’s killboard history: a threat rating, kill and loss ratios, and kills per month."
       },
-      "flyNext": {
-        "eyebrow": "Ships",
-        "question": "Which ship can I fly next?",
-        "answer": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers and what you still need to train."
-      },
       "fitting": {
         "eyebrow": "Fitting",
         "question": "Will this fit hold up?",
-        "answer": "Build a fit on the ring and see its damage, drones and tank: resists, EHP and local tank."
-      },
-      "survey": {
-        "eyebrow": "Mining",
-        "question": "When is this belt mined out?",
-        "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
+        "answer": "Build a fit and see its damage, resists, EHP and local tank. Improve Fit suggests swaps, and What to train lists the skills you still need."
       },
       "courier": {
         "eyebrow": "Contracts",
         "question": "Which haul pays best per jump?",
-        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route preference, and flags any that pays far above the going rate."
+        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route rules, and flags any that pays far above the going rate."
       },
       "assets": {
         "eyebrow": "Assets",
         "question": "Where did I leave that ship?",
-        "answer": "Assets lists every ship across your characters, nearest first, with where it sits, even one packed in a container."
+        "answer": "Assets lists every ship on every character, nearest first, with its station, even ones packed in a container."
       }
     },
     "screenshotEnlarge": "Enlarge: {{alt}}",
@@ -4747,21 +4761,13 @@
         "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
         "caption": "Build plans with profit after fees"
       },
-      "survey": {
-        "alt": "A Mining Survey: percent of the field mined, volume left over time by ore, mining pace and an estimated finish time.",
-        "caption": "Mining surveys that tell you when the belt is gone"
-      },
       "fitting": {
         "alt": "A ship fitting on the ring: modules, rigs and drones around a Caracal, with its missile and drone DPS, shield, armor and hull resists and EHP, local tank, calibration, powergrid and CPU.",
         "caption": "Fittings with damage and tank"
       },
-      "shipTree": {
-        "alt": "The Ship Tree map for Caldari State with the Caracal selected and its Skills & Mastery panel open: the skills the hull needs, its Mastery tiers, and the training time still missing for each.",
-        "caption": "A hull’s skills and Mastery tiers, and what you still need to train"
-      },
       "walletJournal": {
         "alt": "The wallet journal with links from each line to its contract and the item that was traded.",
-        "caption": "A journal that links to what each line was"
+        "caption": "Every journal line links to its contract or item"
       },
       "phoneMarketJumps": {
         "alt": "The market order book on a phone, limited to stations within 15 jumps of Jita, with the jump count and security of each order.",
@@ -4812,7 +4818,7 @@
         "caption": "Every character’s assets, down to the container"
       }
     },
-    "featuresHeading": "Everything outside the client",
+    "featuresHeading": "Every tool, by area",
     "showcase": {
       "label": "Areas of the app",
       "covers": "Also includes",
@@ -4825,10 +4831,10 @@
       },
       "market": {
         "tab": "Market & orders",
-        "orders": "Open Orders files each order under the worst thing wrong with it, worst first, across every character.",
-        "market": "Market shows every order for an item with its jump count from the system you pick, on a phone too.",
+        "orders": "Open Orders puts every order, across every character, under its worst problem, worst first.",
+        "market": "Market searches every region and sorts each order by jumps from you, on desktop or phone.",
         "wallet": "Each Wallet journal line links to the contract or item behind it.",
-        "assets": "Assets finds a thing and drills into stations, ships and containers."
+        "assets": "Assets searches every character's items, down to stations, ships and containers."
       },
       "skills": {
         "tab": "Skills",
@@ -4928,11 +4934,11 @@
         "name": "Communities"
       }
     },
-    "trustHeading": "It reads. It writes only when you act.",
+    "trustHeading": "What it can touch, and what it can't",
     "trust": {
       "readOnly": {
-        "name": "Six writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, a Community invite you send by mail, or the result of an SRP claim you approve or reject, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
+        "name": "It writes only when you act",
+        "desc": "It writes to EVE only when you act. Opening a mail flags it as read in EVE. Answering a calendar invite sends your response. Mail you send goes out through your account: replies, forwards, Community invites, Pledge mails and SRP results. Saving a Fitting to EVE recreates it on the game's side. Setting a route's waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else writes to EVE."
       },
       "token": {
         "name": "Your login stays on this device",
@@ -4943,7 +4949,7 @@
         "desc": "Install it like an app. Your characters and skill plans open from this device without a connection, marked as cached, and your plans sync across your devices. Live market and killboard data need a connection."
       },
       "openSource": {
-        "name": "Free, and open to read",
+        "name": "Free and open source",
         "desc": "No account to create, no ads, no subscription, no paid tier. Read the source before you decide to trust it."
       }
     },
@@ -4975,7 +4981,7 @@
       "readMore": "Read more in the privacy policy",
       "writes": {
         "q": "Can it move ISK or change anything in EVE?",
-        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
+        "a": "It cannot move ISK. It writes to EVE only on the short list under Trust (marking mail read, calendar replies, mail you send, saving a Fitting, setting waypoints, Open in EVE), and only when you act. Nothing else is ever written."
       },
       "free": {
         "q": "Is it free?",
@@ -4998,8 +5004,8 @@
         "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's, and split fleet loot with a Fleet Payout."
       }
     },
-    "bottomCtaHeading": "Undock into your dashboard.",
-    "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
+    "bottomCtaHeading": "Ready to undock?",
+    "bottomCtaBody": "Log in once with EVE Online, then add every character you fly. Free and open source.",
     "footerOpenSource": "Free & open source",
     "footerPrivacy": "Privacy policy",
     "footerDataCredit": "Data credit",

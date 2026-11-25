@@ -5,7 +5,7 @@
  */
 import { test, expect, PHONE } from './support/testBase';
 
-const PARAGRAPHS = [/^Logging in lets it read/];
+const PARAGRAPHS = [/^Here is everything logging in grants/];
 
 for (const size of [
   { width: 1440, height: 900 },

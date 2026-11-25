@@ -73,7 +73,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi.activity.char:read': 'Campaign Objectives you pressed Participate on',
 };
 
-/** The write scopes (opt-in, not in the Base Grant) — their disclosure goes in the "Six writes" trust card, not the read sentence, which it would otherwise contradict. */
+/** The write scopes (opt-in, not in the Base Grant) — their disclosure goes in the "It writes only when you act" trust card, not the read sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'flags it as read in EVE',
   'esi-calendar.respond_calendar_events.v1': 'sends your response',
@@ -111,7 +111,7 @@ beforeEach(async () => {
 describe('Login', () => {
   it('stashes the page the auth gate sent the visitor from', async () => {
     renderLogin({ pathname: '/login', state: { from: '/market/browser?info=123#x' } });
-    await screen.findByRole('heading', { name: /answers, not api dumps/i });
+    await screen.findByRole('heading', { name: /everything you do outside the client/i });
     expect(takeLoginReturnTo()).toBe('/market/browser?info=123#x');
   });
 
@@ -119,14 +119,14 @@ describe('Login', () => {
     'ignores an unusable from %j',
     async (from) => {
       renderLogin({ pathname: '/login', state: { from } });
-      await screen.findByRole('heading', { name: /answers, not api dumps/i });
+      await screen.findByRole('heading', { name: /everything you do outside the client/i });
       expect(takeLoginReturnTo()).toBeNull();
     }
   );
 
   it('stashes nothing on a plain visit', async () => {
     renderLogin();
-    await screen.findByRole('heading', { name: /answers, not api dumps/i });
+    await screen.findByRole('heading', { name: /everything you do outside the client/i });
     expect(takeLoginReturnTo()).toBeNull();
   });
 
@@ -136,9 +136,11 @@ describe('Login', () => {
     expect(await screen.findAllByRole('button', { name: /log in with eve online/i })).toHaveLength(
       1
     );
-    expect(screen.queryByRole('heading', { name: /answers, not api dumps/i })).toBeNull();
+    expect(
+      screen.queryByRole('heading', { name: /everything you do outside the client/i })
+    ).toBeNull();
     expect(screen.getByRole('heading', { name: 'Neocom Desk' })).toBeInTheDocument();
-    expect(screen.queryByText(/logging in lets it read/i)).toBeNull();
+    expect(screen.queryByText(/everything logging in grants/i)).toBeNull();
     expect(
       screen.getByRole('button', { name: /log in with custom permissions/i })
     ).toBeInTheDocument();
@@ -152,7 +154,7 @@ describe('Login', () => {
     try {
       renderLogin();
       expect(document.getElementById(LANDING_SHELL_ID)).not.toBeNull();
-      await screen.findByRole('heading', { name: /answers, not api dumps/i });
+      await screen.findByRole('heading', { name: /everything you do outside the client/i });
       expect(document.getElementById(LANDING_SHELL_ID)).toBeNull();
       expect(document.documentElement.hasAttribute(LANDING_SHELL_ATTR)).toBe(false);
     } finally {
@@ -165,7 +167,7 @@ describe('Login', () => {
     renderLogin();
     expect(
       await screen.findByRole('heading', {
-        name: /answers, not api dumps/i,
+        name: /everything you do outside the client/i,
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
@@ -198,7 +200,7 @@ describe('Login', () => {
   it('leads with the questions the app answers', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /the questions it exists to answer/i })
+      await screen.findByRole('heading', { name: /questions you'd alt-tab for/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /which order is quietly losing isk/i })
@@ -211,13 +213,13 @@ describe('Login', () => {
   it('pairs every question with a screenshot, each with alt text, lazily loaded', async () => {
     renderLogin();
     const grid = within(
-      await screen.findByRole('region', { name: /the questions it exists to answer/i })
+      await screen.findByRole('region', { name: /questions you'd alt-tab for/i })
     );
     const images = grid.getAllByRole('img');
     // One capture per tile, and one tile per heading.
     expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
-    expect(images).toHaveLength(11);
-    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(11);
+    expect(images).toHaveLength(9);
+    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(9);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -230,7 +232,7 @@ describe('Login', () => {
     renderLogin();
     // The features showcase opens on the same capture, so scope to the questions grid.
     const grid = within(
-      await screen.findByRole('region', { name: /the questions it exists to answer/i })
+      await screen.findByRole('region', { name: /questions you'd alt-tab for/i })
     );
     await user.click(grid.getByRole('button', { name: /enlarge: a build plan for an orca/i }));
     const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
@@ -252,9 +254,7 @@ describe('Login', () => {
     renderLogin();
     // Scoped to the section: "Clones" and "Market" also appear in the hero's
     // preview panel, so an unscoped query matches two nodes.
-    const section = within(
-      await screen.findByRole('region', { name: /everything outside the client/i })
-    );
+    const section = within(await screen.findByRole('region', { name: /every tool, by area/i }));
     const user = userEvent.setup();
 
     // Each feature is a tab's own name or an "Also includes" chip in that tab's panel.
@@ -289,7 +289,7 @@ describe('Login', () => {
 
   it('has no How it works section or header link any more', async () => {
     renderLogin();
-    await screen.findByRole('region', { name: /the questions it exists to answer/i });
+    await screen.findByRole('region', { name: /questions you'd alt-tab for/i });
     expect(screen.queryByRole('region', { name: /how it works/i })).toBeNull();
     expect(
       within(screen.getByRole('navigation', { name: /page sections/i })).queryByRole('link', {
@@ -323,20 +323,18 @@ describe('Login', () => {
 
     // The grid: the app's own Widgets, loaded as a chunk of their own, each titled as the real one is.
     for (const title of [
-      'Mining tax',
-      'Contracts',
-      'Mail',
-      'Location and ship',
-      'Calendar',
+      'Hauling',
+      'Below-market contracts',
+      'Price watch',
+      'Planetary',
       'Wallet',
-      'Mining survey',
-      'Wallet flow',
+      'Profit',
       'Training',
       'Open orders',
     ]) {
       expect(await preview.findByRole('region', { name: title })).toBeInTheDocument();
     }
-    expect(preview.getByText('1 outstanding')).toBeInTheDocument();
+    expect(preview.getByText('48M')).toBeInTheDocument();
     expect(preview.getByRole('button', { name: /data updated/i })).toBeInTheDocument();
 
     // The fixed board is gone: no summary strip cells, no folded alerts row.
@@ -379,17 +377,17 @@ describe('Login', () => {
   it('answers the trust objections and enumerates the scopes it asks for', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /it writes only when you act/i })
+      await screen.findByRole('heading', { name: /what it can touch, and what it can't/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /six writes, and nothing else/i })
+      screen.getByRole('heading', { name: /it writes only when you act/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /your login stays on this device/i })
     ).toBeInTheDocument();
 
-    const trust = within(screen.getByRole('region', { name: /it writes only when you act/i }));
-    expect(trust.getByText(/logging in lets it read/i)).toBeInTheDocument();
+    const trust = within(screen.getByRole('region', { name: /what it can touch/i }));
+    expect(trust.getByText(/everything logging in grants/i)).toBeInTheDocument();
     for (const name of [
       /skills & clones/i,
       /money & market/i,
@@ -415,9 +413,7 @@ describe('Login', () => {
 
   it('keeps the planetary-scope note, the one-login note and the revoke link', async () => {
     renderLogin();
-    const trust = within(
-      await screen.findByRole('region', { name: /it writes only when you act/i })
-    );
+    const trust = within(await screen.findByRole('region', { name: /what it can touch/i }));
     expect(trust.getByText(/manage your planetary installations/i)).toHaveTextContent(
       /only reads that data and never writes/i
     );
@@ -471,9 +467,7 @@ describe('Login', () => {
 
   it('links the permissions note to the privacy policy', async () => {
     renderLogin();
-    const trust = within(
-      await screen.findByRole('region', { name: /it writes only when you act/i })
-    );
+    const trust = within(await screen.findByRole('region', { name: /what it can touch/i }));
     expect(trust.getByRole('link', { name: /privacy policy/i })).toHaveAttribute(
       'href',
       '/privacy.html'
@@ -492,7 +486,7 @@ describe('Login', () => {
     renderLogin();
     await screen.findByRole('heading', { name: /it writes only when you act/i });
 
-    const permissions = screen.getByText(/logging in lets it read/i);
+    const permissions = screen.getByText(/everything logging in grants/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
       expect(permissions).not.toHaveTextContent(phrase);
       expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();

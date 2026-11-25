@@ -48,14 +48,8 @@ const desktop = (file: string, key: string): Screenshot => ({ file, key, size: D
 
 export const SHOWCASE_TABS: ShowcaseTab[] = [
   {
-    id: 'industry',
-    shot: desktop('desktop-industry-jobs', 'industryJobs'),
-    bullets: ['costs', 'verdict', 'setup', 'jobs'],
-    features: [{ icon: Industry, key: 'industry' }],
-  },
-  {
     id: 'market',
-    shot: desktop('desktop-market', 'market'),
+    shot: desktop('desktop-wallet-journal', 'walletJournal'),
     bullets: ['orders', 'market', 'wallet', 'assets'],
     features: [
       { icon: Market, key: 'market' },
@@ -63,6 +57,12 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
       { icon: Wallet, key: 'walletOrders' },
       { icon: Container, key: 'assets' },
     ],
+  },
+  {
+    id: 'industry',
+    shot: desktop('desktop-industry-jobs', 'industryJobs'),
+    bullets: ['costs', 'verdict', 'setup', 'jobs'],
+    features: [{ icon: Industry, key: 'industry' }],
   },
   {
     id: 'skills',

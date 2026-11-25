@@ -56,6 +56,7 @@ export function LandingBackdrop({
 
 /**
  * One titled band of the landing page, on a full-bleed backdrop with its
+ * numbered eyebrow (the header link's label), a HUD-style heading and an optional lead,
  * content held in the page's single `max-w-6xl` column. Named as a landmark
  * rather than left an anonymous `<section>`: on a page this long, "skip to what
  * it does" and "skip to what it asks for" are real navigation, and the name
@@ -65,13 +66,21 @@ export function LandingBackdrop({
  */
 export function LandingSection({
   id,
+  index,
+  eyebrow,
   heading,
+  lead,
   tone = 'plain',
   ship,
   children,
 }: {
   id: string;
+  /** The band's place on the page, "01" and up, shown before the eyebrow like a console readout. */
+  index: string;
+  /** The header link's own label for this band, so the link and the band it lands on agree. */
+  eyebrow: string;
   heading: string;
+  lead?: string;
   tone?: LandingTone;
   ship?: LandingShipPlacement;
   children: ReactNode;
@@ -84,9 +93,16 @@ export function LandingSection({
     >
       <LandingBackdrop tone={tone} ship={ship} />
       <Reveal className="relative mx-auto max-w-6xl px-6 py-16">
-        <h2 id={`${id}-heading`} className="text-xl font-semibold">
+        <p className="font-mono text-xs tracking-[0.2em] text-accent uppercase">
+          {index} · {eyebrow}
+        </p>
+        <h2
+          id={`${id}-heading`}
+          className="mt-2 font-hud text-3xl leading-tight font-bold text-balance uppercase sm:text-4xl"
+        >
           {heading}
         </h2>
+        {lead && <p className="mt-3 max-w-2xl text-text-dim">{lead}</p>}
         {children}
       </Reveal>
     </section>

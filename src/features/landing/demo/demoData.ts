@@ -26,6 +26,7 @@ import type { SkillCatalog } from '@/features/skills/skillMap';
 import { blank, statusOf } from '@/features/overview/widgets/data/builderKit';
 import { buildView } from '@/features/overview/widgets/data/models';
 import { settingsContext } from '@/features/overview/widgets/data/viewSettings';
+import { sampleView } from '@/features/overview/widgets/gallerySamples';
 import { wobble } from '@/features/overview/samplePilot';
 import { ordersStateChart, ordersTable } from '@/features/overview/widgets/data/ordersModels';
 import type {
@@ -263,17 +264,20 @@ const feedsAt = (now: number): Feeds => {
   };
 };
 
-/** The layout: four Small cards, then Medium, Large and a Full Open orders, as a fresh role starts. */
+/**
+ * The layout: four Small cards, then three Medium and a Full Open orders. Led by
+ * the widgets that show what Neocom Desk adds beyond the game's own screens
+ * (hauls, under-priced contracts, price alerts, colonies, profit); the kinds
+ * with no demo feed below draw the Overview gallery's own sample (`SAMPLED_KINDS`).
+ */
 export const DEMO_WIDGETS: readonly Widget[] = [
-  { id: 'd-tax', kind: 'miningTax', size: 'S', view: 'number' },
-  { id: 'd-contracts', kind: 'contracts', size: 'S', view: 'number' },
-  { id: 'd-mail', kind: 'mail', size: 'S', view: 'number' },
-  { id: 'd-location', kind: 'location', size: 'S', view: 'number' },
-  { id: 'd-coming', kind: 'comingUp', size: 'M', view: 'table' },
+  { id: 'd-hauling', kind: 'hauling', size: 'S', view: 'number' },
+  { id: 'd-below', kind: 'belowMarket', size: 'S', view: 'number' },
+  { id: 'd-watch', kind: 'priceWatch', size: 'S', view: 'number' },
+  { id: 'd-planetary', kind: 'planetary', size: 'S', view: 'number' },
   { id: 'd-wallet', kind: 'wallet', size: 'M', view: 'chart', range: 30 },
-  { id: 'd-survey', kind: 'survey', size: 'M', view: 'chart' },
-  { id: 'd-flow', kind: 'wallet', show: 'flow', size: 'M', view: 'chart', range: 30 },
-  { id: 'd-training', kind: 'training', size: 'L', view: 'table' },
+  { id: 'd-profit', kind: 'profit', size: 'M', view: 'table' },
+  { id: 'd-training', kind: 'training', size: 'M', view: 'table' },
   { id: 'd-orders', kind: 'orders', size: 'F', view: 'table', rowsPerPage: 5 },
 ].map((w) => ({ ...w, scope: 'header', showOnPhone: true }) as Widget);
 
@@ -351,12 +355,26 @@ function ordersView(t: Translate, now: number): KindView {
   };
 }
 
+/** Kinds whose demo View is the Overview gallery's sample rather than a demo feed. */
+const SAMPLED_KINDS: ReadonlySet<string> = new Set([
+  'hauling',
+  'belowMarket',
+  'priceWatch',
+  'planetary',
+  'profit',
+]);
+
 /** One View per demo widget, keyed by widget id, as the real feeds would have built them at `now`. */
 export function buildDemoViews(t: TFunction, now: number): ReadonlyMap<string, KindView> {
   const translate: Translate = (key, options) => String(t(key, options));
   const feeds = feedsAt(now);
   const views = new Map<string, KindView>();
   for (const widget of DEMO_WIDGETS) {
+    const sampled = SAMPLED_KINDS.has(widget.kind) ? sampleView(widget.kind, t) : undefined;
+    if (sampled) {
+      views.set(widget.id, sampled);
+      continue;
+    }
     views.set(
       widget.id,
       widget.kind === 'orders'
