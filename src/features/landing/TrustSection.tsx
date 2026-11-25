@@ -33,7 +33,7 @@ export function TrustSection() {
     <>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {TRUST.map(({ icon: Icon, key }) => (
-          <Panel key={key}>
+          <Panel key={key} className="border-t-2 border-t-accent">
             <Icon size={ICON_SIZE.lg} aria-hidden="true" className="text-accent" />
             <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
             <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>

@@ -1,12 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { OverviewDemo } from './OverviewDemo';
-
-// The survey chart is a chunk of its own, and the demo holds it back for a moment anyway.
-vi.mock('@/features/survey/SurveyCharts', () => ({ SurveyCharts: () => <div /> }));
 
 const board = async () => {
   const demo = within(screen.getByRole('group', { name: /logged-in view/i }));

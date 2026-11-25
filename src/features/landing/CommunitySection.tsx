@@ -34,7 +34,7 @@ export function CommunitySection({ quotes = LANDING_QUOTES }: { quotes?: readonl
         <ExternalLink
           href={DISCORD_URL}
           variant="bare"
-          className={cx('shrink-0 sm:ml-auto', buttonClassName({ variant: 'accent' }))}
+          className={cx('shrink-0 sm:ml-auto', buttonClassName({ variant: 'ghost' }))}
         >
           {t('login.community.join')}
         </ExternalLink>

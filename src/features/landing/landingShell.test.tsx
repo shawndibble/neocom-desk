@@ -10,8 +10,8 @@ import { Login } from '@/routes/Login';
 /**
  * The prerendered landing hero (`src/app/landingShell.ts`) is the real `Login`
  * render, cut down to what the first screen shows: the sticky header and the
- * hero, without the live Overview demo (its countdowns change by the minute,
- * and it is a separate chunk anyway). Kept as a file snapshot that
+ * hero. The live Overview demo is the next section, so it stays out (its
+ * countdowns change by the minute, and it is a separate chunk anyway). Kept as a file snapshot that
  * `vite.config.ts` injects into `index.html`, so any change to the hero fails
  * here until the snapshot is regenerated: `npx vitest run
  * src/features/landing/landingShell.test.tsx -u`.
@@ -19,13 +19,15 @@ import { Login } from '@/routes/Login';
  * Wrapped in `inert`: its buttons look real but do nothing until React takes
  * over, so they must not take focus or a click that is then lost.
  */
+const HEADING = `${en.login.heading} ${en.login.headingAccent}`;
+
 async function landingShellHtml(): Promise<string> {
   const { container } = render(
     <MemoryRouter initialEntries={['/login']}>
       <Login />
     </MemoryRouter>
   );
-  await screen.findByRole('heading', { level: 1, name: en.login.heading });
+  await screen.findByRole('heading', { level: 1, name: HEADING });
 
   const page = container.querySelector('.landing-root');
   const header = page?.querySelector(':scope > header');
@@ -33,10 +35,6 @@ async function landingShellHtml(): Promise<string> {
   if (!page || !header || !(hero instanceof HTMLElement)) {
     throw new Error('Login no longer renders a header and a hero section');
   }
-  const demo = hero.querySelector('[aria-labelledby="login-preview-label"]');
-  if (demo === null) throw new Error('the hero no longer holds the Overview demo');
-  demo.remove();
-
   const shell = document.createElement('div');
   shell.id = LANDING_SHELL_ID;
   shell.className = page.className;
@@ -59,8 +57,8 @@ describe('landing shell', () => {
 
   it('holds the first screen and the ship as a high-priority load', async () => {
     const shell = new DOMParser().parseFromString(await landingShellHtml(), 'text/html');
-    expect(shell.querySelector('h1')?.textContent).toBe(en.login.heading);
-    expect(shell.body.textContent).toContain(en.app.tagline);
+    expect(shell.querySelector('h1')?.textContent).toBe(HEADING);
+    expect(shell.body.textContent).toContain(en.login.tagline);
     expect(
       shell.querySelector('img[src="/landing/megathron.webp"]')?.getAttribute('fetchpriority')
     ).toBe('high');

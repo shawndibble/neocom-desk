@@ -183,6 +183,8 @@
   /* Type — system stack approximating EVE's condensed sans */
   --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  /* `font-hud`: the landing page's display face only (headings), self-hosted, Latin, bold. */
+  --font-hud: 'Chakra Petch', var(--font-display);
 }
 
 /*
@@ -1825,6 +1827,44 @@
   .lp-badge-pulse {
     animation: lp-badge-pulse 700ms ease-out;
   }
+}
+
+/*
+ * Landing page HUD: the display face, the targeting reticle around the hero
+ * ship and the corner brackets on framed panels. Chakra Petch (SIL OFL 1.1,
+ * public/fonts/chakra-petch-OFL.txt) is self-hosted and only the landing page's
+ * headings use it; `swap` keeps the heading readable while it loads.
+ */
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/chakra-petch-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+.lp-hud {
+  position: relative;
+}
+.lp-hud::before,
+.lp-hud::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-color: var(--color-accent);
+  border-style: solid;
+  pointer-events: none;
+}
+.lp-hud::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+.lp-hud::after {
+  right: -1px;
+  bottom: -1px;
+  border-width: 0 2px 2px 0;
 }
 
 /*

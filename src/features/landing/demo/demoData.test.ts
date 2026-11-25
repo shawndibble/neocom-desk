@@ -6,12 +6,23 @@ const t = ((key: string) => key) as unknown as TFunction;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
 
 describe('buildDemoViews', () => {
-  it("builds each widget with its own settings: the Wallet flow widget draws the Wallet's Flow", () => {
-    expect(DEMO_WIDGETS.find((w) => w.id === 'd-flow')).toMatchObject({ show: 'flow' });
+  it('builds a View with data for every demo widget', () => {
     const views = buildDemoViews(t, NOW);
-    // Flow is net bars with a table by ref type; Balance is an area chart over the journal.
-    expect(views.get('d-flow')?.chart?.kind).toBe('bars');
-    expect(views.get('d-flow')?.table?.columns[0]?.key).toBe('type');
-    expect(views.get('d-wallet')?.chart?.kind).not.toBe('bars');
+    for (const widget of DEMO_WIDGETS) {
+      expect(views.get(widget.id)?.status.hasData, widget.id).toBe(true);
+    }
+  });
+
+  it('draws the kinds with no demo feed from the Overview gallery sample', () => {
+    const views = buildDemoViews(t, NOW);
+    expect(views.get('d-hauling')?.number.value).toBe('48M');
+    expect(views.get('d-profit')?.rows.length).toBeGreaterThan(0);
+  });
+
+  it('builds the Wallet with its own Range: an area chart over the journal', () => {
+    const views = buildDemoViews(t, NOW);
+    const chart = views.get('d-wallet')?.chart;
+    expect(chart).toBeDefined();
+    expect(chart?.kind).not.toBe('bars');
   });
 });

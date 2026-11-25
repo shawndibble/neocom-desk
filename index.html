@@ -68,6 +68,13 @@
           l.href = '/landing/megathron.webp';
           l.setAttribute('fetchpriority', 'high');
           document.head.appendChild(l);
+          var f = document.createElement('link');
+          f.rel = 'preload';
+          f.setAttribute('as', 'font');
+          f.setAttribute('type', 'font/woff2');
+          f.setAttribute('crossorigin', '');
+          f.href = '/fonts/chakra-petch-700.woff2';
+          document.head.appendChild(f);
         }
       } catch (e) {}
     </script>

@@ -15,6 +15,8 @@ import { LandingBackdrop, LandingSection } from '@/features/landing/LandingSecti
 import { TrustSection } from '@/features/landing/TrustSection';
 import { useBelowFold } from '@/features/landing/useBelowFold';
 import { LandingHeader } from '@/features/landing/LandingHeader';
+import { HeroReticle } from '@/features/landing/HeroReticle';
+import { hudLabelClassName } from '@/features/landing/hudLabel';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
@@ -44,8 +46,9 @@ export function Login() {
   const [promoPlays, setPromoPlays] = useState(0);
   const playPromo = () => setPromoPlays((n) => n + 1);
 
-  // The large login buttons (hero and closing call to action); the sticky
-  // header shows its own only while neither is in view.
+  // The hero's login button; the header (a fixed bottom bar on phones) shows
+  // its own once the hero's is out of view. The closing call to action is not
+  // watched, so the header's button stays while it is on screen.
   const heroCtaRef = useRef<HTMLDivElement>(null);
   const ctaRefs = useMemo(() => [heroCtaRef], []);
 
@@ -103,64 +106,91 @@ export function Login() {
 
       <main>
         {/*
-          A funnel, not two columns: the heading is the widest line, the tagline
-          narrower, the login button narrower still, so the eye lands on the
-          button. The live preview sits under it as the proof, rather than
-          beside it competing for the first look.
+          The hero is a ship locked in a targeting reticle beside the pitch:
+          copy and the login button on the left (centred over the reticle on a
+          phone), the reticle on the right. Under the button, the three trust
+          points a pilot weighs before handing over an EVE login.
         */}
         <section className="relative isolate overflow-hidden">
-          <LandingBackdrop tone="space" ship={{ ship: 'megathron', side: 'right' }} eager />
-          <div className="relative mx-auto flex max-w-[96rem] flex-col items-center gap-12 px-4 py-16 text-center sm:px-6">
-            <div className="flex flex-col items-center">
-              <p className="lp-hero-in lp-hero-in-0 text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
+          <LandingBackdrop tone="space" />
+          <div className="relative mx-auto grid max-w-page items-center gap-8 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12 lg:px-16 lg:py-20">
+            <HeroReticle className="lg:order-2" />
+            <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+              <p
+                className={cx(
+                  hudLabelClassName,
+                  'lp-hero-in lp-hero-in-0 flex items-center gap-2.5 text-xs text-balance text-accent'
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="hidden size-2 shrink-0 bg-accent shadow-[0_0_12px_var(--color-accent)] sm:block"
+                />
                 {t('login.eyebrow')}
               </p>
-              <h1 className="lp-hero-in lp-hero-in-1 mt-3 max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl">
-                {t('login.heading')}
+              <h1 className="lp-hero-in lp-hero-in-1 mt-5 max-w-3xl font-hud text-4xl leading-[0.98] font-bold text-balance uppercase sm:text-6xl xl:text-7xl">
+                {t('login.heading')} <span className="text-accent">{t('login.headingAccent')}</span>
               </h1>
-              <p className="lp-hero-in lp-hero-in-2 mt-4 max-w-xl text-text-dim text-balance">
-                {t('app.tagline')}
+              <p className="lp-hero-in lp-hero-in-2 mt-6 max-w-xl text-text-dim sm:text-lg">
+                {t('login.tagline')}
               </p>
-              <div
-                ref={heroCtaRef}
-                className="lp-hero-in lp-hero-in-3 lp-cta-glow mt-7 flex flex-col items-center gap-3"
-              >
-                <EveSsoButton
-                  size="large"
-                  pending={pending}
-                  onClick={onLogin}
-                  label={t('login.button')}
-                />
+              <div className="lp-hero-in lp-hero-in-3 mt-8 flex flex-col items-center gap-4 lg:items-start">
+                <div className="flex flex-col items-center gap-x-6 gap-y-4 sm:flex-row">
+                  <div ref={heroCtaRef} className="lp-cta-glow">
+                    <EveSsoButton
+                      size="large"
+                      pending={pending}
+                      onClick={onLogin}
+                      label={t('login.button')}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={plainTextActionClassName('gap-2.5')}
+                    onClick={playPromo}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex size-9 rounded-full items-center justify-center border border-accent text-accent"
+                    >
+                      <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
+                    </span>
+                    {t('login.video.heroLink', { duration: PROMO_VIDEO.duration })}
+                  </button>
+                </div>
                 {loginFailed && <InlineError>{t('login.failed')}</InlineError>}
+                <TrustLine className="lg:justify-start" />
                 <CustomizeLink onClick={() => setCustomizing(true)} />
-                <button
-                  type="button"
-                  className={plainTextActionClassName('gap-1.5')}
-                  onClick={playPromo}
-                >
-                  <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
-                  {t('login.video.heroLink', { duration: PROMO_VIDEO.duration })}
-                </button>
               </div>
             </div>
-
-            <OverviewDemo />
           </div>
         </section>
 
+        <LandingSection
+          id="login-overview"
+          heading={t('login.overviewHeading')}
+          lead={t('login.overviewLead')}
+        >
+          <OverviewDemo />
+        </LandingSection>
+
         {belowFold && (
           <>
-            <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')}>
-              <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.video.lead')}</p>
-              <PromoVideo plays={promoPlays} onPlay={playPromo} />
-            </LandingSection>
             <LandingSection
               id="login-answers"
               heading={t('login.answersHeading')}
+              lead={t('login.answersLead')}
               ship={{ ship: 'venture', side: 'right' }}
             >
-              <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
               <QuestionGrid />
+            </LandingSection>
+            <LandingSection
+              id={PROMO_VIDEO_ANCHOR}
+              heading={t('login.video.heading')}
+              lead={t('login.video.lead', { duration: PROMO_VIDEO.duration })}
+              tone="space"
+            >
+              <PromoVideo plays={promoPlays} onPlay={playPromo} />
             </LandingSection>
             <LandingSection
               id="login-features"
@@ -180,19 +210,31 @@ export function Login() {
             </LandingSection>
 
             <section className="relative isolate overflow-hidden">
-              <LandingBackdrop tone="space" ship={{ ship: 'orca', side: 'left' }} />
-              <Reveal className="relative mx-auto max-w-6xl px-6 py-20 text-center">
-                <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
-                <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
+              <LandingBackdrop tone="space" />
+              <Reveal className="relative mx-auto flex max-w-6xl flex-col items-center px-6 py-24 text-center">
+                <img
+                  src="/landing/orca.webp"
+                  alt=""
+                  width={512}
+                  height={512}
+                  loading="lazy"
+                  decoding="async"
+                  className="size-36 rounded-full border-2 border-accent/55 shadow-[0_0_60px_color-mix(in_srgb,var(--color-accent)_30%,transparent)] sm:size-44"
+                />
+                <h2 className="mt-8 font-hud text-6xl leading-none font-bold uppercase sm:text-8xl">
+                  {t('login.bottomCtaHeading')}
+                </h2>
+                <p className="mx-auto mt-5 max-w-lg text-text-dim sm:text-lg">
                   {t('login.bottomCtaBody')}
                 </p>
-                <div className="mt-6 flex flex-col items-center gap-3">
+                <div className="lp-cta-glow mt-8 flex flex-col items-center gap-4">
                   <EveSsoButton
                     size="large"
                     pending={pending}
                     onClick={onLogin}
                     label={t('login.button')}
                   />
+                  <TrustLine />
                   <CustomizeLink onClick={() => setCustomizing(true)} />
                 </div>
               </Reveal>
@@ -204,7 +246,7 @@ export function Login() {
       </main>
 
       {belowFold && (
-        <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
+        <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim max-md:pb-24">
           <ExternalLink href={REPO_URL} variant="quiet">
             {t('login.footerOpenSource')}
           </ExternalLink>
@@ -229,6 +271,28 @@ const FOOTER_LINK = cx(
   interactiveClassName,
   focusRingClassName
 );
+
+/** The three trust points under each large login button, as a HUD readout. */
+function TrustLine({ className }: { className?: string }) {
+  const { t } = useTranslation();
+  return (
+    <ul
+      className={cx(
+        'flex flex-wrap justify-center gap-x-5 gap-y-1.5 font-mono text-xs text-text-dim',
+        className
+      )}
+    >
+      {(['device', 'writes', 'revoke'] as const).map((key) => (
+        <li key={key} className="flex items-center gap-2">
+          <span aria-hidden="true" className="text-accent">
+            ◆
+          </span>
+          {t(`login.trustLine.${key}`)}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Opens the Customize permissions dialog — always right under a "Log in" button, never a substitute for one. */
 function CustomizeLink({ onClick }: { onClick: () => void }) {

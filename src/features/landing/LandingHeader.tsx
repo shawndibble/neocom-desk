@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
+import { hudLabelClassName } from './hudLabel';
 import { useTranslation } from 'react-i18next';
 import { EveSsoButton, LogoMark, Tooltip, iconButtonClassName } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -35,15 +36,17 @@ function useAllOutOfView(targets: RefObject<HTMLElement | null>[]): boolean {
 }
 
 const ANCHOR_CLASS = cx(
-  'rounded-xs px-2 py-1 text-sm text-text-dim hover:text-text',
+  hudLabelClassName,
+  'rounded-xs px-2 py-1 text-xs text-text-dim hover:text-text',
   interactiveClassName,
   focusRingClassName
 );
 
 /**
- * The landing page's sticky banner: brand, section anchors (md up), Discord and
- * GitHub, and, once no large login button is in view, a small
- * one in its place. Phones get the logo, Discord and that conditional button.
+ * The landing page's sticky banner: brand, section anchors (lg up), Discord and
+ * GitHub, and, once no large login button is in view, a small one in its place.
+ * Phones get the logo and Discord, and that conditional button in a bar fixed
+ * to the bottom of the screen.
  */
 export function LandingHeader({
   ctaRefs,
@@ -58,19 +61,16 @@ export function LandingHeader({
   const { t } = useTranslation();
   const ctaOut = useAllOutOfView(ctaRefs);
   return (
-    <header
-      data-cta-open={ctaOut}
-      className="group sticky top-0 z-30 border-b border-line bg-bg/95"
-    >
+    <header className="sticky top-0 z-30 border-b border-line bg-bg/95">
       <div className="mx-auto flex max-w-[96rem] items-center gap-4 px-4 py-2 sm:px-6">
         <div className="flex items-center gap-2">
           <LogoMark className="size-7" />
-          {/* On a phone the login button needs the room: the name goes visually hidden while it shows. */}
-          <span className="text-sm font-bold tracking-wide whitespace-nowrap max-sm:group-data-[cta-open=true]:sr-only">
+          <span className="font-hud text-base font-bold tracking-wider whitespace-nowrap uppercase">
             {t('app.name')}
           </span>
         </div>
-        <nav aria-label={t('login.header.nav')} className="hidden flex-1 justify-center md:flex">
+        {/* Left-aligned after the name, so the header's login button opening on the right never moves it. */}
+        <nav aria-label={t('login.header.nav')} className="ml-6 hidden lg:flex">
           <ul className="flex gap-1">
             {LANDING_ANCHORS.map(({ id, key }) => (
               <li key={id}>
@@ -81,7 +81,7 @@ export function LandingHeader({
             ))}
           </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-1 md:ml-0">
+        <div className="ml-auto flex items-center gap-1">
           <HeaderIconLink href={DISCORD_URL} label={t('login.header.discord')}>
             <Discord aria-hidden="true" />
           </HeaderIconLink>
@@ -91,25 +91,30 @@ export function LandingHeader({
             </HeaderIconLink>
           </span>
           {/*
-            Always laid out, collapsed to zero width until no large login
-            button is in view: opening the track (not mounting the button) is
-            what slides the icons beside it over instead of making them jump.
+            From md: always laid out, collapsed to zero width until no large
+            login button is in view. Opening the track (not mounting the
+            button) is what slides the icons beside it over instead of making
+            them jump. Below md the same button rides in a bar fixed to the
+            bottom of the screen, under the thumb, sliding up into view.
             Collapsed it is `inert` and hidden from assistive tech, so it can
-            neither be tabbed to nor announced. Without motion the width just
-            changes at once.
+            neither be tabbed to nor announced. Without motion it just appears.
           */}
           <div
             data-open={ctaOut}
             inert={!ctaOut}
             aria-hidden={!ctaOut}
-            className="grid grid-cols-[0fr] data-[open=true]:grid-cols-[1fr] motion-safe:transition-[grid-template-columns] motion-safe:duration-300 motion-safe:ease-out"
+            className={cx(
+              'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:flex max-md:justify-center max-md:border-t max-md:border-accent/30 max-md:bg-bg/95 max-md:px-4 max-md:pt-2.5 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+              'max-md:translate-y-full max-md:data-[open=true]:translate-y-0 max-md:motion-safe:transition-transform max-md:motion-safe:duration-300',
+              'md:grid md:grid-cols-[0fr] md:data-[open=true]:grid-cols-[1fr] md:motion-safe:transition-[grid-template-columns] md:motion-safe:duration-300 md:motion-safe:ease-out'
+            )}
           >
-            <div className="min-w-0 overflow-hidden">
+            <div className="min-w-0 md:overflow-hidden">
               <div
                 className={cx(
-                  'pl-2 opacity-0 data-[open=true]:opacity-100',
-                  'motion-safe:transition-[opacity,translate] motion-safe:duration-300 motion-safe:ease-out',
-                  'translate-x-3 data-[open=true]:translate-x-0'
+                  'md:pl-2 md:opacity-0 md:data-[open=true]:opacity-100',
+                  'md:motion-safe:transition-[opacity,translate] md:motion-safe:duration-300 md:motion-safe:ease-out',
+                  'md:translate-x-3 md:data-[open=true]:translate-x-0'
                 )}
                 data-open={ctaOut}
               >
