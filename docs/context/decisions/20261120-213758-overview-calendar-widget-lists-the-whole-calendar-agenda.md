@@ -22,7 +22,7 @@ _Recorded 2026-11-20._
 - **Next deadline still takes calendar events only from this widget, the committed ones.** The other
   clocks reach the strip through their own widgets, and two offers of one clock could contradict
   each other.
-- **Items overdue for more than two days are left out (`LONG_OVERDUE_MS`).** The rail folds them into
+- **Items overdue from before today are left out (`splitOverdueBeforeToday`).** The rail folds them into
   one summary row; a widget has no room for that fold, and a month of idle extractors would bury
   what is current.
 - **Shared Pops show once, at the viewer's Pop Time, exactly as on the page.** Both surfaces run
