@@ -12,6 +12,7 @@
  */
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Outcome } from '@/components/OutcomeNote';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -19,8 +20,6 @@ import { useOnline } from '@/stores/network';
 import { setWaypointsInGame } from './sendWaypoints';
 import type { ScopeGroup } from '@/esi/registry';
 import { WAYPOINT_ENDPOINTS, WAYPOINT_GROUPS, waypointOutcome } from './waypointOutcome';
-
-type SetDestinationOutcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 interface SetDestination {
   /** Why sending can't work yet — no Character, or no waypoint scope — or null when it can. */
@@ -30,7 +29,7 @@ interface SetDestination {
   /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
-  outcome: SetDestinationOutcome;
+  outcome: Outcome | null;
   /** No-ops while blocked. */
   send: () => void;
 }
@@ -52,7 +51,7 @@ export function useSetDestination(
   const lacksScope = useCharacterLacksEndpoints(characterId, WAYPOINT_ENDPOINTS);
   const online = useOnline();
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<SetDestinationOutcome>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   /** `sending` lags a render behind; two quick selects must not both send. */
   const inFlight = useRef(false);
 

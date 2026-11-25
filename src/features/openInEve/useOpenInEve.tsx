@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Outcome } from '@/components/OutcomeNote';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useCharacterIdsWithScopes, useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -21,8 +22,6 @@ import { openInEve, OPEN_IN_EVE_ENDPOINTS, type OpenInEveTarget } from './sendOp
 
 /** How long a result stays on screen before it clears itself. */
 export const OUTCOME_VISIBLE_MS = 10_000;
-
-type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 const MISSING_GROUPS: readonly ScopeGroup[] = permissionsForEndpoints(OPEN_IN_EVE_ENDPOINTS);
 const OPEN_IN_EVE_SCOPES = requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS);
@@ -45,7 +44,7 @@ export interface OpenInEve {
   /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
-  outcome: Outcome;
+  outcome: Outcome | null;
   /** No-ops while blocked. */
   send: () => void;
 }
@@ -93,7 +92,7 @@ export function useOpenInEve(
   const holders = useCharacterIdsWithScopes(OPEN_IN_EVE_SCOPES);
   const names = useCharacterNames();
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   /** `sending` lags a render behind; two quick selects must not both send. */
   const inFlight = useRef(false);
 

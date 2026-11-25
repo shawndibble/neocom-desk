@@ -14,6 +14,7 @@
  */
 import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote } from '@/components/OutcomeNote';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
 import { ViewRouteButton } from '@/features/travel/ViewRouteButton';
@@ -53,14 +54,7 @@ export function SetDestinationButton({
           {blockedReason}
         </span>
       )}
-      {outcome && (
-        <span
-          role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-xs text-danger' : 'text-xs text-success'}
-        >
-          {outcome.text}
-        </span>
-      )}
+      <OutcomeNote outcome={outcome} />
     </span>
   );
 }
