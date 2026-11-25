@@ -20,7 +20,7 @@ describe('PromoVideo', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'login.video.play' }));
 
-    const player = screen.getByTitle('login.video.playerTitle');
+    const player = screen.getByLabelText('login.video.playerTitle');
     expect(player.getAttribute('src')).toBe(promoEmbedUrl(PROMO_VIDEO.youtubeId));
     expect(player).toHaveFocus();
     expect(screen.queryByRole('button')).toBeNull();
@@ -28,11 +28,11 @@ describe('PromoVideo', () => {
 
   it('starts at once when another control asked to play, and refocuses the same player on a later press', () => {
     const view = render(<PromoVideo plays={1} onPlay={() => {}} />);
-    const player = screen.getByTitle('login.video.playerTitle');
+    const player = screen.getByLabelText('login.video.playerTitle');
     expect(player).toHaveFocus();
     player.blur();
     view.rerender(<PromoVideo plays={2} onPlay={() => {}} />);
-    expect(screen.getByTitle('login.video.playerTitle')).toBe(player);
+    expect(screen.getByLabelText('login.video.playerTitle')).toBe(player);
     expect(player).toHaveFocus();
   });
 });

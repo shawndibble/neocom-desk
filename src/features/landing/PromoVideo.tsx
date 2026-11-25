@@ -41,7 +41,7 @@ export function PromoVideo({ plays, onPlay }: { plays: number; onPlay: () => voi
         <iframe
           ref={player}
           src={promoEmbedUrl(youtubeId)}
-          title={t('login.video.playerTitle')}
+          aria-label={t('login.video.playerTitle')}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
@@ -70,7 +70,7 @@ export function PromoVideo({ plays, onPlay }: { plays: number; onPlay: () => voi
           />
           <span
             aria-hidden="true"
-            className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg/45 motion-safe:transition-colors group-hover:bg-bg/25"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg/45 motion-safe:transition-[background-color] group-hover:bg-bg/25"
           >
             <span className="flex size-16 items-center justify-center rounded-full bg-accent text-bg shadow-lg motion-safe:transition-transform group-hover:scale-105 sm:size-20">
               <PlayVideo size={ICON_SIZE.lg} />
