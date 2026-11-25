@@ -121,11 +121,7 @@ function Board({ characterId, layout }: BoardProps) {
         actions={
           <>
             <OverviewNext summary={summary} />
-            {narrow && summary.fetchedAt && !editing ? (
-              <OverviewMoreMenu summary={summary} />
-            ) : (
-              <OverviewCustomize />
-            )}
+            {narrow ? <OverviewMoreMenu summary={summary} /> : <OverviewCustomize />}
           </>
         }
       />

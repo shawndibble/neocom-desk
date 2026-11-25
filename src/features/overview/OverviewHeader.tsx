@@ -1,9 +1,9 @@
 /**
  * The Overview's header controls, handed to `CharacterHeader`'s slots: the
- * data age (`OverviewDataAge`, on the tab row) and the
+ * data age (`OverviewDataAge`, on the tab row from `md` up) and the
  * controls (`OverviewNext` and `OverviewCustomize`, level with the bell).
- * Below `md` the page swaps Customize and the data age for one ⋮ menu
- * (`OverviewMoreMenu`) and Next becomes a borderless row.
+ * Below `md` the page drops the data age chip and swaps Customize for one ⋮
+ * menu (`OverviewMoreMenu`) holding both, and Next becomes a borderless row.
  *
  * It reads what is on screen, not what is stored: the button and the age count
  * only the widgets the page draws (a widget hidden on a phone offers neither a
@@ -172,15 +172,16 @@ export function OverviewCustomize() {
  * Below `md`: the header's one ⋮ menu, holding Customize and a Refresh of
  * every widget (its label carries the data age, which the tab row has no room
  * for). Two real actions are needed to earn the ⋮ (§6c), so while the edit
- * bar owns Done, or before any read has landed, the page keeps its single
- * control inline instead and this renders nothing.
+ * bar owns Done, or before any read has landed, this draws the single inline
+ * Customize button instead (which is nothing while editing). The page just
+ * renders this below `md` and `OverviewCustomize` from `md` up.
  */
 export function OverviewMoreMenu({ summary }: { summary: OverviewSummary }) {
   const { t } = useTranslation();
   const { editing, startEditing } = useOverviewEdit();
   const { refresh } = useOverviewRefresh();
   const { fetchedAt, now } = summary;
-  if (editing || !fetchedAt) return null;
+  if (editing || !fetchedAt) return <OverviewCustomize />;
   return (
     <HeaderMoreMenu>
       <DropdownMenuItem onSelect={startEditing}>
