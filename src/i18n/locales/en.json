@@ -4938,14 +4938,14 @@
     "trust": {
       "readOnly": {
         "name": "It writes only when you act",
-        "desc": "Each write follows something you do. Opening a mail flags it as read in EVE. Answering a calendar invite sends your response. Mail you send goes out through your account: replies, forwards, Community invites, Pledge mails and SRP results. Saving a Fitting to EVE recreates it on the game's side. Setting a route's waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else writes to EVE."
+        "desc": "Opening a mail flags it as read in EVE. Answering a calendar invite sends your response. Mail you send goes out through your account. Saving a Fitting to EVE recreates it on the game's side. Setting waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else writes to EVE."
       },
       "token": {
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications and, if you add them, its location (nearby alerts) and its mail headers (new-mail alerts). Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
+        "desc": "Your login's refresh token lives in this device's own storage, never on our server or in a log. Remove a character and it goes with it. Two opt-in features keep their own narrow token on our server, only while they are on: Alerts when closed and a Corp Tax Book's Automatic sync. The FAQ below has the details."
       },
       "offline": {
-        "name": "Your data stays when the signal goes",
+        "name": "Install it, open it offline",
         "desc": "Install it like an app. Your characters and skill plans open from this device without a connection, marked as cached, and your plans sync across your devices. Live market and killboard data need a connection."
       },
       "openSource": {
@@ -4989,7 +4989,7 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, Share Links you create (readable by anyone with the link, for 7 days), and your corporation's own records: SRP Claims and its Corp Tax Book, which its officers can read."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. On our server, only if you use them: alerts you have seen, push, anything you share with a Community, Share Links you create (readable by anyone with the link, for 7 days), and your corporation's SRP Claims and Corp Tax Book, which its officers can read. Two opt-in features also keep a separate, encrypted token there while they are on: Alerts when closed, which can read only that character's notifications and, if you add them, its location and mail headers; and a Corp Tax Book's Automatic sync, limited to the book's reads, for the officer who turned it on. Turn either off, or remove the character, and its token is deleted."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
