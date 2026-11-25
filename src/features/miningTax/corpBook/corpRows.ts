@@ -88,6 +88,8 @@ const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> =
   billed: 'outstanding',
   // Visible and not owed: it needs a decision, but not the member's money.
   conflict: 'needs-review',
+  // Not owed and nothing to do yet, but kept beside the day's bill rather than in History.
+  settling: 'needs-review',
   paid: 'paid',
   dismissed: 'dismissed',
   // Forgiven in full by an officer write-off (#4637): not owed, like a dismissal.

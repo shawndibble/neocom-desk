@@ -78,17 +78,25 @@ export function CorpBookSyncNote({
     Math.abs(opening) >= 1;
   if (!hasWords) return null;
 
+  // A closed day whose ore is still Settling is not safe yet: more of it may still be billed.
+  const settling = closedThrough !== undefined && book.settlingFrom !== undefined;
   const safe =
     owedNow > 0 || book.pendingFrom !== undefined
-      ? closedThrough
-        ? t(`miningTax.corpBook.sync.safe${here}`, {
-            date: shortDate(closedThrough, i18n.language),
+      ? settling
+        ? t(`miningTax.corpBook.sync.settling${here}`, {
+            date: shortDate(book.settlingFrom!, i18n.language),
             corp: corpName,
             ago,
           })
-        : synced
-          ? t(`miningTax.corpBook.sync.safeOnce${here}`, { corp: corpName, ago })
-          : t(`miningTax.corpBook.sync.neverSynced${here}`, { corp: corpName })
+        : closedThrough
+          ? t(`miningTax.corpBook.sync.safe${here}`, {
+              date: shortDate(closedThrough, i18n.language),
+              corp: corpName,
+              ago,
+            })
+          : synced
+            ? t(`miningTax.corpBook.sync.safeOnce${here}`, { corp: corpName, ago })
+            : t(`miningTax.corpBook.sync.neverSynced${here}`, { corp: corpName })
       : null;
   const closesAt = book.pendingFrom
     ? new Date(dayClosesAt(book.pendingFrom, loaded.graceHours))
@@ -96,7 +104,9 @@ export function CorpBookSyncNote({
   return (
     <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
       {safe && (
-        <span className={closedThrough ? 'font-semibold text-success' : 'text-text-dim'}>
+        <span
+          className={closedThrough && !settling ? 'font-semibold text-success' : 'text-text-dim'}
+        >
           {safe}
         </span>
       )}

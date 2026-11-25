@@ -8,6 +8,7 @@ export type PillState =
   | 'pending'
   | 'billed'
   | 'conflict'
+  | 'settling'
   | 'unattributed'
   | 'dismissed'
   | 'waived'
@@ -19,6 +20,7 @@ export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
   billed: 'billed',
   conflict: 'conflict',
+  settling: 'settling',
   unattributed: 'unattributed',
   dismissed: 'dismissed',
   waived: 'waived',
@@ -86,6 +88,7 @@ export function useCorpStateHint() {
       return t(`miningTax.corpBook.hint.${key}`, {
         corp: corpName,
         date: resolvesOn(view.resolvesAt),
+        day: view.date,
         reason: view.dismissalReason ?? '',
         sentOn: isoDay(view.flagged?.at),
         flagReason: view.flagged?.reason ?? '',

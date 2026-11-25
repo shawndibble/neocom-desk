@@ -111,6 +111,10 @@ export function CorpOverlapNotice({
         corpName={corpName}
         cause={view.conflictCause}
         {...(view.ownerPayeeId !== undefined && { ownerName: nameOf(view.ownerPayeeId) })}
+        {...(view.conflictCause === 'overListed' &&
+          view.overlap?.payeeIds[0] !== undefined && {
+            ownPayeeName: nameOf(view.overlap.payeeIds[0]),
+          })}
         entries={mine.map((a) => ({
           id: a.id,
           payeeName: nameOf(a.payeeId ?? ''),

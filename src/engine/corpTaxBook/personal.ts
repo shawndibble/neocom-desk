@@ -54,9 +54,14 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { HOUR_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
-export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
+/**
+ * `settling`: ore the member listed for the corporation's own Payee beyond what the book recorded,
+ * while the refinery log may still be catching up on the day (`isSettled`). Never billed or
+ * flagged; once the day settles the same ore is an `overListed` Conflict.
+ */
+export type BookRowState = 'billed' | 'conflict' | 'settling' | 'dismissed' | 'waived' | 'paid';
 /**
  * Why a Conflict clashes. `otherPayee`: the member gave the ore to a Payee that is not this
  * corporation's. `overListed`: the member's entry for the corporation's own Payee lists more ore
@@ -823,6 +828,19 @@ export function previewTakeover(
   return out;
 }
 
+/**
+ * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
+ * missing: the book holds the miner's ore at that refinery on a later day, or a day has passed
+ * since the day ended. A sync soon after the day closes can predate the log's last writes.
+ */
+function isSettled(book: PersonalBook, charge: PreparedCharge, now: string): boolean {
+  const { characterId, structureId, date } = charge.observed;
+  if (Date.parse(now) >= Date.parse(dayClosesAt(date, 0)) + DAY_MS) return true;
+  return book.observed.some(
+    (o) => o.characterId === characterId && o.structureId === structureId && o.date > date
+  );
+}
+
 function disputeOf(
   entry: PersonalEntry | undefined,
   bookLines: readonly OreLine[],
@@ -924,7 +942,8 @@ export function overlayCorpBooks(input: {
   };
 
   // Ore the member listed for the corporation's own Payee beyond what any book recorded: visible,
-  // never owed, never billed, and it never resolves to the corporation (#6203).
+  // never owed, never billed, and it never resolves to the corporation (#6203). Until the day
+  // settles it is only Settling: the refinery log may still be catching up on the day.
   const pushExcess = (
     p: Prepared,
     charge: PreparedCharge,
@@ -936,13 +955,21 @@ export function overlayCorpBooks(input: {
     pushRow({
       ...commonOf(p, charge, value),
       id: `${p.book.corporationId}:${charge.charge.key}:overListed:${allocation.id ?? ''}`,
-      state: 'conflict',
       oreLines: excess,
       estimatedValue: worth.estimatedValue,
       taxOwed: null,
       billed: 0,
-      conflictCause: 'overListed',
-      overlap: { payeeIds: [allocation.payeeId], ore: excess, paid: allocation.status === 'paid' },
+      ...(isSettled(p.book, charge, now)
+        ? {
+            state: 'conflict' as const,
+            conflictCause: 'overListed' as const,
+            overlap: {
+              payeeIds: [allocation.payeeId],
+              ore: excess,
+              paid: allocation.status === 'paid',
+            },
+          }
+        : { state: 'settling' as const }),
     });
   };
 

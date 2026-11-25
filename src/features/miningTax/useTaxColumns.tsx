@@ -303,7 +303,8 @@ export function useTaxColumns({
         // Owed is the figure the page is about; settled history recedes, and so does a day the
         // Payee's book now decides: there is nothing for the pilot to do on it.
         cellClassName: (dr) =>
-          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
+          dr.corp?.kind === 'row' &&
+          (dr.corp.view.state === 'conflict' || dr.corp.view.state === 'settling')
             ? 'text-text-dim'
             : dr.status === 'outstanding' && taxOwedOf(dr) <= 0
               ? 'text-text-dim'

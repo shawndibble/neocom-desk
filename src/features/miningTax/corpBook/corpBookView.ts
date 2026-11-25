@@ -45,6 +45,8 @@ export interface CorpBookViewBook {
   payee: PayeeRecord;
   /** The earliest day whose corp record is still pending, when any is. */
   pendingFrom?: string;
+  /** The earliest day with ore still Settling (the refinery log catching up), when any is. */
+  settlingFrom?: string;
 }
 
 export interface CorpClaim {
@@ -190,6 +192,10 @@ export function buildCorpBookView(
       )
       .map(([key]) => key.split(':')[1])
       .sort();
+    const settlingFrom = overlay.rows
+      .filter((r) => r.state === 'settling' && r.corporationId === loadedBook.corporationId)
+      .map((r) => r.date)
+      .sort()[0];
     const ownRate = overlay.rows.find((r) => r.corporationId === loadedBook.corporationId)?.taxPct;
     const firstChar = loadedBook.characterIds[0];
     return {
@@ -205,6 +211,7 @@ export function buildCorpBookView(
         loadedBook.hubId
       ),
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
+      ...(settlingFrom !== undefined ? { settlingFrom } : {}),
     };
   });
   const claims: CorpClaim[] = ready.flatMap((book) =>
