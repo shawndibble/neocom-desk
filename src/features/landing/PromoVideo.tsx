@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { focusRingClassName } from '@/components/ui/controlStyles';
+import { focusRingInsetClassName } from '@/components/ui/controlStyles';
 import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { promoEmbedUrl } from './promoVideo';
+import { PROMO_VIDEO, promoEmbedUrl } from './promoVideo';
 
 const POSTER = '/promo/promo-poster-1280.webp';
 const POSTER_SRCSET = '/promo/promo-poster-640.webp 640w, /promo/promo-poster-1280.webp 1280w';
@@ -13,16 +13,28 @@ const POSTER_SRCSET = '/promo/promo-poster-640.webp 640w, /promo/promo-poster-12
  * button, swapped for the YouTube player only when pressed. Nothing from
  * YouTube loads before that, so the landing page's paint and privacy are
  * unchanged for a visitor who never plays it. Never autoplays on arrival:
- * the video is narrated, and muted autoplay would lose the point.
+ * the video is narrated, and muted autoplay would lose the point. Phone
+ * browsers may still want a second tap on YouTube's own play button: the
+ * press does not carry into the cross-origin frame.
  */
-export function PromoVideo({ youtubeId, length }: { youtubeId: string; length: string }) {
+export function PromoVideo({ playing, onPlay }: { playing: boolean; onPlay: () => void }) {
   const { t } = useTranslation();
-  const [playing, setPlaying] = useState(false);
+  const { youtubeId, duration } = PROMO_VIDEO;
+  const player = useRef<HTMLIFrameElement>(null);
+
+  // The pressed control is gone (or was the hero's link, up the page): bring the
+  // player into view and hand it keyboard focus.
+  useLayoutEffect(() => {
+    if (!playing) return;
+    player.current?.scrollIntoView({ block: 'nearest' });
+    player.current?.focus({ preventScroll: true });
+  }, [playing]);
 
   return (
     <div className="relative mt-6 aspect-video w-full overflow-hidden border border-line bg-bg">
       {playing ? (
         <iframe
+          ref={player}
           src={promoEmbedUrl(youtubeId)}
           title={t('login.video.playerTitle')}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
@@ -33,17 +45,17 @@ export function PromoVideo({ youtubeId, length }: { youtubeId: string; length: s
       ) : (
         <button
           type="button"
-          onClick={() => setPlaying(true)}
-          aria-label={t('login.video.play', { length })}
+          onClick={onPlay}
+          aria-label={t('login.video.play', { duration })}
           className={cx(
             'group absolute inset-0 block size-full cursor-pointer',
-            focusRingClassName
+            focusRingInsetClassName
           )}
         >
           <img
             src={POSTER}
             srcSet={POSTER_SRCSET}
-            sizes="(min-width: 72rem) 72rem, 100vw"
+            sizes="(min-width: 72rem) 69rem, calc(100vw - 3rem)"
             alt=""
             width={1280}
             height={720}
@@ -59,7 +71,7 @@ export function PromoVideo({ youtubeId, length }: { youtubeId: string; length: s
               <PlayVideo size={ICON_SIZE.lg} />
             </span>
             <span className="rounded-xs bg-bg/80 px-2 py-0.5 font-mono text-xs text-text">
-              {length}
+              {duration}
             </span>
           </span>
         </button>

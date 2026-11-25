@@ -40,6 +40,9 @@ export function Login() {
   // "Log in" button's own link right under it.
   const [customizing, setCustomizing] = useState(false);
 
+  // The promo video starts from its poster or from the hero's "Watch" link.
+  const [promoPlaying, setPromoPlaying] = useState(false);
+
   // The large login buttons (hero and closing call to action); the sticky
   // header shows its own only while neither is in view.
   const heroCtaRef = useRef<HTMLDivElement>(null);
@@ -129,15 +132,14 @@ export function Login() {
                 />
                 {loginFailed && <InlineError>{t('login.failed')}</InlineError>}
                 <CustomizeLink onClick={() => setCustomizing(true)} />
-                {PROMO_VIDEO.youtubeId !== null && (
-                  <a
-                    href={`#${PROMO_VIDEO_ANCHOR}`}
-                    className={plainTextActionClassName('gap-1.5')}
-                  >
-                    <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
-                    {t('login.video.heroLink', { length: PROMO_VIDEO.length })}
-                  </a>
-                )}
+                <button
+                  type="button"
+                  className={plainTextActionClassName('gap-1.5')}
+                  onClick={() => setPromoPlaying(true)}
+                >
+                  <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
+                  {t('login.video.heroLink', { duration: PROMO_VIDEO.duration })}
+                </button>
               </div>
             </div>
 
@@ -147,12 +149,10 @@ export function Login() {
 
         {belowFold && (
           <>
-            {PROMO_VIDEO.youtubeId !== null && (
-              <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')}>
-                <p className="mt-2 max-w-2xl text-text-dim">{t('login.video.lead')}</p>
-                <PromoVideo youtubeId={PROMO_VIDEO.youtubeId} length={PROMO_VIDEO.length} />
-              </LandingSection>
-            )}
+            <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')}>
+              <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.video.lead')}</p>
+              <PromoVideo playing={promoPlaying} onPlay={() => setPromoPlaying(true)} />
+            </LandingSection>
             <LandingSection
               id="login-answers"
               heading={t('login.answersHeading')}
