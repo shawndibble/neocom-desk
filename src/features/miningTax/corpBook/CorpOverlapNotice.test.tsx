@@ -382,6 +382,31 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
     ).toBeInTheDocument();
   });
 
+  it("names the member's own Payee on over-listed ore, never another Payee", () => {
+    render(
+      <CorpOverlapNotice
+        view={
+          {
+            ...conflict,
+            conflictCause: 'overListed',
+            overlap: { payeeIds: ['p1'], ore: conflict.oreLines, paid: false },
+          } as BookRowView
+        }
+        corpName="Brass Meridian"
+        recordedAt="Efa"
+        // The book stands in for the Assignment, so it is not among the tab's own rows.
+        everyAssignment={[]}
+        payeeById={new Map([['p1', payee]])}
+        typeNames={new Map([[ZEO, 'Zeolites']])}
+        onChanged={() => {}}
+      />
+    );
+    expect(
+      screen.getByText('Your entry: lists more of this ore for Ashfall than the book recorded')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/another Payee/)).toBeNull();
+  });
+
   it('offers nothing to dispute on ore the book never recorded', () => {
     renderWith({ ...conflict, conflictCause: 'overListed' });
     expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();

@@ -20,6 +20,8 @@ const SYL = 45491;
 const NOW = '2026-10-18T14:00:00Z';
 /** Past a 2026-10-17 Conflict's 14 days: the book's share of it is owed. */
 const LATE = '2026-11-05T14:00:00Z';
+/** A day after 2026-10-17 ended: over-listed ore on it is no longer Settling. */
+const SETTLED = '2026-10-19T00:00:00Z';
 // Synced 2h ago: every day through 17 Oct is Billable (day end + 6h grace, then a sync).
 const SYNCED = '2026-10-18T12:00:00Z';
 
@@ -507,7 +509,7 @@ describe('overlayCorpBooks', () => {
           },
         ],
       });
-      const out = overlay([two], [book({ ownPayeeIds: ['bmw'] })]);
+      const out = overlay([two], [book({ ownPayeeIds: ['bmw'] })], SETTLED);
       // 40,000 + 3,050 fill the book's 43,050; the other 5,950 of 'two' is over-listed.
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['one', 'two']);
       expect(out.rows.find((r) => r.state === 'conflict')?.oreLines).toEqual([
@@ -599,7 +601,7 @@ describe('overlayCorpBooks', () => {
           },
         ],
       });
-      const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })]);
+      const out = overlay([big], [book({ ownPayeeIds: ['bmw'] })], SETTLED);
       expect(out.rows.find((r) => r.state === 'conflict')).toMatchObject({
         conflictCause: 'overListed',
       });
@@ -1722,7 +1724,8 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
             alloc({ id: 'a-bmw', payeeId: 'bmw', oreLines: [{ typeId: ZEO, quantity: 50_000 }] }),
           ]),
         ],
-        [book({ ownPayeeIds: ['bmw'] })]
+        [book({ ownPayeeIds: ['bmw'] })],
+        SETTLED
       );
       const billed = out.rows.find((r) => r.state === 'billed');
       expect(billed?.oreLines).toEqual([{ typeId: ZEO, quantity: 43_050 }]);
@@ -1740,6 +1743,76 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
       expect(conflicts[0].resolvesAt).toBeUndefined();
       // Both rows stand in for the Assignment.
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
+    });
+
+    describe('while the refinery log may still be catching up on the day', () => {
+      const overListed = () =>
+        allGiven(50_000, [
+          alloc({ id: 'a-bmw', payeeId: 'bmw', oreLines: [{ typeId: ZEO, quantity: 50_000 }] }),
+        ]);
+      const later = (structureId: number, characterId = ME) => ({
+        characterId,
+        recordedCorporationId: CORP,
+        structureId,
+        date: '2026-10-18',
+        solarSystemId: SYSTEM,
+        oreLines: [{ typeId: ZEO, quantity: 1_000 }],
+      });
+      const statesOf = (out: ReturnType<typeof overlay>) =>
+        out.rows.filter((r) => r.state !== 'billed').map((r) => r.state);
+
+      it('shows the excess as Settling: no Conflict, no overlap, nothing billed', () => {
+        const out = overlay([overListed()], [book({ ownPayeeIds: ['bmw'] })]);
+        const settling = out.rows.filter((r) => r.state === 'settling');
+        expect(settling).toHaveLength(1);
+        expect(settling[0]).toMatchObject({
+          oreLines: [{ typeId: ZEO, quantity: 6_950 }],
+          taxOwed: null,
+          billed: 0,
+        });
+        expect(settling[0].overlap).toBeUndefined();
+        expect(settling[0].conflictCause).toBeUndefined();
+        expect(out.rows.some((r) => r.state === 'conflict')).toBe(false);
+        // The Assignment is still stood in for, so its ore is not listed twice.
+        expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
+      });
+
+      it("settles once the book holds the miner's ore at that refinery on a later day", () => {
+        const b = book({
+          ownPayeeIds: ['bmw'],
+          observed: [...book().observed, later(1000)],
+        });
+        expect(statesOf(overlay([overListed()], [b]))).toEqual(['conflict']);
+      });
+
+      it("keeps Settling on later ore at another refinery, or another miner's", () => {
+        const b = book({
+          ownPayeeIds: ['bmw'],
+          observed: [...book().observed, later(1001), later(1000, ME + 1)],
+        });
+        expect(statesOf(overlay([overListed()], [b]))).toEqual(['settling']);
+      });
+
+      it('keeps Settling until every refinery the miner used that day has later ore', () => {
+        const other = { ...book().observed[0], structureId: 1001, oreLines: [] };
+        const b = (observed: PersonalBook['observed']) =>
+          book({ ownPayeeIds: ['bmw'], observed: [...book().observed, other, ...observed] });
+        expect(statesOf(overlay([overListed()], [b([later(1000)])]))).toEqual(['settling']);
+        expect(statesOf(overlay([overListed()], [b([later(1000), later(1001)])]))).toEqual([
+          'conflict',
+        ]);
+      });
+
+      it('settles a day after the day ended, with no later ore', () => {
+        expect(
+          statesOf(
+            overlay([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T23:59:59Z')
+          )
+        ).toEqual(['settling']);
+        expect(
+          statesOf(overlay([overListed()], [book({ ownPayeeIds: ['bmw'] })], SETTLED))
+        ).toEqual(['conflict']);
+      });
     });
 
     it("leaves what another book contests on the Assignment, not as this book's excess", () => {
