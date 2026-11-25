@@ -9,7 +9,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173/',
     headless: true,
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: 1440, height: 960 },
     deviceScaleFactor: 1.5,
     colorScheme: 'dark',
     actionTimeout: 15_000,
