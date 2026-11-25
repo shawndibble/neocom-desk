@@ -14,6 +14,7 @@ import { useCharacters } from '@/features/character/useCharacters';
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote, type Outcome } from '@/components/OutcomeNote';
 import { useNavigate } from 'react-router-dom';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { grantMissingPath } from '@/app/grantMissingPath';
@@ -38,14 +39,13 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
+import { MESSAGE_MS } from '@/components/ui/useTimedToast';
 import { useWaypointsDismissed } from './waypointsDismissed';
 import { setWaypointsInGame } from './sendWaypoints';
 import { waypointFailureText } from './waypointFailureText';
 import type { RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
-
-type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 export function SetWaypoints({
   legs,
@@ -79,7 +79,7 @@ export function SetWaypoints({
     characters.length > 0 &&
     (holders === undefined || holders.size === 0 || lacksScope);
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
 
   const blockedReason =
     characterId === null
@@ -215,14 +215,7 @@ export function SetWaypoints({
           </div>
         </div>
       )}
-      {outcome && (
-        <p
-          role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-danger' : 'text-text-dim'}
-        >
-          {outcome.text}
-        </p>
-      )}
+      <OutcomeNote outcome={outcome} durationMs={MESSAGE_MS} as="p" />
     </div>
   );
 }

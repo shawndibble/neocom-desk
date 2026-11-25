@@ -54,6 +54,7 @@ export function ReclaimBookSection() {
       {revoked !== null && (
         <Toast
           message={t('corpTaxBook.moons.settings.reclaim.done', { count: revoked })}
+          tone="success"
           onClose={() => setRevoked(null)}
         />
       )}

@@ -290,7 +290,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           />
         )}
         {saved && (
-          <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />
+          <Toast
+            message={t('corpTaxBook.moons.settings.saved')}
+            tone="success"
+            onClose={() => setSaved(false)}
+          />
         )}
         {inviteOpen && (
           <InviteMoonOwnerDialog

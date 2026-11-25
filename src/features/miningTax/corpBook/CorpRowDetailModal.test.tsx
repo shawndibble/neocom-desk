@@ -89,7 +89,7 @@ describe('CorpRowDetailModal', () => {
   it('shows what the book bills, with the book and your own quantity', () => {
     renderModal();
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Billed')).toBeInTheDocument();
+    expect(screen.getByText('Outstanding')).toBeInTheDocument();
     expect(screen.getByText(/43,050 \(corp\) · 41,200 \(you\)/)).toBeInTheDocument();
     expect(screen.getAllByText(/15% per-moon rate from 2026-10-01/).length).toBeGreaterThan(0);
   });

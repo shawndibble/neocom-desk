@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import '@/i18n';
 import { PortalContainerProvider } from './portalContainer';
 import { Toast } from './Toast';
 
@@ -77,6 +78,50 @@ describe('Toast', () => {
     expect(screen.getByText('Item removed')).toBeVisible();
     screen.getByRole('button', { name: 'Undo' }).click();
     expect(undone).toBe(true);
+  });
+
+  describe('tone', () => {
+    afterEach(() => vi.useRealTimers());
+
+    const toastBox = () => screen.getByText('Saved').parentElement!;
+
+    it('leaves an untoned toast neutral, with no glyph and no spoken tone', () => {
+      vi.useFakeTimers();
+      render(<Toast message="Saved" />);
+      expect(toastBox()).toHaveClass('border-line-bright');
+      expect(toastBox().querySelector('svg')).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(/^Saved$/);
+    });
+
+    it('tints the border, draws the glyph and speaks the word for success', () => {
+      vi.useFakeTimers();
+      render(<Toast message="Saved" tone="success" />);
+      const box = toastBox();
+      expect(box).toHaveClass('border-success');
+      expect(box).not.toHaveClass('border-line-bright');
+      // The glyph is decorative: the live region carries the word instead, so
+      // colour is never the only signal (DESIGN.md §7).
+      const glyph = box.querySelector('svg');
+      expect(glyph).toHaveAttribute('aria-hidden', 'true');
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Success: Saved');
+    });
+
+    it('tints the border, draws the glyph and speaks the word for danger', () => {
+      vi.useFakeTimers();
+      render(<Toast message="Saved" tone="danger" />);
+      expect(toastBox()).toHaveClass('border-danger');
+      expect(toastBox().querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Error: Saved');
+    });
   });
 
   describe('announcement', () => {

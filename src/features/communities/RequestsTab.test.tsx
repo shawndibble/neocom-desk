@@ -595,7 +595,7 @@ describe('Message the requester', () => {
       subject: 'Your Request: Tritanium',
       body: 'Hi Aria Voss, about your Request in Pals for Tritanium: ',
     });
-    expect(await screen.findByText('Opened in your EVE client.')).toBeInTheDocument();
+    expect((await screen.findAllByText('Opened in your EVE client.')).length).toBeGreaterThan(0);
   });
 
   it('hides Message without the Open in EVE Permission', async () => {

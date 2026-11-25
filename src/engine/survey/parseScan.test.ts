@@ -131,4 +131,17 @@ describe('isSurveyScanText', () => {
       { ore: 'Sylvite', units: 4718, volume: 47_180, isk: 1_820_000.5, distanceM: 224_396_806_050 },
     ]);
   });
+
+  it('reads a scan pasted from a Swiss client, whose thousands mark is an apostrophe', () => {
+    const text = [
+      'Zeolites\t11’202\t112’020 m3\t8’370’000.00 ISK\t48 km',
+      'Brimful Sylvite',
+      "Brimful Sylvite\t2'836\t28'360 m3\t2'760'000.00 ISK\t7'035 m",
+    ].join('\n');
+    expect(parseSurveyScan(text)).toEqual([
+      { ore: 'Zeolites', units: 11_202, volume: 112_020, isk: 8_370_000, distanceM: 48_000 },
+      { ore: 'Brimful Sylvite', units: 2836, volume: 28_360, isk: 2_760_000, distanceM: 7035 },
+    ]);
+    expect(isSurveyScanText(text)).toBe(true);
+  });
 });

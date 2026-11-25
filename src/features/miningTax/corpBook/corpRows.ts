@@ -86,6 +86,8 @@ export function corpPayee(
 
 const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> = {
   billed: 'outstanding',
+  // Owed now, at an estimate, until the book closes the day and bills it.
+  estimate: 'outstanding',
   // Visible and not owed: it needs a decision, but not the member's money.
   conflict: 'needs-review',
   // Not owed and nothing to do yet, but kept beside the day's bill rather than in History.

@@ -620,7 +620,7 @@ export function Characters() {
       )}
 
       {removeFailedName !== null && (
-        <Toast message={t('characters.removeFailed', { name: removeFailedName })} />
+        <Toast message={t('characters.removeFailed', { name: removeFailedName })} tone="danger" />
       )}
 
       <RemoveCharacterDialog

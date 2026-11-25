@@ -87,7 +87,7 @@ export function CorpRowDetailModal({
       : 'miningTax.detail.breakdown.raw'
   );
   const owed = bookRowTax(view);
-  const owing = view.state === 'billed';
+  const owing = view.state === 'billed' || view.state === 'estimate';
   const scope = t(`miningTax.corpBook.rateScope.${view.rateScope}`);
   const synced = book?.summary.lastSyncedAt;
   const personal = view.personalOreLines;

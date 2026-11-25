@@ -41,6 +41,16 @@ export const WithAction: Story = {
   },
 };
 
+/** @summary Feedback cue (§6c Undo): `success` — an outcome that could have failed and didn't. Green border, check glyph, "Success" spoken. */
+export const ToneSuccess: Story = {
+  args: { message: 'Moon settings saved', tone: 'success', onClose: noop },
+};
+
+/** @summary Feedback cue (§6c Undo): `danger` — an outcome that failed. Red border, warning glyph, "Error" spoken. */
+export const ToneDanger: Story = {
+  args: { message: "Couldn't copy the multibuy list", tone: 'danger', onClose: noop },
+};
+
 /** @summary Feedback cue (§6c Undo): over a panel, where it must still stand out from the page. */
 export const OverPanel: Story = {
   args: {

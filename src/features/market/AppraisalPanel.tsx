@@ -600,6 +600,7 @@ export function AppraisalPanel({
       {janice.status === 'failed' && (
         <Toast
           message={t(`market.appraisal.janiceFailed.${janice.reason}`)}
+          tone="danger"
           instance={janice}
           onClose={dismissJanice}
         />

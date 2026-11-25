@@ -75,12 +75,14 @@ describe('ReclaimBookSection', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Reclaim the book' }).at(-1)!);
     expect(reclaimBook).toHaveBeenCalledWith(ME, CORP);
     expect(reload).toHaveBeenCalled();
-    // The toast's live region announces it (its visible copy is aria-hidden).
+    // The toast's live region announces it (its visible copy is aria-hidden),
+    // with the success tone's word ahead of the message — §7's rule that the
+    // tone never rides on the border colour alone.
     await waitFor(() =>
       expect(
         screen
           .getAllByRole('status')
-          .some((el) => el.textContent === 'Book reclaimed; 3 officers must re-verify')
+          .some((el) => el.textContent === 'Success: Book reclaimed; 3 officers must re-verify')
       ).toBe(true)
     );
   });

@@ -24,6 +24,7 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote, type Outcome } from '@/components/OutcomeNote';
 import { GrantCellMark } from '@/app/GrantCellMark';
 import { usePermissionMark } from '@/app/usePermissionMark';
 import {
@@ -77,7 +78,7 @@ export interface TurnInDestinationViewProps {
   /** "Autopilot waypoints", named by a dismissed button's tooltip. */
   permissionLabel: string;
   sending: boolean;
-  outcome: { tone: 'status' | 'alert'; text: ReactNode } | null;
+  outcome: Outcome | null;
   onSend: () => void;
   /** The waypoint `GrantCellMark`, drawn after the button when `block` is `mark`. */
   mark?: ReactNode;
@@ -125,14 +126,7 @@ export function TurnInDestinationView({
         {reason ? <Tooltip content={reason}>{button}</Tooltip> : button}
         {block.kind === 'mark' && mark}
       </div>
-      {outcome && (
-        <p
-          role={outcome.tone}
-          className={cx('text-xs', outcome.tone === 'alert' ? 'text-danger' : 'text-success')}
-        >
-          {outcome.text}
-        </p>
-      )}
+      <OutcomeNote outcome={outcome} as="p" />
     </div>
   );
 }

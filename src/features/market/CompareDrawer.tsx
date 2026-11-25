@@ -1,5 +1,5 @@
 /**
- * Resizable bottom drawer for the Compare Set (GLOSSARY.md, round 8): a
+ * Drag-resized bottom drawer for the Compare Set (GLOSSARY.md, round 8): a
  * persistent `Compare (N)` handle, opening a drawer beside the order book
  * rather than covering it — comparing happens *while* browsing, so this is a
  * non-modal overlay, never `Modal`/`<dialog>` (that would inert the order
@@ -15,14 +15,7 @@
 import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import {
@@ -40,12 +33,14 @@ import * as Icon from '@/components/ui/icons';
 import {
   controlHeightClassName,
   focusRingInsetClassName,
+  grabberClassName,
   resizeHandleTouchClassName,
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useDrawerResize } from '@/components/ui/useDrawerResize';
 import { MarketItemLink } from './MarketItemLink';
 import { RemovableTypeIcon } from './RemovableTypeIcon';
 import { useCompareSet } from './compareSet';
@@ -74,25 +69,15 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
-const MAX_HEIGHT = 560;
 const DEFAULT_HEIGHT = 280;
-const FULL_HEIGHT = '80vh';
+/** One arrow-key press of height. */
 const STEP = 24;
-
 /**
- * `md` (48rem), matching this drawer's own phone/desktop split elsewhere in
- * this file (`bottom-16 md:bottom-0`) — not `useIsPhone`'s `sm` threshold,
- * which answers a different question (`useIsPhone.ts`). A third inline copy
- * of this query is fine (`Layout.tsx` ~493, `EntryList.tsx` ~77 each already
- * have their own); there's no shared hook for it.
+ * Tallest the grip can drag the drawer, as a share of the viewport — where the
+ * Expand button used to jump it, so dragging still reaches everywhere the
+ * button did (decision `20261125-211649-compare-drawer-is-dragged-to-size-with-no`).
  */
-function isDesktopWidth(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches;
-}
-
-function clampHeight(value: number): number {
-  return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, value));
-}
+const MAX_HEIGHT_FRACTION = 0.8;
 
 const VIEW_LABEL_KEYS = {
   prices: 'viewPrices',
@@ -137,65 +122,63 @@ export function CompareDrawer({
   // A pending `openRequest` at the very first render means `addMany` +
   // `openIn` already ran in the same synchronous batch that mounted this
   // drawer (a fresh Variations "Compare" click going from an empty Compare
-  // Set), so the initial mode is decided here.
-  const [mode, setMode] = useState<'closed' | 'open' | 'full'>(() =>
-    useCompareSet.getState().openRequest > 0 ? (isDesktopWidth() ? 'open' : 'full') : 'closed'
-  );
-  const [heightPx, setHeightPx] = useState(DEFAULT_HEIGHT);
+  // Set), so it opens already open.
+  const [open, setOpen] = useState(() => useCompareSet.getState().openRequest > 0);
   // Below `md` an open drawer is a full-screen sheet, not a resizable strip:
   // a phone has no order book worth keeping in view beside it, and a 280px
   // strip above the bottom nav showed about one item.
   const narrow = useIsNarrow();
-  const fullScreen = narrow && mode !== 'closed';
+  const fullScreen = narrow && open;
   const handleRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  // The drag, and its keyboard equivalents. Disabled under the full-screen
+  // sheet, which has no grip and no height to pick.
+  const resize = useDrawerResize({
+    min: MIN_HEIGHT,
+    initial: DEFAULT_HEIGHT,
+    step: STEP,
+    maxFraction: MAX_HEIGHT_FRACTION,
+    onDismiss: () => close(),
+    enabled: open && !fullScreen,
+  });
   // Fixed over the page bottom: publish what it covers so focus scrolls clear
   // (WCAG 2.4.11).
   useStickyClearance(wrapperRef, 'compare-drawer');
-  // Real bottom space for `main` (Layout.tsx), so the page tail can scroll
-  // above the bar. Normally all of the clearance. Desktop Expand covers the
-  // page and focus is inside it, so only the handle gets room, not 80vh.
-  const expanded = mode === 'full' && !narrow;
+  // Real bottom space for `main` (Layout.tsx), so the page tail scrolls clear
+  // of the bar — all of what it covers, at every height. The old two-tier
+  // publish existed only because Expand jumped to 80vh in one click, and
+  // padding `main` by 80vh of blank scroll was not what that click asked for.
+  // With the height dragged by hand that case is gone: a reader who pulls the
+  // drawer over the page can pull it back, while capping the reservation left
+  // the content under a tall drawer impossible to scroll into view.
   useEffect(() => {
     const rootStyle = document.documentElement.style;
-    const handle = handleRef.current;
-    if (!expanded || !handle) {
-      rootStyle.setProperty('--compare-drawer-space', 'var(--compare-drawer-clearance, 0px)');
-      return () => rootStyle.removeProperty('--compare-drawer-space');
-    }
-    const publish = () => {
-      const covered = Math.max(0, window.innerHeight - handle.getBoundingClientRect().top);
-      rootStyle.setProperty('--compare-drawer-space', `calc(${covered}px + 0.75rem)`);
-    };
-    publish();
-    window.addEventListener('resize', publish);
+    rootStyle.setProperty('--compare-drawer-space', 'var(--compare-drawer-clearance, 0px)');
     return () => {
-      window.removeEventListener('resize', publish);
       rootStyle.removeProperty('--compare-drawer-space');
     };
-  }, [expanded]);
+  }, []);
 
   // Every `openIn` is consumed once acted on — the one that mounted this
   // drawer here, later ones in the listener — so a remount after leaving
   // Market doesn't reopen the drawer on a request it already honoured. A
-  // later `openIn` (e.g. a second Variations "Compare" click) only opens a
-  // *closed* drawer; an already-open one just gets the view switch below, so
-  // this never downgrades a manually expanded `full` back to `open`.
+  // later `openIn` (e.g. a second Variations "Compare" click) opens a closed
+  // drawer and otherwise only switches the view below — it never resets a
+  // height the reader has dragged.
   useEffect(() => {
     const store = useCompareSet.getState();
     if (store.openRequest > 0) store.consumeOpenRequest();
     return useCompareSet.subscribe((state, previous) => {
       if (state.openRequest <= previous.openRequest) return;
       state.consumeOpenRequest();
-      setMode((current) => (current === 'closed' ? (isDesktopWidth() ? 'open' : 'full') : current));
+      setOpen(true);
     });
   }, []);
 
   const rows = useCompareRows({
     items,
-    enabled: mode !== 'closed',
+    enabled: open,
     location,
     refreshTick,
   });
@@ -210,7 +193,7 @@ export function CompareDrawer({
   const skillLevels = useKeyedLoad(
     characterId === null ? null : String(characterId),
     loadSkillLevels,
-    mode === 'closed'
+    !open
   ).data;
   // Null with no Character, or until *their* skills load — a stale
   // previous Character's levels never price this one.
@@ -218,11 +201,11 @@ export function CompareDrawer({
     () => (skillLevels !== undefined ? { ...skillLevels, standing } : null),
     [skillLevels, standing]
   );
-  const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
+  const attributes = useCompareAttributes(items, open && view === 'attributes');
   const attributesExport = useCompareAttributesExport(rows, attributes.data);
   const { hubId: ownHubId } = useHubFor('market');
   const ownHubName = TRADE_HUBS.find((candidate) => candidate.id === ownHubId)?.systemName ?? '';
-  const hubsData = useCompareHubs(items, mode !== 'closed' && view === 'hubs', refreshTick);
+  const hubsData = useCompareHubs(items, open && view === 'hubs', refreshTick);
   const hubRows = useMemo(() => buildCompareHubRows(items, hubsData), [items, hubsData]);
   const hubsCsvColumns = useMemo(
     () => compareHubsCsvColumns(t, { jumps: hubsData.jumps, ownHub: ownHubId }),
@@ -244,10 +227,10 @@ export function CompareDrawer({
   // focus back once the closed state has rendered.
   const focusHandleOnClose = useRef(false);
   useEffect(() => {
-    if (mode !== 'closed' || !focusHandleOnClose.current) return;
+    if (open || !focusHandleOnClose.current) return;
     focusHandleOnClose.current = false;
     handleRef.current?.focus();
-  }, [mode]);
+  }, [open]);
 
   // A full-screen sheet takes focus on open — the heading, not Close, whose
   // tooltip would pop open on a programmatic focus — so Tab and Escape start
@@ -280,35 +263,7 @@ export function CompareDrawer({
 
   function close() {
     focusHandleOnClose.current = true;
-    setMode('closed');
-  }
-
-  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    if (mode !== 'open') return;
-    dragRef.current = { startY: event.clientY, startHeight: heightPx };
-    function onMove(moveEvent: PointerEvent) {
-      const drag = dragRef.current;
-      if (!drag) return;
-      setHeightPx(clampHeight(drag.startHeight + (drag.startY - moveEvent.clientY)));
-    }
-    function onUp() {
-      dragRef.current = null;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    }
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  }
-
-  function onHandleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (mode !== 'open') return;
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setHeightPx((h) => clampHeight(h + STEP));
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setHeightPx((h) => clampHeight(h - STEP));
-    }
+    setOpen(false);
   }
 
   const marginFor = useCallback(
@@ -465,20 +420,20 @@ export function CompareDrawer({
         // Covered by the full-screen sheet: out of the tab order rather than
         // a focus stop the reader can't see.
         inert={fullScreen}
-        aria-expanded={mode !== 'closed'}
+        aria-expanded={open}
         aria-controls={DRAWER_ID}
         onClick={() => {
           // Prices for a lone item compares nothing, so opening lands on Trade hubs
           // (a view the user picked on purpose stays).
-          if (mode === 'closed' && items.length === 1 && view === 'prices') setView('hubs');
-          setMode((m) => (m === 'closed' ? 'open' : 'closed'));
+          if (!open && items.length === 1 && view === 'prices') setView('hubs');
+          setOpen((current) => !current);
         }}
         className={`flex ${controlHeightClassName.md} items-center justify-center gap-1.5 border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase ${rowInteractiveClassName} ${focusRingInsetClassName}`}
       >
-        <Caret expanded={mode !== 'closed'} />
+        <Caret expanded={open} />
         {t('market.compare.handle', { count: items.length })}
       </button>
-      {mode !== 'closed' && (
+      {open && (
         <section
           id={DRAWER_ID}
           aria-label={t('market.compare.title')}
@@ -492,24 +447,47 @@ export function CompareDrawer({
               close();
             }
           }}
-          style={fullScreen ? undefined : { height: mode === 'full' ? FULL_HEIGHT : heightPx }}
+          style={fullScreen ? undefined : resize.style}
           className={`flex flex-col border-line bg-panel ${fullScreen ? 'motion-rise-full fixed inset-0 h-dvh pb-[env(safe-area-inset-bottom)]' : 'motion-rise border border-b-0'}`}
         >
           {!fullScreen && (
+            // The visible grip §6c's drag rule requires, carrying a sheet's
+            // grabber mark (`grabberClassName`, the same mark `Modal` draws).
+            // 24px so a pointer can hit it without the pseudo-element overhang
+            // §6c forbids, 36px on touch; the header below is a drag zone too,
+            // so "drag the drawer" also works where the reader is looking.
+            // Focusable, so it carries the shared focus ring and the keys.
             <div
               role="separator"
               aria-orientation="horizontal"
               aria-label={t('market.compare.resize')}
-              aria-valuenow={mode === 'open' ? heightPx : undefined}
+              aria-valuenow={resize.height}
               aria-valuemin={MIN_HEIGHT}
-              aria-valuemax={MAX_HEIGHT}
-              tabIndex={mode === 'open' ? 0 : -1}
-              onPointerDown={startDrag}
-              onKeyDown={onHandleKeyDown}
-              className={`h-1.5 shrink-0 touch-none border-b border-line ${resizeHandleTouchClassName} ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
-            />
+              aria-valuemax={resize.max}
+              tabIndex={0}
+              {...resize.dragProps}
+              onKeyDown={resize.onKeyDown}
+              className={cx(
+                'flex h-6 shrink-0 cursor-row-resize touch-none items-center justify-center border-b border-line hover:bg-panel-2',
+                focusRingInsetClassName,
+                resizeHandleTouchClassName
+              )}
+            >
+              <span aria-hidden="true" className={grabberClassName} />
+            </div>
           )}
-          <header className="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1">
+          <header
+            // A second drag zone, so the reader can grab the drawer's top edge
+            // rather than aim at the grip alone. Past §6c's 4px activation
+            // distance the gesture captures the pointer, so a press on a
+            // control in here still reaches it — the same trade `Modal` makes
+            // for a sheet's header. Never the scrolled body below.
+            {...(fullScreen ? {} : resize.dragProps)}
+            className={cx(
+              'flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1',
+              !fullScreen && 'touch-none'
+            )}
+          >
             <div className="flex items-center gap-2">
               <h2
                 ref={headingRef}
@@ -564,17 +542,9 @@ export function CompareDrawer({
                 )
               )}
               {!narrow && (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}
-                  >
-                    {mode === 'full' ? t('market.compare.restore') : t('market.compare.expand')}
-                  </Button>
-                  <Button size="sm" onClick={clearSet}>
-                    {t('market.compare.clearAll')}
-                  </Button>
-                </>
+                <Button size="sm" onClick={clearSet}>
+                  {t('market.compare.clearAll')}
+                </Button>
               )}
               <IconButton
                 size="sm"
