@@ -24,6 +24,7 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote } from '@/components/OutcomeNote';
 import { GrantCellMark } from '@/app/GrantCellMark';
 import { usePermissionMark } from '@/app/usePermissionMark';
 import {
@@ -125,14 +126,7 @@ export function TurnInDestinationView({
         {reason ? <Tooltip content={reason}>{button}</Tooltip> : button}
         {block.kind === 'mark' && mark}
       </div>
-      {outcome && (
-        <p
-          role={outcome.tone}
-          className={cx('text-xs', outcome.tone === 'alert' ? 'text-danger' : 'text-success')}
-        >
-          {outcome.text}
-        </p>
-      )}
+      <OutcomeNote outcome={outcome} as="p" />
     </div>
   );
 }

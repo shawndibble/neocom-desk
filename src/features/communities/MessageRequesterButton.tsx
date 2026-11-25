@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote } from '@/components/OutcomeNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button } from '@/components/ui';
 import { OUTCOME_VISIBLE_MS } from '@/features/openInEve/useOpenInEve';
@@ -95,14 +96,7 @@ export function MessageRequesterButton({
           {t('common.needsConnection')}
         </span>
       )}
-      {outcome && (
-        <span
-          role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-xs text-danger' : 'text-xs text-success'}
-        >
-          {outcome.text}
-        </span>
-      )}
+      <OutcomeNote outcome={outcome} />
     </div>
   );
 }

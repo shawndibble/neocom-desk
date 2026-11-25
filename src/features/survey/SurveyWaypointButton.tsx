@@ -11,6 +11,7 @@
  */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote } from '@/components/OutcomeNote';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -44,16 +45,7 @@ export function SurveyWaypointButton({ location }: { location: { id: number; nam
           </span>
         )}
       </div>
-      {outcome && (
-        <span
-          role={outcome.tone}
-          className={
-            outcome.tone === 'alert' ? 'w-full text-xs text-danger' : 'w-full text-xs text-success'
-          }
-        >
-          {outcome.text}
-        </span>
-      )}
+      <OutcomeNote outcome={outcome} className="w-full" />
     </>
   );
 }

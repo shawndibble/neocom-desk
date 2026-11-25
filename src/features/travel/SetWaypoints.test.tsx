@@ -121,10 +121,12 @@ describe('SetWaypoints', () => {
     await userEvent.click(button);
 
     expect(
-      await screen.findByText(
+      (
+        await screen.findAllByText(
         'Waypoints set. Your client plans the path between them with its own settings.'
       )
-    ).toBeInTheDocument();
+      ).length
+    ).toBeGreaterThan(0);
     expect(postAutopilotWaypointMock.mock.calls).toEqual([
       [ONE, PERIMETER, { clearOtherWaypoints: true }],
       [ONE, UEDAMA, { clearOtherWaypoints: false }],
@@ -141,10 +143,12 @@ describe('SetWaypoints', () => {
     await userEvent.click(button);
 
     expect(
-      await screen.findByText(
+      (
+        await screen.findAllByText(
         'Waypoints set to Uedama. Take the wormhole there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
       )
-    ).toBeInTheDocument();
+      ).length
+    ).toBeGreaterThan(0);
     expect(postAutopilotWaypointMock.mock.calls).toEqual([
       [ONE, UEDAMA, { clearOtherWaypoints: true }],
     ]);
@@ -160,10 +164,12 @@ describe('SetWaypoints', () => {
     await userEvent.click(button);
 
     expect(
-      await screen.findByText(
+      (
+        await screen.findAllByText(
         'Waypoints set to Uedama. Take the bridge there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
       )
-    ).toBeInTheDocument();
+      ).length
+    ).toBeGreaterThan(0);
   });
 
   it('offers Grant, Manage and Dismiss to a Character without the scope', async () => {

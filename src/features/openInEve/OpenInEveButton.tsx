@@ -7,6 +7,7 @@
  */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OutcomeNote } from '@/components/OutcomeNote';
 import { Button, type ButtonSize } from '@/components/ui';
 import type { OpenInEveTarget } from './sendOpenInEve';
 import { useOpenInEve, type OpenInEveLookup } from './useOpenInEve';
@@ -79,14 +80,7 @@ export function OpenInEveButton({
           {blockedReason}
         </span>
       )}
-      {outcome && (
-        <span
-          role={outcome.tone}
-          className={`self-center text-xs ${outcome.tone === 'alert' ? 'text-danger' : 'text-success'}`}
-        >
-          {outcome.text}
-        </span>
-      )}
+      <OutcomeNote outcome={outcome} className="self-center" />
     </span>
   );
 }
