@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { useTimeFormat } from '@/lib/timeFormat';
 import { ComingUpRail } from './ComingUpRail';
 
 const noop = () => {};
@@ -67,9 +68,11 @@ describe('ComingUpRail long-overdue items', () => {
     response: null,
     important: false,
   });
-  const items = [extractor('Old A', 31), extractor('Old B', 9), extractor('Fresh', 1)];
+  // 12:00 UTC on the EVE clock: an item 1/24 of a day old went overdue today.
+  const items = [extractor('Old A', 31), extractor('Old B', 1), extractor('Fresh', 1 / 24)];
 
-  it('folds items overdue for over two days into one summary row that expands', async () => {
+  it('folds items overdue from before today into one summary row that expands', async () => {
+    useTimeFormat.setState({ value: 'eve', hydrated: true });
     render(<ComingUpRail {...base} selectedDayMs={null} items={items} />);
     const summary = await screen.findByRole('button', { name: /oldest 31 days/i });
     expect(summary).toHaveAttribute('aria-expanded', 'false');

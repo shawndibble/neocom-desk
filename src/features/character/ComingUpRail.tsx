@@ -8,8 +8,8 @@
  * a view switcher (see the scope decision).
  *
  * Grouping only; the ordering is `engine/character/board.ts`'s and is never
- * re-derived here. Items overdue for over `LONG_OVERDUE_MS` fold into one
- * summary row at the top ("Overdue over 2 days · oldest 31 days", with the
+ * re-derived here. Items overdue from before today fold into one
+ * summary row at the top ("Overdue before today · oldest 31 days", with the
  * count), which expands in place (§6c's leading caret); a picked day folds
  * nothing.
  */
@@ -24,7 +24,6 @@ import { useTimeZone } from '@/lib/timeFormat';
 import {
   groupByDay,
   relativeDayFor,
-  LONG_OVERDUE_MS,
   splitLongOverdue,
   type DayGroup,
 } from '@/engine/character/deadlines';
@@ -61,9 +60,9 @@ export function ComingUpRail({
   const { longOverdue, rest } = useMemo(
     () =>
       selectedDayMs === null
-        ? splitLongOverdue(items, nowMs, LONG_OVERDUE_MS)
+        ? splitLongOverdue(items, nowMs, zone)
         : { longOverdue: [], rest: [...items] },
-    [items, nowMs, selectedDayMs]
+    [items, nowMs, selectedDayMs, zone]
   );
   // One sharing corporation across the list: name it once in the header, not on every row.
   const soleSharer = useMemo(() => {
@@ -135,7 +134,6 @@ export function ComingUpRail({
               count: Math.floor(
                 (nowMs - Math.min(...longOverdue.map((i) => i.deadlineMs))) / DAY_MS
               ),
-              windowDays: LONG_OVERDUE_MS / DAY_MS,
             })}
             trailing={longOverdue.length}
             expanded={showLongOverdue}

@@ -244,7 +244,7 @@ describe('countsByKind', () => {
 });
 
 describe('splitLongOverdue', () => {
-  it('takes out the items overdue for longer than the window, in board order, oldest first', () => {
+  it('folds everything overdue from before today, in board order, oldest first', () => {
     const board = buildCharacterBoard({
       nowMs: NOW,
       planetExtractions: [
@@ -254,16 +254,43 @@ describe('splitLongOverdue', () => {
         clock('soon', NOW + DAY_MS),
       ],
     });
-    const { longOverdue, rest } = splitLongOverdue(board, NOW, 2 * DAY_MS);
-    expect(longOverdue.map((i) => i.subject)).toEqual(['month-old', 'week-old']);
-    expect(rest.map((i) => i.subject)).toEqual(['yesterday', 'soon']);
+    const { longOverdue, rest } = splitLongOverdue(board, NOW, undefined);
+    expect(longOverdue.map((i) => i.subject)).toEqual(['month-old', 'week-old', 'yesterday']);
+    expect(rest.map((i) => i.subject)).toEqual(['soon']);
   });
 
-  it('keeps everything when nothing is overdue for that long', () => {
+  it("keeps today's overdue items in place, even minutes past the midnight before them", () => {
     const board = buildCharacterBoard({
       nowMs: NOW,
-      planetExtractions: [clock('edge', NOW - 2 * DAY_MS), clock('soon', NOW + DAY_MS)],
+      planetExtractions: [
+        clock('last-night', localMidnight(NOW) - 1),
+        clock('this-morning', localMidnight(NOW) + 1),
+        clock('just-now', NOW - 1),
+        clock('soon', NOW + DAY_MS),
+      ],
     });
-    expect(splitLongOverdue(board, NOW, 2 * DAY_MS)).toEqual({ longOverdue: [], rest: board });
+    const { longOverdue, rest } = splitLongOverdue(board, NOW, undefined);
+    expect(longOverdue.map((i) => i.subject)).toEqual(['last-night']);
+    expect(rest.map((i) => i.subject)).toEqual(['this-morning', 'just-now', 'soon']);
+  });
+
+  it('cuts the day on the UTC clock when asked', () => {
+    const utcMidnight = Date.UTC(2026, 9, 7);
+    const now = utcMidnight + 5 * 3_600_000;
+    const board = buildCharacterBoard({
+      nowMs: now,
+      planetExtractions: [clock('before', utcMidnight - 1), clock('after', utcMidnight + 1)],
+    });
+    const { longOverdue, rest } = splitLongOverdue(board, now, 'UTC');
+    expect(longOverdue.map((i) => i.subject)).toEqual(['before']);
+    expect(rest.map((i) => i.subject)).toEqual(['after']);
+  });
+
+  it('keeps everything when nothing is overdue from before today', () => {
+    const board = buildCharacterBoard({
+      nowMs: NOW,
+      planetExtractions: [clock('soon', NOW + DAY_MS)],
+    });
+    expect(splitLongOverdue(board, NOW, undefined)).toEqual({ longOverdue: [], rest: board });
   });
 });
