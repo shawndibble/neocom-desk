@@ -104,11 +104,14 @@ jobs:
           include-hidden-files: true
       # deploy-pages sometimes fails within seconds with "No artifacts named
       # github-pages-N were found" straight after a good upload (GitHub's
-      # artifact API, seen 2026-11-24/25: 1 in ~5 production deploys, and a
-      # re-run minutes later often hit it again). The artifact is fine, so
-      # retry the deploy step itself, twice, instead of failing the run and
+      # artifact API; several production deploys between 2026-11-17 and
+      # 2026-11-25 needed re-runs, and a re-run a few minutes later sometimes
+      # hit it again, hence three attempts rather than two). The artifact is
+      # fine, so retry the deploy step itself instead of failing the run and
       # making someone re-run a 2-minute build. A deploy that fails for a
-      # real reason fails all three and the job fails.
+      # real reason fails all three and the job fails. A skipped step's
+      # outcome is `skipped`, so each condition below only needs the
+      # previous attempt.
       - uses: actions/deploy-pages@v5
         id: deployment
         continue-on-error: true
@@ -124,11 +127,11 @@ jobs:
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
       - name: Wait before final retry
-        if: steps.deployment.outcome == 'failure' && steps.deployment-2.outcome == 'failure'
+        if: steps.deployment-2.outcome == 'failure'
         run: sleep 45
       - uses: actions/deploy-pages@v5
         id: deployment-3
-        if: steps.deployment.outcome == 'failure' && steps.deployment-2.outcome == 'failure'
+        if: steps.deployment-2.outcome == 'failure'
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
       - uses: actions/cache/save@v4
