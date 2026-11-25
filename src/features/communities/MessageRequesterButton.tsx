@@ -1,13 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OutcomeNote } from '@/components/OutcomeNote';
+import { OutcomeNote, type Outcome } from '@/components/OutcomeNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button } from '@/components/ui';
 import { OUTCOME_VISIBLE_MS } from '@/features/openInEve/useOpenInEve';
 import { OPEN_NEW_MAIL_ENDPOINTS, openNewMail } from '@/features/openInEve/sendOpenNewMail';
 import { useOnline } from '@/stores/network';
-
-type Outcome = { tone: 'status' | 'alert'; text: string } | null;
 
 /**
  * "Message <name>…" in a Request's side panel: opens the EVE client's new-mail
@@ -40,7 +38,7 @@ export function MessageRequesterButton({
   const offlineBlocked = !online && !lacksScope;
   const blocked = lacksScope || offlineBlocked;
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   /** `sending` lags a render behind; two quick presses must not both send. */
   const inFlight = useRef(false);
 

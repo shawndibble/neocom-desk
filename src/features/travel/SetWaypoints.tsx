@@ -14,7 +14,7 @@ import { useCharacters } from '@/features/character/useCharacters';
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OutcomeNote } from '@/components/OutcomeNote';
+import { OutcomeNote, type Outcome } from '@/components/OutcomeNote';
 import { useNavigate } from 'react-router-dom';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { grantMissingPath } from '@/app/grantMissingPath';
@@ -46,8 +46,6 @@ import { waypointFailureText } from './waypointFailureText';
 import type { RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
-
-type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 export function SetWaypoints({
   legs,
@@ -81,7 +79,7 @@ export function SetWaypoints({
     characters.length > 0 &&
     (holders === undefined || holders.size === 0 || lacksScope);
   const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
 
   const blockedReason =
     characterId === null

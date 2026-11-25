@@ -123,8 +123,8 @@ describe('SetWaypoints', () => {
     expect(
       (
         await screen.findAllByText(
-        'Waypoints set. Your client plans the path between them with its own settings.'
-      )
+          'Waypoints set. Your client plans the path between them with its own settings.'
+        )
       ).length
     ).toBeGreaterThan(0);
     expect(postAutopilotWaypointMock.mock.calls).toEqual([
@@ -145,8 +145,8 @@ describe('SetWaypoints', () => {
     expect(
       (
         await screen.findAllByText(
-        'Waypoints set to Uedama. Take the wormhole there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
-      )
+          'Waypoints set to Uedama. Take the wormhole there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
+        )
       ).length
     ).toBeGreaterThan(0);
     expect(postAutopilotWaypointMock.mock.calls).toEqual([
@@ -166,8 +166,8 @@ describe('SetWaypoints', () => {
     expect(
       (
         await screen.findAllByText(
-        'Waypoints set to Uedama. Take the bridge there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
-      )
+          'Waypoints set to Uedama. Take the bridge there, then set the rest from Thera. Your client plans the path to Uedama with its own settings.'
+        )
       ).length
     ).toBeGreaterThan(0);
   });
