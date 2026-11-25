@@ -16,7 +16,7 @@ import { TrustSection } from '@/features/landing/TrustSection';
 import { useBelowFold } from '@/features/landing/useBelowFold';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { HeroReticle } from '@/features/landing/HeroReticle';
-import { LANDING_ANCHORS, landingIndex } from '@/features/landing/landingAnchors';
+import { hudLabelClassName } from '@/features/landing/hudLabel';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
@@ -33,12 +33,6 @@ import { setLoginReturnTo, usableLoginReturnTo } from '@/auth/loginReturnTo';
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
   const { t } = useTranslation();
-  /** A band's id, its "01"-style place and its eyebrow, the header link's own label. */
-  const sectionLabels = (id: string) => ({
-    id,
-    index: landingIndex(id),
-    eyebrow: t(`login.header.${LANDING_ANCHORS.find((anchor) => anchor.id === id)?.key ?? ''}`),
-  });
   const [pending, setPending] = useState(false);
   const [loginFailed, setLoginFailed] = useState(false);
   // Read once: a TWA launch referrer only exists on the first load.
@@ -52,8 +46,9 @@ export function Login() {
   const [promoPlays, setPromoPlays] = useState(0);
   const playPromo = () => setPromoPlays((n) => n + 1);
 
-  // The large login buttons (hero and closing call to action); the sticky
-  // header shows its own only while neither is in view.
+  // The hero's login button; the header (a fixed bottom bar on phones) shows
+  // its own once the hero's is out of view. The closing call to action is not
+  // watched, so the header's button stays while it is on screen.
   const heroCtaRef = useRef<HTMLDivElement>(null);
   const ctaRefs = useMemo(() => [heroCtaRef], []);
 
@@ -119,9 +114,14 @@ export function Login() {
         <section className="relative isolate overflow-hidden">
           <LandingBackdrop tone="space" />
           <div className="relative mx-auto grid max-w-page items-center gap-8 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12 lg:px-16 lg:py-20">
-            <HeroReticle className="lp-hero-in lp-hero-in-0 lg:order-2" />
+            <HeroReticle className="lg:order-2" />
             <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
-              <p className="lp-hero-in lp-hero-in-0 flex items-center gap-2.5 font-mono text-xs tracking-[0.18em] text-balance text-accent uppercase">
+              <p
+                className={cx(
+                  hudLabelClassName,
+                  'lp-hero-in lp-hero-in-0 flex items-center gap-2.5 text-xs text-balance text-accent'
+                )}
+              >
                 <span
                   aria-hidden="true"
                   className="hidden size-2 shrink-0 bg-accent shadow-[0_0_12px_var(--color-accent)] sm:block"
@@ -151,7 +151,7 @@ export function Login() {
                   >
                     <span
                       aria-hidden="true"
-                      className="lp-round flex size-9 items-center justify-center border border-accent text-accent"
+                      className="flex size-9 rounded-full items-center justify-center border border-accent text-accent"
                     >
                       <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
                     </span>
@@ -167,7 +167,7 @@ export function Login() {
         </section>
 
         <LandingSection
-          {...sectionLabels('login-overview')}
+          id="login-overview"
           heading={t('login.overviewHeading')}
           lead={t('login.overviewLead')}
         >
@@ -177,7 +177,7 @@ export function Login() {
         {belowFold && (
           <>
             <LandingSection
-              {...sectionLabels('login-answers')}
+              id="login-answers"
               heading={t('login.answersHeading')}
               lead={t('login.answersLead')}
               ship={{ ship: 'venture', side: 'right' }}
@@ -185,7 +185,7 @@ export function Login() {
               <QuestionGrid />
             </LandingSection>
             <LandingSection
-              {...sectionLabels(PROMO_VIDEO_ANCHOR)}
+              id={PROMO_VIDEO_ANCHOR}
               heading={t('login.video.heading')}
               lead={t('login.video.lead', { duration: PROMO_VIDEO.duration })}
               tone="space"
@@ -193,31 +193,19 @@ export function Login() {
               <PromoVideo plays={promoPlays} onPlay={playPromo} />
             </LandingSection>
             <LandingSection
-              {...sectionLabels('login-features')}
+              id="login-features"
               heading={t('login.featuresHeading')}
               ship={{ ship: 'hulk', side: 'left' }}
             >
               <FeatureShowcase />
             </LandingSection>
-            <LandingSection
-              {...sectionLabels('login-trust')}
-              heading={t('login.trustHeading')}
-              tone="panel"
-            >
+            <LandingSection id="login-trust" heading={t('login.trustHeading')} tone="panel">
               <TrustSection />
             </LandingSection>
-            <LandingSection
-              {...sectionLabels('login-community')}
-              heading={t('login.communityHeading')}
-              tone="space"
-            >
+            <LandingSection id="login-community" heading={t('login.communityHeading')} tone="space">
               <CommunitySection />
             </LandingSection>
-            <LandingSection
-              {...sectionLabels('login-faq')}
-              heading={t('login.faqHeading')}
-              tone="panel"
-            >
+            <LandingSection id="login-faq" heading={t('login.faqHeading')} tone="panel">
               <LandingFaq />
             </LandingSection>
 
@@ -227,12 +215,11 @@ export function Login() {
                 <img
                   src="/landing/orca.webp"
                   alt=""
-                  aria-hidden="true"
                   width={512}
                   height={512}
                   loading="lazy"
                   decoding="async"
-                  className="lp-round size-36 border-2 border-accent/55 shadow-[0_0_60px_color-mix(in_srgb,var(--color-accent)_30%,transparent)] sm:size-44"
+                  className="size-36 rounded-full border-2 border-accent/55 shadow-[0_0_60px_color-mix(in_srgb,var(--color-accent)_30%,transparent)] sm:size-44"
                 />
                 <h2 className="mt-8 font-hud text-6xl leading-none font-bold uppercase sm:text-8xl">
                   {t('login.bottomCtaHeading')}

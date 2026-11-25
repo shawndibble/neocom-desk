@@ -21,6 +21,8 @@ describe('buildDemoViews', () => {
 
   it('builds the Wallet with its own Range: an area chart over the journal', () => {
     const views = buildDemoViews(t, NOW);
-    expect(views.get('d-wallet')?.chart?.kind).not.toBe('bars');
+    const chart = views.get('d-wallet')?.chart;
+    expect(chart).toBeDefined();
+    expect(chart?.kind).not.toBe('bars');
   });
 });

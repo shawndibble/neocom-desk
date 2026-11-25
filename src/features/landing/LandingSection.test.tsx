@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import '@/i18n';
 import { LandingSection } from './LandingSection';
 
 describe('LandingSection', () => {
   it('names the landmark by its heading and draws no backdrop for the plain tone', () => {
     const { container } = render(
-      <LandingSection id="x" index="01" eyebrow="Intro" heading="Hello" lead="Lead text">
+      <LandingSection id="login-faq" heading="Hello" lead="Lead text">
         body
       </LandingSection>
     );
     expect(screen.getByRole('region', { name: 'Hello' })).toBeInTheDocument();
-    expect(screen.getByText('01 · Intro')).toBeInTheDocument();
+    // Numbered and labelled from its header anchor.
+    expect(screen.getByText('07 · FAQ')).toBeInTheDocument();
     expect(screen.getByText('Lead text')).toBeInTheDocument();
     expect(container.querySelector('.lp-layer')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
@@ -19,9 +21,7 @@ describe('LandingSection', () => {
   it('adds a decorative tone layer and a lazy, hidden ship render', () => {
     const { container } = render(
       <LandingSection
-        id="y"
-        index="02"
-        eyebrow="Space"
+        id="login-community"
         heading="Space"
         tone="space"
         ship={{ ship: 'hulk', side: 'right' }}

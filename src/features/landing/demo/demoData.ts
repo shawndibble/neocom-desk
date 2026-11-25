@@ -3,7 +3,7 @@
  * Views built from them.
  *
  * The data is raw: the same shapes the live feeds hold (a wallet journal, a
- * skill queue, a calendar, open orders), and the Views come out of the app's
+ * skill queue, open orders), and the Views come out of the app's
  * own `buildView`, so a demo card reads, rounds and words things exactly as
  * the real one does and follows it when a builder changes. Only Open orders
  * is assembled by hand around the real table and chart builders, because its
@@ -16,10 +16,9 @@
  */
 import type { TFunction } from 'i18next';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
-import type { CalendarEventSummary, SkillQueueEntry, WalletJournalEntry } from '@/esi/endpoints';
+import type { SkillQueueEntry, WalletJournalEntry } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
 import type { OrderProblem } from '@/engine/market/orderProblems';
-import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
 import { ordersSeverity } from '@/features/overview/data/boardSeverity';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { SkillCatalog } from '@/features/skills/skillMap';
@@ -38,8 +37,6 @@ import type {
 import type { Translate } from '@/lib/translate';
 import type { Widget } from '@/features/overview/widgets/layout';
 import { formatIskCompact } from '@/lib/isk';
-import { NEXT_EVENT } from './demoCast';
-import { toCalendarEventSources } from '@/features/character/calendarBoardSources';
 
 /** The wallet balance the journal walks to. */
 const BALANCE = 1_842_600_000;
@@ -133,120 +130,12 @@ function skills(now: number): { queue: SkillQueueEntry[]; catalog: SkillCatalog 
   return { queue, catalog: { bySkillTypeID: names } as unknown as SkillCatalog };
 }
 
-/** A field mined out over a morning: the last scan shows nothing left. */
-function surveyScans(now: number): SurveyScan[] {
-  const rock = (ore: string, volume: number) => ({ ore, volume });
-  const at = (minutesAgo: number) => now - minutesAgo * MINUTE_MS;
-  return [
-    {
-      at: at(210),
-      rocks: [
-        rock('Veldspar', 41_000),
-        rock('Veldspar', 38_500),
-        rock('Scordite', 27_000),
-        rock('Pyroxeres', 19_500),
-        rock('Plagioclase', 12_000),
-      ],
-    },
-    {
-      at: at(150),
-      rocks: [
-        rock('Veldspar', 30_000),
-        rock('Veldspar', 22_000),
-        rock('Scordite', 19_000),
-        rock('Pyroxeres', 11_000),
-      ],
-    },
-    {
-      at: at(95),
-      rocks: [rock('Veldspar', 9_500), rock('Scordite', 8_000), rock('Pyroxeres', 3_000)],
-    },
-    { at: at(50), rocks: [rock('Scordite', 2_500)] },
-    { at: at(12), rocks: [] },
-  ];
-}
-
 const feedsAt = (now: number): Feeds => {
   const fetched = (minutesAgo: number) => new Date(now - minutesAgo * MINUTE_MS);
-  const events: CalendarEventSummary[] = [
-    {
-      event_id: 1,
-      event_date: new Date(now + NEXT_EVENT.inMs).toISOString(),
-      title: NEXT_EVENT.title,
-      importance: 0,
-      event_response: 'accepted',
-    },
-    {
-      event_id: 2,
-      event_date: new Date(now + 3 * DAY_MS + 21 * HOUR_MS).toISOString(),
-      title: 'Moon fracture: Maw of Creation',
-      importance: 0,
-      event_response: 'accepted',
-    },
-    {
-      event_id: 3,
-      event_date: new Date(now + 6 * DAY_MS + 2 * HOUR_MS).toISOString(),
-      title: 'Hauler fleet, Jita run',
-      importance: 0,
-      event_response: 'tentative',
-    },
-  ];
   const { queue, catalog } = skills(now);
-  const scans = surveyScans(now);
   return {
     wallet: ok({ result: cached(BALANCE, fetched(2)), needsReauth: false }),
     journal: ok({ result: cached(journal(now), fetched(2)), needsReauth: false }),
-    calendar: ok({
-      calendarEvents: toCalendarEventSources(events),
-      corporations: [],
-      sharedPops: [],
-      readableRefineries: [],
-      sharingCorporations: [],
-      skyhookRaidDetails: [],
-      readableKinds: ['calendarEvent'],
-      reauthKinds: [],
-      oldestFetchedAt: fetched(5),
-      fromCache: false,
-      events,
-      loadedAtMs: now,
-    }),
-    mining: ok({
-      unpaidIsk: 17_400_000,
-      payeeCount: 2,
-      unassignedCount: 0,
-      oldestUnpaidDays: 1,
-      needsReauth: false,
-      fetchedAt: fetched(7),
-      payees: [
-        { payeeId: 'p1', name: 'Kestrel Ward', unpaidIsk: 11_200_000, oldestDays: 1, entries: 3 },
-        { payeeId: 'p2', name: 'Orrin Tavish', unpaidIsk: 6_200_000, oldestDays: 0, entries: 1 },
-      ],
-      characterCount: 1,
-      missingCharacterNames: [],
-    }),
-    contracts: ok({
-      summary: {
-        inProgress: 1,
-        exchanges: 1,
-        outstanding: 1,
-        dueSoon: 0,
-        overdue: 0,
-        soonest: null,
-        items: [],
-        rows: [],
-      },
-      route: null,
-      needsReauth: false,
-      fetchedAt: fetched(9),
-    }),
-    mail: ok({ unread: 0, recent: [], inbox: [], needsReauth: false, fetchedAt: fetched(4) }),
-    location: ok({
-      needsReauth: false,
-      system: { id: 30_002_000, name: 'Badivefi', security: 0.7 },
-      shipTypeId: 17_476,
-      shipName: 'Mackinaw',
-      fetchedAt: fetched(3),
-    }),
     skills: ok({
       skillsResult: null,
       queueResult: cached(queue, fetched(11)),
@@ -254,12 +143,6 @@ const feedsAt = (now: number): Feeds => {
       totalSp: null,
       catalog,
       maxOrders: 305,
-    }),
-    survey: ok({
-      hasSurvey: true,
-      location: 'Badivefi',
-      summary: summarizeSurvey(scans),
-      fetchedAt: fetched(12),
     }),
   };
 };

@@ -4649,9 +4649,9 @@
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Everything you do outside the client.",
     "headingAccent": "In one place.",
-    "tagline": "Search every region's market by jumps, using your own route rules. See what to change in your fit and what to train next. Keep industry, orders, PI and corp tax in view, with alerts even when the game is closed. One login for every character.",
+    "tagline": "Search every region's market by jumps, using your own route rules. See what to change in your fit and what to train next. Keep industry, orders, PI and corp tax in view, with alerts even when the game is closed. Every character in one place.",
     "trustLine": {
-      "device": "Your login stays on your device",
+      "device": "Login stays on this device",
       "writes": "Writes to EVE only when you act",
       "revoke": "Revoke anytime"
     },
@@ -4737,7 +4737,7 @@
       },
       "fitting": {
         "eyebrow": "Fitting",
-        "question": "Will this fit hold up?",
+        "question": "How do I make this fit better?",
         "answer": "Build a fit and see its damage, resists, EHP and local tank. Improve Fit suggests swaps, and What to train lists the skills you still need."
       },
       "courier": {
@@ -4938,7 +4938,7 @@
     "trust": {
       "readOnly": {
         "name": "It writes only when you act",
-        "desc": "It writes to EVE only when you act. Opening a mail flags it as read in EVE. Answering a calendar invite sends your response. Mail you send goes out through your account: replies, forwards, Community invites, Pledge mails and SRP results. Saving a Fitting to EVE recreates it on the game's side. Setting a route's waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else writes to EVE."
+        "desc": "Each write follows something you do. Opening a mail flags it as read in EVE. Answering a calendar invite sends your response. Mail you send goes out through your account: replies, forwards, Community invites, Pledge mails and SRP results. Saving a Fitting to EVE recreates it on the game's side. Setting a route's waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else writes to EVE."
       },
       "token": {
         "name": "Your login stays on this device",

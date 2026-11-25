@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { hudLabelClassName } from './hudLabel';
+import { landingAnchor } from './landingAnchors';
 import { cx } from '@/lib/cx';
 import { Reveal } from './Reveal';
 
@@ -66,25 +69,22 @@ export function LandingBackdrop({
  */
 export function LandingSection({
   id,
-  index,
-  eyebrow,
   heading,
   lead,
   tone = 'plain',
   ship,
   children,
 }: {
+  /** One of `LANDING_ANCHORS`: it sets the band's "01"-style number and its eyebrow, the header link's own label. */
   id: string;
-  /** The band's place on the page, "01" and up, shown before the eyebrow like a console readout. */
-  index: string;
-  /** The header link's own label for this band, so the link and the band it lands on agree. */
-  eyebrow: string;
   heading: string;
   lead?: string;
   tone?: LandingTone;
   ship?: LandingShipPlacement;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const { index, key } = landingAnchor(id);
   return (
     <section
       id={id}
@@ -93,8 +93,8 @@ export function LandingSection({
     >
       <LandingBackdrop tone={tone} ship={ship} />
       <Reveal className="relative mx-auto max-w-6xl px-6 py-16">
-        <p className="font-mono text-xs tracking-[0.2em] text-accent uppercase">
-          {index} · {eyebrow}
+        <p className={cx(hudLabelClassName, 'text-xs text-accent')}>
+          {index} · {t(`login.header.${key}`)}
         </p>
         <h2
           id={`${id}-heading`}

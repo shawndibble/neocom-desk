@@ -1,6 +1,6 @@
 # Scope decisions — Login page is a tactical-HUD split hero with the Overview demo below
 
-_Recorded 2026-11-25. Supersedes the hero layout in 20261010-204610 and the hero placement of the demo in 20261011-150654._
+_Recorded 2026-11-25. Supersedes the hero layout in 20261010-204610 and 20261011-150654's widget set and hero placement for the Overview demo._
 
 - **The page looks like a ship's console, not a SaaS page.** Owner asked for something bold that feels like a space game. Headings use Chakra Petch 700 (`font-hud`, self-hosted from `public/fonts`, SIL OFL) in uppercase; each section opens with a mono eyebrow numbered by `landingIndex` ("02 · Answers"); the demo, video and tiles get `.lp-hud` accent corner brackets. App pages are unchanged: the HUD style is for the logged-out page only.
 - **Split hero: words and the login button left, the Megathron in a targeting reticle right.** The headline covers the whole app ("Everything you do outside the client. In one place."). A market-only headline was rejected by the owner: the app is more than a market tool. Under the button sit a three-item trust line (login on your device, writes only when you act, revoke anytime) and a play button for the tour, renamed from "Watch the 1:38 tour" to "Watch the tour (1:38)" so the length doesn't read as a time.

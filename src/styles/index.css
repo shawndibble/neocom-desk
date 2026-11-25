@@ -1842,14 +1842,6 @@
   font-style: normal;
   font-display: swap;
 }
-.lp-ring {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-}
-.lp-round {
-  border-radius: 50%;
-}
 .lp-hud {
   position: relative;
 }

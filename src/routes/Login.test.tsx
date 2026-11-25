@@ -252,8 +252,8 @@ describe('Login', () => {
   // consent list below is the half that *can* be derived, and is.
   it('tabs the feature catalog by area and names every surface that ships today', async () => {
     renderLogin();
-    // Scoped to the section: "Clones" and "Market" also appear in the hero's
-    // preview panel, so an unscoped query matches two nodes.
+    // Scoped to the section: "Clones" and "Market" also appear elsewhere on the
+    // page, so an unscoped query matches more than one node.
     const section = within(await screen.findByRole('region', { name: /every tool, by area/i }));
     const user = userEvent.setup();
 

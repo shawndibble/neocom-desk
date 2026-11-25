@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
+import { hudLabelClassName } from './hudLabel';
 import { useTranslation } from 'react-i18next';
 import { EveSsoButton, LogoMark, Tooltip, iconButtonClassName } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -35,7 +36,8 @@ function useAllOutOfView(targets: RefObject<HTMLElement | null>[]): boolean {
 }
 
 const ANCHOR_CLASS = cx(
-  'rounded-xs px-2 py-1 font-mono text-xs tracking-[0.12em] text-text-dim uppercase hover:text-text',
+  hudLabelClassName,
+  'rounded-xs px-2 py-1 text-xs text-text-dim hover:text-text',
   interactiveClassName,
   focusRingClassName
 );
@@ -59,14 +61,10 @@ export function LandingHeader({
   const { t } = useTranslation();
   const ctaOut = useAllOutOfView(ctaRefs);
   return (
-    <header
-      data-cta-open={ctaOut}
-      className="group sticky top-0 z-30 border-b border-line bg-bg/95"
-    >
+    <header className="sticky top-0 z-30 border-b border-line bg-bg/95">
       <div className="mx-auto flex max-w-[96rem] items-center gap-4 px-4 py-2 sm:px-6">
         <div className="flex items-center gap-2">
           <LogoMark className="size-7" />
-          {/* On a phone the login button needs the room: the name goes visually hidden while it shows. */}
           <span className="font-hud text-base font-bold tracking-wider whitespace-nowrap uppercase">
             {t('app.name')}
           </span>
