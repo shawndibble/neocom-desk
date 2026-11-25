@@ -7,6 +7,7 @@ import { answeredByMember, isoDay } from './memberFlag';
 export type PillState =
   | 'pending'
   | 'billed'
+  | 'estimate'
   | 'conflict'
   | 'settling'
   | 'unattributed'
@@ -19,6 +20,7 @@ export type PillState =
 export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
   billed: 'billed',
+  estimate: 'estimate',
   conflict: 'conflict',
   settling: 'settling',
   unattributed: 'unattributed',

@@ -158,7 +158,7 @@ describe('TaxTab with a Corp Tax Book', () => {
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
   });
 
-  it('shows the corp Payee balance, a Billed row and the Safe to pay note', async () => {
+  it('shows the corp Payee balance, an Outstanding row and the Safe to pay note', async () => {
     hoisted.view = buildCorpBookView(
       {
         rows: snapshot.entries,
@@ -175,7 +175,7 @@ describe('TaxTab with a Corp Tax Book', () => {
     const user = userEvent.setup();
     renderTab();
     expect(screen.getAllByText('Brass Meridian Logistics').length).toBeGreaterThan(0);
-    expect(screen.getByText('Billed')).toBeInTheDocument();
+    expect(screen.getByText('Outstanding')).toBeInTheDocument();
     // The 13 Oct ore is free and no book observed it at all: still the member's to assign (D12).
     expect(screen.queryByText('Unattributed')).not.toBeInTheDocument();
     expect(screen.getAllByText('Unassigned').length).toBeGreaterThan(0);

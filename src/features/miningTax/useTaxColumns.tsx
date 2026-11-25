@@ -335,6 +335,14 @@ export function useTaxColumns({
                 <CorpCorrectedAmount correction={dr.corp.view.correction}>
                   {`${formatIsk(taxOwedOf(dr))} ISK`}
                 </CorpCorrectedAmount>
+              ) : dr.corp?.kind === 'row' && dr.corp.view.state === 'estimate' ? (
+                // Not billed until the day closes: the figure may still change.
+                <span className="block">
+                  <span className="block">{`${formatIsk(taxOwedOf(dr))} ISK`}</span>
+                  <span className="block text-[0.6875rem] font-normal text-text-dim">
+                    {t('miningTax.corpBook.conflict.estimated')}
+                  </span>
+                </span>
               ) : (
                 `${formatIsk(taxOwedOf(dr))} ISK`
               ),

@@ -18,6 +18,7 @@ const book = (over: Partial<CorpBookViewBook['summary']> = {}, rest = {}): CorpB
       lastSyncedAt: '2026-10-18T12:00:00Z',
       closedThrough: '2026-10-17',
       credit: 0,
+      estimate: 0,
       hubId: 'jita',
       oreForm: 'compressed',
       ...over,
@@ -113,6 +114,21 @@ describe('CorpBookSyncNote', () => {
     expect(
       screen.getByText(
         "17 Oct is still settling: Brass Meridian Logistics's refinery log hasn't caught up with all your mining that day (synced 2h ago). Paying now pays only what is billed so far."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("says what it owes includes the open day's estimate, and when that day is billed", () => {
+    render(
+      <CorpBookSyncNote
+        book={book({ estimate: 666_000 }, { estimateFrom: '2026-10-18' })}
+        owedNow={666_000}
+        now={NOW}
+      />
+    );
+    expect(
+      screen.getByText(
+        'Includes 666,000 ISK estimated for 18 Oct: Brass Meridian Logistics bills it once it closes, after 06:00 UTC on 19 Oct and its next sync.'
       )
     ).toBeInTheDocument();
   });

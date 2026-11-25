@@ -47,6 +47,8 @@ export interface CorpBookViewBook {
   pendingFrom?: string;
   /** The earliest day with ore still Settling (the refinery log catching up), when any is. */
   settlingFrom?: string;
+  /** The earliest open day owed at an estimate, when any is. */
+  estimateFrom?: string;
 }
 
 export interface CorpClaim {
@@ -196,6 +198,10 @@ export function buildCorpBookView(
       .filter((r) => r.state === 'settling' && r.corporationId === loadedBook.corporationId)
       .map((r) => r.date)
       .sort()[0];
+    const estimateFrom = overlay.rows
+      .filter((r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId)
+      .map((r) => r.date)
+      .sort()[0];
     const ownRate = overlay.rows.find((r) => r.corporationId === loadedBook.corporationId)?.taxPct;
     const firstChar = loadedBook.characterIds[0];
     return {
@@ -212,6 +218,7 @@ export function buildCorpBookView(
       ),
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
       ...(settlingFrom !== undefined ? { settlingFrom } : {}),
+      ...(estimateFrom !== undefined ? { estimateFrom } : {}),
     };
   });
   const claims: CorpClaim[] = ready.flatMap((book) =>

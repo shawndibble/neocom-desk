@@ -70,6 +70,11 @@ export function CorpBookSyncNote({
     .reduce((sum, a) => sum + a.amount, 0);
   const opening =
     (rolled > 0 && (owedNow > 0 || account?.owes)) || (rolled < 0 && credit) ? rolled : 0;
+  // An open day owed at an estimate: in what the member owes now, billed once it closes.
+  const estimateFrom = summary.estimate > 0 ? book.estimateFrom : undefined;
+  const estimateClosesAt = estimateFrom
+    ? new Date(dayClosesAt(estimateFrom, loaded.graceHours))
+    : null;
   const hasWords =
     owedNow > 0 ||
     book.pendingFrom !== undefined ||
@@ -112,7 +117,18 @@ export function CorpBookSyncNote({
           {safe}
         </span>
       )}
-      {book.pendingFrom && closesAt && (
+      {estimateFrom && estimateClosesAt && (
+        <span className="text-text-dim">
+          {t(`miningTax.corpBook.sync.estimate${here}`, {
+            amount: formatIsk(summary.estimate, 0),
+            date: shortDate(estimateFrom, i18n.language),
+            time: estimateClosesAt.toISOString().slice(11, 16),
+            closeDate: shortDate(utcDay(estimateClosesAt.getTime()), i18n.language),
+            corp: corpName,
+          })}
+        </span>
+      )}
+      {book.pendingFrom && closesAt && book.pendingFrom !== estimateFrom && (
         <span className="text-text-dim">
           {t(`miningTax.corpBook.sync.openDay${here}`, {
             date: shortDate(book.pendingFrom, i18n.language),

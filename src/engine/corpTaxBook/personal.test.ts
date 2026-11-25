@@ -2533,3 +2533,115 @@ describe('resolving in the app: an open dispute holds its day', () => {
     });
   });
 });
+
+describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate", () => {
+  const TODAY = '2026-10-18';
+  const KEY = `${ME}:${TODAY}:${SYSTEM}`;
+  const observedToday = (quantity: number) => ({
+    characterId: ME,
+    recordedCorporationId: CORP,
+    structureId: 1000,
+    date: TODAY,
+    solarSystemId: SYSTEM,
+    oreLines: [{ typeId: ZEO, quantity }],
+  });
+  const today = (quantity: number, taxPct = 15) =>
+    entry({
+      date: TODAY,
+      oreLines: [{ typeId: ZEO, quantity }],
+      freeOreLines: [],
+      allocations: [
+        {
+          id: 'a-today',
+          payeeId: 'bmw',
+          taxPct,
+          oreLines: [{ typeId: ZEO, quantity }],
+          status: 'outstanding',
+        },
+      ],
+    });
+  const withToday = (seen: number | null, over: Partial<PersonalBook> = {}) =>
+    book({
+      ownPayeeIds: ['bmw'],
+      observed: [...book().observed, ...(seen === null ? [] : [observedToday(seen)])],
+      ...over,
+    });
+  const payment = (amount: number) => ({
+    id: 'p1',
+    minerId: `solo:${ME}`,
+    characterId: ME,
+    amount,
+    at: '2026-10-18T13:00:00Z',
+    source: 'donation' as const,
+  });
+  const ofToday = (out: ReturnType<typeof overlay>) => out.rows.filter((r) => r.date === TODAY);
+
+  it("is Outstanding at the book's figure for what it observed so far, standing in for the Assignment", () => {
+    const out = overlay([today(30_000)], [withToday(30_000)]);
+    expect(ofToday(out)).toMatchObject([
+      { state: 'estimate', oreLines: [{ typeId: ZEO, quantity: 30_000 }], taxPct: 15 },
+    ]);
+    expect(ofToday(out)[0].taxOwed).toBeCloseTo(30_000 * 148 * 0.15, 4);
+    expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-today']);
+    expect(out.labels.has(KEY)).toBe(false);
+    expect(out.books[0].estimate).toBeCloseTo(30_000 * 148 * 0.15, 4);
+  });
+
+  it("values the member's own Assignment while the book has observed nothing of the day", () => {
+    const out = overlay([today(30_000, 10)], [withToday(null)]);
+    expect(ofToday(out)).toMatchObject([{ state: 'estimate', taxPct: 10 }]);
+    expect(ofToday(out)[0].taxOwed).toBeCloseTo(30_000 * 148 * 0.1, 4);
+    expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-today']);
+  });
+
+  it('leaves what the Assignment lists beyond the observed ore Settling', () => {
+    const out = overlay([today(30_000)], [withToday(20_000)]);
+    expect(ofToday(out).map((r) => [r.state, r.oreLines[0].quantity])).toEqual([
+      ['estimate', 20_000],
+      ['settling', 10_000],
+    ]);
+  });
+
+  it('is paid by credit ahead of every billed day; what credit misses stays Outstanding', () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay(
+      [today(30_000)],
+      [withToday(30_000, { payments: [payment(DAY + 400_000)] })]
+    );
+    const rows = ofToday(out);
+    expect(rows.map((r) => r.state).sort()).toEqual(['estimate', 'paid']);
+    const paid = rows.find((r) => r.state === 'paid')!;
+    const left = rows.find((r) => r.state === 'estimate')!;
+    expect(paid.billed).toBeCloseTo(400_000, 4);
+    expect(left.taxOwed).toBeCloseTo(tax - 400_000, 4);
+    expect(paid.oreLines[0].quantity + left.oreLines[0].quantity).toBe(30_000);
+    expect(out.books[0].estimate).toBeCloseTo(tax - 400_000, 4);
+    expect(out.books[0].credit).toBeCloseTo(0, 4);
+  });
+
+  it('reads Paid when credit covers the whole estimate', () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay([today(30_000)], [withToday(30_000, { payments: [payment(DAY + tax)] })]);
+    expect(ofToday(out)).toMatchObject([{ state: 'paid', taxOwed: 0 }]);
+    expect(out.books[0].estimate).toBe(0);
+  });
+
+  it('is billed by the book, not estimated, once the day closes', () => {
+    const out = overlay([today(30_000)], [withToday(30_000)], '2026-10-19T14:00:00Z');
+    // An officer has not synced since: the day is still open, so still an estimate.
+    expect(ofToday(out).map((r) => r.state)).toEqual(['estimate']);
+    const closed = overlay(
+      [today(30_000)],
+      [withToday(30_000, { lastSyncedAt: '2026-10-19T12:00:00Z' })],
+      '2026-10-19T14:00:00Z'
+    );
+    expect(ofToday(closed).map((r) => r.state)).toEqual(['billed']);
+    expect(closed.books[0].estimate).toBe(0);
+  });
+
+  it('leaves free ore on an open day a Pending corp record, never owed', () => {
+    const out = overlay([entry({ date: TODAY })], [withToday(41_200)]);
+    expect(ofToday(out)).toEqual([]);
+    expect(out.labels.get(KEY)?.state).toBe('pending');
+  });
+});

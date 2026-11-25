@@ -181,6 +181,7 @@ describe('buildDisplayRows', () => {
           view({ id: 'c', state: 'conflict', taxOwed: null }),
           view({ id: 'p', state: 'paid', taxOwed: 0 }),
           view({ id: 'd', state: 'dismissed', taxOwed: 0, dismissalReason: 'Fleet' }),
+          view({ id: 'e', state: 'estimate', taxOwed: 9_000 }),
         ],
       }),
       nameOf
@@ -197,6 +198,9 @@ describe('buildDisplayRows', () => {
     expect(byId.c.assignment?.taxOwed).toBe(0);
     expect(byId.p.status).toBe('paid');
     expect(byId.d.status).toBe('dismissed');
+    // An open day's estimate is owed now, in Open, at its estimated figure.
+    expect(byId.e.status).toBe('outstanding');
+    expect(byId.e.assignment?.taxOwed).toBe(9_000);
   });
 
   it('a Paid day keeps the tax it was billed at, like every other Paid row; a dismissal stays 0', () => {

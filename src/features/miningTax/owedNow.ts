@@ -113,7 +113,10 @@ export function bookOwesOf(
   inView: CharactersInView = 'all'
 ): Map<string, number> {
   return new Map(
-    booksInView(corpView, inView).map((b) => [b.payee.id, b.summary.account.owes?.amount ?? 0])
+    booksInView(corpView, inView).map((b) => [
+      b.payee.id,
+      (b.summary.account.owes?.amount ?? 0) + b.summary.estimate,
+    ])
   );
 }
 

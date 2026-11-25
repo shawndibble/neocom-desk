@@ -74,7 +74,21 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
       onPaid={onPaid}
       rows={settleRows}
       {...(payerId !== undefined ? { payerId } : {})}
-      owedFor={(payer) => minerOf(payer)?.account.owes?.amount ?? 0}
+      owedFor={(payer) => {
+        const miner = minerOf(payer);
+        if (!miner) return 0;
+        // An open day's estimate is owed now too: paid early, it waits as credit for the bill.
+        const estimate = rows.reduce(
+          (sum, dr) =>
+            dr.corp?.kind === 'row' &&
+            dr.corp.view.state === 'estimate' &&
+            dr.corp.view.minerId === miner.minerId
+              ? sum + (dr.corp.view.taxOwed ?? 0)
+              : sum,
+          0
+        );
+        return (miner.account.owes?.amount ?? 0) + estimate;
+      }}
       preview={(amount, _paidOn, payer) => {
         const miner = minerOf(payer);
         if (!miner) return undefined;
