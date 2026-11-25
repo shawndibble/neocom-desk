@@ -160,7 +160,7 @@ describe('the loader', () => {
   });
 
   describe('on the landing page', () => {
-    type Emit = (entries: { url?: string }[]) => void;
+    type Emit = (entries: { url?: string; element?: Element }[]) => void;
     let emit: Emit | undefined;
     let disconnected = false;
 
@@ -170,7 +170,9 @@ describe('the loader', () => {
       disconnected = false;
       class FakeObserver {
         static supportedEntryTypes = ['paint', 'largest-contentful-paint'];
-        constructor(callback: (list: { getEntries: () => { url?: string }[] }) => void) {
+        constructor(
+          callback: (list: { getEntries: () => { url?: string; element?: Element }[] }) => void
+        ) {
           emit = (entries) => callback({ getEntries: () => entries });
         }
         observe(options: { type: string; buffered: boolean }) {
@@ -201,6 +203,19 @@ describe('the loader', () => {
       vi.advanceTimersByTime(0);
       expect(preloads()).toHaveLength(3);
       expect(entry()).not.toBeNull();
+    });
+
+    it("starts once the hero's headline paints, where it outsizes the ship (a phone)", () => {
+      stubLcpObserver();
+      runLoader();
+      emit?.([{ url: '', element: document.createElement('p') }]);
+      vi.advanceTimersByTime(10);
+      expect(preloads()).toHaveLength(0);
+
+      emit?.([{ url: '', element: document.createElement('h1') }]);
+      expect(disconnected).toBe(true);
+      vi.advanceTimersByTime(0);
+      expect(preloads()).toHaveLength(3);
     });
 
     it('falls back to load and two frames without an LCP observer', () => {

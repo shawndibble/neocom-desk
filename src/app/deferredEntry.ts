@@ -5,7 +5,9 @@
  * parser starts them all at once: about 60 files and 520 KB that, on a slow
  * phone, share the line with the stylesheet the first paint waits on. The
  * landing visitor is looking at the static hero (`app/landingShell.ts`) until
- * React takes over, so none of that is needed for the first paint.
+ * React takes over, so none of that is needed for the first paint. The hero's
+ * largest paint is its ship or, on a phone where the headline outsizes the
+ * ship, its `<h1>`: either one starts the app.
  *
  * `vite.config.ts` runs `deferEntryHtml` over the built page: those tags come
  * out, and an inline loader puts them back. Where the landing-shell gate in
@@ -79,7 +81,8 @@ function loaderSource(entry: string, preloads: readonly string[]): string {
       var entries = list.getEntries();
       for (var i = 0; i < entries.length; i++) {
         var url = entries[i].url || '';
-        if (url.slice(-hero.length) === hero) {
+        var el = entries[i].element;
+        if (url.slice(-hero.length) === hero || (el && el.tagName === 'H1')) {
           observer.disconnect();
           afterPaint();
           return;
