@@ -1,16 +1,18 @@
 ---
 name: code-review
-description: 'Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo''s documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".'
+description: 'Review the changes since a fixed point (commit, branch, tag, or merge-base) along four axes: Standards (does the code follow this repo''s documented coding standards?), Spec (does the code match what the originating issue/spec asked for?), Ponytail (correct, safe, tested, lean?) and Thermo-nuclear (is the structure as simple as it could be?). Runs the four reviews as parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".'
 ---
 
-Two-axis review of the diff between `HEAD` and a fixed point:
+Four-axis review of the diff between `HEAD` and a fixed point:
 
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
+- **Ponytail**: is it correct, safe, tested, and lean? (the `ponytail-review` lens)
+- **Thermo-nuclear**: is the structure as simple as it could be? (the vendored `thermo-nuclear-code-quality-review` lens)
 
-The two axes are kept **separate** so one never masks the other. **Always run them as two parallel sub-agents**, whether or not a human is driving. Each axis re-reads the whole diff; doing that inline pours both passes into the caller's context, and inside an unattended `/next-ticket` run that context is already large and gets re-sent on every subsequent turn. The sub-agents read the diff in their own fresh contexts and return only their findings. Do not merge or rerank findings across axes.
+The axes are kept **separate** so one never masks another. **Always run them as four parallel sub-agents**, whether or not a human is driving. Each axis re-reads the whole diff; doing that inline pours every pass into the caller's context, and inside an unattended `/next-ticket` run that context is already large and gets re-sent on every subsequent turn. The sub-agents read the diff in their own fresh contexts and return only their findings. Do not merge or rerank findings across axes.
 
-Both sub-agents are **read-only diff review**: they read the diff and cited files and report findings — they never run the test suite, linter, typechecker, build, or any validation script (`npm test`, `npm run lint`, `npm run typecheck`, etc.). The pre-commit hook already covers lint/format/typecheck and CI covers the rest; re-running any of that inside a review sub-agent is redundant and expensive. State this explicitly in each sub-agent's own prompt, not just here — the sub-agent never sees this file's prose.
+All four sub-agents are **read-only diff review**: they read the diff and cited files and report findings — they never run the test suite, linter, typechecker, build, or any validation script (`npm test`, `npm run lint`, `npm run typecheck`, etc.). The pre-commit hook already covers lint/format/typecheck and CI covers the rest; re-running any of that inside a review sub-agent is redundant and expensive. State this explicitly in each sub-agent's own prompt, not just here — the sub-agent never sees this file's prose.
 
 The issue tracker config is at `docs/agents/issue-tracker.md`.
 
@@ -29,7 +31,7 @@ Confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is
 Look for the originating spec, in order:
 
 1. Issue references in the commit messages (`#123`, `Closes #45`), fetched via `docs/agents/issue-tracker.md` (`gh issue view <n> --comments`).
-2. A path passed as an argument.
+2. A path or pasted description passed as an argument (a description is used as the spec as-is).
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, the **Spec** axis reports "no spec available".
 
@@ -65,20 +67,24 @@ Repo-specific hard rules to check (from `CLAUDE.md`):
 - All user-facing strings go through i18next (`src/i18n/locales/en.json`).
 - No new hand-rolled async load (`useEffect` + `let cancelled` + `useState`): `useKeyedLoad` / `useAsyncLoad` (`docs/SHARED-CODE.md`). A hunk that edits an existing one for a value load should convert it. Don't flag untouched ones.
 
-### 4. Run both axes
+### 4. Run the four axes
 
 Each sub-agent's prompt must open with: "This is a read-only review: read the diff and cited files only — never run tests, lint, typecheck, build, or any script."
 
 **Standards axis** — report, per file/hunk: (a) every place the diff violates a documented standard (cite the standard); (b) any baseline smell (name it, quote the hunk). For UI diffs, run `npm run ui:catalog` and flag (hard) any re-implemented `src/components/ui` primitive and any new primitive without a `<Component>.stories.tsx`. Distinguish hard violations from judgement calls. Skip what tooling enforces.
 
+**Ponytail axis** — the sub-agent reads `~/.claude/plugins/marketplaces/ponytail/skills/ponytail-review/SKILL.md` and follows it against the diff (it reads callers and tests of changed code too; that is allowed, running anything is not). Ask for its findings in its own severity order, each with file:line. If that file is missing, report "ponytail not installed" and carry on with the other axes.
+
+**Thermo-nuclear axis** — the sub-agent reads `.claude/skills/thermo-nuclear-code-quality-review/SKILL.md` and follows it against the diff, including its "Neocom Desk scope" section (stay inside the diff; tag each finding `blocker` or `suggestion`).
+
 **Spec axis** — report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but wrong. Quote the spec line for each finding. If no spec, skip and note it.
 
 ### 5. Aggregate
 
-Present the two reports under `## Standards` and `## Spec` headings. Do **not** merge or rerank across axes.
+Present the reports under `## Standards`, `## Spec`, `## Ponytail` and `## Thermo-nuclear` headings. Do **not** merge or rerank across axes. If two axes flag the same line, keep both; the overlap is itself a signal.
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_.
 
-## Inside /next-ticket
+## Acting on the findings
 
-`code-review` here is advisory, not a gate. Address any **hard** Standards violation and any **missing/wrong** Spec finding before pushing. Judgement-call smells: fix if cheap, otherwise note them in the PR body under "Review notes". The gate that actually blocks the PR is CI (`npm run format:check`, `lint`, `typecheck`, `test:run`, `build`, e2e).
+This is the one place that says what to fix; `/implement`, `/do-it` and `/next-ticket` point here rather than restating it. The review is advisory, not a gate. Address any **hard** Standards violation, any **missing/wrong** Spec finding, any Ponytail bug/risk/missing-test finding, and any Thermo-nuclear `blocker` before pushing. The Ponytail axis is best-effort: if it reports "ponytail not installed", note that in the PR body instead of treating the review as four-axis. Judgement-call smells, Ponytail lean/speed suggestions and Thermo-nuclear `suggestion`s: fix if cheap, otherwise note them in the PR body under "Review notes". The gate that actually blocks the PR is CI (`npm run format:check`, `lint`, `typecheck`, `test:run`, `build`, e2e).

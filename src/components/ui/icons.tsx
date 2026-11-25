@@ -219,6 +219,8 @@ export const SyncOffline = withWeight(CloudSlash);
 export const Revert = withWeight(ArrowCounterClockwise);
 /** Runs a local calculation right now — no fetch involved. Deliberately not `Refresh`, which re-fetches from ESI. */
 export const Run = withWeight(Play);
+/** Starts a video (the Login page's promo poster). Same glyph as `Run`, a different meaning. */
+export const PlayVideo = withWeight(Play);
 /** Download the current view as CSV. */
 export const Download = withWeight(DownloadSimple);
 /** A newer build is waiting: apply it now. */

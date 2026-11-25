@@ -50,9 +50,8 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
   // not race. Do what the warm does for the chunks this page loaded: fetch them again under the
   // worker's control (its CacheFirst route stores them), then wait until they are in Cache Storage.
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
-  // The demo board mounts on a `requestIdleCallback` (up to 3 s, `useBoardReady`) and its survey
-  // chart imports its own chunks 1.2 s after that (`SURVEY_CHART_DELAY_MS`): both land after
-  // `networkidle` can see them. Wait for each chunk, then for what they pull in, so the list below
+  // The demo board mounts on a `requestIdleCallback` (up to 3 s, `useBoardReady`), after
+  // `networkidle` can see it. Wait for its chunk, then for what it pulls in, so the list below
   // cannot miss them; uncached, the offline navigation shows the error screen and aborts `goto`.
   const hasChunk = (name: string) =>
     page.evaluate(
@@ -63,7 +62,6 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
       `/assets/${name}-[^/]+\\.js$`
     );
   await expect.poll(() => hasChunk('DemoBoard'), { timeout: 15_000 }).toBe(true);
-  await expect.poll(() => hasChunk('SurveyCharts'), { timeout: 15_000 }).toBe(true);
   await page.waitForLoadState('networkidle');
   const pageChunks = await page.evaluate(() =>
     performance

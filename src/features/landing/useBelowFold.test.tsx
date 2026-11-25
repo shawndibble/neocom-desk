@@ -34,6 +34,11 @@ describe('useBelowFold', () => {
     expect(commits.at(-1)).toBe(true);
   });
 
+  it('mounts everything in the first commit when the URL names the promo video', () => {
+    const { commits } = renderProbe(true, '/login#login-video');
+    expect(commits).toEqual([true]);
+  });
+
   it('mounts everything in the first commit when the URL names a landing section', () => {
     const { commits } = renderProbe(true, '/login#login-faq');
     expect(commits).toEqual([true]);

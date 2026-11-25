@@ -14,36 +14,30 @@ export interface Tile {
   wide?: boolean;
 }
 
+/**
+ * Led by the market searched by jumps on the pilot's own route rules, the
+ * first thing most pilots alt-tab out of the client for.
+ */
 export const QUESTION_TILES: Tile[] = [
   {
-    key: 'orders',
-    shot: { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
+    key: 'marketRange',
+    shot: { file: 'desktop-market', key: 'market', size: DESKTOP_SIZE },
     span: 'md:col-span-2 lg:col-span-4',
     wide: true,
   },
   {
-    key: 'journal',
-    shot: { file: 'desktop-wallet-journal', key: 'walletJournal', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'build',
-    shot: { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
-    span: 'lg:col-span-3',
-  },
-  {
     key: 'fitting',
     shot: { file: 'desktop-fitting', key: 'fitting', size: DESKTOP_SIZE },
-    span: 'lg:col-span-3',
-  },
-  {
-    key: 'flyNext',
-    shot: { file: 'desktop-ship-tree', key: 'shipTree', size: DESKTOP_SIZE },
     span: 'lg:col-span-2',
   },
   {
-    key: 'survey',
-    shot: { file: 'desktop-survey', key: 'survey', size: DESKTOP_SIZE },
+    key: 'assets',
+    shot: { file: 'desktop-assets', key: 'assets', size: DESKTOP_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'orders',
+    shot: { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
     span: 'md:col-span-2 lg:col-span-4',
     wide: true,
   },
@@ -53,8 +47,8 @@ export const QUESTION_TILES: Tile[] = [
     span: 'lg:col-span-3',
   },
   {
-    key: 'assets',
-    shot: { file: 'desktop-assets', key: 'assets', size: DESKTOP_SIZE },
+    key: 'build',
+    shot: { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
     span: 'lg:col-span-3',
   },
 ];

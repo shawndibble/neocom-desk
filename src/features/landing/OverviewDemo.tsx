@@ -179,7 +179,7 @@ export function OverviewDemo() {
       ref={frameRef}
       role="group"
       aria-labelledby="login-preview-label"
-      className="lp-float relative w-full min-w-0 rounded-xs border border-line bg-panel/95 p-4 text-left shadow-[0_0_60px_-20px_color-mix(in_srgb,var(--color-accent)_25%,transparent)] sm:p-6"
+      className="lp-float lp-hud relative mt-8 w-full min-w-0 border border-accent/30 bg-panel/95 p-4 text-left shadow-[0_30px_120px_-30px_rgb(0_0_0/0.7),0_0_80px_-20px_color-mix(in_srgb,var(--color-accent)_20%,transparent)] sm:p-6"
     >
       <span
         id="login-preview-label"

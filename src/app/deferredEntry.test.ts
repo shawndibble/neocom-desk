@@ -5,10 +5,11 @@ import {
   DEFERRED_ENTRY_HERO_IMAGE,
   DEFERRED_ENTRY_SCRIPT_ID,
   DEFERRED_ENTRY_SHELL_ATTR,
+  DEFERRED_ENTRY_SHELL_ID,
   deferEntryHtml,
   importMapProblem,
 } from './deferredEntry';
-import { LANDING_SHELL_ATTR } from './landingShell';
+import { LANDING_SHELL_ATTR, LANDING_SHELL_ID } from './landingShell';
 import shellSnapshot from '@/features/landing/landingShell.snapshot.html?raw';
 
 /** The shape Vite writes into the built `index.html` head. */
@@ -76,6 +77,10 @@ describe('deferEntryHtml', () => {
       '<script type="module" crossorigin src="/x.js"></script></head>'
     );
     expect(() => deferEntryHtml(twice)).toThrow(/found 2/);
+  });
+
+  it('looks for paints inside the same shell element the boot script clones in', () => {
+    expect(DEFERRED_ENTRY_SHELL_ID).toBe(LANDING_SHELL_ID);
   });
 
   it('reads the same attribute the landing-shell gate sets', () => {
@@ -160,7 +165,7 @@ describe('the loader', () => {
   });
 
   describe('on the landing page', () => {
-    type Emit = (entries: { url?: string }[]) => void;
+    type Emit = (entries: { url?: string; element?: Element }[]) => void;
     let emit: Emit | undefined;
     let disconnected = false;
 
@@ -170,7 +175,9 @@ describe('the loader', () => {
       disconnected = false;
       class FakeObserver {
         static supportedEntryTypes = ['paint', 'largest-contentful-paint'];
-        constructor(callback: (list: { getEntries: () => { url?: string }[] }) => void) {
+        constructor(
+          callback: (list: { getEntries: () => { url?: string; element?: Element }[] }) => void
+        ) {
           emit = (entries) => callback({ getEntries: () => entries });
         }
         observe(options: { type: string; buffered: boolean }) {
@@ -201,6 +208,21 @@ describe('the loader', () => {
       vi.advanceTimersByTime(0);
       expect(preloads()).toHaveLength(3);
       expect(entry()).not.toBeNull();
+    });
+
+    it('starts once text in the hero paints, where it outsizes the ship (a phone)', () => {
+      document.body.innerHTML = `<header><p id="h">brand</p></header><div id="${DEFERRED_ENTRY_SHELL_ID}"><main><p id="t">tagline</p></main></div>`;
+      stubLcpObserver();
+      runLoader();
+      emit?.([{ url: '', element: document.getElementById('h') ?? undefined }]);
+      vi.advanceTimersByTime(10);
+      expect(preloads()).toHaveLength(0);
+
+      emit?.([{ url: '', element: document.getElementById('t') ?? undefined }]);
+      expect(disconnected).toBe(true);
+      vi.advanceTimersByTime(0);
+      expect(preloads()).toHaveLength(3);
+      document.body.innerHTML = '';
     });
 
     it('falls back to load and two frames without an LCP observer', () => {

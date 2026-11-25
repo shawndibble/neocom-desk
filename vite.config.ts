@@ -661,6 +661,8 @@ export default defineConfig({
           ...lazySdeGlobIgnores(),
           '**/vendor/dogma/**',
           '**/screenshots/**',
+          // The promo video's poster: signed-out landing page only, like screenshots/.
+          '**/promo/**',
           '**/icons/icon-512*.png',
           '**/brand/**',
           '**/version.json',

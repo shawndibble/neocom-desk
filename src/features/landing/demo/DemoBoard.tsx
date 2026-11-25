@@ -9,7 +9,7 @@
  * link's look without a link, and a table's sort and pager are the only state
  * that moves, as they are local to the table in the app too.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OverviewEditContext, type OverviewEdit } from '@/features/overview/widgets/editContext';
 import { flexRule, GRID_GAP } from '@/features/overview/widgets/gridStyle';
@@ -20,26 +20,12 @@ import { buildDemoViews, DEMO_WIDGETS } from './demoData';
 
 const none = () => undefined;
 
-/** How long the Mining survey's chart waits: its charting library is a chunk of its own. */
-const SURVEY_CHART_DELAY_MS = 1200;
-
 export default function DemoBoard() {
   const { t } = useTranslation();
   // Wall-clock read for the illustrative figures; lazy so it runs once.
   const [now] = useState(() => Date.now());
   const [widgets, setWidgets] = useState<readonly WidgetModel[]>(DEMO_WIDGETS);
-  const [surveyChart, setSurveyChart] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setSurveyChart(true), SURVEY_CHART_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const views = useMemo(() => {
-    const built = buildDemoViews(t, now);
-    if (surveyChart) return built;
-    const survey = built.get('d-survey');
-    return survey ? new Map(built).set('d-survey', { ...survey, chart: undefined }) : built;
-  }, [t, now, surveyChart]);
+  const views = useMemo(() => buildDemoViews(t, now), [t, now]);
 
   const edit = useMemo<OverviewEdit>(
     () => ({

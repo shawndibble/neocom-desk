@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { hudLabelClassName } from './hudLabel';
+import { landingAnchor } from './landingAnchors';
 import { cx } from '@/lib/cx';
 import { Reveal } from './Reveal';
 
@@ -56,6 +59,7 @@ export function LandingBackdrop({
 
 /**
  * One titled band of the landing page, on a full-bleed backdrop with its
+ * numbered eyebrow (the header link's label), a HUD-style heading and an optional lead,
  * content held in the page's single `max-w-6xl` column. Named as a landmark
  * rather than left an anonymous `<section>`: on a page this long, "skip to what
  * it does" and "skip to what it asks for" are real navigation, and the name
@@ -66,16 +70,21 @@ export function LandingBackdrop({
 export function LandingSection({
   id,
   heading,
+  lead,
   tone = 'plain',
   ship,
   children,
 }: {
+  /** One of `LANDING_ANCHORS`: it sets the band's "01"-style number and its eyebrow, the header link's own label. */
   id: string;
   heading: string;
+  lead?: string;
   tone?: LandingTone;
   ship?: LandingShipPlacement;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const { index, key } = landingAnchor(id);
   return (
     <section
       id={id}
@@ -84,9 +93,16 @@ export function LandingSection({
     >
       <LandingBackdrop tone={tone} ship={ship} />
       <Reveal className="relative mx-auto max-w-6xl px-6 py-16">
-        <h2 id={`${id}-heading`} className="text-xl font-semibold">
+        <p className={cx(hudLabelClassName, 'text-xs text-accent')}>
+          {index} · {t(`login.header.${key}`)}
+        </p>
+        <h2
+          id={`${id}-heading`}
+          className="mt-2 font-hud text-3xl leading-tight font-bold text-balance uppercase sm:text-4xl"
+        >
           {heading}
         </h2>
+        {lead && <p className="mt-3 max-w-2xl text-text-dim">{lead}</p>}
         {children}
       </Reveal>
     </section>
