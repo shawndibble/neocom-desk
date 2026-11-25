@@ -1,7 +1,9 @@
 /**
  * The Overview's header controls, handed to `CharacterHeader`'s slots: the
- * data age (`OverviewDataAge`, on the tab row) and the
+ * data age (`OverviewDataAge`, on the tab row from `md` up) and the
  * controls (`OverviewNext` and `OverviewCustomize`, level with the bell).
+ * Below `md` the page drops the data age chip and swaps Customize for one ⋮
+ * menu (`OverviewMoreMenu`) holding both, and Next becomes a borderless row.
  *
  * It reads what is on screen, not what is stored: the button and the age count
  * only the widgets the page draws (a widget hidden on a phone offers neither a
@@ -10,26 +12,32 @@
  * footer and the command palette switch the active Character, and each
  * widget's own menu chooses its Character scope.
  */
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DropdownMenuItem,
+  HeaderMoreMenu,
   SEVERITY_TEXT,
   SeverityIcon,
   Tooltip,
   buttonClassName,
   CachedNotice,
 } from '@/components/ui';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
+import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
-import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
-import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { DataAgePopover } from './DataAgePopover';
 import { useOverviewRefresh } from './widgets/data/refreshContext';
 import { useOverviewEdit } from './widgets/editContext';
-import { nextShape, reservedNextHeight, type ChipTone } from './widgets/nextDeadline';
+import type { ChipTone } from './widgets/nextDeadline';
 import type { OverviewSummary } from './useOverviewSummary';
 
 /** The button's own ladder: amber under 3 h, red under 30 min (not the per-card severities). */
@@ -71,52 +79,70 @@ export function OverviewCachedNotice({ summary }: { summary: OverviewSummary }) 
 }
 
 /**
- * The Next deadline: a link to the page that owns the clock, drawn as a plain
- * button (a plain readout when no page owns it; absent with no deadline). It is a child of `CharacterHeader`'s flex
- * row: left of Customize and the bell from `md`, on its own full-width line
- * under them on a phone.
+ * The Next deadline: a link to the page that owns the clock (a plain readout
+ * when no page owns it; absent with no deadline). It is a child of
+ * `CharacterHeader`'s flex row. From `md` it is a button left of Customize and
+ * the bell. Below `md` it is a borderless row that fills what is left of the
+ * controls' line under the name, its whole width the link (§6c "Topic
+ * drill-in": a trailing GoTo chevron), the countdown first so a narrow
+ * phone still shows it when the note truncates.
  */
 export function OverviewNext({ summary }: { summary: OverviewSummary }) {
   const { t } = useTranslation();
-  const { next, remaining, tone, pending } = summary;
-  const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const shape = nextShape(next);
-  const shapeKey = `overview.nextShape.${characterId ?? 0}`;
-  // Once every read is in, remember what this Character's header drew, for the next load.
-  useEffect(() => {
-    if (!pending) writeLocal(shapeKey, shape);
-  }, [pending, shape, shapeKey]);
-  if (!next) {
-    // On a phone the button is a line of its own: hold last time's room open while the reads
-    // that may offer a clock are still out, so the board does not drop when it arrives.
-    const reserved = pending ? reservedNextHeight(readLocal(shapeKey)) : null;
-    return reserved ? (
-      <div aria-hidden="true" className={cx('order-last basis-full md:hidden', reserved)} />
-    ) : null;
-  }
-  const content = (
+  const narrow = useIsNarrow();
+  const { next, remaining, tone } = summary;
+  if (!next) return null;
+  const countdown = (
     <>
-      <span className="text-text-dim">{t('overview.header.next')}</span>
       {tone !== 'neutral' && <SeverityIcon severity={tone === 'danger' ? 'critical' : 'warning'} />}
       <b className={cx('font-semibold tabular-nums', CHIP_TEXT[tone])}>
         {formatCountdown(remaining / 1000)}
       </b>
+    </>
+  );
+  if (narrow) {
+    const row = (
+      <>
+        {countdown}
+        <span className="min-w-0 truncate text-text-dim">{next.note}</span>
+      </>
+    );
+    return next.to === undefined ? (
+      <span className="flex min-w-0 flex-1 items-center gap-2 text-sm whitespace-nowrap">
+        {row}
+      </span>
+    ) : (
+      <Link
+        to={next.to}
+        className={cx(
+          'flex min-w-0 flex-1 items-center gap-2 rounded-xs text-sm whitespace-nowrap',
+          tappableRowClassName,
+          interactiveClassName,
+          focusRingClassName
+        )}
+      >
+        {row}
+        <Icon.GoTo aria-hidden="true" className="ml-auto shrink-0 text-text-dim" />
+      </Link>
+    );
+  }
+  const content = (
+    <>
+      <span className="text-text-dim">{t('overview.header.next')}</span>
+      {countdown}
       <span className="min-w-0 truncate text-text-dim normal-case md:max-w-40">{next.note}</span>
     </>
   );
   return (
-    <div className="order-last min-w-0 basis-full md:order-none md:basis-auto">
+    <div className="min-w-0">
       {next.to === undefined ? (
         // No page owns this clock: a plain readout, not a button that goes nowhere.
-        <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm">{content}</span>
+        <span className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap">{content}</span>
       ) : (
         <Tooltip content={t('overview.header.nextGoTo', { note: next.note })}>
           <Link
             to={next.to}
-            className={buttonClassName({
-              size: 'md',
-              className: 'w-full min-w-0 whitespace-nowrap md:w-auto',
-            })}
+            className={buttonClassName({ size: 'md', className: 'min-w-0 whitespace-nowrap' })}
           >
             {content}
           </Link>
@@ -139,5 +165,36 @@ export function OverviewCustomize() {
       <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
       <span className="sr-only md:not-sr-only">{t('overview.header.customize')}</span>
     </Button>
+  );
+}
+
+/**
+ * Below `md`: the header's one ⋮ menu, holding Customize and a Refresh of
+ * every widget (its label carries the data age, which the tab row has no room
+ * for). Two real actions are needed to earn the ⋮ (§6c), so while the edit
+ * bar owns Done, or before any read has landed, this draws the single inline
+ * Customize button instead (which is nothing while editing). The page just
+ * renders this below `md` and `OverviewCustomize` from `md` up.
+ */
+export function OverviewMoreMenu({ summary }: { summary: OverviewSummary }) {
+  const { t } = useTranslation();
+  const { editing, startEditing } = useOverviewEdit();
+  const { refresh } = useOverviewRefresh();
+  const { fetchedAt, now } = summary;
+  if (editing || !fetchedAt) return <OverviewCustomize />;
+  return (
+    <HeaderMoreMenu>
+      <DropdownMenuItem onSelect={startEditing}>
+        <Icon.EditBoard aria-hidden="true" />
+        {t('overview.header.customize')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={refresh}>
+        <Icon.Refresh aria-hidden="true" />
+        {t('overview.header.refreshAll')}
+        <span className="ml-auto pl-3 text-xs text-text-dim">
+          {formatAge(Math.max(0, now - fetchedAt.getTime()), t)}
+        </span>
+      </DropdownMenuItem>
+    </HeaderMoreMenu>
   );
 }
