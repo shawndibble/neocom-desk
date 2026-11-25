@@ -85,9 +85,19 @@ export function CharacterHeader({
   const sp = (value: number | null | undefined): string =>
     value == null ? t('common.unknown') : formatCount(value);
   const showSp = totalSp !== undefined || unallocatedSp !== undefined;
+  // Each link keeps a 24px target (WCAG 2.5.8) in a line of its own height. Side by side the
+  // targets overlap their neighbours' lines harmlessly; stacked below `md` on the Overview they would
+  // overlap each other, so the negative margin applies from `md` up there.
+  const affiliationLinkClassName = cx('min-w-0 truncate py-1', overview ? 'md:-my-1' : '-my-1');
 
   return (
-    <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <header
+      className={cx(
+        'flex flex-wrap items-center gap-x-3 gap-y-2',
+        // Below `md` the Overview's controls share one line under the name, packed to its end.
+        overview && 'max-md:justify-end'
+      )}
+    >
       <CharacterAvatar
         characterId={characterId}
         size="lg"
@@ -101,12 +111,24 @@ export function CharacterHeader({
         to a single letter instead. Given a real basis, the chips wrap to
         their own line and the name gets the full width.
       */}
-      <div className={cx('min-w-0 flex-1', overview || actions ? 'basis-36' : 'basis-48')}>
+      <div
+        className={cx(
+          'min-w-0 flex-1',
+          overview || actions ? 'basis-36' : 'basis-48',
+          // Below `md` the Overview's name takes the whole row beside the portrait (64px + the
+          // 12px gap, and a pixel of slack), so the controls wrap to a line of their own.
+          overview && 'max-md:basis-[calc(100%-4.8rem)]'
+        )}
+      >
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
         <div className="flex flex-wrap items-center gap-x-3">
           <h1
             tabIndex={-1}
-            className="max-w-full min-w-0 truncate text-xl font-semibold tracking-widest uppercase focus:outline-none"
+            className={cx(
+              'max-w-full min-w-0 text-xl font-semibold tracking-widest uppercase focus:outline-none',
+              // The Overview's name wraps below `md` rather than ending in an ellipsis.
+              overview ? 'max-md:wrap-break-word md:truncate' : 'truncate'
+            )}
           >
             {character?.name ?? t('common.unknown')}
           </h1>
@@ -118,9 +140,15 @@ export function CharacterHeader({
           phone, WCAG 2.5.8). No native `title` (off-limits outside the ui
           primitives, §6c): each link's Show Info names it whole.
         */}
-        <p className="flex min-w-0 text-xs whitespace-nowrap text-text-dim">
+        <p
+          className={cx(
+            'flex min-w-0 text-xs whitespace-nowrap text-text-dim',
+            // Below `md` the corporation and the alliance each get a line, so neither hides the other.
+            overview && 'max-md:flex-col'
+          )}
+        >
           {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
-            <CorporationLink id={publicInfo.corporationId} className="-my-1 min-w-0 truncate py-1">
+            <CorporationLink id={publicInfo.corporationId} className={affiliationLinkClassName}>
               {publicInfo.corporationName}
             </CorporationLink>
           ) : (
@@ -130,9 +158,11 @@ export function CharacterHeader({
           )}
           {publicInfo?.allianceName && (
             <>
-              <span className="shrink-0 whitespace-pre">{' / '}</span>
+              <span className={cx('shrink-0 whitespace-pre', overview && 'max-md:hidden')}>
+                {' / '}
+              </span>
               {publicInfo.allianceId !== undefined ? (
-                <AllianceLink id={publicInfo.allianceId} className="-my-1 min-w-0 truncate py-1">
+                <AllianceLink id={publicInfo.allianceId} className={affiliationLinkClassName}>
                   {publicInfo.allianceName}
                 </AllianceLink>
               ) : (
