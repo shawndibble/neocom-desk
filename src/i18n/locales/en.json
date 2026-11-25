@@ -4673,6 +4673,13 @@
         }
       }
     },
+    "video": {
+      "heading": "Take the tour",
+      "lead": "A narrated tour of what sets it apart, filled with sample data.",
+      "play": "Play the {{duration}} tour video",
+      "playerTitle": "Neocom Desk tour video",
+      "heroLink": "Watch the {{duration}} tour"
+    },
     "answersHeading": "The questions it exists to answer",
     "answersPhoneEyebrow": "On your phone",
     "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",

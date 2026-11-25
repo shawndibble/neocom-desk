@@ -6,6 +6,7 @@ import { BootScreen } from '@/app/BootScreen';
 import { releaseLandingShell } from '@/app/landingShell';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
+import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { InlineError } from '@/components/ui/InlineError';
 import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
@@ -17,6 +18,8 @@ import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
+import { PromoVideo } from '@/features/landing/PromoVideo';
+import { PROMO_VIDEO, PROMO_VIDEO_ANCHOR } from '@/features/landing/promoVideoConfig';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -36,6 +39,10 @@ export function Login() {
   // One Customize permissions dialog for the whole page, opened from either
   // "Log in" button's own link right under it.
   const [customizing, setCustomizing] = useState(false);
+
+  // The promo video starts from its poster or from the hero's "Watch" link.
+  const [promoPlays, setPromoPlays] = useState(0);
+  const playPromo = () => setPromoPlays((n) => n + 1);
 
   // The large login buttons (hero and closing call to action); the sticky
   // header shows its own only while neither is in view.
@@ -126,6 +133,14 @@ export function Login() {
                 />
                 {loginFailed && <InlineError>{t('login.failed')}</InlineError>}
                 <CustomizeLink onClick={() => setCustomizing(true)} />
+                <button
+                  type="button"
+                  className={plainTextActionClassName('gap-1.5')}
+                  onClick={playPromo}
+                >
+                  <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
+                  {t('login.video.heroLink', { duration: PROMO_VIDEO.duration })}
+                </button>
               </div>
             </div>
 
@@ -135,6 +150,10 @@ export function Login() {
 
         {belowFold && (
           <>
+            <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')}>
+              <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.video.lead')}</p>
+              <PromoVideo plays={promoPlays} onPlay={playPromo} />
+            </LandingSection>
             <LandingSection
               id="login-answers"
               heading={t('login.answersHeading')}

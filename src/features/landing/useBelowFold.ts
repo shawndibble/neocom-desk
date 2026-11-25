@@ -1,10 +1,10 @@
 import { startTransition, useEffect, useLayoutEffect, useState } from 'react';
-import { LANDING_ANCHORS } from './landingAnchors';
+import { LANDING_SECTION_IDS } from './landingAnchors';
 
 /** The landing section a URL `#hash` names, or null. Compared raw: the ids are plain ASCII, and decoding throws on a stray `%`. */
 function anchorTarget(hash: string): string | null {
   const id = hash.slice(1);
-  return LANDING_ANCHORS.some((anchor) => anchor.id === id) ? id : null;
+  return LANDING_SECTION_IDS.includes(id) ? id : null;
 }
 
 /**
