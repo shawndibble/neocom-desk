@@ -1,4 +1,4 @@
-import { PROMO_VIDEO_ANCHOR } from './promoVideo';
+import { PROMO_VIDEO_ANCHOR } from './promoVideoConfig';
 
 /**
  * The page sections the header links to: the element id and the `login.header.*`

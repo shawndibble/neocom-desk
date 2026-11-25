@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PromoVideo } from './PromoVideo';
-import { PROMO_VIDEO, promoEmbedUrl } from './promoVideo';
+import { PROMO_VIDEO, promoEmbedUrl } from './promoVideoConfig';
 
 function Harness() {
-  const [playing, setPlaying] = useState(false);
-  return <PromoVideo playing={playing} onPlay={() => setPlaying(true)} />;
+  const [plays, setPlays] = useState(0);
+  return <PromoVideo plays={plays} onPlay={() => setPlays((n) => n + 1)} />;
 }
 
 describe('PromoVideo', () => {
@@ -26,9 +26,14 @@ describe('PromoVideo', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('starts at once when another control already asked to play', () => {
-    render(<PromoVideo playing onPlay={() => {}} />);
-    expect(screen.getByTitle('login.video.playerTitle')).toHaveFocus();
+  it('starts at once when another control asked to play, and refocuses the same player on a later press', () => {
+    const view = render(<PromoVideo plays={1} onPlay={() => {}} />);
+    const player = screen.getByTitle('login.video.playerTitle');
+    expect(player).toHaveFocus();
+    player.blur();
+    view.rerender(<PromoVideo plays={2} onPlay={() => {}} />);
+    expect(screen.getByTitle('login.video.playerTitle')).toBe(player);
+    expect(player).toHaveFocus();
   });
 });
 

@@ -19,7 +19,7 @@ import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { PromoVideo } from '@/features/landing/PromoVideo';
-import { PROMO_VIDEO, PROMO_VIDEO_ANCHOR } from '@/features/landing/promoVideo';
+import { PROMO_VIDEO, PROMO_VIDEO_ANCHOR } from '@/features/landing/promoVideoConfig';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -41,7 +41,8 @@ export function Login() {
   const [customizing, setCustomizing] = useState(false);
 
   // The promo video starts from its poster or from the hero's "Watch" link.
-  const [promoPlaying, setPromoPlaying] = useState(false);
+  const [promoPlays, setPromoPlays] = useState(0);
+  const playPromo = () => setPromoPlays((n) => n + 1);
 
   // The large login buttons (hero and closing call to action); the sticky
   // header shows its own only while neither is in view.
@@ -135,7 +136,7 @@ export function Login() {
                 <button
                   type="button"
                   className={plainTextActionClassName('gap-1.5')}
-                  onClick={() => setPromoPlaying(true)}
+                  onClick={playPromo}
                 >
                   <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" />
                   {t('login.video.heroLink', { duration: PROMO_VIDEO.duration })}
@@ -151,7 +152,7 @@ export function Login() {
           <>
             <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')}>
               <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.video.lead')}</p>
-              <PromoVideo playing={promoPlaying} onPlay={() => setPromoPlaying(true)} />
+              <PromoVideo plays={promoPlays} onPlay={playPromo} />
             </LandingSection>
             <LandingSection
               id="login-answers"

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { focusRingInsetClassName } from '@/components/ui/controlStyles';
 import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { PROMO_VIDEO, promoEmbedUrl } from './promoVideo';
+import { PROMO_VIDEO, promoEmbedUrl } from './promoVideoConfig';
 
 const POSTER = '/promo/promo-poster-1280.webp';
 const POSTER_SRCSET = '/promo/promo-poster-640.webp 640w, /promo/promo-poster-1280.webp 1280w';
@@ -17,7 +17,12 @@ const POSTER_SRCSET = '/promo/promo-poster-640.webp 640w, /promo/promo-poster-12
  * browsers may still want a second tap on YouTube's own play button: the
  * press does not carry into the cross-origin frame.
  */
-export function PromoVideo({ playing, onPlay }: { playing: boolean; onPlay: () => void }) {
+/**
+ * `plays` counts presses of any play control (this poster or the hero's
+ * action): 0 shows the poster, and each press after the first brings the
+ * running player back into view without reloading it.
+ */
+export function PromoVideo({ plays, onPlay }: { plays: number; onPlay: () => void }) {
   const { t } = useTranslation();
   const { youtubeId, duration } = PROMO_VIDEO;
   const player = useRef<HTMLIFrameElement>(null);
@@ -25,14 +30,14 @@ export function PromoVideo({ playing, onPlay }: { playing: boolean; onPlay: () =
   // The pressed control is gone (or was the hero's link, up the page): bring the
   // player into view and hand it keyboard focus.
   useLayoutEffect(() => {
-    if (!playing) return;
+    if (plays === 0) return;
     player.current?.scrollIntoView({ block: 'nearest' });
     player.current?.focus({ preventScroll: true });
-  }, [playing]);
+  }, [plays]);
 
   return (
     <div className="relative mt-6 aspect-video w-full overflow-hidden border border-line bg-bg">
-      {playing ? (
+      {plays > 0 ? (
         <iframe
           ref={player}
           src={promoEmbedUrl(youtubeId)}
