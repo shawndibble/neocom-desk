@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MINUTE_MS } from '@/lib/age';
 import { IDB_RELOAD_KEY, isIdbConnectionLost, reloadOnceForLostIdb } from './idbConnectionLost';
 
 function unknownError(message: string): Error {
@@ -52,7 +53,7 @@ describe('reloadOnceForLostIdb', () => {
     const reload = vi.fn();
     const error = unknownError('Unable to open cursor');
     store.set(IDB_RELOAD_KEY, '1000');
-    expect(reloadOnceForLostIdb(error, 1000 + 6 * 60 * 1000, reload, storage)).toBe(true);
+    expect(reloadOnceForLostIdb(error, 1000 + 6 * MINUTE_MS, reload, storage)).toBe(true);
   });
 
   it('never reloads for an unrelated error', () => {

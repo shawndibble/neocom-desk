@@ -1,3 +1,5 @@
+import { MINUTE_MS } from '@/lib/age';
+
 /**
  * WebKit loses its connection to Safari's IndexedDB process and every read
  * after that fails until the page reloads (WebKit bugs 273827, 277615, 309386).
@@ -8,8 +10,8 @@
 const LOST = /Unable to open cursor|Connection to Indexed Database server lost/i;
 
 /** Reloaded this recently for the same cause: show the error screen instead of looping. */
-const RELOAD_COOLDOWN_MS = 5 * 60 * 1000;
-export const IDB_RELOAD_KEY = 'idbConnectionLostReloadAt';
+const RELOAD_COOLDOWN_MS = 5 * MINUTE_MS;
+export const IDB_RELOAD_KEY = 'neocom:idb-lost-reload-at';
 
 export function isIdbConnectionLost(error: unknown): boolean {
   // Dexie wraps a native failure and keeps it on `inner`.

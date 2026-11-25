@@ -68,6 +68,8 @@ installInputModality();
 // the first real screen lets it go. A render error shows `#root` at once, so
 // the error screen is never stuck behind it, and the timer is the backstop for
 // anything else that keeps that screen from arriving.
+/** Lets Sentry's transport send a report before a deliberate reload. */
+const SENTRY_FLUSH_GRACE_MS = 500;
 const reportError = reactErrorHandler();
 function releaseAndReport(...args: Parameters<typeof reportError>) {
   releaseLandingShell();
@@ -79,7 +81,7 @@ function releaseAndReport(...args: Parameters<typeof reportError>) {
       scope.setFingerprint(['idb-connection-lost']);
       reportError(...args);
     });
-    setTimeout(() => reloadOnceForLostIdb(args[0]), 500);
+    setTimeout(() => reloadOnceForLostIdb(args[0]), SENTRY_FLUSH_GRACE_MS);
     return;
   }
   if (!isRouteChunkFailure(args[0])) return reportError(...args);
