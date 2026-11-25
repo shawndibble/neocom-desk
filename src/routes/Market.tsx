@@ -1245,6 +1245,7 @@ export function Market() {
         {sharedSeed.loadFailed && (
           <Toast
             message={t('market.sharedAppraisalLoadFailed')}
+            tone="danger"
             // Stays mounted, busy, until the retry settles: it unmounts only on success.
             action={{
               label: sharedSeed.retrying ? t('common.loading') : t('common.retry'),

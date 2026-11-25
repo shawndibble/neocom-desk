@@ -7250,6 +7250,10 @@
     "resetColumns": "Reset to default",
     "resetFilters": "Reset filters",
     "close": "Close",
+    "toastTone": {
+      "success": "Success",
+      "danger": "Error"
+    },
     "discardInputTitle": "Discard what you typed?",
     "discardInputBody": "Closing this will throw away the changes you have not saved.",
     "discardInputKeep": "Keep editing",

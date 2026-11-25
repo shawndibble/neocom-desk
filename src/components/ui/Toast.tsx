@@ -17,6 +17,36 @@ import { LiveStatus } from './LiveStatus';
 import { usePortalContainer } from './portalContainer';
 import { TOAST_MS } from './useTimedToast';
 
+/**
+ * Tone to the border it tints, the glyph beside the message and the word for
+ * it — one record rather than three, which is what stops a caller taking the
+ * tint and leaving the glyph behind (the reasoning `SeverityIcon` spells out).
+ * DESIGN.md §7: colour is never the only signal. The word goes to the live
+ * region, so a reader who sees neither the colour nor the glyph is still told
+ * which kind of toast this is.
+ *
+ * Two rungs, and neither is the default: a routine confirmation ("Copied")
+ * stays neutral, because a toast that only ever reports success teaches
+ * nothing by being green. `success` is for an outcome that could have failed
+ * and didn't — a save that went through; `danger` is for one that did fail.
+ */
+const TOAST_TONE = {
+  success: {
+    border: 'border-success',
+    text: 'text-success',
+    glyph: Icon.Succeeded,
+    wordKey: 'common.toastTone.success',
+  },
+  danger: {
+    border: 'border-danger',
+    text: 'text-danger',
+    glyph: Icon.Warn,
+    wordKey: 'common.toastTone.danger',
+  },
+} as const;
+
+export type ToastTone = keyof typeof TOAST_TONE;
+
 interface ToastBaseProps {
   message: ReactNode;
   /**
@@ -31,6 +61,12 @@ interface ToastBaseProps {
    * stack owns the position. Leave unset everywhere else.
    */
   stacked?: boolean;
+  /**
+   * Tints the border and adds a glyph and a spoken word (`TOAST_TONE`). Leave
+   * unset for a routine confirmation; pass `success` where the outcome could
+   * have failed and didn't, `danger` where it failed.
+   */
+  tone?: ToastTone;
 }
 
 /** Plain toasts expire on their own; with `onClose` the toast runs that timer itself. */
@@ -85,12 +121,15 @@ export function Toast({
   message,
   instance,
   stacked,
+  tone,
   undo,
   action,
   onClose,
   durationMs = TOAST_MS,
 }: ToastProps) {
   const { t } = useTranslation();
+  const toned = tone ? TOAST_TONE[tone] : null;
+  const ToneGlyph = toned?.glyph;
   const portalContainer = usePortalContainer();
   const persistent = Boolean(undo || action);
   const pathname = useContext(UNSAFE_LocationContext)?.location.pathname;
@@ -187,7 +226,9 @@ export function Toast({
   const toast = (
     <div
       ref={rootRef}
-      className={`toast-in bg-panel-2 border-line-bright text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ${
+      className={`toast-in bg-panel-2 text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ${
+        toned?.border ?? 'border-line-bright'
+      } ${
         stacked
           ? 'pointer-events-auto max-w-full'
           : 'fixed bottom-[calc(8rem+env(safe-area-inset-bottom))] left-1/2 z-40 w-[95vw] -translate-x-1/2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]'
@@ -207,12 +248,24 @@ export function Toast({
       }}
       onKeyDown={handleKeyDown}
     >
+      {ToneGlyph && (
+        // Decorative: the tone's word goes to the live region with the message,
+        // so the glyph is never the only statement of it.
+        <ToneGlyph
+          aria-hidden="true"
+          size={Icon.ICON_SIZE.sm}
+          className={`shrink-0 ${toned.text}`}
+        />
+      )}
       {/* Visible copy is hidden from AT; the live region below announces it. The
           toast mounts already filled, which a bare role="status" announces unreliably. */}
       <span aria-hidden="true" className="min-w-0 break-words">
         {message}
       </span>
-      <LiveStatus announceKey={occurrence}>{message}</LiveStatus>
+      <LiveStatus announceKey={occurrence}>
+        {toned && <>{t(toned.wordKey)}: </>}
+        {message}
+      </LiveStatus>
       {undo && (
         <button
           ref={undoRef}
