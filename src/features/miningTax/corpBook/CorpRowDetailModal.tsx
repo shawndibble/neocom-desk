@@ -168,6 +168,14 @@ export function CorpRowDetailModal({
                     : `${formatIsk(owed)} ISK`}
             </span>
           </div>
+          {view.state === 'settling' && (
+            <p className="-mt-2 text-right text-xs text-text-dim">
+              {t('miningTax.corpBook.conflict.settlingNote', {
+                corp: corp.corpName,
+                day: view.date,
+              })}
+            </p>
+          )}
           {conflict && (
             <p className="-mt-2 text-right text-xs text-warning">
               {t(

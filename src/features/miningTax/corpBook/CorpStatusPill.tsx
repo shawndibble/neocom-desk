@@ -17,6 +17,8 @@ const PILL_TONE: Record<PillState, string> = {
   pending: 'text-text-dim',
   billed: 'text-danger bg-danger/10',
   conflict: 'text-warning bg-warning/10',
+  // Waiting on the refinery log: nothing for the member to do.
+  settling: 'text-text-dim',
   unattributed: 'text-text-dim',
   dismissed: 'text-text-dim',
   waived: 'text-text-dim',
