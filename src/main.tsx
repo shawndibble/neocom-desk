@@ -13,7 +13,12 @@ import { BootCoverHost } from './app/BootCoverHost';
 import { BootUpdateGate } from './app/BootUpdateGate';
 import { hideBootCover, showBootCover } from './app/bootCover';
 import { installInputModality } from './app/inputModality';
-import { isIdbConnectionLost, reloadOnceForLostIdb } from './app/idbConnectionLost';
+import {
+  characterRowCount,
+  isIdbConnectionLost,
+  reloadOnceForLostIdb,
+} from './app/idbConnectionLost';
+import { db } from './db';
 import { isRouteChunkFailure } from './app/routeChunks';
 import { LANDING_SHELL_BACKSTOP_MS, releaseLandingShell } from './app/landingShell';
 import { installTranslateGuard } from './app/translateGuard';
@@ -68,20 +73,23 @@ installInputModality();
 // the first real screen lets it go. A render error shows `#root` at once, so
 // the error screen is never stuck behind it, and the timer is the backstop for
 // anything else that keeps that screen from arriving.
+const reportError = reactErrorHandler();
 /** Lets Sentry's transport send a report before a deliberate reload. */
 const SENTRY_FLUSH_GRACE_MS = 500;
-const reportError = reactErrorHandler();
 function releaseAndReport(...args: Parameters<typeof reportError>) {
   releaseLandingShell();
   if (isIdbConnectionLost(args[0])) {
     // WebKit dropped its IndexedDB connection: one reload cures it. Report
     // first, tagged and grouped as one issue, and give the send a moment.
-    withScope((scope) => {
-      scope.setTag('idb_connection_lost', 'true');
-      scope.setFingerprint(['idb-connection-lost']);
-      reportError(...args);
+    void characterRowCount(() => db.characters.count()).then((characterRows) => {
+      withScope((scope) => {
+        scope.setTag('idb_connection_lost', 'true');
+        scope.setFingerprint(['idb-connection-lost']);
+        scope.setContext('idb', { characterRows });
+        reportError(...args);
+      });
+      setTimeout(() => reloadOnceForLostIdb(args[0]), SENTRY_FLUSH_GRACE_MS);
     });
-    setTimeout(() => reloadOnceForLostIdb(args[0]), SENTRY_FLUSH_GRACE_MS);
     return;
   }
   if (!isRouteChunkFailure(args[0])) return reportError(...args);

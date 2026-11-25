@@ -41,3 +41,23 @@ export function reloadOnceForLostIdb(
   reload();
   return true;
 }
+
+/**
+ * How many rows the Characters table holds, for the Sentry report: a populated
+ * table points at WebKit's lost connection, an empty one at a cursor bug on
+ * empty stores. `'unavailable'` when the read fails or does not answer in time,
+ * which it may not, on a broken connection.
+ */
+export async function characterRowCount(
+  count: () => Promise<number>,
+  timeoutMs = 300
+): Promise<number | 'unavailable'> {
+  try {
+    return await Promise.race([
+      count(),
+      new Promise<'unavailable'>((resolve) => setTimeout(() => resolve('unavailable'), timeoutMs)),
+    ]);
+  } catch {
+    return 'unavailable';
+  }
+}
