@@ -13,6 +13,7 @@ import { BootCoverHost } from './app/BootCoverHost';
 import { BootUpdateGate } from './app/BootUpdateGate';
 import { hideBootCover, showBootCover } from './app/bootCover';
 import { installInputModality } from './app/inputModality';
+import { isIdbConnectionLost, reloadOnceForLostIdb } from './app/idbConnectionLost';
 import { isRouteChunkFailure } from './app/routeChunks';
 import { LANDING_SHELL_BACKSTOP_MS, releaseLandingShell } from './app/landingShell';
 import { installTranslateGuard } from './app/translateGuard';
@@ -70,6 +71,17 @@ installInputModality();
 const reportError = reactErrorHandler();
 function releaseAndReport(...args: Parameters<typeof reportError>) {
   releaseLandingShell();
+  if (isIdbConnectionLost(args[0])) {
+    // WebKit dropped its IndexedDB connection: one reload cures it. Report
+    // first, tagged and grouped as one issue, and give the send a moment.
+    withScope((scope) => {
+      scope.setTag('idb_connection_lost', 'true');
+      scope.setFingerprint(['idb-connection-lost']);
+      reportError(...args);
+    });
+    setTimeout(() => reloadOnceForLostIdb(args[0]), 500);
+    return;
+  }
   if (!isRouteChunkFailure(args[0])) return reportError(...args);
   // A failed chunk is usually the visitor's network or a blocker, so it is a
   // warning; a burst after a deploy is a broken release, which a Sentry alert
