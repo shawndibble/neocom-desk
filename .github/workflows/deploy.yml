@@ -101,7 +101,7 @@ jobs:
       - run: node scripts/keep-old-assets.mjs https://neocomdesk.com .cache/asset-history.json
         continue-on-error: true
       - uses: actions/configure-pages@v6
-      # Named per attempt, and deploy-pages told which to read. Artifacts
+      # Named per attempt, and `deploy` told which to read. Artifacts
       # persist across attempts within a run, so a re-run of this job used to
       # upload a second `github-pages` alongside the first and deploy-pages
       # then refused with "Multiple artifacts named github-pages ... count is
@@ -124,6 +124,9 @@ jobs:
           path: .cache/asset-history.json
           retention-days: 1
           if-no-files-found: ignore
+          # `.cache` is a dot-directory, which upload-artifact@v4 skips by default
+          # even for an explicit path.
+          include-hidden-files: true
 
   # Pages deploy for the artifact `build` uploaded. One retry as a backstop in
   # case the artifact lookup still races: the step is idempotent, and a deploy
