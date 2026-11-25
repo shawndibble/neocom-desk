@@ -115,7 +115,8 @@ export function SrpSettingsView() {
   return (
     <>
       {body}
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {/* The only thing this toast ever reports is a save that went through. */}
+      {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
     </>
   );
 }

@@ -16,7 +16,7 @@ export { CachedNotice } from './CachedNotice';
 export { IncompleteNotice } from './IncompleteNotice';
 export { LoadFailedState } from './LoadFailedState';
 export { EmptyState } from './EmptyState';
-export { Toast } from './Toast';
+export { Toast, type ToastTone } from './Toast';
 export { ToastStack } from './ToastStack';
 export { useDeferredCommits } from './useDeferredCommits';
 export { useTimedToast } from './useTimedToast';

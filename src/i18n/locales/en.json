@@ -7250,6 +7250,10 @@
     "resetColumns": "Reset to default",
     "resetFilters": "Reset filters",
     "close": "Close",
+    "toastTone": {
+      "success": "Success",
+      "danger": "Error"
+    },
     "discardInputTitle": "Discard what you typed?",
     "discardInputBody": "Closing this will throw away the changes you have not saved.",
     "discardInputKeep": "Keep editing",
@@ -14164,8 +14168,6 @@
       "columnVolume": "Volume",
       "remove": "Remove {{name}}",
       "clearAll": "Clear all",
-      "expand": "Expand",
-      "restore": "Restore",
       "resize": "Resize the drawer",
       "viewLabel": "Compare view",
       "viewPrices": "Prices",

@@ -411,7 +411,7 @@ Observed gaps
 
 ### 3. Compare drawer (Compare Set)
 
-Component `CompareDrawer.tsx`, mounted by `Market.tsx:1310` whenever the Compare Set is non-empty, on every Market tab. Fixed-position non-modal bottom drawer (`z-30`, `bottom-16` over mobile nav), handle button "Compare (N)" toggles open/closed; drag handle to resize, ArrowUp/ArrowDown on handle step the height; expand to full-screen sheet (`z-50`) with restore; on narrow screens Clear all moves into the export overflow menu.
+Component `CompareDrawer.tsx`, mounted by `Market.tsx:1310` whenever the Compare Set is non-empty, on every Market tab. Fixed-position non-modal bottom drawer (`z-30`, `bottom-16` over mobile nav), handle button "Compare (N)" toggles open/closed; the grip drags to any height between `MIN_HEIGHT` and 80% of the viewport and, pulled past the minimum, slides the drawer off and closes it (`SWIPE_DISMISS_DISTANCE`); ArrowUp/ArrowDown on the grip step the height and Home/End reach the ends. There is no Expand/Restore button — decision `20261125-211649-compare-drawer-is-dragged-to-size-with-no`. Below `md` it opens as a full-screen sheet (`z-50`) with no grip; on narrow screens Clear all moves into the export overflow menu.
 
 Compare Set (`compareSet.ts`): zustand, scratch only (no Dexie, no sync, lost on reload). Items added from Browser item header (Compare IconButton), item context menus, Variations "Compare" (`addMany`, followed by Undo toast `market.compareUndo.*`, `Market.tsx:371`). Views: Prices | Attributes (`SegmentedControl`); `openIn(view)` + counter `openRequest`, consumed once.
 

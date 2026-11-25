@@ -1206,7 +1206,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
       {content}
       {copyStatus === 'copied' && <Toast message={t('market.hauling.copied')} />}
-      {copyStatus === 'failed' && <Toast message={t('market.hauling.copyFailed')} />}
+      {copyStatus === 'failed' && <Toast message={t('market.hauling.copyFailed')} tone="danger" />}
     </div>
   );
 }

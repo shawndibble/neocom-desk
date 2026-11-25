@@ -296,6 +296,8 @@ export const SeverityCritical = withWeight(WarningOctagon);
 export const SeverityWatch = withWeight(Eye);
 /** Nothing pending. */
 export const SeverityClear = withWeight(CheckCircle);
+/** An outcome that could have failed and didn't — a `Toast`'s `success` tone. */
+export const Succeeded = withWeight(CheckCircle);
 /** Clear a field, dismiss a panel. */
 export const Close = withWeight(X);
 /** Edit a name in place — the rename affordance on a saved-plan row. */
