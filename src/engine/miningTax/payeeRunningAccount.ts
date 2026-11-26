@@ -1,6 +1,7 @@
 import { MinerRunningAccount, type RunningAccountOwes } from '../corpTaxBook/minerRunningAccount';
 import type { PaymentOutcome } from '../corpTaxBook/paymentPreview';
 import type { TaxPayment } from '../corpTaxBook/payments';
+import { wholeIsk } from '../corpTaxBook/wholeIsk';
 
 export type PayeePaymentKind = 'journal' | 'contract' | 'recorded' | 'legacy';
 
@@ -96,7 +97,7 @@ export class PayeeRunningAccount {
         continue;
       }
       const open = left.get(charge.date) ?? (day.held ? 0 : day.remaining);
-      const amount = Math.max(0, Math.min(mark.amount, charge.tax, open));
+      const amount = Math.max(0, Math.min(mark.amount, wholeIsk(charge.tax), open));
       left.set(charge.date, open - amount);
       marked.push({ id: paymentLinkKey(mark), date: charge.date, amount });
       if (amount > 0) settles.push({ date: charge.date, tax: -amount });

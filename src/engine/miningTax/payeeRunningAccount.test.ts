@@ -97,6 +97,13 @@ describe('PayeeRunningAccount', () => {
       expect(account.marked).toEqual([{ id: 'legacy:mark:m2', date: '2026-10-02', amount: 1_000 }]);
     });
 
+    it('settles a day whose tax is a half ISK completely, never leaving 1 ISK', () => {
+      const account = buildMarked([mark('h1', 1_000)], [charge('h1', '2026-10-01', 100.5)]);
+      expect(account.isPaid('2026-10-01')).toBe(true);
+      expect(account.owes).toBeNull();
+      expect(account.marked).toEqual([{ id: 'legacy:mark:h1', date: '2026-10-01', amount: 101 }]);
+    });
+
     it('does not double-pay a day the pilot marked and then linked the real payment of', () => {
       const account = buildMarked([mark('m1'), mark('m2'), link(9, 2_000, '2026-10-04')]);
       expect(account.owes).toBeNull();
