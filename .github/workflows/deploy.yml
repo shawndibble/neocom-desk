@@ -8,26 +8,39 @@ on:
   push:
     branches: [main, develop]
 
-# No workflow-level concurrency: each job has its own group for the resource
-# it deploys to (`pages` queues, `pages-dev` lets the latest win), and a
-# workflow-level group would serialise runs ahead of them and defeat that.
+# One production promotion at a time, build included, queued rather than
+# cancelled. The build carries retired `assets/*` over from the live site and
+# the Actions cache (keep-old-assets below), so a second build that starts
+# before the first deploy lands would not carry the first run's chunks, and
+# tabs on that build would 404 once the second deploy replaced it. So the
+# `pages` group covers the whole run on `main`. Every `develop` run gets a
+# group of its own, which leaves `deploy-dev` to its own `pages-dev`
+# latest-wins group.
+concurrency:
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('deploy-{0}', github.run_id) }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  # Build and upload the Pages artifact. Deploying from a separate job (below)
+  # matters: deploy-pages looks the artifact up by listing the run's artifacts
+  # once, and run in the same job straight after the upload that listing
+  # sometimes comes back without it ("No artifacts named github-pages-N were
+  # found", actions/deploy-pages#451). Several production deploys between
+  # 2026-11-17 and 2026-11-25 needed re-runs. A job boundary between the upload
+  # and the lookup is what GitHub's own Pages workflows use. It also means
+  # "Re-run failed jobs" redeploys the finished artifact instead of rebuilding.
+  # Needs the VITE_* / SENTRY_* values as repository variables and secrets,
+  # not on the `github-pages` environment, which only `deploy` is in.
+  build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # One Pages deploy at a time, queued rather than cancelled — the
-    # environment is a single shared resource and a half-applied deploy is
-    # worse than a slow one.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: read
+    # `deploy` reads these names rather than github.run_attempt: a deploy-only
+    # re-run bumps run_attempt but must reuse the artifact attempt N uploaded.
+    outputs:
+      artifact: github-pages-${{ github.run_attempt }}
+      history: asset-history-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -77,8 +90,8 @@ jobs:
       # without it the site ships exactly as it did before this step.
       # The retirement history rides the Actions cache rather than being read
       # back off the site, whose CDN can serve it 10 minutes stale — longer
-      # than the gap between deploys. Saved only once the deploy lands, so it
-      # never records a build that did not go live.
+      # than the gap between deploys. Saved by `deploy` only once the site is
+      # live, so it never records a build that did not go live.
       - uses: actions/cache/restore@v4
         continue-on-error: true
         with:
@@ -87,25 +100,72 @@ jobs:
           restore-keys: asset-history-
       - run: node scripts/keep-old-assets.mjs https://neocomdesk.com .cache/asset-history.json
         continue-on-error: true
-      - uses: actions/configure-pages@v5
-      # Named per attempt, and deploy-pages told which to read. Artifacts
+      - uses: actions/configure-pages@v6
+      # Named per attempt, and `deploy` told which to read. Artifacts
       # persist across attempts within a run, so a re-run of this job used to
       # upload a second `github-pages` alongside the first and deploy-pages
       # then refused with "Multiple artifacts named github-pages ... count is
       # 2". That turned any transient failure here — an OIDC token timeout,
       # say — into one that could not be cleared by re-running, which is the
       # first thing anyone tries.
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
           name: github-pages-${{ github.run_attempt }}
           # Default excludes dotfiles/dotdirs, silently dropping
           # dist/.well-known/assetlinks.json (Play Store TWA verification).
           include-hidden-files: true
-      - uses: actions/deploy-pages@v4
-        id: deployment
+      # Handed to `deploy`, which saves it to the Actions cache. Best effort: a
+      # missing history only means keep-old-assets reads the live site instead.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
-          artifact_name: github-pages-${{ github.run_attempt }}
+          name: asset-history-${{ github.run_attempt }}
+          path: .cache/asset-history.json
+          retention-days: 1
+          if-no-files-found: ignore
+          # `.cache` is a dot-directory, which upload-artifact@v4 skips by default
+          # even for an explicit path.
+          include-hidden-files: true
+
+  # Pages deploy for the artifact `build` uploaded. One retry as a backstop in
+  # case the artifact lookup still races: the step is idempotent, and a deploy
+  # that fails for a real reason fails both attempts and the job.
+  # The artifact is kept 1 day, so a deploy-only re-run after that fails: use
+  # "Re-run all jobs" instead.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Guards a manual re-run of an older run's deploy overlapping another
+    # run's. The workflow-level `pages` group already serialises whole runs.
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment
+        continue-on-error: true
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact }}
+      - name: Wait before retrying deploy
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - uses: actions/deploy-pages@v5
+        id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact }}
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ${{ needs.build.outputs.history }}
+          path: .cache
       - uses: actions/cache/save@v4
         continue-on-error: true
         with:
@@ -113,7 +173,7 @@ jobs:
           key: asset-history-${{ github.run_id }}-${{ github.run_attempt }}
 
   # dev.neocomdesk.com: every merge to `develop` ships here, so the 5-7 merges
-  # an hour never touch production (`deploy` above runs only for `main`).
+  # an hour never touch production (`build` and `deploy` above run only for `main`).
   # Cloudflare Pages by direct upload, because GitHub Pages serves one site
   # per repo. Uses the `dev` environment's own EVE application (a callback URL
   # is one per app), and sits out Sentry so dev noise stays out of production.
