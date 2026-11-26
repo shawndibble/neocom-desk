@@ -15561,6 +15561,7 @@
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
+      "installRequiredLink": "Install options in Settings",
       "missingGrantBadge": {
         "base": "Needs Alerts when closed. Turn it on in Manage Alerts when closed.",
         "mail": "Needs Alerts when closed with mail. Turn it on in Manage Alerts when closed.",

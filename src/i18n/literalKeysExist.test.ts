@@ -12,7 +12,6 @@ function sourceFiles(dir: string): string[] {
 }
 
 const KNOWN_MISSING = new Set([
-  'settings.notifications.installRequiredLink',
   'piPlan.find.whatIfChip',
   'piPlan.make.failedTitle',
   'piPlan.make.failedHint',
