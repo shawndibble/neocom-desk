@@ -21,6 +21,9 @@ vi.mock('@/features/miningTax/corpBook/useAutoClaimDonations', () => ({
 vi.mock('@/features/miningTax/corpBook/useToleranceRecordChanges', () => ({
   useToleranceRecordChanges: () => [],
 }));
+vi.mock('@/features/miningTax/corpBook/useBookAutoAssign', () => ({
+  useBookAutoAssign: () => undefined,
+}));
 vi.mock('@/features/miningTax/corpBook/useBookSystems', () => ({
   useBookSystems: () => ({ names: new Map(), security: new Map() }),
 }));
