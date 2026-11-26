@@ -384,17 +384,19 @@ export function WhatToTrainItem({
       title={
         <span className="flex items-baseline gap-2">
           <span className="text-text-dim tabular-nums">{rank}</span>
-          <SkillLink
-            typeId={row.skillTypeId}
-            planEntries={plan?.entries}
-            className="min-w-0 font-semibold"
-          >
-            {row.name}
-          </SkillLink>
-          <span className={cx(STAT_DETAIL, 'shrink-0')}>
-            {row.fromLevel > 0
-              ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
-              : t('fittings.whatToTrain.notTrained')}
+          <span className="min-w-0">
+            <SkillLink
+              typeId={row.skillTypeId}
+              planEntries={plan?.entries}
+              className="font-semibold"
+            >
+              {row.name}
+            </SkillLink>{' '}
+            <span className={STAT_DETAIL}>
+              {row.fromLevel > 0
+                ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
+                : t('fittings.whatToTrain.notTrained')}
+            </span>
           </span>
         </span>
       }
