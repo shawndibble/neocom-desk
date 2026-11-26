@@ -13,10 +13,11 @@ import {
 } from '@/engine/corpTaxBook/closedDayFix';
 import {
   assignmentRecordChange,
+  sameTerms,
   type AssignmentChange,
   type AssignmentChangeReason,
+  type AssignmentRecordChange,
   type AssignmentTerms,
-  type RecordChange,
 } from '@/engine/miningTax/recordChanges';
 import { addLines, priceMap, sameLines } from '@/engine/miningTax/oreLines';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -279,21 +280,23 @@ export async function releaseOre(
   });
 }
 
+async function putBack(records: readonly MiningTaxAssignmentRecord[]): Promise<void> {
+  const idsByCharacter = new Map<number, string[]>();
+  for (const r of records) {
+    const ids = idsByCharacter.get(r.characterId);
+    if (ids) ids.push(r.id);
+    else idsByCharacter.set(r.characterId, [r.id]);
+  }
+  for (const [characterId, ids] of idsByCharacter)
+    await removeTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
+  const now = Date.now();
+  await putAssignments(records.map((r) => ({ ...r, updatedAt: now })));
+}
+
 export function restoreAssignments(
   records: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
-  return commit(charactersOf(records), async () => {
-    const idsByCharacter = new Map<number, string[]>();
-    for (const r of records) {
-      const ids = idsByCharacter.get(r.characterId);
-      if (ids) ids.push(r.id);
-      else idsByCharacter.set(r.characterId, [r.id]);
-    }
-    for (const [characterId, ids] of idsByCharacter)
-      await removeTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
-    const now = Date.now();
-    await putAssignments(records.map((r) => ({ ...r, updatedAt: now })));
-  });
+  return commit(charactersOf(records), () => putBack(records));
 }
 
 export function split(
@@ -404,8 +407,9 @@ export async function unlinkPayments(keys: readonly string[]): Promise<LedgerAct
 export type ClosedDayFixReason = Extract<AssignmentChangeReason, 'autoFix' | 'fixMyRecords'>;
 
 export interface ClosedDayFixOutcome {
-  change: RecordChange | null;
+  change: AssignmentRecordChange | null;
   stale: boolean;
+  originals?: MiningTaxAssignmentRecord[];
 }
 
 const termsOf = (a: MiningTaxAssignmentRecord): AssignmentTerms => ({
@@ -519,8 +523,9 @@ export async function fixClosedDay(
       });
     }
     const only = plan.books.length === 1 ? plan.books[0] : undefined;
+    const id = closedDayRecordChangeId(plan, reason);
     const change = assignmentRecordChange({
-      id: closedDayRecordChangeId(plan, reason),
+      id: reason === 'fixMyRecords' ? `${id}:${at}` : id,
       reason,
       at,
       date: plan.date,
@@ -528,8 +533,50 @@ export async function fixClosedDay(
       assignments: changes,
     });
     if (change) await saveRecordChanges([{ characterId: plan.characterId, change }]);
-    return { change };
+    return { change, originals: [...held.values()] };
   });
   if (!result.ok) return result;
-  return result.value ? { ok: true, value: { change: result.value.change, stale: false } } : stale;
+  return result.value ? { ok: true, value: { ...result.value, stale: false } } : stale;
+}
+
+export async function undoClosedDayFix(
+  characterId: number,
+  change: AssignmentRecordChange,
+  originals: readonly MiningTaxAssignmentRecord[],
+  at: string = new Date().toISOString()
+): Promise<LedgerActionResult<ClosedDayFixOutcome>> {
+  const result = await commit([characterId], async () => {
+    const current = await db.miningTaxAssignments.bulkGet(
+      change.assignments.map((a) => a.assignmentId)
+    );
+    const moved = change.assignments.some((a, i) => {
+      const now = current[i];
+      return a.after === null ? now !== undefined : !now || !sameTerms(termsOf(now), a.after);
+    });
+    if (moved) return null;
+    const created = change.assignments.flatMap((a, i) =>
+      a.before === null && current[i] ? [current[i]!] : []
+    );
+    await deleteAssignments(created);
+    await putBack(originals);
+    const undo = assignmentRecordChange({
+      id: `undo:${change.id}:${at}`,
+      reason: 'undo',
+      at,
+      date: change.date,
+      ...(change.corporationId !== undefined ? { corporationId: change.corporationId } : {}),
+      ...(change.minerId !== undefined ? { minerId: change.minerId } : {}),
+      assignments: change.assignments.map((a) => ({
+        assignmentId: a.assignmentId,
+        before: a.after,
+        after: a.before,
+      })),
+    });
+    if (undo) await saveRecordChanges([{ characterId, change: undo }]);
+    return { change: undo };
+  });
+  if (!result.ok) return result;
+  return result.value
+    ? { ok: true, value: { change: result.value.change, stale: false } }
+    : { ok: true, value: { change: null, stale: true } };
 }

@@ -1,3 +1,4 @@
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import { describe, expect, it } from 'vitest';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import {
@@ -201,6 +202,12 @@ describe('targets', () => {
   it('a day with nothing to resolve has no target', () => {
     expect(rowTarget(row({ state: 'dismissed' }))).toBeUndefined();
     expect(rowTarget(row({ state: 'conflict' }))?.problem.kind).toBe('conflict');
+  });
+
+  it('a paid closed day whose records differ from the book is a Conflict carrying its fix', () => {
+    const plan = { state: 'conflict', fixes: [] } as unknown as ClosedDayPlan;
+    const target = rowTarget(row({ state: 'paid' }), undefined, plan);
+    expect(target?.problem).toMatchObject({ kind: 'conflict', plan });
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  closedDayDifferences,
   closedDayRecordChangeId,
   planClosedDayFix as planWith,
   type ClosedDay,
@@ -327,5 +328,72 @@ describe('closedDayRecordChangeId', () => {
       /^autoFix:90000001:2026-11-20:30003838:/
     );
     expect(closedDayRecordChangeId(one, 'fixMyRecords')).toMatch(/^fixMyRecords:/);
+  });
+});
+
+describe('closedDayDifferences', () => {
+  const differencesOf = (day: ClosedDay) => closedDayDifferences(planClosedDayFix(day));
+
+  it('names ore listed for the corp beyond what its book recorded', () => {
+    expect(differencesOf(dayOf())).toEqual([
+      {
+        kind: 'overListed',
+        corporationId: CORP_A,
+        payeeId: 'own-a',
+        lines: [{ typeId: ZEO, quantity: 40 }],
+      },
+    ]);
+  });
+
+  it('names ore the book recorded that the miner gave another Payee', () => {
+    expect(
+      differencesOf(
+        dayOf({
+          allocations: [
+            alloc({ id: 'c', oreLines: [{ typeId: ZEO, quantity: 40 }] }),
+            alloc({ id: 'x', payeeId: 'buddy', oreLines: [{ typeId: ZEO, quantity: 60 }] }),
+          ],
+          books: [bookOf({ share: [{ typeId: ZEO, quantity: 70 }] })],
+        })
+      )
+    ).toEqual([
+      {
+        kind: 'elsewhere',
+        corporationIds: [CORP_A],
+        payeeId: 'buddy',
+        lines: [{ typeId: ZEO, quantity: 30 }],
+      },
+    ]);
+  });
+
+  it('names ore the book recorded that the miner had not assigned to anyone', () => {
+    expect(
+      differencesOf(
+        dayOf({
+          allocations: [alloc({ id: 'c', oreLines: [{ typeId: ZEO, quantity: 40 }] })],
+          books: [bookOf({ share: [{ typeId: ZEO, quantity: 70 }] })],
+        })
+      )
+    ).toEqual([
+      { kind: 'unlisted', corporationIds: [CORP_A], lines: [{ typeId: ZEO, quantity: 30 }] },
+    ]);
+  });
+
+  it('names a rate that differs from the book', () => {
+    expect(
+      differencesOf(
+        dayOf({
+          allocations: [alloc({ id: 'c', taxPct: 8, oreLines: [{ typeId: ZEO, quantity: 60 }] })],
+        })
+      )
+    ).toEqual([{ kind: 'rate', corporationId: CORP_A, payeeId: 'own-a', yours: 8, book: 10 }]);
+  });
+
+  it('says nothing for a day that matches', () => {
+    expect(
+      differencesOf(
+        dayOf({ allocations: [alloc({ id: 'c', oreLines: [{ typeId: ZEO, quantity: 60 }] })] })
+      )
+    ).toEqual([]);
   });
 });

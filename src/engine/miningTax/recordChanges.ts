@@ -10,6 +10,7 @@ export const RECORD_CHANGE_REASONS = [
   'autoFix',
   'fixMyRecords',
   'autoAssign',
+  'undo',
 ] as const;
 
 export type RecordChangeReason = (typeof RECORD_CHANGE_REASONS)[number];
@@ -166,7 +167,7 @@ function oreKey(lines: readonly OreLine[]): string {
     .join(',');
 }
 
-function sameTerms(a: AssignmentTerms | null, b: AssignmentTerms | null): boolean {
+export function sameTerms(a: AssignmentTerms | null, b: AssignmentTerms | null): boolean {
   if (a === null || b === null) return a === b;
   return (
     a.payeeId === b.payeeId &&

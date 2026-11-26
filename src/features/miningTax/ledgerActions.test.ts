@@ -20,6 +20,7 @@ import {
   dismiss,
   dismissOwed,
   fixClosedDay,
+  undoClosedDayFix,
   releaseOre,
   restoreAssignments,
   unassign,
@@ -753,5 +754,73 @@ describe('fixClosedDay', () => {
     });
     expect((await stored())[0]!.oreLines).toEqual([{ typeId: ORE, quantity: 80 }]);
     expect(await db.miningTaxRecordChanges.count()).toBe(0);
+  });
+  it('undoes Fix my records: brings back every Assignment as it was and saves an undo Record Change', async () => {
+    const corp = assignment({
+      id: 'c',
+      payeeId: 'own',
+      oreLines: [{ typeId: ORE, quantity: 40 }],
+    });
+    const other = assignment({
+      id: 'x',
+      payeeId: 'buddy',
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+    });
+    await db.miningTaxAssignments.bulkPut([corp, other]);
+    const fixed = await fixClosedDay(
+      planClosedDayFix(dayOf([corp, other], 100)),
+      'fixMyRecords',
+      '2026-09-06T00:00:00Z'
+    );
+    expect(fixed.ok && fixed.value.change?.reason).toBe('fixMyRecords');
+    expect((await stored()).map((a) => a.id)).toEqual(['c']);
+    if (!fixed.ok || !fixed.value.change || !fixed.value.originals) throw new Error('not fixed');
+
+    const undone = await undoClosedDayFix(
+      CHAR,
+      fixed.value.change,
+      fixed.value.originals,
+      '2026-09-06T00:01:00Z'
+    );
+
+    expect(undone).toMatchObject({ ok: true, value: { stale: false } });
+    const byId = new Map((await stored()).map((a) => [a.id, a]));
+    expect(byId.get('c')).toMatchObject({ oreLines: corp.oreLines, taxOwed: corp.taxOwed });
+    expect(byId.get('x')).toMatchObject({ oreLines: other.oreLines });
+    expect(await tombstonedIds()).toEqual([]);
+    const changes = await db.miningTaxRecordChanges.toArray();
+    expect(changes.map((c) => c.reason).sort()).toEqual(['fixMyRecords', 'undo']);
+    const undo = changes.find((c) => c.reason === 'undo')!;
+    expect(undo.assignments?.find((a) => a.assignmentId === 'x')).toMatchObject({
+      before: null,
+      after: { payeeId: 'buddy' },
+    });
+  });
+
+  it('removes an Assignment Fix my records created when it is undone', async () => {
+    const other = assignment({ id: 'x', payeeId: 'buddy' });
+    await db.miningTaxAssignments.put(other);
+    const fixed = await fixClosedDay(planClosedDayFix(dayOf([other], 60)), 'fixMyRecords');
+    if (!fixed.ok || !fixed.value.change || !fixed.value.originals) throw new Error('not fixed');
+
+    await undoClosedDayFix(CHAR, fixed.value.change, fixed.value.originals);
+
+    expect((await stored()).map((a) => a.id)).toEqual(['x']);
+    expect((await stored())[0]).toMatchObject({ oreLines: other.oreLines });
+  });
+
+  it('does not undo over a change made since the fix', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own' });
+    await db.miningTaxAssignments.put(corp);
+    const fixed = await fixClosedDay(planClosedDayFix(dayOf([corp], 60)), 'fixMyRecords');
+    if (!fixed.ok || !fixed.value.change || !fixed.value.originals) throw new Error('not fixed');
+    const now = (await db.miningTaxAssignments.get('c'))!;
+    await db.miningTaxAssignments.put({ ...now, taxPct: 3 });
+
+    expect(await undoClosedDayFix(CHAR, fixed.value.change, fixed.value.originals)).toEqual({
+      ok: true,
+      value: { change: null, stale: true },
+    });
+    expect((await db.miningTaxAssignments.get('c'))!.taxPct).toBe(3);
   });
 });

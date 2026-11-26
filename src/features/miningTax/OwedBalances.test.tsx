@@ -105,6 +105,7 @@ describe('OwedBalances Conflicts line', () => {
         first: {} as never,
         firstCorpName: 'Bureau of Unified Harvesting',
         firstResolvesOn: '2026-11-12',
+        closed: 0,
       },
       onReviewConflicts,
     });
@@ -120,6 +121,28 @@ describe('OwedBalances Conflicts line', () => {
     expect(onReviewConflicts).toHaveBeenCalledOnce();
   });
 
+  it('says a paid day differs from the book and offers Fix my records', async () => {
+    const onFixConflicts = vi.fn();
+    renderBalances([balance('a', 0)], {
+      conflicts: {
+        days: 1,
+        waiting: 0,
+        amount: 400,
+        first: {} as never,
+        firstCorpName: 'Brass',
+        firstResolvesOn: '',
+        closed: 1,
+      },
+      onFixConflicts,
+    });
+    expect(
+      screen.getByText(/Your records differ from Brass's book on a day money already reached/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Not owed yet/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Fix my records' }));
+    expect(onFixConflicts).toHaveBeenCalledOnce();
+  });
+
   it('counts several Conflict days, after the owed cards', () => {
     renderBalances([balance('a', 1_000_000)], {
       conflicts: {
@@ -129,6 +152,7 @@ describe('OwedBalances Conflicts line', () => {
         first: {} as never,
         firstCorpName: 'Brass',
         firstResolvesOn: '2026-11-12',
+        closed: 0,
       },
     });
     expect(
@@ -220,6 +244,7 @@ describe('OwedBalances Conflicts the member has already answered', () => {
     first: {} as never,
     firstCorpName: 'Bureau of Unified Harvesting',
     firstResolvesOn: '2026-11-12',
+    closed: 0,
   };
 
   it('still shows the bill and its date, but stops reading as a warning', () => {

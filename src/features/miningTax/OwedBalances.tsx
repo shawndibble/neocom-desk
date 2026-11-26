@@ -339,10 +339,12 @@ export function OwedBalances({
                 corp: conflicts.firstCorpName,
                 date: conflicts.firstResolvesOn,
               })
-            : t('miningTax.conflictsHint', {
-                count: conflicts.days,
-                corp: conflicts.firstCorpName,
-              }),
+            : t(
+                conflicts.closed === conflicts.days
+                  ? 'miningTax.conflictsHintClosed'
+                  : 'miningTax.conflictsHint',
+                { count: conflicts.days, corp: conflicts.firstCorpName }
+              ),
           (onFixConflicts || onReviewConflicts) && (
             <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">
               {onFixConflicts && (

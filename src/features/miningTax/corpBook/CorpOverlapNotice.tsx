@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import type { BookRowView } from '@/engine/corpTaxBook/personal';
-import { releaseOre } from '../ledgerActions';
-import { useLedgerAction } from '../useLedgerAction';
+import { combineOverlaps, type BookRowView } from '@/engine/corpTaxBook/personal';
 import { ConflictNotice } from './ConflictNotice';
-import { planTakeover } from './conflictTakeover';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import { CorpDisputeAction } from './CorpDisputeAction';
 import type { MailContext } from './resolve/resolveSubmit';
@@ -23,8 +20,6 @@ interface Props {
   siblings?: readonly BookRowView[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
-  typeNames: ReadonlyMap<number, string>;
-  onChanged: () => void;
   onBookChanged?: () => void;
   onResolve?: (target: ResolveTarget) => void;
   mail?: MailContext;
@@ -37,15 +32,12 @@ export function CorpOverlapNotice({
   siblings = NO_SIBLINGS,
   everyAssignment,
   payeeById,
-  typeNames,
-  onChanged,
   onBookChanged,
   onResolve,
   mail,
 }: Props) {
   const { t } = useTranslation();
   const conflict = view.state === 'conflict';
-  const { pending, error, run } = useLedgerAction();
   const [acked, setAcked] = useState<Set<string> | null>(null);
   const key = overlapAckKey(view.corporationId, view.characterId, view.date, view.solarSystemId);
 
@@ -57,22 +49,28 @@ export function CorpOverlapNotice({
     };
   }, []);
 
-  const { mine, steps, overlap } = useMemo(
-    () => planTakeover(view, siblings, everyAssignment),
-    [view, siblings, everyAssignment]
+  const overlap = useMemo(
+    () =>
+      conflict ? combineOverlaps([view.overlap, ...siblings.map((s) => s.overlap)]) : view.overlap,
+    [conflict, view.overlap, siblings]
+  );
+  const mine = useMemo(
+    () =>
+      overlap
+        ? everyAssignment.filter(
+            (a) =>
+              a.characterId === view.characterId &&
+              a.date === view.date &&
+              a.solarSystemId === view.solarSystemId &&
+              a.status !== 'dismissed' &&
+              a.payeeId !== undefined &&
+              overlap.payeeIds.includes(a.payeeId)
+          )
+        : [],
+    [overlap, everyAssignment, view.characterId, view.date, view.solarSystemId]
   );
 
   const nameOf = (payeeId: string) => payeeById.get(payeeId)?.name ?? payeeId;
-  const previews = steps.map((p) => ({
-    payeeName: nameOf(p.assignment.payeeId ?? ''),
-    before: p.before,
-    after: p.after,
-  }));
-  const takeOver = () =>
-    void run(
-      () => releaseOre(steps.map((p) => ({ assignment: p.assignment, after: p.after }))),
-      onChanged
-    );
 
   const conflictPayeeName =
     [...new Set(mine.map((a) => nameOf(a.payeeId ?? '')))].join(', ') ||
@@ -97,11 +95,6 @@ export function CorpOverlapNotice({
         recordedAt={recordedAt}
         resolvesOn={resolvesOn(view.resolvesAt)}
         others={siblings.map((s) => ({ corpName: s.corpName, billAmount: s.billed }))}
-        previews={previews}
-        typeNames={typeNames}
-        busy={pending}
-        error={error}
-        onTakeOver={takeOver}
         onResolve={resolveConflict}
         tell={
           onBookChanged && (
@@ -130,11 +123,6 @@ export function CorpOverlapNotice({
       corpName={corpName}
       payeeNames={overlap.payeeIds.map(nameOf)}
       paid={overlap.paid}
-      previews={previews}
-      typeNames={typeNames}
-      busy={pending}
-      error={error}
-      onTakeOver={takeOver}
       onPaidAnotherWay={() =>
         void acknowledgeOverlap(key).then(() => setAcked((held) => new Set(held).add(key)))
       }

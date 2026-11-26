@@ -194,6 +194,55 @@ export function planClosedDayFix(day: ClosedDay, paidInto: ReadonlySet<string>):
   return { ...base, state: blockers.length > 0 ? 'conflict' : 'fix', fixes, blockers };
 }
 
+export type ClosedDayDifference =
+  | { kind: 'overListed'; corporationId: number; payeeId: string; lines: OreLine[] }
+  | { kind: 'elsewhere'; corporationIds: number[]; payeeId: string; lines: OreLine[] }
+  | { kind: 'unlisted'; corporationIds: number[]; lines: OreLine[] }
+  | { kind: 'rate'; corporationId: number; payeeId: string; yours: number; book: number };
+
+export function closedDayDifferences(plan: Pick<ClosedDayPlan, 'fixes'>): ClosedDayDifference[] {
+  const out: ClosedDayDifference[] = [];
+  const gainers = new Set<number>();
+  let gained: OreLine[] = [];
+  let moved: OreLine[] = [];
+  const elsewhere: { payeeId: string; lines: OreLine[] }[] = [];
+  for (const fix of plan.fixes) {
+    const before = fix.before?.oreLines ?? [];
+    const lost = minusLines(before, fix.after.oreLines);
+    if (fix.corporationId === undefined) {
+      if (lost.length === 0) continue;
+      moved = addLines(moved, lost);
+      elsewhere.push({ payeeId: fix.payeeId, lines: lost });
+      continue;
+    }
+    if (lost.length > 0)
+      out.push({
+        kind: 'overListed',
+        corporationId: fix.corporationId,
+        payeeId: fix.payeeId,
+        lines: lost,
+      });
+    const got = minusLines(fix.after.oreLines, before);
+    if (got.length > 0) {
+      gainers.add(fix.corporationId);
+      gained = addLines(gained, got);
+    }
+    if (fix.before && fix.before.taxPct !== fix.after.taxPct)
+      out.push({
+        kind: 'rate',
+        corporationId: fix.corporationId,
+        payeeId: fix.payeeId,
+        yours: fix.before.taxPct,
+        book: fix.after.taxPct,
+      });
+  }
+  const corporationIds = [...gainers].sort((a, b) => a - b);
+  for (const d of elsewhere) out.push({ kind: 'elsewhere', corporationIds, ...d });
+  const unlisted = minusLines(gained, moved);
+  if (unlisted.length > 0) out.push({ kind: 'unlisted', corporationIds, lines: unlisted });
+  return out;
+}
+
 const termsKey = (t: FixTerms) =>
   `${t.oreLines.map((l) => `${l.typeId}x${l.quantity}`).join('+')}@${t.taxPct}`;
 

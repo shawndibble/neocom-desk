@@ -55,7 +55,7 @@ const view = {
   overlap: { payeeIds: ['p1'], ore: [{ typeId: ZEO, quantity: 43_050 }], paid: false },
 } as BookRowView;
 
-const renderNotice = (v: BookRowView = view, onChanged = () => {}) =>
+const renderNotice = (v: BookRowView = view) =>
   render(
     <CorpOverlapNotice
       view={v}
@@ -63,8 +63,6 @@ const renderNotice = (v: BookRowView = view, onChanged = () => {}) =>
       recordedAt="Efa"
       everyAssignment={[assignment]}
       payeeById={new Map([['p1', payee]])}
-      typeNames={new Map([[ZEO, 'Zeolites']])}
-      onChanged={onChanged}
     />
   );
 
@@ -78,19 +76,6 @@ describe('CorpOverlapNotice', () => {
   it('renders nothing without an overlap', () => {
     const { container } = renderNotice({ ...view, overlap: undefined });
     expect(container.textContent).toBe('');
-  });
-
-  it('removes only the overlapping ore from the miner entry', async () => {
-    let changed = 0;
-    renderNotice(view, () => changed++);
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Let the corporation bill it' })
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
-    await waitFor(() => expect(changed).toBe(1));
-    expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
-      { typeId: ZEO, quantity: 6_950 },
-    ]);
   });
 
   it('remembers "I paid it another way" and stops asking', async () => {
@@ -112,8 +97,7 @@ describe('CorpOverlapNotice on a Conflict day', () => {
   } as BookRowView;
   const renderConflict = (
     entry: MiningTaxAssignmentRecord = assignment,
-    v: BookRowView = conflict,
-    onChanged = () => {}
+    v: BookRowView = conflict
   ) =>
     render(
       <CorpOverlapNotice
@@ -122,8 +106,6 @@ describe('CorpOverlapNotice on a Conflict day', () => {
         recordedAt="Efa - Ore Works"
         everyAssignment={[entry]}
         payeeById={new Map([['p1', payee]])}
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={onChanged}
       />
     );
 
@@ -138,25 +120,15 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     );
   });
 
-  it('takes the ore off an owed entry when the book is right', async () => {
-    let changed = 0;
-    renderConflict(assignment, conflict, () => changed++);
-    await userEvent.click(screen.getByRole('button', { name: 'Let the corporation bill it' }));
-    expect(screen.getByText(/Ashfall: 50,000 Zeolites → 6,950 Zeolites/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
-    await waitFor(() => expect(changed).toBe(1));
-    expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
-      { typeId: ZEO, quantity: 6_950 },
-    ]);
-  });
-
-  it("lets the book take a paid entry's ore too: what was paid becomes credit there", () => {
+  it('points a paid entry to Fix my records once the day closes, with no separate takeover', () => {
     const paid = { ...assignment, status: 'paid' } as MiningTaxAssignmentRecord;
     renderConflict(paid, { ...conflict, overlap: { ...view.overlap!, paid: true } });
     const region = screen.getByRole('region', { name: 'Conflict' });
     expect(region).toHaveTextContent('Your entry: Ashfall · 500 ISK · paid');
-    expect(region).toHaveTextContent('If the book is right: take this ore off your entry.');
-    expect(screen.getByRole('button', { name: 'Let the corporation bill it' })).toBeInTheDocument();
+    expect(region).toHaveTextContent(
+      "If the book is right: once Brass Meridian's book has closed the whole day and nothing holds it, Fix my records puts your records right."
+    );
+    expect(screen.queryByRole('button', { name: 'Let the corporation bill it' })).toBeNull();
   });
 
   it('still explains the conflict after "I paid it another way" was said for the day', async () => {
@@ -187,7 +159,7 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     );
   });
 
-  it('takes what each corporation recorded off the entry in one go when several books contest the day', async () => {
+  it('names every corporation that contests the day', () => {
     const second = {
       ...conflict,
       corporationId: 98000002,
@@ -195,7 +167,6 @@ describe('CorpOverlapNotice on a Conflict day', () => {
       billed: 120_000,
       overlap: { payeeIds: ['p1'], ore: [{ typeId: ZEO, quantity: 5_000 }], paid: false },
     } as BookRowView;
-    let changed = 0;
     render(
       <CorpOverlapNotice
         view={conflict}
@@ -204,64 +175,13 @@ describe('CorpOverlapNotice on a Conflict day', () => {
         siblings={[second]}
         everyAssignment={[assignment]}
         payeeById={new Map([['p1', payee]])}
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={() => changed++}
       />
     );
     const region = screen.getByRole('region', { name: 'Conflict' });
     expect(region).toHaveTextContent(
       'Also in conflict on this day: Ashfall Prospecting (120,000 ISK).'
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Let each corp bill its share' }));
-    expect(screen.getByText(/Ashfall: 50,000 Zeolites → 1,950 Zeolites/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
-    await waitFor(() => expect(changed).toBe(1));
-    expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
-      { typeId: ZEO, quantity: 1_950 },
-    ]);
-  });
-
-  it("takes each corporation's share off the Payee its line names, not whichever comes first", async () => {
-    const other = { ...assignment, id: 'a2', payeeId: 'p2' } as MiningTaxAssignmentRecord;
-    await db.miningTaxAssignments.put(other);
-    const first = {
-      ...conflict,
-      overlap: { payeeIds: ['p2'], ore: [{ typeId: ZEO, quantity: 10_000 }], paid: false },
-    } as BookRowView;
-    const second = {
-      ...conflict,
-      id: 'v2',
-      corporationId: 98000002,
-      corpName: 'Ashfall Prospecting',
-      overlap: { payeeIds: ['p1'], ore: [{ typeId: ZEO, quantity: 5_000 }], paid: false },
-    } as BookRowView;
-    let changed = 0;
-    render(
-      <CorpOverlapNotice
-        view={first}
-        corpName="Brass Meridian"
-        recordedAt="Efa"
-        siblings={[second]}
-        everyAssignment={[assignment, other]}
-        payeeById={
-          new Map([
-            ['p1', payee],
-            ['p2', { ...payee, id: 'p2', name: 'Cinder' }],
-          ])
-        }
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={() => changed++}
-      />
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Let each corp bill its share' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
-    await waitFor(() => expect(changed).toBe(1));
-    expect((await db.miningTaxAssignments.get('a2'))?.oreLines).toEqual([
-      { typeId: ZEO, quantity: 40_000 },
-    ]);
-    expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
-      { typeId: ZEO, quantity: 45_000 },
-    ]);
+    expect(screen.queryByRole('button', { name: 'Let each corp bill its share' })).toBeNull();
   });
 
   it('says another Payee holds the ore when no entry of yours matches', () => {
@@ -289,8 +209,6 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
         recordedAt="Efa"
         everyAssignment={[assignment]}
         payeeById={new Map([['p1', payee]])}
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={() => {}}
         onBookChanged={onBookChanged}
         onResolve={onResolve}
       />
@@ -381,8 +299,6 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
         recordedAt="Efa"
         everyAssignment={[assignment]}
         payeeById={new Map([['p1', payee]])}
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={() => {}}
         onResolve={onResolve}
       />
     );

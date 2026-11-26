@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import '@/i18n';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 
 const submit = vi.hoisted(() => ({
@@ -270,14 +271,16 @@ describe('ResolveDialog', () => {
     expect(screen.queryByText(/until\s+while/)).not.toBeInTheDocument();
   });
 
-  it('fixes your own records on a Conflict in one click', async () => {
+  it('shows what Fix my records changes, then fixes your own records in one click', async () => {
     const user = userEvent.setup();
     const onFixRecords = vi.fn();
+    const plan = { state: 'conflict', fixes: [] } as unknown as ClosedDayPlan;
     open(
-      { ...base, kind: 'conflict', row: { ...row, state: 'conflict' } as BookRowView },
-      { onFixRecords, payeeName: 'Rock Hound' }
+      { ...base, kind: 'conflict', row: { ...row, state: 'conflict' } as BookRowView, plan },
+      { onFixRecords, payeeName: 'Rock Hound', fixPreview: <p>Rock Hound: 60 → 30</p> }
     );
-    await user.click(screen.getByRole('button', { name: 'Fix it' }));
+    expect(screen.getByText('Rock Hound: 60 → 30')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Fix my records' }));
     expect(onFixRecords).toHaveBeenCalled();
   });
 });

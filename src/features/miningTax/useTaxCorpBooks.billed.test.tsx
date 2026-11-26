@@ -26,6 +26,7 @@ vi.mock('@/features/miningTax/corpBook/useBookAutoAssign', () => ({
 }));
 vi.mock('@/features/miningTax/corpBook/useClosedDayFixes', () => ({
   useClosedDayFixes: () => undefined,
+  closedDayPlans: () => [],
 }));
 vi.mock('@/features/miningTax/corpBook/useBookSystems', () => ({
   useBookSystems: () => ({ names: new Map(), security: new Map() }),

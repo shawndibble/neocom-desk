@@ -8063,6 +8063,8 @@
         "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
         "bills": "Its book bills {{amount}} ISK.",
         "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
+        "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take this ore over. It bills it on {{date}} unless something changes first.",
+        "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner, {{payee}}. Its book bills it on {{date}} unless something changes first.",
         "anotherPayee": "another Payee",
         "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
         "nextStep": "What to do next: {{step}}",
@@ -8086,7 +8088,7 @@
         "uncredited": "Donations not credited",
         "inReview": "Donations held for review",
         "figure": "{{date}}: the book's figure differs",
-        "conflict": "{{date}} claimed twice",
+        "conflict": "{{date}}: your records differ from {{corp}}'s book",
         "billed": "{{date}}: {{corp}} bills this day",
         "kept": "{{corp}} kept the bill"
       },
@@ -8101,8 +8103,8 @@
           "hint_again": "Only if that ISK went somewhere else. The book credits a new payment on its next sync."
         },
         "fixRecords": {
-          "title": "Fix my records — {{corp}} is right",
-          "hint": "Takes this ore off your {{payee}} entry, so you owe it once, to {{corp}}. One click, and you can undo it."
+          "title": "Fix my records — {{corp}}'s book is right",
+          "hint": "Changes your records to match {{corp}}'s book, as shown here. One click, and you can undo it."
         },
         "notPaying": {
           "title": "Not paying — hide this",
@@ -8123,7 +8125,7 @@
       },
       "action": {
         "pay": "Pay",
-        "fixRecords": "Fix it",
+        "fixRecords": "Fix my records",
         "notPaying": "Hide it",
         "notPaying_tell": "Hide it and tell them",
         "paid": "Send proof",
@@ -8438,10 +8440,7 @@
         "countsFrom": "From {{date}} this app also counts it as owed to {{corp}}.",
         "cardBills": "On its date",
         "fixTitle": "To fix it",
-        "fixedToast": "{{date}}: {{corp}} bills that ore now.",
-        "bookRight": "If the book is right: take this ore off your entry.",
-        "booksRight": "If the books are right: take what each corporation recorded off your entry.",
-        "letEachBill": "Let each corp bill its share",
+        "bookRightLater": "If the book is right: once {{corp}}'s book has closed the whole day and nothing holds it, Fix my records puts your records right.",
         "entryRight": "If your entry is right: tell {{corp}}, and its officers correct the book or keep the bill and say what to do next.",
         "tell": "Tell {{corp}} it went to {{payee}}",
         "told": "Sent to {{corp}} on {{date}}. An officer answers it in the book.",
@@ -8453,6 +8452,28 @@
         "withdrawFailed": "Could not withdraw it. Try again.",
         "otherPayee": "another Payee"
       },
+      "closedConflict": {
+        "region": "Conflict",
+        "title": "Your records differ from {{corp}}'s book for this day",
+        "overListed": "You recorded {{ore}} for {{payee}} that {{corp}}'s book did not record.",
+        "elsewhere": "{{corp}}'s book recorded {{ore}} that you gave to {{payee}}.",
+        "unlisted": "{{corp}}'s book recorded {{ore}} that you had not assigned to anyone.",
+        "rate": "{{corp}}'s book taxes this day at {{book}}%; you recorded {{yours}}% for {{payee}}.",
+        "other": "Your records for this day differ from {{corp}}'s book.",
+        "paidAssignment": "You already paid {{payee}} for this day, so this app did not change your records on its own.",
+        "paidBook": "{{corp}}'s book already has money on this day, so this app did not change your records on its own.",
+        "fixHint": "Fix my records changes your records to match {{corp}}'s book. Money already paid stays where it went: what you paid another Payee for ore that moves becomes credit with them, and whatever the book's bill still lacks stays owed.",
+        "fix": "Fix my records",
+        "previewTitle": "This is what changes on your records:",
+        "previewLine": "{{payee}}: {{before}} → {{after}}",
+        "terms": "{{ore}} at {{pct}}%",
+        "nothing": "nothing",
+        "disagree": "If your records are right: tell {{corp}}, and its officers correct the book or keep the bill and say what to do next.",
+        "fixedToast": "{{date}}: your records match {{corp}}'s book now.",
+        "undoneToast": "{{date}}: your records are back as they were.",
+        "undoStale": "{{date}}: your records changed since, so they were not put back.",
+        "stale": "{{date}}: your records changed meanwhile, so nothing was fixed. Open the day again."
+      },
       "declare": {
         "waiting": "Declared — waiting for {{corp}}",
         "waitingAmount": "Declared {{amount}} ISK — waiting for {{corp}}",
@@ -8462,12 +8483,7 @@
       "overlap": {
         "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",
         "noticePaid": "You marked this paid to {{payee}}. {{corp}} still bills it. If that was the same payment, say so.",
-        "letBill": "Let the corporation bill it",
         "paidOther": "I paid it another way",
-        "previewTitle": "This is what changes on your list:",
-        "previewLine": "{{payee}}: {{before}} → {{after}}",
-        "nothingLeft": "nothing",
-        "confirm": "Take it off my list",
         "region": "This ore is also billed by the corporation"
       },
       "pay": {
@@ -8500,7 +8516,7 @@
         "inReviewItem": "{{amount}} ISK, sent {{time}}",
         "inReviewReason": "“{{reason}}”",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
-        "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
+        "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day to see what differs and how to fix it.",
         "openDay": "Open the day"
       },
       "claim": {
@@ -8565,8 +8581,10 @@
     "conflictsTitle": "Conflicts",
     "conflictsHint_one": "Not owed yet. {{corp}}'s book bills it on its date unless an officer changes the book.",
     "conflictsHint_other": "{{count}} days, not owed yet. Each is billed on its date unless an officer changes the book.",
+    "conflictsHintClosed_one": "Your records differ from {{corp}}'s book on a day money already reached, so they were not changed for you. Fix my records puts them right.",
+    "conflictsHintClosed_other": "{{count}} days where your records differ from the book and money already reached the day, so they were not changed for you.",
     "conflictsReview": "Review",
-    "conflictsFix": "Let {{corp}} bill it",
+    "conflictsFix": "Fix my records",
     "conflictsWaitingTitle": "Waiting on the corp",
     "conflictsWaitingHint_one": "You have told {{corp}}. It still bills on {{date}} unless an officer answers first, so check back.",
     "conflictsWaitingHint_other": "{{count}} days you have told their corporations about. The first still bills on {{date}} unless an officer answers first, so check back.",
@@ -9037,7 +9055,8 @@
           "tolerance": "Closed within tolerance",
           "autoFix": "Fixed automatically at close",
           "fixMyRecords": "Fixed by Fix my records",
-          "autoAssign": "Assigned automatically"
+          "autoAssign": "Assigned automatically",
+          "undo": "Fix my records undone"
         }
       },
       "held": "On hold while a dispute is open",
@@ -9074,6 +9093,7 @@
           "autoFix": "Changed automatically when {{date}} closed.",
           "fixMyRecords": "Changed by Fix my records for {{date}}.",
           "autoAssign": "Assigned automatically for {{date}}.",
+          "undo": "Fix my records for {{date}} was undone.",
           "billed": "Billed",
           "paid": "Paid",
           "writtenOff": "Written off",

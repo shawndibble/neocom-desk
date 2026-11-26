@@ -42,6 +42,7 @@ interface Props {
   onHide: (key: string) => Promise<unknown>;
   onPay: () => void;
   onFixRecords?: () => void;
+  fixPreview?: ReactNode;
   onSent: () => void;
   onClose: () => void;
 }
@@ -72,6 +73,7 @@ export function ResolveDialog({
   onHide,
   onPay,
   onFixRecords,
+  fixPreview,
   onSent,
   onClose,
 }: Props) {
@@ -157,7 +159,7 @@ export function ResolveDialog({
     problem.kind === 'uncredited'
       ? t(k(held ? 'title.inReview' : 'title.uncredited'))
       : problem.kind === 'conflict'
-        ? t(k('title.conflict'), { date: row?.date ?? '' })
+        ? t(k('title.conflict'), { date: row?.date ?? '', corp })
         : problem.kind === 'kept'
           ? t(k('title.kept'), { corp })
           : problem.kind === 'overdue'
@@ -308,6 +310,8 @@ export function ResolveDialog({
             {sendsTo}
           </>
         );
+      case 'fixRecords':
+        return fixPreview ?? null;
       default:
         return null;
     }

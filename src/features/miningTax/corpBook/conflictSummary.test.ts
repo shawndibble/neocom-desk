@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
 import { conflictSiblings, summarizeConflicts } from './conflictSummary';
@@ -17,6 +18,23 @@ const row = (v: BookRowView, corpName = 'Brass') =>
   ({ key: v.id, corp: { kind: 'row', corpName, view: v } }) as unknown as DisplayRow;
 
 describe('summarizeConflicts', () => {
+  it('counts a closed day whose records differ from the book and was already paid', () => {
+    const paid = row(view({ id: 'p', state: 'paid', billed: 400, corporationId: 7 }));
+    const plan = {
+      characterId: 1,
+      date: '2026-10-28',
+      solarSystemId: 30003838,
+      state: 'conflict',
+      books: [{ corporationId: 7 }],
+    } as unknown as ClosedDayPlan;
+    expect(summarizeConflicts([paid], new Set(), [plan])).toMatchObject({
+      days: 1,
+      amount: 400,
+      closed: 1,
+    });
+    expect(summarizeConflicts([paid], new Set(), [])).toBeNull();
+  });
+
   it('is null with no Conflict in view', () => {
     expect(summarizeConflicts([row(view({ state: 'billed', billed: 500 }))])).toBeNull();
   });
