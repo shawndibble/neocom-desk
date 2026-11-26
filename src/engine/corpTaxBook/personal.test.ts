@@ -2594,11 +2594,32 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-today']);
   });
 
-  it('leaves what the Assignment lists beyond the observed ore Settling', () => {
+  it("estimates the member's whole live entry, not only what the book observed so far", () => {
     const out = overlay([today(30_000)], [withToday(20_000)]);
-    expect(ofToday(out).map((r) => [r.state, r.oreLines[0].quantity])).toEqual([
-      ['estimate', 20_000],
-      ['settling', 10_000],
+    expect(ofToday(out).map((r) => [r.state, r.structureId, r.oreLines[0].quantity])).toEqual([
+      ['estimate', 1000, 30_000],
+    ]);
+  });
+
+  it('names the refinery the miner last mined at in the system while the book saw nothing today', () => {
+    const out = overlay(
+      [today(30_000, 10)],
+      [withToday(null, { structureNames: { 1000: 'Palomino Prospecting' } })]
+    );
+    expect(ofToday(out)).toMatchObject([
+      { state: 'estimate', structureId: 1000, refineryLabel: 'Palomino Prospecting' },
+    ]);
+  });
+
+  it('splits the day by the refineries the book saw, the rest to the one it saw most of', () => {
+    const second = { ...observedToday(5_000), structureId: 1001 };
+    const out = overlay(
+      [today(30_000)],
+      [withToday(null, { observed: [...book().observed, observedToday(15_000), second] })]
+    );
+    expect(ofToday(out).map((r) => [r.structureId, r.oreLines[0].quantity])).toEqual([
+      [1000, 25_000],
+      [1001, 5_000],
     ]);
   });
 
@@ -2615,6 +2636,8 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     expect(paid.billed).toBeCloseTo(400_000, 4);
     expect(left.taxOwed).toBeCloseTo(tax - 400_000, 4);
     expect(paid.oreLines[0].quantity + left.oreLines[0].quantity).toBe(30_000);
+    // Both halves are the open day's: the ledger lists them until the book bills it.
+    expect([paid.open, left.open]).toEqual([true, true]);
     expect(out.books[0].estimate).toBeCloseTo(tax - 400_000, 4);
     expect(out.books[0].credit).toBeCloseTo(0, 4);
   });

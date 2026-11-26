@@ -30,6 +30,11 @@ export interface LedgerCharge {
   ore?: readonly OreLine[];
   /** An Adjustment's reason. */
   reason?: string;
+  /**
+   * A day the account has not billed yet (not closed): listed and counted in the balance and what
+   * is owed as it stands now, credit ahead of every billed day paying it first.
+   */
+  open?: boolean;
   /** An Adjustment that is the balance rolled over from another system. */
   opening?: boolean;
   /**
@@ -236,15 +241,34 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
     balance += moves ? row.charged - row.paid : 0;
     return { ...row, balance } as PayeeLedgerRow;
   });
+  const open = source.charges.filter((c) => c.open && !c.reversed);
+  const openTax = open.reduce((sum, c) => sum + c.tax, 0);
   return {
     rows: balanced,
-    status: statusOf(account),
-    credit: account.credit,
+    status: statusOf(account, open),
+    credit: Math.max(0, account.credit - openTax),
     notYetBilled: source.notYetBilled ?? { tax: 0, days: 0 },
   };
 }
 
-function statusOf(account: PayeeLedgerSource['account']): PayeeLedgerStatus {
+function statusOf(
+  account: PayeeLedgerSource['account'],
+  open: readonly LedgerCharge[] = []
+): PayeeLedgerStatus {
+  // Open days are owed as they stand, after the credit ahead of every billed day.
+  const openLeft = Math.max(0, open.reduce((sum, c) => sum + c.tax, 0) - account.credit);
+  if (openLeft >= 0.5) {
+    const days = new Set(open.map((c) => c.date));
+    const oldest = [...days].sort()[0]!;
+    return account.owes
+      ? {
+          kind: 'owes',
+          amount: account.owes.amount + openLeft,
+          days: account.owes.days + days.size,
+          oldest: account.owes.oldest,
+        }
+      : { kind: 'owes', amount: openLeft, days: days.size, oldest };
+  }
   if (account.owes) return { kind: 'owes', ...account.owes };
   if (account.paidThrough) return { kind: 'paid', through: account.paidThrough };
   return { kind: 'none' };

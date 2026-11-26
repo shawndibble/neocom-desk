@@ -679,11 +679,34 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     if (!book) return null;
     const miner = book.summary.miners.find((m) => m.minerId === ledgerMinerId);
     if (!miner) return null;
-    return minerLedgerSource(miner, book.loaded, {
+    const source = minerLedgerSource(miner, book.loaded, {
       character: characterNameOf,
       place: (l) =>
         l.structureId === undefined ? undefined : book.loaded.structureNames?.[l.structureId],
     });
+    // A day the book has not billed yet is listed as it stands now, so today's mining shows.
+    const open = allDisplayRows.flatMap((dr): LedgerCharge[] => {
+      const view = dr.corp?.kind === 'row' ? dr.corp.view : undefined;
+      if (
+        !view?.open ||
+        view.corporationId !== book.loaded.corporationId ||
+        view.minerId !== miner.minerId
+      )
+        return [];
+      const place = view.refineryLabel ?? systemLabel(systemNames, view.solarSystemId);
+      return [
+        {
+          id: view.id,
+          date: view.date,
+          kind: 'mined',
+          tax: view.billed,
+          ...(place ? { place } : {}),
+          ore: view.oreLines,
+          open: true,
+        },
+      ];
+    });
+    return { ...source, charges: [...source.charges, ...open] };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterNameOf reads trackedCharacters
   }, [
     ledgerTarget,
@@ -694,6 +717,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     ledgerBook,
     ledgerMinerId,
     trackedCharacters,
+    allDisplayRows,
   ]);
   const ledgerTitle =
     ledgerTarget?.kind === 'personal'

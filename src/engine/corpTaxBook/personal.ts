@@ -380,6 +380,8 @@ export interface BookRowView {
   unlinkedDonation?: { amount: number; at: string };
   /** This line's share of the ore the miner's own entry also gives a Payee. */
   overlap?: BookOverlap;
+  /** A day the book has not billed yet: an estimate, or the part of one credit already paid. */
+  open?: true;
   correction?: BookCorrection;
   /** What the book forgave of the day: an officer's write-off, or a shortfall within the tolerance. */
   forgivenIsk?: number;
@@ -1264,9 +1266,11 @@ export function overlayCorpBooks(input: {
   }
 
   // 1b. A day the book has not closed: what the member listed for the corporation's own Payee is
-  // owed to it now, as an estimate. It is valued from what the book observed of the day so far,
-  // else from the member's own Assignment; ore listed beyond the observed is Settling. When the day
-  // closes the book bills it (step 1) and the estimate is gone, so nothing is counted twice.
+  // owed to it now, as an estimate from the member's own live entry (the refinery log runs behind
+  // it). Each refinery the book saw the miner at that day takes the ore it observed, priced and
+  // rated as the book will; the rest goes to the one it saw most of, else to the refinery the miner
+  // last mined at in that system. When the day closes the book bills it (step 1) and the estimate
+  // is gone, so nothing is counted twice.
   for (const [key, entry] of entryByKey) {
     for (const p of prepared) {
       const { book } = p;
@@ -1284,71 +1288,75 @@ export function overlayCorpBooks(input: {
           isBilledStatus(a)
       );
       if (own.length === 0) continue;
-      const here = p.open.filter(
-        (c) =>
-          c.entry !== undefined &&
-          entryKey(c.entry.characterId, c.entry.date, c.entry.solarSystemId) === key
-      );
+      const ofEntry = (e: PersonalEntry | undefined) =>
+        e !== undefined && entryKey(e.characterId, e.date, e.solarSystemId) === key;
+      const charges = p.open.filter((c) => ofEntry(c.entry));
       // An officer already dismissed the day: the book will not bill it, so nothing is estimated.
-      if (here.some((c) => c.dismissal)) continue;
-      if (here.length > 0) {
-        const pool = overlapPool(own);
-        const { lines: taken } = takeOwnAllocations(
-          pool,
-          book.ownPayeeIds,
-          sumLines(...here.map((c) => c.oreLines))
-        );
-        let left = taken;
-        for (const charge of here) {
-          const lines = intersectLines(left, charge.oreLines);
-          if (lines.length === 0) continue;
-          left = minusLines(left, lines);
-          const value = dayValue(charge);
-          const worth = computeAssignmentValue(lines, priceMap(value.unitPrices), value.taxPct);
-          pushRow({
-            ...commonOf(p, charge, value),
-            id: `${book.corporationId}:${charge.charge.key}:estimate`,
-            state: 'estimate',
-            oreLines: lines,
-            estimatedValue: worth.estimatedValue,
-            taxOwed: worth.taxOwed,
-            billed: worth.taxOwed,
-          });
-        }
-        for (const item of pool) {
-          const excess = linesOfLeft(item.left);
-          if (excess.length > 0) pushExcess(p, here[0]!, item.allocation, excess);
-        }
-      } else {
-        const { prices, sources } = book.pricesOn(entry.date);
-        for (const a of own) {
-          const lines = sumLines(a.oreLines);
-          const worth = computeAssignmentValue(lines, prices, a.taxPct);
-          const types = lines.map((l) => l.typeId);
-          pushRow({
-            id: `${book.corporationId}:${key}:estimate:${a.id}`,
-            corporationId: book.corporationId,
-            corpName: book.corpName,
-            characterId: entry.characterId,
-            date: entry.date,
-            solarSystemId: entry.solarSystemId,
-            state: 'estimate',
-            oreLines: lines,
-            personalOreLines: entry.oreLines,
-            unitPrices: Object.fromEntries(types.map((t) => [t, prices.get(t) ?? 0])),
-            priceSources: Object.fromEntries(
-              types.flatMap((t) => (sources.has(t) ? [[t, sources.get(t)!]] : []))
-            ),
-            taxPct: a.taxPct,
-            rateScope: 'corp',
-            estimatedValue: worth.estimatedValue,
-            taxOwed: worth.taxOwed,
-            billed: worth.taxOwed,
-            minerId: minerIdFor(entry.characterId, book.miners, entry.date),
-            hubId: book.hubId,
-            oreForm: book.oreForm,
-          });
-        }
+      if (charges.some((c) => c.dismissal)) continue;
+      const seen = p.pending.filter((x) => ofEntry(x.entry)).map((x) => x.observed);
+      const byStructure = new Map<number | undefined, OreLine[]>();
+      let left = sumLines(...own.map((a) => a.oreLines));
+      for (const o of [...seen].sort((a, b) => a.structureId - b.structureId)) {
+        const lines = intersectLines(left, o.oreLines);
+        if (lines.length === 0) continue;
+        left = minusLines(left, lines);
+        byStructure.set(o.structureId, sumLines(byStructure.get(o.structureId) ?? [], lines));
+      }
+      if (left.length > 0) {
+        const most = [...seen].sort((a, b) => quantityOf(b.oreLines) - quantityOf(a.oreLines))[0];
+        const last = book.observed
+          .filter(
+            (o) =>
+              o.characterId === entry.characterId &&
+              o.solarSystemId === entry.solarSystemId &&
+              o.date < entry.date
+          )
+          .sort((a, b) => b.date.localeCompare(a.date))[0];
+        const to = most?.structureId ?? last?.structureId;
+        byStructure.set(to, sumLines(byStructure.get(to) ?? [], left));
+      }
+      const { prices, sources } = book.pricesOn(entry.date);
+      const ownPct = own[0]!.taxPct;
+      for (const [structureId, lines] of byStructure) {
+        const charge = charges.find((c) => c.observed.structureId === structureId);
+        const value = charge ? dayValue(charge) : undefined;
+        const unitPrices = value
+          ? priceMap(value.unitPrices)
+          : new Map(lines.map((l) => [l.typeId, prices.get(l.typeId) ?? 0]));
+        const taxPct = value?.taxPct ?? ownPct;
+        const worth = computeAssignmentValue(lines, unitPrices, taxPct);
+        const types = lines.map((l) => l.typeId);
+        const label = structureId === undefined ? undefined : book.structureNames?.[structureId];
+        pushRow({
+          ...(charge && value
+            ? commonOf(p, charge, value)
+            : {
+                corporationId: book.corporationId,
+                corpName: book.corpName,
+                characterId: entry.characterId,
+                date: entry.date,
+                solarSystemId: entry.solarSystemId,
+                personalOreLines: entry.oreLines,
+                unitPrices: Object.fromEntries(types.map((t) => [t, unitPrices.get(t) ?? 0])),
+                priceSources: Object.fromEntries(
+                  types.flatMap((t) => (sources.has(t) ? [[t, sources.get(t)!]] : []))
+                ),
+                taxPct,
+                rateScope: 'corp' as const,
+                minerId: minerIdFor(entry.characterId, book.miners, entry.date),
+                ...(structureId !== undefined ? { structureId } : {}),
+                ...(label !== undefined ? { refineryLabel: label } : {}),
+                hubId: book.hubId,
+                oreForm: book.oreForm,
+              }),
+          id: `${book.corporationId}:${key}:estimate:${structureId ?? 'system'}`,
+          state: 'estimate',
+          open: true,
+          oreLines: lines,
+          estimatedValue: worth.estimatedValue,
+          taxOwed: worth.taxOwed,
+          billed: worth.taxOwed,
+        });
       }
       absorbed.set(key, new Set([...(done ?? []), ...own.map((a) => a.id!)]));
     }
