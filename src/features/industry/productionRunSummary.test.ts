@@ -77,21 +77,19 @@ describe('summarizeProductionRun with losses', () => {
     expect(s.profit.profit).toBe(-550_000);
   });
 
-  it('writes lost units off open inventory and counts insurance as proceeds', () => {
-    const s = summarizeProductionRun(run(), [], [], {}, undefined, [
-      loss({ quantity: 4, insurancePayout: 100_000 }),
-    ]);
+  it('writes lost units off open inventory and keeps the full run cost in profit', () => {
+    const s = summarizeProductionRun(run(), [], [], {}, undefined, [loss({ quantity: 4 })]);
     expect(s.quantityLost).toBe(4);
     expect(s.remaining).toBe(6);
     expect(s.openInventoryValue).toBe(330_000);
-    expect(s.profit.profit).toBe(-450_000);
+    expect(s.profit.profit).toBe(-550_000);
     expect(s.status).toBe('open');
   });
 
   it('sums several loss records and closes the run once sold plus lost covers it', () => {
     const s = summarizeProductionRun(run(), [saleLink({ quantity: 3 })], [], {}, undefined, [
       loss({ quantity: 4 }),
-      loss({ id: '1:loss:2', quantity: 3, insurancePayout: 50_000 }),
+      loss({ id: '1:loss:2', quantity: 3 }),
     ]);
     expect(s.quantityLost).toBe(7);
     expect(s.remaining).toBe(0);

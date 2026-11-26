@@ -34,7 +34,6 @@ export function summarizeProductionRun(
 ): ProductionRunSummary {
   const runLosses = losses.filter((l) => l.runId === run.id);
   const quantityLost = runLosses.reduce((sum, l) => sum + l.quantity, 0);
-  const insurancePayout = runLosses.reduce((sum, l) => sum + l.insurancePayout, 0);
   const runSaleLinks = saleLinks.filter((l) => l.runId === run.id);
   const runOrderWatches = orderWatches
     .filter((w) => w.runId === run.id)
@@ -58,7 +57,6 @@ export function summarizeProductionRun(
     brokerFeeableRevenue: watchRevenue,
     brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
     standing,
-    insurancePayout,
   });
 
   const remaining = Math.max(0, run.quantity - quantitySold - quantityLost);

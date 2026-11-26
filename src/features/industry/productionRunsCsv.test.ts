@@ -36,7 +36,6 @@ function summary(): ProductionRunSummary {
       salesTax: 10,
       brokerFee: 5,
       netRevenue: 785,
-      insurance: 0,
       profit: -215,
       marginPct: -26.875,
     },

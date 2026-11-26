@@ -14,7 +14,7 @@ interface RealizedProfitBreakdownProps {
   accountingLevel: number;
   brokerRelationsLevel: number;
   standing?: ResolvedStandings;
-  netLoss?: number;
+  lostCost?: number;
 }
 
 export function RealizedProfitBreakdown({
@@ -24,7 +24,7 @@ export function RealizedProfitBreakdown({
   accountingLevel,
   brokerRelationsLevel,
   standing,
-  netLoss = 0,
+  lostCost = 0,
 }: RealizedProfitBreakdownProps) {
   const { t } = useTranslation();
   const taxPct = salesTaxPct(accountingLevel, standing?.feeDiscountFactor);
@@ -96,21 +96,14 @@ export function RealizedProfitBreakdown({
 
         <Section title={t('industry.realizedBreakdown.profitTitle')}>
           <Formula>
-            {profit.insurance > 0
-              ? t('industry.realizedBreakdown.profitFormulaInsured', {
-                  net: formatIsk(profit.netRevenue),
-                  insurance: formatIsk(profit.insurance),
-                  cost: formatIsk(profit.totalCost),
-                  profit: formatIsk(profit.profit),
-                })
-              : t('industry.realizedBreakdown.profitFormula', {
-                  net: formatIsk(profit.netRevenue),
-                  cost: formatIsk(profit.totalCost),
-                  profit: formatIsk(profit.profit),
-                })}
+            {t('industry.realizedBreakdown.profitFormula', {
+              net: formatIsk(profit.netRevenue),
+              cost: formatIsk(profit.totalCost),
+              profit: formatIsk(profit.profit),
+            })}
           </Formula>
-          {netLoss !== 0 && (
-            <p>{t('industry.realizedBreakdown.netLoss', { loss: formatIsk(-netLoss) })}</p>
+          {lostCost !== 0 && (
+            <p>{t('industry.realizedBreakdown.lostCost', { loss: formatIsk(-lostCost) })}</p>
           )}
           <p>
             {profit.marginPct === null

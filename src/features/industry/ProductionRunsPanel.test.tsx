@@ -513,7 +513,7 @@ describe('ProductionRunsPanel', () => {
     expect(screen.getByRole('dialog', { name: 'Manual / Private Sale' })).toBeTruthy();
   });
 
-  it('marks units as lost with typed insurance, shows the badge, and writes them off open inventory', async () => {
+  it('marks units as lost, shows the badge, and writes them off open inventory', async () => {
     await addRun();
     const user = userEvent.setup();
     renderPanel(null);
@@ -525,16 +525,14 @@ describe('ProductionRunsPanel', () => {
     const units = within(dialog).getByLabelText('Units lost');
     await user.clear(units);
     await user.type(units, '2');
-    await user.click(within(dialog).getByRole('button', { name: 'Type ISK' }));
-    await user.type(within(dialog).getByLabelText('Insurance payout (ISK)'), '50000');
-    await user.tab();
+    expect(within(dialog).queryByText(/insurance/i)).toBeNull();
     await user.click(within(dialog).getByRole('button', { name: 'Mark as lost' }));
 
     await waitFor(async () => {
       expect(await db.productionLosses.count()).toBe(1);
     });
     const saved = (await db.productionLosses.toArray())[0];
-    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2, insurancePayout: 50_000 });
+    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2 });
     expect(await screen.findByText('2 lost')).toBeTruthy();
   });
 
