@@ -106,18 +106,6 @@ describe('CorpBookSyncNote', () => {
     ).toBeInTheDocument();
   });
 
-  it('does not call a closed day safe while ore on it is still settling', () => {
-    render(
-      <CorpBookSyncNote book={book({}, { settlingFrom: '2026-10-17' })} owedNow={1} now={NOW} />
-    );
-    expect(screen.queryByText(/Safe to pay/)).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "17 Oct is still settling: Brass Meridian Logistics's refinery log hasn't caught up with all your mining that day (synced 2h ago). Paying now pays only what is billed so far."
-      )
-    ).toBeInTheDocument();
-  });
-
   it("says what it owes includes the open day's estimate, and when that day is billed", () => {
     render(
       <CorpBookSyncNote

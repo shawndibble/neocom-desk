@@ -132,8 +132,6 @@ export function CorpRowDetailModal({
   }
   // A conflict is the first thing to read and act on, so its notice leads.
   const conflict = view.state === 'conflict';
-  // Ore listed beyond what the book recorded: the book never bills it.
-  const excess = conflict && view.conflictCause === 'overListed';
   // #6206: "I paid this another way" on a day a Late notice asked for while it is still owed, and
   // what came of it. A day with an overlap says it in its notice instead.
   // What Resolve opens on for this day: an officer's kept bill, a Conflict, a figure that differs.
@@ -177,31 +175,16 @@ export function CorpRowDetailModal({
               )}
             >
               {/* A Conflict is not owed yet, but shows what the book bills if it is left. */}
-              {conflict && !excess
+              {conflict
                 ? `${formatIsk(view.billed)} ISK`
-                : excess
+                : view.taxOwed === null
                   ? '—'
-                  : view.taxOwed === null
-                    ? '—'
-                    : `${formatIsk(owed)} ISK`}
+                  : `${formatIsk(owed)} ISK`}
             </span>
           </div>
-          {view.state === 'settling' && (
-            <p className="-mt-2 text-right text-xs text-text-dim">
-              {t('miningTax.corpBook.conflict.settlingNote', {
-                corp: corp.corpName,
-                day: view.date,
-              })}
-            </p>
-          )}
           {conflict && (
             <p className="-mt-2 text-right text-xs text-warning">
-              {t(
-                excess
-                  ? 'miningTax.corpBook.conflict.headerNotBilled'
-                  : 'miningTax.corpBook.conflict.headerNotOwed',
-                { corp: corp.corpName }
-              )}
+              {t('miningTax.corpBook.conflict.headerNotOwed', { corp: corp.corpName })}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">

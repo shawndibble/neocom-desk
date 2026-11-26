@@ -115,7 +115,7 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
       </div>
     );
   const recordKey = view.recordKey;
-  if (recordKey === undefined || view.conflictCause === 'overListed') return null;
+  if (recordKey === undefined) return null;
   const send = async () => {
     setBusy(true);
     setFailed(null);

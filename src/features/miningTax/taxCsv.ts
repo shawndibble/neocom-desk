@@ -66,13 +66,7 @@ export function taxCsvColumns(
     { header: t('miningTax.csvTaxPct'), value: (dr) => dr.assignment?.taxPct ?? null },
     {
       header: t('miningTax.csvNeedsReview'),
-      // Settling ore sits in Open beside the day's bill, but needs nothing from the pilot.
-      value: (dr) =>
-        exportFlag(
-          t,
-          dr.status === 'needs-review' &&
-            !(dr.corp?.kind === 'row' && dr.corp.view.state === 'settling')
-        ),
+      value: (dr) => exportFlag(t, dr.status === 'needs-review'),
     },
     {
       header: t('miningTax.csvCorpOverlap'),

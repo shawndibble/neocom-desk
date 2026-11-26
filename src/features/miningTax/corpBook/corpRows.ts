@@ -90,8 +90,6 @@ const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> =
   estimate: 'outstanding',
   // Visible and not owed: it needs a decision, but not the member's money.
   conflict: 'needs-review',
-  // Not owed and nothing to do yet, but kept beside the day's bill rather than in History.
-  settling: 'needs-review',
   paid: 'paid',
   dismissed: 'dismissed',
   // Forgiven in full by an officer write-off (#4637): not owed, like a dismissal.
@@ -147,16 +145,18 @@ export function buildDisplayRows(
 ): DisplayRow[] {
   if (!overlay) return flatten(entries);
   const adjusted = entries.map((row) => {
-    const taken = overlay.takenFromFree.get(
-      entryKey(row.characterId, row.entry.date, row.entry.solarSystemId)
-    );
-    return taken
-      ? {
-          ...row,
-          unassignedOreLines: minusLines(row.unassignedOreLines, taken),
-          bookTakenOreLines: taken,
-        }
-      : row;
+    const key = entryKey(row.characterId, row.entry.date, row.entry.solarSystemId);
+    const taken = overlay.takenFromFree.get(key);
+    // Ore listed for the corporation beyond its closed book: the book's records stand, so it is
+    // unassigned again, under the same Unattributed label as any ore the books left.
+    const released = overlay.released.get(key);
+    if (!taken && !released) return row;
+    const unassigned = addLines(row.unassignedOreLines, released ?? []);
+    return {
+      ...row,
+      unassignedOreLines: taken ? minusLines(unassigned, taken) : unassigned,
+      ...(taken ? { bookTakenOreLines: taken } : {}),
+    };
   });
   // A Payee that is the corporation: its rows give way to the book's, which bills the same ore.
   const taken = (dr: DisplayRow) =>

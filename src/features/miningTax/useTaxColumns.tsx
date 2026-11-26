@@ -308,8 +308,7 @@ export function useTaxColumns({
         // Owed is the figure the page is about; settled history recedes, and so does a day the
         // Payee's book now decides: there is nothing for the pilot to do on it.
         cellClassName: (dr) =>
-          dr.corp?.kind === 'row' &&
-          (dr.corp.view.state === 'conflict' || dr.corp.view.state === 'settling')
+          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
             ? 'text-text-dim'
             : dr.status === 'outstanding' && taxOwedOf(dr) <= 0
               ? 'text-text-dim'
@@ -320,12 +319,7 @@ export function useTaxColumns({
                   : undefined,
         render: (dr) =>
           // A Conflict owes nothing yet; it shows what the book bills, and when, if it is left.
-          dr.corp?.kind === 'row' &&
-          dr.corp.view.state === 'conflict' &&
-          dr.corp.view.conflictCause === 'overListed' ? (
-            // Ore the book never recorded: the book never bills it.
-            '—'
-          ) : dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
+          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
             <span className="block">
               <span className="block">{`${formatIsk(dr.corp.view.billed)} ISK`}</span>
               <span className="block text-[0.6875rem] font-normal text-warning">

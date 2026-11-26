@@ -54,29 +54,22 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { HOUR_MS, MINUTE_MS } from '@/lib/age';
+import { HOUR_MS } from '@/lib/age';
 
-/**
- * `settling`: ore the member listed for the corporation's own Payee beyond what the book recorded,
- * while the refinery log may still be catching up on the day (`isSettled`). Never billed or
- * flagged; once the day settles the same ore is an `overListed` Conflict.
- */
 /**
  * `estimate`: a day the book has not closed yet, owed by what the member listed for the
  * corporation's own Payee (decision 20261125). Owed and payable, but the book bills it only when
  * the day closes, so its figure may still change.
  */
-export type BookRowState =
-  'billed' | 'estimate' | 'conflict' | 'settling' | 'dismissed' | 'waived' | 'paid';
+export type BookRowState = 'billed' | 'estimate' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /**
  * Why a Conflict clashes. `otherPayee`: the member gave the ore to a Payee that is not this
- * corporation's. `overListed`: the member's entry for the corporation's own Payee lists more ore
- * than the book recorded; the Conflict is that excess only. `ownNeedsReview`: the member's own
+ * corporation's. `ownNeedsReview`: the member's own
  * entry for the corporation needs review, so the book cannot take it yet. `ownerCollected`: a
  * Collector's book recorded the ore at a moon owner's refinery, and the member gave it to that
  * moon owner.
  */
-export type ConflictCause = 'otherPayee' | 'overListed' | 'ownNeedsReview' | 'ownerCollected';
+export type ConflictCause = 'otherPayee' | 'ownNeedsReview' | 'ownerCollected';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
 export type BookLabelState = 'pending' | 'unattributed';
 
@@ -351,10 +344,7 @@ export interface BookRowView {
   dismissalReason?: string;
   /** A conflict: when it resolves to the corp. */
   resolvesAt?: string;
-  /**
-   * A conflict: why the two records clash (`ConflictCause`). An `overListed` one is ore the book
-   * never recorded: the book never bills it (`billed` 0) and it never resolves to the corporation.
-   */
+  /** A conflict: why the two records clash (`ConflictCause`). */
   conflictCause?: ConflictCause;
   /** An `ownerCollected` conflict: the member's Payee that is the moon owner. */
   ownerPayeeId?: string;
@@ -485,6 +475,12 @@ export interface PersonalOverlay {
    * resolves it; the Payee bills it as resolved then (`alsoBilled`, or its own again).
    */
   conflicted: Map<string, Map<string, number>>;
+  /**
+   * Per Mining Ledger Entry key, ore the member listed for a corporation's own Payee beyond what
+   * its closed book recorded: the book's records stand, so it is the member's free ore again
+   * (decision 20261125-201722), labelled like any free ore the books left.
+   */
+  released: Map<string, OreLine[]>;
   /** Per Mining Ledger Entry key, how its remaining free ore reads. */
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
@@ -861,33 +857,6 @@ export function previewTakeover(
   return out;
 }
 
-/**
- * How long after a day closes (its grace included) ore the book lacks may still be the refinery
- * log catching up (decision 20261125-184957).
- */
-const SETTLE_MS = 20 * MINUTE_MS;
-
-/**
- * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
- * missing: the book holds the miner's ore on a later day at every refinery they mined at in that
- * system that day (the excess can't be tied to one), or `SETTLE_MS` has passed since the day
- * closed. A sync soon after the day closes can predate the log's last writes.
- */
-function isSettled(book: PersonalBook, charge: PreparedCharge, now: string): boolean {
-  const { characterId, solarSystemId, date } = charge.observed;
-  if (Date.parse(now) >= Date.parse(dayClosesAt(date, book.graceHours)) + SETTLE_MS) return true;
-  const mine = book.observed.filter((o) => o.characterId === characterId);
-  const refineries = new Set(
-    mine
-      .filter((o) => o.date === date && o.solarSystemId === solarSystemId)
-      .map((o) => o.structureId)
-  );
-  refineries.add(charge.observed.structureId);
-  return [...refineries].every((structureId) =>
-    mine.some((o) => o.structureId === structureId && o.date > date)
-  );
-}
-
 function disputeOf(
   entry: PersonalEntry | undefined,
   bookLines: readonly OreLine[],
@@ -902,7 +871,9 @@ function disputeOf(
   const bookQuantity = quantityOf(bookLines);
   const pcts = new Set(entry.allocations.map((a) => a.taxPct));
   const personalPct = pcts.size === 1 ? [...pcts][0] : undefined;
-  const quantity = personalQuantity !== bookQuantity;
+  // The book is the record once it closes a day: ore the member listed beyond it is simply not
+  // billed. Only a book that bills more than the member mined is a difference worth disputing.
+  const quantity = bookQuantity > personalQuantity;
   const rate = sameRate && personalPct !== undefined && personalPct !== bookPct;
   if (!quantity && !rate) return undefined;
   return {
@@ -934,6 +905,7 @@ export function overlayCorpBooks(input: {
   const trimmed: PersonalOverlay['trimmed'] = new Map();
   const alsoBilled: PersonalOverlay['alsoBilled'] = new Map();
   const conflicted: PersonalOverlay['conflicted'] = new Map();
+  const released: PersonalOverlay['released'] = new Map();
   // The book rows behind each `alsoBilled` share: a day an officer writes off bills nobody.
   const alsoBilledRows = new Map<string, Map<string, BookRowView[]>>();
   // The ore each personal entry still has free after the books, per entry key.
@@ -986,38 +958,6 @@ export function overlayCorpBooks(input: {
       hubId: book.hubId,
       oreForm: book.oreForm,
     };
-  };
-
-  // Ore the member listed for the corporation's own Payee beyond what any book recorded: visible,
-  // never owed, never billed, and it never resolves to the corporation (#6203). Until the day
-  // settles it is only Settling: the refinery log may still be catching up on the day.
-  const pushExcess = (
-    p: Prepared,
-    charge: PreparedCharge,
-    allocation: PersonalAllocation,
-    excess: OreLine[]
-  ) => {
-    const value = dayValue(charge);
-    const worth = computeAssignmentValue(excess, priceMap(value.unitPrices), value.taxPct);
-    pushRow({
-      ...commonOf(p, charge, value),
-      id: `${p.book.corporationId}:${charge.charge.key}:overListed:${allocation.id ?? ''}`,
-      oreLines: excess,
-      estimatedValue: worth.estimatedValue,
-      taxOwed: null,
-      billed: 0,
-      ...(isSettled(p.book, charge, now)
-        ? {
-            state: 'conflict' as const,
-            conflictCause: 'overListed' as const,
-            overlap: {
-              payeeIds: [allocation.payeeId],
-              ore: excess,
-              paid: allocation.status === 'paid',
-            },
-          }
-        : { state: 'settling' as const }),
-    });
   };
 
   const buildRows = (
@@ -1109,9 +1049,9 @@ export function overlayCorpBooks(input: {
     const split = splitAcrossBooks(entry.oreLines, observations);
     let left = free.get(key) ?? [];
     const pool = overlapPool(entry.allocations);
-    // What the books took of each allocation, and the book whose own Payee it names.
+    // What the books took of each allocation, and the allocations a book's own Payee names.
     const takenOf = new Map<PoolItem, OreLine[]>();
-    const ownedBy = new Map<PoolItem, { p: Prepared; charge: PreparedCharge }>();
+    const ownedBy = new Set<PoolItem>();
     // What a book bills of an allocation to another Payee that still lists it.
     const alsoBilledOf = new Map<PoolItem, { lines: OreLine[]; rows: BookRowView[] }>();
     // What a book contests of an allocation to another Payee while the day is a Conflict.
@@ -1128,18 +1068,12 @@ export function overlayCorpBooks(input: {
       const own = ownOf.get(p)!;
       for (const [item, lines] of own.taken)
         takenOf.set(item, sumLines(takenOf.get(item) ?? [], lines));
-      // Ore listed for this corporation beyond what any book took is this book's excess (below).
-      const anchor = here.find((c) => !c.dismissal);
-      if (anchor) {
+      // Ore listed for this corporation beyond what any book took is given back (below).
+      if (here.some((c) => !c.dismissal)) {
         for (const item of pool) {
           const a = item.allocation;
-          if (
-            !ownedBy.has(item) &&
-            a.id !== undefined &&
-            isBilledStatus(a) &&
-            isOwnPayee(p.book.ownPayeeIds, a)
-          )
-            ownedBy.set(item, { p, charge: anchor });
+          if (a.id !== undefined && isBilledStatus(a) && isOwnPayee(p.book.ownPayeeIds, a))
+            ownedBy.add(item);
         }
       }
       const resolved = resolveBookShare({
@@ -1222,8 +1156,8 @@ export function overlayCorpBooks(input: {
       }
     }
     // Each allocation the books took part of: the rest stays with its Payee, except what the member
-    // listed for a corporation's own Payee beyond any book's share: that excess is the
-    // corporation's over-listed conflict, and the book's rows then stand for the whole allocation.
+    // listed for a corporation's own Payee beyond any book's share. The closed book's records
+    // stand: its rows stand for the whole allocation, and that excess is free ore again.
     // Priced at the books' hub prices of the day, for every type the allocation lists.
     const prices = new Map<number, number>();
     for (const p of claiming)
@@ -1234,9 +1168,11 @@ export function overlayCorpBooks(input: {
     for (const item of pool) {
       const { allocation } = item;
       if (allocation.id === undefined) continue;
-      const owner = ownedBy.get(item);
-      const excess = owner ? linesOfLeft(item.left) : [];
-      if (owner && excess.length > 0) pushExcess(owner.p, owner.charge, allocation, excess);
+      const excess = ownedBy.has(item) ? linesOfLeft(item.left) : [];
+      if (excess.length > 0) {
+        left = sumLines(left, excess);
+        released.set(key, sumLines(released.get(key) ?? [], excess));
+      }
       const gone = sumLines(takenOf.get(item) ?? [], excess);
       const listed = sumLines(allocation.oreLines);
       const kept = minusLines(listed, gone);
@@ -1564,6 +1500,7 @@ export function overlayCorpBooks(input: {
     trimmed,
     alsoBilled,
     conflicted,
+    released,
     labels,
     books: summaries,
   };

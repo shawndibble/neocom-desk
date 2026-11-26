@@ -45,8 +45,6 @@ export interface CorpBookViewBook {
   payee: PayeeRecord;
   /** The earliest day whose corp record is still pending, when any is. */
   pendingFrom?: string;
-  /** The earliest day with ore still Settling (the refinery log catching up), when any is. */
-  settlingFrom?: string;
   /** The earliest open day owed at an estimate whose figure may still change, when any is. */
   estimateFrom?: string;
   /** The latest open day whose estimate is already final (over, and the book holds all of it). */
@@ -196,10 +194,6 @@ export function buildCorpBookView(
       )
       .map(([key]) => key.split(':')[1])
       .sort();
-    const settlingFrom = overlay.rows
-      .filter((r) => r.state === 'settling' && r.corporationId === loadedBook.corporationId)
-      .map((r) => r.date)
-      .sort()[0];
     const estimates = overlay.rows.filter(
       (r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId
     );
@@ -227,7 +221,6 @@ export function buildCorpBookView(
         loadedBook.hubId
       ),
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
-      ...(settlingFrom !== undefined ? { settlingFrom } : {}),
       ...(estimateFrom !== undefined ? { estimateFrom } : {}),
       ...(finalThrough !== undefined ? { finalThrough } : {}),
     };

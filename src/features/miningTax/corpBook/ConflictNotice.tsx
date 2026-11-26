@@ -8,7 +8,6 @@ import { TakeoverConfirm, type OverlapPreview } from './TakeoverConfirm';
 
 const TITLE_KEY: Record<ConflictCause, string> = {
   otherPayee: 'titleOtherPayee',
-  overListed: 'titleOverListed',
   ownNeedsReview: 'titleOwnNeedsReview',
   ownerCollected: 'titleOwnerCollected',
 };
@@ -27,8 +26,6 @@ interface Props {
   cause: ConflictCause | undefined;
   /** An `ownerCollected` conflict: the name of the miner's Payee that is the moon owner. */
   ownerName?: string;
-  /** An `overListed` conflict: the corporation's own Payee the member's entry lists the ore for. */
-  ownPayeeName?: string;
   /** The entries behind the conflict; empty when none could be matched. */
   entries: readonly ConflictEntry[];
   /** Where the book recorded the ore: the refinery, else the system. */
@@ -61,7 +58,6 @@ export function ConflictNotice({
   corpName,
   cause,
   ownerName = '',
-  ownPayeeName = '',
   entries,
   recordedAt,
   resolvesOn,
@@ -98,11 +94,7 @@ export function ConflictNotice({
       )}
       <ul className="list-disc space-y-0.5 pl-4">
         {entries.length === 0 ? (
-          <li>
-            {cause === 'overListed'
-              ? t(k('yourEntryOverListed'), { payee: ownPayeeName || corpName })
-              : t(k('yourEntryUnknown'))}
-          </li>
+          <li>{t(k('yourEntryUnknown'))}</li>
         ) : (
           entries.map((entry) => (
             <li key={entry.id}>
