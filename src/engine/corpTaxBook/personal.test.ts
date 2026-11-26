@@ -1746,7 +1746,8 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
     });
 
     describe('while the refinery log may still be catching up on the day', () => {
-      // A sync soon after the day closed, read before the settling window ran out.
+      // A sync soon after the day closed, read before the settling window ran out: the sync must
+      // not be later than `now`, or the day would look closed by a sync that has not happened.
       const early = (
         entries: PersonalEntry[],
         books: PersonalBook[],

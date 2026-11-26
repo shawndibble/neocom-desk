@@ -856,18 +856,17 @@ export function previewTakeover(
 }
 
 /**
- * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
- * missing: the book holds the miner's ore on a later day at every refinery they mined at in that
- * system that day (the excess can't be tied to one), or `SETTLE_MS` has passed since the day closed. A
- * sync soon after the day closes can predate the log's last writes.
- */
-/**
- * How long after a day closes ore the book lacks may still be the refinery log catching up. Its
- * lag is about an hour on top of ESI's hour cache (the 24 Nov ore arrived within two); a day later
- * the missing ore was still missing, so waiting longer only hides a real difference.
+ * How long after a day closes (its grace included) ore the book lacks may still be the refinery
+ * log catching up (decision 20261125-184957).
  */
 const SETTLE_MS = 6 * HOUR_MS;
 
+/**
+ * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
+ * missing: the book holds the miner's ore on a later day at every refinery they mined at in that
+ * system that day (the excess can't be tied to one), or `SETTLE_MS` has passed since the day
+ * closed. A sync soon after the day closes can predate the log's last writes.
+ */
 function isSettled(book: PersonalBook, charge: PreparedCharge, now: string): boolean {
   const { characterId, solarSystemId, date } = charge.observed;
   if (Date.parse(now) >= Date.parse(dayClosesAt(date, book.graceHours)) + SETTLE_MS) return true;
