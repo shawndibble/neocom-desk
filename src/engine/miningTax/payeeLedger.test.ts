@@ -263,6 +263,13 @@ describe('payeeLedger: a day not billed yet', () => {
     expect(ledger.credit).toBe(0);
   });
 
+  it('counts only the open days credit has not covered', () => {
+    const tomorrow = charge('u', '2026-10-05', 200_000, { open: true });
+    const paid = source(MINED, [payment('p1', 3_900_000, '2026-10-05T10:00:00Z')]);
+    const ledger = payeeLedger({ ...paid, charges: [...MINED, today, tomorrow] });
+    expect(ledger.status).toEqual({ kind: 'owes', amount: 100_000, days: 1, oldest: '2026-10-05' });
+  });
+
   it('owes only the open day once every billed day is paid', () => {
     const paid = source(MINED, [payment('p1', 3_500_000, '2026-10-04T10:00:00Z')]);
     const ledger = payeeLedger({ ...paid, charges: [...MINED, today] });

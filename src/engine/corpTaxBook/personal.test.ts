@@ -2611,6 +2611,32 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     ]);
   });
 
+  it('prices ore the book has not observed yet at the day, beside its own price for the rest', () => {
+    const live = entry({
+      date: TODAY,
+      oreLines: [
+        { typeId: ZEO, quantity: 30_000 },
+        { typeId: SYL, quantity: 1_000 },
+      ],
+      freeOreLines: [],
+      allocations: [
+        {
+          id: 'a-today',
+          payeeId: 'bmw',
+          taxPct: 15,
+          oreLines: [
+            { typeId: ZEO, quantity: 30_000 },
+            { typeId: SYL, quantity: 1_000 },
+          ],
+          status: 'outstanding',
+        },
+      ],
+    });
+    const [row] = ofToday(overlay([live], [withToday(30_000)]));
+    expect(row.unitPrices[SYL]).toBe(100);
+    expect(row.taxOwed).toBeCloseTo((30_000 * 148 + 1_000 * 100) * 0.15, 4);
+  });
+
   it('splits the day by the refineries the book saw, the rest to the one it saw most of', () => {
     const second = { ...observedToday(5_000), structureId: 1001 };
     const out = overlay(

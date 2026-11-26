@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { payeeLedger } from '../miningTax/payeeLedger';
 import { buildBookView, minerAccountOf, type BookViewInput } from './bookView';
-import { minerLedgerSource } from './minerLedgerSource';
+import { minerLedgerSource, openDayCharges } from './minerLedgerSource';
 import type { ObservedMiningEntry } from './types';
+import type { BookRowView } from './personal';
 
 const CORP = 98000001;
 const ORE = 45490;
@@ -231,6 +232,41 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
     expect(offs.map((r) => r.key)).toEqual(['writeOff:new']);
     expect(offs[0]!.kind === 'writeOff' && offs[0]!.days).toEqual([
       { date: '2026-08-10', amount: 20_000 },
+    ]);
+  });
+});
+
+describe('openDayCharges', () => {
+  const row = (over: Partial<BookRowView>): BookRowView =>
+    ({
+      id: 'r',
+      corporationId: 1,
+      date: '2026-11-25',
+      solarSystemId: 30,
+      minerId: 'm1',
+      billed: 100,
+      oreLines: [{ typeId: 7, quantity: 10 }],
+      open: true,
+      ...over,
+    }) as BookRowView;
+
+  it("lists the Miner's open rows in the book, by refinery else system", () => {
+    const charges = openDayCharges(
+      [
+        row({ id: 'a', refineryLabel: 'Palomino Prospecting' }),
+        row({ id: 'b', billed: 40 }),
+        row({ id: 'b:paid', billed: 60 }),
+        row({ id: 'billed', open: undefined }),
+        row({ id: 'other', minerId: 'm2' }),
+        row({ id: 'corp', corporationId: 2 }),
+      ],
+      1,
+      'm1',
+      () => 'Ainsan'
+    );
+    expect(charges.map((c) => [c.id, c.place, c.tax, c.open])).toEqual([
+      ['a', 'Palomino Prospecting', 100, true],
+      ['b', 'Ainsan', 100, true],
     ]);
   });
 });

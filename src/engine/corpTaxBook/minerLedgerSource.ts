@@ -14,6 +14,8 @@ import type { Adjustment } from './adjustments';
 import type { BillableLine } from './billableLines';
 import type { MinerAccountBooks } from './bookView';
 import type { RecordedWriteOff } from './payments';
+import type { BookRowView } from './personal';
+import { addLines } from '../miningTax/oreLines';
 import { utcDayOf } from '../localDay';
 
 export interface MinerLedgerNames {
@@ -29,6 +31,45 @@ export interface MinerLedgerNames {
 export interface MinerLedgerBook {
   adjustments?: readonly Adjustment[];
   writeOffs?: readonly RecordedWriteOff[];
+}
+
+/**
+ * A Miner's days the book has not billed yet, as ledger charges: each open row the member's overlay
+ * shows (an estimate, or the part of one credit already paid), so today's mining is listed. Named
+ * by its refinery, else by `systemName`.
+ */
+export function openDayCharges(
+  rows: readonly BookRowView[],
+  corporationId: number,
+  minerId: string,
+  systemName: (solarSystemId: number) => string | undefined
+): LedgerCharge[] {
+  // A day credit paid part of is split in two rows; the ledger lists it as the one day it is.
+  const byId = new Map<string, LedgerCharge>();
+  for (const view of rows) {
+    if (!view.open || view.corporationId !== corporationId || view.minerId !== minerId) continue;
+    const id = view.id.replace(/:paid$/, '');
+    const held = byId.get(id);
+    if (held) {
+      byId.set(id, {
+        ...held,
+        tax: held.tax + view.billed,
+        ore: addLines(held.ore ?? [], view.oreLines),
+      });
+      continue;
+    }
+    const place = view.refineryLabel ?? systemName(view.solarSystemId);
+    byId.set(id, {
+      id,
+      date: view.date,
+      kind: 'mined',
+      tax: view.billed,
+      ...(place ? { place } : {}),
+      ore: view.oreLines,
+      open: true,
+    });
+  }
+  return [...byId.values()];
 }
 
 export function minerLedgerSource(

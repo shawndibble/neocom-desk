@@ -14,6 +14,7 @@ import {
 } from '../../../functions/src/corpTaxBookLateNotice';
 import type { DayAmount, MinerRunningAccount } from '../corpTaxBook/minerRunningAccount';
 import { utcDayOf } from '../localDay';
+import { sum } from '../math';
 import type { OreLine } from './types';
 
 /** One line the account billed: a mined day's ore, or an officer's Adjustment. */
@@ -242,10 +243,10 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
     return { ...row, balance } as PayeeLedgerRow;
   });
   const open = source.charges.filter((c) => c.open && !c.reversed);
-  const openTax = open.reduce((sum, c) => sum + c.tax, 0);
+  const openTax = sum(open.map((c) => c.tax));
   return {
     rows: balanced,
-    status: statusOf(account, open),
+    status: statusOf(account, open, openTax),
     credit: Math.max(0, account.credit - openTax),
     notYetBilled: source.notYetBilled ?? { tax: 0, days: 0 },
   };
@@ -253,13 +254,26 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
 
 function statusOf(
   account: PayeeLedgerSource['account'],
-  open: readonly LedgerCharge[] = []
+  open: readonly LedgerCharge[],
+  openTax: number
 ): PayeeLedgerStatus {
-  // Open days are owed as they stand, after the credit ahead of every billed day.
-  const openLeft = Math.max(0, open.reduce((sum, c) => sum + c.tax, 0) - account.credit);
+  // Open days are owed as they stand, after the credit ahead of every billed day, which pays the
+  // oldest first: a day it covers is not owed.
+  const openLeft = Math.max(0, openTax - account.credit);
   if (openLeft >= 0.5) {
-    const days = new Set(open.map((c) => c.date));
-    const oldest = [...days].sort()[0]!;
+    const byDate = new Map<string, number>();
+    for (const c of open) byDate.set(c.date, (byDate.get(c.date) ?? 0) + c.tax);
+    let credit = account.credit;
+    const owedDates = [...byDate]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .filter(([, tax]) => {
+        const pay = Math.min(credit, tax);
+        credit -= pay;
+        return tax - pay >= 0.5;
+      })
+      .map(([date]) => date);
+    const days = new Set(owedDates);
+    const oldest = owedDates[0]!;
     return account.owes
       ? {
           kind: 'owes',

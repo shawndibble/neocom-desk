@@ -1316,13 +1316,14 @@ export function overlayCorpBooks(input: {
         byStructure.set(to, sumLines(byStructure.get(to) ?? [], left));
       }
       const { prices, sources } = book.pricesOn(entry.date);
+      // A refinery with no charge yet takes the member's own rate: one Payee, one rate a day.
       const ownPct = own[0]!.taxPct;
       for (const [structureId, lines] of byStructure) {
         const charge = charges.find((c) => c.observed.structureId === structureId);
         const value = charge ? dayValue(charge) : undefined;
-        const unitPrices = value
-          ? priceMap(value.unitPrices)
-          : new Map(lines.map((l) => [l.typeId, prices.get(l.typeId) ?? 0]));
+        // The book's own price for what it observed; the day's price for what it has not yet.
+        const unitPrices = new Map(lines.map((l) => [l.typeId, prices.get(l.typeId) ?? 0]));
+        if (value) for (const [t, price] of priceMap(value.unitPrices)) unitPrices.set(t, price);
         const taxPct = value?.taxPct ?? ownPct;
         const worth = computeAssignmentValue(lines, unitPrices, taxPct);
         const types = lines.map((l) => l.typeId);
@@ -1349,6 +1350,13 @@ export function overlayCorpBooks(input: {
                 hubId: book.hubId,
                 oreForm: book.oreForm,
               }),
+          unitPrices: Object.fromEntries(types.map((t) => [t, unitPrices.get(t) ?? 0])),
+          priceSources: Object.fromEntries(
+            types.flatMap((t) => {
+              const source = value?.priceSources[t] ?? sources.get(t);
+              return source !== undefined ? [[t, source]] : [];
+            })
+          ),
           id: `${book.corporationId}:${key}:estimate:${structureId ?? 'system'}`,
           state: 'estimate',
           open: true,
