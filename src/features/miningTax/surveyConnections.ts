@@ -145,7 +145,7 @@ export async function applySurveyConnections(
   return created;
 }
 
-async function takeOverFromDefaults(
+export async function takeOverFromDefaults(
   takeovers: readonly Takeover[],
   paid: PayeeRunningAccounts
 ): Promise<boolean> {
