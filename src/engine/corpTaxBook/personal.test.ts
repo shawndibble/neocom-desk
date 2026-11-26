@@ -2672,6 +2672,44 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     expect(out.books[0].estimate).toBe(0);
   });
 
+  it('reads Paid when credit falls short by no more than the day tolerance', () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay(
+      [today(30_000)],
+      [withToday(30_000, { payments: [payment(DAY + tax - tax * 0.004)] })]
+    );
+    expect(ofToday(out)).toMatchObject([{ state: 'paid', taxOwed: 0, billed: tax - tax * 0.004 }]);
+    expect(out.books[0].estimate).toBe(0);
+  });
+
+  it('keeps a shortfall beyond the day tolerance Outstanding', () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay(
+      [today(30_000)],
+      [withToday(30_000, { payments: [payment(DAY + tax - tax * 0.006)] })]
+    );
+    expect(out.books[0].estimate).toBeCloseTo(tax * 0.006, 4);
+  });
+
+  it("follows the book's own day tolerance", () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay(
+      [today(30_000)],
+      [withToday(30_000, { dayTolerancePct: 0.2, payments: [payment(DAY + tax - tax * 0.004)] })]
+    );
+    expect(out.books[0].estimate).toBeCloseTo(tax * 0.004, 4);
+  });
+
+  it("reads Paid inside a wider day tolerance the book's officers set", () => {
+    const tax = 30_000 * 148 * 0.15;
+    const out = overlay(
+      [today(30_000)],
+      [withToday(30_000, { dayTolerancePct: 2, payments: [payment(DAY + tax - tax * 0.015)] })]
+    );
+    expect(ofToday(out)).toMatchObject([{ state: 'paid', taxOwed: 0 }]);
+    expect(out.books[0].estimate).toBe(0);
+  });
+
   it('is billed by the book, not estimated, once the day closes', () => {
     const out = overlay([today(30_000)], [withToday(30_000)], '2026-10-19T14:00:00Z');
     expect(ofToday(out).map((r) => r.state)).toEqual(['estimate']);

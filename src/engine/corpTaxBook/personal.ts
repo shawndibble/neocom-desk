@@ -13,7 +13,12 @@ import {
   isSameJournalTransfer,
   matchesStatedTransfer,
 } from '../../../functions/src/corpTaxBookTransferMatch';
-import { MinerRunningAccount, RESIDUE_ISK, type RunningAccountOwes } from './minerRunningAccount';
+import {
+  daySettleTolerance,
+  MinerRunningAccount,
+  RESIDUE_ISK,
+  type RunningAccountOwes,
+} from './minerRunningAccount';
 import type { ToleranceExemption } from './toleranceExemptions';
 import type { BillableLine } from './billableLines';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
@@ -1137,8 +1142,9 @@ export function overlayCorpBooks(input: {
       if (have < RESIDUE_ISK || tax <= 0) continue;
       const pay = Math.min(have, tax);
       credit.set(minerId, have - pay);
-      if (tax - pay < RESIDUE_ISK) {
-        Object.assign(row, { state: 'paid', taxOwed: 0 });
+      const tolerance = daySettleTolerance(tax, p.book.dayTolerancePct);
+      if (tax - pay <= Math.max(RESIDUE_ISK, tolerance)) {
+        Object.assign(row, { state: 'paid', taxOwed: 0, billed: pay });
         continue;
       }
       const share = pay / tax;
