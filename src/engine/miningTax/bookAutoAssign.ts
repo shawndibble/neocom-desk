@@ -57,17 +57,20 @@ export interface BookAutoAssignSlice {
   takeovers: Takeover[];
 }
 
-function coversEntry(book: AutoAssignBook, e: MiningLedgerEntry, now: string): boolean {
+function coversEntry(book: AutoAssignBook, e: MiningLedgerEntry): boolean {
   return (
     book.characterIds.includes(e.characterId) &&
     e.date >= book.startDate &&
-    book.observed.some((o) => o.solarSystemId === e.solarSystemId) &&
-    !isDayBillable(e.date, {
-      now,
-      ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
-      ...(book.graceHours !== undefined ? { graceHours: book.graceHours } : {}),
-    })
+    book.observed.some((o) => o.solarSystemId === e.solarSystemId)
   );
+}
+
+function isOpenDay(book: AutoAssignBook, date: string, now: string): boolean {
+  return !isDayBillable(date, {
+    now,
+    ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
+    ...(book.graceHours !== undefined ? { graceHours: book.graceHours } : {}),
+  });
 }
 
 function placeSeen(book: AutoAssignBook, e: MiningLedgerEntry) {
@@ -92,6 +95,7 @@ function placeSeen(book: AutoAssignBook, e: MiningLedgerEntry) {
 
 function rateOf(book: AutoAssignBook, e: MiningLedgerEntry, minerId: string) {
   const { today, seen, structureId, moonId } = placeSeen(book, e);
+  const labelled = seen?.structureId;
   const isGuest = seen
     ? seen.recordedCorporationId !== book.corporationId
     : book.memberCharacterIds !== undefined && !book.memberCharacterIds.includes(e.characterId);
@@ -105,23 +109,26 @@ function rateOf(book: AutoAssignBook, e: MiningLedgerEntry, minerId: string) {
     isGuest,
     ...(seen ? { minerCorporationId: seen.recordedCorporationId } : {}),
   });
-  return { rate, structureId };
+  return { rate, labelled };
 }
 
 export function planBookAutoAssign(input: BookAutoAssignInput): BookAutoAssignSlice[] {
   const byEntry = new Map<string, AutoAssignCovering[]>();
   for (const a of input.assignments) {
     const key = defaultOptOutKey(a.characterId, a.date, a.solarSystemId);
-    byEntry.set(key, [...(byEntry.get(key) ?? []), a]);
+    const list = byEntry.get(key);
+    if (list) list.push(a);
+    else byEntry.set(key, [a]);
   }
   const slices: BookAutoAssignSlice[] = [];
   for (const e of input.entries) {
     const key = defaultOptOutKey(e.characterId, e.date, e.solarSystemId);
     if (input.optedOut.has(key)) continue;
     if (!e.oreLines.some((l) => l.quantity > 0)) continue;
-    const books = input.books.filter((b) => coversEntry(b, e, input.now));
+    const books = input.books.filter((b) => coversEntry(b, e));
     if (books.length !== 1) continue;
     const book = books[0]!;
+    if (!isOpenDay(book, e.date, input.now)) continue;
     const own = payeesOfBookCorporation(
       input.payees.filter((p) => p.characterId === e.characterId),
       { corporationId: book.corporationId, name: book.corpName }
@@ -132,9 +139,9 @@ export function planBookAutoAssign(input: BookAutoAssignInput): BookAutoAssignSl
       isUnpaidDefault(a) && !(a.payeeId !== undefined && ownIds.has(a.payeeId));
     if (!covering.every(takeable)) continue;
     const minerId = minerIdFor(e.characterId, book.miners, e.date);
-    const { rate, structureId } = rateOf(book, e, minerId);
+    const { rate, labelled } = rateOf(book, e, minerId);
     if (!rate) continue;
-    const label = structureId === undefined ? undefined : book.structureNames?.[structureId];
+    const label = labelled === undefined ? undefined : book.structureNames?.[labelled];
     slices.push({
       corporationId: book.corporationId,
       characterId: e.characterId,

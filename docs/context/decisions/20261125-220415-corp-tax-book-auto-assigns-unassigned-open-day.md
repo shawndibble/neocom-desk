@@ -11,16 +11,22 @@ _Recorded 2026-11-25 · issue #6768._
 - **A Default-System Assignment to the corporation's own Payee counts as assigned.** It already
   bills the right Payee (and the Default-System runner never targets a book-owned Payee anyway).
   A Default-System one to anyone else is taken over whole, the same way a Survey connection takes
-  one over (`takeOverFromDefaults`, now shared).
+  one over. The price, value, takeover and assign steps of all three auto-assigners (Default
+  Systems, Survey connections, the book) now share `autoAssignSlice`.
 - **The planner is `planBookAutoAssign` in `src/engine/miningTax/bookAutoAssign.ts`.** A system
   counts when the book has observed any refinery there (any miner, any day), the Character is in
-  the book's `characterIds`, the day is on or after the book's start date and not yet Billable
-  (`isDayBillable` with the book's clock). Exactly one such book, or nothing: two books in one
-  system leave it Pending for the close-of-day fix (#6766).
+  the book's `characterIds` and the day is on or after the book's start date. Exactly one such
+  book, or nothing: two books in one system leave it Pending for the close-of-day fix (#6766),
+  even when the other book has already closed the day. Only then is the one book's day checked
+  to be not yet Billable (`isDayBillable` with the book's clock).
 - **The rate is the book's own `resolveRate` for this miner**, with the refinery, moon, feeder and
   guest status taken from what the book saw this Character at in that system today, else the most
-  recent earlier day, else the system's only refinery. No book rate means no auto-assign.
-- **The label is the refinery's name when the book knows it, else no label.** The row already
+  recent earlier day, else the system's only refinery. That is the miner-side overlay's own
+  placement (`observed-rows`, moon from the observed row). When the miner is at several refineries
+  in one system, the lowest structure id's rate is used for the whole entry; the close-of-day fix
+  settles the split. No book rate means no auto-assign.
+- **The label is the name of the refinery the book has seen this miner at, else no label.** The
+  system's only refinery may set the rate but never the label. The row already
   names the system, so "else the system" is met without writing the system name into the label
   a second time.
 - **The corp Payee is the miner's own stored one** (`payeesOfBookCorporation` for that

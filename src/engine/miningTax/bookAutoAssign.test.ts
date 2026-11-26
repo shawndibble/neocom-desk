@@ -199,6 +199,27 @@ describe('planBookAutoAssign', () => {
     expect(plan({ books: [book(), second] })).toEqual([]);
   });
 
+  it('leaves a two-book system Pending when the other book has closed the day', () => {
+    const day = '2026-11-23';
+    const open = book({
+      lastSyncedAt: '2026-11-23T20:00:00.000Z',
+      observed: [observed({ date: day })],
+    });
+    const closed = book({
+      corporationId: OTHER_CORP,
+      corpName: 'Second Corp',
+      observed: [observed({ recordedCorporationId: OTHER_CORP, structureId: 3044, date: day })],
+    });
+    const entries = [entry({ date: day })];
+    expect(plan({ entries, books: [open] })).toHaveLength(1);
+    expect(plan({ entries, books: [open, closed] })).toEqual([]);
+  });
+
+  it('does not label with a refinery the miner was never seen at', () => {
+    const [slice] = plan({ books: [book({ observed: [observed({ characterId: 777 })] })] });
+    expect(slice).not.toHaveProperty('label');
+  });
+
   it('assigns only in systems where the book has a refinery', () => {
     expect(plan({ entries: [entry({ solarSystemId: 30002 })] })).toEqual([]);
   });

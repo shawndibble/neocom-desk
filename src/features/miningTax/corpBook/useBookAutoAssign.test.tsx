@@ -71,7 +71,10 @@ const row = (assigned: boolean): MoonMiningTaxRow => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  applyMock.applyBookAutoAssign.mockResolvedValue({ ready: true, created: [{ id: 'x' }] });
+  applyMock.applyBookAutoAssign.mockResolvedValue({
+    ready: true,
+    created: [{ id: 'x', characterId: CHAR, date: today, solarSystemId: SYSTEM }],
+  });
 });
 
 describe('useBookAutoAssign', () => {
@@ -83,6 +86,18 @@ describe('useBookAutoAssign', () => {
     rerender();
     expect(applyMock.applyBookAutoAssign).toHaveBeenCalledTimes(1);
     expect(applyMock.applyBookAutoAssign.mock.calls[0]?.[1]).toEqual([rows[0]!.entry]);
+  });
+
+  it('tries again after an attempt that assigned nothing', async () => {
+    applyMock.applyBookAutoAssign.mockResolvedValue({ ready: true, created: [] });
+    const { rerender } = renderHook(({ rows }) => useBookAutoAssign(view, rows, [], vi.fn()), {
+      initialProps: { rows: [row(false)] },
+    });
+    await waitFor(() => expect(applyMock.applyBookAutoAssign).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(applyMock.applyBookAutoAssign.mock.results[0]?.value).toBeDefined());
+    await applyMock.applyBookAutoAssign.mock.results[0]?.value;
+    rerender({ rows: [row(false)] });
+    await waitFor(() => expect(applyMock.applyBookAutoAssign).toHaveBeenCalledTimes(2));
   });
 
   it('does nothing when every entry is already assigned', () => {

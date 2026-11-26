@@ -11,16 +11,13 @@ import {
   type OwnedRecordChange,
 } from '@/engine/miningTax/recordChanges';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { autoAssignSlice } from '../autoAssignSlice';
 import { loadDefaultOptOuts } from '../defaultOptOuts';
-import { assign } from '../ledgerActions';
 import { readCompressedOre } from '../oreForm';
 import { createPayeeOnce, loadPayees } from '../payees';
 import type { PayeeRunningAccounts } from '../payeeRunningAccounts';
 import { linksReady, loadPayeeRunningAccounts } from '../paymentLinkStore';
-import { hubForPayee, loadUnitPricesOnDate } from '../pricing';
 import { recordChangesReady, saveRecordChanges } from '../recordChangeStore';
-import { takeOverFromDefaults } from '../surveyConnections';
 
 export interface BookAutoAssignTarget extends AutoAssignBook {
   hubId: string;
@@ -67,34 +64,25 @@ async function assignSlice(
   book: BookAutoAssignTarget,
   payees: readonly PayeeRecord[],
   stored: readonly MiningTaxAssignmentRecord[],
-  paid: PayeeRunningAccounts
+  paid: PayeeRunningAccounts,
+  compressed: boolean
 ): Promise<{ record: MiningTaxAssignmentRecord; owned?: OwnedRecordChange } | undefined> {
   const payee = await corpPayeeFor(slice, book, payees);
   if (!payee) return undefined;
-  const { prices } = await loadUnitPricesOnDate(
-    slice.oreLines.map((line) => line.typeId),
-    hubForPayee(payee.hubId ?? book.hubId),
-    slice.date,
-    await readCompressedOre()
-  );
-  const value = computeAssignmentValue(slice.oreLines, prices, slice.taxPct);
   const taken = slice.takeovers.flatMap((t) => stored.find((a) => a.id === t.assignmentId) ?? []);
-  if (!(await takeOverFromDefaults(slice.takeovers, paid))) return undefined;
-  const result = await assign({
+  const result = await autoAssignSlice({
     characterId: slice.characterId,
     date: slice.date,
     solarSystemId: slice.solarSystemId,
-    payeeId: payee.id,
+    payee,
     oreLines: slice.oreLines,
     entryOreLines: slice.entryOreLines,
     taxPct: slice.taxPct,
-    estimatedValue: value.estimatedValue,
-    taxOwed: value.taxOwed,
-    takesGrowth: true,
+    compressed,
     ...(slice.label !== undefined ? { label: slice.label } : {}),
-    isPaid: (a) => paid.isPaid(a),
+    takeOver: { takeovers: slice.takeovers, paid },
   });
-  if (!result.ok) return undefined;
+  if (!result?.ok) return undefined;
   const change = assignmentRecordChange({
     id: `autoAssign:${result.value.id}`,
     reason: 'autoAssign',
@@ -122,7 +110,11 @@ export async function applyBookAutoAssign(
   if (books.length === 0 || characterIds.length === 0) return { ready: true, created: [] };
   if (!(await linksReady(characterIds)) || !(await recordChangesReady(characterIds)))
     return { ready: false, created: [] };
-  const [paid, optedOut] = await Promise.all([loadPayeeRunningAccounts(), loadDefaultOptOuts()]);
+  const [paid, optedOut, compressed] = await Promise.all([
+    loadPayeeRunningAccounts(),
+    loadDefaultOptOuts(),
+    readCompressedOre(),
+  ]);
   const created: MiningTaxAssignmentRecord[] = [];
   const changes: OwnedRecordChange[] = [];
   for (const characterId of characterIds) {
@@ -142,7 +134,7 @@ export async function applyBookAutoAssign(
       const book = books.find((b) => b.corporationId === slice.corporationId);
       if (!book) continue;
       try {
-        const done = await assignSlice(slice, book, payees, stored, paid);
+        const done = await assignSlice(slice, book, payees, stored, paid, compressed);
         if (!done) continue;
         created.push(done.record);
         if (done.owned) changes.push(done.owned);

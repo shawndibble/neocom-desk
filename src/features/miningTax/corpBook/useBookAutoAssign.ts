@@ -1,12 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PayeeRecord } from '@/db';
 import { planBookAutoAssign } from '@/engine/miningTax/bookAutoAssign';
 import { defaultOptOutKey } from '@/engine/miningTax/defaultSystems';
+import { useDefaultOptOuts } from '../defaultOptOuts';
 import type { MoonMiningTaxRow } from '../snapshot';
 import { applyBookAutoAssign, type BookAutoAssignTarget } from './bookAutoAssign';
 import type { CorpBookView } from './corpBookView';
-
-const NO_OPT_OUTS: ReadonlySet<string> = new Set();
 
 export function bookAutoAssignTargets(view: CorpBookView): BookAutoAssignTarget[] {
   return view.books.map(({ loaded, corpName }) => ({
@@ -33,9 +32,17 @@ export function useBookAutoAssign(
 ): void {
   const tried = useRef(new Set<string>());
   const running = useRef(false);
+  const missed = useRef(false);
+  const [pass, setPass] = useState(0);
+  const optOutList = useDefaultOptOuts((s) => s.value);
+  const optedOut = useMemo(() => new Set(optOutList), [optOutList]);
 
   useEffect(() => {
-    if (!view || !rows || running.current) return;
+    if (!view || !rows) return;
+    if (running.current) {
+      missed.current = true;
+      return;
+    }
     const books = bookAutoAssignTargets(view);
     const entries = rows.map((r) => r.entry);
     const now = new Date().toISOString();
@@ -44,7 +51,7 @@ export function useBookAutoAssign(
       assignments: rows.flatMap((r) => r.assignments),
       books,
       payees,
-      optedOut: NO_OPT_OUTS,
+      optedOut,
       now,
     });
     const keys = planned
@@ -64,11 +71,18 @@ export function useBookAutoAssign(
     )
       .then(({ ready, created }) => {
         if (!ready) forget();
+        const done = new Set(
+          created.map((a) => defaultOptOutKey(a.characterId, a.date, a.solarSystemId))
+        );
+        for (const k of keys) if (!done.has(k)) tried.current.delete(k);
         if (created.length > 0) onAssigned?.();
       })
       .catch(forget)
       .finally(() => {
         running.current = false;
+        if (!missed.current) return;
+        missed.current = false;
+        setPass((n) => n + 1);
       });
-  }, [view, rows, payees, onAssigned]);
+  }, [view, rows, payees, onAssigned, pass, optedOut]);
 }
