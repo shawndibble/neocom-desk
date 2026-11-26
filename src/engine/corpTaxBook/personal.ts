@@ -32,6 +32,8 @@ import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
 import { HOUR_MS } from '@/lib/age';
+import { sum } from '../math';
+import type { EstimateDay } from './paymentPreview';
 import type { ClosedDay, ClosedDayBook } from './closedDayFix';
 
 export type BookRowState = 'billed' | 'estimate' | 'conflict' | 'dismissed' | 'waived' | 'paid';
@@ -232,6 +234,7 @@ export interface BookMinerRunningAccount {
   minerId: string;
   account: MinerRunningAccount;
   estimate?: number;
+  estimateDays?: EstimateDay[];
   lines: BillableLine[];
   notices: LateNotice[];
   payments: TaxPayment[];
@@ -1171,10 +1174,11 @@ export function overlayCorpBooks(input: {
       (r) => r.state === 'estimate'
     );
     const estimate = estimates.reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
-    for (const m of miners)
-      m.estimate = estimates
-        .filter((r) => minerOfRow(p, r) === m.minerId)
-        .reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
+    for (const m of miners) {
+      const own = estimates.filter((r) => minerOfRow(p, r) === m.minerId);
+      m.estimateDays = estimateDaysOf(own);
+      m.estimate = sum(m.estimateDays.map((d) => d.amount));
+    }
     return {
       corporationId: p.book.corporationId,
       corpName: p.book.corpName,
@@ -1322,6 +1326,15 @@ function closedDayBook(
 
 const byDateThenId = (a: BookRowView, b: BookRowView) =>
   a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
+
+function estimateDaysOf(rows: readonly BookRowView[]): EstimateDay[] {
+  const byDate = new Map<string, number>();
+  for (const r of rows) byDate.set(r.date, (byDate.get(r.date) ?? 0) + (r.taxOwed ?? 0));
+  return [...byDate]
+    .filter(([, amount]) => amount > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, amount]) => ({ date, amount }));
+}
 
 const minerOfRow = (p: Prepared, row: Pick<BookRowView, 'minerId' | 'characterId' | 'date'>) =>
   row.minerId ?? minerIdFor(row.characterId, p.book.miners, row.date);

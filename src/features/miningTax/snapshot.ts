@@ -50,6 +50,7 @@ export interface MoonMiningTaxSnapshot {
   payeesByCharacter: Map<number, PayeeRecord[]>;
   paymentLinks: PayeePaymentLink[];
   billedElsewhere: ReadonlyMap<string, number>;
+  bookOwned: ReadonlySet<string>;
   unclassified: UnclassifiedOre[];
   reauthCharacters: TrackedCharacter[];
   fetchedAt: Date | null;
@@ -177,6 +178,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     payeesByCharacter,
     paymentLinks: inputs.links,
     billedElsewhere: inputs.billedElsewhere,
+    bookOwned: inputs.bookOwned,
     unclassified,
     reauthCharacters,
     fetchedAt,

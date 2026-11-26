@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, InfoTooltip, Tooltip, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxPaymentMethod } from '@/db';
 import { SETTLE_FIELD_LABEL, SETTLE_METHODS } from './settleUpFields';
 import { cx } from '@/lib/cx';
 import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
+
+const SETTLE_ROW_LABEL = cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0');
 
 export function SettleCopyRow({
   label,
@@ -27,7 +30,7 @@ export function SettleCopyRow({
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
-      <span className={cx(SETTLE_FIELD_LABEL, 'w-14 shrink-0')}>{label}</span>
+      <span className={SETTLE_ROW_LABEL}>{label}</span>
       <Tooltip content={value}>
         <span
           className={cx(
@@ -55,6 +58,31 @@ export function SettleCopyRow({
         )}
         {copied ? t('miningTax.settleUpCopied') : t('miningTax.settleUpCopy')}
       </Button>
+    </div>
+  );
+}
+
+export function SettleInfoRow({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+      <span className={SETTLE_ROW_LABEL}>{label}</span>
+      <span
+        className={cx(
+          'flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-xs break-words',
+          tappableRowClassName
+        )}
+      >
+        <span className="font-semibold">{value}</span>
+        {note && <span className="text-text-dim">{note}</span>}
+      </span>
     </div>
   );
 }

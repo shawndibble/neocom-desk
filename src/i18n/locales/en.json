@@ -8372,8 +8372,6 @@
         "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you.",
         "owes": "You owe {{corp}} {{amount}} ISK.",
         "owesWithEstimate": "You owe {{amount}} ISK. {{estimate}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
-        "estimate": "{{amount}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
-        "estimateHere": "{{amount}} ISK of it is {{date}}, billed after {{time}} UTC on {{closeDate}}.",
         "safeHere": "Safe to pay — {{date}} is closed (synced {{ago}}).",
         "safeOnceHere": "Safe to pay once the book syncs (last synced {{ago}}).",
         "neverSyncedHere": "Safe to pay once the book syncs (never synced).",
@@ -8506,11 +8504,11 @@
       },
       "pay": {
         "copy": "Copy",
-        "account": "Account: <strong>{{account}}</strong>",
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
         "codeOf": "{{character}} · code:",
-        "alsoAccepted": "The book also counts a donation into: {{accounts}}.",
+        "accountLabel": "Account",
+        "orAccounts": "or {{accounts}}",
         "codeInReason": "The Reason starts with your own code, which tells the book the money is yours, then the days this pays (month-day). A payment pays your oldest unpaid days first."
       },
       "attention": {
@@ -8861,10 +8859,9 @@
       "openInEveAs": "Open in EVE · {{name}}",
       "preview": {
         "pays": "Pays your oldest unpaid days first:",
-        "paidDay": "{{amount}} ISK · paid",
-        "partDay": "{{amount}} ISK · {{left}} ISK still owed",
-        "credit": "{{amount}} ISK more than is owed: kept as credit for the next days.",
-        "owedAfter": "{{amount}} ISK still owed after it."
+        "estimateNote": "Estimate until the day closes",
+        "credit": "Credit for your next days",
+        "owedAfter": "Still owed after it"
       }
     },
     "linkWallet": {
@@ -15564,6 +15561,7 @@
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
+      "installRequiredLink": "Install options in Settings",
       "missingGrantBadge": {
         "base": "Needs Alerts when closed. Turn it on in Manage Alerts when closed.",
         "mail": "Needs Alerts when closed with mail. Turn it on in Manage Alerts when closed.",

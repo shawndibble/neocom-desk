@@ -158,6 +158,7 @@ export class PayeeRunningAccount {
     });
     return {
       lines,
+      openLines: [],
       owedBefore: this.account.owes?.amount ?? 0,
       owedAfter: after.owes?.amount ?? 0,
       creditAfter: after.credit,

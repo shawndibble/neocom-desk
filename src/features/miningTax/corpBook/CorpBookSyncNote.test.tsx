@@ -132,7 +132,7 @@ describe('CorpBookSyncNote', () => {
     expect(screen.queryByText(/Safe to pay/)).not.toBeInTheDocument();
   });
 
-  it("in the pay dialog says the amount includes the open day's estimate", () => {
+  it("in the pay dialog leaves the open day's estimate to the dialog's breakdown", () => {
     render(
       <CorpBookSyncNote
         book={book({ estimate: 666_000 }, { estimateFrom: '2026-10-18' })}
@@ -142,9 +142,8 @@ describe('CorpBookSyncNote', () => {
         inDialog
       />
     );
-    expect(
-      screen.getByText('666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.')
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/of it is/)).not.toBeInTheDocument();
+    expect(screen.getByText('Safe to pay — 17 Oct is closed (synced 2h ago).')).toBeInTheDocument();
   });
 
   it('calls a day that is over and the book holds all of safe to pay, before the book bills it', () => {

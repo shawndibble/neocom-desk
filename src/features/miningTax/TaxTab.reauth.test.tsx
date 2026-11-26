@@ -16,6 +16,7 @@ const snapshot = {
   payeesByCharacter: new Map(),
   paymentLinks: [],
   billedElsewhere: new Map(),
+  bookOwned: new Set<string>(),
   unclassified: [],
   reauthCharacters: [{ characterId: ALT, characterName: 'Shadow Ruler' }],
   fetchedAt: new Date(),
