@@ -505,6 +505,41 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     });
   });
 
+  it('names each reason once, and stacks a bundle of skills under one Add all button', async () => {
+    skillGainsState.overBudget = true;
+    skillFixesState.fixes = [
+      {
+        entries: [
+          { skillTypeID: 3300, targetLevel: 5 },
+          { skillTypeID: 3315, targetLevel: 5 },
+        ],
+        after: {},
+      },
+    ];
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[
+            { skillTypeID: 3436, targetLevel: 4 },
+            { skillTypeID: 3300, targetLevel: 2 },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findAllByText(/Needed to fly the ship or use its modules/)).toHaveLength(1);
+    expect(screen.getAllByText(/under CPU or powergrid budget/)).toHaveLength(1);
+    expect(screen.getAllByText('Add all')).toHaveLength(1);
+    const bundle = screen.getByText('Add all').closest('li')!;
+    expect(within(bundle).getByRole('link', { name: 'Gunnery' }).parentElement).toHaveClass(
+      'block'
+    );
+    expect(within(bundle).getByRole('link', { name: 'Surgical Strike' })).toBeInTheDocument();
+  });
+
   it('lists the missing skills while the ranking is still working out', async () => {
     render(
       <MemoryRouter>

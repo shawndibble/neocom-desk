@@ -53,7 +53,8 @@ import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
 import { StatNote } from './StatFacts';
 import { Expanded } from '@/components/ui/icons';
-import { STAT_DETAIL, STAT_EYEBROW_TYPE, joinDetail, statRowClassName } from './statKit';
+import { STAT_DETAIL, STAT_EYEBROW_TYPE, joinDetail } from './statKit';
+import { TrainRow } from './FittingTrainRow';
 
 export interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -188,15 +189,18 @@ function WhatToTrainRanking({
     <div className="space-y-1">
       <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>{t('fittings.skillFixes.heading')}</p>
       {missingFixes.length > 0 && (
-        <SkillFixList
-          fixes={missingFixes}
-          {...fixListProps}
-          reason={t('fittings.skillFixes.missing')}
-          together
-        />
+        <>
+          <p className={STAT_DETAIL}>{t('fittings.skillFixes.missing')}</p>
+          <SkillFixList fixes={missingFixes} {...fixListProps} together />
+        </>
       )}
       {skillFixes.fixes && skillFixes.fixes.length > 0 && (
-        <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
+        <>
+          <p className={cx(STAT_DETAIL, missingFixes.length > 0 && 'pt-2')}>
+            {t('fittings.skillFixes.makesItFit')}
+          </p>
+          <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
+        </>
       )}
     </div>
   );
@@ -374,51 +378,29 @@ export function WhatToTrainItem({
   const canAdd = plan !== undefined && level !== null;
 
   return (
-    <li className={statRowClassName()}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <span className="flex items-baseline gap-2">
-            <span className="text-text-dim tabular-nums">{rank}</span>
-            <SkillLink
-              typeId={row.skillTypeId}
-              planEntries={plan?.entries}
-              className="min-w-0 font-semibold"
-            >
-              {row.name}
-            </SkillLink>
-          </span>
-          <p className={STAT_DETAIL}>
-            {joinDetail([
-              row.fromLevel > 0
-                ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
-                : t('fittings.whatToTrain.notTrained'),
-              ...changes,
-            ])}
-          </p>
-        </div>
-        <div className="shrink-0 text-right tabular-nums">
-          {time === null ? (
-            <span className="text-text-dim">{t('common.loading')}</span>
-          ) : (
-            formatCountdown(time.seconds)
-          )}
-          {time?.includesPrerequisites && (
-            <div>
-              <WhatToTrainPrerequisites
-                skill={skill}
-                rows={prerequisiteRows}
-                plannedLevels={plannedLevels}
-                planEntries={plan?.entries}
-                totalSeconds={time.seconds}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-      {((plan && plannedSpan !== null) || canAdd) && (
-        <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
+    <TrainRow
+      title={
+        <span className="flex items-baseline gap-2">
+          <span className="text-text-dim tabular-nums">{rank}</span>
+          <SkillLink
+            typeId={row.skillTypeId}
+            planEntries={plan?.entries}
+            className="min-w-0 font-semibold"
+          >
+            {row.name}
+          </SkillLink>
+        </span>
+      }
+      detail={
+        <>
+          {joinDetail([
+            row.fromLevel > 0
+              ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
+              : t('fittings.whatToTrain.notTrained'),
+            ...changes,
+          ])}
           {plan && plannedSpan !== null && (
-            <span className="mr-auto text-[0.6875rem] text-text-dim">
+            <span className="block">
               <Trans
                 i18nKey="fittings.whatToTrain.plannedLevels"
                 values={{ levels: plannedSpan, plan: plan.name }}
@@ -428,52 +410,72 @@ export function WhatToTrainItem({
               />
             </span>
           )}
-          {canAdd && (
-            <div className="flex">
-              <Button
-                size="sm"
-                className={options.length > 1 ? 'rounded-r-none' : undefined}
-                aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
-                onClick={() => void onAdd(row, level)}
-              >
-                {t('fittings.whatToTrain.addLevel', { level: romanLevel(level) })}
-              </Button>
-              {options.length > 1 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton
-                      size="sm"
-                      icon={<Expanded />}
-                      label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
-                      className="-ml-px rounded-l-none"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuRadioGroup
-                      value={String(level)}
-                      onValueChange={(value) => setPicked(Number(value))}
-                    >
-                      {options.map((option) => (
-                        <DropdownMenuRadioItem
-                          key={option.level}
-                          value={String(option.level)}
-                          disabled={option.planned}
-                        >
-                          {option.planned
-                            ? t('fittings.whatToTrain.levelInPlan', {
-                                level: romanLevel(option.level),
-                              })
-                            : romanLevel(option.level)}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </li>
+        </>
+      }
+      time={
+        time === null ? (
+          <span className="text-text-dim">{t('common.loading')}</span>
+        ) : (
+          formatCountdown(time.seconds)
+        )
+      }
+      prerequisites={
+        time?.includesPrerequisites && (
+          <WhatToTrainPrerequisites
+            skill={skill}
+            rows={prerequisiteRows}
+            plannedLevels={plannedLevels}
+            planEntries={plan?.entries}
+            totalSeconds={time.seconds}
+          />
+        )
+      }
+      action={
+        canAdd && (
+          <div className="flex">
+            <Button
+              size="sm"
+              className={options.length > 1 ? 'rounded-r-none' : undefined}
+              aria-label={t('fittings.whatToTrain.addToPlanLabel', { skill })}
+              onClick={() => void onAdd(row, level)}
+            >
+              {t('fittings.whatToTrain.addLevel', { level: romanLevel(level) })}
+            </Button>
+            {options.length > 1 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton
+                    size="sm"
+                    icon={<Expanded />}
+                    label={t('fittings.whatToTrain.levelLabel', { skill: row.name })}
+                    className="-ml-px rounded-l-none"
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup
+                    value={String(level)}
+                    onValueChange={(value) => setPicked(Number(value))}
+                  >
+                    {options.map((option) => (
+                      <DropdownMenuRadioItem
+                        key={option.level}
+                        value={String(option.level)}
+                        disabled={option.planned}
+                      >
+                        {option.planned
+                          ? t('fittings.whatToTrain.levelInPlan', {
+                              level: romanLevel(option.level),
+                            })
+                          : romanLevel(option.level)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )
+      }
+    />
   );
 }

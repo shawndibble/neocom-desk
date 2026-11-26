@@ -11,7 +11,8 @@ import type { SkillPlanRecord } from '@/db';
 import { gainChangeLabels } from './whatToTrainChanges';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
 import type { ModuleUpgradeRow } from './useModuleUpgrades';
-import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
+import { STAT_DETAIL, joinDetail } from './statKit';
+import { TrainRow } from './FittingTrainRow';
 
 export interface ModuleUpgradeListProps {
   rows: readonly ModuleUpgradeRow[] | null;
@@ -79,29 +80,23 @@ export function ModuleUpgradeItem({
     : [];
 
   return (
-    <li className={statRowClassName()}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <span className="font-semibold">{swap}</span>
-          <p className={STAT_DETAIL}>{joinDetail([needs, ...changes])}</p>
-        </div>
-        <div className="shrink-0 text-right tabular-nums">
-          {formatCountdown(time.seconds)}
-          {time.includesPrerequisites && (
-            <div>
-              <WhatToTrainPrerequisites
-                skill={toName}
-                rows={prerequisiteRows}
-                plannedLevels={plannedLevels}
-                planEntries={plan?.entries}
-                totalSeconds={time.seconds}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-      {plan !== undefined && (
-        <div className="mt-1 flex justify-end">
+    <TrainRow
+      title={<span className="font-semibold">{swap}</span>}
+      detail={joinDetail([needs, ...changes])}
+      time={formatCountdown(time.seconds)}
+      prerequisites={
+        time.includesPrerequisites && (
+          <WhatToTrainPrerequisites
+            skill={toName}
+            rows={prerequisiteRows}
+            plannedLevels={plannedLevels}
+            planEntries={plan?.entries}
+            totalSeconds={time.seconds}
+          />
+        )
+      }
+      action={
+        plan !== undefined && (
           <Button
             size="sm"
             aria-label={t('fittings.whatToTrain.upgrades.addToPlanLabel', { module: toName })}
@@ -109,8 +104,8 @@ export function ModuleUpgradeItem({
           >
             {t('fittings.whatToTrain.addToPlan')}
           </Button>
-        </div>
-      )}
-    </li>
+        )
+      }
+    />
   );
 }
