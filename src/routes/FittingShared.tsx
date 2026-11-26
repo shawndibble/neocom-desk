@@ -27,6 +27,7 @@ import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
+import { resolvedTypeNames, useResolvedTypeNames } from '@/features/fittings/resolvedTypeNames';
 import { fittingToEft } from '@/engine/fittings/eftExport';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
@@ -52,6 +53,7 @@ export function FittingShareView({ code, expiresAt }: { code: string; expiresAt?
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const characterCount = useCharacterCountOrLoading();
+  useResolvedTypeNames();
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -127,7 +129,10 @@ export function FittingShareView({ code, expiresAt }: { code: string; expiresAt?
       const types = await loadTypes();
       if (!cancelled) {
         setShipGroupId(types[String(readyFitting.shipTypeId)]?.groupID);
-        setTypeName(() => (typeId: number) => typeNameOr(t, types[String(typeId)]?.name, typeId));
+        setTypeName(
+          () => (typeId: number) =>
+            typeNameOr(t, types[String(typeId)]?.name ?? resolvedTypeNames().get(typeId), typeId)
+        );
       }
     })();
     return () => {
