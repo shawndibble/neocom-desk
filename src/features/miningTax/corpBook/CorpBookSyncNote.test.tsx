@@ -156,9 +156,7 @@ describe('CorpBookSyncNote', () => {
       />
     );
     expect(
-      screen.getByText(
-        '666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.'
-      )
+      screen.getByText('666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.')
     ).toBeInTheDocument();
   });
 
