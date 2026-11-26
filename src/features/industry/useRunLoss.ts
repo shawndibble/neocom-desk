@@ -70,14 +70,8 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
     setDialog((state) => (state ? { ...state, form: updater(state.form), error: null } : state));
   }
 
-  const preview = dialog
-    ? {
-        writtenOffCost: lostUnitsCost(
-          dialog.totalCost,
-          dialog.runQuantity,
-          unmaskNumber(dialog.form.quantity) ?? 0
-        ),
-      }
+  const writtenOffCost = dialog
+    ? lostUnitsCost(dialog.totalCost, dialog.runQuantity, unmaskNumber(dialog.form.quantity) ?? 0)
     : null;
 
   async function saveLoss() {
@@ -102,7 +96,10 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
       runId: dialog.runId,
       quantity: quantityLost,
       lostAt: fromDateInput(dialog.form.date),
-      insurancePayout: 0,
+      insurancePayout: existing?.insurancePayout ?? 0,
+      ...(existing?.journalEntryId !== undefined
+        ? { journalEntryId: existing.journalEntryId }
+        : {}),
       ...(note ? { note } : {}),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -130,7 +127,7 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
 
   return {
     dialog,
-    preview,
+    writtenOffCost,
     removingLossId,
     openLoss,
     closeLoss,

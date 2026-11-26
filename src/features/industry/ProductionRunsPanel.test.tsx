@@ -355,6 +355,42 @@ describe('ProductionRunsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Calculations?' })).not.toBeInTheDocument();
   });
 
+  it('shows the cost of lost units on its own line in the breakdown', async () => {
+    await addRun();
+    const now = Date.now();
+    await db.productionSaleLinks.add({
+      id: `${CHARACTER_ID}:txn:9002`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      transactionId: 9002,
+      quantity: 3,
+      unitPrice: 100_000,
+      linkedAt: now,
+      updatedAt: now,
+    });
+    await db.productionLosses.add({
+      id: `${CHARACTER_ID}:loss:a`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      quantity: 2,
+      lostAt: now,
+      insurancePayout: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Calculations?' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: "How this run's realized profit is calculated",
+    });
+
+    expect(within(dialog).getByText(/Cost of lost units: .*128,000/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/insurance/i)).toBeNull();
+  });
+
   it('opens a realized-profit breakdown with the confirmed sale figures once sold', async () => {
     await addRun();
     const now = Date.now();
@@ -532,7 +568,7 @@ describe('ProductionRunsPanel', () => {
       expect(await db.productionLosses.count()).toBe(1);
     });
     const saved = (await db.productionLosses.toArray())[0];
-    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2 });
+    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2, insurancePayout: 0 });
     expect(await screen.findByText('2 lost')).toBeTruthy();
   });
 

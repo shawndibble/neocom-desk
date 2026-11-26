@@ -18,7 +18,7 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
   const { t } = useTranslation();
   const quantityErrorId = useId();
   const dialog = loss.dialog;
-  const preview = loss.preview;
+  const writtenOffCost = loss.writtenOffCost;
 
   return (
     <>
@@ -27,7 +27,7 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
         onClose={loss.closeLoss}
         title={dialog?.lossId ? t('industry.editLoss') : t('industry.markAsLost')}
       >
-        {dialog && preview && (
+        {dialog && writtenOffCost !== null && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-xs">
@@ -84,7 +84,7 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
             <dl className="space-y-1 rounded-xs border border-line px-2.5 py-2 text-xs">
               <div className="flex justify-between gap-2">
                 <dt className="text-text-dim">{t('industry.lossCostWrittenOff')}</dt>
-                <dd>{formatIsk(preview.writtenOffCost)}</dd>
+                <dd>{formatIsk(writtenOffCost)}</dd>
               </div>
             </dl>
 
