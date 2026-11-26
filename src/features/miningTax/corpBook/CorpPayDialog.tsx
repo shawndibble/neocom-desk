@@ -1,14 +1,15 @@
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { divisionsPrimaryFirst, primaryDivisionOf } from '@/engine/corpTaxBook/uncounted';
-import { previewPayment } from '@/engine/corpTaxBook/paymentPreview';
+import { coverOpenDays, previewPayment } from '@/engine/corpTaxBook/paymentPreview';
 import type { DisplayRow } from '../groupRows';
 import { defaultPayer } from '../settlePayer';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { buildSettleUpReason } from '../groupRows';
 import { linkPayment } from '../ledgerActions';
 import { SettleUpDialog, type SettleUpRow } from '../SettleUpDialog';
+import { SettleInfoRow } from '../SettleUpParts';
 import { useCopiedField } from '../settleUpFields';
 import { CorpBookSyncNote } from './CorpBookSyncNote';
 import { corpPayAccount, corpPayAccounts } from './corpPayAccount';
@@ -68,20 +69,23 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
       preview={(amount, _paidOn, payer) => {
         const miner = minerOf(payer);
         if (!miner) return undefined;
-        return previewPayment(miner.account.input, {
-          id: 'preview',
-          minerId: miner.minerId,
-          characterId: payer ?? 0,
-          amount,
-          at: new Date().toISOString(),
-          source: 'donation',
-        });
+        return coverOpenDays(
+          previewPayment(miner.account.input, {
+            id: 'preview',
+            minerId: miner.minerId,
+            characterId: payer ?? 0,
+            amount,
+            at: new Date().toISOString(),
+            source: 'donation',
+          }),
+          miner.estimateDays ?? []
+        );
       }}
       reason={(payer, outcome) =>
         buildSettleUpReason(
           suggestedCode(codes, payer ?? undefined)?.code ?? t('miningTax.settleUpReasonPrefix'),
           [],
-          (outcome?.lines ?? []).map((l) => l.date).sort()
+          [...(outcome?.lines ?? []), ...(outcome?.openLines ?? [])].map((l) => l.date).sort()
         )
       }
       reasonHint={t('miningTax.corpBook.pay.codeInReason')}
@@ -99,20 +103,21 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
           payment.payerId ?? activeCharacterId ?? book.loaded.characterIds[0] ?? 0
         )
       }
+      toAccount={
+        <SettleInfoRow
+          label={t('miningTax.corpBook.pay.accountLabel')}
+          value={corpPayAccount(division, book.loaded.divisionNames, t)}
+          {...(otherAccounts.length > 0
+            ? {
+                note: t('miningTax.corpBook.pay.orAccounts', {
+                  accounts: otherAccounts.join(', '),
+                }),
+              }
+            : {})}
+        />
+      }
       notice={(_payer, amount) => (
         <div className="space-y-1.5 text-xs text-text-dim">
-          <p>
-            <Trans
-              i18nKey="miningTax.corpBook.pay.account"
-              values={{ account: corpPayAccount(division, book.loaded.divisionNames, t) }}
-              components={{ strong: <strong className="font-semibold text-text" /> }}
-            />
-          </p>
-          {otherAccounts.length > 0 && (
-            <p>
-              {t('miningTax.corpBook.pay.alsoAccepted', { accounts: otherAccounts.join(', ') })}
-            </p>
-          )}
           {several && (
             <ul className="space-y-1">
               {codes.map((c) => (

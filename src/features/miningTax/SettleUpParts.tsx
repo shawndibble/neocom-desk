@@ -27,7 +27,7 @@ export function SettleCopyRow({
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
-      <span className={cx(SETTLE_FIELD_LABEL, 'w-14 shrink-0')}>{label}</span>
+      <span className={cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0')}>{label}</span>
       <Tooltip content={value}>
         <span
           className={cx(
@@ -55,6 +55,26 @@ export function SettleCopyRow({
         )}
         {copied ? t('miningTax.settleUpCopied') : t('miningTax.settleUpCopy')}
       </Button>
+    </div>
+  );
+}
+
+export function SettleInfoRow({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-2 px-2 py-1.5">
+      <span className={cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0')}>{label}</span>
+      <span className="min-w-0 flex-1 text-xs break-words">
+        <span className="font-semibold">{value}</span>
+        {note && <span className="ml-2 text-text-dim">{note}</span>}
+      </span>
     </div>
   );
 }

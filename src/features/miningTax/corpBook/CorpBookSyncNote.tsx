@@ -108,14 +108,6 @@ export function CorpBookSyncNote({
           {safe}
         </span>
       )}
-      {estimateWords && !showStanding && (
-        <span className="text-text-dim">
-          {t(`miningTax.corpBook.sync.estimate${here}`, {
-            ...estimateWords,
-            amount: estimateWords.estimate,
-          })}
-        </span>
-      )}
       {book.pendingFrom && closesAt && book.pendingFrom !== estimateFrom && (
         <span className="text-text-dim">
           {t(`miningTax.corpBook.sync.openDay${here}`, {
