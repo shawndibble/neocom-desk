@@ -380,8 +380,8 @@ export function runningDaysFromLines(
   const byDate = new Map<string, { tax: number; charge: number; paidBefore: number }>();
   for (const l of lines) {
     const held = byDate.get(l.date) ?? { tax: 0, charge: 0, paidBefore: 0 };
-    held.tax += l.tax;
-    held.charge += l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0);
+    held.tax += Math.round(l.tax);
+    held.charge += Math.round(l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0));
     held.paidBefore += l.paidBefore ?? 0;
     byDate.set(l.date, held);
   }

@@ -39,6 +39,19 @@ describe('MinerRunningAccount.build', () => {
     ]);
   });
 
+  it('counts a charge in whole ISK, so paying the figures shown leaves exactly nothing', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-18', 6_000_756.144), day('2026-11-21', 3_869_888.4)],
+      payments: [
+        payment('p1', 6_000_756, '2026-11-20T10:00:00Z'),
+        payment('p2', 3_869_888, '2026-11-22T10:00:00Z'),
+      ],
+    });
+    expect(account.byDay.get('2026-11-18')?.tax).toBe(6_000_756);
+    expect(account.byDay.get('2026-11-21')?.tax).toBe(3_869_888);
+    expect(account.balance).toBeCloseTo(0, 9);
+  });
+
   it('owes the unpaid days, from the oldest', () => {
     const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1_000_000), day('2026-11-02', 2_000_000), day('2026-11-03', 3e6)],

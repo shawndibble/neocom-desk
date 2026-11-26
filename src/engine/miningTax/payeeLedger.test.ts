@@ -52,6 +52,23 @@ const MINED = [
 ];
 
 describe('payeeLedger', () => {
+  it('charges in whole ISK, so paying the figures shown leaves a balance of exactly 0', () => {
+    const src = source(
+      [charge('a', '2026-11-18', 6_000_756.144), charge('b', '2026-11-21', 3_869_888.4)],
+      [
+        payment('p1', 6_000_756, '2026-11-20T10:00:00Z'),
+        payment('p2', 3_869_888, '2026-11-22T10:00:00Z'),
+      ]
+    );
+    const rows = payeeLedger(src).rows;
+    expect(rows.map((r) => [r.charged, r.paid, Math.abs(r.balance)])).toEqual([
+      [6_000_756, 0, 6_000_756],
+      [0, 6_000_756, 0],
+      [3_869_888, 0, 3_869_888],
+      [0, 3_869_888, 0],
+    ]);
+  });
+
   it('lists charges and payments oldest first with a running balance that ends at the account balance', () => {
     const src = source(MINED, [payment('p1', 1_000_000, '2026-10-02T12:00:00Z')]);
     const ledger = payeeLedger(src);

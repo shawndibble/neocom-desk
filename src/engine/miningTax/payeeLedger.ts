@@ -122,7 +122,11 @@ export interface PayeeLedger {
 
 type Unbalanced<R = PayeeLedgerRow> = R extends PayeeLedgerRow ? Omit<R, 'balance'> : never;
 
-export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
+export function payeeLedger(input: PayeeLedgerSource): PayeeLedger {
+  const source = {
+    ...input,
+    charges: input.charges.map((c) => ({ ...c, tax: Math.round(c.tax) })),
+  };
   const { account } = source;
   const { opening } = source;
   const rows: Unbalanced[] = [
