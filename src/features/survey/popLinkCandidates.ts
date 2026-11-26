@@ -1,16 +1,12 @@
 import { moonOreBaseOf } from '@/engine/corpTaxBook/moonOreVariants';
 import { classifyPlaceId } from '@/features/places/classify';
 import { sharedPopIsShown, sharedPopShownAtMs } from '@/features/character/calendarSharedPops';
+import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import type { SharedPopView } from '@/sync/sharedPops';
 
 export interface PopLinkCandidate {
   pop: SharedPopView;
   score: number | null;
-}
-
-interface Place {
-  id: number | null;
-  name: string;
 }
 
 const baseSet = (typeIds: Iterable<number>): Set<number> =>
@@ -21,7 +17,7 @@ function overlap(a: ReadonlySet<number>, b: ReadonlySet<number>): number {
   return shared / (a.size + b.size - shared);
 }
 
-function atPlace(pop: SharedPopView, location: Place | null): boolean {
+function atPlace(pop: SharedPopView, location: InfoLocation | null): boolean {
   const id = location?.id ?? null;
   if (id === null) return true;
   const kind = classifyPlaceId(id);
@@ -42,7 +38,7 @@ export function popLinkCandidates({
 }: {
   pops: readonly SharedPopView[];
   scanOreIds: ReadonlySet<number>;
-  location: Place | null;
+  location: InfoLocation | null;
   now: number;
 }): PopLinkCandidate[] {
   const scan = baseSet(scanOreIds);

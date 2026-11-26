@@ -32,7 +32,6 @@ export function SurveyInfoLine({
             surveyId={survey.id}
             oreNames={summary.oreNames}
             location={survey.info?.location ?? null}
-            owned
           />
         )}
         <SurveyInfoEditor

@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
+import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { dismissPopLink, useDismissedPopLinks } from './surveyPref';
 import { usePopLinkPrompt, type PopLinkOption } from './usePopLinkPrompt';
@@ -19,12 +20,10 @@ export function SurveyPopLinkPrompt({
   surveyId,
   oreNames,
   location,
-  owned,
 }: {
   surveyId: string;
   oreNames: readonly string[];
-  location: { id: number | null; name: string } | null;
-  owned: boolean;
+  location: InfoLocation | null;
 }) {
   const { t } = useTranslation();
   const hydrated = useHydratedStore(useDismissedPopLinks);
@@ -36,7 +35,7 @@ export function SurveyPopLinkPrompt({
     surveyId,
     oreNames,
     location,
-    enabled: owned && hydrated && !dismissed.includes(surveyId),
+    enabled: hydrated && !dismissed.includes(surveyId),
   });
   if (!prompt || prompt.options.length === 0) return null;
 

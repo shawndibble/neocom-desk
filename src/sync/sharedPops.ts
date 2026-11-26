@@ -36,9 +36,9 @@ export async function linkSharedPopSurvey(
   const [character] = await db.characters.toArray();
   if (!character) return;
   await ensureSignedIn(character.characterId);
-  await callRouted<{ popId: string; surveyId: string; onlyIfUnlinked?: boolean }, { linked: true }>(
+  await callRouted<{ popId: string; surveyId: string; onlyIfUnlinked: boolean }, { linked: true }>(
     'linkSharedPopSurveyCallable',
-    { popId, surveyId, ...(options.onlyIfUnlinked ? { onlyIfUnlinked: true } : {}) },
+    { popId, surveyId, onlyIfUnlinked: options.onlyIfUnlinked === true },
     character.characterId
   );
 }

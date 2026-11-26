@@ -2,9 +2,12 @@ import { useCallback, useState } from 'react';
 import { sharedPopTitle, type SharedPopEntry } from '@/features/character/calendarSharedPops';
 import { loadSharedPopsRead } from '@/features/character/calendarSharedPopsRead';
 import { loadMoonOreTypeIdByName } from '@/features/corp/moons/keptSurveyScan';
+import type { InfoLocation } from '@/engine/survey/infoTemplate';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { linkSharedPopSurvey } from '@/sync/sharedPops';
 import { popLinkCandidates, strongPopMatch, type PopLinkCandidate } from './popLinkCandidates';
+
+const FORCE_RELOAD_MS = 0;
 
 export interface PopLinkOption {
   id: string;
@@ -33,8 +36,13 @@ const optionOf = (
   };
 };
 
-const isAlreadyLinked = (error: unknown): boolean =>
-  String((error as { code?: unknown } | null)?.code ?? '').endsWith('failed-precondition');
+const isAlreadyLinked = (error: unknown): boolean => {
+  const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
+  return (
+    String(code ?? '').endsWith('failed-precondition') &&
+    String(message ?? '').includes('already linked')
+  );
+};
 
 export function usePopLinkPrompt({
   surveyId,
@@ -44,7 +52,7 @@ export function usePopLinkPrompt({
 }: {
   surveyId: string;
   oreNames: readonly string[];
-  location: { id: number | null; name: string } | null;
+  location: InfoLocation | null;
   enabled: boolean;
 }): PopLinkState | null {
   const [attempt, setAttempt] = useState(0);
@@ -53,7 +61,7 @@ export function usePopLinkPrompt({
   const loader = useCallback(async () => {
     const now = Date.now();
     const [read, idByName] = await Promise.all([
-      loadSharedPopsRead(now, attempt === 0 ? undefined : 0),
+      loadSharedPopsRead(now, attempt === 0 ? undefined : FORCE_RELOAD_MS),
       loadMoonOreTypeIdByName(),
     ]);
     return { now, entries: read.entries ?? [], idByName };

@@ -63,7 +63,6 @@ const props = {
   surveyId: SURVEY_ID,
   oreNames: ['Bitumens', 'Cobaltite'],
   location: null,
-  owned: true,
 };
 
 beforeEach(async () => {
@@ -88,15 +87,12 @@ describe('SurveyPopLinkPrompt', () => {
     );
   });
 
-  it('shows nothing to a visitor, with no candidates, or once a pop already shows this Survey', async () => {
+  it('shows nothing with no candidates, or once a pop already shows this Survey', async () => {
     loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
-    const { rerender, container } = render(<SurveyPopLinkPrompt {...props} owned={false} />);
-    await Promise.resolve();
-    expect(container.textContent).toBe('');
     loadSharedPopsRead.mockResolvedValue({ entries: [], corporations: [] });
-    rerender(<SurveyPopLinkPrompt {...props} />);
-    await Promise.resolve();
-    expect(container.textContent).toBe('');
+    const { rerender, container } = render(<SurveyPopLinkPrompt {...props} />);
+    await waitFor(() => expect(loadSharedPopsRead).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(container.textContent).toBe(''));
     loadSharedPopsRead.mockResolvedValue({
       entries: [entry('p1'), entry('p2', { surveyId: SURVEY_ID })],
       corporations: [],
@@ -115,9 +111,10 @@ describe('SurveyPopLinkPrompt', () => {
     await waitFor(() => expect(first.container.textContent).toBe(''));
     first.unmount();
     useDismissedPopLinks.setState({ hydrated: false });
+    loadSharedPopsRead.mockClear();
     const again = render(<SurveyPopLinkPrompt {...props} />);
     await waitFor(() => expect(useDismissedPopLinks.getState().hydrated).toBe(true));
-    await Promise.resolve();
+    expect(loadSharedPopsRead).not.toHaveBeenCalled();
     expect(again.container.textContent).toBe('');
   });
 
@@ -127,7 +124,7 @@ describe('SurveyPopLinkPrompt', () => {
       corporations: [],
     });
     render(<SurveyPopLinkPrompt {...props} />);
-    expect(await screen.findByText(/one of these moon pops/)).toBeTruthy();
+    expect(await screen.findByText(/one of these shared moon pops/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Link' }).getAttribute('disabled')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'None of these' })).toBeTruthy();
   });
@@ -136,11 +133,26 @@ describe('SurveyPopLinkPrompt', () => {
     loadSharedPopsRead
       .mockResolvedValueOnce({ entries: [entry('p1')], corporations: [] })
       .mockResolvedValue({ entries: [entry('p1', { surveyId: 'zzz999' })], corporations: [] });
-    linkSharedPopSurvey.mockRejectedValue({ code: 'functions/failed-precondition' });
+    linkSharedPopSurvey.mockRejectedValue({
+      code: 'functions/failed-precondition',
+      message: 'already linked',
+    });
     const { container } = render(<SurveyPopLinkPrompt {...props} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
     await waitFor(() => expect(container.textContent).toBe(''));
     expect(loadSharedPopsRead).toHaveBeenLastCalledWith(expect.any(Number), 0);
+  });
+
+  it('says so when the Survey itself is gone, which is also a failed precondition', async () => {
+    loadSharedPopsRead.mockResolvedValue({ entries: [entry('p1')], corporations: [] });
+    linkSharedPopSurvey.mockRejectedValue({
+      code: 'functions/failed-precondition',
+      message: 'That Survey does not exist',
+    });
+    render(<SurveyPopLinkPrompt {...props} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(loadSharedPopsRead).toHaveBeenCalledTimes(1);
   });
 
   it('says so when linking fails for another reason', async () => {

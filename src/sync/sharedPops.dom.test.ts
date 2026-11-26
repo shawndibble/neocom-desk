@@ -60,12 +60,12 @@ describe('fetchSharedPops', () => {
 });
 
 describe('linkSharedPopSurvey', () => {
-  it('sends only the ids by default', async () => {
+  it('leaves the overwrite guard off by default', async () => {
     characters(1);
     await linkSharedPopSurvey('98000001_1000_1', 'abc234');
     expect(callRouted).toHaveBeenCalledWith(
       'linkSharedPopSurveyCallable',
-      { popId: '98000001_1000_1', surveyId: 'abc234' },
+      { popId: '98000001_1000_1', surveyId: 'abc234', onlyIfUnlinked: false },
       1
     );
   });
