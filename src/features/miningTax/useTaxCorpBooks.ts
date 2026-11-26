@@ -81,7 +81,8 @@ export function useTaxCorpBooks(
     () => bookOwnersOf(payees, shownBooks, corpNameOf),
     [payees, shownBooks, corpNameOf]
   );
-  const bookOwned = useMemo(() => new Set(bookOwners.keys()), [bookOwners]);
+  const liveBookOwned = useMemo(() => new Set(bookOwners.keys()), [bookOwners]);
+  const bookOwned = booksKnown ? liveBookOwned : (data?.bookOwned ?? liveBookOwned);
   const accounts = useMemo(
     () =>
       PayeeRunningAccounts.build({

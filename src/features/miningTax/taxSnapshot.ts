@@ -17,6 +17,7 @@ export interface TaxSnapshot {
   payeesByCharacter: Map<number, PayeeRecord[]>;
   paymentLinks: PayeePaymentLink[];
   billedElsewhere: ReadonlyMap<string, number>;
+  bookOwned: ReadonlySet<string>;
   unclassified: { characterId: number; characterName: string; typeIds: number[] }[];
   reauthCharacters: TrackedCharacter[];
   fetchedAt: Date | null;

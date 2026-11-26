@@ -7,6 +7,7 @@ import type { PayeeRecord } from '@/db';
 const hoisted = vi.hoisted(() => ({
   view: null as CorpBookView | null,
   shownBooks: [] as { corporationId: number; memberCharacterIds: number[] }[],
+  booksKnown: true,
 }));
 
 vi.mock('./useMadePayments', () => ({
@@ -38,7 +39,7 @@ vi.mock('@/features/miningTax/corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
     view: hoisted.view,
     booksRead: true,
-    booksKnown: true,
+    booksKnown: hoisted.booksKnown,
     reload: vi.fn(),
     shownBooks: hoisted.shownBooks,
     corpNameOf: (id: number) => (id === 5 ? 'Ashfall' : `Corp ${id}`),
@@ -71,6 +72,7 @@ const assignment = {
 describe('useTaxCorpBooks billed elsewhere', () => {
   beforeEach(() => {
     hoisted.shownBooks = [];
+    hoisted.booksKnown = true;
     hoisted.view = {
       overlay: {
         absorbed: new Map([['x', ['a1']]]),
@@ -92,6 +94,23 @@ describe('useTaxCorpBooks billed elsewhere', () => {
     } as unknown as TaxSnapshot;
     const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
     expect(result.current.accounts.of('p1')?.owes?.amount ?? 0).toBe(0);
+  });
+
+  it('keeps a stored book-owned Payee out of owed until the books have loaded', () => {
+    hoisted.booksKnown = false;
+    hoisted.view = null;
+    const data = {
+      entries: [{ assignments: [assignment] }],
+      payeesByCharacter: new Map([[1, [payee]]]),
+      paymentLinks: [],
+      billedElsewhere: new Map(),
+      bookOwned: new Set(['p1']),
+      systemNames: new Map(),
+      systemSecurity: new Map(),
+    } as unknown as TaxSnapshot;
+    const { result } = renderHook(() => useTaxCorpBooks(data, [], null));
+    expect(result.current.accounts.isBookOwned('p1')).toBe(true);
+    expect(result.current.accounts.of('p1')).toBeUndefined();
   });
 
   it('stores the Payees a book owns, an unlinked one named as its corporation included', async () => {
