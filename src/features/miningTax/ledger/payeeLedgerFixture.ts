@@ -117,6 +117,7 @@ export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
         paid: 5_490_000,
         writtenOff: 10_000,
         tolerancePct: 0.5,
+        tolerance: 27_500,
         paymentId: 'p1',
       },
     },

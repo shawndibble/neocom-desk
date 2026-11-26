@@ -655,3 +655,48 @@ describe('MinerRunningAccount: what screens read off it (D1)', () => {
     expect(priced.closableThrough('2026-11-21')).toBe('2026-11-01');
   });
 });
+
+describe('MinerRunningAccount tolerance close-outs', () => {
+  it('names each day a payment closed within the tolerance, with only the money paid and the limit used', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 996_000, '2026-11-02T10:00:00Z')],
+    });
+    expect([...account.toleranceCloseOuts]).toEqual([
+      ['2026-11-01', { billed: 1_000_000, paid: 996_000, writtenOff: 4_000, limit: 5_000 }],
+    ]);
+  });
+
+  it("uses the day's exemption as its limit", () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 980_000, '2026-11-02T10:00:00Z')],
+      toleranceExemptions: new Map([['2026-11-01', 25_000]]),
+    });
+    expect(account.toleranceCloseOuts.get('2026-11-01')).toMatchObject({
+      limit: 25_000,
+      writtenOff: 20_000,
+      exempt: true,
+    });
+  });
+
+  it('leaves out a day closed by the stored Paid through, one paid in full, and one short beyond the tolerance', () => {
+    const pinned = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 999_000, '2026-11-02T10:00:00Z')],
+      storedPaidThrough: '2026-11-01',
+    });
+    expect(pinned.byDay.get('2026-11-01')?.writtenOff).toBe(1_000);
+    expect(pinned.toleranceCloseOuts.size).toBe(0);
+    const full = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 1_000_000, '2026-11-02T10:00:00Z')],
+    });
+    expect(full.toleranceCloseOuts.size).toBe(0);
+    const short = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 990_000, '2026-11-02T10:00:00Z')],
+    });
+    expect(short.toleranceCloseOuts.size).toBe(0);
+  });
+});

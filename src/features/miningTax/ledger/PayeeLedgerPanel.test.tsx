@@ -82,10 +82,11 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText(/no more than the book’s 0.5% tolerance/)).toBeInTheDocument();
     expect(screen.getByText('Billed').parentElement).toHaveTextContent('5,500,000 ISK');
     expect(screen.getByText('Written off').parentElement).toHaveTextContent('10,000 ISK');
+    expect(screen.getByText('Tolerance').parentElement).toHaveTextContent('27,500 ISK');
     await user.click(screen.getByText('Fixed automatically at close'));
     expect(screen.getByText('Before').parentElement).toHaveTextContent('12%: 3,846,000 ISK');
     expect(screen.getByText('After').parentElement).toHaveTextContent('10%: 3,205,000 ISK');
-    expect(screen.getByText('After').parentElement).toHaveTextContent('Bitumens');
+    expect(screen.getAllByRole('link', { name: 'Bitumens' })).toHaveLength(2);
   });
 
   it('unlinks a payment from its opened row, for a personal Payee only', async () => {
@@ -243,7 +244,7 @@ describe('ledgerCsvColumns', () => {
       .rows.filter((r) => r.kind === 'recordChange')
       .map((r) => what.value(r));
     expect(lines).toEqual([
-      'Closed within tolerance: 2026-10-03: billed 5,500,000 ISK, paid 5,490,000 ISK, 10,000 ISK written off (0.5% tolerance)',
+      'Closed within tolerance: 2026-10-03: billed 5,500,000 ISK, paid 5,490,000 ISK, 10,000 ISK written off (tolerance 27,500 ISK)',
       'Fixed automatically at close: 2026-10-17: 12% 3,846,000 ISK → 10% 3,205,000 ISK',
     ]);
   });

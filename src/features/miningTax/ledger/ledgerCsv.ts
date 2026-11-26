@@ -48,7 +48,7 @@ export function recordChangeSummary(change: RecordChange, t: Translate): string 
       billed: isk(change.closeOut.billed),
       paid: isk(change.closeOut.paid),
       writtenOff: isk(change.closeOut.writtenOff),
-      pct: change.closeOut.tolerancePct,
+      tolerance: isk(change.closeOut.tolerance),
     });
   const terms = (x: AssignmentTerms | null) =>
     x
@@ -56,7 +56,11 @@ export function recordChangeSummary(change: RecordChange, t: Translate): string 
       : t('miningTax.ledger.summary.none');
   return t('miningTax.ledger.summary.assignments', {
     date: change.date,
-    changes: change.assignments.map((a) => `${terms(a.before)} → ${terms(a.after)}`).join('; '),
+    changes: change.assignments
+      .map((a) =>
+        t('miningTax.ledger.summary.change', { before: terms(a.before), after: terms(a.after) })
+      )
+      .join(t('miningTax.ledger.summary.separator')),
   });
 }
 
@@ -67,7 +71,10 @@ export function ledgerCsvColumns(t: Translate, history?: boolean): CsvColumn<Pay
       header: t('miningTax.ledger.column.what'),
       value: (r) =>
         r.kind === 'recordChange'
-          ? `${ledgerWhat(r, t)}: ${recordChangeSummary(r.change, t)}`
+          ? t('miningTax.ledger.summary.line', {
+              what: ledgerWhat(r, t),
+              summary: recordChangeSummary(r.change, t),
+            })
           : ledgerWhat(r, t),
     },
     { header: t('miningTax.ledger.column.charged'), value: (r) => r.charged || null },

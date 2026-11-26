@@ -18,7 +18,13 @@ const CHANGE = {
   date: '2026-11-01',
   corporationId: 98000001,
   minerId: 'm1',
-  closeOut: { billed: 1_000_000, paid: 996_000, writtenOff: 4_000, tolerancePct: 0.5 },
+  closeOut: {
+    billed: 1_000_000,
+    paid: 996_000,
+    writtenOff: 4_000,
+    tolerancePct: 0.5,
+    tolerance: 5_000,
+  },
   updatedAt: 1,
   ownerHash: 'hash-a',
   deleted: false,
@@ -58,6 +64,9 @@ describe('characters/{uid}/miningTaxRecordChanges', () => {
       })
     );
     await assertFails(setDoc(doc(owner(), `${PATH}/c1`), { ...CHANGE, reason: 'autoFix' }));
+    await assertFails(
+      setDoc(doc(owner(), `${PATH}/c1`), { ...CHANGE, reason: 'autoFix', deleted: true })
+    );
   });
 
   it('lets the owner tombstone or delete it', async () => {

@@ -5,6 +5,7 @@ import {
   type ToleranceBookInput,
 } from '@/engine/miningTax/recordChanges';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
+import { subscribeSyncStatus } from '@/sync';
 import { loadRecordChanges, recordChangesReady, saveRecordChanges } from '../recordChangeStore';
 import type { CorpBookView } from './corpBookView';
 
@@ -23,7 +24,15 @@ export function useToleranceRecordChanges(
   view: CorpBookView | null,
   reloadKey: string
 ): readonly RecordChange[] {
-  const stored = useKeyedLoad(reloadKey, loadRecordChanges).data;
+  const [syncedAt, setSyncedAt] = useState<number | null>(null);
+  useEffect(
+    () =>
+      subscribeSyncStatus((s) => {
+        if (s.state === 'idle' && s.lastSyncedAt !== null) setSyncedAt(s.lastSyncedAt);
+      }),
+    []
+  );
+  const stored = useKeyedLoad(`${reloadKey}:${syncedAt ?? 0}`, loadRecordChanges).data;
   const [added, setAdded] = useState<readonly RecordChange[]>(NONE);
   const tried = useRef(new Set<string>());
 

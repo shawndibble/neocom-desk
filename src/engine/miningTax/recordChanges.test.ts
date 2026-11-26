@@ -59,6 +59,7 @@ describe('planToleranceRecordChanges', () => {
           paid: 996_000,
           writtenOff: 4_000,
           tolerancePct: 0.5,
+          tolerance: 5_000,
           paymentId: 'p1',
         },
       },
@@ -78,7 +79,7 @@ describe('planToleranceRecordChanges', () => {
     const payments = [payment('p1', 990_000, '2026-11-02T10:00:00Z')];
     const [change] = plan(days, payments, { dayTolerancePct: 2 });
     expect(change).toMatchObject({
-      closeOut: { writtenOff: 10_000, paid: 990_000, tolerancePct: 2 },
+      closeOut: { writtenOff: 10_000, paid: 990_000, tolerancePct: 2, tolerance: 20_000 },
     });
   });
 
@@ -250,7 +251,7 @@ describe('which ledger a Record Change shows in', () => {
     date: '2026-11-01',
     corporationId,
     minerId,
-    closeOut: { billed: 1, paid: 1, writtenOff: 0, tolerancePct: 0.5 },
+    closeOut: { billed: 1, paid: 1, writtenOff: 0, tolerancePct: 0.5, tolerance: 0 },
   });
   const moved: RecordChange = {
     id: 'moved',

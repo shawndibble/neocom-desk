@@ -250,6 +250,8 @@ export const FULL_MINING_TAX_RECORD_CHANGE: Required<MiningTaxRecordChangeRecord
     paid: 1_995_000,
     writtenOff: 5_000,
     tolerancePct: 0.5,
+    tolerance: 10_000,
+    exempt: true,
     paymentId: 'p2',
   },
   assignments: [

@@ -1,7 +1,5 @@
 import {
   DAY_SETTLE_TOLERANCE_PCT,
-  RESIDUE_ISK,
-  daySettleTolerance,
   type MinerRunningAccount,
 } from '../corpTaxBook/minerRunningAccount';
 import type { Miner } from '../corpTaxBook/charges';
@@ -36,6 +34,8 @@ export interface ToleranceCloseOut {
   paid: number;
   writtenOff: number;
   tolerancePct: number;
+  tolerance: number;
+  exempt?: boolean;
   paymentId?: string;
 }
 
@@ -72,7 +72,7 @@ export function toleranceRecordChangeId(
 export interface ToleranceRecordChangeInput {
   corporationId: number;
   minerId: string;
-  account: Pick<MinerRunningAccount, 'byDay' | 'input' | 'writtenOffDays'>;
+  account: Pick<MinerRunningAccount, 'toleranceCloseOuts' | 'input' | 'writtenOffDays'>;
   payments: readonly { id: string; at: string }[];
   existingIds: ReadonlySet<string>;
 }
@@ -85,14 +85,11 @@ export function planToleranceRecordChanges({
   existingIds,
 }: ToleranceRecordChangeInput): ToleranceRecordChange[] {
   const pct = account.input.dayTolerancePct ?? DAY_SETTLE_TOLERANCE_PCT;
-  const exemptions = account.input.toleranceExemptions;
   return account.writtenOffDays(payments).flatMap((w): ToleranceRecordChange[] => {
-    const day = account.byDay.get(w.date);
-    if (w.paymentId === undefined || !day || day.held || !day.settled) return [];
+    const day = account.toleranceCloseOuts.get(w.date);
+    if (w.paymentId === undefined || !day) return [];
     const id = toleranceRecordChangeId(corporationId, minerId, w.date);
     if (existingIds.has(id)) return [];
-    const limit = exemptions?.get(w.date) ?? daySettleTolerance(day.tax, pct);
-    if (day.writtenOff > limit + RESIDUE_ISK) return [];
     return [
       {
         id,
@@ -102,10 +99,12 @@ export function planToleranceRecordChanges({
         corporationId,
         minerId,
         closeOut: {
-          billed: day.tax,
-          paid: day.credited - day.forgiven,
+          billed: day.billed,
+          paid: day.paid,
           writtenOff: day.writtenOff,
           tolerancePct: pct,
+          tolerance: day.limit,
+          ...(day.exempt ? { exempt: true } : {}),
           paymentId: w.paymentId,
         },
       },

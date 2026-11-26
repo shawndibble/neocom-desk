@@ -129,7 +129,8 @@ service cloud.firestore {
         allow list: if isOwner();
         allow create: if isOwner() && incomingHashMatches();
         allow update: if isOwner() && hashMatches() && incomingHashMatches()
-          && (request.resource.data.deleted == true
+          && ((request.resource.data.deleted == true
+              && request.resource.data.keys().hasOnly(['id', 'characterId', 'updatedAt', 'ownerHash', 'deleted']))
             || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'ownerHash']));
         allow delete: if isOwner();
       }

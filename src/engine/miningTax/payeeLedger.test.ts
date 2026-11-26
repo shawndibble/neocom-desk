@@ -130,6 +130,7 @@ describe('payeeLedger', () => {
         paid: 1_995_000,
         writtenOff: 5_000,
         tolerancePct: 0.5,
+        tolerance: 10_000,
         paymentId: 'p2',
       },
     };
@@ -159,7 +160,13 @@ describe('payeeLedger', () => {
           date: '2026-10-01',
           corporationId: 98000001,
           minerId: 'm1',
-          closeOut: { billed: 601_000, paid: 600_000, writtenOff: 1_000, tolerancePct: 0.5 },
+          closeOut: {
+            billed: 601_000,
+            paid: 600_000,
+            writtenOff: 1_000,
+            tolerancePct: 0.5,
+            tolerance: 3_005,
+          },
         },
       ],
     });
