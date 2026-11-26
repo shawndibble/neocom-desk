@@ -11,6 +11,8 @@ import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import { explainModule, type ChargeBasis, type DogmaAssetProgress } from './dogmaFittingEngine';
 import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
+import { fittingItemCounts } from '@/engine/fittings/fittingExport';
+import { resolveTypeNames } from './resolvedTypeNames';
 import { useDogmaEngine } from './fittingContext';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -112,6 +114,10 @@ export function useFittingEvaluation({
       cancelled = true;
     };
   }, [fitting, pilot, damageProfile, conditions, attempt]);
+
+  useEffect(() => {
+    if (fitting !== null) resolveTypeNames(fittingItemCounts(fitting).keys());
+  }, [fitting]);
 
   const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const percent = usePricePercentFor('fittings');
