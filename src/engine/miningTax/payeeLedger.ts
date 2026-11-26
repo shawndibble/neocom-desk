@@ -6,6 +6,7 @@ import {
 } from '../../../functions/src/corpTaxBookLateNotice';
 import type { DayAmount, MinerRunningAccount } from '../corpTaxBook/minerRunningAccount';
 import { utcDayOf } from '../localDay';
+import { wholeIsk } from '../corpTaxBook/wholeIsk';
 import { sum } from '../math';
 import type { RecordChange } from './recordChanges';
 import type { OreLine } from './types';
@@ -122,7 +123,11 @@ export interface PayeeLedger {
 
 type Unbalanced<R = PayeeLedgerRow> = R extends PayeeLedgerRow ? Omit<R, 'balance'> : never;
 
-export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
+export function payeeLedger(input: PayeeLedgerSource): PayeeLedger {
+  const source = {
+    ...input,
+    charges: input.charges.map((c) => ({ ...c, tax: wholeIsk(c.tax) })),
+  };
   const { account } = source;
   const { opening } = source;
   const rows: Unbalanced[] = [
@@ -234,7 +239,7 @@ function chargeRows({ account, charges }: PayeeLedgerSource): Unbalanced[] {
         key: `charge:${charge.id}:reversal`,
         date: utcDayOf(charge.reversed.at),
         at: charge.reversed.at,
-        charged: -charge.tax,
+        charged: 0 - charge.tax,
         paid: 0,
         charge: {
           ...charge,

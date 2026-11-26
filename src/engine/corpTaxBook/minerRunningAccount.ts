@@ -11,6 +11,7 @@ import { countedPayments, netPayment, type TaxPayment } from './payments';
 import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { shiftUtcDate, utcDayOf } from '@/engine/localDay';
 import { daySettleTolerance } from '../../../functions/src/corpTaxBookKinds';
+import { wholeIsk } from './wholeIsk';
 
 export const RESIDUE_ISK = 0.5;
 
@@ -340,7 +341,7 @@ export class MinerRunningAccount {
     if (!day || day.held || day.tax <= 0 || tax <= 0) return 0;
     const charging = this.input.days
       .filter((d) => d.date === date)
-      .reduce((sum, d) => sum + Math.max(0, d.tax), 0);
+      .reduce((sum, d) => sum + Math.max(0, wholeIsk(d.tax)), 0);
     const gross = Math.max(charging, day.tax);
     return (day.remaining * tax) / gross;
   }
@@ -380,8 +381,8 @@ export function runningDaysFromLines(
   const byDate = new Map<string, { tax: number; charge: number; paidBefore: number }>();
   for (const l of lines) {
     const held = byDate.get(l.date) ?? { tax: 0, charge: 0, paidBefore: 0 };
-    held.tax += l.tax;
-    held.charge += l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0);
+    held.tax += wholeIsk(l.tax);
+    held.charge += wholeIsk(l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0));
     held.paidBefore += l.paidBefore ?? 0;
     byDate.set(l.date, held);
   }

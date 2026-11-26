@@ -174,6 +174,17 @@ export const PERSONAL_LEDGER: PayeeLedgerSource = sample({
 
 export const EMPTY_LEDGER: PayeeLedgerSource = sample({ charges: [] });
 
+export const SUB_ISK_LEDGER: PayeeLedgerSource = sample({
+  charges: [
+    mined('s1', '2026-11-18', 6_000_756.144, TATARA, [[BITUMENS, 30_000]]),
+    mined('s2', '2026-11-21', 3_869_888.4, TATARA, [[BITUMENS, 20_000]]),
+  ],
+  payments: [
+    { id: 's3', amount: 6_000_756, at: '2026-11-20T10:00:00Z' },
+    { id: 's4', amount: 3_869_888, at: '2026-11-22T10:00:00Z' },
+  ],
+});
+
 export const CREDIT_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('k1', '2026-11-02', 3_100_000, TATARA, [[BITUMENS, 16_300]]),

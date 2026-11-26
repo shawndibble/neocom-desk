@@ -12,6 +12,7 @@ import {
   CREDIT_LEDGER,
   EMPTY_LEDGER,
   LEDGER_TYPE_NAMES,
+  SUB_ISK_LEDGER,
 } from './payeeLedgerFixture';
 
 const renderPanel = (source: PayeeLedgerSource | null, lockDate?: string) =>
@@ -58,6 +59,13 @@ describe('PayeeLedgerPanel', () => {
           : '0'
     );
     expect(shown.reverse()).toEqual(inDateOrder);
+  });
+
+  it('shows a balance under one whole ISK as a plain 0, neither red nor green', () => {
+    renderPanel(SUB_ISK_LEDGER);
+    const balance = within(bodyRows()[0]!).getAllByRole('cell').at(-1)!;
+    expect(balance).toHaveTextContent(/^0$/);
+    expect(balance.querySelector('.text-isk-neg, .text-isk-pos')).toBeNull();
   });
 
   it('writes every date, the status line included, the way its rows do', () => {
