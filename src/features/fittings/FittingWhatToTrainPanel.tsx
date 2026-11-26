@@ -44,7 +44,7 @@ import { useSkillLevelGain } from './useSkillLevelGain';
 import { ModuleUpgradeList } from './FittingModuleUpgrades';
 import { gainChangeLabels } from './whatToTrainChanges';
 import { useModuleUpgrades } from './useModuleUpgrades';
-import { SkillFixList } from './FittingSkillFixList';
+import { SkillFixGroup } from './FittingSkillFixList';
 import { useSkillFixes } from './useSkillFixes';
 import { usePlannedLevels, useTrainingSchedule } from './useTrainingSchedule';
 import { cx } from '@/lib/cx';
@@ -189,20 +189,21 @@ function WhatToTrainRanking({
     <div className="space-y-1">
       <p className={cx(STAT_EYEBROW_TYPE, 'text-warning')}>{t('fittings.skillFixes.heading')}</p>
       {missingFixes.length > 0 && (
-        <>
-          <p className={STAT_DETAIL}>{t('fittings.skillFixes.missing')}</p>
-          <SkillFixList fixes={missingFixes} {...fixListProps} together />
-        </>
+        <SkillFixGroup
+          reason={t('fittings.skillFixes.missing')}
+          fixes={missingFixes}
+          {...fixListProps}
+          together
+          addAll
+        />
       )}
       {skillFixes.fixes && skillFixes.fixes.length > 0 && (
-        <>
-          <p
-            className={cx(STAT_DETAIL, missingFixes.length > 0 && 'mt-2 border-t border-line pt-2')}
-          >
-            {t('fittings.skillFixes.makesItFit')}
-          </p>
-          <SkillFixList fixes={skillFixes.fixes} {...fixListProps} />
-        </>
+        <SkillFixGroup
+          reason={t('fittings.skillFixes.makesItFit')}
+          fixes={skillFixes.fixes}
+          {...fixListProps}
+          className={missingFixes.length > 0 ? 'mt-2 border-t border-line pt-2' : undefined}
+        />
       )}
     </div>
   );
