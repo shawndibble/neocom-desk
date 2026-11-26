@@ -17,6 +17,8 @@ interface RealizedProfitBreakdownProps {
   lostCost?: number;
 }
 
+const bold = (text: string) => <span className="font-semibold">{text}</span>;
+
 export function RealizedProfitBreakdown({
   open,
   onClose,
@@ -36,8 +38,7 @@ export function RealizedProfitBreakdown({
     standing?.feeDiscountFactor
   );
 
-  const deduction = (amount: number) => (amount > 0 ? `−${formatIsk(amount)}` : formatIsk(0));
-  const strong = (text: string) => <span className="font-semibold">{text}</span>;
+  const margin = profit.marginPct;
 
   return (
     <Modal open={open} onClose={onClose} title={t('industry.realizedBreakdown.title')}>
@@ -54,65 +55,65 @@ export function RealizedProfitBreakdown({
           <ValueRow
             label={t('industry.realizedBreakdown.salesTaxLabel')}
             note={formatPercent(taxPct)}
-            value={deduction(profit.salesTax)}
+            value={formatIsk(-profit.salesTax)}
           />
           <ValueRow
             label={t('industry.realizedBreakdown.brokerFeeLabel')}
             note={formatPercent(brokerPct)}
-            value={deduction(profit.brokerFee)}
+            value={formatIsk(-profit.brokerFee)}
           />
           <ValueRow
-            label={strong(t('industry.realizedBreakdown.netRevenue'))}
-            value={strong(formatIsk(profit.netRevenue))}
+            label={bold(t('industry.realizedBreakdown.netRevenue'))}
+            value={bold(formatIsk(profit.netRevenue))}
           />
           <ValueRow
             label={t('industry.realizedBreakdown.totalCost')}
-            value={deduction(profit.totalCost)}
+            value={formatIsk(-profit.totalCost)}
           />
           <ValueRow
-            label={strong(t('industry.realizedBreakdown.profit'))}
-            value={strong(formatIsk(profit.profit))}
+            label={bold(t('industry.realizedBreakdown.profit'))}
+            value={bold(formatIsk(profit.profit))}
             tone={profit.profit < 0 ? 'danger' : 'default'}
           />
           <ValueRow
             label={t('industry.realizedBreakdown.margin')}
-            note={
-              profit.marginPct === null ? t('industry.realizedBreakdown.marginUnknown') : undefined
-            }
-            value={profit.marginPct === null ? '—' : formatPercent(profit.marginPct)}
+            note={margin === null ? t('industry.realizedBreakdown.marginUnknown') : undefined}
+            value={margin === null ? '—' : formatPercent(margin)}
           />
           {lostCost !== 0 && (
             <ValueRow
               label={t('industry.realizedBreakdown.lostCost')}
               note={t('industry.realizedBreakdown.lostCostNote')}
-              value={formatIsk(-lostCost)}
+              value={formatIsk(lostCost)}
             />
           )}
         </ValueList>
 
         <Section title={t('industry.realizedBreakdown.notesTitle')}>
-          <p className="text-text-dim">{t('industry.realizedBreakdown.revenue')}</p>
-          <p className="text-text-dim">
-            {t('industry.realizedBreakdown.salesTax', {
-              accounting: accountingLevel,
-              pct: formatPercent(taxPct),
-            })}
-          </p>
-          <p className="text-text-dim">
-            {t('industry.realizedBreakdown.brokerFee', {
-              broker: brokerRelationsLevel,
-              pct: formatPercent(brokerPct),
-              factionStanding: standing?.factionStanding ?? 0,
-              corpStanding: standing?.corpStanding ?? 0,
-            })}
-          </p>
-          {standing?.feeDiscountFactor !== undefined && (
-            <p className="text-text-dim">
-              {t('industry.realizedBreakdown.feeDiscount', {
-                pct: formatPercent((1 - standing.feeDiscountFactor) * 100),
+          <div className="space-y-1.5 text-text-dim">
+            <p>{t('industry.realizedBreakdown.revenue')}</p>
+            <p>
+              {t('industry.realizedBreakdown.salesTax', {
+                accounting: accountingLevel,
+                pct: formatPercent(taxPct),
               })}
             </p>
-          )}
+            <p>
+              {t('industry.realizedBreakdown.brokerFee', {
+                broker: brokerRelationsLevel,
+                pct: formatPercent(brokerPct),
+                factionStanding: standing?.factionStanding ?? 0,
+                corpStanding: standing?.corpStanding ?? 0,
+              })}
+            </p>
+            {standing?.feeDiscountFactor !== undefined && (
+              <p>
+                {t('industry.realizedBreakdown.feeDiscount', {
+                  pct: formatPercent((1 - standing.feeDiscountFactor) * 100),
+                })}
+              </p>
+            )}
+          </div>
         </Section>
       </div>
     </Modal>

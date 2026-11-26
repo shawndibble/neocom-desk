@@ -387,9 +387,10 @@ describe('ProductionRunsPanel', () => {
       name: "How this run's realized profit is calculated",
     });
 
-    expect(within(dialog).getByText('Cost of lost units').closest('div')).toHaveTextContent(
-      '128,000'
-    );
+    expect(
+      within(dialog).getByText('Cost of lost units').closest('div')?.querySelector('dd')
+        ?.textContent
+    ).toBe('128,000');
     expect(within(dialog).queryByText(/insurance/i)).toBeNull();
   });
 
@@ -415,14 +416,15 @@ describe('ProductionRunsPanel', () => {
       name: "How this run's realized profit is calculated",
     });
 
-    const row = (label: string) => within(dialog).getByText(label).closest('div') as HTMLElement;
-    expect(row('Gross revenue')).toHaveTextContent('500,000');
-    expect(row('Sales tax')).toHaveTextContent('−37,500');
-    expect(row('Broker fee')).toHaveTextContent('0');
-    expect(row('Net revenue')).toHaveTextContent('462,500');
-    expect(row('Total cost')).toHaveTextContent('−320,000');
-    expect(row('Profit')).toHaveTextContent('142,500');
-    expect(row('Margin')).toHaveTextContent('28.5%');
+    const value = (label: string) =>
+      within(dialog).getByText(label).closest('div')?.querySelector('dd')?.textContent;
+    expect(value('Gross revenue')).toBe('500,000');
+    expect(value('Sales tax')).toBe('-37,500');
+    expect(value('Broker fee')).toBe('0');
+    expect(value('Net revenue')).toBe('462,500');
+    expect(value('Total cost')).toBe('-320,000');
+    expect(value('Profit')).toBe('142,500');
+    expect(value('Margin')).toBe('28.5%');
   });
 
   it('rejects linking the same transaction twice, even across runs', async () => {
