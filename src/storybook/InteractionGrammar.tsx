@@ -8,6 +8,7 @@ import { plainTextActionClassName } from '@/components/ui/plainTextActionClassNa
 import { Pill } from '@/components/ui/Pill';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
+import { TourVideoLink } from '@/features/landing/TourVideo';
 import { useNeedsLogin } from '@/stores/authFailure';
 import { useState, type ReactNode } from 'react';
 import { Chart } from '@/features/overview/widgets/charts/Chart';
@@ -198,6 +199,9 @@ export function InteractionGrammar() {
             {k('samples.addToCalendar')}
             <ExternalMark />
           </Button>
+        </Cue>
+        <Cue rule={k('rules.mediaDialog')}>
+          <TourVideoLink video="industry" />
         </Cue>
       </Group>
 

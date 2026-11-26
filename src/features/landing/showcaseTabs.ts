@@ -22,6 +22,7 @@ import {
   Wallet,
   type IconProps,
 } from '@/components/ui/icons';
+import type { TourVideoId } from './promoVideoConfig';
 import { DESKTOP_SIZE, type Screenshot } from './screenshots';
 
 export interface Feature {
@@ -34,6 +35,7 @@ export interface ShowcaseTab {
   shot: Screenshot;
   bullets: string[];
   features: Feature[];
+  video?: TourVideoId;
 }
 
 const desktop = (file: string, key: string): Screenshot => ({ file, key, size: DESKTOP_SIZE });
@@ -55,6 +57,7 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
     shot: desktop('desktop-industry-jobs', 'industryJobs'),
     bullets: ['costs', 'verdict', 'setup', 'jobs'],
     features: [{ icon: Industry, key: 'industry' }],
+    video: 'industry',
   },
   {
     id: 'skills',
@@ -85,6 +88,7 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
       { icon: NavCorpMoons, key: 'corpTaxBook' },
       { icon: NavCorpSrp, key: 'srp' },
     ],
+    video: 'corp',
   },
   {
     id: 'comms',

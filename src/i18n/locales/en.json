@@ -4697,6 +4697,24 @@
       "playerTitle": "Neocom Desk tour video",
       "heroLink": "Watch the tour ({{duration}})"
     },
+    "tourVideos": {
+      "evening": {
+        "title": "An evening in EVE",
+        "link": "Watch the full tour ({{duration}})"
+      },
+      "undock": {
+        "title": "From a fit to undocking",
+        "link": "Watch: from a fit to undocking ({{duration}})"
+      },
+      "industry": {
+        "title": "Build it, sell it, see the profit",
+        "link": "Watch: build it, sell it, see the profit ({{duration}})"
+      },
+      "corp": {
+        "title": "Running a corp: the officer's side",
+        "link": "Watch: running a corp, the officer's side ({{duration}})"
+      }
+    },
     "answersHeading": "Questions you'd alt-tab for",
     "answersPhoneEyebrow": "On your phone",
     "answersLead": "Each of these is a screen from the app, filled with sample data. Open any screenshot to see it full size.",
@@ -20979,6 +20997,7 @@
       "textAction": "Text action: performs an action",
       "balanceFigure": "Solid underline on a Payee's balance figure: opens its ledger",
       "externalLink": "Trailing external icon: leaves Neocom Desk",
+      "mediaDialog": "Play glyph before an underlined accent action with the length: plays that video in a dialog",
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
       "missingGrantMark": "Red slashed broadcast icon: this row needs a permission the Character hasn't given",
