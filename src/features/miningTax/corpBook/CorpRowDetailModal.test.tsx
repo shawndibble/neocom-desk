@@ -177,39 +177,6 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
-  it('shows an over-listed excess as never billed: the book did not record it', () => {
-    const excess: BookRowView = {
-      ...view,
-      state: 'conflict',
-      conflictCause: 'overListed',
-      taxOwed: null,
-      billed: 0,
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: excess } });
-    expect(
-      screen.getByText("Not billed · Brass Meridian Logistics's book did not record this ore")
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Late notice/)).not.toBeInTheDocument();
-  });
-
-  it('shows Settling ore as not billed yet, waiting on the refinery log, with no conflict', () => {
-    const settling: BookRowView = {
-      ...view,
-      state: 'settling',
-      taxOwed: null,
-      billed: 0,
-      dispute: undefined,
-    };
-    renderModal({ corp: { ...corp, view: settling } });
-    expect(
-      screen.getByText(
-        /^Not billed yet · Brass Meridian Logistics's refinery log hasn't caught up with your mining on/
-      )
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/did not record this ore/)).not.toBeInTheDocument();
-  });
-
   it('says why the day is locked and keeps the billed amount once it is paid', () => {
     const paid: BookRowView = {
       ...view,

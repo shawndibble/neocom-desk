@@ -9,7 +9,6 @@ export type PillState =
   | 'billed'
   | 'estimate'
   | 'conflict'
-  | 'settling'
   | 'unattributed'
   | 'dismissed'
   | 'waived'
@@ -22,7 +21,6 @@ export const PILL_KEY: Record<PillState, string> = {
   billed: 'billed',
   estimate: 'estimate',
   conflict: 'conflict',
-  settling: 'settling',
   unattributed: 'unattributed',
   dismissed: 'dismissed',
   waived: 'waived',
@@ -58,7 +56,6 @@ export function useCorpStateLabel() {
 
 const CONFLICT_HINT_KEY: Record<ConflictCause, string> = {
   otherPayee: 'conflict',
-  overListed: 'conflictOverListed',
   ownNeedsReview: 'conflictOwnNeedsReview',
   ownerCollected: 'conflictOwnerCollected',
 };

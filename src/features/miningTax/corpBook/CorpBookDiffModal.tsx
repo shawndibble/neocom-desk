@@ -91,7 +91,7 @@ export function CorpBookDiffModal({
           <tbody className="divide-y divide-line">
             {view.oreLines.map((line) => {
               const you = quantityOf(view.personalOreLines, line.typeId);
-              const differsHere = you !== line.quantity;
+              const differsHere = line.quantity > (you ?? 0);
               return (
                 <tr key={line.typeId}>
                   <td className="py-1.5">
@@ -158,11 +158,7 @@ export function CorpBookDiffModal({
                     ? bookAsksMore
                       ? t('miningTax.corpBook.diff.raiseRate', { corp: view.corpName })
                       : t('miningTax.corpBook.diff.inYourFavourRate', { corp: view.corpName })
-                    : bookAsksMore
-                      ? t('miningTax.corpBook.diff.raiseQuantity', { corp: view.corpName })
-                      : t('miningTax.corpBook.diff.inYourFavourQuantity', {
-                          corp: view.corpName,
-                        })}
+                    : t('miningTax.corpBook.diff.raiseQuantity', { corp: view.corpName })}
               </p>
             )}
             {view.state === 'billed' && bookAsksMore !== false && (onFixRecords || onResolve) && (

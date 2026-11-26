@@ -68,7 +68,6 @@ const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> =
   billed: 'outstanding',
   estimate: 'outstanding',
   conflict: 'needs-review',
-  settling: 'needs-review',
   paid: 'paid',
   dismissed: 'dismissed',
   waived: 'dismissed',

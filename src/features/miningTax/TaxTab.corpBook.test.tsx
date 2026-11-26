@@ -419,15 +419,20 @@ describe('Compare with the book: which way the difference runs', () => {
     expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
 
-  it('says there is nothing to raise when the book bills less', async () => {
+  it('raises nothing when the book bills less: its records stand, so there is no dispute', async () => {
     hoisted.view = viewWith({
       ...book,
       observed: [{ ...book.observed[0], oreLines: [{ typeId: ZEO, quantity: 39_000 }] }],
     });
-    const compare = await openCompare();
-    expect(compare.getByText(/The book recorded less ore than you did/)).toBeInTheDocument();
-    expect(compare.getByText(/there is nothing to raise/)).toBeInTheDocument();
-    expect(compare.queryByText(/Ask a .* officer to correct the book/)).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    renderTab();
+    const date = screen
+      .getAllByText('2026-10-17')
+      .find((el) => el.closest('tr')?.textContent?.includes('Brass Meridian Logistics'));
+    await user.click(date ?? screen.getAllByText('2026-10-17')[0]);
+    await screen.findByRole('dialog');
+    expect(screen.queryByText(/^Disputed/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /compare with the book/i })).toBeNull();
   });
 
   it('reads the rate when that is what differs, not the ore', async () => {

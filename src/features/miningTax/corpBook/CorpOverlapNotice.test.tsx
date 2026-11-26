@@ -167,13 +167,6 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     expect(screen.getByRole('region', { name: 'Conflict' })).toBeInTheDocument();
   });
 
-  it("says so when the corporation's own Payee lists more ore than the book recorded", () => {
-    renderConflict(assignment, { ...conflict, conflictCause: 'overListed' });
-    expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
-      'Your entry lists more ore than the book recorded'
-    );
-  });
-
   it('names an own entry for the corporation that needs review, not another Payee', () => {
     renderConflict(assignment, { ...conflict, conflictCause: 'ownNeedsReview' });
     expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
@@ -377,35 +370,6 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
     expect(
       screen.getByText('Brass Meridian waived the tax on that ore: Their ore')
     ).toBeInTheDocument();
-  });
-
-  it("names the member's own Payee on over-listed ore, never another Payee", () => {
-    render(
-      <CorpOverlapNotice
-        view={
-          {
-            ...conflict,
-            conflictCause: 'overListed',
-            overlap: { payeeIds: ['p1'], ore: conflict.oreLines, paid: false },
-          } as BookRowView
-        }
-        corpName="Brass Meridian"
-        recordedAt="Efa"
-        everyAssignment={[]}
-        payeeById={new Map([['p1', payee]])}
-        typeNames={new Map([[ZEO, 'Zeolites']])}
-        onChanged={() => {}}
-      />
-    );
-    expect(
-      screen.getByText('Your entry: lists more of this ore for Ashfall than the book recorded')
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/another Payee/)).toBeNull();
-  });
-
-  it('offers nothing to dispute on ore the book never recorded', () => {
-    renderWith({ ...conflict, conflictCause: 'overListed' });
-    expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
   });
 
   it('on a day a Late notice asked for, Resolve opens its Late notice problem', async () => {

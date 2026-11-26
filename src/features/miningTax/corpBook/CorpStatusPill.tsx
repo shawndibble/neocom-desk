@@ -17,7 +17,6 @@ const PILL_TONE: Record<PillState, string> = {
   billed: 'text-danger bg-danger/10',
   estimate: 'text-danger bg-danger/10',
   conflict: 'text-warning bg-warning/10',
-  settling: 'text-text-dim',
   unattributed: 'text-text-dim',
   dismissed: 'text-text-dim',
   waived: 'text-text-dim',

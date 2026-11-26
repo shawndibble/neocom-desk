@@ -106,8 +106,8 @@ const keyOf = (row: BookRowView) => notPayingDayKey(row.corporationId, row.chara
 
 export function bookAsksMore(row: BookRowView): boolean {
   const d = row.dispute;
-  if (!d || (d.quantity && d.rate)) return true;
-  return d.rate ? d.bookPct > (d.personalPct ?? d.bookPct) : d.bookQuantity > d.personalQuantity;
+  if (!d || d.quantity) return true;
+  return d.bookPct > (d.personalPct ?? d.bookPct);
 }
 
 const stillOwed = (row: BookRowView) => row.state === 'billed' || row.state === 'conflict';

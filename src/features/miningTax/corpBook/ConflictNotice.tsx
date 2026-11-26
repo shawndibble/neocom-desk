@@ -8,7 +8,6 @@ import { TakeoverConfirm, type OverlapPreview } from './TakeoverConfirm';
 
 const TITLE_KEY: Record<ConflictCause, string> = {
   otherPayee: 'titleOtherPayee',
-  overListed: 'titleOverListed',
   ownNeedsReview: 'titleOwnNeedsReview',
   ownerCollected: 'titleOwnerCollected',
 };
@@ -24,7 +23,6 @@ interface Props {
   corpName: string;
   cause: ConflictCause | undefined;
   ownerName?: string;
-  ownPayeeName?: string;
   entries: readonly ConflictEntry[];
   recordedAt: string;
   resolvesOn: string;
@@ -42,7 +40,6 @@ export function ConflictNotice({
   corpName,
   cause,
   ownerName = '',
-  ownPayeeName = '',
   entries,
   recordedAt,
   resolvesOn,
@@ -79,11 +76,7 @@ export function ConflictNotice({
       )}
       <ul className="list-disc space-y-0.5 pl-4">
         {entries.length === 0 ? (
-          <li>
-            {cause === 'overListed'
-              ? t(k('yourEntryOverListed'), { payee: ownPayeeName || corpName })
-              : t(k('yourEntryUnknown'))}
-          </li>
+          <li>{t(k('yourEntryUnknown'))}</li>
         ) : (
           entries.map((entry) => (
             <li key={entry.id}>

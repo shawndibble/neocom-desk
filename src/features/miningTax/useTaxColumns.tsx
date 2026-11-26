@@ -271,8 +271,7 @@ export function useTaxColumns({
         className: 'whitespace-nowrap',
         cardCorner: true,
         cellClassName: (dr) =>
-          dr.corp?.kind === 'row' &&
-          (dr.corp.view.state === 'conflict' || dr.corp.view.state === 'settling')
+          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict'
             ? 'text-text-dim'
             : dr.status === 'outstanding' && taxOwedOf(dr) <= 0
               ? 'text-text-dim'
@@ -282,11 +281,7 @@ export function useTaxColumns({
                   ? 'text-text-dim font-normal'
                   : undefined,
         render: (dr) =>
-          dr.corp?.kind === 'row' &&
-          dr.corp.view.state === 'conflict' &&
-          dr.corp.view.conflictCause === 'overListed' ? (
-            '—'
-          ) : dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
+          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
             <span className="block">
               <span className="block">{`${formatIsk(dr.corp.view.billed)} ISK`}</span>
               <span className="block text-[0.6875rem] font-normal text-warning">

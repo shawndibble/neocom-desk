@@ -116,7 +116,6 @@ export function CorpRowDetailModal({
     facts.push([t('miningTax.corpBook.detail.factOriginal'), `${formatIsk(view.billed)} ISK`]);
   }
   const conflict = view.state === 'conflict';
-  const excess = conflict && view.conflictCause === 'overListed';
   const resolvable = rowTarget(view);
   const unlinked = unlinkedTarget(view);
   const declaring =
@@ -156,31 +155,16 @@ export function CorpRowDetailModal({
                 conflict && 'text-text-dim'
               )}
             >
-              {conflict && !excess
+              {conflict
                 ? `${formatIsk(view.billed)} ISK`
-                : excess
+                : view.taxOwed === null
                   ? '—'
-                  : view.taxOwed === null
-                    ? '—'
-                    : `${formatIsk(owed)} ISK`}
+                  : `${formatIsk(owed)} ISK`}
             </span>
           </div>
-          {view.state === 'settling' && (
-            <p className="-mt-2 text-right text-xs text-text-dim">
-              {t('miningTax.corpBook.conflict.settlingNote', {
-                corp: corp.corpName,
-                day: view.date,
-              })}
-            </p>
-          )}
           {conflict && (
             <p className="-mt-2 text-right text-xs text-warning">
-              {t(
-                excess
-                  ? 'miningTax.corpBook.conflict.headerNotBilled'
-                  : 'miningTax.corpBook.conflict.headerNotOwed',
-                { corp: corp.corpName }
-              )}
+              {t('miningTax.corpBook.conflict.headerNotOwed', { corp: corp.corpName })}
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
@@ -209,7 +193,7 @@ export function CorpRowDetailModal({
                 typeId: line.typeId,
                 name: typeLabel(typeNames, line.typeId),
                 quantity:
-                  you !== undefined && you !== line.quantity
+                  you !== undefined && line.quantity > you
                     ? t('miningTax.corpBook.detail.bookAndYou', {
                         book: formatCount(line.quantity),
                         you: formatCount(you),

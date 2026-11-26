@@ -31,11 +31,10 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { HOUR_MS, MINUTE_MS } from '@/lib/age';
+import { HOUR_MS } from '@/lib/age';
 
-export type BookRowState =
-  'billed' | 'estimate' | 'conflict' | 'settling' | 'dismissed' | 'waived' | 'paid';
-export type ConflictCause = 'otherPayee' | 'overListed' | 'ownNeedsReview' | 'ownerCollected';
+export type BookRowState = 'billed' | 'estimate' | 'conflict' | 'dismissed' | 'waived' | 'paid';
+export type ConflictCause = 'otherPayee' | 'ownNeedsReview' | 'ownerCollected';
 export type BookLabelState = 'pending' | 'unattributed';
 
 export interface PersonalAllocation {
@@ -598,23 +597,6 @@ export function previewTakeover(
   return out;
 }
 
-const SETTLE_MS = 20 * MINUTE_MS;
-
-function isSettled(book: PersonalBook, charge: PreparedCharge, now: string): boolean {
-  const { characterId, solarSystemId, date } = charge.observed;
-  if (Date.parse(now) >= Date.parse(dayClosesAt(date, book.graceHours)) + SETTLE_MS) return true;
-  const mine = book.observed.filter((o) => o.characterId === characterId);
-  const refineries = new Set(
-    mine
-      .filter((o) => o.date === date && o.solarSystemId === solarSystemId)
-      .map((o) => o.structureId)
-  );
-  refineries.add(charge.observed.structureId);
-  return [...refineries].every((structureId) =>
-    mine.some((o) => o.structureId === structureId && o.date > date)
-  );
-}
-
 function disputeOf(
   entry: PersonalEntry | undefined,
   bookLines: readonly OreLine[],
@@ -628,7 +610,7 @@ function disputeOf(
   const bookQuantity = quantityOf(bookLines);
   const pcts = new Set(entry.allocations.map((a) => a.taxPct));
   const personalPct = pcts.size === 1 ? [...pcts][0] : undefined;
-  const quantity = personalQuantity !== bookQuantity;
+  const quantity = bookQuantity > personalQuantity;
   const rate = sameRate && personalPct !== undefined && personalPct !== bookPct;
   if (!quantity && !rate) return undefined;
   return {
@@ -708,35 +690,6 @@ export function overlayCorpBooks(input: {
       hubId: book.hubId,
       oreForm: book.oreForm,
     };
-  };
-
-  const pushExcess = (
-    p: Prepared,
-    charge: PreparedCharge,
-    allocation: PersonalAllocation,
-    excess: OreLine[]
-  ) => {
-    const value = dayValue(charge);
-    const worth = computeAssignmentValue(excess, priceMap(value.unitPrices), value.taxPct);
-    pushRow({
-      ...commonOf(p, charge, value),
-      id: `${p.book.corporationId}:${charge.charge.key}:overListed:${allocation.id ?? ''}`,
-      oreLines: excess,
-      estimatedValue: worth.estimatedValue,
-      taxOwed: null,
-      billed: 0,
-      ...(isSettled(p.book, charge, now)
-        ? {
-            state: 'conflict' as const,
-            conflictCause: 'overListed' as const,
-            overlap: {
-              payeeIds: [allocation.payeeId],
-              ore: excess,
-              paid: allocation.status === 'paid',
-            },
-          }
-        : { state: 'settling' as const }),
-    });
   };
 
   const buildRows = (
@@ -825,7 +778,7 @@ export function overlayCorpBooks(input: {
     let left = free.get(key) ?? [];
     const pool = overlapPool(entry.allocations);
     const takenOf = new Map<PoolItem, OreLine[]>();
-    const ownedBy = new Map<PoolItem, { p: Prepared; charge: PreparedCharge }>();
+    const ownedBy = new Set<PoolItem>();
     const alsoBilledOf = new Map<PoolItem, { lines: OreLine[]; rows: BookRowView[] }>();
     const conflictedOf = new Map<PoolItem, OreLine[]>();
     const shareOf = (p: Prepared) => split.byBook.get(String(p.book.corporationId)) ?? [];
@@ -838,17 +791,11 @@ export function overlayCorpBooks(input: {
       const own = ownOf.get(p)!;
       for (const [item, lines] of own.taken)
         takenOf.set(item, sumLines(takenOf.get(item) ?? [], lines));
-      const anchor = here.find((c) => !c.dismissal);
-      if (anchor) {
+      if (here.some((c) => !c.dismissal)) {
         for (const item of pool) {
           const a = item.allocation;
-          if (
-            !ownedBy.has(item) &&
-            a.id !== undefined &&
-            isBilledStatus(a) &&
-            isOwnPayee(p.book.ownPayeeIds, a)
-          )
-            ownedBy.set(item, { p, charge: anchor });
+          if (a.id !== undefined && isBilledStatus(a) && isOwnPayee(p.book.ownPayeeIds, a))
+            ownedBy.add(item);
         }
       }
       const resolved = resolveBookShare({
@@ -926,9 +873,7 @@ export function overlayCorpBooks(input: {
     for (const item of pool) {
       const { allocation } = item;
       if (allocation.id === undefined) continue;
-      const owner = ownedBy.get(item);
-      const excess = owner ? linesOfLeft(item.left) : [];
-      if (owner && excess.length > 0) pushExcess(owner.p, owner.charge, allocation, excess);
+      const excess = ownedBy.has(item) ? linesOfLeft(item.left) : [];
       const gone = sumLines(takenOf.get(item) ?? [], excess);
       const listed = sumLines(allocation.oreLines);
       const kept = minusLines(listed, gone);

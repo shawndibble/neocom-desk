@@ -37,7 +37,6 @@ export interface CorpBookViewBook {
   summary: BookSummary;
   payee: PayeeRecord;
   pendingFrom?: string;
-  settlingFrom?: string;
   estimateFrom?: string;
   finalThrough?: string;
 }
@@ -169,10 +168,6 @@ export function buildCorpBookView(
       )
       .map(([key]) => key.split(':')[1])
       .sort();
-    const settlingFrom = overlay.rows
-      .filter((r) => r.state === 'settling' && r.corporationId === loadedBook.corporationId)
-      .map((r) => r.date)
-      .sort()[0];
     const estimates = overlay.rows.filter(
       (r) => r.state === 'estimate' && r.corporationId === loadedBook.corporationId
     );
@@ -200,7 +195,6 @@ export function buildCorpBookView(
         loadedBook.hubId
       ),
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
-      ...(settlingFrom !== undefined ? { settlingFrom } : {}),
       ...(estimateFrom !== undefined ? { estimateFrom } : {}),
       ...(finalThrough !== undefined ? { finalThrough } : {}),
     };
