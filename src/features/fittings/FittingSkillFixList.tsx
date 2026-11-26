@@ -162,7 +162,9 @@ export function SkillFixGroup({ reason, addAll = false, className, ...list }: Gr
     !isPlanned(entries, list.plannedLevels);
   return (
     <>
-      <div className={cx('flex items-center justify-between gap-3', className)}>
+      <div
+        className={cx('flex items-center justify-between gap-3', showAddAll && 'pb-1', className)}
+      >
         <p className={STAT_DETAIL}>{reason}</p>
         {showAddAll && (
           <Button

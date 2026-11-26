@@ -154,6 +154,22 @@ describe('MakeItFitDialog', () => {
     mocks.skillFixes = { fixes: null, failed: false };
   });
 
+  it('says what the training does to the budget', () => {
+    mocks.skillFixes = {
+      fixes: [
+        {
+          entries: [{ skillTypeID: DRONES_RIGGING, targetLevel: 4 }],
+          before: { cpuUsed: 148, cpuTotal: 100, powergridUsed: 0, powergridTotal: 100 },
+          after: inBudget,
+        },
+      ],
+      failed: false,
+    };
+    renderDialog([option(0, 10, [ehpDown])], { characterId: 1 });
+    expect(screen.getByText('CPU 148 / 100 → 90 / 100 tf')).toBeTruthy();
+    mocks.skillFixes = { fixes: null, failed: false };
+  });
+
   it('offers no training without a Character', () => {
     mocks.skillFixes = {
       fixes: [{ entries: [{ skillTypeID: DRONES_RIGGING, targetLevel: 4 }], after: inBudget }],
