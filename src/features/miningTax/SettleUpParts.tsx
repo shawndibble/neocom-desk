@@ -7,6 +7,8 @@ import { SETTLE_FIELD_LABEL, SETTLE_METHODS } from './settleUpFields';
 import { cx } from '@/lib/cx';
 import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 
+const SETTLE_ROW_LABEL = cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0');
+
 export function SettleCopyRow({
   label,
   value,
@@ -27,7 +29,7 @@ export function SettleCopyRow({
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
-      <span className={cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0')}>{label}</span>
+      <span className={SETTLE_ROW_LABEL}>{label}</span>
       <Tooltip content={value}>
         <span
           className={cx(
@@ -70,7 +72,7 @@ export function SettleInfoRow({
 }) {
   return (
     <div className="flex min-w-0 items-baseline gap-2 px-2 py-1.5">
-      <span className={cx(SETTLE_FIELD_LABEL, 'w-18 shrink-0')}>{label}</span>
+      <span className={SETTLE_ROW_LABEL}>{label}</span>
       <span className="min-w-0 flex-1 text-xs break-words">
         <span className="font-semibold">{value}</span>
         {note && <span className="ml-2 text-text-dim">{note}</span>}

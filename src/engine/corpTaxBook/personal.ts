@@ -32,6 +32,8 @@ import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
 import { HOUR_MS } from '@/lib/age';
+import { sum } from '../math';
+import type { EstimateDay } from './paymentPreview';
 
 export type BookRowState = 'billed' | 'estimate' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 export type ConflictCause = 'otherPayee' | 'ownNeedsReview' | 'ownerCollected';
@@ -225,11 +227,6 @@ export interface BookRowView {
 export interface PersonalAccountStatus {
   paidThrough: string | null;
   owes: RunningAccountOwes | null;
-}
-
-export interface EstimateDay {
-  date: string;
-  amount: number;
 }
 
 export interface BookMinerRunningAccount {
@@ -1142,8 +1139,8 @@ export function overlayCorpBooks(input: {
     const estimate = estimates.reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
     for (const m of miners) {
       const own = estimates.filter((r) => minerOfRow(p, r) === m.minerId);
-      m.estimate = own.reduce((sum, r) => sum + (r.taxOwed ?? 0), 0);
       m.estimateDays = estimateDaysOf(own);
+      m.estimate = sum(m.estimateDays.map((d) => d.amount));
     }
     return {
       corporationId: p.book.corporationId,

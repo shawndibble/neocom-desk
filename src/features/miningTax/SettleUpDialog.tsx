@@ -177,61 +177,96 @@ export function SettleUpDialog({
   );
 
   const footer = (
-    <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-      {record && (
-        <div className="min-w-0 flex-1 basis-36">
-          <SettleSentOnAndMethod
-            paidOn={paidOn}
-            onPaidOn={setPaidOn}
-            method={method}
-            onMethod={setMethod}
-            {...(methods ? { methods } : {})}
-            extra={
-              method === 'contract' ? (
-                <div className="space-y-1 sm:w-32 sm:shrink-0">
-                  <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpContractIdLabel')}</p>
-                  <TextInput
-                    type="text"
-                    inputMode="numeric"
-                    value={contractId}
-                    onChange={(e) => setContractId(e.target.value)}
-                    placeholder={t('miningTax.settleUpContractIdPlaceholder')}
-                    aria-label={t('miningTax.settleUpContractIdLabel')}
-                    className="w-full"
-                  />
-                </div>
-              ) : null
-            }
-          />
+    <div className="space-y-2">
+      <LedgerActionError error={saveError} />
+      {confirmingDismiss && onDismissBalance && (
+        <div
+          role="group"
+          aria-label={t('miningTax.settleUp.dismiss.title')}
+          className="space-y-2 rounded-xs border border-line bg-panel-2 p-2 text-xs"
+        >
+          <p>
+            {t('miningTax.settleUp.dismiss.intro', {
+              amount: formatIsk(owed, 0),
+              payee: payeeName,
+            })}
+          </p>
+          <p className="text-text-dim">{t('miningTax.settleUp.dismiss.effect')}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="danger"
+              loading={saving}
+              onClick={() => void dismissBalance()}
+            >
+              {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
+            </Button>
+            <Button
+              size="sm"
+              aria-disabled={saving || undefined}
+              onClick={() => setConfirmingDismiss(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+          </div>
         </div>
       )}
-      <DialogFooter className="ml-auto">
-        {onDismissBalance && !confirmingDismiss && (
-          <Button
-            variant="danger"
-            aria-disabled={saving || undefined}
-            onClick={() => setConfirmingDismiss(true)}
-          >
-            {t('miningTax.settleUp.dismiss.action')}
-          </Button>
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+        {record && (
+          <div className="min-w-0 flex-1 basis-36">
+            <SettleSentOnAndMethod
+              paidOn={paidOn}
+              onPaidOn={setPaidOn}
+              method={method}
+              onMethod={setMethod}
+              {...(methods ? { methods } : {})}
+              extra={
+                method === 'contract' ? (
+                  <div className="space-y-1 sm:w-32 sm:shrink-0">
+                    <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpContractIdLabel')}</p>
+                    <TextInput
+                      type="text"
+                      inputMode="numeric"
+                      value={contractId}
+                      onChange={(e) => setContractId(e.target.value)}
+                      placeholder={t('miningTax.settleUpContractIdPlaceholder')}
+                      aria-label={t('miningTax.settleUpContractIdLabel')}
+                      className="w-full"
+                    />
+                  </div>
+                ) : null
+              }
+            />
+          </div>
         )}
-        {record ? (
-          <Tooltip content={amountToSend <= 0 || paidOn === '' ? t('common.needsInput') : null}>
+        <DialogFooter className="ml-auto">
+          {onDismissBalance && !confirmingDismiss && (
             <Button
-              variant="primary"
-              loading={saving}
-              aria-disabled={amountToSend <= 0 || paidOn === '' || undefined}
-              onClick={() => void commit()}
+              variant="danger"
+              aria-disabled={saving || undefined}
+              onClick={() => setConfirmingDismiss(true)}
             >
-              {t('miningTax.settleUp.recordAction')}
+              {t('miningTax.settleUp.dismiss.action')}
             </Button>
-          </Tooltip>
-        ) : (
-          <Button variant="primary" onClick={onClose}>
-            {t('common.close')}
-          </Button>
-        )}
-      </DialogFooter>
+          )}
+          {record ? (
+            <Tooltip content={amountToSend <= 0 || paidOn === '' ? t('common.needsInput') : null}>
+              <Button
+                variant="primary"
+                loading={saving}
+                aria-disabled={amountToSend <= 0 || paidOn === '' || undefined}
+                onClick={() => void commit()}
+              >
+                {t('miningTax.settleUp.recordAction')}
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button variant="primary" onClick={onClose}>
+              {t('common.close')}
+            </Button>
+          )}
+        </DialogFooter>
+      </div>
     </div>
   );
 
@@ -368,40 +403,6 @@ export function SettleUpDialog({
             )}
           </p>
         )}
-
-        <LedgerActionError error={saveError} />
-        {confirmingDismiss && onDismissBalance && (
-          <div
-            role="group"
-            aria-label={t('miningTax.settleUp.dismiss.title')}
-            className="space-y-2 rounded-xs border border-line bg-panel-2 p-2 text-xs"
-          >
-            <p>
-              {t('miningTax.settleUp.dismiss.intro', {
-                amount: formatIsk(owed, 0),
-                payee: payeeName,
-              })}
-            </p>
-            <p className="text-text-dim">{t('miningTax.settleUp.dismiss.effect')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="danger"
-                loading={saving}
-                onClick={() => void dismissBalance()}
-              >
-                {t('miningTax.settleUp.dismiss.confirm', { count: rows.length })}
-              </Button>
-              <Button
-                size="sm"
-                aria-disabled={saving || undefined}
-                onClick={() => setConfirmingDismiss(false)}
-              >
-                {t('common.cancel')}
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </Modal>
   );
@@ -441,7 +442,7 @@ function PreviewRow({
 export function PaymentPreview({ outcome }: { outcome: PaymentOutcome }) {
   const { t } = useTranslation();
   const k = (key: string) => t(`miningTax.settleUp.preview.${key}`);
-  const open = outcome.openLines ?? [];
+  const open = outcome.openLines;
   const pays = outcome.lines.length > 0 || open.length > 0;
   const credit = outcome.creditAdded >= 1;
   const owedAfter = outcome.owedAfter >= 1;

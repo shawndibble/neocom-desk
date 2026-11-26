@@ -85,7 +85,7 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
         buildSettleUpReason(
           suggestedCode(codes, payer ?? undefined)?.code ?? t('miningTax.settleUpReasonPrefix'),
           [],
-          [...(outcome?.lines ?? []), ...(outcome?.openLines ?? [])].map((l) => l.date).sort()
+          (outcome ? [...outcome.lines, ...outcome.openLines] : []).map((l) => l.date).sort()
         )
       }
       reasonHint={t('miningTax.corpBook.pay.codeInReason')}

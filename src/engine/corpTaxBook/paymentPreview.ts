@@ -14,9 +14,14 @@ export interface OpenDayLine {
   applied: number;
 }
 
+export interface EstimateDay {
+  date: string;
+  amount: number;
+}
+
 export interface PaymentOutcome {
   lines: PaymentOutcomeLine[];
-  openLines?: OpenDayLine[];
+  openLines: OpenDayLine[];
   owedBefore: number;
   owedAfter: number;
   creditAfter: number;
@@ -41,6 +46,7 @@ export function previewPayment(
   });
   return {
     lines,
+    openLines: [],
     owedBefore: before.owes?.amount ?? 0,
     owedAfter: after.owes?.amount ?? 0,
     creditAfter: after.credit,
@@ -50,8 +56,8 @@ export function previewPayment(
 
 export function coverOpenDays(
   outcome: PaymentOutcome,
-  estimates: readonly { date: string; amount: number }[]
-): PaymentOutcome & { openLines: OpenDayLine[] } {
+  estimates: readonly EstimateDay[]
+): PaymentOutcome {
   let left = outcome.creditAdded;
   const openLines: OpenDayLine[] = [];
   for (const day of [...estimates].sort((a, b) => a.date.localeCompare(b.date))) {
