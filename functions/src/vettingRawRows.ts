@@ -1,8 +1,3 @@
-// Vetting: every row a read returned, as the officer browses it (ADR 0035). Pure. Unlike the
-// dealings in vettingRows.ts, nothing is filtered or capped here: NPC parties, rows with no other
-// side and every contact kind stay. Only ids, times, amounts and the source's own word for the
-// row are kept; never a mail subject or body, a contract title or a journal description.
-
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import type { VettingRawRow } from './vettingEngine.js';
 import { contractAmount, text } from './vettingRows.js';
@@ -45,7 +40,6 @@ export function rawContactRows(characterId: number, rows: readonly unknown[]): V
   });
 }
 
-/** Headers only: who, when, which way. Picked field by field, so no other field can ride along. */
 export function rawMailRows(characterId: number, rows: readonly unknown[]): VettingRawRow[] {
   return rows.flatMap((row): VettingRawRow[] => {
     if (!isPlainRecord(row)) return [];
@@ -107,10 +101,6 @@ export function rawSkillRows(characterId: number, body: unknown): VettingRawRow[
   );
 }
 
-/**
- * Corporation stays, newest first. ESI gives only when a stay began, so a stay ended when the
- * next newer one began; the newest has not ended.
- */
 export function rawHistoryRows(characterId: number, rows: readonly unknown[]): VettingRawRow[] {
   const stays = rows
     .flatMap((row) =>

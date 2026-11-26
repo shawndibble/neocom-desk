@@ -1,8 +1,3 @@
-/**
- * The Makeover phase of an Improve search (Rework's whole-fit rework, run after
- * the single swaps): its one-slot moves, the `findMakeover` call with the bar
- * the single swaps set, progress, and the result shaped as tickable options.
- */
 import type { ImproveCandidate, ImproveHold, ImproveOption } from '@/engine/fittings/improve';
 import type { JobSetting } from '@/engine/fittings/improve';
 import {
@@ -23,7 +18,6 @@ import type { MakeoverResult } from './types';
 
 type MoveOptions = Omit<MakeoverMoveOptions, 'pool'>;
 
-/** The Makeover's one-slot moves on any fit the search reaches, for the catalogue, pilot and settings of this search. */
 export function makeoverMovesFor(
   ctx: SearchContext,
   options: MoveOptions
@@ -33,7 +27,6 @@ export function makeoverMovesFor(
   return (fitting) => makeoverMoves(fitting.modules, index, rackOf, { ...options, pool });
 }
 
-/** The forced propulsion step of the Makeover for the Job and this pilot's catalogue; null when the Job needs none. */
 export function makeoverPropulsionFor(
   ctx: SearchContext,
   options: MoveOptions
@@ -50,25 +43,17 @@ export interface MakeoverPhaseParams {
   target: TargetProfile | null | undefined;
   hold: ImproveHold;
   jobSetting: JobSetting;
-  /** The propulsion the Job needs, added first; null: none needed. */
   propulsion?: PropulsionStart | null;
-  /** How common a move's target group is on the hull for the Job; orders near-ties. */
   targetShare?: (move: ImproveCandidate) => number;
   iskBudget: number | null;
   fitTotal: number | null;
-  /** The single swaps' results: the Makeover must beat the best of them. */
   listed: { noDownside: readonly ImproveOption[]; tradeOffs: readonly ImproveOption[] };
   concurrency: number;
-  /** Calculations done and the most this search makes; called with 0 at the start. */
   onProgress: (checked: number, total: number) => void;
   isCancelled: () => boolean;
   shouldStop: () => boolean;
 }
 
-/**
- * Runs the Makeover search. Null when cancelled; otherwise `makeover` is null
- * when nothing beat the best single swap, and `stopped` says it ended early.
- */
 export async function runMakeoverPhase(
   ctx: SearchContext,
   params: MakeoverPhaseParams
@@ -89,7 +74,6 @@ export async function runMakeoverPhase(
     ...(params.targetShare ? { targetShare: params.targetShare } : {}),
     iskBudget: params.iskBudget,
     fitTotal: params.fitTotal,
-    // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.
     bestSingle: makeoverBar(listed, ctx.index),
     concurrency: params.concurrency,
     onProgress,

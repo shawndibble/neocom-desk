@@ -20,18 +20,12 @@ export interface PriceBreakdownInput {
   ) => ReadonlyMap<number, TaxPriceSource>;
 }
 
-/**
- * The figures behind a bill estimate, and the text the More menu copies for a
- * chat with the landlord (issue #2832). Shared by the card and the row detail
- * modal so the formatting lives once.
- */
 export function usePriceBreakdown(input: PriceBreakdownInput) {
   const { t } = useTranslation();
   const compressed = useMiningTaxCompressedOre((state) => state.value);
   return buildPriceBreakdown(input, t, compressed);
 }
 
-/** The same figures and text outside a render — the row menu's "Copy pricing as text", which has no component to hold the hook. */
 export function buildPriceBreakdown(
   { assignment, payee, systemName, typeNames, pricesFor, priceSourcesFor }: PriceBreakdownInput,
   t: TFunction,

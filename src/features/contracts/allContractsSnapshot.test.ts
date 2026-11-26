@@ -118,10 +118,8 @@ describe('loadAllContractsSnapshot', () => {
     expect(snapshot.contractsResult?.fetchedAt).toEqual(new Date(1000));
     const view = allContractsView(snapshot);
     const byId = new Map(snapshot.contractsResult?.data.map((c) => [c.contract_id, c]));
-    // 10 is Pilot 1's own, offered to Pilot 2: its receiver is Pilot 2.
     expect(view.ownerOf(byId.get(10)!)).toBe(1);
     expect(contractReceiver(byId.get(10)!, view.ownerOf(byId.get(10)!)!)?.id).toBe(2);
-    // 11 is Pilot 2's, offered to a stranger; read against Pilot 1 the receiver would differ.
     expect(view.ownerOf(byId.get(11)!)).toBe(2);
     expect(view.characterNameOf?.(byId.get(11)!)).toBe('Pilot 2');
   });

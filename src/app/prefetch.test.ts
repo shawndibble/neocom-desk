@@ -12,7 +12,6 @@ import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 
 const CHAR_ID = 91;
 
-/** Every scope the full task table asks for — a Character that granted everything. */
 const ALL_SCOPES = [
   ...new Set(
     PREFETCH_TASKS.flatMap((task) =>
@@ -28,10 +27,6 @@ beforeEach(async () => {
 
 describe('prefetchTasksFor', () => {
   it('runs only the unscoped tasks for a Character with no granted scopes', () => {
-    // Not "everything": an unfiltered warm-up 403s its way to a spurious
-    // app-wide re-auth banner at boot, which is the whole point of the gate.
-    // A task on a public endpoint (employment history) has no grant to be
-    // missing, so it is exactly what should survive an empty scope set.
     expect(prefetchTasksFor([]).map((task) => task.id)).toEqual(['employment-history']);
   });
 
@@ -53,8 +48,6 @@ describe('prefetchTasksFor', () => {
     const planets = PREFETCH_TASKS.find((task) => task.id === 'planets');
     expect(planets?.endpoints.length).toBeGreaterThan(1);
 
-    // PI's two endpoints share one scope today, so exercise the "all, not any"
-    // rule against a task built to have two distinct ones.
     const twoScopes: PrefetchTask = {
       id: 'two-scopes',
       endpoints: ['getCharacterSkills', 'getCharacterAssets'],
@@ -83,10 +76,6 @@ describe('prefetchTasksFor', () => {
 
 describe('prefetchCharacterData', () => {
   it('runs no task at all when the Character has no token row', async () => {
-    // Including the tasks on public endpoints, which need no grant: no token
-    // row is no session, and nothing should reach the network for a Character
-    // who is not signed in. This used to fall out of `prefetchTasksFor([])`
-    // being empty; it stopped being free the moment a task had no scope.
     const run = vi.fn(async () => {});
     const publicTask: PrefetchTask = {
       id: 'public',

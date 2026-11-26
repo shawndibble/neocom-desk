@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 
-/**
- * Pins the `no-restricted-syntax` selectors that keep raw number formatting
- * out of app code (issue #4594) — numbers on screen go through
- * src/lib/numberLocale so they follow the Number format setting. A selector
- * that never fires lints clean, so this runs the real config against fixtures.
- */
 const eslint = new ESLint();
 
 async function numberFormatErrors(source, filePath = 'src/features/fixture.tsx') {
@@ -63,7 +57,6 @@ describe('number-format lint guard', () => {
   ])('exempts %s', async (filePath) => {
     const source = "export const f = new Intl.NumberFormat('en');\n";
     const [result] = await eslint.lintText(source, { filePath });
-    // A file ESLint ignores, or can't parse, reports a null ruleId: not an exemption.
     expect(result.messages.filter((m) => m.ruleId === null)).toEqual([]);
     expect(await numberFormatErrors(source, filePath)).toHaveLength(0);
   });

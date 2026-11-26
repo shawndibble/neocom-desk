@@ -31,20 +31,11 @@ import {
   TYPES,
 } from '@/test/marketMocks';
 
-// Shared harness for the Market route tests (src/routes/Market*.test.tsx), one
-// file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
-// test file (vitest hoists them per file); their factories live in marketMocks.tsx.
-
-/**
- * Renders the Market route on its own (its TabRoute and info modals, no App
- * boot or shell) at the current `window.location`. The few tests that prove the
- * App wiring — the rail, the shell — render `<App />` (Market.sections.test.tsx).
- */
 export function renderMarketRoute() {
   return renderPageRoute('/market', <Market />);
 }
 
-export const RIFTER_REGION_ID = 10000002; // The Forge (Jita hub's region)
+export const RIFTER_REGION_ID = 10000002;
 
 export function ordersHandler(hits: { count: number }) {
   return http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () => {
@@ -56,7 +47,7 @@ export function ordersHandler(hits: { count: number }) {
           type_id: 587,
           is_buy_order: false,
           price: 1000000,
-          location_id: 60003760, // Jita 4-4, the hub's own station
+          location_id: 60003760,
           system_id: 30000142,
           volume_remain: 5,
           volume_total: 10,
@@ -70,7 +61,7 @@ export function ordersHandler(hits: { count: number }) {
           type_id: 587,
           is_buy_order: true,
           price: 500000,
-          location_id: 60003760, // Jita 4-4, the hub's own station
+          location_id: 60003760,
           system_id: 30000142,
           volume_remain: 3,
           volume_total: 3,
@@ -84,7 +75,7 @@ export function ordersHandler(hits: { count: number }) {
           type_id: 587,
           is_buy_order: false,
           price: 2000000,
-          location_id: 1035466617946, // player structure elsewhere in the region, not in STATIONS
+          location_id: 1035466617946,
           system_id: 30000142,
           volume_remain: 1,
           volume_total: 1,
@@ -99,10 +90,6 @@ export function ordersHandler(hits: { count: number }) {
   });
 }
 
-// Related Items strip (issue #10): a type_id-aware handler so each Destroyer
-// sibling's own order book differs, unlike ordersHandler above which answers
-// identically for any type_id in its region. hits counts requests per type_id
-// so a test can tell "the strip refetched" apart from "the main item refetched".
 export function destroyerOrdersHandler(hits: Map<number, number>) {
   const ordersByType: Record<number, unknown[]> = {
     [MERLIN_TYPE_ID]: [
@@ -121,9 +108,6 @@ export function destroyerOrdersHandler(hits: Map<number, number>) {
         range: 'region',
       },
       {
-        // A second location, hidden by Trade Hub mode, so the station-filter
-        // test below can filter down to a location the siblings have no
-        // orders at.
         order_id: 103,
         type_id: MERLIN_TYPE_ID,
         is_buy_order: false,
@@ -189,7 +173,7 @@ export function plexOrdersHandler(hits: { count: number }) {
           type_id: PLEX_TYPE_ID,
           is_buy_order: false,
           price: 3000000,
-          location_id: 60003760, // PLEX orders still carry ordinary station ids
+          location_id: 60003760,
           system_id: 30000142,
           volume_remain: 267,
           volume_total: 267,
@@ -204,7 +188,6 @@ export function plexOrdersHandler(hits: { count: number }) {
   });
 }
 
-/** `GET /markets/{region_id}/types`: `typeIds` listed in every region. */
 export function marketTypesHandler(typeIds: readonly number[]) {
   return http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () =>
     HttpResponse.json(typeIds, { headers: { 'X-Pages': '1' } })
@@ -223,26 +206,16 @@ export function historyHandler(
   });
 }
 
-// A default network error for the item-detail fetch the header fires on selection: tests that
-// read it override it; the rest don't care, and with no delay between keystrokes
-// it lands before teardown, where it would otherwise be an unhandled request.
 export const server = setupServer(
   http.get(`${ESI_BASE_URL}/universe/types/:typeId`, () => HttpResponse.error()),
-  // The tree's "No orders in {Region}" cue (#6200): every fixture type is
-  // listed in every region, so no row carries the cue unless a test says so.
   marketTypesHandler(TYPES.map((type) => type.typeId))
 );
 
-/** The per-test reset: a fresh Dexie, store and module state, at /market. */
 async function resetMarketSession(): Promise<void> {
   await db.characters.clear();
   await db.settings.clear();
   await db.quickbars.clear();
-  // Price history reads through esiCache; a row left by one test would answer
-  // the next test's request for the same item without reaching its handler.
   await db.esiCache.clear();
-  // Market needs no ESI scope and no *active* Character; a signed-in one exists,
-  // as the App's RequireCharacter guarantees, for the tests that read Characters.
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
@@ -252,23 +225,13 @@ async function resetMarketSession(): Promise<void> {
   useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   useCompareSet.setState({ items: [] });
   clearOrderBookCache();
-  // Module state, and it latches. One test provoking an ESI error (the 420 in
-  // "an ESI failure clears the spinner" in Market.variations.test.tsx) trips the error-limit gate, and
-  // without this every later test in the file has its fetches declined before
-  // they are sent — eleven of them failed that way on a "Sell Orders" table
-  // that never arrived, with nothing in the message to say why.
   resetEsiBudget();
   window.history.pushState({}, '', '/market');
 }
 
-/** Registers the file's MSW lifecycle and the per-test reset. Call once at module scope. */
 export function installMarketHarness(): void {
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: 'error' });
-    // One throwaway render, so no test pays for the first one: a worker's first
-    // render — compiling the Market graph, warming jsdom and React — landed on
-    // whichever test ran first and could outlast its findBy under CI load
-    // ("Unable to find role=button Ships"). Done here under the hook's budget.
     await routeChunks.loadMarket();
     await resetMarketSession();
     const { unmount } = renderMarketRoute();
@@ -284,17 +247,13 @@ export function installMarketHarness(): void {
   beforeEach(resetMarketSession);
 }
 
-// The Market Group, not the "Ships" link an App render's nav rail adds: the group is a button.
-// Matches the plain browse header and the search one, which appends " · <count>".
 export const SHIPS_GROUP = { name: /^Ships(?: ·|$)/ } as const;
 
-/** Variations live behind their own item tab, next to Order Book and Price History. */
 export async function openVariationsTab(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('tab', { name: /^Variations/ }));
   return screen.findByRole('table', { name: 'Variations' });
 }
 
-/** The finder column: item search, its filter funnel, the Market Group tree. */
 export function finder(): HTMLElement {
   const panel = screen.getByRole('searchbox').closest('section');
   if (!panel) throw new Error('expected the finder panel');

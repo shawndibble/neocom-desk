@@ -41,7 +41,6 @@ describe('TransactionsSummaryStrip range line', () => {
     );
     const text = screen.getByText(/transactionsRange/).textContent ?? '';
     expect(text).toContain('"from":"10/1/2026"');
-    // The newest fill is 2026-10-20 01:00 UTC; the UTC day, whatever the local zone.
     expect(text).toContain('"to":"10/20/2026"');
   });
 });

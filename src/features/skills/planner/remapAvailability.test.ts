@@ -85,10 +85,6 @@ describe('timedRemapFrom', () => {
   });
 
   it('floors notBeforeSeconds at 0 when the cooldown has already passed the plan start', () => {
-    // yearlyReady is false relative to `now` (fetch time), but the plan
-    // starts later than the cooldown itself. Still raises the count — the
-    // remap already IS usable by then, so there is nothing left to hold it
-    // back for, not nothing left to add.
     const info = remapAvailability(
       { bonus_remaps: 0, accrued_remap_cooldown_date: '2026-08-29T13:00:00Z' },
       NOW

@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// Seeds a sample Corp Tax Book into the local Firebase emulator (issue #4190,
-// epic #4055) so the officer /corp/moons page, the personal tab and the verify
-// page can be checked in a browser without deploying anything. It writes the
-// exact layout functions/src/corpTaxBookStore.ts writes (read that file when
-// the schema changes), through the admin SDK against FIRESTORE_EMULATOR_HOST.
-//
-//   node scripts/dev/seed-corp-tax-book.mjs --corp 98000001 --corp-name "Moon Tax Corp" \
-//     --officer 90000001 --member 90000002 [--guest 90000003] [--owner-hash <hash>] [--port 5173]
-//
-// Refuses to run unless FIRESTORE_EMULATOR_HOST is set or defaults to the
-// emulator port in firebase.json; it can never reach production Firestore.
 
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -36,8 +25,6 @@ const { values: args } = parseArgs({
     extra: { type: 'string', default: '12' },
     project: { type: 'string', default: 'demo-neocom-desk' },
     port: { type: 'string', default: '5173' },
-    // Player groups for the Members page (see the block before "Write"). The ids and names are
-    // the sandbox ESI roster's (scripts/dev/sandbox/playerGroups.json), so the two always agree.
     players: { type: 'boolean', default: false },
   },
 });
@@ -68,14 +55,12 @@ process.env.FIRESTORE_EMULATOR_HOST = host;
 initializeApp({ projectId: args.project });
 const db = getFirestore();
 
-// --- Time ------------------------------------------------------------------
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
 const NOW = Date.now();
 const iso = (ms) => new Date(ms).toISOString();
 const day = (back) => iso(NOW - back * DAY).slice(0, 10);
 
-// --- Fixtures --------------------------------------------------------------
 const SYSTEMS = [30002187, 30002053, 30000144];
 const REFINERIES = Array.from({ length: 6 }, (_, i) => ({
   id: 1040000000001 + i,
@@ -83,7 +68,6 @@ const REFINERIES = Array.from({ length: 6 }, (_, i) => ({
   solarSystemId: SYSTEMS[i % 3],
   moonId: 40139001 + i,
 }));
-// R4 moon ores: Zeolites, Sylvite, Bitumens. Prices are per raw unit.
 const ORES = [
   { typeId: 45490, price: 1200 },
   { typeId: 45491, price: 1500 },
@@ -91,15 +75,14 @@ const ORES = [
 ];
 const RATE_PCT = 5;
 const START = day(40);
-const NOTICE_DAYS = [12, 11, 10, 9, 8]; // listed on the issued Late notice
-const OPEN_DAYS = [7, 6, 5, 4, 3, 2, 1]; // still Billable
+const NOTICE_DAYS = [12, 11, 10, 9, 8];
+const OPEN_DAYS = [7, 6, 5, 4, 3, 2, 1];
 
 const book = db.collection('corps').doc(String(CORP));
 const sub = (name) => book.collection(name);
-const writes = []; // [ref, data]
+const writes = [];
 const put = (ref, data) => writes.push([ref, data]);
 
-// --- Book settings (BOOK_DEFAULTS + defaultSettings + turnOn fields) --------
 put(book, {
   hubId: 'jita',
   oreForm: 'compressed',
@@ -119,7 +102,6 @@ put(book, {
   schemaVersion: 1,
 });
 
-// --- Officer access (what verifyOfficer writes; rules read it for 24h) -------
 put(sub('officers').doc(`char:${OFFICER}`), {
   isCeo: true,
   isDirector: true,
@@ -135,8 +117,6 @@ put(sub('officers').doc(`char:${OFFICER}`), {
   expiresAt: NOW + 24 * HOUR,
 });
 
-// --- Miners: the member, optional guest, the officer, and synthetic extras ----
-// Synthetic ids are made up, so ESI cannot name them; the app shows their ids.
 const EXTRA_MINERS = Number(args.extra);
 if (!Number.isInteger(EXTRA_MINERS) || EXTRA_MINERS < 0) {
   console.error('--extra must be a whole number, 0 or more.');
@@ -168,7 +148,6 @@ const MINERS = [
   })),
 ];
 
-// --- Observed Mining Entries -------------------------------------------------
 const minedQty = (charId, dayBack, ore, structure) =>
   8_000 + ((charId + dayBack * 7 + ore.typeId + structure.id) % 9) * 2_500;
 
@@ -200,19 +179,14 @@ for (const r of MINERS.flatMap((m) => m.rows)) {
   });
 }
 
-// --- One issued Late notice per Miner that has billed days; verify link for the member
-// Layout of issueLateNoticeDocs (functions/src/corpTaxBookLateNoticeStore.ts): the `lateNotices`
-// doc, its `lateNoticeLinks` token, and the verify token (whose id field keeps its legacy wire name).
 const NOTICE_ID_FIELD = 'statementId';
-/** `paymentCode` (functions/src/corpTaxBookLateNotice.ts): a stable Reason code for a seed. */
 const paymentCode = (seed) => {
   let h = 2166136261;
   for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
   return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
 };
-/** The code a Miner puts on a donation: one per Miner (`minerPaymentCode`). */
 const minerPaymentCode = (minerId) => paymentCode(`miner:${minerId}`);
-const noticeOf = new Map(); // character id -> { noticeId, minerId, amount }
+const noticeOf = new Map();
 let token = '';
 for (const m of MINERS) {
   const billed = NOTICE_DAYS.filter((back) => m.days.includes(back)).reverse();
@@ -275,7 +249,6 @@ for (const m of MINERS) {
   noticeOf.set(m.id, { noticeId, minerId, amount, code: minerPaymentCode(minerId) });
 }
 
-// --- Tax Payments: matched, partial, over, Unmatched, not tax, manual --------
 const donation = (refId, characterId, amountIsk, back, extra = {}) => ({
   id: `j1_${refId}`,
   source: 'donation',
@@ -291,7 +264,6 @@ let ref = 900_000;
 for (const m of MINERS) {
   const st = noticeOf.get(m.id);
   if (!st) continue;
-  // Money names no notice: it pays the Miner's oldest unpaid day, whatever code it carries.
   const pinned = (amt, back) =>
     donation((ref += 1), m.id, amt, back, { reason: st.code, minerId: st.minerId });
   if (m.pays === 'third') payments.push(pinned(Math.round(st.amount / 3), 4));
@@ -299,13 +271,10 @@ for (const m of MINERS) {
   if (m.pays === 'partial') payments.push(pinned(Math.round(st.amount * 0.6), 4));
   if (m.pays === 'over') payments.push(pinned(Math.round(st.amount * 1.2), 3));
 }
-// Unmatched: no code, no Miner.
 payments.push(donation((ref += 1), GUEST ?? OFFICER, 2_500_000, 3, { reason: 'moon tax' }));
-// Extra miners' ids start at 90_001_000; skip these when `--extra` is too small to have them.
 if (EXTRA_MINERS > 1)
   payments.push(donation((ref += 1), 90_001_001, 1_750_000, 2, { reason: 'ty o7' }));
 if (EXTRA_MINERS > 7) payments.push(donation((ref += 1), 90_001_007, 3_100_000, 1));
-// Not tax: marked by an officer as something else.
 payments.push(
   donation((ref += 1), MEMBER, 40_000_000, 5, {
     notTaxAmount: 40_000_000,
@@ -328,7 +297,6 @@ put(sub('payments').doc('manual-dev-1'), {
   recordedBy: OFFICER,
 });
 
-// --- Dismissals and a declaration ----------------------------------------------
 const memberOpenRow = MINERS[0].rows.find((r) => r.date === day(3));
 put(sub('dismissals').doc('d-dev-1'), {
   id: 'd-dev-1',
@@ -349,7 +317,6 @@ put(sub('declarations').doc('x-dev-1'), {
   note: 'Says it was paid by contract',
 });
 
-// --- Extractions: every refinery gets a spread of states ---------------------
 function extraction(structure, startedAgoH, arrivesInH, decaysInH, laserAgoH) {
   const start = NOW - startedAgoH * HOUR;
   const startIso = iso(start);
@@ -365,18 +332,14 @@ function extraction(structure, startedAgoH, arrivesInH, decaysInH, laserAgoH) {
   put(sub('extractions').doc(fields.id), fields);
 }
 REFINERIES.forEach((s, i) => {
-  extraction(s, 400, -300, -250); // Expired: fractured 250h ago
+  extraction(s, 400, -300, -250);
   const live = i % 4;
-  if (live === 0) extraction(s, 24, 72 + i * 10, 120 + i * 10); // Extracting
-  if (live === 1) extraction(s, 120, -2, 46); // Ready, not yet fractured
-  if (live === 2) extraction(s, 200, -80, -30, 30); // Fractured
-  if (live === 3) extraction(s, 60, 8, 56); // Extracting, arriving soon
+  if (live === 0) extraction(s, 24, 72 + i * 10, 120 + i * 10);
+  if (live === 1) extraction(s, 120, -2, 46);
+  if (live === 2) extraction(s, 200, -80, -30, 30);
+  if (live === 3) extraction(s, 60, 8, 56);
 });
 
-// --- SRP (ship replacement): settings, the officer's access record, claims, audit ------
-// Layout of functions/src/srpStore.ts and src/features/corp/srpClaimTypes.ts. Officers read
-// all of it under the rules; the officer record needs canEdit and the same ownerHash.
-// Rifter, Drake, Raven, Catalyst, Hulk, Covetor, Orca (rules below: Rifter fixed, Drake percent, Catalyst not covered, Orca officer decides).
 const SRP_HULLS = [587, 24698, 638, 16240, 22544, 17476, 28606];
 put(book.collection('srp').doc('settings'), {
   corporationId: CORP,
@@ -415,7 +378,6 @@ const SRP_STATES = ['pending', 'pending', 'approved', 'paid', 'paid', 'rejected'
 for (let i = 0; i < 14; i++) {
   const miner = MINERS[i % MINERS.length];
   const state = SRP_STATES[i % SRP_STATES.length];
-  // A claim awaiting an officer-typed amount is on the hull whose rule is "officer decides".
   const needsAmount = state === 'pending' && i % 2 === 0;
   const hullTypeId = needsAmount ? 28606 : SRP_HULLS[i % SRP_HULLS.length];
   const killmailId = 130_000_001 + i;
@@ -477,7 +439,6 @@ for (let i = 0; i < 14; i++) {
   if (state === 'paid') entry(filedAt + 6 * HOUR, 'markClaimPaid');
 }
 
-// --- Audit trail (what turnOn and issueLateNotice append) --------------------
 function audit(at, action, detail) {
   put(sub('audit').doc(`${String(at).padStart(15, '0')}~${randomBytes(6).toString('base64url')}`), {
     at,
@@ -495,10 +456,6 @@ for (const [, st] of noticeOf)
     listed: st.amount,
   });
 
-// --- Player groups (--players): Miner groups, Self-proven links, conflicts, declines ----------
-// Layout of writeMiner / promoteProvenClaims / recordAnswer in functions/src/corpTaxBookStore.ts
-// and playerLayer.ts. Names, ids and last-seen times come from sandbox/playerGroups.json, which
-// the sandbox's fake ESI roster serves too. Outside-corp characters get no roster row there.
 if (args.players) {
   const fixture = JSON.parse(
     readFileSync(new URL('./sandbox/playerGroups.json', import.meta.url), 'utf8')
@@ -520,7 +477,6 @@ if (args.players) {
     ['Mira Quill', [10, 7, 5, 3]],
     ['Quill Alt', [6, 4, 2]],
   ];
-  // Observed Mining Entries so the book has real rows for them (never for Kestrel Vane).
   for (const [name, days] of MINED) {
     for (const r of observedRows(idOf(name), CORP, days)) {
       put(sub('observed').doc(`${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`), {
@@ -529,7 +485,6 @@ if (args.players) {
       });
     }
   }
-  // [group id, main, characters, officerClaimed, provenCharacterIds, pendingConfirmation, daysAgo]
   const GROUPS = [
     [
       'kestrel',
@@ -551,7 +506,6 @@ if (args.players) {
     ],
     ['dax', 'Dax Orlov', ['Dax Orlov', 'Orlov Scout'], [], [], [], 30],
     ['mira', 'Mira Quill', ['Mira Quill', 'Quill Alt'], [], [], ['Quill Alt'], 25],
-    // Bram Holt sits in two groups: a conflict an officer sees in meta/groupConflicts.
     ['bram-a', 'Tomas Reed', ['Tomas Reed', 'Bram Holt'], [], [], [], 20],
     ['bram-b', 'Hana Bright', ['Hana Bright', 'Bram Holt'], [], [], [], 10],
   ];
@@ -583,7 +537,6 @@ if (args.players) {
       },
     ],
   });
-  // Self-proven links: Sora Tenn signed in as her outside alt (players/ + playerCharacters/).
   const provenIds = [idOf('Sora Of Elsewhere'), idOf('Sora Tenn')].sort((a, b) => a - b);
   const playerId = String(provenIds[0]);
   put(db.collection('players').doc(playerId), {
@@ -600,7 +553,6 @@ if (args.players) {
       provenAt: iso(NOW - 3 * DAY),
     });
   }
-  // Nyx Arden was unlinked by an officer: automatic grouping leaves them alone.
   const nyx = idOf('Nyx Arden');
   put(sub('meta').doc('declinedAutoGroup'), { ids: [nyx] });
   put(sub('meta').doc('groupingAnswers'), {
@@ -610,8 +562,6 @@ if (args.players) {
   });
 }
 
-// --- Write ---------------------------------------------------------------------
-// Clear any earlier seed of this book through the emulator's own wipe endpoint.
 await fetch(`http://${host}/emulator/v1/projects/${args.project}/databases/(default)/documents`, {
   method: 'DELETE',
 });

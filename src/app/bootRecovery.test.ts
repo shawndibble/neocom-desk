@@ -22,7 +22,7 @@ describe('recoverFromStalledBoot', () => {
   it('reloads when no update is waiting', async () => {
     const env = makeEnv({ getRegistration: vi.fn().mockResolvedValue({ waiting: null }) });
     await recoverFromStalledBoot(env);
-    expect(env.wait).toHaveBeenCalledTimes(1); // the lookup bound only
+    expect(env.wait).toHaveBeenCalledTimes(1);
     expect(env.reload).toHaveBeenCalledOnce();
   });
 
@@ -33,8 +33,6 @@ describe('recoverFromStalledBoot', () => {
   });
 
   it('reloads even when the registration lookup never settles', async () => {
-    // The hang bootRecovery.ts exists to escape; an unbounded await here
-    // would leave the button inert.
     const env = makeEnv({ getRegistration: vi.fn().mockReturnValue(new Promise(() => {})) });
     await recoverFromStalledBoot(env);
     expect(env.reload).toHaveBeenCalledOnce();

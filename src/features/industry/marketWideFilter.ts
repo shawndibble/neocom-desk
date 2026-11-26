@@ -1,4 +1,3 @@
-/** The Market-Wide Build Opportunities panel's filter: its shape, URL codec and pure predicates. */
 import type { TFunction } from 'i18next';
 import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import { BLUEPRINT_SOURCES, type BlueprintSource } from '@/engine/industry/blueprintObtainability';
@@ -13,7 +12,6 @@ import { formatIskCompact } from '@/lib/isk';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 import { DEFAULT_SALES_SHARE, SALES_SHARE_OPTIONS } from './salesSharePref';
 
-/** "Max build cost" presets — a budget cap, applied to the ranked rows since cost is only known once priced. */
 export const BUILD_COST_CAPS = ['any', '10m', '100m', '1b', '10b'] as const;
 export type BuildCostCap = (typeof BUILD_COST_CAPS)[number];
 export const BUILD_COST_CAP_ISK: Record<BuildCostCap, number | null> = {
@@ -29,11 +27,8 @@ export interface MarketWideFilterState {
   categories: ReadonlySet<ProductCategory>;
   sources: ReadonlySet<BlueprintSource>;
   maxBuildCost: BuildCostCap;
-  /** Hides rows no Character on the account has the skills to build. */
   hideSkillGated: boolean;
-  /** Hides products selling fewer than `RARELY_SOLD_PER_DAY` a day in the scanned hub's region. */
   hideRarelySold: boolean;
-  /** The percent of daily sales ISK/day assumes the pilot sells, as `SALES_SHARE_OPTIONS` text. */
   salesShare: string;
 }
 
@@ -42,7 +37,6 @@ export const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
   categories: { key: 'marketWide.categories', codec: enumSetParam(PRODUCT_CATEGORIES) },
   sources: { key: 'marketWide.sources', codec: enumSetParam(BLUEPRINT_SOURCES) },
   maxBuildCost: { key: 'marketWide.maxCost', codec: enumParam(BUILD_COST_CAPS, 'any') },
-  // The key the standalone chip used, so links saved before the move still apply.
   hideSkillGated: { key: 'marketWide.hideGated', codec: boolParam() },
   hideRarelySold: { key: 'marketWide.hideRare', codec: boolParam() },
   salesShare: {
@@ -51,7 +45,6 @@ export const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
   },
 });
 
-/** The picked members of a closed set, in the set's own order, as one short pill value. */
 function pickedSummary<V extends string>(
   members: readonly V[],
   picked: ReadonlySet<V>,
@@ -62,10 +55,6 @@ function pickedSummary<V extends string>(
   return summarizeFilterValues(names, t);
 }
 
-/**
- * The filters set away from their default. The budget leads: it is the one a
- * pilot sets to match their wallet, and it removes the most rows.
- */
 export function activeMarketWideFilters(
   filter: MarketWideFilterState,
   t: TFunction
@@ -132,7 +121,6 @@ export function activeMarketWideFilters(
   return active;
 }
 
-/** Only a product whose sales were read and fall short is hidden; an unreadable one stays. */
 export function isKnownRarelySold(unitsPerDay: number | null | undefined): boolean {
   return unitsPerDay !== null && unitsPerDay !== undefined && isRarelySold(unitsPerDay);
 }

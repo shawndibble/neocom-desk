@@ -1,13 +1,3 @@
-/**
- * One officer visit's sync of the Corp Tax Book (issue #4062, D9): read what
- * ESI holds, upload it monotonically, and record the gaps. The server stores
- * what it is sent and does not detect gaps (#4061 hand-off), so they are decided
- * here with the pure engine (`engine/corpTaxBook/sync.ts`). Money pays each
- * Miner's oldest day on their Running account: there is nothing to settle.
- *
- * The collaborators are passed in so the flow is testable without Firebase or
- * ESI; `defaultSyncDeps` wires the real ones.
- */
 import {
   detectGaps,
   mergeGaps,
@@ -63,11 +53,8 @@ import {
 import { reconcileFeederPayouts } from './feederClient';
 import { chunk } from '@/lib/chunk';
 
-/** The server accepts at most this many observer rows in one sync call. */
 export const OBSERVED_PER_CALL = 2000;
-/** And this many donations; the newest are sent first and the rest follow on the next visit. */
 export const DONATIONS_PER_CALL = 500;
-/** And this many extractions. */
 export const EXTRACTIONS_PER_CALL = 200;
 
 export interface SyncDeps {
@@ -90,26 +77,18 @@ export interface SyncDeps {
     options?: { whole?: boolean }
   ) => Promise<JournalDonation[] | null>;
   uploadSync: (characterId: number, upload: SyncUpload) => Promise<SyncReceipt>;
-  /** Attaches the wallet's outgoing donations to the moon owner payouts recorded (no-op without moon owners). */
   reconcilePayouts?: (
     characterId: number,
     corporationId: number,
     divisions: readonly number[]
   ) => Promise<unknown>;
-  /** The Characters on this app account with the corporation they were last seen in (D26). */
   loadAccountCharacters: () => Promise<{ characterId: number; corporationId: number }[]>;
-  /** Characters an officer unlinked, read from the book so every officer's sync respects them. */
   declinedGrouping: (characterId: number, corporationId: number) => Promise<ReadonlySet<number>>;
   applyGrouping: (
     characterId: number,
     corporationId: number,
     edit: GroupingEdit | RegroupEdit
   ) => Promise<unknown>;
-  /**
-   * The book's stored observer rows and its moon owners' coverage: the mining it bills at moon
-   * owners' refineries, which this Character's ESI read never holds. Read only when a donation is
-   * held for review or a new one would be, so it can be matched against that mining too.
-   */
   loadStoredRows?: (
     characterId: number,
     corporationId: number
@@ -117,7 +96,6 @@ export interface SyncDeps {
     rows: readonly ObservedRow[];
     feeders: readonly FeederCoverage[];
   }>;
-  /** Gives a stored Unmatched donation to a Miner (`assignPayment`, audited). */
   assignPayment: (
     characterId: number,
     corporationId: number,
@@ -152,14 +130,12 @@ export const defaultSyncDeps: SyncDeps = {
   loadStoredRows: readStoredRows,
 };
 
-/** What the Character may read from ESI; the rest of the sync does without a source it cannot reach. */
 export type SyncCapabilities = Pick<
   CorpCapabilities,
   'canReadMiningLedger' | 'canReadMoonExtractions' | 'canReadWallet'
 >;
 
 export type SyncOutcome =
-  /** Nothing was uploaded. `reason` says why. */
   | {
       kind: 'skipped';
       reason:
@@ -170,29 +146,17 @@ export type SyncOutcome =
       observedRows: number;
       extractions: number;
       donationsAdded: number;
-      /** The gaps now on record, earlier ones included. */
       gaps: ReturnType<typeof mergeGaps>;
-      /** The corporation has no refinery this Character can read: donations synced, the ledger is empty. */
       noRefineries?: true;
-      /** Sources this Character could not read this time (the rest still synced). */
       missing: MissingSource[];
       truncated: boolean;
-      /** Characters of this account put into one Miner this visit (D26). */
       autoGrouped: number;
-      /** Why grouping failed this visit, if it did (the sync itself still succeeded). */
       autoGroupError?: string;
-      /** Merges an officer is asked to decide: too large for one write, or two groups claim one character. */
       groupPrompts?: MergePrompt[];
-      /** Account characters an officer removed or a character declined: never re-added. */
       groupFlagged?: number[];
-      /** Why re-matching stored Unmatched payments failed this visit, if it did (the sync itself still succeeded). */
       reassignError?: string;
     };
 
-/**
- * A source this Character could not read this time; the rest still synced. `ore`: no
- * Station_Manager role (or no extraction scope), so neither the Extractions nor their ore were read.
- */
 export type MissingSource = 'extractions' | 'donations' | 'ore';
 
 const paymentId = (d: JournalDonation) => `j${d.division}_${d.refId}`;
@@ -202,7 +166,6 @@ export async function syncCorpTaxBook(
   deps: SyncDeps = defaultSyncDeps
 ): Promise<SyncOutcome> {
   const { characterId, corporationId, capabilities } = args;
-  // Without the scope the observer read is a guaranteed 403; ask for it first (`useMiningLedgerAccess`).
   if (!capabilities.canReadMiningLedger) return { kind: 'skipped', reason: 'missing-mining-scope' };
 
   const verdict = await deps.verifyOfficer(characterId, corporationId);
@@ -223,7 +186,6 @@ export async function syncCorpTaxBook(
     capabilities.canReadWallet
       ? deps.loadDonations(characterId, corporationId, before.book.divisions).catch(() => null)
       : Promise.resolve(null),
-    // #6207: the divisions the book does not read, only to note what looks like tax paid there.
     capabilities.canReadWallet
       ? deps
           .loadDonations(characterId, corporationId, otherDivisions(before.book.divisions), {
@@ -233,15 +195,12 @@ export async function syncCorpTaxBook(
       : Promise.resolve(null),
   ]);
   if (feedRead === 'needs-reauth') return { kind: 'skipped', reason: 'needs-reauth' };
-  // Recording a sync whose ledger never arrived would blame the gap on the officers.
   if (feedRead === 'unavailable') return { kind: 'skipped', reason: 'esi-unavailable' };
-  // Donations still sync, but the outcome says the ledger had nothing to read, so the page never calls it "Synced".
   const noRefineries = feedRead === 'no-refineries';
   const feed: ObserverFeed = noRefineries
     ? { rows: [], structureIds: [], oldestEsiDate: {}, truncated: false, systemIds: {} }
     : feedRead;
   if (canExtract && esiExtractions === null) missing.push('extractions');
-  // A corp with no refinery of its own (only moon owners) has no chunk of its own to read.
   if (!canExtract && !noRefineries) missing.push('ore');
   if (!capabilities.canReadWallet || donations === null) missing.push('donations');
 
@@ -266,8 +225,6 @@ export async function syncCorpTaxBook(
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
-  // The rows donations are matched against: this read's, and the moon owners' mining the book
-  // bills, which only the stored rows hold.
   const rows = [
     ...feed.rows,
     ...(await billedStoredRows(deps, characterId, corporationId, before, feed.rows, fresh)),
@@ -279,9 +236,6 @@ export async function syncCorpTaxBook(
     minedCharacterIds: mined,
     payments: before.payments,
   });
-  // The server places each donation itself, with the shared rule (`donationOwner`): a Miner this
-  // tab named would be ignored, so none is sent.
-  // A sender whose Miner has mined since the book began likely owes: no open balance to read.
   const uncounted =
     elsewhere === null
       ? undefined
@@ -291,9 +245,6 @@ export async function syncCorpTaxBook(
           minedSinceStart(rows, before.miners, before.book.startDate)
         );
 
-  // The first call carries everything but the overflow of observer rows, so a
-  // later failure loses only ledger rows (each call also records the visit).
-  // The server caps extractions per call, so they split too.
   const placed = placeObservedRows(
     feed.rows as ObservedRow[],
     canExtract ? extractions : before.extractions,
@@ -302,8 +253,6 @@ export async function syncCorpTaxBook(
   const batches = chunk(placed, OBSERVED_PER_CALL);
   const extraCalls = chunk(extractions, EXTRACTIONS_PER_CALL);
   const first = { observed: batches.shift() ?? [], extractions: extraCalls.shift() ?? [] };
-  // Verifying again right before writing renews the 10-minute role cache the
-  // upload relies on, which the slow ESI reads above may have outlived.
   await deps.verifyOfficer(characterId, corporationId);
   const receipt = await deps.uploadSync(characterId, {
     corporationId,
@@ -311,7 +260,6 @@ export async function syncCorpTaxBook(
     donations: fresh,
     gaps,
     ...(uncounted ? { uncounted } : {}),
-    // Members' "not credited" notes wait on a sync that read the wallet, not on any sync.
     donationsRead: capabilities.canReadWallet && donations !== null,
   });
   const { donationsAdded } = receipt;
@@ -322,14 +270,12 @@ export async function syncCorpTaxBook(
     await deps.uploadSync(characterId, { corporationId, extractions: rest, gaps });
   }
 
-  // What the wallet sent a moon owner is its own books: a failure here is not the sync's.
   if (capabilities.canReadWallet && donations !== null) {
     await deps
       .reconcilePayouts?.(characterId, corporationId, before.book.divisions)
       .catch(() => undefined);
   }
 
-  // D26: this account's own Characters in the corporation share one Miner, so one payment covers them.
   const {
     grouped: autoGrouped,
     error: autoGroupError,
@@ -337,8 +283,6 @@ export async function syncCorpTaxBook(
     flagged: groupFlagged,
   } = await autoGroup(deps, characterId, corporationId, before.miners, recordCounts(before));
 
-  // A donation stored Unmatched stays so forever unless re-matched: its sender may have joined a
-  // Miner (or mined here) since. Assign the ones that match now; the officer's queue keeps the rest.
   const { error: reassignError } = await reassignUnmatched(deps, characterId, corporationId, {
     before,
     mined,
@@ -363,12 +307,6 @@ export async function syncCorpTaxBook(
   };
 }
 
-/**
- * The stored rows the book bills that a held or would-be-held donation is matched against
- * (`storedRowsWanted`): its moon owners' mining, which this Character's ESI read never holds.
- * None when nothing is held and every new donation already matches; a failed read is none too
- * (the hold stays for the next sync).
- */
 async function billedStoredRows(
   deps: SyncDeps,
   characterId: number,
@@ -414,7 +352,6 @@ async function billedStoredRows(
   }
 }
 
-/** Re-runs `donationOwner` for stored Unmatched payments and assigns those that now match. A failure is not the sync's, so it is returned for the page to show. */
 async function reassignUnmatched(
   deps: SyncDeps,
   characterId: number,
@@ -426,7 +363,6 @@ async function reassignUnmatched(
     regrouped: boolean;
   }
 ): Promise<{ assigned: number; error?: string }> {
-  // The shared re-match (`rematchUnmatched`): one placed, not tax or held as ambiguous is left.
   const open = args.before.payments.filter((p) => p.minerId === undefined);
   if (open.length === 0) return { assigned: 0 };
   let assigned = 0;
@@ -435,8 +371,6 @@ async function reassignUnmatched(
     const book = args.regrouped
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
-    // A sender the book knows credits their Miner, owing or not (#6300). That includes one held
-    // for review under #6207: the next sync clears it.
     const matchBook = donationMatchBook({
       miners: book.miners,
       notices: book.notices,
@@ -452,7 +386,6 @@ async function reassignUnmatched(
         await deps.assignPayment(characterId, corporationId, paymentId, minerId);
         assigned += 1;
       } catch (e) {
-        // A refused assignment never stops the next one: report the first, the next sync retries.
         error ??= e instanceof Error ? e.message : String(e);
       }
     }
@@ -462,12 +395,6 @@ async function reassignUnmatched(
   return { assigned, ...(error !== undefined ? { error } : {}) };
 }
 
-/**
- * Groups the app account's Characters (proven by this very login) that are in the corporation
- * (`planSignInGroups`): free ones into one Miner, Miners they touch merged by regroup while the
- * records moved fit one write, else a prompt for an officer. A failure here must not fail the sync
- * that already uploaded, so it is reported in the outcome and the next visit tries again.
- */
 async function autoGroup(
   deps: SyncDeps,
   characterId: number,
@@ -500,7 +427,6 @@ async function autoGroup(
   }
 }
 
-/** What a merge would move per Miner: its late notices and payments (the records the re-key rewrites). */
 function recordCounts(book: BookState): Map<string, number> {
   const counts = new Map<string, number>();
   const bump = (id: string | undefined) => {

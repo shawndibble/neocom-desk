@@ -23,9 +23,6 @@ describe('stripEveMarkup', () => {
   });
 
   it('does not double-decode: a literal &lt; that only appears after &amp; is decoded stays literal (BUG #4)', () => {
-    // "&amp;lt;" first decodes (as &amp;) to the literal text "&lt;" — that
-    // must not then be decoded a second time into "<". Entities present in
-    // the raw string decode once each, in a single pass.
     expect(stripEveMarkup('5 &amp;lt; 10')).toBe('5 &lt; 10');
   });
 

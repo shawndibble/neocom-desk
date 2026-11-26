@@ -88,7 +88,7 @@ describe('computeBuildPlan', () => {
     const tritanium = result?.materials[0];
     expect(tritanium?.ownedQuantity).toBe(0);
     expect(tritanium?.remainingQuantity).toBe(tritanium?.quantity);
-    expect(tritanium?.unitPrice).toBe(4); // overridePrice survives
+    expect(tritanium?.unitPrice).toBe(4);
   });
 
   it('clamps a cleared/invalid runs field to 1 instead of throwing', () => {
@@ -98,7 +98,7 @@ describe('computeBuildPlan', () => {
       ...MARKET,
     });
     expect(error).toBeNull();
-    expect(result?.materials[0].baseQuantity).toBe(4500); // 1 run x 4500
+    expect(result?.materials[0].baseQuantity).toBe(4500);
   });
 
   it('clamps ME/TE outside the engine ranges instead of throwing', () => {
@@ -131,7 +131,6 @@ describe('computeBuildPlan', () => {
       blueprint: BLUEPRINT,
       ...MARKET,
     });
-    // eiv x 2% > eiv x 0 (structure defaultTaxPct is 0)
     expect(result?.jobFee.facilityTax).toBeGreaterThan(0);
   });
 

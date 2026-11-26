@@ -11,7 +11,6 @@ vi.mock('@/features/character/stations', () => ({
   ),
   loadStationSystemId: vi.fn(async (id: number) => (id === 60003760 ? 30000142 : null)),
 }));
-// Character 7 can dock at the structure; any other cannot read it.
 vi.mock('@/features/character/structures', () => ({
   loadStructureName: vi.fn(async (characterId: number) =>
     characterId === 7 ? 'Perimeter - Tranquility Trading Tower' : null

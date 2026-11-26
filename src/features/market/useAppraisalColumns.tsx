@@ -34,19 +34,10 @@ import { PriceMark } from './LivePriceStatus';
 import { MarketItemLink } from './MarketItemLink';
 import type { AppraisalController } from './useAppraisal';
 
-/** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
-/**
- * `lg` up to 1440px: there is room for the default columns but not for a second refine column on top
- * (the row menu would slip out of the table at 1280px), so Refine + ore starts ticked off here and
- * is one tick away in the Columns menu. From 1440px it is on. Like the compact range, a min-and-max
- * pair never matches under the test `matchMedia` stub, so tests see the full default.
- */
 const MEDIUM_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 89.999rem)';
 const MEDIUM_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['refineWithLeftover'];
-/** A phone starts with Item, Buy and Sell; the Columns menu swaps others in. */
-/** The columns whose cells wear the live-price mark. */
 const PRICE_MARK_COLUMNS: ReadonlySet<AppraisalColumnId> = new Set([
   'buyEach',
   'sellEach',
@@ -66,24 +57,15 @@ export function useAppraisalColumns({
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
-  /** The active Character's standing toward this hub's NPC station owner, for the broker fee. */
   standing: ResolvedStandings;
-  /** Opens the refine breakdown on one item; absent, the Refine figure is plain text. */
   onOpenRefine?: (typeId: number) => void;
-  /** The side of the book the Refine total column is priced on (the remembered pick). */
   refineBasis: RefineBasis;
-  /** False until the remembered basis has loaded, so the Refine figures do not show on buy first and then switch. */
   refineReady?: boolean;
-  /** The rows' campaign turn-ins; absent, there is no Turn in column. */
   turnIns?: Pick<AppraisalTurnIns, 'rowTurnIn' | 'any'>;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
   const storedColumns = useVisibleAppraisalColumns((state) => state.value);
-  // Side by side below `xl` the results card is only ~500px wide, so with no
-  // stored selection the per-unit price and volume columns start unticked (the totals and the Cargo group say
-  // the same thing) rather than pushing the row menu out of reach. Only a
-  // default: ticking one shows it, and a stored selection is read as saved.
   const compactResults = useMediaQuery(COMPACT_RESULTS_QUERY);
   const mediumResults = useMediaQuery(MEDIUM_RESULTS_QUERY);
   const isPhone = useIsPhone();
@@ -109,7 +91,6 @@ export function useAppraisalColumns({
   }
 
   const rows = useMemo(() => result?.appraisal.rows ?? [], [result]);
-  // Fully covered lines sink to the bottom (stable otherwise) and render dim.
   const tableRows: OwnedRow[] = useMemo(() => {
     if (!owned) return rows;
     const withOwned: OwnedRow[] = subtractOwned(rows, owned);
@@ -119,14 +100,8 @@ export function useAppraisalColumns({
     ];
   }, [rows, owned]);
   const hasRefine = refineReady && pileFigures(rows, refineBasis).refinable;
-  // Undefined per row when nothing the active Character holds LP with sells
-  // this item — same "only earns its place once something has it" rule as
-  // the refine column, and also why this never shows with no active
-  // Character (`appraisalData.ts` never sets `lpOption` then).
   const hasLpOption = rows.some((row) => row.lpCorpName !== undefined);
-  // Like Refine: only once a pasted item has an Active turn-in.
   const hasTurnIn = turnIns?.any ?? false;
-  /** The Turn in detail's line about this row against selling it, and how many count. */
   function turnInSurfaceLine(row: OwnedRow, turnIn: RowTurnIn) {
     const against = turnIn.beats
       ? t('market.appraisal.turnIn.overSellNow', { amount: formatIskCompact(turnIn.over) })
@@ -134,7 +109,6 @@ export function useAppraisalColumns({
         ? t('market.appraisal.turnIn.sellNowPaysMore', { amount: formatIskCompact(-turnIn.over) })
         : t('market.appraisal.turnIn.refinePaysMore');
     if (turnIn.reward.quantity >= row.quantity) return against;
-    // Cut by the objective's remaining progress or the Character's own cap.
     return t('market.appraisal.turnIn.withCounted', {
       against,
       counted: formatVolume(turnIn.reward.quantity),
@@ -149,11 +123,6 @@ export function useAppraisalColumns({
       stickyStartOnPanel: true,
       header: t('market.appraisal.columnItem'),
       primary: true,
-      // A priced line is nearly always followed by "…and what is the book
-      // actually like?", so the name is the way through to the Browser. The
-      // link drops `section`, which is exactly what `Market.tsx` reads as an
-      // incoming item link and answers by switching tabs; the paste itself
-      // survives the trip because `useAppraisal` lives at route level.
       render: (row) => (
         <>
           <MarketItemLink typeId={row.typeId}>{row.name}</MarketItemLink>
@@ -167,11 +136,9 @@ export function useAppraisalColumns({
     {
       id: 'quantity',
       header: owned ? t('market.appraisal.columnNeed') : t('market.appraisal.columnQuantity'),
-      // On a phone the count sits under the item name instead (below).
       phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      // A count, not ISK — an ISK formatter would run `clampIskZero` over it.
       render: (row) =>
         row.need !== undefined ? (
           <span>
@@ -187,10 +154,6 @@ export function useAppraisalColumns({
     },
   ];
 
-  // Sales tax is the Accounting skill's rate and the broker fee is Broker
-  // Relations plus standing, so with no Character (or skills still loading)
-  // there is no honest figure and the fee columns stay out of the table and
-  // the picker, as Refine does without refine data.
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
   const feeInputs = useMemo(
@@ -200,30 +163,19 @@ export function useAppraisalColumns({
         : { accountingLevel, brokerRelationsLevel, standing },
     [accountingLevel, brokerRelationsLevel, standing]
   );
-  // Every column, whichever the picker shows; fees blank until the skills load.
   const csvColumns = useMemo(
     () => appraisalCsvColumns(t, { fees: feeInputs, live: { refineBasis } }),
     [t, feeInputs, refineBasis]
   );
-  // The rows as the table holds them (need/owned, covered lines last), in the table's sort.
   const tableExport = useTableExport({
     surface: 'market-appraisal',
     rows: tableRows,
     columns: csvColumns,
   });
-  // Every derived figure a cell shows, on the remembered basis; fees null until the skills load.
   const figures = (row: OwnedRow) => rowFigures(row, refineBasis, feeInputs);
-  // Selling as is beats refining on this basis, so the as-is total on the basis wears the mark.
   const asIsWins = (row: OwnedRow, side: RefineBasis) =>
     refineBasis === side && figures(row).refine.verdict === 'sellAsIs';
 
-  // The optional columns' catalog, keyed by `AppraisalColumnId` so the
-  // `ColumnPickerMenu` below and the push loop past it share one definition.
-  // Refine and LP store still only ever enter `availableColumns` when the
-  // data backing them exists — a picker toggle for a column with nothing to
-  // show would just be a lie.
-  // The price mark repeats in up to four cells of a row; only the first shown
-  // one speaks, the rest keep the icon and tooltip.
   const firstPriceColumn = APPRAISAL_COLUMN_IDS.find(
     (id) => PRICE_MARK_COLUMNS.has(id) && visibleColumns.includes(id)
   );
@@ -349,7 +301,6 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnRefineWithLeftover'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      // The refined minerals plus the units too few to refine, sold as is: what the verdict compares.
       render: (row) => {
         const { withLeftover, verdict, pricedAll } = figures(row).refine;
         if (withLeftover === undefined) return '—';
@@ -374,8 +325,6 @@ export function useAppraisalColumns({
       headerTooltip: t('market.appraisal.columnTurnInHelp'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      // What the units the objective still takes pay handed in, for the active Character;
-      // never part of the Buy/Sell totals. Bold when it beats selling them now.
       render: (row) => {
         const turnIn = turnIns?.rowTurnIn(row) ?? null;
         if (turnIn === null) return '—';
@@ -399,10 +348,6 @@ export function useAppraisalColumns({
       id: 'lpTotal',
       header: t('market.appraisal.columnLpTotal'),
       align: 'right',
-      // Kept to the width of an ISK figure plus one icon — never the full
-      // "X ISK + Y LP (Corp)" sentence, which would blow out the column at
-      // phone width. That sentence still exists, as the icon's tooltip and
-      // accessible name (`LpStoreLink`'s `label`).
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => {
         if (row.lpCorpName === undefined || row.lpCorporationId === undefined) return '—';
@@ -471,14 +416,6 @@ export function useAppraisalColumns({
     if (visibleColumns.includes(id)) columns.push(optionalColumnsById[id]);
   }
 
-  // The same menu the tree, the Quickbar and the Variations table carry — an
-  // appraised row is an item like any other, and every action on it applies.
-  // The Item Detail modal (Market's `ItemActionsProvider`) and `CompareDrawer`
-  // sit outside Market's section guards, so Show Info and Add to Compare work
-  // from this tab without a second copy of either.
-  // Takes the item's lines out of the text box and prices what is left. Gone
-  // is gone, with no confirmation: pasting the list again brings it back. A
-  // fit has no such thing as one item's lines, so it carries no Remove.
   const canRemoveRows = !looksLikeEftFit(text);
   function removeRow(name: string) {
     const next = removeItemFromPaste(text, name);

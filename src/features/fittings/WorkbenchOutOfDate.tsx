@@ -1,13 +1,7 @@
-/**
- * The Workbench tab's **Out-of-date fit** note (issue #2485). An out-of-date
- * fit is never listed; this says the check is running, then — when it hid
- * every fit — why the list is empty. The check itself is `workbenchHullRows.ts`.
- */
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import type { WorkbenchHullRows } from './workbenchHullRows';
 
-/** Below the list: the check's progress, then a note when every fit is out of date. */
 export function OutOfDateNote({
   list,
 }: {

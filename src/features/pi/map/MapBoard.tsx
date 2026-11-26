@@ -1,22 +1,3 @@
-/**
- * The map itself: planets, then P0 to P4, each a column of real buttons
- * (planets) and links (products) in list markup, with SVG wires drawn behind
- * them.
- *
- * - **Non-visual equivalent.** Every tier is a labelled `<section>` with a
- *   heading and a `<ul>`; each product is a link to its PI detail (`?product=`,
- *   DESIGN.md §6c "Entities", Overrides) whose accessible name is the
- *   whole comparison sentence and price. The wires are `aria-hidden`: the chain
- *   they show is also written out in the detail panel.
- * - **Keyboard.** One tab stop for the whole board (roving `tabIndex`). Up and
- *   Down walk a column, Left and Right hop to the neighbouring column at about
- *   the same height, Home and End jump to a column's ends. Enter or Space on
- *   a product clicks it (PlanMap traces or clears); on a planet, toggles it
- *   or opens "add a planet".
- * - **Ghost slots.** What the ticked planets cannot make keeps its place as an
- *   empty, `aria-hidden` slot so the layout never jumps, and it is not a tab
- *   stop.
- */
 import {
   useCallback,
   useEffect,
@@ -71,34 +52,22 @@ const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 export interface MapBoardProps {
   graph: MapGraph;
   owned: ReadonlySet<PlanetType>;
-  /** No colony yet: every type is in play and each is a plain toggle. */
   noColonies: boolean;
-  /** Planet types the map is filtered to: what it can make is lit, the rest leaves ghost slots. */
   ticked: ReadonlySet<PlanetType>;
-  /** Missing planet types the traced product needs: drawn lit, tagged NEED, though not ticked. */
   needTypes: ReadonlySet<PlanetType>;
-  /** Products the ticked planet types can make. */
   litIds: ReadonlySet<number>;
-  /** Products a what-if planet (hovered, focused or open in the detail panel) would unlock. */
   newIds: ReadonlySet<number>;
-  /** The what-if planet types shown (the ticked set, or the one hovered); none the pilot has. */
   whatIfTypes: ReadonlySet<PlanetType>;
-  /** The what-if types ticked, which the planet toggles read as pressed (a hovered one is not). */
   whatIfTicked: ReadonlySet<PlanetType>;
   trace: Trace | null;
-  /** Fade everything off the trace: only once the pilot traced something themselves. */
   dimOthers: boolean;
-  /** Product -> its pick rank (1 to 3). */
   pickRanks: ReadonlyMap<number, number>;
-  /** Planet type -> the pick ranks that use it. */
   pickPlanets: ReadonlyMap<PlanetType, number[]>;
-  /** Planet type -> names of the pilot's colonies on it. */
   colonyNames: ReadonlyMap<PlanetType, string[]>;
   figureOf: (typeId: number) => ProductFigure;
   onPlanet: (type: PlanetType) => void;
   onPreview: (type: PlanetType | null) => void;
   onProduct: (typeId: number) => void;
-  /** The product's PI detail URL: a tile is a real link, so new tab and copy link work. */
   productHref: (typeId: number) => string;
 }
 
@@ -109,7 +78,6 @@ const productKey = (typeId: number): Key => `p:${typeId}`;
 interface Wire {
   d: string;
   cls: string;
-  /** Where the wire meets its two nodes: dotted while the pointer or focus is on one of them. */
   ends?: readonly [{ x: number; y: number }, { x: number; y: number }];
 }
 
@@ -124,7 +92,6 @@ export function MapBoard(props: MapBoardProps) {
   const { edges, pageScroll } = useScrollEdges(scrollerRef, boardRef);
   const nodes = useRef(new Map<Key, HTMLElement>());
   const [focusKey, setFocusKey] = useState<Key | null>(null);
-  /** The node under the pointer or focus: its own wires stand out, the rest step back. */
   const [aim, setAim] = useState<Key | null>(null);
   const aimEvents = (key: Key) => ({
     onPointerEnter: (event: PointerEvent<HTMLElement>) => {
@@ -138,7 +105,6 @@ export function MapBoard(props: MapBoardProps) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [layoutVersion, setLayoutVersion] = useState(0);
 
-  // Hovering a product lights its whole chain back to the planets, as a click would trace it.
   const hover = useMemo(() => {
     const id = aim?.startsWith('p:') ? Number(aim.slice(2)) : null;
     if (id === null || !graph.byId.has(id)) return null;
@@ -154,7 +120,6 @@ export function MapBoard(props: MapBoardProps) {
     [litIds, newIds]
   );
 
-  // The columns in tab order, each a list of focusable keys.
   const columns = useMemo<Key[][]>(
     () => [
       graph.planetTypes.map(planetKey),
@@ -178,7 +143,6 @@ export function MapBoard(props: MapBoardProps) {
     []
   );
 
-  // --- Wires ---------------------------------------------------------------
   useEffect(() => {
     const board = boardRef.current;
     if (!board || typeof ResizeObserver === 'undefined') return;
@@ -232,7 +196,6 @@ export function MapBoard(props: MapBoardProps) {
           (aim === productKey(input) ||
             aim === productKey(product.typeId) ||
             ((hover?.edges.has(key) ?? false) && visible(input) && visible(product.typeId)));
-        // A wire that jumps a column crosses tiles: dashed, so it reads as a skip.
         const skips =
           (graph.byId.get(input)?.tier ?? 0) + 1 < product.tier ? '[stroke-dasharray:6_4]' : '';
         if (mine) {
@@ -251,7 +214,6 @@ export function MapBoard(props: MapBoardProps) {
         } else if (litIds.has(product.typeId) && litIds.has(input)) {
           base.push({
             d: curve(a, b),
-            // Off-path wires step back whenever a chain is lit, so the lit one is what the eye follows.
             cls: cx(
               aim || quiet
                 ? 'stroke-line/20'
@@ -307,7 +269,6 @@ export function MapBoard(props: MapBoardProps) {
     layoutVersion,
   ]);
 
-  // --- Roving focus --------------------------------------------------------
   function move(key: Key, event: KeyboardEvent<HTMLElement>) {
     const col = columns.findIndex((c) => c.includes(key));
     if (col < 0) return;
@@ -362,9 +323,6 @@ export function MapBoard(props: MapBoardProps) {
   const inTrace = (typeId: number) => trace?.ids.has(typeId) ?? false;
 
   return (
-    // The frame holds the edge chevrons outside the scroller: its fade mask
-    // would fade a chevron inside it. Both are md+ only; the phone layout
-    // owns a clipped board there ("Show full map").
     <div className="relative">
       {wide &&
         (['before', 'after'] as const).map((side) =>
@@ -399,8 +357,6 @@ export function MapBoard(props: MapBoardProps) {
           ref={boardRef}
           role="group"
           onBlur={(event) => {
-            // The what-if preview lives while focus moves within the board (a
-            // planet to a tile it unlocked); it ends only when focus leaves.
             if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
           }}
           aria-labelledby={headingId}
@@ -435,7 +391,6 @@ export function MapBoard(props: MapBoardProps) {
             )}
           </svg>
 
-          {/* Planets */}
           <section
             aria-labelledby={`${headingId}-planets`}
             className="sticky left-0 z-10 box-content flex flex-col bg-panel pl-3 shadow-[1px_0_0_var(--color-line)]"
@@ -630,7 +585,6 @@ export function MapBoard(props: MapBoardProps) {
                   );
                 })}
               </ul>
-              {/* Gaps carry no fill (a grey box read as a broken tile); a column left with none says why. */}
               {graph.tiers[tier].every((product) => !visible(product.typeId)) && (
                 <p className="pointer-events-none absolute inset-x-0 top-1/2 px-2 text-center text-[0.6875rem] text-text-dim">
                   {t('piMap.columnNone')}
@@ -675,7 +629,6 @@ function PlanetToggle({
 }: {
   type: PlanetType;
   have: boolean;
-  /** A plain show/hide toggle: the pilot has this type, or has no colony at all. */
   togglable: boolean;
   pressed: boolean;
   names: string[];
@@ -715,16 +668,13 @@ function PlanetToggle({
         aria-label={label}
         onFocus={() => {
           props.onFocusKey();
-          // Landing on a planet the pilot has ends any other planet's preview.
           props.onPreview(previewable ? type : null);
         }}
         onPointerEnter={(event) => {
-          // Touch fires enter on tap with no leave, which would stick the preview.
           if (event.pointerType === 'mouse' && previewable) props.onPreview(type);
         }}
         onPointerLeave={(event) => {
           if (event.pointerType !== 'mouse' || !previewable) return;
-          // A focused tile this preview unlocked must not vanish under the pointer.
           const active = document.activeElement;
           if (active instanceof HTMLElement && active.dataset.mapKey?.startsWith('p:')) {
             if (props.boardRef.current?.contains(active)) return;

@@ -1,10 +1,3 @@
-/**
- * "What to do with this ore" (issue #2836): how much of an ore stock a plan
- * could use as minerals, and which ore to give up first.
- *
- * Pure. Yields come from `reprocessing.ts`, which refuses to guess the
- * facility or the tax; the caller states those assumptions.
- */
 import { reprocessingValue, reprocessingYield, type ReprocessingMaterial } from './reprocessing';
 import { netOfReprocessingTax } from './refiningSetup';
 
@@ -13,9 +6,7 @@ export interface OreStack {
   units: number;
   portionSize: number;
   materials: readonly ReprocessingMaterial[];
-  /** From `reprocessingEfficiency` / `refiningEfficiency`. */
   efficiency: number;
-  /** What one unit fetches sold raw; decides which ore is used first. */
   rawUnitPrice: number;
 }
 
@@ -23,25 +14,15 @@ export interface OreAllocation {
   typeId: number;
   batchesUsed: number;
   unitsUsed: number;
-  /** Ore left over: unused batches plus the part-portion remainder. */
   unitsNotUsed: number;
-  /** Minerals credited to the plan, capped at what it still needed. */
   credited: Record<number, number>;
 }
 
 export interface OreAllocationResult {
-  /** One entry per input stack, in input order. */
   ores: OreAllocation[];
-  /** Total minerals credited per type id. */
   covered: Record<number, number>;
 }
 
-/**
- * Spread ore stacks over a plan's mineral needs. The ore that costs least to
- * give up (raw value per unit of needed mineral) goes first; each is capped at
- * what the plan still needs. An ore refining into several needed minerals is
- * taken once and credits every mineral it yields.
- */
 export function allocateOreToNeeds(
   needs: Readonly<Record<number, number>>,
   stacks: readonly OreStack[]
@@ -110,7 +91,6 @@ export interface MineralCoverage {
   typeId: number;
   need: number;
   covered: number;
-  /** 0-100, rounded. */
   percent: number;
 }
 
@@ -127,22 +107,17 @@ export function planCoverage(
 }
 
 export interface OreExitValues {
-  /** Net of sales tax, at the buy price given. 0 when unpriced. */
   sellRaw: number;
-  /** Refined minerals, net of sales tax. A floor when `pricedAll` is false. */
   refineThenSell: number;
   outputs: ReprocessingMaterial[];
-  /** The portion trap: units that refine into nothing. */
   unitsLeftOver: number;
   pricedAll: boolean;
 }
 
-/** Sell raw against refine-then-sell for one stack, both at the same buy prices and tax. */
 export function valueOreExits(input: {
   stack: Pick<OreStack, 'units' | 'portionSize' | 'materials' | 'efficiency' | 'rawUnitPrice'>;
   mineralPrices: Readonly<Record<number, number>>;
   salesTaxPct: number;
-  /** The facility's reprocessing tax as a fraction of the refined value; absent = none. */
   reprocessingTaxRate?: number;
 }): OreExitValues {
   const { stack, mineralPrices, salesTaxPct, reprocessingTaxRate = 0 } = input;

@@ -1,4 +1,3 @@
-/** A pilot's own loss, opened from "Or pick a lost ship": the payout, the facts, the fit checked against doctrine, File claim. */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
@@ -20,11 +19,9 @@ import {
 
 interface Props {
   subject: KillmailSubject;
-  /** Only an open loss can be filed. */
   canFile: boolean;
   busy: boolean;
   previewDoctrine: (killmail: string) => Promise<DoctrinePreview>;
-  /** With the doctrine check the modal read, so filing need not read it again. */
   onFile: (check?: DoctrineCheckRecord) => void;
   onClose: () => void;
 }
@@ -36,7 +33,6 @@ function usePreview(
   const { killmailId, killmailHash } = subject;
   const load = useCallback(
     () => previewDoctrine(esiKillmailLink(killmailId, killmailHash)),
-    // `previewDoctrine` is a stable callback of the page; the loss is the only input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [killmailId, killmailHash]
   );

@@ -1,12 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { LiveNote, LiveStatus } from './LiveStatus';
 
-/**
- * Visually hidden polite live region (WCAG 4.1.3, §7). It has no visual cue
- * by design; the story renders it next to visible text for context.
- *
- * @summary Screen-reader status message for results, "Copied" and failed loads.
- */
 const meta = {
   title: 'ui/LiveStatus',
   component: LiveStatus,
@@ -25,16 +19,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Status message (§7): a result count read out politely when it changes. */
 export const ResultCount: Story = {};
 
-/** @summary Status message (§7): `announceKey` re-reads identical text ("Copied" twice). */
 export const Reannounce: Story = { args: { children: 'Copied', announceKey: 1 } };
 
-/** @summary Status message (§7): an empty region is silent but stays mounted. */
 export const Silent: Story = { args: { children: null } };
 
-/** @summary Visible notice (§7): `LiveNote` shows the text and announces it politely. */
 export const VisibleNotice: StoryObj<typeof LiveNote> = {
   render: () => <LiveNote className="text-xs text-warning">Prices are a day old.</LiveNote>,
 };

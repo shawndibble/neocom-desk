@@ -48,7 +48,6 @@ function Filters() {
           const next = new Set(values.types);
           if (next.has('b')) next.delete('b');
           else next.add('b');
-          // The whole object, as a filter bar passes it: text unchanged.
           setValues({ q: values.q, types: next, only: values.only });
         }}
       >
@@ -101,7 +100,6 @@ describe('useUrlParams', () => {
     await user.click(screen.getByRole('button', { name: 'toggle b' }));
     expect(probe()).toBe('/p?types=a%2Cc|REPLACE');
     await user.click(screen.getByRole('button', { name: 'toggle b' }));
-    // Back to every member: the default, so the key is gone again.
     expect(probe()).toBe('/p|REPLACE');
   });
 
@@ -131,7 +129,6 @@ describe('useUrlParams', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderAt('/p?types=a');
-    // Each keystroke passes `types` along unchanged; it must not force a write.
     await user.type(screen.getByLabelText('search'), 'zz');
     expect(probe()).toBe('/p?types=a|POP');
   });
@@ -279,15 +276,12 @@ describe('useUrlFilter', () => {
     const user = userEvent.setup();
     renderAt('/p', <Deferred />);
     await user.type(screen.getByLabelText('text'), 'x');
-    // Some render showed the typed text in the box while rows still read the old filter...
     expect(seen).toContainEqual(['x', '']);
-    // ...and the rows caught up once React got to the deferred pass.
     expect(seen.at(-1)).toEqual(['x', 'x']);
   });
 });
 
 describe('useRememberedUrlParams', () => {
-  /** `q` is URL-only; `max` and `only` have a remembered default behind them. */
   const GROUP = { q: textParam(), max: textParam(), only: boolParam() };
   type Stored = { max: string; only: boolean };
   type GroupValues = { q: string; max: string; only: boolean };
@@ -329,7 +323,6 @@ describe('useRememberedUrlParams', () => {
           value={values.max}
           onChange={(event) => setValues({ ...values, max: event.target.value })}
         />
-        {/* The whole object, as a filter bar commits it. */}
         <button type="button" onClick={() => setValues({ ...values, only: !values.only })}>
           toggle only
         </button>
@@ -432,7 +425,6 @@ describe('useRememberedUrlParams', () => {
 
     rerender({ ...props, hydrated: true });
 
-    // `q` has no stored default, so there is nothing to adopt it into.
     expect(onRemember).toHaveBeenCalledTimes(1);
     expect(onRemember).toHaveBeenCalledWith({ max: '10' });
     expect(stored()).toBe('10|false');
@@ -455,11 +447,9 @@ describe('useRememberedUrlParams', () => {
 });
 
 const IDS = orderedIdListParam();
-/** Holds every navigation's transition open until `release` runs: a slow page's render. */
 const hold: {
   promise: Promise<void> | null;
   release: () => void;
-  /** Hold every move off this entry; unset, hold any move to a non-empty search. */
   fromKey?: string;
   shownKey?: string;
 } = {
@@ -478,7 +468,6 @@ function holdNavigations({ offShown = false } = {}) {
 function HoldNavigation() {
   const { search, key } = useLocation();
   const held = hold.fromKey === undefined ? search !== '' : key !== hold.fromKey;
-  // Thrown, not `use`d: under `use` the held transition never landed after release.
   useLayoutEffect(() => {
     hold.shownKey = key;
   });
@@ -587,7 +576,6 @@ describe('useUrlParam writes from two hooks', () => {
     );
     await user.click(screen.getByRole('button', { name: 'push a' }));
     expect(probe()).toBe('/p?a=1|PUSH');
-    // Back's own navigation is the slow one: `?a=1` stays on screen.
     holdNavigations({ offShown: true });
     await user.click(screen.getByRole('button', { name: 'back' }));
     expect(probe()).toBe('/p?a=1|PUSH');

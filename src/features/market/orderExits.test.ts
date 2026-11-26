@@ -57,7 +57,6 @@ describe('orderExits', () => {
       worstScope: 'station',
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
     };
-    // undercutPrice(450) = 449.90 — one legal tick under the rival, never a tie.
     const exit = orderExits({ row }).find((e) => e.kind === 'undercutStation');
     expect(exit?.price).toBe(449.9);
     expect(exit?.netPerUnit).toBeCloseTo(49.9, 6);
@@ -79,7 +78,6 @@ describe('orderExits', () => {
     const competitors = [
       buyOrder({ orderId: 2, price: 320 }),
       buyOrder({ orderId: 3, price: 350 }),
-      // A sell order at the same station is not an exit.
       buyOrder({ orderId: 4, price: 900, isBuyOrder: false }),
     ];
     expect(orderExits({ row: BASE_ROW, competitors })).toContainEqual({
@@ -159,12 +157,9 @@ describe('orderExits', () => {
 
   describe('reprocess and sell the materials', () => {
     const SKILLS = NO_CHARACTER_MODIFIERS;
-    /** 10 units refine into 1,000 Tritanium at 100%; at the assumed 50% station that is 500. */
     const ENTRY = { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] };
 
     it('prices the materials across the units actually refined, not the units on hand', () => {
-      // 10 of the 10 units on hand refine -> 500 Tritanium at 2 ISK = 1,000
-      // ISK over 10 units = 100 a unit, against a fill floor of 380.
       const exits = orderExits({
         row: BASE_ROW,
         reprocessing: { entry: ENTRY, modifiers: SKILLS, materialPrices: { 34: 2 } },
@@ -179,7 +174,6 @@ describe('orderExits', () => {
     });
 
     it("refines at the pilot's own facility yield and pays its tax", () => {
-      // 10 units -> 1,000 Tritanium at 100%; 60% yield = 600 at 2 ISK = 1,200, less 10% tax = 1,080
       const exits = orderExits({
         row: BASE_ROW,
         reprocessing: {

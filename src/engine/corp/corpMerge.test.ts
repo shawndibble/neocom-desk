@@ -21,7 +21,6 @@ describe('mergeCorpRows', () => {
   });
 
   it('keeps a row two corporations both list once, under the first', () => {
-    // A contract between two of the pilot's corporations is in both reads.
     const merged = mergeCorpRows(
       [
         { corporationId: 10, rows: [{ id: 7 }] },

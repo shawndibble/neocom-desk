@@ -1,8 +1,3 @@
-/**
- * The Stock tab's landing view once the pilot stocks two or more markets:
- * one row per market, worst first, so the one that needs restocking is on
- * top. A row opens that market.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -80,7 +75,6 @@ export function StockMarketsList({
       ? t('stockTargets.need.stocked')
       : t(`stockTargets.need.${need}`, { count: market[need] });
   };
-  // Left off a phone card: the need pill already says the market is fine there.
   const zero = (
     <span data-dense-omit className="text-text-dim">
       0
@@ -97,7 +91,6 @@ export function StockMarketsList({
           <Link
             to={hrefOf(market)}
             className="font-medium text-accent [overflow-wrap:anywhere] hover:underline"
-            // The row is the tab stop and opens the market; the link stays for a middle-click.
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
@@ -122,7 +115,6 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
-      // Leads the phone card's meta line, so a stocked market's card still says something.
       render: (market) => (
         <>
           {formatNumber(market.items)}
@@ -210,7 +202,6 @@ export function StockMarketsList({
       header: '',
       align: 'right',
       headerCellClassName: 'sm:w-8',
-      // Closes the phone card's meta line at its right edge, rather than adding a "·" to it.
       stackEdge: 'end',
       render: () => <RowCaret />,
     },

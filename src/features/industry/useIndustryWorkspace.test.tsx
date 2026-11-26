@@ -16,7 +16,6 @@ vi.mock('@/features/character/characterModifiers', () => ({
 }));
 vi.mock('@/sde/loadSde', () => ({ loadPi: () => loadPi() }));
 
-// The hook's other inputs are their own modules' business; stable stubs keep this to the loads.
 const hydrate = vi.fn(async () => {});
 const setValue = vi.fn();
 vi.mock('./facilityDefaults', () => ({
@@ -29,7 +28,6 @@ vi.mock('./reactionFacilityDefaults', () => ({
 vi.mock('./useDetectedOwnedStock', () => ({ useOwnedStockSnapshot: () => ({}) }));
 vi.mock('./corpOwnedStock', () => ({ useCorpOwnedStockSource: () => ({}) }));
 vi.mock('./buildPlanPricingInputs', () => ({ useBuildPlanPricingInputs: () => ({}) }));
-// Selector-callable like a zustand hook, plus the getState/subscribe `useHydratedStore` reads.
 const { settingStub } = vi.hoisted(() => ({
   settingStub: (state: () => object) =>
     Object.assign((select: (s: object) => unknown) => select(state()), {
@@ -74,7 +72,6 @@ describe('useIndustryWorkspace', () => {
     let release: (value: unknown) => void = () => {};
     loadCharacterModifiers.mockReturnValue(new Promise((resolve) => (release = resolve)));
     const { result } = renderHook(() => useIndustryWorkspace());
-    // Let the catalog resolve and the pending reads settle as far as they can.
     await act(async () => {
       await Promise.resolve();
     });

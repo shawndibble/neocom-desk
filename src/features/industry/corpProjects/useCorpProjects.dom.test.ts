@@ -46,8 +46,8 @@ describe('useCorpProjects', () => {
 
   it('reads once per Character that holds the permission and a corporation', async () => {
     await seed(1, 500, [SCOPE]);
-    await seed(2, 500, []); // no permission
-    await seed(3, undefined, [SCOPE]); // no corporation
+    await seed(2, 500, []);
+    await seed(3, undefined, [SCOPE]);
     load.mockResolvedValue({
       cached: { data: [project], fetchedAt: new Date(), fromCache: false, truncated: false },
       needsReauth: false,

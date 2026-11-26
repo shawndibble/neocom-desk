@@ -11,54 +11,26 @@ import { RowTappableContext } from './tooltipHold';
 
 interface SlideOverProps {
   open: boolean;
-  /** Escape or the close button. A click outside never closes it. */
   onClose: () => void;
   title: ReactNode;
   children: ReactNode;
-  /** One quiet line under the title, inside the header (a count, a scope). */
   subtitle?: ReactNode;
-  /** Where focus lands on open instead of the panel itself: the one field the panel exists for. */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** Drop the body's own padding: the children draw their own gutters (full-bleed rows). */
   flush?: boolean;
-  /** Which edge it slides over. */
   side?: 'left' | 'right';
-  /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
-  /** A panel holding a table: up to 64rem wide instead of the 25rem default. */
   wide?: boolean;
-  /** Replaces the 25rem default max width (ignored with `wide`): the Overview Gallery's 460px. */
   maxWidthClassName?: string;
-  /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
-  /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
   returnFocusFallback?: () => HTMLElement | null;
-  /**
-   * Identity of the record shown (a contract id). When it changes while the
-   * panel stays open, the body fades the new record in rather than swapping.
-   */
   contentKey?: string | number;
 }
 
-/** The edge it sits on, and slides in from and back out to (`index.css` "Overlay motion"). */
 const SIDE_CLASS = {
   left: 'left-0 border-r motion-slide-left',
   right: 'right-0 border-l motion-slide-right',
 } as const;
 
-/**
- * A non-modal panel that slides over one edge of the page, on Radix's
- * `Dialog` with `modal={false}` (docs/adr/0008) for its Escape handling,
- * focus management and labelling.
- *
- * Unlike `Modal`, the page behind stays live: nothing goes inert, there is
- * no backdrop, and a click outside is not a dismissal — so the page can keep
- * steering what the panel shows (the Fitting editor retargets its Add panel
- * from the Ring behind it) and take drops dragged out of it.
- *
- * Escape, the close button and Back all close it; `env(safe-area-inset-bottom)`
- * keeps its last row clear of a phone's home indicator.
- */
 export function SlideOver({
   open,
   onClose,
@@ -77,10 +49,7 @@ export function SlideOver({
 }: SlideOverProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  // Back closes it, like every other overlay (§6c).
   useOverlayHistory(open, onClose, closeOnBack);
-  // Radix has no Trigger here, so it cannot return focus on close: remember
-  // what held focus as the panel opened and give it back.
   const opener = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (!open) return;
@@ -90,7 +59,6 @@ export function SlideOver({
   return (
     <DialogPrimitive.Root
       open={open}
-      // Near full-screen on a phone, so the page behind is not usable: trap focus there.
       modal={isPhone}
       onOpenChange={(next) => {
         if (!next) onClose();
@@ -100,27 +68,17 @@ export function SlideOver({
         <DialogPrimitive.Content
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => {
-            // An open Modal (Add or a confirm opened from inside the panel)
-            // owns this Escape and closes alone; Radix would otherwise close
-            // both. Asked of the page, not the event target: focus may be on
-            // the body while the Modal is up.
             if (document.querySelector('dialog[open]')) event.preventDefault();
           }}
           aria-describedby={undefined}
-          // Lets a page that has room reserve the panel's width (`body:has([data-slide-over=right])`).
           data-slide-over={side}
           tabIndex={-1}
           onOpenAutoFocus={(event) => {
-            // Focus the panel, not its first control: the Close button's
-            // tooltip would otherwise open on this programmatic focus and eat
-            // the first Escape. The dialog's title is announced instead.
             event.preventDefault();
             const target = initialFocusRef?.current ?? (event.currentTarget as HTMLElement);
             target.focus({ preventScroll: true });
           }}
           onCloseAutoFocus={(event) => {
-            // The opener may be gone (a recycled list row, a page that changed
-            // under it): then the fallback, else Radix's default.
             const kept = opener.current;
             opener.current = null;
             const target = kept?.isConnected ? kept : (returnFocusFallback?.() ?? null);
@@ -153,11 +111,6 @@ export function SlideOver({
   );
 }
 
-/**
- * Its own component so it mounts with the panel's content (Radix portals one
- * render late): the fade then runs as the panel opens and on each new
- * `contentKey`, never on a re-render of the same record.
- */
 function SlideOverBody({
   flush,
   contentKey,

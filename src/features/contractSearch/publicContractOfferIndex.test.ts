@@ -6,7 +6,6 @@ import { loadOfferIndex, loadOffersForTypes, offerIndexFromR2 } from './publicCo
 
 const getDoc = vi.hoisted(() => vi.fn());
 
-// R2 is the only store (issue #4270): this spy proves nothing reaches Firestore.
 vi.mock('firebase/firestore/lite', () => ({ getDoc, doc: vi.fn() }));
 
 const row = (typeId: number, contractId: number) => ({ typeId, contractId });

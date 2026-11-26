@@ -58,7 +58,6 @@ describe('orderFloor', () => {
     });
     expect(withoutSkill).not.toBeNull();
     expect(withSkill).not.toBeNull();
-    // Both get the base discount; higher skill level narrows the gap further.
     expect(withSkill!.relist).toBeLessThan(withoutSkill!.relist);
     expect(withoutSkill!.relist).toBeLessThan(breakEvenPrice(1_000_000, 1, 0, 0) as number);
   });
@@ -77,7 +76,6 @@ describe('orderFloor', () => {
     const tax = salesTaxPct(accountingLevel);
     const expectedFill = unitCost / (1 - tax / 100);
     expect(result?.fill).toBeCloseTo(expectedFill, 6);
-    // sanity: filling at `fill` and paying sales tax nets exactly unitCost
     expect(result!.fill * (1 - tax / 100)).toBeCloseTo(unitCost, 6);
   });
 
@@ -128,7 +126,6 @@ describe('orderFloor', () => {
     expect(base).not.toBeNull();
     expect(withStandings).not.toBeNull();
     expect(withStandings!.relist).toBeLessThan(base!.relist);
-    // fill has no broker fee, so standings do not move it
     expect(withStandings!.fill).toBeCloseTo(base!.fill, 6);
   });
 
@@ -212,8 +209,6 @@ describe('orderFloor', () => {
   });
 
   it('re-solves the 100 ISK minimum broker fee once against the whole remaining stack, not per unit', () => {
-    // A cheap item where 3% of a single unit's value is nowhere near 100 ISK,
-    // but the stack of 10,000 units easily clears it via the percentage fee.
     const unitCost = 10;
     const remainingQuantity = 10_000;
     const accountingLevel = 5;
@@ -234,20 +229,10 @@ describe('orderFloor', () => {
       advancedBrokerRelationsLevel
     );
     expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
-    // The bug this pins: charging the 100 ISK minimum per unit would inflate
-    // relist to roughly unitCost + tax + 100. The correct per-stack minimum
-    // spreads 100 ISK across all 10,000 units, landing just above unitCost.
     expect(result!.relist).toBeLessThan(unitCost + 5);
   });
 
   it('spreads the 100 ISK minimum across a stack whose percentage fee alone would still fall short of it', () => {
-    // Percentage fee on the whole 100-unit stack is still under the 100 ISK
-    // minimum even after the Relist Discount, so the minimum applies once and
-    // is spread across all 100 units — not the qty-1 case, and not a stack
-    // large enough to clear the minimum on percentage fee alone. The minimum
-    // re-solve (totalCost + 100) / (1 - taxPct/100) does not depend on the
-    // broker rate at all, so this lands at the same figure with or without
-    // the Relist Discount.
     const unitCost = 10;
     const remainingQuantity = 100;
     const accountingLevel = 5;
@@ -292,8 +277,6 @@ describe('orderFloor', () => {
     });
     expect(singleUnit).not.toBeNull();
     expect(bigStack).not.toBeNull();
-    // Single unit still eats the full 100 ISK minimum; a 10,000-unit stack
-    // spreads that same 100 ISK to a fraction of an ISK per unit.
     expect(singleUnit!.relist).toBeGreaterThan(100);
     expect(bigStack!.relist).toBeLessThan(unitCost + 5);
   });

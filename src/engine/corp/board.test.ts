@@ -16,7 +16,6 @@ import {
 
 const NOW = Date.parse('2026-09-03T12:00:00Z');
 
-/** The window corp reads are cached for — ESI's own ~1h on the structures endpoint. */
 const STALE_WINDOW = HOUR_MS;
 
 const at = (ms: number) => NOW + ms;
@@ -38,18 +37,11 @@ function board(sources: Parameters<typeof buildCorpBoard>[0]): CorpBoardItem[] {
   return buildCorpBoard(sources);
 }
 
-/** The common case: only structures, only the fuel clock. */
 function fuelBoard(structures: readonly BoardStructureSource[]): CorpBoardItem[] {
   return board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, structures });
 }
 
 describe('severityForRemaining', () => {
-  /**
-   * The heart of AC2: one ladder, called by every source. A Fortizar with 25
-   * days of fuel and an Athanor with 2 are the same kind of item at very
-   * different urgencies, and nothing about *which endpoint they came from*
-   * may enter into it.
-   */
   it('derives urgency from time alone, identically for every source', () => {
     expect(severityForRemaining(25 * DAY_MS, 'logistics')).toBe('clear');
     expect(severityForRemaining(2 * DAY_MS, 'logistics')).toBe('warning');
@@ -68,12 +60,6 @@ describe('severityForRemaining', () => {
     expect(severityForRemaining(-90 * DAY_MS)).toBe('critical');
   });
 
-  /**
-   * An offline service has no clock to rank by, so it cannot derive a level.
-   * It takes the middle tone rather than the top: it is a real fault, but a
-   * standing one, and shouting it over a structure that runs dry tonight
-   * would invert the board's whole ordering.
-   */
   it('gives an item with no clock the middle tone rather than none or the top', () => {
     expect(severityForRemaining(null)).toBe('warning');
   });
@@ -90,12 +76,6 @@ describe('structure fuel', () => {
     expect(item.severity).toBe('warning');
   });
 
-  /**
-   * `fuel_expires` is absent exactly when it matters most: ESI drops the field
-   * once the structure has run dry. Reading that as "no timer" would sort a
-   * dead Fortizar to the bottom of the board, under a moon chunk three weeks
-   * out.
-   */
   it('reads an absent fuel_expires as already dry, not as untimed', () => {
     const [item] = fuelBoard([structure({ fuelExpiresMs: null })]);
     expect(item.timing).toBe('passed');
@@ -141,7 +121,6 @@ describe('structure state timers', () => {
       }),
     ]);
     expect(items.filter((item) => item.kind === 'structureTimer')).toHaveLength(2);
-    // Two items about one structure must not collide as React keys.
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
   });
 
@@ -169,11 +148,6 @@ describe('offline services', () => {
     expect(offline[0].remainingMs).toBeNull();
   });
 
-  /**
-   * `cleanup` is the transient state a service passes through on its way
-   * offline, not a fault someone has to act on — it resolves itself within
-   * minutes, long before an hour-stale board could report it usefully.
-   */
   it('ignores a service in the transient cleanup state', () => {
     const items = fuelBoard([
       structure({ services: [{ name: 'Reprocessing', state: 'cleanup' }] }),
@@ -214,12 +188,6 @@ describe('moon extractions', () => {
     expect(item.detail).toBe('arrival');
   });
 
-  /**
-   * Past arrival the chunk is fracturable and the clock that matters is the
-   * one that ends it: an unfractured chunk breaks up on its own and the ore is
-   * gone. Keeping the arrival deadline here would show an op as overdue when
-   * there are still two days to run it.
-   */
   it('switches to natural decay once the chunk has arrived', () => {
     const [item] = board({
       nowMs: NOW,
@@ -263,12 +231,6 @@ describe('industry jobs', () => {
     expect(item.severity).toBe('critical');
   });
 
-  /**
-   * The board never resolves a name or opens a menu; it only carries the
-   * product's type id through so the view can (issue #419's context menu —
-   * "check Market for a job's product"). `null` on every other kind — a
-   * structure or a moon chunk has no market-relevant item of its own.
-   */
   it('carries the job source’s type id through, and null for every other kind', () => {
     const [jobItem] = board({
       nowMs: NOW,
@@ -300,12 +262,6 @@ describe('industry jobs', () => {
     expect(items).toEqual([]);
   });
 
-  /**
-   * ESI frequently leaves a finished job's `status` at `active` past its
-   * `end_date` — the Industry tab already treats a job as done once its
-   * clock runs out regardless of what ESI reports. The corp board must
-   * agree, or a job can sit undelivered for days without ever surfacing here.
-   */
   it('raises an active job whose end time has already passed', () => {
     const [item] = board({
       nowMs: NOW,
@@ -330,11 +286,6 @@ describe('industry jobs', () => {
     expect(items).toEqual([]);
   });
 
-  /**
-   * The longer a job sits, the more overdue it is — so the sort key must not
-   * be clamped at zero the way a display countdown is, or every undelivered
-   * job in the corp collapses into one tie.
-   */
   it('orders overdue jobs by how long they have been sitting', () => {
     const items = board({
       nowMs: NOW,
@@ -351,10 +302,6 @@ describe('industry jobs', () => {
 });
 
 describe('the interleaved board', () => {
-  /**
-   * AC2: one ordered list mixing every source, which is the whole feature —
-   * these five clocks live in four ESI endpoints and four windows in game.
-   */
   it('interleaves all five item kinds by deadline, ignoring which endpoint they came from', () => {
     const items = board({
       nowMs: NOW,
@@ -389,20 +336,14 @@ describe('the interleaved board', () => {
     });
 
     expect(items.map((item) => item.kind)).toEqual([
-      'jobDelivery', // 6h overdue
-      'structureTimer', // 10h
-      'moonExtraction', // 2d
-      'structureFuel', // 4d
-      'serviceOffline', // no clock — last
+      'jobDelivery',
+      'structureTimer',
+      'moonExtraction',
+      'structureFuel',
+      'serviceOffline',
     ]);
   });
 
-  /**
-   * Array.prototype.sort is stable, so equal deadlines would otherwise inherit
-   * whatever order the caller happened to concatenate its sources in — an
-   * ordering that is an accident of this function's internals rather than a
-   * decision. Ties resolve on kind, then on id.
-   */
   it('breaks ties on kind order and then id, not on the order sources were passed', () => {
     const sameInstant = at(3 * DAY_MS);
     const items = board({
@@ -445,13 +386,6 @@ describe('the interleaved board', () => {
 });
 
 describe('short timers against an hour-stale cache', () => {
-  /**
-   * The failure mode the ticket names: CCP caches corp structures for about an
-   * hour, so a twelve-minute armor timer read from this board may already have
-   * run out. Marking it here, in the pure layer, is what lets the view refuse
-   * to render it as a live countdown — and what makes that refusal testable
-   * rather than a comment in JSX.
-   */
   it('marks a clock shorter than the cache window as untrustworthy', () => {
     const timer = fuelBoard([
       structure({ state: 'shield_vulnerable', stateTimerEndMs: at(12 * MINUTE_MS) }),
@@ -464,11 +398,6 @@ describe('short timers against an hour-stale cache', () => {
     expect(item.withinStaleWindow).toBe(false);
   });
 
-  /**
-   * A deadline already behind us is certain: time only moves forward, so no
-   * amount of cache age can put it back in the future. The doubt is only ever
-   * about a countdown shorter than the window.
-   */
   it('does not doubt a deadline that has already passed', () => {
     const items = board({
       nowMs: NOW,
@@ -670,7 +599,6 @@ describe('mergeCorpBoards', () => {
       [500, at(5 * DAY_MS)],
       [600, at(9 * DAY_MS)],
     ]);
-    // The same structure id in two corporations stays two rows with distinct keys.
     expect(new Set(merged.map((item) => item.id)).size).toBe(3);
   });
 

@@ -1,8 +1,3 @@
-/**
- * New Mail composer wiring, with ESI send, draft store, mailing lists and
- * search mocked. The rules themselves (caps, validation) are covered in
- * `engine/mailCompose.test.ts`.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -106,8 +101,6 @@ describe('send-mail Permission', () => {
   it('offers the grant note when the stored grant lacks it', async () => {
     lacks.value = true;
     setup();
-    // The recipient picker's search note is for the same Character, so the two
-    // fold into one banner (search is Core Grant: only Send mail is named).
     expect(await screen.findByText('This character: grant Send mail')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Grant in EVE' })).toHaveLength(1);
   });

@@ -15,27 +15,16 @@ import { unknownCharacterName, type PlayerGroup } from './playerRows';
 const NO_IDS: ReadonlySet<number> = new Set();
 
 export interface RosterGrouping {
-  /** An officer who can edit an active book: the roster offers "Group with". */
   canGroup: boolean;
-  /** The stored group a character is in, if it is in one. */
   groupOf: (characterId: number) => Miner | undefined;
-  /** Names for every character in a group, or a choice (empty until read). */
   names: ReadonlyMap<number, string>;
-  /** The dialog's data, for the Miner of `characterId` (a stored group or the character alone). */
   source: GroupSource;
-  /** Every stored group with its claim state, for the Players view. */
   groups: readonly PlayerGroup[];
-  /** Characters two groups claim, and ones that declined a link. */
   conflictIds: ReadonlySet<number>;
   declinedIds: ReadonlySet<number>;
   reload: () => void;
 }
 
-/**
- * What the Members roster needs to show and edit groups (the roster sits outside the Corp Tax
- * Book's page, so it reads the book itself). Quiet: a Character that is no officer, or a corporation
- * with no book, simply gets no grouping.
- */
 export function useRosterGrouping(
   characterId: number | null,
   corporationId: number | null
@@ -92,9 +81,7 @@ export function useRosterGrouping(
           declinedIds: flags.declinedIds,
           status: 'ready',
         });
-    })().catch(() => {
-      // Not an officer, or the book is unreadable: no grouping on the roster.
-    });
+    })().catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -108,7 +95,6 @@ export function useRosterGrouping(
       canGroup: held !== null,
       groupOf: (id) => miners.find((m) => m.characterIds.includes(id) && m.characterIds.length > 1),
       names,
-      // The stored docs carry the claim lists the engine's `Miner` leaves out.
       groups: miners as readonly PlayerGroup[],
       conflictIds: held?.conflictIds ?? NO_IDS,
       declinedIds: held?.declinedIds ?? NO_IDS,

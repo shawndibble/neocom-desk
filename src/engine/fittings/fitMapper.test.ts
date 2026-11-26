@@ -3,10 +3,6 @@ import { fittingToDogmaFit } from './fitMapper';
 import { mutaplasmidLookup } from './mutaplasmids';
 import type { Fitting, FittingModule, PilotProfile } from './types';
 
-// Real ids from public/data/mutaplasmids.json: Gravid Heavy Energy Neutralizer
-// Mutaplasmid (47831) makes the Heavy Abyssal Energy Neutralizer (47832) from a
-// Heavy Gremlin Compact (16475); Exigent Light Drone Firepower (60461) makes a
-// Light Mutated Drone (60478) from a Hobgoblin I (2454).
 const mutaplasmids = mutaplasmidLookup({
   attributeNames: { 6: 'capacitorNeed', 97: 'energyNeutralizerAmount', 64: 'damageMultiplier' },
   mutaplasmids: {
@@ -234,8 +230,6 @@ describe('fittingToDogmaFit', () => {
   });
 
   it('puts each implant and booster in its own EVE slot, not its place in the list', () => {
-    // A clone with only a slot-10 implant: list position would call it slot 1, and the
-    // engine reports "in a slot it can't use".
     const slotOf = (typeId: number) =>
       typeId === 22535
         ? { kind: 'implant' as const, slot: 10 }
@@ -255,7 +249,6 @@ describe('fittingToDogmaFit', () => {
       slot: { type: 'implant', index: 10 },
       state: 'online',
     });
-    // One the lookup does not know takes the lowest slot no known implant holds.
     expect(dogmaFit.items).toContainEqual({
       type_id: 19540,
       slot: { type: 'implant', index: 1 },
@@ -270,7 +263,6 @@ describe('fittingToDogmaFit', () => {
   });
 
   it('never numbers an implant it cannot place onto a slot a known implant holds', () => {
-    // List position would give the unknown one slot 1, clashing with the known slot-1 implant.
     const slotOf = (typeId: number) =>
       typeId === 9899 ? { kind: 'implant' as const, slot: 1 } : undefined;
     const dogmaFit = fittingToDogmaFit(
@@ -365,12 +357,10 @@ describe('fittingToDogmaFit — Tactical Destroyer modes and booster side effect
     const dogmaFit = fittingToDogmaFit(fitting(), {
       skillLevels: new Map(),
       implantTypeIds: [],
-      // Standard Blue Pill, Standard Drop.
       boosterTypeIds: [9950, 15466],
       boosterSideEffects: [2737, 2749, 2741],
     });
     const booster = (typeId: number) => dogmaFit.items.find((item) => item.type_id === typeId);
-    // Shield capacity is a side effect of both; explosion velocity only the Blue Pill's.
     expect(booster(9950)?.booster_side_effects).toEqual([2737, 2749]);
     expect(booster(15466)?.booster_side_effects).toEqual([2737, 2741]);
   });

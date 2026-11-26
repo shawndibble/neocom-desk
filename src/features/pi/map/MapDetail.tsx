@@ -1,14 +1,3 @@
-/**
- * What the detail panel says: a product (how it is made, chain written out in
- * words, what to find) or an "add a planet" (what it unlocks, the best
- * one-planet recipe, free slots, nearby planets). The same content fills the
- * docked panel, the right-hand drawer and the phone's bottom sheet.
- *
- * The product panel is the PI product detail every product name on the PI tabs
- * opens (DESIGN.md §6c "Entities", Overrides), so its own name is plain text
- * and it carries the two destinations that link displaced: View in Market and
- * Show info.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
 import { formatList } from '@/lib/listFormat';
@@ -41,7 +30,6 @@ import type { ProductDetailView } from './productDetailModel';
 export interface FinderOrigin {
   systemId: number | null;
   name: string | null;
-  /** Home system security, to seed the finder's "Highsec only"; null when unknown. */
   security: number | null;
 }
 
@@ -51,7 +39,6 @@ export interface ProductDetailProps {
   figure: ProductFigure;
   trace: Trace;
   rank: number | null;
-  /** Gain against today for a rebuild pick, or the per-planet figure for a recipe pick. */
   pickPerDay: number | null;
   pickKind: 'rebuild' | 'recipes' | 'none';
   owned: ReadonlySet<PlanetType>;
@@ -64,11 +51,6 @@ export interface ProductDetailProps {
 const names = (graph: MapGraph, ids: readonly number[]) =>
   ids.map((id) => graph.byId.get(id)!.name);
 
-/**
- * A chain of product names, each a link to its own PI detail but the one
- * already open. Names in a group are parallel, joined with commas; an arrow
- * marks the step to the next group.
- */
 function NameChain({
   graph,
   groups,
@@ -107,7 +89,6 @@ export function ProductDetail(props: ProductDetailProps) {
   const { t } = useTranslation();
   const itemActions = useOptionalItemActions();
   const product = graph.byId.get(typeId)!;
-  // Every type can host it: say only the facility, and leave the planets to "You need".
   const anyHost = view.hosts.length === graph.planetTypes.length;
   const hostTypes = anyHost
     ? t('piMap.detail.anyPlanet')
@@ -186,7 +167,6 @@ export function ProductDetail(props: ProductDetailProps) {
       ) : null}
       {view.money.kind !== 'multi-planet' && (
         <p className="mt-2 text-xs text-text">
-          {/* The compared product links to its own detail, as the chain's names do. */}
           <Sentence
             text={comparisonSentence(t, figure, '{name}')}
             slots={{
@@ -311,7 +291,6 @@ export function ProductDetail(props: ProductDetailProps) {
             steps: (
               <NameChain
                 graph={graph}
-                // Direct inputs as one group: a P4 can take a P1 beside its P3s.
                 groups={[view.inputs.map((input) => input.typeId), [typeId]].filter(
                   (group) => group.length > 0
                 )}
@@ -361,7 +340,6 @@ export function ProductDetail(props: ProductDetailProps) {
         </div>
       )}
 
-      {/* A chain estimate states its own basis above; this note is about one-planet figures. */}
       {!(view.money.kind === 'multi-planet' && view.money.estimate) && (
         <p className="mt-4 text-[0.6875rem] leading-snug text-text-dim">
           {t('piMap.estimateNote')}
@@ -376,23 +354,16 @@ export function ProductDetail(props: ProductDetailProps) {
 
 export interface AddPlanetDetailProps {
   graph: MapGraph;
-  /** The planet types being tried, together, sorted. */
   types: readonly PlanetType[];
-  /** Products these planet types unlock together (P1 up). */
   unlockedIds: readonly number[];
-  /** The best one-planet recipe only these types add, priced for them. */
   recipe: RecipeRank | null;
-  /** Recipes that only these types host. */
   oneHostCount: number;
   slots: SlotNudge;
-  /** The pilot's weakest colony today, for "replace one". */
   weakest: { name: string; perDay: number } | null;
   finder: FinderOrigin;
   onTraceRecipe: (typeId: number) => void;
-  /** The recipe's PI detail URL. */
   productHref: (typeId: number) => string;
   onClose: () => void;
-  /** The Bigger chains this type makes possible, when the pilot hauls between planets; left out otherwise. */
   chains?: React.ReactNode;
 }
 

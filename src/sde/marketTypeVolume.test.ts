@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { packagedVolumeOf, type MarketTypeEntry } from '@/sde/marketTypes';
 
-// The shipped snapshot itself, so a rebuild that drops or garbles the
-// volumes fails here rather than in the UI (issue #2336).
 const SNAPSHOT = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/market/types.json'), 'utf8')
 ) as MarketTypeEntry[];

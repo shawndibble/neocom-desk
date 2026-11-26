@@ -27,7 +27,6 @@ describe('summarizeConflicts', () => {
       'Ashfall'
     );
     const soon = row(view({ id: 'soon', billed: 200, resolvesAt: '2026-11-12' }), 'Brass');
-    // A second book on the same day as `soon`: one day, two lines.
     const sameDay = row(view({ id: 'same', billed: 100, resolvesAt: '2026-11-13' }), 'Other');
     const undated = row(view({ id: 'undated', billed: 50, date: '2026-10-29', resolvesAt: '' }));
     const out = summarizeConflicts([
@@ -41,7 +40,6 @@ describe('summarizeConflicts', () => {
     expect(out?.first).toBe(soon);
   });
 
-  // "Not paying" is the member's own answer: nothing to warn about, and it is on the quiet line.
   it('leaves out the days the member chose not to pay', () => {
     const hidden = row(view({ id: 'h', billed: 300, corporationId: 1, characterId: 1 }));
     const shown = row(view({ id: 's', billed: 200, date: '2026-10-29', corporationId: 1 }));
@@ -50,8 +48,6 @@ describe('summarizeConflicts', () => {
     expect(summarizeConflicts([hidden], new Set(['day:1:1:2026-10-28']))).toBeNull();
   });
 
-  // #6206: a day the member has answered still bills on its own 14-day clock, so it stays
-  // counted — `waiting` is what lets the caller stop calling it a warning.
   it('counts a day sent to the corporation, and one whose ore it waived, as waiting', () => {
     const sent = row(
       view({
@@ -113,7 +109,6 @@ describe('summarizeConflicts', () => {
     expect(out?.first).toBe(open);
   });
 
-  // One book answered, another on the same day not: the day still needs the member.
   it('only calls a day waiting once every book contesting it has been answered', () => {
     const answered = row(
       view({

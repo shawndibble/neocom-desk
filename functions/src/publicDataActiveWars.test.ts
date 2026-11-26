@@ -83,7 +83,6 @@ describe('publishActiveWars while seeding', () => {
         put: async (key, body) => {
           stored.set(key, JSON.parse(String(body)));
         },
-        // Ended wars are not held open, so they do not eat the next run's budget.
         fetchImpl: (async (input: string | URL | Request) => {
           const detail = /\/wars\/(\d+)\/$/.exec(String(input));
           return detail

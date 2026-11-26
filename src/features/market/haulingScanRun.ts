@@ -1,9 +1,3 @@
-/**
- * The scan work `useHaulingScan` and `useHaulingFillScan` share: read the SDE
- * the scan needs, pick the type ids, then run the Hauling Opportunities scan.
- * Its own module so a test that mocks `./useHaulingScan` wholesale still gets
- * a working fill scan.
- */
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
@@ -19,9 +13,7 @@ export interface HaulingScanTarget {
   from: HaulingEnd;
   to: HaulingEnd;
   mode: HaulMode;
-  /** See `HaulingScanRequest.scope`. */
   scope: number | string;
-  /** See `HaulingScanRequest.maxUnitPrice`. */
   maxUnitPrice?: number | null;
   typeIds: (
     groups: readonly MarketGroupNode[],
@@ -38,7 +30,6 @@ export async function scanHaulingLane(
     loadMarketGroups(),
     loadMarketTypes(),
     loadTypes(),
-    // Without it every category reads as unknown: items still plan, in the general hold only.
     loadGroupCategories().catch(() => ({})),
   ]);
   return runHaulingScan({

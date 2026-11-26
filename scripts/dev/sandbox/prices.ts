@@ -1,11 +1,3 @@
-/**
- * Open Prices for the sandbox: the R2 host (data.neocomdesk.com/open-prices) answers any type id
- * with a plausible 30-day buy/sell series at each Trade Hub station, so every page that values
- * something (mining, moons, assets, PI, industry) shows ISK instead of "unpriced".
- *
- * Shape: src/features/market/marketOpenPrices.ts (`{dates, stations: {<stationId>: {buy, sell}}}`).
- * The shard route answers an empty shard; the per-type fallback route does the generating.
- */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
@@ -18,38 +10,35 @@ import { mix } from './gen';
 const HUB_STATIONS = TRADE_HUBS.map((hub) => hub.stationId);
 const DAYS = 30;
 
-/** Rough base prices (ISK) for the type ids the sandbox data uses. */
 const BASE_PRICE: Record<number, number> = {
   34: 5,
   35: 10,
   36: 80,
   37: 60,
   38: 1_000,
-  40: 2_200, // minerals
+  40: 2_200,
   1230: 15,
   1228: 20,
-  1224: 25, // ore
+  1224: 25,
   45490: 1_200,
   45491: 1_500,
-  45492: 1_000, // moon ore (the Corp Tax Book seed's prices)
+  45492: 1_000,
   587: 450_000,
   24698: 25_000_000,
   638: 250_000_000,
   16240: 350_000,
   22544: 250_000_000,
   17476: 60_000_000,
-  28606: 700_000_000, // ships
+  28606: 700_000_000,
   2048: 600_000,
   3841: 4_000_000,
   12058: 1_200_000,
   21896: 30,
 };
 
-// Run from the repo root (the skill does): reads the app's own ore tables.
 const readData = <T>(name: string): T =>
   JSON.parse(readFileSync(join(process.cwd(), 'public/data', name), 'utf8')) as T;
 const MOON_ORES = new Set(readData<number[]>('moonOreTypes.json'));
-/** Compressed type id -> raw ore type id. The app prices raw quantity x the Compressed type's per-unit price, so the sandbox prices both alike. */
 const RAW_OF_COMPRESSED = new Map(
   Object.entries(readData<Record<string, number>>('compressedOreTypeIds.json')).map(
     ([raw, compressed]) => [compressed, Number(raw)]

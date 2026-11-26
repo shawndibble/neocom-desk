@@ -4,7 +4,6 @@ import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import type { TrackedCharacter } from '@/features/miningTax/snapshot';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 
-/** Whether and where the Payee manager opens: its target Character, the first-run call to action, and where the header shows its button. */
 export function useTaxPayeeManager(
   hasData: boolean,
   characters: readonly TrackedCharacter[],
@@ -20,9 +19,6 @@ export function useTaxPayeeManager(
     characters[0]?.characterId ??
     null;
 
-  // A corp's book is something to owe on its own: a member with no Payee of their own yet still
-  // sees what the book billed, and the day it will bill (a first day in a book is Today's mining
-  // until it closes: nothing is billed, but the pending record and any payment ahead are theirs).
   const bookHasTheirs =
     corpView !== null &&
     (corpView.overlay.rows.length > 0 || corpView.books.some((b) => b.pendingFrom !== undefined));
@@ -37,9 +33,6 @@ export function useTaxPayeeManager(
     [defaultCharacterId]
   );
 
-  // The header row never wraps (it has a picker): below `md` Payees moves
-  // into the ⋮, except as the accent first-run call to action, which is the
-  // one control an empty tab is waiting on and so stays in sight.
   const canManagePayees = defaultCharacterId !== null;
   const payeesInline = canManagePayees && (payeesFit || needsFirstPayee);
 

@@ -92,9 +92,6 @@ describe('autoBuildDepthContext', () => {
       reactionPlanFacilityContext,
       NO_CHARACTER_MODIFIERS
     );
-    // Ready the instant a Reaction Location is configured — never waiting on
-    // a live systemCostIndex the way the price-resolved reactionFacilityContext
-    // does, which is the bug this seam exists to not repeat.
     expect(ctx.reactionFacility).toEqual({
       facility: FACILITY_PRESETS.tatara,
       rigFit: ['meT2', 'teT2', 'none'],

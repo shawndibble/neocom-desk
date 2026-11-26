@@ -474,10 +474,10 @@ describe('unreadDeltaByTab', () => {
 
   it('counts a mail marked read, marked unread and deleted-while-unread against its own tab', () => {
     const rows = [
-      row('1', 'inbox', false), // marked read: -1 inbox
-      row('2', 'corp', true), // marked unread: +1 corp
-      row('3', 'inbox', false), // deleted while unread: -1 inbox
-      row('4', 'corp', true), // deleted while read: no change
+      row('1', 'inbox', false),
+      row('2', 'corp', true),
+      row('3', 'inbox', false),
+      row('4', 'corp', true),
     ];
     const delta = unreadDeltaByTab(rows, new Set(['1']), new Set(['2']), new Set(['3', '4']));
     expect(delta.get('inbox')).toBe(-2);

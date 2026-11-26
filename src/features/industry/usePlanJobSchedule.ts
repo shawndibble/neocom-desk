@@ -5,10 +5,6 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import { planJobNodes, usePlanSchedule } from './planJobSlots';
 import { planOwnedBlueprints, type CorpBlueprintSource } from './resolveBuildPlan';
 
-/**
- * When the plan's jobs would finish given the pilot's free slots, and the
- * seconds from now that takes (`undefined` until the schedule is in hand).
- */
 export function usePlanJobSchedule(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,

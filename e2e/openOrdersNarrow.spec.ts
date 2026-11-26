@@ -1,28 +1,3 @@
-/**
- * Open Orders fix list at narrow widths: the Needs you / Watch / All segments
- * and the healthy fold's "Show" text action meet the 36px touch floor on a
- * phone, the page never scrolls sideways (390px, and 768px with every
- * optional column on — the table scrolls inside its own frame instead), and
- * the compact phone card opens its detail.
- *
- * Orders are seeded via a `page.route` override on
- * `GET /characters/{id}/orders`, registered before `signInAndGoto` — the same
- * pattern `mailNarrow.spec.ts` uses for the boot-time `/mail` prefetch.
- * `mockEsi.ts`'s `PREFETCHED_EMPTY` set answers this same endpoint empty by
- * default, and the app's own boot prefetch (`app/prefetch.ts`) calls it
- * immediately after login; overriding the route (rather than seeding the
- * `esiCache` Dexie row directly) means the boot prefetch itself receives and
- * caches these fixture orders, so there is no race between a direct IndexedDB
- * write and prefetch's own live write to the same `[characterId, 'orders']`
- * row.
- *
- * Two orders, matching `OpenOrdersPanel.test.tsx`'s own fixtures exactly
- * (`NO_COST_BASIS_ORDER` / `EXPIRING_ORDER`) so the classification is already
- * proven by unit test, not guessed here: one is `expiringOrStale` (issued
- * today, 5-day duration — Needs you), the other `healthy` (Fine, folded under
- * the list). No cost-basis or skills seeding: with none supplied the only
- * thing that can make the expiring order need the pilot is its own expiry.
- */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -33,7 +8,6 @@ import type { MarketOrder } from '../src/esi/endpoints';
 const TABLET = { width: 768, height: 900 };
 
 const REGION = 10000002;
-/** Jita 4-4 — a real NPC station id, so `stationName` resolution never has to guess. */
 const STATION_A = 60003760;
 
 function order(
@@ -53,7 +27,6 @@ function order(
   };
 }
 
-/** Healthy sell order — no cost basis linked, no competition data supplied. Tritanium/Pyerite/Mexallon type ids are all in `public/data/types.json`, so name resolution never needs a live ESI call. */
 const HEALTHY_ORDER = order({
   order_id: 103,
   type_id: 35,
@@ -61,7 +34,6 @@ const HEALTHY_ORDER = order({
   volume_remain: 20,
   volume_total: 20,
 });
-/** Sell order expiring within the week — issued today, 5-day duration. */
 const EXPIRING_ORDER = order({
   order_id: 201,
   type_id: 36,
@@ -73,9 +45,6 @@ const EXPIRING_ORDER = order({
 });
 
 async function seedOpenOrders(page: Page): Promise<void> {
-  // Registered before login so the app's own boot prefetch (which fetches
-  // this exact endpoint right after login) receives these orders — see the
-  // file header for why this beats a direct IndexedDB seed here.
   await page.route(`**/characters/${CHARACTER_ID}/orders`, (route) =>
     route.fulfill({
       status: 200,
@@ -100,7 +69,6 @@ test.describe('Open Orders — fix list at narrow widths', () => {
     await expect(needsYou).toHaveAttribute('aria-pressed', 'true');
     const show = page.getByRole('button', { name: 'Show', exact: true });
     await expect(show).toBeVisible();
-    // The joined segments are one 36px control; its border is the box's own.
     expect(await height(page.getByRole('group', { name: 'Which orders' }))).toBeGreaterThanOrEqual(
       36
     );
@@ -127,15 +95,6 @@ test.describe('Open Orders — fix list at narrow widths', () => {
   });
 });
 
-/**
- * `openDetails` (`OpenOrdersPanel.tsx`) fires four on-open ESI fetches the
- * instant a row is tapped — region competition, price history, reprocessing
- * material prices, and route distance to every trade hub — regardless of
- * whether the modal ends up showing any of that data. None of them are in
- * `mockEsi.ts`'s default `PREFETCHED_EMPTY` set (they're not boot-prefetched,
- * only fetched on demand), so a spec that opens the detail modal has to mock
- * them itself or trip `support/testBase.ts`'s real-network guard.
- */
 async function mockOrderDetailDependencies(page: Page): Promise<void> {
   await page.route('https://esi.evetech.net/markets/*/orders*', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
@@ -143,7 +102,6 @@ async function mockOrderDetailDependencies(page: Page): Promise<void> {
   await page.route('https://esi.evetech.net/markets/*/history*', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   );
-  // `/route/` always includes at least the origin system (`engine/jumpsAway.ts`).
   await page.route('https://esi.evetech.net/route/*/*', (route) =>
     route.fulfill({
       status: 200,

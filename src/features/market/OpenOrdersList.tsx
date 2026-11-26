@@ -16,31 +16,14 @@ import { orderTurnInGlyph } from './orderTurnIn';
 
 interface OpenOrdersListProps {
   rows: readonly OpenOrderRow[];
-  /** Accessible name for the list. */
   label: string;
-  /** The row a notification pointed at (`useHighlightParam`): scrolled to and pulsed. */
   highlightId: number | null;
-  /** The selected row (the work-through's current order): accent edge and `aria-current`. */
   selectedId?: number | null;
-  /** Content under a row's button, outside it — buttons don't nest (the work-through controls). */
   rowExtra?: (row: OpenOrderRow) => ReactNode;
   onOpen: (row: OpenOrderRow) => void;
-  /** Wraps a row, e.g. the item context menu. Same contract as `DataTable`'s. */
   rowContextMenu?: (row: OpenOrderRow, el: ReactElement) => ReactElement;
 }
 
-/**
- * The Open Orders fix list below `sm`: a dense two-line card per order — the
- * item and its problem badge, then the "Do this" call with its exact price —
- * and the ⋮ at the right. Tapping anywhere on the card opens
- * `OrderDetailModal`; `rowExtra` sits below, outside the button.
- *
- * The item name is the card's accent cue (§6c), not a `MarketItemLink`, the
- * badge renders with `interactive={false}` (no "?" trigger) and the price is
- * plain text, not a `CopyablePrice`: each would otherwise be focusable content
- * nested inside the card's own `<button>`, which a `<button>` cannot legally
- * contain. Station, character, remaining and expiry live in the detail.
- */
 export function OpenOrdersList({
   rows,
   label,
@@ -94,9 +77,6 @@ export function OpenOrdersList({
                   <OrderDoThisText row={row} interactive={false} />
                 </span>
               </button>
-              {/* Beside the button, not in it — buttons don't nest. An order a turn-in pays
-                  more for, whose badge says something else, says so; it opens the same
-                  detail the card does. */}
               {orderTurnInGlyph(row) && (
                 <TurnInGlyph
                   name={row.typeName}

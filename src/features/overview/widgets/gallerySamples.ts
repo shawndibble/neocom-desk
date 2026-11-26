@@ -1,17 +1,3 @@
-/**
- * Sample data for the Gallery's previews: one `KindView` per kind, so the
- * preview is the real widget body drawing sample figures, not a picture of
- * one.
- *
- * Pure data (no fetch, no stores). Figures and EVE proper nouns are literal;
- * every word of prose goes through the `t` the caller passes in
- * (`overview.gallery.samples.*`, or the matching `overview.widgets.*` phrase
- * where the live widget already says the same thing). The cast is the
- * mockup's pilot (Efa, a Muninn, a Jita to Amarr run), so every preview tells
- * the same self-consistent story. A kind with no sample gets no preview (the
- * Gallery then shows the description alone), which is also what a coming-soon
- * kind gets.
- */
 import type { TFunction } from 'i18next';
 import type { ChartModel } from './charts/types';
 import type { KindView, ListRow } from './data/types';
@@ -21,7 +7,6 @@ type Row = readonly [title: string, detail: string, value: string];
 
 interface Sample {
   value: string;
-  /** An ISK figure: the widget draws it as shorthand. */
   isk?: number;
   unit?: string;
   note?: string;
@@ -29,7 +14,6 @@ interface Sample {
   chart?: ChartModel;
 }
 
-/** A gently wobbling run from `from` to `to`: the same on every render, so a preview never twitches. */
 function series(count: number, from: number, to: number, wobble = 0.06): number[] {
   return Array.from({ length: count }, (_, i) => {
     const t = count === 1 ? 1 : i / (count - 1);
@@ -123,7 +107,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         rangeLabel: t('overview.widgets.chart.span', { count: 30 }),
       },
     },
-    // The Wallet flow preset card: the Wallet on its Flow.
     walletFlow: {
       value: '+232M',
       unit: t('overview.gallery.samples.walletFlow.unit'),
@@ -336,7 +319,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       isk: 1_120_000_000,
       unit: 'ISK',
       note: t('overview.gallery.samples.profit.note'),
-      // A new Profit widget opens on Both: builds and trades side by side.
       rows: [
         ['Hurricane', t('overview.widgets.profit.source.builds'), '660M'],
         ['Gila', t('overview.widgets.profit.source.builds'), '340M'],
@@ -394,7 +376,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       },
     },
-    // The PLEX and Large Skill Injector preset cards: one line each, so the area fill shows.
     marketTrendPlex: {
       value: '+1.7%',
       unit: t('overview.widgets.data.marketTrend.unit', { item: 'PLEX', days: 7 }),
@@ -714,7 +695,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Taxes', 0.18, '11%'],
       ]),
     },
-    // The Cash flow and Income by source preset cards: the corp wallet on its Flow and Sources.
     corpCashFlow: {
       value: '+1.4B',
       isk: 1_400_000_000,
@@ -1016,7 +996,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
   };
 }
 
-/** Whether a kind's preview draws a chart: it then previews its Chart view, else its List. */
 export function sampleHasChart(kind: string, t: TFunction): boolean {
   return buildSamples(t)[kind]?.chart !== undefined;
 }

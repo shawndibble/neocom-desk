@@ -1,16 +1,3 @@
-/**
- * The Appraisal page's live order books (issue #5591): one item's region book
- * folded to a hub station's orders, fetched through the shared ESI client
- * (`getMarketOrders`: `X-Compatibility-Date`, `X-User-Agent`, `X-Ratelimit-*`
- * and `Retry-After` handled there and by the app-wide budget).
- *
- * A fetched book is reused for ten minutes, longer than ESI's own 300 s on
- * purpose (owner decision: fewer calls), so re-appraising or copying the same
- * types makes no new requests. Only a manual Refresh (`force`) refetches
- * whatever the age. In-memory only: this is live depth, not worth persisting.
- * Deliberately not `orderBook.ts`'s cache: that one is the Browser's, keyed by
- * region and kept at 300 s.
- */
 import { getMarketOrders } from '@/esi/endpoints';
 import type { LiveOrder } from '@/engine/market/liveBook';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -18,13 +5,10 @@ import type { TradeHub } from '@/market/hubs';
 
 export const LIVE_BOOK_TTL_MS = 600_000;
 
-/** Rows fetched at once: one hub prices 200 items in about 4 s at this width (measured, #5591). */
 export const LIVE_BOOK_CONCURRENCY = 12;
 
 export interface LiveBook {
-  /** The hub station's orders, plus every buy order in the region (its range may reach the station). */
   orders: LiveOrder[];
-  /** When ESI was asked, kept across cache hits for "checked N s ago". */
   fetchedAt: number;
 }
 
@@ -42,13 +26,11 @@ function keyOf({ hub, typeId }: LiveBookRequest): string {
   return `${hub.stationId}:${typeId}`;
 }
 
-/** Test-only reset. */
 export function clearLiveBooks(): void {
   cache.clear();
   inFlight.clear();
 }
 
-/** The cached book if it is still inside the TTL, else undefined; never fetches. */
 export function peekLiveBook(
   request: LiveBookRequest,
   now: Clock = Date.now
@@ -57,11 +39,6 @@ export function peekLiveBook(
   return book !== undefined && now() - book.fetchedAt < LIVE_BOOK_TTL_MS ? book : undefined;
 }
 
-/**
- * The live book for one request. Throws when ESI fails or returns a region
- * book it could not read whole: a partial book would be a wrong best price,
- * so the caller marks the row failed instead.
- */
 export async function getLiveBook(
   request: LiveBookRequest,
   { force = false, now = Date.now }: { force?: boolean; now?: Clock } = {}
@@ -114,13 +91,6 @@ export async function getLiveBook(
   }
 }
 
-/**
- * Fetches every request at `LIVE_BOOK_CONCURRENCY`, in the order given (most
- * valuable first), reporting each as it settles. Never rejects: a failed
- * request settles as `'failed'` so one bad row leaves the rest untouched.
- * Once `isCancelled` is true, requests not yet started are skipped (and not
- * reported); those already in flight finish and still fill the cache.
- */
 export async function loadLiveBooks(
   requests: readonly LiveBookRequest[],
   onSettled: (request: LiveBookRequest, result: LiveBook | 'failed') => void,

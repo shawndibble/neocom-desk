@@ -35,11 +35,6 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
 });
 
-/**
- * A Grant note that does show (its Character has no token), rendered beside the
- * notice: both read the grant in the same commit, so once this one is up the
- * notice's answer has landed too, and its absence means something.
- */
 function WithControl() {
   return (
     <>
@@ -60,7 +55,6 @@ describe('StandingsScopeNotice', () => {
     await grant(['esi-characters.read_contacts.v1']);
     render(<StandingsScopeNotice />);
 
-    // Names the Character and the one Permission missing, nothing more.
     expect(await screen.findByText('Kestrel Vane: grant Character details')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Grant in EVE' }));
 

@@ -1,11 +1,3 @@
-/**
- * Local wallet journal and transaction archive. ESI serves only ~30 days of
- * each; every fetch upserts its rows here (keyed by ESI id per Character,
- * never capped by count) and rows older than 365 days are pruned. Coverage
- * windows record what a complete fetch actually saw, so the Journal can state
- * its real reach and any gap. Device-local, not synced, not in the encrypted
- * backup — same footing as the mining ledger history.
- */
 import { captureException } from '@sentry/react';
 import type Dexie from 'dexie';
 import { db, type ArchiveKind } from '@/db';
@@ -27,7 +19,6 @@ type ArchiveTable = Dexie.Table<ArchiveRow, [number, number]>;
 
 const KINDS: Record<ArchiveKind, { table: () => ArchiveTable; cursor: boolean }> = {
   journal: { table: () => db.walletJournalArchive as unknown as ArchiveTable, cursor: false },
-  // Transactions walk a `from_id` cursor, newest first.
   transactions: {
     table: () => db.walletTransactionArchive as unknown as ArchiveTable,
     cursor: true,
@@ -49,8 +40,6 @@ async function recordCoverage(
   result: CachedResult<ReadonlyArray<{ date: string }>>
 ): Promise<void> {
   const fetchedAt = result.fetchedAt.getTime();
-  // A saved copy proves nothing about the window it is read in, and a failed
-  // page proves nothing about which stretch was lost.
   const window = result.fromCache
     ? null
     : fetchWindow({
@@ -59,7 +48,6 @@ async function recordCoverage(
         oldestEntryMs: oldestMs(result.data),
         cursor: KINDS[kind].cursor,
       });
-  // One transaction: concurrent loaders must not overwrite each other's window.
   await db.transaction('rw', db.walletArchiveCoverage, async () => {
     const existing = await db.walletArchiveCoverage.get([characterId, kind]);
     const windows = existing?.windows ?? [];
@@ -72,11 +60,6 @@ async function recordCoverage(
   });
 }
 
-/**
- * Upserts a fetched list, records what it covered and prunes past a year,
- * then hands the result back. Never throws. A result no newer than the last
- * archived one is skipped: the cache replays the same rows until it refetches.
- */
 export async function archiveResult<T extends { date: string }>(
   kind: ArchiveKind,
   characterId: number,
@@ -117,7 +100,6 @@ async function archivedRows<T>(kind: ArchiveKind, characterId: number): Promise<
   return rows.map((row) => stripCharacter(row) as unknown as T);
 }
 
-/** When the archive last saw the list: newest window end, else the newest row. */
 async function archiveFreshness(
   kind: ArchiveKind,
   characterId: number,
@@ -129,7 +111,6 @@ async function archiveFreshness(
   return new Date(Math.max(0, ...rows.map((row) => Date.parse(row.date)).filter(Number.isFinite)));
 }
 
-/** The live result with archived rows folded in; a result built from the archive alone when nothing live came back. */
 async function withArchive<T extends { date: string }>(
   kind: ArchiveKind,
   characterId: number,
@@ -147,7 +128,6 @@ async function withArchive<T extends { date: string }>(
     return archived.length === 0 ? live : { ...live, data: unionById(live.data, archived, idOf) };
   }
   if (archived.length === 0) return null;
-  // Stamped with what was seen, not now: Data Age must not claim a fresh fetch.
   return {
     data: archived,
     fetchedAt: await archiveFreshness(kind, characterId, archived),
@@ -171,15 +151,11 @@ export function transactionsWithArchive(
 }
 
 export interface WalletArchiveInfo {
-  /** Epoch ms the archive's first covered window starts, null when nothing is covered. */
   since: number | null;
-  /** Uncovered stretches, `[fromMs, toMs]`, including the one up to now. */
   gaps: Array<[number, number]>;
-  /** Rows are stored but no complete fetch has confirmed what they cover. */
   unconfirmed: boolean;
 }
 
-/** What the Journal's history line states: reach and gaps. */
 export async function loadWalletArchiveInfo(
   characterId: number,
   nowMs: number = Date.now(),
@@ -197,7 +173,6 @@ export async function loadWalletArchiveInfo(
   };
 }
 
-/** Drops a Character's archive rows and coverage. Call inside a Dexie transaction that includes these tables. */
 export async function clearWalletArchive(characterId: number): Promise<void> {
   await db.walletJournalArchive.where('characterId').equals(characterId).delete();
   await db.walletTransactionArchive.where('characterId').equals(characterId).delete();

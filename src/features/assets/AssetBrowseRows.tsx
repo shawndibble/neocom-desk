@@ -47,7 +47,6 @@ import {
   type CharacterBadgeContext,
 } from './assetBrowseModel';
 
-/** Selection wiring every browse row shares. */
 interface RowSelectionProps {
   selectMode: boolean;
   selectedIds: ReadonlySet<number>;
@@ -55,10 +54,6 @@ interface RowSelectionProps {
   t: Translate;
 }
 
-/**
- * A ship, bay or container node — descends one more step. Shared by the
- * personal and corp browse; each supplies its own drill-down `href`.
- */
 export function NodeContainerRow({
   node,
   href,
@@ -75,12 +70,9 @@ export function NodeContainerRow({
   node: Exclude<AssetTreeNode, { kind: 'item' }>;
   href: string;
   label: string;
-  /** The player's in-game name for this ship or container. */
   gameName?: string;
   characterBadge: string | null;
-  /** The station it sits in, for its menu's Set waypoint; null when unknown. */
   stationId: number | null;
-  /** More menu entries (a ship's Open in Fittings). */
   extraItems?: ReactNode;
 }) {
   return (
@@ -103,10 +95,6 @@ export function NodeContainerRow({
   );
 }
 
-/**
- * An item leaf. The caller owns what differs — pricing, volume, badges and the
- * context-menu wrapper — and passes it in; selection wiring lives here.
- */
 export function NodeItemRow({
   asset,
   label,
@@ -129,7 +117,6 @@ export function NodeItemRow({
 }: RowSelectionProps & {
   asset: Pick<CharacterAsset, 'item_id' | 'type_id' | 'quantity'>;
   label: string;
-  /** The player's in-game name for this ship or container. */
   gameName?: string;
   unitVolume: number | undefined;
   estimatedValue: number;
@@ -140,7 +127,6 @@ export function NodeItemRow({
   showStockCost: boolean;
   characterBadge: string | null;
   blueprintKind: ComponentProps<typeof ItemRow>['blueprintKind'];
-  /** Set for a Mutated module only. */
   itemId?: number;
   wrap: ComponentProps<typeof ItemRow>['wrap'];
 }) {
@@ -173,14 +159,12 @@ interface BrowseRowViewProps {
   row: BrowseRow;
   t: Translate;
   typeNames: ReadonlyMap<number, string>;
-  /** In-game ship/container names by item id: shown first, the type name beneath. */
   assetNames: AssetNameMap;
   characterBadges: CharacterBadgeContext;
   selectMode: boolean;
   selectedIds: ReadonlySet<number>;
   onToggleSelection: (ids: readonly number[]) => void;
   stationLabelFor: (station: AssetTreeStation) => string;
-  /** Place Nicknames by location id: the personal Assets display only. */
   placeNicknames: PlaceNicknamesValue;
   nodeLabel: (node: AssetTreeNode) => string;
   locationNames: ReadonlyMap<number, string>;
@@ -193,11 +177,9 @@ interface BrowseRowViewProps {
   trailFor: (asset: CharacterAsset) => string[];
   nodePathFor: (asset: CharacterAsset) => FoundAssetNode | null;
   rootStationIdFor: (asset: CharacterAsset) => number | null;
-  /** The page's query string, carried onto every drill-down link. */
   query: string;
 }
 
-/** Dispatches one virtualized row to the right presentation component. */
 export function BrowseRowView(props: BrowseRowViewProps) {
   const { row, t } = props;
 
@@ -236,11 +218,6 @@ export function BrowseRowView(props: BrowseRowViewProps) {
   return <SearchMatchRow {...props} match={row.match} />;
 }
 
-/**
- * An abyssal module's row asks for its MutaMarket estimate while it is on
- * screen, and names what its value is (or why it has none). Undefined for
- * any other stack.
- */
 function useAbyssalValueHint(
   asset: Pick<CharacterAsset, 'item_id' | 'type_id'> | null,
   abyssal: AbyssalAssetEstimates,
@@ -252,18 +229,12 @@ function useAbyssalValueHint(
   const { request } = abyssal;
   useEffect(() => {
     if (!isAbyssal || itemId === undefined || typeId === undefined) return undefined;
-    // Leaving the screen before its turn drops the ask.
     return request({ itemId, typeId });
   }, [isAbyssal, itemId, typeId, request]);
   if (!isAbyssal || itemId === undefined) return undefined;
   return abyssalValueHint(abyssal.estimates.get(itemId), t);
 }
 
-/**
- * A turn-in stack's glyph and popover: for the stack's own Character (whose
- * Participate the detail shows, whose client Set destination steers) and what
- * the stack turns in. Null for a stack no Active objective takes.
- */
 function StackTurnIn({
   asset,
   label,
@@ -295,7 +266,6 @@ function StackTurnIn({
   );
 }
 
-/** Split out so it can call `useAssetItemActions` — a heading/location row does not. */
 function SearchMatchRow({
   match,
   t,
@@ -314,15 +284,12 @@ function SearchMatchRow({
   const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
   const searchValue = assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId);
   const rootStationId = rootStationIdFor(asset);
-  // The trail's first segment is the station: its Place Nickname, display only.
   const trail = trailFor(asset);
   const stationNickname = rootStationId === null ? undefined : placeNicknames[rootStationId];
   if (stationNickname !== undefined && trail.length > 0) trail[0] = stationNickname;
-  // Leaving search: the places below list their contents, not these matches again.
   const nextQuery = queryLeavingSearch(query);
   const stationHref = assetHref(rootStationId, [], nextQuery);
   const found = nodePathFor(asset);
-  // A ship or container opens to its contents; anything else opens to where it sits.
   const opensInside = found !== null && found.node.kind !== 'item';
   const href =
     found === null
@@ -330,7 +297,6 @@ function SearchMatchRow({
       : assetHref(found.stationId, opensInside ? found.segments : found.parentSegments, nextQuery);
   const locationHref =
     found === null ? null : assetHref(found.stationId, found.parentSegments, nextQuery);
-  // Each place once: not the row's own link, and not the same place twice.
   const places = [
     { key: 'location', href: locationHref },
     { key: 'station', href: stationHref },
@@ -355,8 +321,6 @@ function SearchMatchRow({
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       valueHint={valueHint}
-      // Outside the row's link (a button never nests in an anchor): often the only place another
-      // Character's stack shows, so its turn-in would otherwise be out of reach.
       afterLink={<StackTurnIn asset={asset} label={name} characterBadges={characterBadges} t={t} />}
       wrap={(children) => (
         <OreItemMenu
@@ -394,7 +358,6 @@ function SearchMatchRow({
   );
 }
 
-/** Split out so it can call `useAssetItemActions` — a leaf needs pricing/menu wiring a heading does not. */
 function NodeRowView({
   node,
   t,
@@ -451,7 +414,6 @@ function NodeRowView({
   }
 
   const { asset } = node;
-  // A Mutated module's Show info opens on its own Rolls; any other stack's on its type.
   const itemId = actions.abyssal.isAbyssalType?.(asset.type_id) ? asset.item_id : undefined;
   const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId);
   const planTarget =

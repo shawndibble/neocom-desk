@@ -19,7 +19,6 @@ const loadSystemNames = () =>
     byId ? new Map([...byId].map(([id, entry]) => [id, entry.name])) : NO_NAMES
   );
 
-/** Hull and system names for the queue's rows, from the SDE the app ships. An unknown id reads "Hull <id>". */
 export function useSrpClaimNames(): SrpClaimNames {
   const { t } = useTranslation();
   const hulls = useAsyncLoad(loadHullNames).data ?? NO_NAMES;

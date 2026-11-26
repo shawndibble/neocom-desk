@@ -1,9 +1,3 @@
-/**
- * Every page keeps its tab strip on a phone, as on desktop: no title-row view
- * picker, however many tabs (scope decision
- * `20261013-122802-phones-keep-the-tab-strip-no-view-picker`). The strip
- * scrolls sideways rather than widening the page.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -27,7 +21,6 @@ for (const { name, path, view, url } of PAGES) {
       await page.goto(path);
 
       const main = page.getByRole('main');
-      // Skills' strip is route links in a `nav`; the others are `Tabs`.
       const target = main
         .getByRole('tab', { name: view, exact: true })
         .or(main.getByRole('link', { name: view, exact: true }));

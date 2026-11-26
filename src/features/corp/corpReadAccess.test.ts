@@ -22,7 +22,6 @@ afterEach(() => {
   configureEsi({ getToken: null });
 });
 
-/** A Character in `corporationId` whose gate opens exactly `capabilities`. */
 function reader(
   characterId: number,
   corporationId: number,
@@ -128,8 +127,8 @@ describe('accountCorpReaders', () => {
   it('reads each corporation once, in account order, skipping a Character without the scope or with unknown roles', async () => {
     await seed(1, [ROLES_SCOPE, STRUCTURES_SCOPE]);
     await seed(2, [ROLES_SCOPE, STRUCTURES_SCOPE]);
-    await seed(3, [ROLES_SCOPE]); // Station Manager without the structures grant.
-    await seed(4, [ROLES_SCOPE, STRUCTURES_SCOPE]); // Roles read fails: standing unknown.
+    await seed(3, [ROLES_SCOPE]);
+    await seed(4, [ROLES_SCOPE, STRUCTURES_SCOPE]);
     await seed(5, [ROLES_SCOPE, STRUCTURES_SCOPE]);
     server.use(
       inCorp(1, 500),

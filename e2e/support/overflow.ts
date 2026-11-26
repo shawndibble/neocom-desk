@@ -1,9 +1,3 @@
-/**
- * Asserts the page itself never scrolls sideways — the failure mode a
- * phone-width (390px) layout bug tends to produce (#1708): one clipped or
- * zero-width element widens `<html>` past the viewport and every table on
- * the page picks up a horizontal scrollbar, not just the offending one.
- */
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
@@ -15,7 +9,6 @@ export async function expectNoPageOverflow(page: Page): Promise<void> {
   expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
 }
 
-/** Fit metrics of the nearest ancestor of `el` that scrolls on x, or null when none does. */
 export const scrollerFit = (el: Locator) =>
   el.evaluate((node) => {
     let n = node.parentElement;
@@ -28,7 +21,6 @@ export const scrollerFit = (el: Locator) =>
     };
   });
 
-/** Right edge of the nearest bordered ancestor of `el`: the Panel it sits in. */
 export const panelRight = (el: Locator) =>
   el.evaluate((node) => {
     let n = node.parentElement;

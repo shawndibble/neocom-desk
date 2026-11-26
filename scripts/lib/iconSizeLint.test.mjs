@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 
-/**
- * Pins the `no-restricted-syntax` selectors that keep numeric / rem-string
- * `size` literals off `Icon.*` glyphs (issue #5774). A regex selector that
- * never fires lints clean, so this runs the real config against fixtures.
- */
 const eslint = new ESLint();
 
 async function iconSizeErrors(source, filePath = 'src/features/fixture.tsx') {

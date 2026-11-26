@@ -128,7 +128,6 @@ describe('Miner page on a running account', () => {
     const owed = screen.getByRole('table', { name: /^Owed days/ });
     expect(within(owed).getAllByRole('row').length).toBeGreaterThan(1);
     expect(screen.getAllByText(/^Payment from /).length).toBeGreaterThan(0);
-    // The one Payee ledger: owed reads with a minus, the same on every page that shows it.
     const ledger = screen.getByRole('table', { name: 'Ledger' });
     expect(within(ledger).getAllByText(/^\u2212[\d,]+/).length).toBeGreaterThan(0);
   });
@@ -137,7 +136,6 @@ describe('Miner page on a running account', () => {
     renderBook(<MinerDetail id={VARRO_ID} />, running);
     await userEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
     expect(screen.getByText(/^Tax .* · paid /)).toBeInTheDocument();
-    // What is owed now is never narrowed.
     expect(screen.getByRole('checkbox', { name: 'Select 2026-09-04' })).toBeInTheDocument();
   });
 });
@@ -171,7 +169,6 @@ describe('Moon page', () => {
     );
     const ore = { name: /Ore mined by Varro Kestane/ };
     expect(screen.queryByRole('table', ore)).not.toBeInTheDocument();
-    // The row's own cells open it, so no pointing at the caret.
     const row = screen.getByRole('link', { name: 'Varro Kestane' }).closest('tr')!;
     await userEvent.click(within(row).getAllByRole('cell').at(-1)!);
     expect(screen.getByRole('table', ore)).toBeInTheDocument();

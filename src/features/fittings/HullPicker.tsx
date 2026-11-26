@@ -27,26 +27,12 @@ const PopularFitsPanel = lazy(() =>
 
 interface HullPickerProps {
   catalogue: FittingCatalogue | null;
-  /** Opens a new Fitting on the chosen hull. */
   onStart: (hull: HullEntry) => void;
-  /** Opens one of the chosen hull's Popular fits; omitted, the panel isn't shown. */
   onOpenPopular?: (loaded: LoadedFitting) => void;
 }
 
-/**
- * "New fitting" from a hull (scope decisions `20260924-215855`, and the
- * two-pane layout's): hulls on the left — a search over Ships market classes,
- * or the Character's recent hulls before anything is typed, optionally only
- * the hulls they can fly — and the picked hull on the right, with Start empty
- * fit and its Popular fits. On a phone the two are screens in turn: picking a
- * hull shows it, Back returns to the list. Needs only the static market data,
- * so it works before the ship data (dogma engine) has downloaded. Each hull
- * carries the Ship Tree's can-fly mark for the active Character once that has
- * loaded (#6011).
- */
 export function HullPicker(props: HullPickerProps) {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  // No Character, no marks: the Ship Tree's data isn't loaded at all.
   return characterId === null ? (
     <HullPickerView {...props} characterId={null} flyMarks={null} />
   ) : (
@@ -114,7 +100,6 @@ function HullPickerView({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 md:flex-row">
-      {/* A phone shows one pane at a time: the list until a hull is picked. */}
       <div
         className={cx(
           'flex min-h-0 flex-1 flex-col gap-3 md:w-72 md:flex-none',
@@ -216,7 +201,6 @@ function HullPickerView({
   );
 }
 
-/** The picked hull: its icon, name and class, the Ship Tree's can-fly mark and mastery, and Start empty fit. */
 function SelectedHull({
   hull,
   mark,

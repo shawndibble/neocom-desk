@@ -3,22 +3,8 @@ import type { CsvColumn } from './csv';
 import { MAX_CELL_TEXT, toCell, type ExportCell, type ExportValue } from './exportCells';
 import { DAY_MS } from '@/lib/age';
 
-/**
- * A minimal .xlsx (Office Open XML) writer: one sheet for a table export, or
- * a sheet per record type for a whole-dataset export. An xlsx opens
- * identically in Excel, LibreOffice/OpenOffice and Google Sheets with no
- * import dialog to get wrong — the failure mode CSV can't rule out. Only
- * what an export needs: inline strings, numbers, dates, a bold frozen
- * header row. Text is always an inline string, never a formula, so no
- * formula-injection guard is needed here.
- *
- * `resolveSheet` reads cells off the rows; `writeWorkbook` turns plain cells into the file
- * (`xlsxBuild` runs it in a worker). Kept out of the main bundle: dynamic import only.
- */
-
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
-/** Style indexes into `STYLES_XML`'s cellXfs. */
 const STYLE_HEADER = 1;
 const STYLE_DATE = 2;
 
@@ -26,7 +12,6 @@ const STYLES_XML = `${XML_HEADER}<styleSheet xmlns="http://schemas.openxmlformat
 
 const ROOT_RELS_XML = `${XML_HEADER}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
 
-/** Excel's day 0 is 1899-12-30 (the 1900 leap-year bug baked in); Unix epoch is serial 25569. */
 const UNIX_EPOCH_SERIAL = 25569;
 
 // eslint-disable-next-line no-control-regex -- stripping exactly the control characters XML 1.0 forbids
@@ -41,7 +26,6 @@ function escapeXml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** 0 → A, 25 → Z, 26 → AA. */
 function columnName(index: number): string {
   let name = '';
   for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) {
@@ -50,7 +34,6 @@ function columnName(index: number): string {
   return name;
 }
 
-/** Excel rejects `: \ / ? * [ ]` in a sheet name and caps it at 31 characters. */
 function sheetName(name: string): string {
   const clean = name
     .replace(/[:\\/?*[\]]/g, ' ')
@@ -60,7 +43,6 @@ function sheetName(name: string): string {
   return clean || 'Sheet1';
 }
 
-/** Excel refuses a workbook whose sheet names repeat, case aside: later ones get " (2)", " (3)". */
 function uniqueSheetNames(names: readonly string[]): string[] {
   const taken = new Set<string>();
   return names.map((raw) => {
@@ -89,7 +71,6 @@ function cellXml(ref: string, cell: ExportCell, style?: number): string {
   }
 }
 
-/** A rough character width per column so the sheet opens readable, capped so one long note can't swamp it. */
 function displayWidth(cell: ExportCell): number {
   switch (cell.kind) {
     case 'empty':
@@ -109,7 +90,6 @@ export interface XlsxSheet<T> {
   columns: readonly CsvColumn<T>[];
 }
 
-/** A sheet with every cell already read off its row: plain data a worker can be posted. */
 export interface PlainSheet {
   name: string;
   headers: string[];
@@ -160,15 +140,10 @@ const SHEET_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the row type is invariant per sheet
 export type AnyXlsxSheet = XlsxSheet<any>;
 
-/** A workbook with a sheet per entry, in order, built in one go on the calling thread. */
 export function toXlsxWorkbook(sheets: readonly AnyXlsxSheet[]): Uint8Array {
   return writeWorkbook(sheets.map(resolveSheet));
 }
 
-/**
- * The file for sheets already resolved; pure, so the worker and the page write the same file.
- * Sheet `i` is `sheet{i+1}.xml` on relationship `rId{i+1}`; styles take the id after the last.
- */
 export function writeWorkbook(sheets: readonly PlainSheet[]): Uint8Array {
   const names = uniqueSheetNames(sheets.map((s) => s.name));
   const n = sheets.length;
@@ -204,7 +179,6 @@ export function writeWorkbook(sheets: readonly PlainSheet[]): Uint8Array {
   return zipSync(files);
 }
 
-/** A one-sheet workbook: what a table export writes. */
 export function toXlsx<T>(
   rows: readonly T[],
   columns: readonly CsvColumn<T>[],

@@ -5,11 +5,6 @@ import { jumpCountsForRoutes } from './jumpCounts';
 import { routeSafetyNetwork } from './routeSafetyTrip';
 import { HUB_SYSTEM_IDS } from './theraConnections';
 
-/**
- *   START ─ W1 ─ W2 ─ W3 ─ W4 ─ END          the gate way, five jumps; W2 is lowsec
- *   START ─ F1 ─ F2 ─ FAR ⤳ THERA ⤳ EXIT ─ END   six jumps through Thera, all highsec
- *   W1 ═ W4                                   an Ansiblex
- */
 const START = 30000001;
 const W1 = 30000002;
 const W2 = 30000003;
@@ -41,7 +36,6 @@ const HOLES = [
   { exitSystemId: EXIT, hub: 'thera' as const },
 ];
 
-/** Safer: lowsec W2 costs far more than the six highsec jumps through Thera. */
 const SAFER = {
   preference: 'prefer-highsec' as const,
   securityOf: (id: number) => (id === W2 ? 0.3 : 1),
@@ -103,7 +97,6 @@ describe('jumpCountsForRoutes', () => {
       originSystemId,
       destinationSystemId,
     });
-    // START asks twice (one sweep); W1 once (one lookup).
     expect(
       jumpCountsForRoutes(GRAPH, [route(START, END), route(START, EXIT), route(W1, END)], SAFER)
     ).toEqual([5, 5, 4]);

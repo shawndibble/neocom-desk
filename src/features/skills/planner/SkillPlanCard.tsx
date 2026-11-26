@@ -19,20 +19,10 @@ interface SkillPlanCardProps {
   activeCharacterId: number;
   remapInfo: RemapAvailability | null;
   scheduleInputs?: PlanStatsInputs;
-  /** Passed to the New plan menu; see `NewPlanSplitButton`. */
   onOptimizeQueue?: () => void;
   queueEmpty?: boolean;
 }
 
-/**
- * The plan the pilot is working on, one tap from its editor, plus the way to
- * every other plan. "The plan" is the one edited last: a pilot with several
- * plans picks up where they left off, and a one-plan pilot sees that plan.
- *
- * All plan management (rename, duplicate, copy, delete, the certified and
- * community starts) stays in the `PlanListPane` the "All plans" popover opens;
- * the editor's own sidebar uses that same pane, so it is not rebuilt here.
- */
 export function SkillPlanCard({
   activeCharacterId,
   remapInfo,
@@ -43,7 +33,6 @@ export function SkillPlanCard({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const isDesktop = useIsDesktop();
-  // The hint's Certified Plan link opens the split button's own picker.
   const [certifiedOpen, setCertifiedOpen] = useState(false);
   const plans = useLiveQuery(
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
@@ -57,7 +46,6 @@ export function SkillPlanCard({
       ),
     [plans]
   );
-  // Only the current plan is shown here; the "All plans" pane costs the rest.
   const stats = usePlanStats(plans, scheduleInputs, activeCharacterId, current ? [current.id] : []);
   const currentStats = current ? stats?.get(current.id) : undefined;
   const meta = !currentStats
@@ -108,8 +96,6 @@ export function SkillPlanCard({
     </div>
   );
 
-  // A new pilot's first look: the ways to start, with the two that live
-  // elsewhere one tap away.
   const empty = (
     <div className="space-y-1">
       <p className="text-sm text-text-dim">{t('plans.planCardEmpty')}</p>
@@ -122,7 +108,6 @@ export function SkillPlanCard({
                 type="button"
                 className={inlineLinkClassName}
                 onClick={(e) => {
-                  // Safari doesn't focus a clicked button; the dialog returns focus here.
                   e.currentTarget.focus();
                   setCertifiedOpen(true);
                 }}
@@ -136,7 +121,6 @@ export function SkillPlanCard({
   );
 
   if (isDesktop) {
-    // Desktop: the plan on its own line, the way to the others on the line under it.
     return (
       <Panel title={t('plans.planCardTitle')}>
         {current ? (
@@ -154,7 +138,6 @@ export function SkillPlanCard({
       </Panel>
     );
   }
-  // Phone: one row that opens the plan, the way to the others under it.
   return (
     <div className="space-y-2">
       {current ? (

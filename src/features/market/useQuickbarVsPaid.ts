@@ -1,10 +1,3 @@
-/**
- * Per Quickbar item: current hub sell price against what the active character
- * paid for the units it still holds (issue #5333). Nothing is stored. The paid
- * side is the wallet's FIFO (`paidBasis`); the price side is the stored daily
- * hub-station sell price the Price History chart already reads, so no market
- * call is added. An item with no covered basis is simply absent from the map.
- */
 import { useCallback, useMemo } from 'react';
 import { hasWalletScope, loadWalletTransactions } from '@/features/character/wallet';
 import { paidBasis, percentVsPaid } from '@/engine/market/paidVsPrice';
@@ -20,7 +13,6 @@ export interface VsPaid {
   units: number;
 }
 
-/** The newest day with a sell price at the hub station, or null. */
 function latestSell(
   stored: Awaited<ReturnType<typeof loadStoredOpenPrices>>,
   stationId: number
@@ -41,7 +33,6 @@ export function useQuickbarVsPaid(
   typeIds: readonly number[],
   hub: TradeHub
 ): ReadonlyMap<number, VsPaid> {
-  // Sorted: a reorder must not reload the wallet.
   const key = [...typeIds].sort((a, b) => a - b).join(',');
   const ids = useMemo(() => (key === '' ? [] : key.split(',').map(Number)), [key]);
   const stationId = hub.stationId;
@@ -69,12 +60,10 @@ export function useQuickbarVsPaid(
         }
       }
     } catch {
-      // A decoration: any read failure means no chip, never an error.
       out.clear();
     }
     return out;
   }, [characterId, ids, stationId]);
 
-  // Keyed by scope: never show the previous character's figures while this one loads.
   return useKeyedLoad(scope, load).data ?? NONE;
 }

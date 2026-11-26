@@ -10,11 +10,9 @@ interface DataTableSortBarProps<T> {
   rows: readonly T[];
   summary?: ReactNode;
   actions?: ReactNode;
-  /** `undefined`: CSS hides it above `sm`. Set: the caller decided the layout. */
   stacked: boolean | undefined;
 }
 
-/** The sort picker bar `mobileSort` puts above a stacked `DataTable`. */
 export function DataTableSortBar<T>({
   sortableColumns,
   sort,

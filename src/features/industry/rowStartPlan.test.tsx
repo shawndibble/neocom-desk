@@ -105,7 +105,6 @@ describe('useRowStartPlan', () => {
       )
     );
     act(() => result.current(entry));
-    // startPlanOnce is what the button routes through.
     await expect(startPlanOnce(entry, () => start())).resolves.toBe(false);
     expect(start).toHaveBeenCalledTimes(1);
     await act(async () => d.resolve(false));
@@ -214,7 +213,6 @@ describe('phone cards: tap runs Start plan, controls are exempt', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start a plan for/ }));
     expect(onStartPlan).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByText('Rifter'));
-    // The button's guard already claimed this entry while its plan was saving.
     expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
@@ -251,7 +249,6 @@ describe('phone cards: tap runs Start plan, controls are exempt', () => {
     const button = screen.getByRole('button', { name: 'Start a plan for Widget Beta' });
     fireEvent.click(button);
     expect(onStartPlan).toHaveBeenCalledTimes(1);
-    // Nothing opened, so the guard re-arms as the button stops being busy.
     await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'));
     fireEvent.click(screen.getByText('Widget Beta'));
     expect(onStartPlan).toHaveBeenCalledTimes(2);

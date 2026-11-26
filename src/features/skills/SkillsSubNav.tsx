@@ -14,11 +14,6 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
   return cx(tabItemClassName, isActive ? tabItemActiveClassName : tabItemIdleClassName);
 }
 
-/**
- * Sub-navigation between the Skills views. Real navigation (routes), not
- * a `Tabs` widget — but it sits in the same slot and reads as the same control,
- * so it borrows `Tabs`' own classes rather than approximating them.
- */
 export function SkillsSubNav() {
   const { t } = useTranslation();
   return (

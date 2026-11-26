@@ -23,7 +23,6 @@ const TONE: Record<DisplayStatus, string> = {
   waiting: 'text-text-dim',
 };
 
-/** The queue's one-line summary: counts as words, the ETA while it runs, and a progress bar. */
 export function MailQueueSummary({ items, now }: { items: readonly MailQueueItem[]; now: number }) {
   const { t } = useTranslation();
   const s = summarize(items, now);
@@ -95,11 +94,9 @@ function failureText(item: MailQueueItem, t: TFunction): string {
 
 export interface MailQueueActions {
   onRetry: (item: MailQueueItem) => void;
-  /** Resolves with a short message to show under the row (the outcome of the call). */
   onOpenInEve: (item: MailQueueItem) => Promise<string | null>;
 }
 
-/** D16: one row per mail in the send queue. Retry and Open in EVE appear on a failure only. */
 export function MailQueueTable({
   items,
   now,
@@ -132,7 +129,6 @@ export function MailQueueTable({
       align: 'right',
       className: 'tabular-nums',
       phoneHidden: true,
-      // Only a late notice's mail carries an amount; moon owner mail has none.
       render: (row) => (isLateNoticeMail(row.kind) ? formatIsk(row.amount) : '—'),
     },
     {
@@ -231,7 +227,6 @@ export function MailQueueTable({
   );
 }
 
-/** The whole queue view: summary above the table. Shared by the popover and the phone sheet. */
 export function MailQueuePanel({
   items,
   now,

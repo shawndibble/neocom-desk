@@ -8,13 +8,8 @@ import type { ResolveTarget } from './targets';
 
 const k = (key: string) => `miningTax.resolve.facts.${key}`;
 
-/**
- * A fact's figure, exact: the Resolve dialog is where the member checks the money to the ISK, so
- * no shorthand (and no second, screen-reader copy of the figure in the sentence).
- */
 const isk = (value: number) => formatIsk(value, 0);
 
-/** What the app knows about a problem, above its choices: the figures, never advice. */
 export function ProblemFacts({ target }: { target: ResolveTarget }) {
   const zone = useTimeZone();
   const { t } = useTranslation();

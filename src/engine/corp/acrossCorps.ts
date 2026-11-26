@@ -1,20 +1,8 @@
-/**
- * Corp Board widgets read across several corporations (the All scope): merging
- * each corporation's rows into one list and totalling what sums.
- *
- * Pure (CLAUDE.md): the reads arrive already loaded, one per corporation.
- */
-
-/** One corporation's rows. */
 export interface CorpRows<T> {
   corporationId: number;
   items: readonly T[];
 }
 
-/**
- * Several corporations' rows as one list ordered by `compare`, each stamped with
- * its corporation. A tie keeps the order the corporations came in.
- */
 export function mergeByCorporation<T>(
   reads: readonly CorpRows<T>[],
   compare: (a: T, b: T) => number
@@ -24,18 +12,15 @@ export function mergeByCorporation<T>(
     .sort(compare);
 }
 
-/** One corporation's wallet: its master division's balance and all its readable divisions'. */
 export interface CorpBalances {
   corporationId: number;
   master: number;
   total: number;
 }
 
-/** Each corporation's master and total balance, largest total first, and the grand total. */
 export function walletBalancesAcross(
   reads: readonly {
     corporationId: number;
-    /** The master wallet's division number. */
     masterDivision: number;
     divisions: readonly { division: number; balance: number }[];
   }[]
@@ -50,7 +35,6 @@ export function walletBalancesAcross(
   return { rows, total: rows.reduce((sum, row) => sum + row.total, 0) };
 }
 
-/** A corporation's killboard totals, as zKillboard states them. */
 export interface KillTotals {
   kills: number;
   losses: number;
@@ -58,10 +42,6 @@ export interface KillTotals {
   iskLost: number;
 }
 
-/**
- * Kills and losses summed; ISK efficiency over the summed ISK (zKillboard's own
- * formula), so a big corporation weighs more than a quiet one. Null when no ISK moved.
- */
 export function killTotalsAcross(stats: readonly KillTotals[]): {
   kills: number;
   losses: number;

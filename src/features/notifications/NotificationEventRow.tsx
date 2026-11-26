@@ -1,10 +1,3 @@
-/**
- * One Notification Event on the event-first page: the shared aggregate row
- * wired to this event's per-Character preferences, plus what used to hang off
- * a Character's own row: the event's delivery caveat, a pointer for
- * Characters that have not granted the Permission it needs, and its warn-ahead
- * times.
- */
 import { useTranslation } from 'react-i18next';
 import { AggregateRow } from './AggregateRow';
 import { PermissionNote } from './PermissionNote';
@@ -35,20 +28,15 @@ export function NotificationEventRow({
 }: {
   eventId: NotificationEventId;
   context: EventRowContext;
-  /** The Topic already says nobody can use its events. */
   omitUnavailableNote?: boolean;
 }) {
   const { t } = useTranslation();
   const entry = eventEntry(eventId);
   const badge = pushBadgeKind(eventId);
-  // A corp event's note is said once on its group header, not on every row.
   const isCorp = isCorpEventId(eventId);
-  // Its sharing corporations are listed under it, each to mute (issue #6225).
   const isSharedMoonPop = eventId === 'sharedMoonPop';
   const availability = useEventAvailability(eventId, context);
   const { prefsValue } = context;
-  // Writes read the store at click time, not a closed-over prop: a boot-time
-  // refresh re-renders from outside, and a stale value would drop an edit.
   const currentValue = () => useNotificationPreferences.getState().value;
 
   const missing = missingPermissionSummary([eventId], context);
@@ -66,7 +54,6 @@ export function NotificationEventRow({
         isEventEnabledFor(characterEventPrefs(prefsValue, character.characterId), eventId, 'feed'))
   );
 
-  // What the row's Warn ahead button says; none when no Character has the event on.
   const warnAheadLabel =
     entry.thresholds === null || thresholdCharacters.length === 0
       ? null

@@ -58,7 +58,6 @@ const ROWS = [
 const TOTALS = { owed: 180, paidThisMonth: 40, count: 3, needALook: 1 };
 const NAME = (id: number) => `Corp ${id}`;
 
-/** Corporation names in the order the table lists them. */
 function order() {
   const table = screen.getByRole('table', { name: 'Moon owners' });
   return within(table)
@@ -82,7 +81,6 @@ describe('MoonOwnersTable', () => {
     const sort = async (header: string, expected: string[]) => {
       const button = screen.getByRole('button', { name: new RegExp(header) });
       await userEvent.click(button);
-      // A first click sorts one way; the second flips it. Either way one of the two is the ascending order.
       const first = order();
       if (JSON.stringify(first) !== JSON.stringify(expected)) await userEvent.click(button);
       expect(order()).toEqual(expected);
@@ -252,7 +250,6 @@ describe('MoonOwnersTab', () => {
     expect(within(table).getByText('Ashfall Mining')).toBeInTheDocument();
     expect(within(table).getByText('Active')).toBeInTheDocument();
     expect(within(table).getByText("Can't read ledger")).toBeInTheDocument();
-    // 1000 ore at 100 ISK, 8%: whole ISK.
     expect(within(table).getByText(/8,000/)).toBeInTheDocument();
   });
 
@@ -261,7 +258,6 @@ describe('MoonOwnersTab', () => {
       moonOwnerPricesOn: () => new Map([[ORE, 50]]),
     });
     const table = screen.getByRole('table', { name: 'Moon owners' });
-    // 1000 ore at the page's 50 ISK, 8%: 4,000, not the miner line's 8,000.
     expect(within(table).getByText(/4,000/)).toBeInTheDocument();
     expect(within(table).queryByText(/8,000/)).toBeNull();
   });
@@ -327,7 +323,6 @@ describe('MoonOwnersTab', () => {
         summaries(summary())
       );
       const table = screen.getByRole('table', { name: 'Moon owners' });
-      // 1000 ore at 100 ISK, 9%, not the summary's 8%.
       expect(within(table).getByText(/9,000/)).toBeInTheDocument();
       expect(within(table).queryByText(/8,000/)).toBeNull();
     });
@@ -477,9 +472,7 @@ const paid = (id: string, amount: number, over: Partial<BookFeeder['payouts'][nu
 describe('Paying a moon owner', () => {
   it('lists the pay list by what is owed and offers Pay only where something is', async () => {
     renderBook(<MoonOwnersTab />, [
-      // 1000 ore at 100 ISK: 8% is 8,000 less 7,000 paid = 1,000 owed.
       feeder(ASH, { agreedRatePct: 8, payouts: [paid('a', 7000)] }),
-      // 500 ore at 100 ISK, 4%: 2,000 owed, so it leads.
       feeder(CIN, { agreedRatePct: 4 }),
     ]);
     const table = screen.getByRole('table', { name: 'Moon owners' });

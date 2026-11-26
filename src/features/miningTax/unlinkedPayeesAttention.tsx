@@ -3,11 +3,6 @@ import { Button } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
 import type { AttentionItem } from './AttentionStrip';
 
-/**
- * One Tax-tab attention item for the Payees nobody in EVE answers to, left
- * after `useAutoLinkPayees` tried them: a Payee must be a real corporation or
- * character, and the fix is picking who it is in Manage Payees.
- */
 export function unlinkedPayeesItem(
   unlinked: readonly PayeeRecord[],
   t: TFunction,

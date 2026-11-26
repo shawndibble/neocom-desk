@@ -64,7 +64,7 @@ describe('flatten', () => {
     const out = flatten([rowA, rowB]);
 
     expect(out).toHaveLength(1);
-    expect(out[0].key).toBe(b.id); // 2026-09-04 sorts first
+    expect(out[0].key).toBe(b.id);
     expect(out[0].groupMembers).toHaveLength(1);
     expect(out[0].groupMembers?.[0].assignment.id).toBe(a.id);
     expect(

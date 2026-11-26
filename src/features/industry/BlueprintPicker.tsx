@@ -16,12 +16,10 @@ const MAX_RESULTS = 20;
 interface BlueprintPickerProps {
   catalog: BlueprintCatalog;
   onPick: (entry: BlueprintCatalogEntry) => void;
-  /** Blueprints the pilot owns; a result with a copy among them carries an "Owned" tag. */
   ownedBlueprints?: readonly CharacterBlueprint[];
   className?: string;
 }
 
-/** Searchable blueprint picker: find a blueprint by its manufactured product's name. */
 export function BlueprintPicker({
   catalog,
   onPick,

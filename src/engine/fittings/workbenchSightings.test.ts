@@ -45,7 +45,6 @@ const loss = (killmailId: number, items: Item[], time: string | null = null): Hu
   victim: { ship_type_id: HULL, items },
 });
 
-/** Two blasters (one loaded with Void), a scram, a DC and a rig. */
 const FLOWN: Item[] = [
   item(100, 27),
   item(900, 27, 40),
@@ -76,7 +75,6 @@ Medium Auxiliary Nano Pump I
 Hammerhead II x3
 Void M x500`;
 
-/** The game's names: everything the loader reads, plus a filament its catalogue leaves out. */
 const GAME_ITEMS = gameItemLookup([
   'Vexor',
   'Thorax',
@@ -161,7 +159,6 @@ Medium Auxiliary Nano Pump I`;
   });
 
   it('leaves out a fit with an unread fitted module, even one the game still has', () => {
-    // A mutated module reads as a fitted line: dropped, the rest would equal the group.
     const mutated = EFT.replace('Warp Scrambler II', 'Warp Scrambler II\nGravid Warp Scrambler');
     expect(match([{ id: 'l', eft: mutated }]).size).toBe(0);
   });

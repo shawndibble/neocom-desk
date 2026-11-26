@@ -22,12 +22,6 @@ const VALID_PAYLOAD: PushPayload = {
   body: "Aurelia's industry job for Tritanium is complete.",
 };
 
-/**
- * The real FCM webpush wire shape: custom fields nested under `data`, every
- * value a string (Admin SDK's `data` is `{[key: string]: string}`) — see
- * `parsePushPayload`'s docstring for how this was confirmed against
- * `@firebase/messaging`'s own service-worker source.
- */
 function rawFcmPayload(payload: Partial<Record<keyof PushPayload, unknown>>): string {
   return JSON.stringify({ data: payload });
 }
@@ -67,8 +61,6 @@ describe('parsePushPayload', () => {
   });
 
   it('returns null when characterId is missing, non-numeric, or already a number', () => {
-    // Already a number is invalid too: real FCM data values are always
-    // strings, so a numeric characterId here can never come off the wire.
     expect(
       parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId: VALID_PAYLOAD.characterId }))
     ).toBeNull();
@@ -318,7 +310,6 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     "structureName: Athanor 'Chunk Line 3'",
   ].join('\n');
 
-  /** Exactly what `functions/src/eveNotificationPush.ts`'s `singlePush` sends. */
   function serverSingle(overrides: Record<string, string> = {}): string {
     return JSON.stringify({
       data: {
@@ -380,7 +371,6 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     };
     const [entry] = vi.mocked(e.recordFeedEntry).mock.calls[0];
     expect(entry.id).toBe(occurrenceKey(pollerFire, NOW));
-    // ...and that is the string the server sends, so the two cannot drift apart.
     expect(entry.id).toBe('777:eveNotification:555');
     expect(entry.eveType).toBe('StructureUnderAttack');
     expect(entry.firedAt).toBe(Date.parse('2026-10-14T11:50:00Z'));
@@ -439,7 +429,6 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     const eve = await run(async () => 'UTC');
     expect(eve).toContain('2026-06-14, 23:30');
     expect(await run(async () => undefined)).not.toContain('2026-06-14, 23:30');
-    // No reader at all (older env): the host's own zone, as before.
     expect(await run()).toMatch(/Timer ends \d{4}-\d{2}-\d{2}, \d{2}:\d{2}/);
   });
 
@@ -502,7 +491,6 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
   it('renders with ids when the name lookup hangs, instead of dropping to generic copy', async () => {
     vi.useFakeTimers();
     try {
-      // Stands in for `resolvePushNames`, which gives up at the resolution budget.
       const e = withName({
         resolveNames: vi.fn(
           () => new Promise<EveNotificationNames>((resolve) => setTimeout(() => resolve({}), 3_000))
@@ -549,7 +537,6 @@ describe('server-pushed events (issue #5121)', () => {
     direction: 'above',
   } as const;
 
-  /** What `functions/src/serverEvents.ts`'s `buildServerEventPush` sends. */
   function serverPush(fire: { eventId: string; characterId: number }, extra = {}): string {
     return JSON.stringify({
       data: {
@@ -665,7 +652,6 @@ describe('server-pushed new mail (issue #5143)', () => {
     fromId: 900,
     subject: 'Fleet tonight',
   } as const;
-  /** What `functions/src/mailPush.ts`'s `buildMailPush` sends. */
   const push = (f: object = fire) =>
     JSON.stringify({
       data: {
@@ -750,7 +736,6 @@ describe('server-pushed nearby alerts (issue #5122)', () => {
     jumps: 1,
   };
 
-  /** What `functions/src/nearbyPush.ts`'s `buildNearbyPush` sends. */
   const push = (fire: typeof skyhook | typeof incursion, extra: Record<string, string> = {}) =>
     JSON.stringify({
       data: {

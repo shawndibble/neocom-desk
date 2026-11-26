@@ -17,9 +17,6 @@ const mockedLogin = vi.mocked(beginCustomizedAddCharacterLogin);
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.settings.clear();
-  // The store is module-scoped and `hydrate()` is a no-op once `hydrated` is
-  // true, so without this reset a later test would start from whatever an
-  // earlier test last applied in memory rather than from the cleared table.
   useCustomizePermissionsSelection.setState({
     value: { groups: DEFAULT_ON_GROUPS },
     hydrated: false,
@@ -149,9 +146,6 @@ describe('CustomizePermissionsDialog', () => {
 
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
 
-    // Mail is on in the pre-hydration default too, so it proves nothing about
-    // the stored selection having loaded. Wait for hydration to unlock the
-    // checkboxes before reading them.
     const wallet = await screen.findByRole('checkbox', { name: 'Wallet' });
     await waitFor(() => expect(wallet).toBeEnabled());
     expect(wallet).not.toBeChecked();
@@ -173,10 +167,6 @@ describe('CustomizePermissionsDialog', () => {
 
   it('disables every Permission checkbox and Submit until hydration resolves, so a fast click can’t fork from the pre-hydration default', async () => {
     const realHydrate = useCustomizePermissionsSelection.getState().hydrate;
-    // Stored selection is Mail only, but `hydrate` never resolves during the
-    // first half of this test — the store stays `hydrated: false` on
-    // purpose, to prove the UI stays locked rather than racing ahead on the
-    // pre-hydration `DEFAULT_ON_GROUPS`.
     useCustomizePermissionsSelection.setState({
       value: { groups: ['mail'] },
       hydrated: false,
@@ -194,7 +184,6 @@ describe('CustomizePermissionsDialog', () => {
       'true'
     );
 
-    // Hydration lands.
     useCustomizePermissionsSelection.setState({ hydrated: true, hydrate: realHydrate });
     await waitFor(() => expect(wallet).not.toBeDisabled());
     expect(screen.getByRole('checkbox', { name: 'Mail' })).toBeChecked();

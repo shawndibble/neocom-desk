@@ -62,7 +62,6 @@ const baseStats: FittingStats = {
   ...neutralExtendedStats(),
 };
 
-// 10 is maxed, 20 changes nothing, 30 and 40 help.
 const profile: PilotProfile = {
   skillLevels: new Map([
     [10, 5],

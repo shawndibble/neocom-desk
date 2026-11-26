@@ -1,35 +1,3 @@
-/**
- * Device-local: how the pilot's planetary industry meets a market. One record,
- * edited by the shared PI settings form (the PI page's gear and Settings), and
- * read by every PI tab, so no two surfaces ever price one operation at two
- * markets.
- *
- * - `hub`: the Trade Hub PI is priced at and sold to. Buying at the hub (when
- *   `buyTiers` is not empty) happens here too.
- * - `buybackPct`: a corp buyback in place of selling on the hub's market. It
- *   pays this percentage of the hub's price, so the hub is still the price
- *   basis. `null` sells on the market.
- * - `buyTiers`: the tiers the pilot is willing to buy at the hub when their
- *   colonies fall short, P1 to P3. Empty (the default) is the point: buying
- *   assumes a shop within reach, and the pilot this was built with is thirty
- *   minutes from one. The Advisor reads "any tier" as "buying on".
- *
- * - `haulBetweenPlanets`: the pilot will haul goods from one of their planets
- *   to another, so Plan may recommend a Bigger chain (a P3 or P4 made across
- *   several planets) in its own section. Off by default: frequent hauls are never assumed: pilots live everywhere,
- *   nullsec included.
- *
- * The restart and haul cadence are the separate `cadencePref` record: they
- * answer how often the pilot logs in, not where they trade, and their stored
- * values are kept as they were.
- *
- * ## Migration
- *
- * This replaces two keys: `piMarketSourcing` (a hub id, or `'none'`) and the
- * Goal Planner's `priceHub` inside `piGoalPlanner`. With no `piSettings` row,
- * the first read derives one from them (`migrateLegacyPiSettings`); the legacy
- * rows are left where they are, as `useLocalSetting` leaves its own.
- */
 import { db } from '@/db';
 import { createSettingStore, type SettingStore } from '@/lib/settingStore';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -38,7 +6,6 @@ export const PI_SETTINGS_KEY = 'piSettings';
 const LEGACY_SOURCING_KEY = 'piMarketSourcing';
 const LEGACY_GOAL_PLANNER_KEY = 'piGoalPlanner';
 
-/** Tiers a pilot can opt to buy. P4 is out of scope. */
 export const PI_BUY_TIERS = [1, 2, 3] as const;
 export type PiBuyTier = (typeof PI_BUY_TIERS)[number];
 
@@ -46,13 +13,7 @@ export interface PiSettings {
   hub: TradeHub['id'];
   buybackPct: number | null;
   buyTiers: PiBuyTier[];
-  /**
-   * True once the pilot picked or dismissed a hub, so the strip stops
-   * suggesting the nearest one. Absent on the default; a stored row naming a
-   * hub other than the default counts as chosen (that was a pick).
-   */
   hubChosen?: true;
-  /** The pilot opted in to hauling between their planets. Absent when off. */
   haulBetweenPlanets?: true;
 }
 
@@ -62,7 +23,6 @@ export const DEFAULT_PI_SETTINGS: PiSettings = {
   buyTiers: [],
 };
 
-/** The settings with the haul-between-planets opt-in on or off; off stores no key. */
 export function withHaulBetweenPlanets(settings: PiSettings, on: boolean): PiSettings {
   const next: PiSettings = { ...settings };
   if (on) next.haulBetweenPlanets = true;
@@ -73,7 +33,6 @@ export function withHaulBetweenPlanets(settings: PiSettings, on: boolean): PiSet
 const isHubId = (value: unknown): value is TradeHub['id'] =>
   TRADE_HUBS.some((hub) => hub.id === value);
 
-/** A pick the pilot made: a non-default hub or a buyback. `hubChosen` is stored only when true. */
 const chosenFlag = (hub: TradeHub['id'], buybackPct: number | null): { hubChosen?: true } =>
   hub !== DEFAULT_PI_SETTINGS.hub || buybackPct !== null ? { hubChosen: true } : {};
 
@@ -94,12 +53,6 @@ export function parsePiSettings(raw: unknown): PiSettings | null {
   };
 }
 
-/**
- * The settings the two legacy keys amount to: a stored hub in
- * `piMarketSourcing` is that hub with P1 buying on; `'none'` (or anything
- * unreadable, or the old boolean) is no buying. The hub, when buying is off,
- * is the Goal Planner's old `priceHub`.
- */
 export function migrateLegacyPiSettings(sourcing: unknown, goalPlannerPrefs: unknown): PiSettings {
   const priceHub =
     typeof goalPlannerPrefs === 'object' && goalPlannerPrefs !== null

@@ -11,25 +11,17 @@ import {
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface MissingSkillRow extends FitCheckRow {
-  /** Not named by the fit: a prerequisite the schedule trains first. */
   prerequisite: boolean;
 }
 
 export interface MissingSkillRows {
-  /** Skills the fit names that the Character lacks: the "Missing N skills" count. */
   missingCount: number;
-  /** Every skill the schedule trains, in training order, prerequisites included. */
   rows: MissingSkillRow[];
   skills: ReadonlyMap<number, EngineSkill>;
   cloneState: CloneState;
   totalSeconds: number;
 }
 
-/**
- * What a training schedule needs for the Character: the skill catalog, their
- * trained skills, attributes, implants and clone state; null while the
- * catalog loads or with no Character.
- */
 export function useScheduleContext(characterId: number | null): ScheduleEntriesContext | null {
   const { catalog, trainedSkills, attributes, implants } = usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
@@ -49,11 +41,6 @@ export function useScheduleContext(characterId: number | null): ScheduleEntriesC
   );
 }
 
-/**
- * The skills `entries` still needs, each with its time on the schedule a Skill
- * Plan uses. Prerequisites the schedule pulls in are rows too and count toward
- * `totalSeconds`, so it matches the ship info "to fly" time.
- */
 export function missingSkillRows(
   entries: readonly PlanEntry[],
   ctx: ScheduleEntriesContext
@@ -72,10 +59,6 @@ export function missingSkillRows(
   };
 }
 
-/**
- * `missingSkillRows` at the Character's current attributes and implants; null
- * while the skill catalog loads.
- */
 export function useMissingSkillRows(
   entries: readonly PlanEntry[],
   characterId: number

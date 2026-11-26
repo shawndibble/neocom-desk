@@ -5,7 +5,6 @@ import { TypeIcon } from './TypeIcon';
 const BLUEPRINT_TYPE_ID = 681;
 const SKIN_TYPE_ID = 34599;
 
-/** jsdom never fires a real network request, so `onError` is driven by hand. */
 function fail(img: HTMLImageElement) {
   fireEvent.error(img);
 }
@@ -68,7 +67,7 @@ describe('TypeIcon', () => {
   });
 
   it('goes straight to the blueprint render for a type whose bp render already loaded once', () => {
-    const typeId = 688; // distinct id: the remembered set is module-level
+    const typeId = 688;
     const first = render(<TypeIcon typeId={typeId} size={32} />);
     fail(first.container.querySelector('img')!);
     fireEvent.load(first.container.querySelector('img')!);

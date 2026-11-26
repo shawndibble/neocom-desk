@@ -1,18 +1,9 @@
-/**
- * The Items page's Asset Category and Blueprints filters (issue #5601).
- *
- * An Asset Category is a top-level market group (GLOSSARY.md); the picker's
- * rows are its direct child market groups. A pick is stored as `'all'` — never
- * as a list — so a market group added later is included, or as the set of
- * ticked option ids.
- */
 import type { UrlParamCodec } from '@/lib/urlState';
 import type { Translate } from '@/lib/translate';
 import { summarizeFilterValues, type ActiveFilter } from '@/components/ui/activeFilters';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { marketGroupBranch } from '@/features/corp/assetCategories';
 
-/** Option id of "Not on the market"; market group ids are positive. */
 export const NOT_ON_MARKET = -1;
 
 export type CategoryPick = 'all' | ReadonlySet<number>;
@@ -24,21 +15,16 @@ export interface CategoryOption {
   name: string;
 }
 
-/** One picker heading: an Asset Category and the rows beneath it. */
 export interface CategoryHeading {
-  /** The root market group id, or `NOT_ON_MARKET`. */
   id: number;
   name: string;
-  /** True for the Blueprints & Reactions heading. */
   blueprints: boolean;
   options: CategoryOption[];
 }
 
 export interface AssetCategoryIndex {
   headings: readonly CategoryHeading[];
-  /** Option id per market-listed type; an absent type is `NOT_ON_MARKET`. */
   optionByTypeId: ReadonlyMap<number, number>;
-  /** Option ids under the Blueprints & Reactions heading. */
   blueprintOptionIds: ReadonlySet<number>;
 }
 
@@ -50,10 +36,6 @@ export const EMPTY_CATEGORY_INDEX: AssetCategoryIndex = {
 
 const isBlueprintRoot = (name: string) => name.toLowerCase().startsWith('blueprints');
 
-/**
- * The two-level picker tree and every type's option id, from the market
- * catalogue. A root that holds types itself gets a row of its own name.
- */
 export function buildCategoryIndex(
   groupList: readonly MarketGroupNode[],
   types: Iterable<MarketTypeEntry>,
@@ -101,13 +83,6 @@ export function buildCategoryIndex(
   return { headings, optionByTypeId, blueprintOptionIds };
 }
 
-/**
- * The index with every option no owned type falls under removed, and any heading
- * left empty. An option already ticked stays so a shared link never shows a pick
- * the picker cannot untick. `optionByTypeId` is kept whole. The result is for
- * display only: toggle against the full index so an `'all'` pick keeps meaning
- * "everything", including a category that shows up later.
- */
 export function pruneCategoryIndex(
   index: AssetCategoryIndex,
   ownedTypeIds: Iterable<number>,
@@ -128,7 +103,6 @@ export function allOptionIds(index: AssetCategoryIndex): number[] {
   return index.headings.flatMap((heading) => heading.options.map((option) => option.id));
 }
 
-/** A set naming every option reads as `'all'`, so a later-added group is still included. */
 export function normalizePick(
   index: AssetCategoryIndex,
   picked: ReadonlySet<number>
@@ -151,7 +125,6 @@ export function toggleOption(
   return normalizePick(index, next);
 }
 
-/** Ticks every option under a heading, or clears them when all are already ticked. */
 export function toggleHeading(
   index: AssetCategoryIndex,
   pick: CategoryPick,
@@ -178,7 +151,6 @@ export function pickIsAll(pick: CategoryPick): pick is 'all' {
   return pick === 'all';
 }
 
-/** True while a Blueprints & Reactions option is ticked: the Blueprints select only means something then. */
 export function blueprintsTicked(index: AssetCategoryIndex, pick: CategoryPick): boolean {
   if (pick === 'all') return index.blueprintOptionIds.size > 0;
   return [...index.blueprintOptionIds].some((id) => pick.has(id));
@@ -188,11 +160,9 @@ export interface AssetKindFilter {
   index: AssetCategoryIndex;
   pick: CategoryPick;
   blueprints: BlueprintKind;
-  /** The SDE's blueprint type ids, once loaded: an off-market original still counts. */
   blueprintTypeIds?: ReadonlySet<number> | null;
 }
 
-/** True when the filter keeps every asset, so callers can skip the work. */
 export function filterIsOpen(filter: AssetKindFilter): boolean {
   return (
     pickIsAll(filter.pick) &&
@@ -200,7 +170,6 @@ export function filterIsOpen(filter: AssetKindFilter): boolean {
   );
 }
 
-/** Whether one asset passes the Category pick and, while it applies, the Blueprints select. */
 export function assetPassesKindFilter(
   asset: { type_id: number; is_blueprint_copy?: boolean },
   filter: AssetKindFilter
@@ -217,7 +186,6 @@ export function assetPassesKindFilter(
   );
 }
 
-/** `cat`: absent = all; `cat=` = none; else comma-separated option ids. */
 export function categoryPickParam(): UrlParamCodec<CategoryPick> {
   return {
     parse: (raw) => {
@@ -240,12 +208,6 @@ export function blueprintKindParam(): UrlParamCodec<BlueprintKind> {
   };
 }
 
-/**
- * What a pick ticks, in picker order, for a one-line summary: a heading whose
- * rows are all ticked as its own name ("Ships", not every ship class), else
- * each ticked row. Read against the index the picker shows, so the summary
- * names what the reader can see ticked there.
- */
 export function pickedCategoryNames(index: AssetCategoryIndex, pick: CategoryPick): string[] {
   if (pick === 'all') return [];
   return index.headings.flatMap((heading) => {
@@ -255,11 +217,6 @@ export function pickedCategoryNames(index: AssetCategoryIndex, pick: CategoryPic
   });
 }
 
-/**
- * The Category and Blueprints filters as `FilterBar` pills, shared by Assets
- * and Corp Assets. Blueprints only counts while its select is shown: a hidden
- * select does not filter (`filterIsOpen`), so it is not a filter that is on.
- */
 export function activeAssetKindFilters<T extends { cat: CategoryPick; bp: BlueprintKind }>(
   value: T,
   {
@@ -267,10 +224,8 @@ export function activeAssetKindFilters<T extends { cat: CategoryPick; bp: Bluepr
     showBlueprintSelect,
     categoryLabel,
   }: {
-    /** The index the picker shows; null while the market tree loads (no picker yet). */
     index: AssetCategoryIndex | null;
     showBlueprintSelect: boolean;
-    /** The Category `FilterField`'s label, which differs between the two pages. */
     categoryLabel: string;
   },
   t: Translate
@@ -293,11 +248,6 @@ export function activeAssetKindFilters<T extends { cat: CategoryPick; bp: Bluepr
   return active;
 }
 
-/**
- * Corp Assets' old `cat` held one Asset Category (a root market group id). An
- * id that names a heading with no row of its own id now means all its rows, so
- * an old link still opens on that category; any other id is a picker option.
- */
 export function expandLegacyCategoryIds(
   index: AssetCategoryIndex,
   pick: CategoryPick

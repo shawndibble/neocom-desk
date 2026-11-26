@@ -3,10 +3,6 @@ import { joined } from '@/lib/exportSheets';
 import type { HolderCount } from '@/engine/stockTargets/onHand';
 import type { StockRow } from '@/engine/stockTargets/stockRows';
 
-/**
- * Every column the Manager table offers plus the facts its tooltips carry; Cost is blank, not 0, for an
- * unpriced item. `characterName` is undefined while only one Character has data, as in the table.
- */
 export function stockCsvColumns(
   t: CsvTranslate,
   {

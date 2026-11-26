@@ -15,10 +15,8 @@ import { routeExposure } from './routeExposure';
 
 const JITA = 30000142;
 const PERIMETER = 30000144;
-/** Uedama — a named gank chokepoint, and 0.5. */
 const UEDAMA = 30002768;
 const AMARR = 30002187;
-/** Not in the snapshot at all. */
 const MISSING = 39999999;
 
 const SYSTEMS = new Map<number, SolarSystemEntry>(

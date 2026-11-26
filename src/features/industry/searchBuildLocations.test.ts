@@ -1,8 +1,3 @@
-/**
- * The search behind the Build Plan's location field: ids from
- * `/characters/{id}/search`, then one lookup per hit, then the mapping into
- * fields a plan can take.
- */
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -44,14 +39,14 @@ const structureHandler = http.get(`${ESI_BASE_URL}/universe/structures/:id`, ({ 
       name: 'K2-18 R&D',
       owner_id: 98,
       solar_system_id: 30003888,
-      type_id: 35826, // Azbel
+      type_id: 35826,
     });
   }
   return HttpResponse.json({
     name: 'K2-18 Market',
     owner_id: 98,
     solar_system_id: 30003888,
-    type_id: 35833, // Fortizar — cannot manufacture
+    type_id: 35833,
   });
 });
 
@@ -102,7 +97,6 @@ describe('searchBuildLocations', () => {
   });
 
   it('drops a structure that cannot host a manufacturing job', async () => {
-    // A Fortizar is a Citadel: no Manufacturing Plant service module exists for it.
     server.use(
       searchHandler({ structure: [AZBEL_ID, FORTIZAR_ID] }),
       structureHandler,
@@ -136,8 +130,6 @@ describe('searchBuildLocations', () => {
   });
 
   it('caps the lookups across both categories, not once each', async () => {
-    // 20 stations and 20 structures used to mean 30 lookups; now it is 15
-    // total, interleaved so neither category can crowd the other out.
     const many = (base: number) => Array.from({ length: 20 }, (_, i) => base + i);
     let lookups = 0;
     server.use(
@@ -167,7 +159,6 @@ describe('searchBuildLocations', () => {
 
     expect(lookups).toBe(15);
     expect(found).toHaveLength(15);
-    // Both categories survive the cap.
     expect(found.some((o) => o.facility === 'npcStation')).toBe(true);
     expect(found.some((o) => o.facility === 'azbel')).toBe(true);
   });
@@ -189,7 +180,6 @@ describe('searchBuildLocations', () => {
   });
 
   it('never calls ESI below the three-character floor ESI itself enforces', async () => {
-    // No handler registered: onUnhandledRequest 'error' fails on any call.
     expect(await searchBuildLocations(CHAR_ID, 'K2', 'manufacturing')).toEqual([]);
     expect(await searchBuildLocations(CHAR_ID, '   ', 'manufacturing')).toEqual([]);
   });
@@ -211,7 +201,7 @@ describe('searchBuildLocations', () => {
               name: 'K2-18 R&D',
               owner_id: 98,
               solar_system_id: 30003888,
-              type_id: 35826, // Azbel — cannot react
+              type_id: 35826,
             })
       ),
       systemHandler

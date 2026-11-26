@@ -10,10 +10,6 @@ interface PickableMiner {
   characterIds: readonly number[];
 }
 
-/**
- * Pick one Miner: sorted by name, with a filter that matches the Miner's name or any of its
- * characters' names. The chosen Miner stays listed, so a search never hides what Assign will send.
- */
 export function MinerPicker({
   miners,
   nameOf,
@@ -25,7 +21,6 @@ export function MinerPicker({
   nameOf: (characterId: number) => string;
   value: string;
   onChange: (id: string) => void;
-  /** For the dialog to focus the filter box on open. */
   filterRef?: Ref<HTMLInputElement>;
 }) {
   const { t } = useTranslation();

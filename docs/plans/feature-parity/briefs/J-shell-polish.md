@@ -95,7 +95,7 @@ Border widths (1px, not themed via a rem custom property in Tailwind v4 — no `
 **Files touched:**
 
 - `src/styles/index.css` — add `--ui-scale: 1;` custom property (default) and the `html { font-size: calc(100% * var(--ui-scale)); }` rule.
-- `src/routes/Settings.tsx` — currently deliberately empty (its own comment says the controls that belong here, including this one, "each ship with their own feature"); add the density-scale slider control to it. No new route needed — `Settings` is already wired at `/settings` in `App.tsx`.
+- `src/routes/Settings.tsx` — currently deliberately empty (the page is empty because the controls that belong here, including this one, "each ship with their own feature"); add the density-scale slider control to it. No new route needed — `Settings` is already wired at `/settings` in `App.tsx`.
 
 **New modules:**
 

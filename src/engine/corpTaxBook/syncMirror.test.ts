@@ -16,10 +16,6 @@ import {
 import { SCHEDULED_STOP_REASONS } from './scheduledSync';
 import { otherDivisions } from './uncounted';
 
-// The scheduled server sync (ADR 0025) runs a mirror of the officer sync's pure
-// half (functions/src/corpTaxBookSyncEngine.ts), because `functions/` cannot
-// import `src/`. Same inputs, same outputs.
-
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 
 describe('functions mirror of the Corp Tax Book sync engine', () => {
@@ -249,7 +245,6 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
         timestamp: n.at,
         payload: mirror.parseMoonPayload(n.text),
       }));
-      // ESI no longer lists 4000's chunk: only the book's stored copy names it.
       const stored = [
         {
           structureId: 4000,
@@ -263,7 +258,6 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       expect(reconciled.map((x) => x.oreLines?.length)).toEqual([2, 2]);
       expect(mirror.reconcileExtractions(esi, theirs, stored)).toEqual(reconciled);
 
-      // Laser fired's ore; the started one winning in either order; ore the book already holds.
       const both = (type: string, at: string, text: string) => ({
         ours: { type, timestamp: at, payload: parseEveNotificationPayload(text) },
         theirs: { type, timestamp: at, payload: mirror.parseMoonPayload(text) },

@@ -1,10 +1,3 @@
-/**
- * What the shared info modal shows below the header for an NPC faction,
- * corporation or agent: the pilot's standing chain, what it opens, what it is
- * worth at the owner's stations, where it is and who the pilot knows there.
- * Each card loads on its own and is left out when its data is missing; with no
- * Character signed in only the facts (Where) remain. Lazy-loaded by the modal.
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -45,8 +38,6 @@ export default function NpcInfoView({ kind, id }: NpcInfoTarget) {
     () => (data ? standingModel(data.chain, data.nameOf, data.skills !== null) : null),
     [data]
   );
-  // Access is gated by the standing the pilot's skills lift: with skills unknown it
-  // has no honest answer (the standing card still shows the base numbers).
   const access = useMemo(
     () =>
       data?.skills

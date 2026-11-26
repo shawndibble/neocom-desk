@@ -1,12 +1,3 @@
-/**
- * The Corp Tax Book as `/corp/moons` reads it (issue #4063): everything the
- * three tabs and the two drill-down pages print, derived in one pass from the
- * book's stored records with the engine's own functions. Nothing here decides
- * a figure the engine does not already decide — rates, valuation, Billable
- * days, each Miner's Running account, Overdue and the Extraction lifecycle are
- * `charges`, `openSet`, `minerRunningAccount`, `overdue` and `extraction`; this
- * module only joins them per Miner, per day and per Extraction.
- */
 import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
@@ -36,32 +27,19 @@ import type { MinerRunningAccount } from './minerRunningAccount';
 import type { BookMinerRunningAccount } from './personal';
 import { settleOpenSet, type MinerSettlement, type OpenSet, type OpenSetInput } from './openSet';
 
-/** What a view is built from: the open set's input, placed by the book's Extractions. */
 export interface BookViewInput extends Omit<OpenSetInput, 'placement'> {
   graceHours: number;
   overdueDays: number;
   hubId: string;
   oreForm: 'compressed' | 'raw';
   structureExpiryHours: Readonly<Record<string, number>>;
-  /** The book's manual chunk rate (m³/h); the fallback behind a refinery's measured one. */
   chunkM3PerHour?: number;
   declarations: readonly Declaration[];
   adjustments: readonly Adjustment[];
   extractions: readonly SyncExtraction[];
-  /**
-   * A moon owner's prices by raw type id (#4621): the server's rule for the moon owner's own
-   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay and that page owe one figure.
-   * Absent: `pricesOn`.
-   */
   moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;
-  /**
-   * Ore of chunks with a linked Moon Ore Survey (D13), by extraction id: the make-up of one with no
-   * notification, and for one with a notification the variant split until its ore is mined.
-   */
   surveyOreLines?: ReadonlyMap<string, readonly OreLine[]>;
-  /** Extraction ids whose survey lines were sized by the survey's own measured volume, not a chunk rate. */
   surveyMeasured?: ReadonlySet<string>;
-  /** Current members, when the viewer can read the roster; else standing comes from the ledger. */
   memberIds?: ReadonlySet<number>;
 }
 
@@ -72,22 +50,16 @@ export interface MinerRow {
   mainCharacterId: number;
   characterIds: number[];
   standing: MinerStanding;
-  /** What the Miner's Running account still owes: its unpaid days. */
   owed: number;
-  /** Whole days past the oldest overdue late notice's due date; null when none is overdue. */
   overdueDays: number | null;
-  /** Days that are not Billable yet. */
   pending: number;
   credit: number;
   lastPaidAt: string | null;
-  /** An overdue clock is paused by a declaration. */
   paused: boolean;
 }
 
-/** A Running account's status: "Paid through {date}" or "Owes X (N days, oldest D)". */
 export type RunningAccountStatus = Pick<MinerRunningAccount, 'paidThrough' | 'owes'>;
 
-/** `owed`: billed, not paid yet. `not-billable`: not Billable yet. */
 export type DayStatus = 'paid' | 'owed' | 'not-billable' | 'dismissed';
 
 export interface DayRow {
@@ -104,13 +76,9 @@ export interface DayRow {
   rateEffectiveFrom?: string;
   tax: number;
   status: DayStatus;
-  /** What is still owed of an `owed` day: its share of the date's remainder, 0 while a dispute holds it. */
   owed?: number;
-  /** A `not-billable` day held while this moon owner's ledger cannot be read (#6210). */
   heldBy?: number;
-  /** An `owed` day an open dispute holds: nothing pays it or bills it until the dispute ends. */
   disputed?: { disputeId: string; until: string };
-  /** The newest late notice that listed the day. */
   noticeId?: string;
   dismissalId?: string;
 }
@@ -125,25 +93,17 @@ export interface ExtractionRow {
   fracturedAt?: string;
   fracturedBy?: 'laser' | 'auto';
   expiresAt?: string;
-  /** Fracture and Expired as the engine plans them, set in every state, so a chunk not yet fractured still has a span to draw. */
   plannedFractureAt: string;
   plannedExpiresAt: string;
-  /** `mined`: no notification or survey, so the make-up is rebuilt from the ore mined after the chunk ended. */
   oreSource: 'notification' | 'survey' | 'mined' | 'unknown';
   oreLines: OreLine[];
-  /** A survey chunk whose ended extraction saw an ore mined past the survey's figure: that figure is a floor. */
   oreCorrected?: boolean;
-  /** The chunk rate a survey estimate was guessed at (D13); absent for the other sources and for a measured volume. */
   chunkRate?: ChunkRate;
   estimatedValue: number | null;
-  /** Share of the estimate already mined, 0-100; null when the make-up is unknown or it has not fractured. */
   minedPct: number | null;
-  /** Tax recorded against this Extraction's days. */
   tax: number;
   minerCount: number;
-  /** Who flagged the chunk Fully Mined and when (#5257); absent when not flagged. */
   fullyMined?: { by: number; byName: string; at: string };
-  /** The moon owner whose refinery it is (#6097); absent means the book's own corporation. */
   sourceCorporationId?: number;
 }
 
@@ -158,7 +118,6 @@ export interface NeedsYouOverdue {
   minerId: string;
   days: number;
   owed: number;
-  /** The late notice whose Overdue clock ran out. */
   noticeId: string;
 }
 export interface NeedsYouUnmatched {
@@ -169,7 +128,6 @@ export interface NeedsYouLeaver {
   kind: 'leaver';
   minerId: string;
   owed: number;
-  /** The newest late notice, which stands for the days owed. */
   noticeId: string | undefined;
 }
 export type NeedsYouItem =
@@ -179,38 +137,31 @@ export interface BookView {
   input: BookViewInput;
   charges: DayCharge[];
   beforeBook: ObservedMiningEntry[];
-  /** Moon owner rows outside their coverage: kept, owe nothing, like "Before the book". */
   outsideCoverage: ObservedMiningEntry[];
-  /** Donations dated before the start date: counted for officers, never credited or listed. */
   donationsBeforeBook: number;
   unrated: ObservedMiningEntry[];
   billableThrough: string | undefined;
   miners: MinerRow[];
   extractions: ExtractionRow[];
-  /** Each refinery's measured chunk rate, learned from its ExtractionStarted notifications. */
   chunkRates: ReadonlyMap<number, LearnedChunkRate>;
   needsYou: NeedsYouItem[];
   totals: { owed: number; overdue: number; overdueCount: number; credit: number };
-  /** Everything the per-Miner and per-Extraction pages read. */
   internals: {
     byMiner: Map<string, MinerInternals>;
     placeOf: OpenSet['placeOf'];
   };
 }
 
-/** One Miner's settlement with its day rows. */
 export interface MinerInternals extends MinerSettlement {
   days: DayRow[];
 }
 
-/** One Miner of a view: their row, their settlement and their Running account. */
 export interface BookMiner {
   row: MinerRow;
   settlement: MinerInternals;
   account: MinerRunningAccount;
 }
 
-/** Undefined for a Miner the view does not hold. */
 export function bookMiner(
   view: Pick<BookView, 'miners' | 'internals'>,
   minerId: string
@@ -220,16 +171,13 @@ export function bookMiner(
   return row && settlement ? { row, settlement, account: settlement.account } : undefined;
 }
 
-/** A Miner's account with what it billed and was paid: what the one Payee ledger is built from. */
 export type MinerAccountBooks = Pick<
   BookMinerRunningAccount,
   'minerId' | 'account' | 'lines' | 'payments' | 'notices'
 > & {
-  /** Mined but not Billable yet: beside the ledger, never in its balance. */
   notYetBilled?: { tax: number; days: number };
 };
 
-/** Undefined for a Miner the view does not hold. */
 export function minerAccountOf(
   view: Pick<BookView, 'internals'>,
   minerId: string
@@ -247,7 +195,6 @@ export function minerAccountOf(
   };
 }
 
-/** Tax on days that are not Billable yet: not dismissed, after the Miner's last Billable day. */
 export function pendingTax(
   input: Pick<BookViewInput, 'dismissals'>,
   charges: readonly DayCharge[],
@@ -262,7 +209,6 @@ export function pendingTax(
     .reduce((sum, c) => sum + c.taxOwed, 0);
 }
 
-/** What the open set of a whole book is settled from, as an officer reads it. */
 export function openSetInputOf(input: BookViewInput): OpenSetInput {
   return {
     ...input,
@@ -274,7 +220,6 @@ export function openSetInputOf(input: BookViewInput): OpenSetInput {
   };
 }
 
-/** Member while a character is in the corporation now; left if it was; else a guest. */
 export function standingOf(
   characterIds: readonly number[],
   latestCorp: ReadonlyMap<number, { corp: number }>,
@@ -288,13 +233,11 @@ export function standingOf(
   return isMember ? 'member' : wasMember ? 'left' : 'guest';
 }
 
-/** The late notice issued last, if any. */
 export const newest = <T extends Pick<LateNotice, 'issuedAt' | 'id'>>(notices: readonly T[]) =>
   [...notices]
     .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id))
     .at(-1);
 
-/** A late notice's Overdue clock: it starts at its issue and runs until every day it listed is paid. */
 export function noticeOverdue(
   view: Pick<BookView, 'input'>,
   notice: Pick<LateNotice, 'id' | 'issuedAt'>
@@ -324,8 +267,6 @@ export function buildBookView(input: BookViewInput): BookView {
     const mainCharacterId =
       input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
     const mine = charges.filter((c) => c.minerId === id);
-    // `billableThrough` is the Miner's own; `hold` set it, and its moon owner is why a held day
-    // waits (#6210) from the hold's first day through the book's billable-through.
     const heldByOf = (date: string) =>
       hold &&
       open.billableThrough !== undefined &&
@@ -334,11 +275,9 @@ export function buildBookView(input: BookViewInput): BookView {
         ? hold.ownerCorporationId
         : undefined;
     const billed = new Set(billable.lines.map((l) => l.key));
-    /** The newest late notice that listed each day. */
     const noticeBy = new Map<string, string>();
     for (const n of notices) for (const line of n.lines) noticeBy.set(line.key, n.id);
     const through = account.input.checkpoint?.through;
-    /** The open dispute that holds a date, and until when. */
     const disputeOf = (date: string) => {
       for (const d of input.disputes ?? []) {
         if (d.date !== date || !isMinersDispute(d, id, characterIds)) continue;
@@ -355,7 +294,6 @@ export function buildBookView(input: BookViewInput): BookView {
         let status: DayStatus;
         if (dismissal) status = 'dismissed';
         else if (!billed.has(c.key)) status = 'not-billable';
-        // A day the account closed through and no longer owes is paid.
         else if (day ? day.settled : through !== undefined && c.date <= through) status = 'paid';
         else status = 'owed';
         const heldBy = status === 'not-billable' ? heldByOf(c.date) : undefined;
@@ -388,7 +326,6 @@ export function buildBookView(input: BookViewInput): BookView {
     let overdueDays: number | null = null;
     let overdueNoticeId: string | undefined;
     let paused = false;
-    // A late notice's Overdue clock starts at its issue, until its days are paid.
     for (const n of notices) {
       if (account.standingOf(n).settled) continue;
       const status = noticeOverdue({ input }, n);
@@ -443,10 +380,8 @@ export function buildBookView(input: BookViewInput): BookView {
   let donationsBeforeBook = 0;
   for (const p of input.payments) {
     if (p.source === 'donation' && isBeforeBook(p.at, input.startDate)) donationsBeforeBook++;
-    // A donation wholly marked not tax needs nothing more; a partly marked one still does.
     else if (!p.minerId && netPayment(p) > 0) needsYou.push({ kind: 'unmatched', payment: p });
   }
-  // The same ordering the cards read in: declarations, then the oldest debt.
   const rank: Record<NeedsYouItem['kind'], number> = {
     declaration: 0,
     overdue: 1,
@@ -484,7 +419,6 @@ export function buildBookView(input: BookViewInput): BookView {
   };
 }
 
-/** A stored Extraction as `learnChunkRates` reads it. */
 export function measurable(x: SyncExtraction) {
   return {
     structureId: x.structureId,
@@ -494,7 +428,6 @@ export function measurable(x: SyncExtraction) {
   };
 }
 
-/** The fields of an Extraction's row that need no ledger day: its state, dates, make-up and estimate. */
 export type ExtractionRowBase = Omit<ExtractionRow, 'minedPct' | 'tax' | 'minerCount'>;
 
 type ExtractionRowInput = Pick<
@@ -503,7 +436,6 @@ type ExtractionRowInput = Pick<
 > &
   Partial<Pick<BookViewInput, 'entries'>>;
 
-/** One Extraction's row without the ledger-derived fields; the same rows the Overview schedule reads. */
 export function extractionRowBase(
   x: SyncExtraction,
   input: ExtractionRowInput,
@@ -517,9 +449,6 @@ export function extractionRowBase(
     ...(x.fullyMined ? { fullyMinedAt: x.fullyMined.at } : {}),
   });
   const planned = fractureAndExpiry(ex, expiryHours);
-  // Source order (D13): a moon drill notification (exact, never corrected; Extraction started,
-  // else finished or fractured), then a linked Survey's first scan, then what was mined once the
-  // chunk has ended.
   const notified = x.oreLines ?? [];
   const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
   let oreSource: ExtractionRow['oreSource'] =
@@ -529,7 +458,6 @@ export function extractionRowBase(
   const ended =
     status.state === 'expired' ||
     (status.state !== 'cancelled' && !!x.fullyMined && !!status.fracturedAt);
-  // A notification names only base ores: split each into the variants mined, else surveyed.
   if (oreSource === 'notification') {
     const mined = input.entries ? minedDuringExtraction(ex, input.entries, { expiryHours }) : [];
     oreLines = splitChunkVariants(oreLines, mined, input.surveyOreLines?.get(ex.id));
@@ -537,7 +465,6 @@ export function extractionRowBase(
   if (oreSource !== 'notification' && ended && input.entries) {
     const mined = minedDuringExtraction(ex, input.entries, { expiryHours });
     if (oreSource === 'survey') {
-      // Per ore, never in total: an ore mined past its survey figure raises that ore alone.
       oreLines = oreLines.map((l) => {
         const got = mined.find((m) => m.typeId === l.typeId)?.quantity ?? 0;
         if (got <= l.quantity) return l;
@@ -606,39 +533,25 @@ function buildExtractionRows(
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));
 }
 
-// --- Drill-downs -----------------------------------------------------------
-
 export interface MinerDetail {
   row: MinerRow;
   days: DayRow[];
   payments: (TaxPayment & { credited: number })[];
-  /** The Miner's late notices, newest first. */
   notices: LateNotice[];
-  /** Which days each payment paid, oldest payment first. */
   paymentDays: MinerSettlement['account']['applications']['payments'];
-  /**
-   * The days a tolerance (or money taken back from a day recorded paid) wrote off, each dated by
-   * the last payment that reached the day, oldest first.
-   */
   dayWriteOffs: { date: string; amount: number; at: string }[];
-  /** Dates an open dispute holds: not billed yet, so not in the balance. */
   heldDays: string[];
-  /** The Miner's officer write-offs (#4637) as recorded, oldest first (the ledger says what each forgave). */
   officerWriteOffs: {
     id: string;
     amount: number;
     reason: string;
     at: string;
-    /** Undone by an officer. */
     reversed?: { by: number; at: string; reason: string };
   }[];
-  /** What officer write-offs forgave of the days the account bills now. */
   forgiven: number;
   dismissals: Dismissal[];
   declarations: Declaration[];
-  /** The Miner's disputes, answered or not. */
   disputes: OreDispute[];
-  /** The checkpoint the account is built from: what came before it is summed up in it. */
   checkpoint?: RunningAccountCheckpoint;
 }
 
@@ -688,7 +601,6 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
 export interface ExtractionDetail {
   row: ExtractionRow;
   miners: { minerId: string; units: number; value: number; tax: number }[];
-  /** The moon's other cycles, newer and older, newest first. */
   otherCycles: ExtractionRow[];
 }
 
@@ -713,42 +625,27 @@ export function extractionDetail(view: BookView, id: string): ExtractionDetail |
   };
 }
 
-// --- Late notices ----------------------------------------------------------
-
-/** One late notice as its panel reads it, its figures read off the Miner's Running account. */
 export interface NoticeDetail {
   notice: LateNotice;
-  /** What its lines billed, as whole ISK. */
   billed: number;
   paid: number;
   outstanding: number;
-  /** What officer write-offs forgave of its days (part of `paid`). */
   forgiven: number;
-  /** The shortfall a tolerance wrote off (part of `paid`). */
   writtenOff: number;
-  /** What open disputes hold of its days. */
   held: number;
   settled: boolean;
   overdue: boolean;
-  /** When it goes (or went) overdue; null once settled. */
   dueAt: string | null;
-  /** Where its Overdue clock stands; a declaration pauses it. */
   state: OverdueState;
-  /** While paused: when the pause ends on its own. */
   pausedUntil?: string;
 }
 
-/**
- * Billed, paid and outstanding as whole ISK, where Billed - Paid - Outstanding is always 0 (#5247).
- * Less than 1 ISK credited is not a payment: the whole amount stays outstanding.
- */
 function shownFigures(amount: number, remaining: number, credited: number) {
   const billed = wholeIsk(amount);
   const outstanding = wholeIsk(credited) === 0 ? billed : Math.min(billed, wholeIsk(remaining));
   return { billed, outstanding, paid: billed - outstanding };
 }
 
-/** One late notice with its standing; undefined when the book holds no such notice. */
 export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | undefined {
   const notice = view.input.notices.find((n) => n.id === noticeId);
   if (!notice) return undefined;

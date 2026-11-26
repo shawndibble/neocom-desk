@@ -20,7 +20,6 @@ import type { CompetingOrder } from '@/engine/market/undercut';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 
-/** Every skill untrained: these fixtures test row shaping, not fee or yield maths. */
 const ZERO_SKILLS: CharacterSkills = {
   accountingLevel: 0,
   brokerRelationsLevel: 0,
@@ -321,7 +320,6 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
       [
         1,
         deepEntry([
-          // Only my own order in the fetched region book: deep check ran, found no rival.
           {
             orderId: 1,
             price: 1000,
@@ -353,7 +351,6 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
         1,
         deepEntry(
           [
-            // Only my own order in the (partially) fetched region book.
             {
               orderId: 1,
               price: 1000,
@@ -363,7 +360,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
               isBuyOrder: false,
             },
           ],
-          true // truncated
+          true
         ),
       ],
     ]);
@@ -395,7 +392,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
               isBuyOrder: false,
             },
           ],
-          false // not truncated
+          false
         ),
       ],
     ]);
@@ -435,7 +432,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
               isBuyOrder: false,
             },
           ],
-          true // truncated, but this rival was still actually seen
+          true
         ),
       ],
     ]);
@@ -478,7 +475,6 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
       [
         1,
         deepEntry([
-          // Same station as mine (60003760), different order id — establishes my systemId.
           {
             orderId: 99,
             price: 1100,
@@ -487,7 +483,6 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
             volumeRemain: 2,
             isBuyOrder: false,
           },
-          // Same system (30000142), different station, beats me.
           {
             orderId: 98,
             price: 900,
@@ -509,7 +504,6 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
       [
         1,
         deepEntry([
-          // No entry at my station or my order id anywhere in the book.
           {
             orderId: 42,
             price: 900,
@@ -524,7 +518,6 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
     const row = firstRow(baseInput({ deepCompetition }));
     expect(row.deepUndercut).not.toBeNull();
     expect('system' in (row.deepUndercut?.byScope ?? {})).toBe(false);
-    // Region scope still resolves since it does not depend on systemId.
     expect(row.worstScope).toBe('region');
   });
 
@@ -557,10 +550,6 @@ describe('buildOpenOrderRows — structure market competition (issue #538)', () 
     expect(row.deepUndercut?.byScope.station?.price).toBe(950);
   });
 
-  // The structure book returns every item at that location, not just mine —
-  // findUndercut itself does not filter by type (the region book is always
-  // pre-filtered to one type_id before it gets there), so this module must
-  // filter to `order.type_id` itself before merging structure competitors in.
   it('drops a structure-book rival for a different item at the same location', () => {
     const structureCompetition = new Map([
       [
@@ -641,7 +630,6 @@ describe('buildOpenOrderRows — structure market competition (issue #538)', () 
 });
 
 describe('buildOpenOrderRows — frequentlyUndercut (issue #1018)', () => {
-  /** `count` samples ending 5 minutes before NOW, one every 5 minutes. */
   function samples(count: number, problem: OrderProblem) {
     return Array.from({ length: count }, (_, i) => ({
       at: NOW - (count - i) * 5 * MINUTE_MS,
@@ -746,8 +734,6 @@ describe('buildOpenOrderRows — cost basis and floor', () => {
     );
     expect(smallStack.floor).not.toBeNull();
     expect(bigStack.floor).not.toBeNull();
-    // A single remaining unit still eats the full 100 ISK minimum; a
-    // 10,000-unit stack spreads that same 100 ISK to a fraction of an ISK.
     expect(smallStack.floor!.relist).toBeGreaterThan(100);
     expect(bigStack.floor!.relist).toBeLessThan(15);
   });
@@ -821,9 +807,9 @@ describe('sorting, filing, counting', () => {
             volume_remain: 1,
             issued: '2026-09-01T00:00:00Z',
             duration: 90,
-          }), // healthy, low isk
-          makeOrder({ order_id: 20, price: 1000, volume_remain: 1, duration: 5 }), // expiring soon, higher isk
-          makeOrder({ order_id: 30, price: 500, volume_remain: 1, duration: 5 }), // expiring soon, lower isk
+          }),
+          makeOrder({ order_id: 20, price: 1000, volume_remain: 1, duration: 5 }),
+          makeOrder({ order_id: 30, price: 500, volume_remain: 1, duration: 5 }),
         ],
       }),
     ]);
@@ -861,7 +847,6 @@ describe('sorting, filing, counting', () => {
           [100, 'Tritanium'],
           [101, 'Pyerite'],
         ]),
-        // Only type 100's station read came back.
         stationPrices: new Map([
           ['60003760:100', { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
         ]),

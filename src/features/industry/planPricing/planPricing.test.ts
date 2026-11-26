@@ -8,7 +8,6 @@ import type { MarketSnapshot } from '../marketData';
 import { resolveBuildPlan, type BuildPlanSources } from '../resolveBuildPlan';
 import { planVerdictOf, pricePlan, productSalePrice, type DepthSource } from './index';
 
-// Blueprint 1 makes one Widget (2) from 100 Tritanium (34).
 const ENTRY: BlueprintCatalogEntry = {
   blueprintTypeID: 1,
   blueprint: {
@@ -78,7 +77,6 @@ function snapshot(overrides: Partial<MarketSnapshot> = {}): MarketSnapshot {
   };
 }
 
-/** An in-memory book: every need fills at `avg`. */
 function depthAt(avg: number): DepthSource {
   return vi.fn(async (_hub, needs: ReadonlyMap<number, number>) => {
     const depth = new Map<number, DepthPrice>();
@@ -142,7 +140,6 @@ describe('planVerdictOf', () => {
     expect(sell.forgone).toBeGreaterThan(0);
     expect(sell.basisResult!.profit).toBeCloseTo(free.basisResult!.profit! - sell.forgone);
     expect(sell.figures!.profit).toBe(sell.basisResult!.profit);
-    // Cost columns keep the plan's own total.
     expect(sell.basisResult!.totalCost).toBe(sell.resolved.result!.totalCost);
   });
 
@@ -165,7 +162,6 @@ describe('planVerdictOf', () => {
     const verdict = verdictFor('free', {}, snap);
     expect(verdict.productUnitPrice).toBe(100_000);
     expect(verdict.priceCapped).toBe(true);
-    // Revenue was priced at the cap too, so the headroom reads off one price.
     expect(verdict.resolved.result!.revenue).toBe(100_000);
     expect(verdict.figures!.headroomPct).toBeCloseTo(
       ((100_000 - verdict.figures!.breakEvenPrice!) / 100_000) * 100

@@ -17,7 +17,6 @@ describe('useOpenParam', () => {
     const { result } = setup('/calendar?open=42&anchor=2026-10-01');
     expect(result.current.open).toBe(42);
     await waitFor(() => expect(result.current.search).toBe('?anchor=2026-10-01'));
-    // Latched: the id survives the strip.
     expect(result.current.open).toBe(42);
   });
 

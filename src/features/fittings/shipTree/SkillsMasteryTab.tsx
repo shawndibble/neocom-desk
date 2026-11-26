@@ -1,15 +1,3 @@
-/**
- * Ship Info › Skills & Mastery: what flying the hull takes, then its
- * Mastery tiers I–V as in game — a button per tier, checked once trained,
- * V in gold — each listing that tier's skills, its own training time, and
- * whether it's already in the target Skill Plan. "Add tier N to plan" puts
- * everything still untrained and unplanned for tiers I..N into the target
- * Skill Plan, and shows the total time to train everything the tier still
- * needs, planned or not — once every such skill is already planned, the
- * button gives way to an "In plan" label instead of no-op'ing.
- * "Show missing" hides what's already trained, in both lists; it sticks.
- * No active Character: names and levels only, nothing to add, no time.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -46,7 +34,6 @@ import type { ShipTreeSource } from './useShipTreeData';
 
 const TIERS = [1, 2, 3, 4, 5] as const;
 
-/** What one Add put into which plan — the Undo toast's payload. */
 export interface AddedToPlan {
   planId: string;
   planName: string;
@@ -75,7 +62,6 @@ export function SkillsMasteryTab({
   const storedShowMissing = useShipInfoShowMissing((state) => state.value);
   const setShowMissing = useShipInfoShowMissing((state) => state.setValue);
   useHydratedStore(useShipInfoShowMissing);
-  // Without a Character nothing is trained, so there is nothing to hide.
   const showMissing = hasCharacter && storedShowMissing;
   const missing = (p: { skillTypeID: number; level: number }) =>
     trainedLevel(p.skillTypeID) < p.level;
@@ -87,31 +73,23 @@ export function SkillsMasteryTab({
   }, [ship, skillName]);
 
   const hasTiers = !!tiers && tiers.some((bundle) => bundle.length > 0);
-  // No entry only means "none" once the file is in; before that it means nothing.
   const masteriesStatus = source.masteriesStatus;
-  // Retry stays mounted while it runs (the status holds at `unavailable`); the result takes focus.
   const [masteryRef, armFocus] = useRetryFocus<HTMLElement>(
     masteriesStatus === 'unavailable' ? 'failed' : masteriesStatus === 'loaded' ? 'ok' : 'busy',
     ship.typeID
   );
-  // Level 0: CCP lists the skill under the tier but asks for nothing yet.
   const tierBundle = (tiers?.[tier - 1] ?? []).filter((p) => p.level > 0);
   const tierSkills = showMissing ? tierBundle.filter(missing) : tierBundle;
   const requiredSkills = showMissing ? ship.required.filter(missing) : ship.required;
-  // Everything still untrained through this tier, whether or not it's
-  // already in the plan — this is what "time to finish the tier" costs.
   const toAdd = useMemo(
     () => (hasTiers ? masteryTierEntries(tiers, tier, trainedLevel) : []),
     [hasTiers, tiers, tier, trainedLevel]
   );
-  // The subset of `toAdd` an "Add tier" click would actually add.
   const unplanned = useMemo(
     () => (hasTiers ? unplannedTierEntries(tiers, tier, trainedLevel, planEntries) : []),
     [hasTiers, tiers, tier, trainedLevel, planEntries]
   );
 
-  // Shared by both schedule calls below, so the six-field context — and the
-  // deps array that goes with it — exists in one place, not two.
   const scheduleCtx = useMemo(
     () =>
       hasCharacter

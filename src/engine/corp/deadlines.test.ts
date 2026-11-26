@@ -8,11 +8,6 @@ import {
   type CorpBoardTiming,
 } from './board';
 
-/**
- * Midday local time, so every "+N days" below stays inside the same local day
- * no matter which zone the suite runs in — a fixture at 23:30 would slide into
- * the next day for half the planet.
- */
 const NOW = new Date(2026, 8, 7, 12, 0, 0).getTime();
 
 function item(
@@ -34,7 +29,6 @@ function item(
   } as CorpBoardItem;
 }
 
-/** Local midnight of the day `ms` falls in — the same identity the strip uses. */
 function midnight(ms: number): number {
   const date = new Date(ms);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -89,8 +83,6 @@ describe('deadlinesByDay', () => {
     expect(strip.reduce((sum, day) => sum + day.count, 0)).toBe(0);
   });
 
-  // ESI drops `fuel_expires` once a structure runs dry, so there is no instant
-  // left to bucket — but the thing is outstanding now, which is day 0.
   it('counts a passed item on day 0', () => {
     const strip = deadlinesByDay(
       [item({ id: 'dry', timing: 'passed', deadlineMs: null, severity: 'critical' })],
@@ -109,8 +101,6 @@ describe('deadlinesByDay', () => {
     expect(strip.slice(1).every((day) => day.count === 0)).toBe(true);
   });
 
-  // An offline service is a standing fault with no instant at all. Counting it
-  // on any day would invent a deadline it does not have.
   it('counts an untimed item on no day', () => {
     const strip = deadlinesByDay(
       [item({ id: 'offline', kind: 'serviceOffline', timing: 'untimed', deadlineMs: null })],
@@ -121,8 +111,6 @@ describe('deadlinesByDay', () => {
     expect(strip.reduce((sum, day) => sum + day.count, 0)).toBe(0);
   });
 
-  // The row refuses to print a figure for these, which is a display decision.
-  // The count is a different claim and stays true.
   it('counts an under-cache-window item on day 0', () => {
     const strip = deadlinesByDay(
       [
@@ -168,12 +156,6 @@ describe('deadlinesByDay', () => {
     expect(strip[1].severity).toBe('warning');
   });
 
-  /**
-   * AC2's reconciliation, stated as a test: the strip's total equals the board
-   * items *inside the window*, never the board's own total. The two disagree by
-   * exactly the untimed items and the ones further out than the window, and a
-   * future change that quietly starts counting either would fail here.
-   */
   it('sums to the board items inside the window, not the whole board', () => {
     const items = [
       item({ id: 'dry', timing: 'passed', deadlineMs: null }),
@@ -252,7 +234,6 @@ describe('deadlinesByDay on the Time format clock', () => {
     process.env.TZ = originalTz;
   });
 
-  // 05:00 UTC on the 8th is 22:00 on the 7th in Los Angeles: two days on two clocks.
   const nowMs = Date.UTC(2026, 8, 7, 12);
   const lateEvening = item({ id: 'late', deadlineMs: Date.UTC(2026, 8, 8, 5) });
 
@@ -277,7 +258,6 @@ describe('deadlinesByDay on the Time format clock', () => {
 
   it('keeps local days on local midnights across a 25-hour DST day', () => {
     process.env.TZ = 'America/Los_Angeles';
-    // Clocks go back on 2026-11-01 in Los Angeles.
     const before = new Date(2026, 9, 31, 12).getTime();
     const late = item({ id: 'x', deadlineMs: new Date(2026, 10, 2, 23, 30).getTime() });
 

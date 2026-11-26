@@ -1,16 +1,3 @@
-/**
- * Flat ESI CharacterAsset[] -> nested Station -> Ship/Container -> ... tree.
- * Decoupled from src/esi (see engine/types.ts) — callers adapt CharacterAsset
- * to EngineAsset, which it is already structurally identical to.
- *
- * Ship vs. plain container is a flag heuristic, not an SDE category lookup
- * (pure engines don't fetch): an asset is treated as a ship only if at least
- * one of its direct children sits in a recognized ship bay (Cargo, DroneBay,
- * or a fitted slot). A ship with every bay empty (nothing fit, nothing in
- * the hold) is indistinguishable from a plain item and renders as a leaf —
- * there is nothing to expand into either way.
- */
-
 import type { JumpsAwayResult } from './clone/jumpsAway';
 
 export interface EngineAsset {
@@ -20,7 +7,6 @@ export interface EngineAsset {
   location_id: number;
   location_type: 'station' | 'solar_system' | 'item' | 'other';
   location_flag: string;
-  /** ESI asset flag: a blueprint copy shares its original's typeID, so it is valued per item, not per type. */
   is_blueprint_copy?: boolean;
 }
 
@@ -43,9 +29,7 @@ export interface AssetTreeContainerNode {
   kind: 'ship' | 'container';
   asset: EngineAsset;
   children: AssetTreeNode[];
-  /** Nested item count across all descendants — excludes this node's own quantity. */
   itemCount: number;
-  /** Nested estimated value across all descendants — excludes this node's own value. */
   estimatedValue: number;
 }
 
@@ -64,7 +48,6 @@ export type StationSortField = 'name' | 'value' | 'itemCount' | 'jumpsAway';
 export interface StationSortContext {
   labelFor: (station: AssetTreeStation) => string;
   pinnedFor: (station: AssetTreeStation) => boolean;
-  /** Undefined and `{ kind: 'unknown', ... }` are treated the same: sorted after every known distance. */
   jumpsAwayFor: (station: AssetTreeStation) => JumpsAwayResult | undefined;
 }
 
@@ -72,7 +55,6 @@ function jumpsAwayValue(result: JumpsAwayResult | undefined): number {
   return result?.kind === 'known' ? result.jumps : Number.POSITIVE_INFINITY;
 }
 
-/** Pinned stations (issue #84) always sort first; the chosen field only orders within each group. */
 export function compareStations(
   a: AssetTreeStation,
   b: AssetTreeStation,
@@ -104,12 +86,6 @@ function bayKindFor(locationFlag: string): AssetTreeBayKind | null {
   return null;
 }
 
-/**
- * True for a `location_flag` that only ever appears on something held by a
- * ship — fitted, in the hold, or in the drone bay. Shared with the industry
- * owned-stock engine (issue #181), which excludes ship-held rows from a Build
- * Plan's detected stock, so the "what is a ship bay" heuristic has one home.
- */
 export function isShipBayFlag(locationFlag: string): boolean {
   return bayKindFor(locationFlag) !== null;
 }
@@ -123,7 +99,6 @@ interface BuildContext {
   visited: Set<number>;
 }
 
-/** Every asset keyed by the `location_id` it sits in — the child lookup `buildNode`'s recursion walks, shared by `buildAssetTree` and `buildAssetGroups`. */
 function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, EngineAsset[]> {
   const map = new Map<number, EngineAsset[]>();
   for (const a of assets) {
@@ -136,12 +111,6 @@ function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, Engin
 
 const NO_ITEM_VALUES: ReadonlyMap<number, number> = new Map();
 
-/**
- * Quantity × type price, unless `itemValueByItemId` holds the item (a blueprint
- * copy's value, an abyssal module's estimate): then exactly that. A copy missing
- * from it is 0, never its original's price; callers strip abyssal types from
- * `priceByTypeId` for the same reason.
- */
 export function assetStackValue(
   asset: Pick<EngineAsset, 'item_id' | 'type_id' | 'quantity' | 'is_blueprint_copy'>,
   priceByTypeId: ReadonlyMap<number, number>,
@@ -153,14 +122,6 @@ export function assetStackValue(
   return asset.quantity * (priceByTypeId.get(asset.type_id) ?? 0);
 }
 
-/**
- * One node's contribution to its parent's totals: its own quantity/value
- * (0 for a bay, which owns nothing itself) plus whatever is already
- * aggregated beneath it. Exported so a caller building a grouping level
- * `assetTree.ts` has no concept of — a corp division's per-office location
- * wrapper, for instance — can total a handful of sibling nodes the same way
- * `sumNodes` does, without re-deriving this arithmetic.
- */
 export function nodeContribution(
   node: AssetTreeNode,
   priceByTypeId: ReadonlyMap<number, number>,
@@ -229,7 +190,6 @@ function buildShipChildren(
   return [...bayNodes, ...directNodes];
 }
 
-/** Sums each child's own contribution (its value/quantity) plus whatever it already aggregated below it. */
 function sumNodes(
   ctx: BuildContext,
   nodes: readonly AssetTreeNode[]
@@ -244,22 +204,15 @@ function sumNodes(
   return { itemCount, estimatedValue };
 }
 
-/** Every leaf `item_id` under this node, recursing through bay/ship/container nesting exactly like `sumNodes` — the cascade-selection seam for issue #90. */
 export function collectItemIds(node: AssetTreeNode): number[] {
   if (node.kind === 'item') return [node.asset.item_id];
   return node.children.flatMap(collectItemIds);
 }
 
-/** Every leaf `item_id` under a station, across all of its top-level children. */
 export function collectStationItemIds(station: AssetTreeStation): number[] {
   return station.children.flatMap(collectItemIds);
 }
 
-/**
- * Sum of every station's own `estimatedValue` — each already aggregates its
- * full nested contents (see `sumNodes`), so summing across top-level stations
- * only avoids double-counting the nodes beneath them.
- */
 export function totalEstimatedValue(stations: readonly AssetTreeStation[]): number {
   return stations.reduce((sum, station) => sum + station.estimatedValue, 0);
 }
@@ -282,15 +235,6 @@ function groupByLocationId(assets: readonly EngineAsset[]): Map<number, RootGrou
   return groups;
 }
 
-/**
- * A named bucket of top-level roots, alongside `AssetTreeStation`'s
- * location-keyed one — corp assets group by `location_flag` (division)
- * rather than by physical location, but need the same container/bay/item
- * recursion beneath each root, so this shares `buildNode`/`sumNodes` rather
- * than re-implementing them (issue #779, reversing round 41/44's "no shared
- * level" reasoning the same way a bay node already does for a ship's cargo
- * hold: grouped by kind, not by `item_id`).
- */
 export interface AssetTreeGroup<Id> {
   id: Id;
   children: AssetTreeNode[];
@@ -298,26 +242,6 @@ export interface AssetTreeGroup<Id> {
   estimatedValue: number;
 }
 
-/**
- * Groups every root asset (`location_type !== 'item'`, i.e. not nested inside
- * another owned asset — same test `buildAssetTree`'s own root pass uses) by
- * `groupIdFor`, then builds each group's contents with the same recursive
- * container/ship/bay logic a station uses. `order` fixes the result's
- * iteration order; an id in `alwaysInclude` appears even with zero roots, any
- * other id in `order` only appears when at least one root lands in it. An id
- * `groupIdFor` produces that isn't in `order` is dropped — callers must make
- * `groupIdFor` total over `order` (division grouping already has an `other`
- * catch-all for exactly this).
- *
- * Also promotes the same two edge cases `buildAssetTree`'s own three-pass
- * structure exists for, so a paginated/partial fetch can't silently drop
- * assets here either: an `'item'`-typed asset whose parent has no row in
- * this fetch at all (most often a structure ESI never returns an asset row
- * for), and anything left over inside an isolated cycle. Both are promoted
- * to a root of their own, grouped by `groupIdFor` on the orphan/cycle asset
- * itself — there is no location axis here to group them under the way
- * `buildAssetTree` groups orphans by `location_id`.
- */
 export function buildAssetGroups<Id>(
   assets: readonly EngineAsset[],
   order: readonly Id[],
@@ -340,8 +264,6 @@ export function buildAssetGroups<Id>(
     childrenById.set(id, list);
   };
 
-  // Real roots first — populates ctx.visited exactly as buildAssetTree's own
-  // first pass does, which the two rescue passes below both read.
   for (const a of assets) {
     if (a.location_type !== 'item') pushRoot(groupIdFor(a), a);
   }
@@ -349,19 +271,10 @@ export function buildAssetGroups<Id>(
   const presentItemIds = new Set(assets.map((a) => a.item_id));
   const unreached = (a: EngineAsset) => a.location_type === 'item' && !ctx.visited.has(a.item_id);
 
-  // Orphans proper: an 'item'-typed asset whose parent has no row in this
-  // list at all (buildAssetTree's own comment on its absentParentGroups pass
-  // explains why this happens). Requiring the parent to be *absent* keeps
-  // this pass order-independent the same way it does there: no two such
-  // assets can be ancestor/descendant of each other.
   for (const a of assets) {
     if (unreached(a) && !presentItemIds.has(a.location_id)) pushRoot(groupIdFor(a), a);
   }
 
-  // Anything still unreached sits in or under an isolated cycle — promote
-  // rather than drop, same as buildAssetTree's third pass. `unreached` reads
-  // ctx.visited live, so a cycle-mate promoted earlier in this same loop
-  // already covers the rest of its cycle by the time this reaches it.
   for (const a of assets) {
     if (unreached(a)) pushRoot(groupIdFor(a), a);
   }
@@ -398,38 +311,18 @@ export function buildAssetTree(
 
   const stations: AssetTreeStation[] = [];
 
-  // Real roots: anything not nested inside another owned asset (ESI never marks these
-  // 'item'). Build these first so `visited` reflects everything actually reachable
-  // before deciding what counts as an orphan below.
   const realRoots = groupByLocationId(assets.filter((a) => a.location_type !== 'item'));
   for (const [locationId, group] of realRoots) stations.push(buildStation(locationId, group));
 
   const presentItemIds = new Set(assets.map((a) => a.item_id));
   const unreached = (a: EngineAsset) => a.location_type === 'item' && !ctx.visited.has(a.item_id);
 
-  // Orphans proper: an 'item'-typed asset whose parent has no row in this list at all.
-  // Overwhelmingly that parent is a player-owned structure — ESI reports everything
-  // docked there as 'item' pointing at the structure id but never returns the structure
-  // itself as an asset — so each such group is a real location, and becomes its own
-  // top-level group (or joins a sibling orphan sharing the same location_id).
-  //
-  // Requiring the parent to be *absent* is what makes this pass order-independent, and
-  // that property is the point of splitting it out: every asset has exactly one parent
-  // id, so a group keyed on an id no asset carries can never be reached from another
-  // group's node — these groups are pairwise disjoint and none can nest another.
   const absentParentGroups = groupByLocationId(
     assets.filter((a) => unreached(a) && !presentItemIds.has(a.location_id))
   );
   for (const [locationId, group] of absentParentGroups)
     stations.push(buildStation(locationId, group));
 
-  // Anything still unreached sits in or under an isolated cycle: its parent is present,
-  // so nothing above ever reaches it. Promote it rather than drop it —
-  // `buildNode`'s ancestor guard cuts the loop. Note `unreached` reads `ctx.visited` at
-  // call time, and the pass above has grown it since, so this sees the smaller remainder
-  // rather than the same candidates twice. Order genuinely matters within this pass too,
-  // hence the second re-check below: a cycle-mate built a moment ago already covers this
-  // group's roots.
   for (const [locationId, group] of groupByLocationId(assets.filter(unreached))) {
     const roots = group.roots.filter((a) => !ctx.visited.has(a.item_id));
     if (roots.length === 0) continue;

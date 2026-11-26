@@ -43,20 +43,11 @@ type PreviewState =
 
 type JoinResult = 'joined' | 'alreadyMember' | 'pending' | 'full' | 'tooMany' | 'failed';
 
-/** A result that is not a problem: the Character is in, or waiting for the admin. */
 const isFine = (result: JoinResult) =>
   result === 'joined' || result === 'alreadyMember' || result === 'pending';
 
 const BLUEPRINTS = ['getCharacterBlueprints'] as const;
 
-/**
- * The invite link's page (issue #3598, ADR 0018): outside the signed-in shell,
- * like a Share Link, so a visitor with no Neocom account sees what the link is
- * for (name, admin, Member count) before logging in. After EVE's login the
- * visitor lands back here and picks which of the device's Characters join,
- * each as its own Member. A Character that hasn't granted the blueprints scope
- * is listed as "needs permission" and runs the ordinary grant flow.
- */
 export function CommunityJoin() {
   const { t } = useTranslation();
   const { code = '' } = useParams();
@@ -90,7 +81,6 @@ export function CommunityJoin() {
   const characters = useLiveQuery(async () =>
     (await db.characters.toArray()).sort((a, b) => a.addedAt - b.addedAt)
   );
-  // Booleans only: a token never goes into React state (ADR 0001).
   const scopesByCharacter = useGrantedScopesByCharacter();
   const withBlueprints = useMemo(
     () =>
@@ -104,7 +94,6 @@ export function CommunityJoin() {
   );
   const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
   const [results, setResults] = useState<Record<number, JoinResult>>({});
-  // Per Character: the blueprint type ids to share. Nothing until chosen.
   const [shares, setShares] = useState<Record<number, ReadonlySet<number>>>({});
   const [pickerFor, setPickerFor] = useState<number | null>(null);
   const sharedCount = (id: number) => shares[id]?.size ?? 0;
@@ -136,8 +125,6 @@ export function CommunityJoin() {
       try {
         const joined = await joinCommunity(character.characterId, code, character.name);
         if (joined.pending) {
-          // Waiting for the admin: keep the choice so the library publishes once
-          // they let this Character in, but there is no Community to open yet.
           await saveShareSelection(
             character.characterId,
             joined.communityId,
@@ -148,10 +135,8 @@ export function CommunityJoin() {
         }
         communityId = joined.communityId;
         joinedIds.push(character.characterId);
-        // An untouched picker on a re-join must not wipe the choice saved before.
         const chosenIds = shares[character.characterId];
         if (chosenIds || !joined.alreadyMember) {
-          // The join stands even if this device can't save the choice.
           await saveShareSelection(
             character.characterId,
             joined.communityId,
@@ -173,8 +158,6 @@ export function CommunityJoin() {
     setWorking(false);
     const allDone = chosen.every((c) => ['joined', 'alreadyMember'].includes(next[c.characterId]));
     if (allDone && communityId && joinedIds.length > 0) {
-      // /communities shows the active Character's Communities: keep it if it
-      // just joined, otherwise switch to one that did.
       const active = useActiveCharacter.getState().activeCharacterId;
       if (active === null || !joinedIds.includes(active)) await setActiveCharacter(joinedIds[0]);
       navigate(`/communities?community=${communityId}`);

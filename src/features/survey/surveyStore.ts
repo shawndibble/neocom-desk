@@ -1,23 +1,3 @@
-/**
- * A shared **Survey**: a `survey` Share Link (`shares/{id}`, same id, URL and
- * 7-day lifetime as every other stored Share Link) whose Survey Scans live in
- * a create-only subcollection, `shares/{id}/surveyScans`, one doc per paste.
- *
- * Anyone holding the link can add a scan and no sign-in is needed: the
- * visitor who keeps a Survey going after the pilot who started it has left
- * may have no account. Only starting one needs a Firebase session, as for any
- * other Share Link. A scan stores the pasted text (the same parser rebuilds
- * the rocks on every reader), the server's clock as its time, and the
- * survey's own expiry so the TTL policy deletes it with the survey.
- *
- * The moon tax (who gets it, at what rate) lives the same way, in a create-only
- * `surveyTax` subcollection: a share can't be rewritten, so each change is a new
- * doc and the newest one is the tax. Only a signed-in pilot can write one.
- *
- * So are the location the fleet is mining at and the starter's notes
- * (`surveyInfo`): each doc is the whole current info, so the newest alone
- * decides and a notes edit can't drop the location.
- */
 import {
   addDoc,
   collection,
@@ -50,7 +30,6 @@ export const SURVEY_TAX_COLLECTION = 'surveyTax';
 export const SURVEY_IGNORES_COLLECTION = 'surveyIgnores';
 export const SURVEY_INFO_COLLECTION = 'surveyInfo';
 
-/** Who gets the moon tax on a Survey, and the rate (0 to 100). */
 export interface SurveyTaxShare {
   name: string;
   pct: number;
@@ -58,37 +37,19 @@ export interface SurveyTaxShare {
 
 export const MAX_TAX_NAME = 100;
 
-/**
- * Where to mine, and the starter's notes for the fleet. The location is a solar
- * system, NPC station or structure id (what ESI's waypoint call takes), with its
- * name stored beside it: a visitor with no sign-in can't resolve a structure's.
- * A manual location (a structure the search couldn't find, typed as free text)
- * has a name and no id, so there is nothing to send as a waypoint.
- */
 export interface SurveyInfoShare {
   location: { id: number | null; name: string } | null;
   notes: string;
 }
 
-/** Mirrored by the size checks in `firestore.rules`. */
 export const MAX_LOCATION_NAME = 120;
 export const MAX_SURVEY_NOTES = 1000;
 
-/** Mirrored by the size check in `firestore.rules`. */
 export const MAX_SCAN_BY = 100;
 
-/**
- * Starts a survey. With an `owner` it is that Character's, written under their
- * session; without one it is an anonymous visitor's (a start link opened with
- * no login), which has no owner and no session. `prefill` is the Additional
- * information a start link carried: it is kept in the share's own payload,
- * because the info and tax docs need a sign-in, and it shows until a signed-in
- * owner stores something newer. Mirrored by the payload checks in `firestore.rules`.
- */
 export async function startSurvey(input: {
   owner?: {
     characterId: number;
-    /** The starting pilot's Character name, kept on the survey so they can be recognised as its owner. */
     ownerName: string;
   };
   prefill?: InfoFields;
@@ -119,11 +80,8 @@ export async function startSurvey(input: {
 export async function addSurveyScan(input: {
   id: string;
   text: string;
-  /** The survey's own expiry, as `loadSurvey` or `startSurvey` returned it. */
   expiresAt: number;
-  /** The submitting Character's name, or none for an anonymous visitor. */
   by?: string | null;
-  /** Writes under this Character's session; omitted for an anonymous visitor (the rules allow it). */
   characterId?: number;
 }): Promise<void> {
   const rejected = rejectScanText(input.text);
@@ -141,19 +99,10 @@ export async function addSurveyScan(input: {
   dropInflight(input.id);
 }
 
-/**
- * Marks the field cleared. The scanner has nothing to copy once the last rock is
- * gone, so no paste can say so: this stores a scan with no text, flagged
- * `cleared`, which every reader loads as a scan with no rocks. Like any scan it
- * can be set aside by the owner, which puts the survey back to mining.
- */
 export async function finishSurvey(input: {
   id: string;
-  /** The survey's own expiry, as `loadSurvey` or `startSurvey` returned it. */
   expiresAt: number;
-  /** The Character name of whoever marked it, or none for an anonymous visitor. */
   by?: string | null;
-  /** Writes under this Character's session; omitted for an anonymous visitor (the rules allow it). */
   characterId?: number;
 }): Promise<void> {
   const by = input.by?.trim().slice(0, MAX_SCAN_BY) ?? '';
@@ -175,7 +124,6 @@ export async function setSurveyTax(input: {
   expiresAt: number;
   name: string;
   pct: number;
-  /** The Character writing it; omitted for the visitor who started the survey with no account (the rules allow it). */
   characterId?: number;
 }): Promise<void> {
   if (input.characterId !== undefined) await ensureAnySession(input.characterId);
@@ -191,13 +139,11 @@ export async function setSurveyTax(input: {
   markDetailsDue(input.id);
 }
 
-/** Stores the survey's location and notes. Empty ones are left out, which is how they are cleared. */
 export async function setSurveyInfo(input: {
   id: string;
   expiresAt: number;
   location: { id: number | null; name: string } | null;
   notes: string;
-  /** The Character writing it; omitted for the visitor who started the survey with no account (the rules allow it). */
   characterId?: number;
 }): Promise<void> {
   const notes = input.notes.trim().slice(0, MAX_SURVEY_NOTES);
@@ -219,15 +165,9 @@ export async function setSurveyInfo(input: {
   markDetailsDue(input.id);
 }
 
-/**
- * Hands the survey to another Character: the one update a `survey` share allows
- * (`payload.owner` alone). The rules can't tell who the current owner is, so
- * the app only offers this to them.
- */
 export async function setSurveyOwner(input: {
   id: string;
   owner: string;
-  /** The signed-in Character handing it over. */
   characterId: number;
 }): Promise<void> {
   const owner = input.owner.trim().slice(0, MAX_SCAN_BY);
@@ -239,17 +179,11 @@ export async function setSurveyOwner(input: {
   markDetailsDue(input.id);
 }
 
-/**
- * Sets a scan aside (or takes it back). Create-only like the scans: the newest
- * doc for a scan decides, so restoring is a newer doc, never an update. Only
- * the survey's owner is offered this; the rules can't tell who that is.
- */
 export async function setSurveyScanIgnored(input: {
   id: string;
   expiresAt: number;
   scanId: string;
   ignored: boolean;
-  /** The Character setting it aside; omitted for the visitor who started the survey with no account (the rules allow it). */
   characterId?: number;
 }): Promise<void> {
   if (input.characterId !== undefined) await ensureAnySession(input.characterId);
@@ -273,37 +207,19 @@ export type LoadSurveyResult =
       owner: string | null;
       tax: SurveyTaxShare | null;
       info: SurveyInfoShare | null;
-      /** Ids of the scans the owner set aside; the survey's totals leave them out. */
       ignored: ReadonlySet<string>;
     }
   | { ok: false; reason: 'not-found' | 'failed' };
 
-/**
- * How long a load reuses the share doc (expiry, owner), the tax and the info
- * before reading them again. They rarely change, and this app's own edits mark
- * them due at once (`markDetailsDue`), so only another pilot's edit waits.
- */
 export const SURVEY_DETAILS_TTL_MS = 5 * MINUTE_MS;
 
-/**
- * What this tab has read of one survey. The lite SDK has no cache and every
- * returned doc is billed, and the Survey page polls; the scans and ignores are
- * create-only, so a load after the first asks only for docs at or after the
- * newest `createdAt` already seen and merges them in.
- */
 interface SurveyCache {
   expiresAt: number;
   owner: string | null;
   tax: SurveyTaxShare | null;
   info: SurveyInfoShare | null;
-  /** What the start link set, shown until a stored tax or info is newer. */
   prefill: ReturnType<typeof prefillOf>;
-  /** When the share doc, tax and info were last read; 0 when they are due. */
   detailsReadAt: number;
-  /**
-   * Bumped by each of this app's edits to them, so a load that began before
-   * the edit (and read the old values) doesn't mark them fresh again.
-   */
   detailsGen: number;
   scans: Map<string, SurveyScan>;
   scansCursor: Timestamp | null;
@@ -312,33 +228,19 @@ interface SurveyCache {
 }
 
 const caches = new Map<string, SurveyCache>();
-/**
- * Loads under way. A second load of the same survey joins one (the page's poll
- * and an Overview widget mounting together, or React's dev double-mount) rather
- * than paying for its own read; `dropInflight` drops it, so a load after this
- * app's own write never joins one that began before it.
- */
 const inflight = new Map<string, Promise<LoadSurveyResult>>();
-/**
- * The subcollections whose `createdAt` index is not deployed yet (indexes go
- * out by hand): they fall back to a full read for the rest of the session
- * rather than failing every poll.
- */
 const missingIndex = new Set<string>();
 
-/** Drops what was read of every survey. For tests. */
 export function forgetSurveyCache(): void {
   caches.clear();
   inflight.clear();
   missingIndex.clear();
 }
 
-/** This app just wrote to the survey: the next load reads afresh instead of joining one already under way. */
 function dropInflight(id: string): void {
   inflight.delete(id);
 }
 
-/** The next load re-reads the share doc, tax and info: this app just changed one. */
 function markDetailsDue(id: string): void {
   dropInflight(id);
   const cache = caches.get(id);
@@ -351,7 +253,6 @@ function subcollection(id: string, name: string) {
   return collection(shareFirestore(), 'shares', id, name);
 }
 
-/** Runs the indexed query, or the full read when the index isn't there. */
 async function readIndexed(
   name: string,
   full: () => Promise<QuerySnapshot>,
@@ -367,12 +268,6 @@ async function readIndexed(
   }
 }
 
-/**
- * The docs created at or after `cursor` (all of them when there is none).
- * `>=`, not `>`: two docs can share a server time, and an empty result is
- * billed as one read anyway, so re-reading the boundary doc costs nothing and
- * the merge drops it by id.
- */
 function docsSince(id: string, name: string, cursor: Timestamp | null): Promise<QuerySnapshot> {
   const col = subcollection(id, name);
   if (cursor === null) return getDocs(col);
@@ -383,7 +278,6 @@ function docsSince(id: string, name: string, cursor: Timestamp | null): Promise<
   );
 }
 
-/** The newest doc alone: the tax and the info are whole values, so only it counts. */
 function newestDocs(id: string, name: string): Promise<QuerySnapshot> {
   const col = subcollection(id, name);
   return readIndexed(
@@ -393,26 +287,22 @@ function newestDocs(id: string, name: string): Promise<QuerySnapshot> {
   );
 }
 
-/** The later of two server times, to the nanosecond: two docs can land in the same millisecond. */
 function laterOf(cursor: Timestamp | null, at: Timestamp): Timestamp {
   if (cursor === null) return at;
   const ms = at.toMillis() - cursor.toMillis();
   return ms > 0 || (ms === 0 && at.nanoseconds > cursor.nanoseconds) ? at : cursor;
 }
 
-/** A stored scan's rocks, or null when its text is not a scan. */
 function parseScanDoc(text: unknown): SurveyRock[] | null {
   return typeof text === 'string' ? parseSurveyScan(text) : null;
 }
 
-/** The Character name a survey was started under; null for one stored before owners existed. */
 function ownerOf(payload: unknown): string | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const { owner } = payload as { owner?: unknown };
   return typeof owner === 'string' && owner !== '' ? owner : null;
 }
 
-/** What a start link stored in the share's payload; blank for a survey that has none. */
 function prefillOf(payload: unknown): { tax: SurveyTaxShare | null; info: SurveyInfoShare | null } {
   const none = { tax: null, info: null };
   if (typeof payload !== 'object' || payload === null) return none;
@@ -455,14 +345,6 @@ function resultOf(cache: SurveyCache): LoadSurveyResult {
   };
 }
 
-/**
- * The survey as it stands now. The scans and ignores are always read (only what
- * is new since the last load, once one has run); the share doc, tax and info
- * are re-read once `SURVEY_DETAILS_TTL_MS` has passed. A load of the same
- * survey already under way is joined, unless `fresh`: a paste compared against
- * the survey must see a scan another pilot added a moment ago, after that load
- * sent its queries.
- */
 export function loadSurvey(
   id: string,
   { fresh = false }: { fresh?: boolean } = {}
@@ -479,7 +361,6 @@ export function loadSurvey(
 async function readSurvey(id: string): Promise<LoadSurveyResult> {
   const startedAt = Date.now();
   let cache = caches.get(id);
-  // Past its expiry the rules refuse every read: ask the share doc, which says "gone".
   if (cache !== undefined && cache.expiresAt <= startedAt) {
     caches.delete(id);
     cache = undefined;
@@ -525,7 +406,6 @@ async function readSurvey(id: string): Promise<LoadSurveyResult> {
       detailsDue ? pullInfo(id, entry) : null,
     ]);
   } catch {
-    // Check the share again next time: the survey may have gone.
     entry.detailsReadAt = 0;
     return { ok: false, reason: 'failed' };
   }
@@ -534,17 +414,12 @@ async function readSurvey(id: string): Promise<LoadSurveyResult> {
   return resultOf(entry);
 }
 
-/**
- * The survey as this tab last read it, with no read at all, or a load when it
- * has none. For a label (the survey picker), where a little staleness is fine.
- */
 export async function loadSurveyCached(id: string): Promise<LoadSurveyResult> {
   const cache = caches.get(id);
   if (cache !== undefined && cache.expiresAt > Date.now()) return resultOf(cache);
   return loadSurvey(id);
 }
 
-/** Merges the scans created since the last pull. A failed read throws: there is no survey without its scans. */
 async function pullScans(id: string, cache: SurveyCache): Promise<void> {
   const snapshot = await docsSince(id, SURVEY_SCANS_COLLECTION, cache.scansCursor);
   for (const d of snapshot.docs) {
@@ -563,7 +438,6 @@ async function pullScans(id: string, cache: SurveyCache): Promise<void> {
   }
 }
 
-/** The newest tax stored on the survey, or null. A failed read keeps what was read before: the scans still load. */
 async function pullTax(id: string, cache: SurveyCache): Promise<void> {
   try {
     const snapshot = await newestDocs(id, SURVEY_TAX_COLLECTION);
@@ -579,12 +453,9 @@ async function pullTax(id: string, cache: SurveyCache): Promise<void> {
       }
     }
     cache.tax = newest?.tax ?? cache.prefill.tax;
-  } catch {
-    // Keep the last tax read.
-  }
+  } catch {}
 }
 
-/** The newest info stored on the survey, or null. A failed read (rules not deployed yet) keeps what was read before. */
 async function pullInfo(id: string, cache: SurveyCache): Promise<void> {
   try {
     const snapshot = await newestDocs(id, SURVEY_INFO_COLLECTION);
@@ -596,7 +467,6 @@ async function pullInfo(id: string, cache: SurveyCache): Promise<void> {
       if (newest !== null && at <= newest.at) continue;
       let location: SurveyInfoShare['location'] = null;
       if (data.locationId !== undefined || data.locationName !== undefined) {
-        // A location is a name, with an id unless it was typed as a manual one.
         const { locationId, locationName } = data;
         if (data.locationId !== undefined) {
           if (typeof locationId !== 'number' || !Number.isInteger(locationId) || locationId <= 0) {
@@ -613,15 +483,9 @@ async function pullInfo(id: string, cache: SurveyCache): Promise<void> {
       newest = { at, info: { location, notes } };
     }
     cache.info = newest?.info ?? cache.prefill.info;
-  } catch {
-    // Keep the last info read.
-  }
+  } catch {}
 }
 
-/**
- * Merges the ignore docs created since the last pull; for each scan the newest
- * one decides. A failed read keeps what was read before: the scans still load.
- */
 async function pullIgnores(id: string, cache: SurveyCache): Promise<void> {
   try {
     const snapshot = await docsSince(id, SURVEY_IGNORES_COLLECTION, cache.ignoresCursor);
@@ -636,7 +500,5 @@ async function pullIgnores(id: string, cache: SurveyCache): Promise<void> {
         cache.ignores.set(data.scanId, { at, ignored: data.ignored });
       }
     }
-  } catch {
-    // Keep the ignores read before.
-  }
+  } catch {}
 }

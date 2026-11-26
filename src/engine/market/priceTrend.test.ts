@@ -82,7 +82,7 @@ describe('days with no usable average', () => {
 
   it('percentChange never reads a zero-average newest day as a -100% crash', () => {
     const points = [pt('2026-10-01', 100), pt('2026-10-17', 150), pt('2026-10-24', 0)];
-    expect(percentChange(points, 7)).toBeCloseTo(0.5); // the 17th is the newest priced day
+    expect(percentChange(points, 7)).toBeCloseTo(0.5);
     expect(percentChange([pt('2026-10-01', 100), pt('2026-10-24', 0)], 7)).toBeNull();
   });
 

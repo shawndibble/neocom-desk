@@ -1,9 +1,3 @@
-/**
- * Realistic EVE fixtures shared by page stories and mockups. Typed with the
- * ESI shapes the app reads, so a fixture that drifts from ESI fails typecheck.
- * Pure data: no Dexie, no fetch. Dates are relative to `now` so recent-first
- * tables and "x hours ago" copy stay plausible whenever a story is opened.
- */
 import type {
   CharacterAsset,
   CharacterPublicInfo,
@@ -21,7 +15,6 @@ export interface SampleCharacter {
   corporationName: string;
 }
 
-/** First entry is the signed-in (active) Character. */
 export const SAMPLE_CHARACTERS: readonly SampleCharacter[] = [
   {
     characterId: 2119876543,
@@ -39,10 +32,6 @@ export const SAMPLE_CHARACTERS: readonly SampleCharacter[] = [
 
 export const SAMPLE_ACTIVE_CHARACTER = SAMPLE_CHARACTERS[0];
 
-/**
- * A pilot's public sheet (`GET /characters/{id}`): a sample Character's name and
- * corporation, or "Pilot" for any other id. `corporationId` overrides the corporation.
- */
 export function sampleCharacterPublicInfo(
   characterId: number,
   corporationId?: number
@@ -58,20 +47,16 @@ export function sampleCharacterPublicInfo(
   };
 }
 
-/** Jita IV - Moon 4 - Caldari Navy Assembly Plant. */
 export const SAMPLE_STATION_ID = 60003760;
-/** Jita, the system `SAMPLE_STATION_ID` sits in. */
 export const SAMPLE_SYSTEM_ID = 30000142;
 export const SAMPLE_REGION_ID = 10000002;
 
 export const SAMPLE_WALLET_BALANCE = 1_284_390_551.17;
 
-/** ISO timestamp `ms` before `now`, the way ESI formats dates (no fractional seconds). */
 export function sampleDate(ms: number, now = Date.now()): string {
   return new Date(now - ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-/** Newest first, like ESI. `balance` is the running balance after each line. */
 export function sampleWalletJournal(now = Date.now()): WalletJournalEntry[] {
   const lines: Array<Omit<WalletJournalEntry, 'id' | 'date' | 'balance'> & { ago: number }> = [
     {
@@ -140,7 +125,7 @@ export function sampleWalletJournal(now = Date.now()): WalletJournalEntry[] {
 
 export const SAMPLE_LOYALTY_POINTS: readonly CharacterLoyaltyPoints[] = [
   { corporation_id: 1000167, loyalty_points: 48_250 },
-  { corporation_id: 1000419, loyalty_points: 1_320 }, // Paragon: EverMarks
+  { corporation_id: 1000419, loyalty_points: 1_320 },
 ];
 
 export const SAMPLE_CORPORATION_NAMES: Readonly<Record<number, string>> = {
@@ -227,11 +212,6 @@ export function sampleIndustryJobs(now = Date.now()): IndustryJob[] {
 
 const PORTRAIT_HUES = [212, 28, 160, 340, 270, 95];
 
-/**
- * An offline stand-in for the Character's `images.evetech.net` portrait: an
- * initial on a hue chosen from the name, as a data URI, so a story needs no
- * image request. Same name, same tile.
- */
 export function samplePortraitDataUri(name: string): string {
   const hue = PORTRAIT_HUES[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 6];
   const svg =

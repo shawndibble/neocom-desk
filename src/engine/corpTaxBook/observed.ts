@@ -1,18 +1,10 @@
-/**
- * The Corp Tax Book's feed of refinery observer rows (D9): any officer's
- * client syncs on visit, so two officers may upload overlapping, differently
- * aged reads of the same ledger. The merge is monotonic so neither can undo
- * the other.
- */
 import { isFiniteNumber } from '../guards';
 import type { ObservedMiningEntry, ObservedRow, OreLine } from './types';
 
 type Data = Record<string, unknown>;
 
-/** What tells one recorded corporation from a later one: the day, the read, the refinery. */
 export interface CorpRecord {
   date: string;
-  /** The ESI read's cache time; absent or unparsable counts as the oldest read. */
   cachedAt?: string;
   structureId?: number;
   recordedCorporationId: number;
@@ -23,13 +15,6 @@ const readMs = (cachedAt: string | undefined) => {
   return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 };
 
-/**
- * Whether `a` records a character's corporation later than `b`: the newer day, then the fresher
- * ESI read, then the higher refinery id, then the higher corporation id. The last two only
- * break ties the data cannot order (one read listing both corps), so every reader — the
- * officer's view, a Miner's page, the server's Close account guard — lands on the same corp
- * whatever order its rows came in. Decision: docs/context/decisions (latest recorded corp).
- */
 export function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
   if (a.date !== b.date) return a.date > b.date;
   const read = readMs(a.cachedAt) - readMs(b.cachedAt);
@@ -42,7 +27,6 @@ export function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
 const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
-/** A stored `observed` doc as an `ObservedRow`, or null when it is not one. */
 export function readObservedRow(d: Data): ObservedRow | null {
   const structureId = num(d.structureId);
   const characterId = num(d.characterId);
@@ -77,12 +61,10 @@ export function readObservedRow(d: Data): ObservedRow | null {
   };
 }
 
-/** The upsert key: miner + ore + day + structure. */
 export function observedRowKey(row: ObservedRow): string {
   return `${row.characterId}:${row.typeId}:${row.date}:${row.structureId}`;
 }
 
-/** One Observed Mining Entry's key: character + refinery + day. Also its day charge's and per-record rate's key. */
 export function observedEntryKey(entry: {
   characterId: number;
   structureId: number;
@@ -92,19 +74,10 @@ export function observedEntryKey(entry: {
 }
 
 export interface ObservedMerge {
-  /** Every row the book holds after the merge. */
   rows: ObservedRow[];
-  /** The rows this merge added or raised — what the sync has to write. */
   changed: ObservedRow[];
 }
 
-/**
- * Upserts `fresh` into `existing`. A row's quantity never goes down, and a row
- * from an ESI cache older than the stored one is ignored outright (its
- * quantity and recorded corporation are both stale). Rows the fresh read no
- * longer lists are kept: ESI's retention is shorter than the book's, and the
- * book is the only long-term record.
- */
 export function mergeObservedRows(
   existing: readonly ObservedRow[],
   fresh: readonly ObservedRow[]
@@ -124,11 +97,6 @@ export function mergeObservedRows(
   return { rows: [...byKey.values()], changed };
 }
 
-/**
- * Groups observer rows into Observed Mining Entries — one per character,
- * refinery and day, summed per ore type — sorted by date, then refinery, then
- * character.
- */
 export function groupObservedEntries(rows: readonly ObservedRow[]): ObservedMiningEntry[] {
   const byKey = new Map<
     string,
@@ -156,7 +124,6 @@ export function groupObservedEntries(rows: readonly ObservedRow[]): ObservedMini
       };
       byKey.set(key, group);
     }
-    // A character who changed corp mid-day is judged by the freshest read (`recordedLater`).
     if (recordedLater(row, { ...group.entry, cachedAt: group.cachedAt })) {
       group.cachedAt = row.cachedAt;
       group.entry.recordedCorporationId = row.recordedCorporationId;

@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// Fetch and merge origin/develop (the integration branch) into the current branch. Mechanism only —
-// on conflict this reports it and stops; the resolving-merge-conflicts
-// skill (agent judgment) resolves and commits, not this script.
-//
-// Usage: node scripts/next-ticket/sync-main.mjs
-//
-// Prints one line of JSON to stdout:
-//   {"status":"already-up-to-date"}
-//   {"status":"merged"}
-//   {"status":"conflict","files":["src/foo.ts", ...]}
 
 import { run, tryRun, printResult, INTEGRATION_BRANCH } from './lib.mjs';
 

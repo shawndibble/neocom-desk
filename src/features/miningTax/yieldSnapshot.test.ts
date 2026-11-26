@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const TRADABLE = 1230; // Veldspar
-const NONTRADABLE = 28617; // Banidine — no market, so no hub prices
+const TRADABLE = 1230;
+const NONTRADABLE = 28617;
 
 const ledgerMock = vi.hoisted(() => ({ loadAllCharacterYields: vi.fn() }));
 vi.mock('./ledger', () => ledgerMock);
@@ -38,11 +38,9 @@ vi.mock('@/esi/cache', async (importOriginal) => {
 const hubPricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
 vi.mock('@/market/prices', () => hubPricesMock);
 
-// The server's hub prices, an R2 read.
 const hubSnapshotMock = vi.hoisted(() => ({ loadHubSnapshotRange: vi.fn() }));
 vi.mock('@/features/market/hubSnapshot', () => hubSnapshotMock);
 
-/** The hub snapshot with one station day priced for `TRADABLE`. */
 function stationDay(date: string, prices: { buy: number | null; sell: number | null }) {
   return { saved: new Map([[date, new Map([[TRADABLE, prices]])]]) };
 }
@@ -52,7 +50,6 @@ import { loadMiningYieldSnapshot } from './yieldSnapshot';
 beforeEach(() => {
   vi.clearAllMocks();
   hubPricesMock.getHubPrices.mockResolvedValue(new Map());
-  // Every type priced at 10/12 on the mined day.
   hubSnapshotMock.loadHubSnapshotRange.mockImplementation(
     async (_start: string, _end: string, typeIds: number[]) => ({
       saved: new Map([['2026-09-01', new Map(typeIds.map((id) => [id, { buy: 10, sell: 12 }]))]]),
@@ -110,8 +107,6 @@ describe('loadMiningYieldSnapshot', () => {
   });
 
   it('carries per-unit volume and the names of the materials the ore refines into', async () => {
-    // Detail-modal inputs: an unnamed "#34" in a refining list is no use to a
-    // miner, and m³ is what an ore hold is measured in.
     sdeMock.loadTypes.mockResolvedValue({ [String(TRADABLE)]: { volume: 0.1 } });
     sdeMock.loadReprocessing.mockResolvedValue({
       [String(TRADABLE)]: { portionSize: 100, materials: [{ typeID: 34, quantity: 400 }] },
@@ -126,8 +121,6 @@ describe('loadMiningYieldSnapshot', () => {
   });
 
   it('fetches a type volume from ESI when the SDE bake has no entry for it (issue #1283)', async () => {
-    // TRADABLE has a volume in the SDE bake; NONTRADABLE (a hand-tagged
-    // override type) does not, so it must fall back to ESI.
     sdeMock.loadTypes.mockResolvedValue({ [String(TRADABLE)]: { volume: 0.1 } });
     endpointsMock.getUniverseType.mockImplementation((typeId: number) =>
       Promise.resolve({ data: { type_id: typeId, volume: 0.05 } })
@@ -156,7 +149,6 @@ describe('loadMiningYieldSnapshot', () => {
 
     expect(snapshot.typeVolumes.get(TRADABLE)).toBe(0.1);
     expect(snapshot.typeVolumes.has(NONTRADABLE)).toBe(false);
-    // Cached as a confirmed negative, not left uncached to be re-asked every load.
     expect(cacheMock.writeCached).toHaveBeenCalledWith(
       0,
       expect.any(String),
@@ -191,7 +183,7 @@ describe('loadMiningYieldSnapshot', () => {
 
   it('serves a stale cached volume immediately rather than blocking on a refresh', async () => {
     sdeMock.loadTypes.mockResolvedValue({ [String(TRADABLE)]: { volume: 0.1 } });
-    const staleFetchedAt = Date.now() - 25 * 60 * 60_000; // older than STALE_AFTER.static (24h)
+    const staleFetchedAt = Date.now() - 25 * 60 * 60_000;
     cacheMock.readCachedEntries.mockResolvedValue(
       new Map([[`type-volume:${NONTRADABLE}`, { value: 0.07, fetchedAt: staleFetchedAt }]])
     );
@@ -201,8 +193,6 @@ describe('loadMiningYieldSnapshot', () => {
 
     const snapshot = await loadMiningYieldSnapshot();
 
-    // The stale value renders immediately, not the fresh one a background
-    // refresh may still be fetching when this promise resolves.
     expect(snapshot.typeVolumes.get(NONTRADABLE)).toBe(0.07);
   });
 
@@ -216,15 +206,11 @@ describe('loadMiningYieldSnapshot', () => {
 
       expect(sdeMock.loadReprocessing).not.toHaveBeenCalled();
       expect(skillsMock.loadCorrectedSkills).not.toHaveBeenCalled();
-      // Only the ore/ice types themselves are priced — never material 34,
-      // which only a refine valuation would ever need a price for.
       expect(hubSnapshotMock.loadHubSnapshotRange.mock.calls[0][2]).not.toContain(34);
       expect(hubPricesMock.getHubPrices.mock.calls[0][1]).not.toContain(34);
 
       const [row] = snapshot.rows;
       expect(row.valuation.refineValue).toBe(0);
-      // Raw pricing is still complete, so the row must not read as Partial
-      // for refine data that was never fetched on purpose.
       expect(row.valuation.pricedAll).toBe(true);
     });
   });
@@ -238,7 +224,6 @@ describe('loadMiningYieldSnapshot', () => {
       expect(snapshot.refiningUnavailable).toBe(true);
       expect(snapshot.rows).toHaveLength(1);
       expect(snapshot.rows[0].valuation.rawValue).toBeGreaterThan(0);
-      // Not Partial for refine data that cannot exist right now.
       expect(snapshot.rows[0].valuation.pricedAll).toBe(true);
       expect(skillsMock.loadCorrectedSkills).not.toHaveBeenCalled();
     });

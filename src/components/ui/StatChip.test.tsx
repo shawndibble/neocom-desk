@@ -12,11 +12,6 @@ describe('StatChip', () => {
   });
 
   it('stays indivisible so a wrapping strip moves it whole', () => {
-    // The chip is `h-7` — a fixed height with no room for a second line. As a
-    // shrinkable flex child it gets squeezed in a crowded strip until its own
-    // text wraps (reported on the Skill Plan header once a Booster added a
-    // fifth chip). Refusing to shrink or wrap pushes the decision up to the
-    // strip's `flex-wrap`, which has somewhere to put the overflow.
     render(<StatChip label="Training time" value="4d 14h 57m" />);
 
     const chip = screen.getByText('Training time').parentElement;

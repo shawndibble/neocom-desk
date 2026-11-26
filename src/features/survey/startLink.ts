@@ -1,38 +1,18 @@
-/**
- * A **Survey start link**: `/survey` plus a query that carries the Additional
- * information (location, moon tax payee and rate, notes) a pilot wants every
- * new Survey to begin with, so a link in a calendar, a chat or a site starts a
- * field already set up. The query is read by anyone who opens the link, so
- * `parseStartLink` trusts nothing in it: the same shapes and caps a stored
- * Survey has, else the part is dropped. Pure.
- *
- * A place or payee may be given by ID alone; the page names it with ESI's
- * public lookup (`startLinkNames.ts`). So a field here can hold an ID with no
- * name yet, and `toInfoFields` is what leaves only complete ones.
- */
 import type { InfoFields } from '@/engine/survey/infoTemplate';
 import type { SurveyPlaceKind } from './surveyPlaces';
 import { MAX_LOCATION_NAME, MAX_SURVEY_NOTES, MAX_TAX_NAME } from './surveyStore';
 
 export const START_LINK_PATH = '/survey';
 
-/** An ID and/or a name; `name` is empty while only the ID is known. */
 export interface StartLinkEntity {
   id: number | null;
   name: string;
-  /**
-   * What the picker said a place is, when it did. A system or NPC station ESI's
-   * public lookup can name from its ID, so the link leaves its name out; a structure
-   * (or a typed place) can't be, so its name stays.
-   */
   kind?: SurveyPlaceKind;
 }
 
-/** What a start link, or the form that builds one, holds. */
 export interface StartLinkFields {
   place: StartLinkEntity | null;
   payee: StartLinkEntity | null;
-  /** The moon tax rate, 0 to 100; null when blank or invalid. */
   rate: number | null;
   notes: string;
 }
@@ -44,10 +24,8 @@ export const EMPTY_START_LINK: StartLinkFields = {
   notes: '',
 };
 
-/** The router path of the start link for these fields, query included when any is set. */
 export function startLinkPath({ place, payee, rate, notes }: StartLinkFields): string {
   const query = new URLSearchParams();
-  // An ID the public lookup can name stands alone: a payee's, and a system's or NPC station's.
   if (place !== null) {
     const named = place.id !== null && (place.kind === 'system' || place.kind === 'station');
     if (place.name.trim() !== '' && !named) query.set('place', place.name.trim());
@@ -63,16 +41,13 @@ export function startLinkPath({ place, payee, rate, notes }: StartLinkFields): s
   return search === '' ? START_LINK_PATH : `${START_LINK_PATH}?${search}`;
 }
 
-/** A pop's start link names its pop in `pop` (`{corporationId}_{extractionId}`); a shape check only. */
 const POP_ID = /^[1-9][0-9]{0,15}_.{1,100}$/;
 
-/** The Shared Pop a start link came from, or null. Kept out of `StartLinkFields`: it is not a field of the Survey. */
 export function popOfStartLink(search: string): string | null {
   const pop = new URLSearchParams(search).get('pop');
   return pop !== null && POP_ID.test(pop) ? pop : null;
 }
 
-/** A start link path that also names its pop. */
 export function withPop(path: string, popId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}pop=${encodeURIComponent(popId)}`;
 }
@@ -86,7 +61,6 @@ function entity(name: string, id: number | null): StartLinkEntity | null {
   return name === '' && id === null ? null : { id, name };
 }
 
-/** The fields a start link's query holds; anything missing or invalid is left blank. */
 export function parseStartLink(search: string): StartLinkFields {
   const query = new URLSearchParams(search);
   const rateText = query.get('rate')?.trim() ?? '';
@@ -105,7 +79,6 @@ export function parseStartLink(search: string): StartLinkFields {
   };
 }
 
-/** A Survey's Additional information as the fields that would build its start link. */
 export function fromInfoFields({ location, tax, notes }: InfoFields): StartLinkFields {
   return {
     place: location,
@@ -115,12 +88,6 @@ export function fromInfoFields({ location, tax, notes }: InfoFields): StartLinkF
   };
 }
 
-/**
- * The fields as a Survey stores them. `names` are the ones ESI gave for an ID;
- * a typed name wins for the place, a resolved one for the payee (it is the
- * in-game spelling). A place or payee still nameless, or a payee without a
- * rate, is left out.
- */
 export function toInfoFields(
   fields: StartLinkFields,
   names: { place?: string; payee?: string } = {}

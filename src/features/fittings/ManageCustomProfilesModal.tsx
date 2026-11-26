@@ -1,14 +1,7 @@
-/**
- * The "manage custom profiles" modal shared by the Damage and Target Profile
- * pickers: list the pilot's custom profiles with edit and delete, and an add
- * button. The profile-specific parts — a row's summary and the edit form —
- * come in as props.
- */
 import { useState, type ReactNode } from 'react';
 import { Button, IconButton, Modal } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 
-/** A form's working copy of a profile; `id` is null while adding a new one. */
 interface ProfileDraft {
   id: string | null;
 }
@@ -42,7 +35,6 @@ export function ManageCustomProfilesModal<
   custom: C[];
   saveCustom: (profile: C) => void;
   deleteCustom: (id: string) => void;
-  /** The dim text beside a row's name. */
   summary: (profile: C) => ReactNode;
   draftOf: (profile: C) => D;
   emptyDraft: D;

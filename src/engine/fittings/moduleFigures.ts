@@ -1,17 +1,3 @@
-/**
- * The module-by-module figures a swap can move that no other stat names: a
- * reactivation or reload delay, a salvager's and a tractor's reach, a
- * scanner's range. Read off the engine's final per-item attributes, the way
- * `explore.ts` does; display only (never a ranking metric). Pure.
- *
- * Attribute ids are plain SDE, named by `market/attributes.json`: 669 Reactivation
- * Delay and 1795 Reload Time (ms), 902 Access Difficulty Bonus (a salvager's
- * %), 54 Optimal Range (m), 1045 Maximum Tractor Velocity, 126 Cargoscan range
- * and 125 Ship scanning range (m). A weapon's DPS is the patched derived
- * attribute -12: a module that has one is a weapon, whose reload already
- * shapes sustained DPS.
- */
-
 const FIGURE_ATTRIBUTE = {
   dps: -12,
   optimal: 54,
@@ -24,17 +10,12 @@ const FIGURE_ATTRIBUTE = {
 } as const;
 
 export interface ModuleFigures {
-  /** The longest reactivation delay, seconds; 0 with none. */
   reactivationSeconds: number;
-  /** The longest reload of a loaded non-weapon (ancillary repairer), seconds; 0 with none. */
   reloadSeconds: number;
-  /** The best salvager's chance bonus, % ; its optimal range, metres. */
   salvageChance: number;
   salvagerRange: number;
-  /** The fastest tractor beam's velocity, m/s; its range, metres. */
   tractorVelocity: number;
   tractorRange: number;
-  /** The longest scanners, metres. */
   cargoScanRange: number;
   shipScanRange: number;
 }
@@ -62,7 +43,6 @@ interface ResultLike {
 
 const MODULE_SLOTS: ReadonlySet<string> = new Set(['high', 'medium', 'low']);
 
-/** `items`/`results` are the index-parallel `dogmaFit.items` and `calculation.items`. */
 export function extractModuleFigures(
   items: readonly ItemLike[],
   results: readonly ResultLike[]
@@ -76,7 +56,6 @@ export function extractModuleFigures(
       figures.reactivationSeconds,
       read(FIGURE_ATTRIBUTE.reactivationDelay) / 1000
     );
-    // A loaded non-weapon: an ancillary repairer's reload; a weapon's already shapes sustained DPS.
     if (result.charge && read(FIGURE_ATTRIBUTE.dps) <= 0)
       figures.reloadSeconds = Math.max(
         figures.reloadSeconds,

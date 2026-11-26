@@ -1,17 +1,3 @@
-/**
- * "What skill affects this?" — each required skill, status + Add to Plan.
- * No Character: name + level only, not an always-"missing"/no-op Add.
- *
- * The target-plan picker ("Adding to") shows only while a required skill is
- * short of its level: it chooses where the rows' Add buttons write, so with
- * every skill trained there is nothing for it to choose for. Checking the
- * direct requirements covers their prerequisites too, since EVE won't train
- * a skill whose prerequisites aren't trained.
- *
- * Shared by `ItemDetailModal` (the item-level view) and `Market.tsx`'s order
- * row expand (the same section, so a pilot who never opens Show Info still
- * sees it from the order book directly).
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { romanLevel } from '@/engine/projection';
@@ -48,14 +34,6 @@ export function RequiredSkillsSection({
       ? t('skills.fitCheck.createPlanAndAdd')
       : t('skills.requiredSkills.addToPlan');
 
-  // The target plan itself, live off Dexie — reflects both entries the plan
-  // already had (e.g. added from a different item earlier) and ones just
-  // added this session, once the write resolves. `SkillRow`'s own status
-  // only ever reflects *trained* level, never *planned*, so without this a
-  // skill already in the plan looks identical to one that isn't, right down
-  // to "Add" still being clickable and silently no-op'ing (issue report:
-  // "clicked Add to Skill Plan and nothing happened" — the skill was already
-  // there from before).
   const planEntries = targetPlanEntries(target);
   const anyUntrained = requiredSkills.some(
     (req) => (trainedSkills.get(req.skillTypeID)?.level ?? 0) < req.level
@@ -81,8 +59,6 @@ export function RequiredSkillsSection({
             );
           }
           const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
-          // Mirrors `upsertEntry`'s own "already covered" check, since that's
-          // exactly the condition under which clicking Add would no-op.
           const planned = isEntryCovered(planEntries, req.skillTypeID, req.level);
           return (
             <SkillRow

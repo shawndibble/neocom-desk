@@ -5,15 +5,12 @@ import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
 
-// --- GET /characters/{character_id}/fittings (esi-fittings.read_fittings.v1) ---
-
 export interface CharacterFittingItem {
   flag: string;
   quantity: number;
   type_id: number;
 }
 
-/** One In-game Fitting (issue #1539) — GLOSSARY.md **In-game Fitting**. */
 export interface CharacterFitting {
   fitting_id: number;
   name: string;
@@ -29,8 +26,6 @@ export function getCharacterFittings(
   return characterGet<CharacterFitting[]>('getCharacterFittings', characterId, options);
 }
 
-// --- POST /characters/{character_id}/fittings/ (esi-fittings.write_fittings.v1) ---
-
 export interface NewCharacterFitting {
   name: string;
   description: string;
@@ -38,7 +33,6 @@ export interface NewCharacterFitting {
   items: CharacterFittingItem[];
 }
 
-/** Saves a new In-game Fitting — Save to EVE (#1540) via `saveFittingToEve`. */
 export function postCharacterFitting(
   characterId: number,
   fitting: NewCharacterFitting,
@@ -53,14 +47,6 @@ export function postCharacterFitting(
   });
 }
 
-// --- DELETE /characters/{character_id}/fittings/{fitting_id}/ (esi-fittings.write_fittings.v1) ---
-
-/**
- * Deletes an In-game Fitting. Save to EVE's overwrite path (#1540) calls this
- * only after the replacement `postCharacterFitting` has already succeeded —
- * ESI has no edit endpoint, so overwriting is a create-then-delete, in that
- * order, so a failed create never costs the pilot their original.
- */
 export function deleteCharacterFitting(
   characterId: number,
   fittingId: number,
@@ -74,11 +60,8 @@ export function deleteCharacterFitting(
   });
 }
 
-// --- GET /killmails/{killmail_id}/{killmail_hash} (public) ---
-
 export interface Killmail {
   killmail_id: number;
-  /** When it died (ISO). */
   killmail_time?: string;
   solar_system_id?: number;
   victim: KillmailVictim & { character_id?: number; corporation_id?: number };
@@ -96,18 +79,11 @@ export function getKillmail(
   });
 }
 
-// --- GET /characters/{character_id}/killmails/recent (esi-killmails.read_killmails.v1) ---
-
-/** One kill or loss the Character was on: the id and hash `getKillmail` takes. */
 export interface CharacterKillmailRef {
   killmail_id: number;
   killmail_hash: string;
 }
 
-/**
- * The Character's recent killmails, kills and losses alike, newest first. Paginated
- * (X-Pages, 50 a page). Opt-in `killmails` Permission: the SRP page asks for it at the point of need.
- */
 export function getCharacterKillmailsRecent(
   characterId: number,
   options: EndpointOptions & { maxPages?: number } = {}

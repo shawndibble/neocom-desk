@@ -1,12 +1,3 @@
-/**
- * Current System: where the active Character is, as the Jump Range filter
- * measures it. ESI's location by default (`character/location.ts`), or a
- * system the pilot picked by hand — see `effectiveCurrentSystem` for when a
- * pick stops applying.
- *
- * Picks are a device-local setting keyed by Character, never synced: a
- * location is about this session, not a preference to carry across devices.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import {
@@ -44,10 +35,8 @@ export const usePickedSystems = createLocalSetting<PickedSystems>({
 });
 
 export interface CurrentSystemState extends CurrentSystem {
-  /** False until both the game location and the stored pick have been read. */
   loaded: boolean;
   pick: (systemId: number) => void;
-  /** Back to the game location. */
   clearPick: () => void;
 }
 
@@ -75,8 +64,6 @@ export function useCurrentSystem(): CurrentSystemState {
   const picked = characterId === null ? null : (picks[String(characterId)] ?? null);
   const current = effectiveCurrentSystem(gameSystemId, picked);
 
-  // A pick made before ESI answered learns what the game said first, so a
-  // later, different answer (the pilot really moved) still ends it.
   useEffect(() => {
     if (characterId === null) return;
     const adopted = adoptGameBaseline(picked, gameSystemId);
@@ -99,11 +86,6 @@ export function useCurrentSystem(): CurrentSystemState {
   };
 }
 
-/**
- * A Character's Current System read once, outside React (the notification
- * poller): the game location or a pick, as `useCurrentSystem` resolves them.
- * `null` when neither is known.
- */
 export async function loadCurrentSystemId(
   characterId: number,
   staleAfterMs?: number
@@ -116,33 +98,10 @@ export async function loadCurrentSystemId(
   return effectiveCurrentSystem(gameSystemId, picked).systemId;
 }
 
-/**
- * What a Jump Range filter can do right now:
- * - `off`: range is Any, nothing to filter;
- * - `no-origin`: no Current System to measure from;
- * - `loading`: distances not computed yet;
- * - `unknown`: the stargate snapshot could not be read;
- * - `ready`: `allowed` is the systems in range.
- *
- * Only `ready` restricts. The others pass every row, so a missing location or
- * an offline first visit never reads as "nothing within 5 jumps".
- */
 export type JumpRangeStatus = 'off' | 'no-origin' | 'loading' | 'unknown' | 'ready';
 
-/**
- * `jumps` itself resolves the same way regardless of `range` — `status` alone
- * can't tell a caller why a row's own distance isn't showing yet, since `off`
- * (range is Any) says nothing about whether the origin or the graph are
- * ready. Mirrors `JumpRangeStatus` minus `off`.
- */
 export type JumpDistanceStatus = 'no-origin' | 'loading' | 'unknown' | 'ready';
 
-/**
- * A row's own Jumps cell, as every table built off `jumps`/`jumpsStatus`
- * renders it: the three unready `JumpDistanceStatus` values verbatim, or a
- * settled `value` — `count: null` for a row this app cannot place on the
- * stargate graph, distinct from still loading.
- */
 export type JumpsCellValue =
   | { kind: 'loading' }
   | { kind: 'no-origin' }
@@ -152,15 +111,7 @@ export type JumpsCellValue =
 export interface JumpRangeFilter {
   status: JumpRangeStatus;
   allowed: ReadonlySet<number> | null;
-  /**
-   * Every reachable system's distance from the Current System, regardless of
-   * `range` or `status` — a row's own jump count (a table column) needs this
-   * even at `'any'`, where `allowed` is `null` and says nothing about it.
-   * `null` while unresolved (loading, no origin, or an unreachable graph) —
-   * `jumpsStatus` says which.
-   */
   jumps: ReadonlyMap<number, number> | null;
-  /** Why `jumps` is `null`, or `'ready'` once it holds a real map. */
   jumpsStatus: JumpDistanceStatus;
 }
 
@@ -169,8 +120,6 @@ export function useJumpRangeFilter(
   range: JumpRange
 ): JumpRangeFilter {
   const originSystemId = current.systemId;
-  // The pilot's jump basis in full (Travel Settings and Route Safety's holes and
-  // bridges): "within 5 jumps" counts the trip Route Safety would draw.
   const { rules, network, key: routeKey, hydrated } = useJumpBasis();
   const [distances, setDistances] = useState<{
     origin: number;
@@ -198,7 +147,6 @@ export function useJumpRangeFilter(
   const jumps = settled ? distances.jumps : null;
 
   const jumpsStatus = useMemo((): JumpDistanceStatus => {
-    // Still reading ESI: "no system" now would flash the set-your-system note.
     if (!current.loaded) return 'loading';
     if (originSystemId === null) return 'no-origin';
     if (!settled) return 'loading';

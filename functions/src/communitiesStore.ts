@@ -1,15 +1,3 @@
-// Communities (issue #3596): the admin-SDK half of the Community callables.
-// Every cap and every delete-on-leave lives here, in one transaction where a
-// count is involved, because Firestore rules can't enforce either. The pure
-// decisions are in communities.ts; this file only reads, decides and writes.
-//
-// Layout (see firestore.rules):
-//   communities/{id}                              name, adminUid, inviteCode, memberCount, createdAt
-//   communities/{id}/members/{uid}                ownerHash, characterName, joinedAt, admittedFrom? (+ client-written pushedAt/libraryHash/chunkCount)
-//   communities/{id}/members/{uid}/library/{n}    chunk of Shared Blueprints, written by the Member
-//   communities/{id}/fittings/{uid~key}           one shared Fitting (issue #3605), written by the Member
-//   characters/{uid}/communities/{id}             the Character's membership index
-
 import type { Caller } from './actorAuth.js';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -44,7 +32,6 @@ import { FLEET_PAYOUTS_COLLECTION } from './communityFleetPayouts.js';
 import { ADMITTED_FROM_REQUEST } from './communityPush.js';
 
 const LIBRARY_COLLECTION = 'library';
-/** The waiting list of a Community that approves new Members (not the item Requests). */
 export const JOIN_REQUESTS_COLLECTION = 'requests';
 const REQUESTS_COLLECTION = JOIN_REQUESTS_COLLECTION;
 const FITTINGS_COLLECTION = 'fittings';
@@ -54,7 +41,6 @@ export const communityRef = (db: Firestore, communityId: string) =>
   db.collection(COMMUNITIES_COLLECTION).doc(communityId);
 export const memberRef = (db: Firestore, communityId: string, uid: string) =>
   communityRef(db, communityId).collection(COMMUNITY_MEMBERS_COLLECTION).doc(uid);
-/** A Character waiting for the admin to let them in (a Community that approves new Members). */
 const requestRef = (db: Firestore, communityId: string, uid: string) =>
   communityRef(db, communityId).collection(REQUESTS_COLLECTION).doc(uid);
 const indexCollection = (db: Firestore, uid: string) =>
@@ -77,7 +63,6 @@ export function fail(decision: string): never {
         reason: 'daily-cap',
       });
     case 'community-full':
-      // `details.reason` lets the join page tell the two caps apart without parsing prose.
       throw new HttpsError('resource-exhausted', 'This Community is full', {
         reason: 'community-full',
       });
@@ -101,11 +86,6 @@ export async function loadCommunity(db: Firestore, communityId: string) {
   return snap;
 }
 
-/**
- * A Member doc counts for the caller only under the ownerHash it was joined
- * with: a sold Character keeps its uid but gets a new ownerHash, and must not
- * act on, or be told it holds, the previous owner's membership.
- */
 export async function isCurrentMember(db: Firestore, communityId: string, caller: Caller) {
   const member = await memberRef(db, communityId, caller.uid).get();
   return member.exists && member.get('ownerHash') === caller.ownerHash;
@@ -113,12 +93,10 @@ export async function isCurrentMember(db: Firestore, communityId: string, caller
 
 const notAMember = () => new HttpsError('not-found', 'Not a Member of this Community');
 
-/** `isCurrentMember` or a not-found error. */
 export async function requireCurrentMember(db: Firestore, communityId: string, caller: Caller) {
   if (!(await isCurrentMember(db, communityId, caller))) throw notAMember();
 }
 
-/** The caller's Member doc in a transaction, only under the ownerHash it was joined with. */
 export async function requireMember(
   tx: FirebaseFirestore.Transaction,
   db: Firestore,
@@ -138,10 +116,6 @@ export async function requireAdmin(db: Firestore, communityId: string, caller: C
   return snap;
 }
 
-/**
- * Drops index entries whose Community no longer exists (a join that raced a
- * delete), so they can't count against the 10-Communities cap forever.
- */
 async function pruneDanglingIndex(db: Firestore, uid: string): Promise<void> {
   for (const entry of (await indexCollection(db, uid).limit(MAX_COMMUNITIES_PER_CHARACTER).get())
     .docs) {
@@ -155,12 +129,6 @@ export interface InvitePreview {
   memberCount: number;
 }
 
-/**
- * What the invite page shows before sign-in: name, admin and Member count.
- * Callable without a session, so it returns only these three public facts —
- * never the invite code, the admin's uid or any Member beyond the admin's name.
- * An unknown or revoked code is the same not-found a join gives.
- */
 export async function previewCommunity(db: Firestore, inviteCode: string): Promise<InvitePreview> {
   const found = await db
     .collection(COMMUNITIES_COLLECTION)
@@ -230,17 +198,12 @@ export async function joinCommunity(
   const mailInvite = mailInviteRef(db, ref.id, characterIdOf(caller.uid));
 
   return db.runTransaction(async (tx) => {
-    // Re-read inside the transaction: the invite may have been revoked, or
-    // the last seat taken, since the lookup above.
     const community = await tx.get(ref);
     const member = await tx.get(memberRef(db, ref.id, caller.uid));
     const joined = await tx.get(
       indexCollection(db, caller.uid).limit(MAX_COMMUNITIES_PER_CHARACTER)
     );
-    // The admin mailing this Character an invite is the approval already, once.
     const mailed = await tx.get(mailInvite);
-    // Already on the waiting list: the join request told the admin, so the
-    // Member-joined push stays quiet, as the Foreground Poller does (#5121).
     const waiting = await tx.get(requestRef(db, ref.id, caller.uid));
     const preApproved = isPreApproved(
       mailed.exists
@@ -263,7 +226,6 @@ export async function joinCommunity(
     });
     if (decision === 'already-member') return { communityId: ref.id, alreadyMember: true };
     if (decision === 'needs-approval') {
-      // Idempotent: asking again refreshes the one waiting request.
       tx.set(requestRef(db, ref.id, caller.uid), {
         ownerHash: caller.ownerHash,
         characterName: input.characterName,
@@ -287,17 +249,10 @@ export async function joinCommunity(
   });
 }
 
-/** A Character's id from its Firebase uid `char:{id}`. */
 function characterIdOf(uid: string): number {
   return Number(uid.slice('char:'.length));
 }
 
-/**
- * Before a Character becomes a Member: a Member doc under another ownerHash is
- * the previous owner of a sold Character, whose shared data goes. Chunks left
- * by any earlier crashed removal are cleared too, since they would be readable
- * again the moment the new Member doc exists.
- */
 async function clearStaleMemberData(
   db: Firestore,
   communityId: string,
@@ -312,7 +267,6 @@ async function clearStaleMemberData(
   }
 }
 
-/** Writes the Member, the Character's index entry and the count: the one place a Member is made. */
 function admit(
   tx: FirebaseFirestore.Transaction,
   db: Firestore,
@@ -326,7 +280,6 @@ function admit(
     ownerHash: who.ownerHash,
     characterName: who.characterName,
     joinedAt: now,
-    // The Member-joined push skips a Member the admin let in themselves (issue #5121).
     ...(admittedFrom ? { admittedFrom } : {}),
   });
   tx.set(indexCollection(db, uid).doc(community.id), {
@@ -337,7 +290,6 @@ function admit(
   tx.update(community, { memberCount: FieldValue.increment(1) });
 }
 
-/** The admin turns "approve new Members" on or off. Requests already waiting stay until decided. */
 export async function setRequireApproval(
   db: Firestore,
   caller: Caller,
@@ -348,12 +300,6 @@ export async function setRequireApproval(
   await community.ref.update({ requireApproval });
 }
 
-/**
- * The admin accepts or declines one waiting request. Accepting makes the
- * Character a Member under the same caps as a join; a cap that stops it is
- * reported and the request stays. Declining just removes the request. Both are
- * safe to repeat: a request already gone is not an error.
- */
 export async function decideJoinRequest(
   db: Firestore,
   caller: Caller,
@@ -369,8 +315,6 @@ export async function decideJoinRequest(
   }
   const waiting = await request.get();
   if (!waiting.exists) return;
-  // A Member already holds this Character: the request is stale (the Character
-  // was sold, or it joined another way). Drop it; never evict the Member.
   if ((await memberRef(db, communityId, requestUid).get()).exists) {
     await request.delete();
     return;
@@ -410,11 +354,6 @@ export async function decideJoinRequest(
   });
 }
 
-/**
- * Queues the deletion of one Member's Pledge on every Request of a Community
- * (the Pledge doc id is the Pledger's uid; deleting one that does not exist is
- * harmless). Returns the delete promises so the caller can await them.
- */
 export async function queuePledgeDeletes(
   db: Firestore,
   writer: { delete: (ref: FirebaseFirestore.DocumentReference) => Promise<unknown> },
@@ -427,12 +366,6 @@ export async function queuePledgeDeletes(
   return board.map((request) => writer.delete(request.collection(PLEDGES_COLLECTION).doc(uid)));
 }
 
-/**
- * Everything one Member shared into a Community: their blueprint library
- * chunks, their shared Fittings (issue #3605), their shared Skill Plans and
- * their Requests with the Pledges under them, and their Fleet Payouts with Shares. Every delete-on-leave path goes
- * through this so a new kind of shared data can't be missed in one.
- */
 export async function deleteMemberShares(
   db: Firestore,
   communityId: string,
@@ -447,40 +380,27 @@ export async function deleteMemberShares(
     .collection(SKILL_PLANS_COLLECTION)
     .where('ownerUid', '==', uid)
     .get();
-  // Requests (ADR 0021): a Member's own, with the Pledges under them.
   const posted = await communityRef(db, communityId)
     .collection(ITEM_REQUESTS_COLLECTION)
     .where('ownerUid', '==', uid)
     .get();
   for (const request of posted.docs) await db.recursiveDelete(request.ref);
-  // Fleet Payouts (#4779): a Member's own, with their Shares. Other bosses' Payouts keep a left Member's Share.
   const payouts = await communityRef(db, communityId)
     .collection(FLEET_PAYOUTS_COLLECTION)
     .where('ownerUid', '==', uid)
     .get();
   for (const payout of payouts.docs) await db.recursiveDelete(payout.ref);
-  // Their Pledges on other Members' Requests (the doc id is the Pledger's uid).
   const writer = db.bulkWriter();
   const pledgeDeletes = await queuePledgeDeletes(db, writer, communityId, uid);
-  // Awaited, so a delete that fails after its retries fails the leave rather than orphaning a readable copy.
   const deletes = [
     ...pledgeDeletes,
     ...[...fittings.docs, ...plans.docs].map((shared) => writer.delete(shared.ref)),
   ];
   await writer.close();
   await Promise.all(deletes);
-  // Their Requests and Pledges are gone: a cached board must re-read, not merge a delta.
   await boardVersionRef(db, communityId).set(boardVersionBump(true), { merge: true });
 }
 
-/**
- * Deletes one Member's shared data and membership. The Member doc, index doc
- * and count go first, in one transaction: with the Member doc gone the rules
- * stop the Member writing another chunk, so the library sweep after it can't
- * race a rewrite. A crash between the two leaves chunks no one can read;
- * joinCommunity clears them before the Member can return. Safe to re-run,
- * and safe when the Community is already gone.
- */
 export async function removeMemberData(
   db: Firestore,
   communityId: string,
@@ -538,8 +458,6 @@ export async function transferAdmin(
   communityId: string,
   newAdminUid: string
 ): Promise<void> {
-  // One transaction, so the heir can't leave between the check and the
-  // hand-over and strand the Community with an admin who is not a Member.
   await db.runTransaction(async (tx) => {
     const community = await tx.get(communityRef(db, communityId));
     if (!community.exists) throw new HttpsError('not-found', 'Community not found');
@@ -577,19 +495,9 @@ export interface MailInviteReservation {
   inviteCode: string;
   communityName: string;
   adminName: string;
-  /** Mail invites left today after this one. */
   remaining: number;
 }
 
-/**
- * Claims one of the admin's daily mail invites and the one-per-target slot
- * before the client sends the mail (the refresh token never leaves the device,
- * so the client must send it). The cap lives here, in one transaction, not in
- * the UI. A revoked link has nothing to mail: not-found.
- */
-// NOTE: functions/src/communityRequestsStore.ts (reserveRequestMail and its confirm/release)
-// mirrors this reserve/confirm/release on purpose, with its own cap and collections. Keep the
-// refund and retake rules in step; they were not merged to leave the invite path untouched.
 export async function reserveMailInvite(
   db: Firestore,
   caller: Caller,
@@ -622,7 +530,6 @@ export async function reserveMailInvite(
       now,
     });
     if (decision === 'retake') {
-      // A crashed tab left this reserved: let the admin try again, at no extra cost.
       tx.update(invite, {
         reservedAt: now,
         attempts: Number(inviteSnap.get('attempts') ?? 1) + 1,
@@ -653,7 +560,6 @@ export async function reserveMailInvite(
   };
 }
 
-/** The mail went out: stamp the time the admin's "Sent" list shows. */
 export async function confirmMailInvite(
   db: Firestore,
   caller: Caller,
@@ -667,11 +573,6 @@ export async function confirmMailInvite(
   if (snap.exists && snap.get('adminUid') === caller.uid) await invite.update({ sentAt: now });
 }
 
-/**
- * The send definitely failed: give back the slot and the day's count. Idempotent
- * and bounded (see `decideMailRelease`): a fresh, unconfirmed reservation of this
- * admin's, a few times a day.
- */
 export async function releaseMailInvite(
   db: Firestore,
   caller: Caller,
@@ -696,8 +597,6 @@ export async function releaseMailInvite(
       refundsToday,
       now,
     });
-    // Past the window, or out of refunds, the slot stays spent: the server
-    // can't tell a failed send from a skipped confirm.
     if (decision !== 'refund') return;
     tx.delete(invite);
     if (quotaSnap.exists) {
@@ -707,7 +606,6 @@ export async function releaseMailInvite(
   });
 }
 
-/** Revoking leaves no working link until the admin regenerates one. */
 export async function revokeInvite(
   db: Firestore,
   caller: Caller,
@@ -728,12 +626,6 @@ export async function regenerateInvite(
   return { inviteCode };
 }
 
-/**
- * Removes every Member's data and index doc, then the Community itself. The
- * invite is revoked first so no join lands mid-delete, and the admin's own
- * index doc goes last: if this crashes part-way, the admin's purge or retry
- * still finds the Community to finish it.
- */
 export async function deleteCommunityData(
   db: Firestore,
   communityId: string,
@@ -762,12 +654,6 @@ export async function deleteCommunity(
   await deleteCommunityData(db, communityId, caller.uid);
 }
 
-/**
- * purgeStaleAccounts hook (ADR 0018): before a stale Character's synced data
- * goes, remove it from every Community it is in. A stale admin takes the
- * Community with it — v1 has no co-admin or transfer, so an adminless
- * Community could never be moderated or deleted.
- */
 export async function purgeCharacterCommunities(db: Firestore, uid: string): Promise<void> {
   for (const entry of (await indexCollection(db, uid).get()).docs) {
     const community = await communityRef(db, entry.id).get();

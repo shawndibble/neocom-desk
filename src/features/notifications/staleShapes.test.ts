@@ -1,12 +1,3 @@
-/**
- * "Stale shape" pins: what every domain's persisted-baseline guard accepts and
- * rejects. A stored baseline is only reused when it parses, so the optional
- * fields (added after snapshots already existed) must stay optional, and the
- * required ones must stay required — a looser guard reads an old baseline with
- * fields missing, a stricter one discards the baseline and re-announces
- * everything as new. Driven through each domain's own store so it holds
- * whatever the guard is built from.
- */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import { EMPTY_POLLER_STATE } from './pollerState';
@@ -47,15 +38,10 @@ type Entry = Record<string, unknown>;
 interface Case {
   name: string;
   domain: PollDomain;
-  /** The snapshot's array field. */
   key?: string;
-  /** Every required field, valid. Nullable ones are listed in `nullable`. */
   base: Entry;
-  /** Fields a baseline written before they existed lacks — absent must pass. */
   optional?: Entry;
-  /** Required fields that also accept `null` (but never absent). */
   nullable?: string[];
-  /** A value of the right primitive type but outside the field's enum. */
   badEnum?: Record<string, unknown>;
 }
 
@@ -268,7 +254,6 @@ const CASES: Case[] = [
   },
 ];
 
-/** Stores a one-character snapshot around `entries` and reports whether it survived parsing. */
 async function survives(domain: PollDomain, entries: unknown[], key = 'entries'): Promise<boolean> {
   await db.settings.put({ key: domain.stateKey, value: { 7: { [key]: entries, nowMs: 1 } } });
   domain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
@@ -276,7 +261,6 @@ async function survives(domain: PollDomain, entries: unknown[], key = 'entries')
   return Object.keys(domain.store.getState().value).length > 0;
 }
 
-/** A value of the right primitive type for the field, but wrong for the type. */
 function wrongType(sample: unknown): unknown {
   if (typeof sample === 'number') return '1';
   if (typeof sample === 'boolean') return 1;

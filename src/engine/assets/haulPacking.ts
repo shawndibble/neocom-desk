@@ -1,13 +1,3 @@
-/**
- * Haul packing: which items ride in which hold of a hauler, haul by haul.
- *
- * First-fit decreasing over whole units. A stack may split across holds and
- * hauls, but one unit never does: a packaged ship has to fit one hold on its
- * own, so a hull whose biggest hold is smaller than the unit cannot carry it
- * at all. Pure — the caller names the holds and the per-unit volumes.
- */
-
-/** The two holds that take any item. Specialised Holds are left out (see `cargoHolds.ts`). */
 export type PackHoldKind = 'cargo' | 'fleetHangar';
 
 export interface PackHold {
@@ -18,9 +8,7 @@ export interface PackHold {
 export interface PackLine {
   typeId: number;
   quantity: number;
-  /** m³ of one unit as hauled. */
   unitM3: number;
-  /** ISK one unit is worth; absent or 0 counts as unpriced. */
   unitIsk?: number;
 }
 
@@ -32,18 +20,14 @@ export interface HoldLoad {
 }
 
 export interface Haul {
-  /** Largest hold first. */
   holds: HoldLoad[];
   usedM3: number;
-  /** ISK the load is worth, by the lines' `unitIsk`. */
   iskValue: number;
 }
 
 export interface PackResult {
   hauls: Haul[];
-  /** Stacks whose single unit is bigger than the hull's biggest hold; never divided. */
   unfit: PackLine[];
-  /** Stacks whose single unit is worth more than the ISK limit; never hauled. */
   overLimit: PackLine[];
 }
 
@@ -57,7 +41,6 @@ function newHaul(holds: readonly PackHold[]): Haul {
   };
 }
 
-/** Puts as many of `left` units as fit into `hold`; returns how many went in. */
 function load(
   haul: Haul,
   hold: HoldLoad,
@@ -79,15 +62,10 @@ function load(
   return n;
 }
 
-/** The usable ISK limit: a finite number above 0, else null for no limit. */
 export function normalizeMaxIsk(raw: unknown): number | null {
   return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
 }
 
-/**
- * `maxIsk` caps what one haul is worth: a haul is full when its volume or its
- * value reaches the limit. Null, 0 or a non-number means no limit.
- */
 export function packHauls(
   lines: readonly PackLine[],
   holds: readonly PackHold[],
@@ -96,7 +74,6 @@ export function packHauls(
   const limit = normalizeMaxIsk(maxIsk);
   const usable = holds
     .filter((h) => h.capacityM3 > 0)
-    // Equal holds: the fleet hangar first, so the cargo hold stays free for loose stock.
     .sort(
       (a, b) =>
         b.capacityM3 - a.capacityM3 ||
@@ -136,7 +113,6 @@ export function packHauls(
         if (placed === left) break;
       }
       if (placed === 0) {
-        // Float edge: the unit is a hair over the biggest hold. Never loop on it.
         unfit.push({ ...line, quantity: left });
         break;
       }

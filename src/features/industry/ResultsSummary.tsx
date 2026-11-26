@@ -24,12 +24,10 @@ interface CostRowProps {
   tooltip?: ReactNode;
   emphasized?: boolean;
   indented?: boolean;
-  /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone. */
   tone?: 'negative' | 'positive';
   className?: string;
 }
 
-/** One ledger row: label (+ optional tooltip) left, value right. */
 function CostRow({
   label,
   value,
@@ -46,15 +44,11 @@ function CostRow({
     <div
       className={cx(
         'flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]',
-        // One step in from the job cost's own label (padding, caret slot, gap: pl-8).
         indented && 'pl-12',
         className
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
-        {/* An empty slot the width of the job cost row's caret, so every
-            label starts at one edge; the caret stays leading, where §6c puts
-            "expands in place". */}
         {!indented && <span aria-hidden="true" className="size-4 shrink-0" />}
         {label}
         {tooltip && typeof label === 'string' && (
@@ -76,72 +70,32 @@ function CostRow({
 
 interface ResultsSummaryProps {
   result: BuildResult;
-  /** False when adjusted prices / cost index couldn't be fetched live (no local cache — offline). */
   pricesReady: boolean;
-  /** True when the price source could not be reached (offline): the empty state then says so. */
   pricesUnreachable?: boolean;
-  /** True while the market snapshot's first fetch for this plan is in flight. */
   pricesLoading: boolean;
   systemCostIndex: number | null;
   productName: string;
-  /** The product's typeID, for the unpriced-product warning's Market link; null when the blueprint has no product. */
   productTypeID: number | null;
-  /** Product's lowest hub sell price (per unit); null when unpriced at this hub. */
   productUnitPrice: number | null;
-  /** True when `productUnitPrice` is CCP's average because the hub's cheapest sell order is a troll price. */
   productPriceCapped?: boolean;
-  /** Units produced by the job (per-run product quantity x runs); null when the blueprint has no product. */
   productQuantity: number | null;
-  /** Short solar-system name the build's cost index applies to. */
   costIndexSystemName: string;
-  /** The build system's ID and the plan's activity, for the cost index trend popover; no id, no popover. */
   costIndexSystemId?: number;
   activity?: IndustryActivity;
-  /** The cheaper-system line under the cost index, when one is known. */
   cheaperNearby?: ReactNode;
-  /**
-   * What the owned materials this job consumes would net if sold, on both
-   * liquidation bases; null while there is nothing to quote against.
-   */
   ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
-  /** How the owned materials would be sold — the "sell via" flip below the ledger. */
   saleBasis: LiquidationBasis;
   onSaleBasisChange: (basis: LiquidationBasis) => void;
-  /** The hero's basis: on `sellValue`, the forgone sale is a ledger line and profit is net of it. */
   profitBasis: ProfitBasis | null;
-  /** Profit on `profitBasis` — the ledger's bottom line, the hero's big number. */
   profit: number | null;
-  /**
-   * The product sold into the hub's buy orders instead, on the same basis as
-   * `profit` (issue #5007). `null` when the hub has no buy order for it;
-   * absent when there is no product sale to quote.
-   */
   sellNow?: ProductSellNow | null;
-  /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
-  /** The plan's trade hub, where the product is priced at its lowest sell. */
   hubName: string;
-  /** The whole tree's wall-clock on free slots, when it differs from the main job's time. */
   planSeconds?: number;
 }
 
-/**
- * Worst-case error in ESI's cost index, which it rounds to 4 decimals (half
- * of 0.0001). Times EIV, that bounds how far the job fee can drift from the
- * game's; a structure's job-cost bonus only shrinks it.
- */
 const COST_INDEX_ROUNDING_STEP = 0.00005;
 
-/**
- * The ledger from the product's sale down to profit: fees, materials, job
- * cost, (on the sell-value basis) the owned materials not sold, then the
- * figure the hero states. Margin, ISK/hour and break-even are the hero's;
- * this panel carries the working and the plan facts that are not a verdict
- * (ISK to spend, buying instead, job time, volume).
- *
- * Every ledger figure stays on `formatIsk` at full precision (issue #948):
- * this is the ledger a player reconciles line by line.
- */
 export function ResultsSummary({
   result,
   pricesReady,
@@ -215,10 +169,6 @@ export function ResultsSummary({
         </p>
       )}
 
-      {/* Divider lines only, no box: the panel is already the frame. `-mx-2.5`
-          pulls the rows' own padding out to the panel's edge. Profit's rule is
-          the brighter one — the line the rest adds up to (its own class, not
-          last-child, since the Profit row is absent while it is unknown). */}
       <div className="-mx-2.5 divide-y divide-line">
         {revenue !== null && (
           <CostRow
@@ -303,9 +253,6 @@ export function ResultsSummary({
             value={formatIsk(result.jobFee.facilityTax)}
             indented
           />
-          {/* Last, so it sits right above the cheaper-nearby note it is
-              compared against. The figure follows its name; the system it was
-              read for takes its own line, so the label never wraps mid-name. */}
           <CostRow
             label={
               systemCostIndex === null ? (
@@ -339,8 +286,6 @@ export function ResultsSummary({
             indented
           />
         </Disclosure>
-        {/* Under the job cost it would lower, and shown whether or not the
-            breakdown is open: a saving folded away is one nobody finds. */}
         {cheaperNearby && (
           <div className="py-2 pr-2.5 pl-8">
             <p className="flex items-start gap-2 rounded-xs bg-panel-2 px-2.5 py-2 text-xs">
@@ -370,8 +315,6 @@ export function ResultsSummary({
             className="relative -mt-px border-t border-line-bright"
           />
         )}
-        {/* The second sale basis, under the headline it is read against: the
-            headline stays on the listed sell order (scope decision for #5007). */}
         {profit !== null && sellNow !== undefined && (
           <CostRow
             label={t('industry.ledger.profitIfSoldNow')}
@@ -390,11 +333,6 @@ export function ResultsSummary({
         )}
       </div>
 
-      {/* Facts about the plan, not lines of the sum: a footer band flush to the
-          panel's edges (the `-mx-3 -mb-3` undo the panel's `p-3`), styled like
-          the verdict hero's setup strip, so Profit ends the ledger and this
-          reads as the card's foot. `mt-0!` sits it straight under Profit, so
-          one rule divides them, not a gap and a rule. No caret indent. */}
       <dl className="-mx-3 mt-0! -mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 rounded-b-xs border-t border-line bg-bg/40 px-3 py-3 text-xs">
         {revenue !== null && (
           <>
@@ -440,7 +378,6 @@ export function ResultsSummary({
           <>
             <dt className="text-text-dim">{t('industry.ledger.ownedSellVia')}</dt>
             <dd className="text-right">
-              {/* §6c: accent text, no underline, tooltip naming the press — a value that flips in place. */}
               <Tooltip content={t('industry.ledger.ownedSellViaHint')}>
                 <button
                   type="button"

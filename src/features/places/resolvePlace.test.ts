@@ -89,8 +89,6 @@ describe('resolvePlace', () => {
   });
 
   it('the caller kind wins over the id: an orphan item that is really a structure', async () => {
-    // An item-parented location whose id sits below the Upwell floor would
-    // classify as no place; the caller that resolved its name says structure.
     const orphan = 1_000_000_000;
     const s = memoryPlaceSource({
       structures: { [`7:${orphan}`]: { name: 'Odd', systemId: 30000001 } },

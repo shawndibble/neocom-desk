@@ -1,102 +1,30 @@
 import type { SecurityBand } from '@/engine/securityStatus';
 
-/**
- * Trade Hub constants for Build Plan price lookups (GLOSSARY.md, ADR 0002).
- * Station/system/region IDs verified against ESI
- * (/universe/stations/{id}, /universe/systems/{id}, /universe/regions/{id})
- * 2026-08-29.
- */
-
-/**
- * A temporary multiplier on a hub's sales tax and broker fee rates, applied
- * after skills and standings (the 100 ISK minimum broker fee and any Safety
- * Tax are not scaled). See `hubFeeDiscountFactor`.
- */
 export interface HubFeeDiscount {
-  /** Multiplied onto the rate: 0.5 halves it. */
   factor: number;
-  /** First UTC millisecond the discount no longer applies (exclusive end). */
   untilMs: number;
-  /** First UTC millisecond it applies (inclusive start). */
   fromMs: number;
 }
 
-/** Fractured Skies went live 2026-11-10 11:00 UTC, when the Deaconry of Economic Oversight opened at Amarr VIII. */
 const AMARR_FEE_DISCOUNT_FROM_MS = Date.UTC(2026, 10, 10, 11);
 
-/**
- * ASSUMPTION, not a confirmed date: CCP's In Focus post says six months, with no
- * end date found. This is the Tuesday 11:00 UTC about six months after
- * Fractured Skies, taken as the next expansion. Correct this one constant when
- * CCP announces the real date; after it the discount stops on its own, so a
- * wrong guess errs toward showing standard (higher) fees.
- */
 export const AMARR_FEE_DISCOUNT_UNTIL_MS = Date.UTC(2027, 4, 11, 11);
 
 export interface TradeHub {
   id: 'jita' | 'amarr' | 'dodixie' | 'rens' | 'hek' | 'manifest';
   name: string;
-  /** Short solar-system name (distinct from `name`, the full station name) — for compact UI labels. */
   systemName: string;
-  /**
-   * The station as traders say it ("Jita 4-4": planet and moon), naming a
-   * price taken at the station rather than region-wide, e.g. Price History's
-   * "Jita 4-4 buy" line. A proper name, so not translated.
-   */
   stationLabel: string;
-  /**
-   * The hub system's security band, for a Build Plan that names no build
-   * system of its own and therefore builds at its hub. Every hub is highsec by
-   * construction — an NPC trade hub is not somewhere CONCORD is absent — and
-   * the raw statuses back that up (Jita 0.946, Amarr 0.949, Dodixie 0.868,
-   * Rens 0.895, Hek 0.800, read from `/universe/systems/{id}` 2026-09-05).
-   * Stored rather than fetched so a plan can derive its band offline.
-   */
   security: SecurityBand;
   stationId: number;
   systemId: number;
   regionId: number;
-  /** The hub region's name, for labels such as "Lowest in The Forge". */
   regionName: string;
-  /**
-   * The hub station's NPC owner and that owner's faction, for broker-fee
-   * standings. Stored rather than fetched: `GET /corporations/{id}` omits
-   * `faction_id` for NPC corps (only militias carry it), so the live lookup
-   * could never find the faction, and it cost one request per hub on every
-   * cold page load. Owners from `/universe/stations/{id}`, factions from the
-   * SDE's `crpNPCCorporations.factionID`, read 2026-09-25.
-   */
   ownerCorporationId: number;
   ownerFactionId: number;
-  /**
-   * Whether the daily backend jobs (open prices, hauling books, LP store
-   * volume) publish this hub's region. Manifest is listed and priced live like
-   * the others, but those jobs still cover only the original five regions, so
-   * a feature that reads their output skips a hub where this is false.
-   */
   dailyJobs: boolean;
-  /**
-   * Whether "every hub" views (the compare tables and cards, Appraisal's
-   * other-hub prices, Hauling's Any hub) include the hub. Manifest is a hub a
-   * pilot can pick and price at, but a pilot who lives in Exordium is not
-   * shopping around the five empire hubs, so those views stay at five.
-   */
   compared: boolean;
-  /**
-   * The Safety Tax a hub charges, percent of the order's value, on every
-   * non-instant order (buy and sell; instant trades pay none). Exordium's is
-   * 5, measured at Manifest V on 2026-11-02: a separate line from the broker
-   * fee (3.0% at Broker Relations 0, 100 ISK minimum) and the sales tax (7.5%
-   * at Accounting 0), neither of which Manifest changes. A 5,000 ISK order
-   * showed 150 broker + 250 safety tax; a 230 ISK order showed 100 + 11.50.
-   */
   safetyTaxPct: number;
-  /**
-   * A temporary discount on this hub's sales tax and broker fee, if one is
-   * running (Amarr VIII's Deaconry of Economic Oversight: 50%, measured in game
-   * 2026-11: 1.69% sales tax at Accounting V, broker fee halved, 100 ISK minimum
-   * kept). Read it through `hubFeeDiscountFactor`, which also checks the dates.
-   */
   feeDiscount?: HubFeeDiscount;
 }
 
@@ -111,8 +39,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     systemId: 30000142,
     regionId: 10000002,
     regionName: 'The Forge',
-    ownerCorporationId: 1000035, // Caldari Navy
-    ownerFactionId: 500001, // Caldari State
+    ownerCorporationId: 1000035,
+    ownerFactionId: 500001,
     dailyJobs: true,
     compared: true,
     safetyTaxPct: 0,
@@ -127,8 +55,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     systemId: 30002187,
     regionId: 10000043,
     regionName: 'Domain',
-    ownerCorporationId: 1000086, // Emperor Family
-    ownerFactionId: 500003, // Amarr Empire
+    ownerCorporationId: 1000086,
+    ownerFactionId: 500003,
     dailyJobs: true,
     compared: true,
     safetyTaxPct: 0,
@@ -148,8 +76,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     systemId: 30002659,
     regionId: 10000032,
     regionName: 'Sinq Laison',
-    ownerCorporationId: 1000120, // Federation Navy
-    ownerFactionId: 500004, // Gallente Federation
+    ownerCorporationId: 1000120,
+    ownerFactionId: 500004,
     dailyJobs: true,
     compared: true,
     safetyTaxPct: 0,
@@ -164,8 +92,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     systemId: 30002510,
     regionId: 10000030,
     regionName: 'Heimatar',
-    ownerCorporationId: 1000049, // Brutor Tribe
-    ownerFactionId: 500002, // Minmatar Republic
+    ownerCorporationId: 1000049,
+    ownerFactionId: 500002,
     dailyJobs: true,
     compared: true,
     safetyTaxPct: 0,
@@ -180,8 +108,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     systemId: 30002053,
     regionId: 10000042,
     regionName: 'Metropolis',
-    ownerCorporationId: 1000057, // Boundless Creation
-    ownerFactionId: 500002, // Minmatar Republic
+    ownerCorporationId: 1000057,
+    ownerFactionId: 500002,
     dailyJobs: true,
     compared: true,
     safetyTaxPct: 0,
@@ -196,39 +124,30 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     systemId: 30100032,
     regionId: 10001004,
     regionName: 'Exordium',
-    ownerCorporationId: 1000413, // AIR Laboratories
-    ownerFactionId: 500028, // AIR Laboratories (the SDE's faction for the corp)
+    ownerCorporationId: 1000413,
+    ownerFactionId: 500028,
     dailyJobs: false,
     compared: false,
     safetyTaxPct: 5,
   },
 ] as const;
 
-/** The id of a hub the "every hub" views cover: every hub but Manifest. */
 export type ComparedHubId = Exclude<TradeHub['id'], 'manifest'>;
 
-/** The hubs "every hub" views cover; see `TradeHub.compared`. */
 export type ComparedHub = TradeHub & { id: ComparedHubId };
 
 export const COMPARED_HUBS: readonly ComparedHub[] = TRADE_HUBS.filter(
   (hub): hub is ComparedHub => hub.compared
 );
 
-/** The hubs the daily backend jobs cover; see `TradeHub.dailyJobs`. */
 export const DAILY_JOB_HUBS: readonly TradeHub[] = TRADE_HUBS.filter((hub) => hub.dailyJobs);
 
-/** Default Trade Hub for a fresh Build Plan (GLOSSARY.md: "Jita 4-4 (default)"). */
 export const DEFAULT_TRADE_HUB: TradeHub = TRADE_HUBS[0];
 
 export function getTradeHub(id: string): TradeHub | undefined {
   return TRADE_HUBS.find((hub) => hub.id === id);
 }
 
-/**
- * The factor to multiply a hub's sales tax and broker fee rates by at `nowMs`:
- * the hub's `feeDiscount.factor` while it runs, otherwise 1. Pure: the caller
- * supplies the clock.
- */
 export function hubFeeDiscountFactor(hub: TradeHub | undefined, nowMs: number): number {
   const discount = hub?.feeDiscount;
   if (!discount || nowMs < discount.fromMs || nowMs >= discount.untilMs) return 1;

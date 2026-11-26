@@ -1,4 +1,3 @@
-/** The map panel in its two shapes: desktop (what-if line, board) and phone (rows, full map behind a toggle). */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
@@ -8,7 +7,6 @@ import { MapLegend, MapLegendTip, PicksStrip, PlanMapBoard, WhatIfLine } from '.
 import { MapPhone } from './MapPhone';
 import type { PlanMapState } from './usePlanMapState';
 
-/** The panel chrome both shapes share: title, legend, help button, customs note, picks strip. */
 function MapPanelFrame({ s, children }: { s: PlanMapState; children: ReactNode }) {
   const { t } = useTranslation();
   const { phone, advice, remember, setHelpOpen } = s;

@@ -17,10 +17,8 @@ import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 
 interface WalletBalanceTabProps {
   activeCharacterId: number;
-  /** The Character the net worth view is drilled into, if any. */
   drilledCharacter: NetWorthCharacter | undefined;
   activeCharacter: NetWorthCharacter | undefined;
-  /** The `?char=` pick reaches beyond the active Character. */
   showingBeyondActive: boolean;
   pickedCharacters: NetWorthCharacter[];
   balances: ReturnType<typeof useWalletBalances>;
@@ -28,7 +26,6 @@ interface WalletBalanceTabProps {
   loyalty: ReturnType<typeof useWalletLoyalty>;
   balanceResult: CachedResult<number> | null;
   balanceNeedsReauth: boolean;
-  /** The picked Characters' loyalty points, summed per corporation. */
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
   loyaltyLoading: boolean;
   journalNeedsReauth: boolean;
@@ -37,10 +34,6 @@ interface WalletBalanceTabProps {
   refreshCount: number;
 }
 
-/**
- * Wallet's Balance tab: the net worth panel — the active Character's, every
- * picked Character's, or the one drilled into — over the ISK waiting and Goal panels.
- */
 export function WalletBalanceTab({
   activeCharacterId,
   drilledCharacter,
@@ -83,7 +76,6 @@ export function WalletBalanceTab({
         needsReauth: entry.needsReauth,
       });
     }
-    // The page already holds the active Character's own balance.
     if (!map.has(activeCharacterId)) {
       map.set(activeCharacterId, {
         balance: balanceResult?.data ?? null,
@@ -106,7 +98,6 @@ export function WalletBalanceTab({
   );
   const scopeIds = useMemo(() => scopeCharacters.map((c) => c.characterId), [scopeCharacters]);
 
-  // Summed over the same picked Characters as the net worth panel.
   const everMarksStat = (
     <div>
       <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
@@ -124,11 +115,6 @@ export function WalletBalanceTab({
 
   return (
     <div className="space-y-4">
-      {/*
-        The page header's Character picker drives which panel this is:
-        unchanged for "This character", a per-character table + total for
-        anything wider, or the one Character drilled into from that table.
-      */}
       {drilledCharacter ? (
         <NetWorthPanel
           mode="single"

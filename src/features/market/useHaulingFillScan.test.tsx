@@ -39,7 +39,6 @@ const scanOf = (
   fetchedAt: 0,
 });
 
-/** Each batch returns one new row, #101, #102…, and says more is left. */
 let next = 100;
 const runHaulingScan = vi.fn<(request: HaulingScanRequest) => Promise<HaulingScan>>();
 const clearHaulingScanCache = vi.fn();
@@ -58,9 +57,7 @@ const JITA = TRADE_HUBS[0]!;
 const AMARR = TRADE_HUBS[1]!;
 const AMMO = 11;
 
-/** `batchRows` defaults to every id the batch brought: none filtered out. */
 type Measured = Omit<HaulingFillMeasure, 'batchRows'> & { batchRows?: number };
-/** Room left after every batch until told otherwise; each batch adds a line. */
 const ROOMY: Measured = {
   freeM3: 30_000,
   capacityM3: 60_000,
@@ -141,7 +138,6 @@ describe('useHaulingFillScan', () => {
       .mockReturnValueOnce(ROOMY)
       .mockReturnValueOnce(ROOMY)
       .mockReturnValueOnce({ ...ROOMY, freeM3: 120 });
-    // The first batch returns #1, a type the next must not scan again.
     runHaulingScan.mockImplementationOnce(async () => scanOf([row(1)]));
     const { result } = renderFill();
     act(() => result.current.find());
@@ -156,24 +152,20 @@ describe('useHaulingFillScan', () => {
     });
     const calls = runHaulingScan.mock.calls.map(([request]) => request);
     expect(calls.map((r) => r.typeIds)).toEqual([[1, 3], [3], [3]]);
-    // Its own scope per id set, never a category's.
     expect(calls[0]!.scope).toBe(haulingFillScope([2]));
     expect(calls[1]!.scope).toBe(haulingFillScope([1, 2]));
     expect(calls[2]!.scope).toBe(haulingFillScope([1, 2, 101]));
-    // Sized on everything found, told which ids the batch brought.
     expect(measure.mock.calls[1]).toEqual([[row(1), row(101)], new Set([101])]);
   });
 
   it('never scans again what an earlier batch examined, a row or not', async () => {
     measure.mockReturnValueOnce(ROOMY).mockReturnValueOnce({ ...ROOMY, freeM3: 0 });
-    // #1 became a row; #2 was looked at and dropped.
     runHaulingScan.mockImplementationOnce(async () => scanOf([row(1)], true, [1, 2]));
     const { result } = renderFill();
     act(() => result.current.find());
     await ready(result);
     const second = runHaulingScan.mock.calls[1]![0];
     expect(second.typeIds).toEqual([3]);
-    // Still an exact scope of its own.
     expect(second.scope).toBe(haulingFillScope([1, 2]));
     expect(second.scope).not.toBe(runHaulingScan.mock.calls[0]![0].scope);
   });
@@ -313,7 +305,6 @@ describe('useHaulingFillScan', () => {
     await act(async () => finish(scanOf([row(1)])));
     expect(result.current.state).toEqual({ status: 'idle' });
 
-    // Coming back to the lane stays idle: it never re-runs by itself.
     rerender({ from: JITA, to: AMARR, categoryId: AMMO });
     expect(result.current.state).toEqual({ status: 'idle' });
     expect(runHaulingScan).toHaveBeenCalledTimes(1);

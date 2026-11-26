@@ -12,11 +12,6 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TIME_FORMATS, useTimeFormat } from '@/lib/timeFormat';
 import { SegmentedRow, SettingsFormLoading } from './settingsFields';
 
-/**
- * The Calendar page's settings modal: time format and which day the week starts on (the same
- * stores Settings → Display edits, `useTimeFormat` and `useCalendarWeekStart`, so the two
- * surfaces can never disagree), and which Pop Time a shared moon pop shows at (Calendar only).
- */
 export function CalendarSettingsForm() {
   const { t } = useTranslation();
   const timeFormat = useTimeFormat((state) => state.value);

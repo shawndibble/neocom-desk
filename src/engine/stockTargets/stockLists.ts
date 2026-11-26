@@ -1,27 +1,15 @@
-/**
- * **Stock Lists** — a market's named set of **Stock Targets** (GLOSSARY.md) —
- * and the pure edits the Stock tab and the "Set stock target" dialog make to them.
- *
- * The stored value is whatever the last device to sync wrote, possibly an
- * older build, so `parseStockLists` keeps every usable list and drops only
- * what is damaged rather than losing every list at once.
- */
-
 export interface StockTarget {
   typeId: number;
-  /** Whole units wanted listed at the market. Always 1 or more. */
   target: number;
 }
 
 export interface StockList {
   id: string;
   name: string;
-  /** The station or structure the pilot sells at: the market this list stocks. */
   locationId: number;
   items: StockTarget[];
 }
 
-/** A typed quantity past this is a typo, not a Stock Target. */
 export const MAX_STOCK_TARGET = 1_000_000_000;
 
 function positiveInteger(value: unknown): number | null {
@@ -58,7 +46,6 @@ function usableList(raw: unknown): StockList | null {
   };
 }
 
-/** Null when the value is not a list at all: the store's cue to use its default. */
 export function parseStockLists(raw: unknown): StockList[] | null {
   if (!Array.isArray(raw)) return null;
   const lists: StockList[] = [];
@@ -77,11 +64,6 @@ function updateList(
   return lists.map((list) => (list.id === listId ? update(list) : list));
 }
 
-/**
- * A blank name is ignored: `parseStockLists` would drop the list on the next
- * read. Starting Stock Targets (from the pilot's current listings) are cleaned
- * the same way a stored list is.
- */
 export function addStockList(
   lists: readonly StockList[],
   list: { id: string; name: string; locationId: number; items?: readonly StockTarget[] }
@@ -118,10 +100,6 @@ export function setStockListLocation(
   return updateList(lists, listId, (list) => ({ ...list, locationId }));
 }
 
-/**
- * The market kept at a station or structure. One list per place: an alert names
- * its market by place, so two lists there would leave it unable to say which.
- */
 export function stockListAt(
   lists: readonly StockList[],
   locationId: number
@@ -129,7 +107,6 @@ export function stockListAt(
   return lists.find((list) => list.locationId === locationId);
 }
 
-/** Adds the Stock Targets a list does not have yet; an item already on it keeps its own. */
 export function addMissingStockTargets(
   lists: readonly StockList[],
   listId: string,
@@ -143,11 +120,6 @@ export function addMissingStockTargets(
     .reduce((acc, item) => setStockTarget(acc, listId, item.typeId, item.target), [...lists]);
 }
 
-/**
- * Adds or replaces one Stock Target. The quantity is rounded to whole units
- * and capped; zero or less removes it, so clearing the field is how a pilot
- * takes an item off the list.
- */
 export function setStockTarget(
   lists: readonly StockList[],
   listId: string,
@@ -176,7 +148,6 @@ export function removeStockTarget(
   }));
 }
 
-/** Removes several Stock Targets in one edit (the Manager's bulk remove). */
 export function removeStockTargets(
   lists: readonly StockList[],
   listId: string,

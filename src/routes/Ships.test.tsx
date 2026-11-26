@@ -9,8 +9,6 @@ import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
 import { Ships } from './Ships';
 import '@/i18n';
 
-// Stands in for the real Fittings page: counts its mounts, so a test can tell
-// "the same instance carried on" from "unmounted and started over".
 const mounts = vi.hoisted(() => ({ count: 0 }));
 vi.mock('./Fittings', () => ({
   Fittings: function FittingsProbe() {
@@ -36,7 +34,6 @@ function LocationProbe() {
   );
 }
 
-/** The routes as `App.tsx` mounts them: the tabbed page at `/ships/*`, Compare nested. */
 function renderAt(path: string) {
   mounts.count = 0;
   return render(

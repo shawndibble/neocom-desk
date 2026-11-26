@@ -1,8 +1,3 @@
-/**
- * Test-only ready dogma engine: every synchronous check a `vi.fn` with a
- * harmless default, so a hook or component test hands in the one answer it
- * is about instead of mocking the engine module.
- */
 import { vi } from 'vitest';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { buildPilotProfile } from '@/engine/fittings/pilotProfile';

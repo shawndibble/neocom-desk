@@ -14,7 +14,6 @@ vi.mock('../taxBook/feederClient', () => ({
 }));
 
 let listOverride: unknown;
-// The list without its ledger mining (the real hook reads moon owners' mining rows).
 vi.mock('./useRefineryList', () => ({
   useRefineryList: () => {
     if (listOverride) return listOverride;
@@ -199,7 +198,6 @@ describe('the refinery page', () => {
   });
 
   it('takes the archive from the list, so the page and the list cannot differ', () => {
-    // Doc windows end after the archive day; the list's ledger mining does not.
     docs = [doc('a', [{ minerId: 'solo:1', oreLines: [{ typeId: 1, quantity: 5 }] }])];
     feeder = {
       ...feeder,

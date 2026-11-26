@@ -48,7 +48,6 @@ describe('Contacts', () => {
       await cacheSecondCharacterContacts([contactsPayload[0]]);
       renderContactsRoute();
       await screen.findByText('Good Friend');
-      // The bare page path settles on the default tab, with no defaults in the query.
       expect(window.location.pathname).toBe('/contacts/character');
       expect(window.location.search).toBe('');
 
@@ -82,13 +81,10 @@ describe('Contacts', () => {
       await showAllCharacters();
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
-      // Good Friend is on both; the other four are on the main alone.
       expect(table.getAllByText('2 of 2').length).toBe(1);
       expect(table.getAllByText('1 of 2').length).toBe(4);
     });
 
-    // Which characters hold the contact is only in the count's tooltip, so the
-    // count has to take keyboard focus to open it (WCAG 2.1.1).
     it('names the characters missing a contact when its count takes keyboard focus', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
@@ -133,7 +129,6 @@ describe('Contacts', () => {
       const sheet = await screen.findByRole('dialog');
       fireEvent.click(within(sheet).getByRole('button', { name: /Only disagreements/ }));
 
-      // No Apply step: the toggle is in the URL while the sheet is still open.
       expect(window.location.search).toContain('across.disagree');
       const table = within(screen.getByRole('table', { name: /across/i }));
       expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
@@ -141,7 +136,6 @@ describe('Contacts', () => {
 
     it('shows every standing a contact was given, not one of them', async () => {
       await addSecondCharacter();
-      // Pilot Two has Good Friend at -10; the main has them at +10.
       await cacheSecondCharacterContacts([{ ...contactsPayload[0], standing: -10 }]);
       renderContactsRoute();
       await screen.findByText('Good Friend');
@@ -282,10 +276,6 @@ describe('Contacts standing filter chips (issue #403)', () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
 
-    // The second character's contacts are still loading — the whole bar
-    // (and with it the funnel this test just opened) unmounts along with the
-    // first character's stale chip counts, rather than let them linger under
-    // the new character.
     expect(screen.queryByRole('group', { name: 'Standing' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Filters/ })).not.toBeInTheDocument();
 

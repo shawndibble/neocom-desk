@@ -23,7 +23,6 @@ describe('bookVersionsOf', () => {
   });
 
   it('is null on a book the server has never stamped', () => {
-    // A client can ship ahead of the functions deploy: nothing is trusted then.
     expect(bookVersionsOf({ active: true })).toBeNull();
     expect(bookVersionsOf(undefined)).toBeNull();
   });

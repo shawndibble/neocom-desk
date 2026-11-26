@@ -7,20 +7,12 @@ import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 const NOT_READ: StatusResult<CharacterLoyaltyPoints[]> = { cached: null, needsReauth: false };
 
 interface PickedLoyaltySnapshot {
-  /** Which Characters it was read for, so a stale pick is never shown as the new one. */
   key: string;
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
   reauthCharacterIds: number[];
   corporationNames: Map<number, string>;
 }
 
-/**
- * Loyalty points summed per corporation across the Wallet's picked
- * Characters (issue #4694), fetched only while `enabled` (the picker reaches
- * beyond the active Character, whose own list the page snapshot already
- * holds). `snapshot === null` means "nothing to show yet" — the same
- * retained-snapshot idiom as `useWalletBalances`.
- */
 export function usePickedLoyalty(enabled: boolean, characters: readonly { characterId: number }[]) {
   const key = characters.map((c) => c.characterId).join(',');
   const [snapshot, setSnapshot] = useState<PickedLoyaltySnapshot | null>(null);
@@ -33,8 +25,6 @@ export function usePickedLoyalty(enabled: boolean, characters: readonly { charac
       const statuses = await Promise.all(
         characterIds.map(async (characterId) => ({
           characterId,
-          // ESI down with nothing cached throws: that Character adds nothing,
-          // the rest still sum.
           status: await loadCharacterLoyaltyPoints(characterId).catch(() => NOT_READ),
         }))
       );

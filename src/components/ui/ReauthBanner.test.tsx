@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { ReauthBanner } from './ReauthBanner';
 import { controlHeightClassName } from './controlStyles';
 
-/** The height utilities a tier puts on the control, as `toHaveClass` args. */
 function heightClasses(tier: 'sm' | 'md'): string[] {
   return controlHeightClassName[tier].split(' ');
 }

@@ -77,17 +77,8 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { calendarCsvColumns } from '@/features/character/calendarCsv';
 import type { CalendarRsvpResponse } from '@/esi/endpoints';
 
-/**
- * The shown month/fortnight (ADR 0015), as a local `YYYY-MM-DD` day key —
- * `calendarGrid.ts`'s own `dayKey`, so parsing agrees with how the grid
- * builders already read a `Date`. `defaultKey` is "today" at codec-creation
- * time, not a fixed constant: it must come from a `useMemo` computed once per
- * mount (see `urlState.ts`'s codec-identity note), never recomputed inline.
- */
 function anchorParam(defaultKey: string): UrlParamCodec<string> {
   return {
-    // A day that does not exist (2026-02-30) is garbage, not a rollover into
-    // March — round-tripped through `dayKey` the same way `isoDateParam` does.
     parse: (raw) => {
       if (raw === null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return defaultKey;
       return dayKey(parseAnchorKey(raw)) === raw ? raw : defaultKey;
@@ -96,34 +87,13 @@ function anchorParam(defaultKey: string): UrlParamCodec<string> {
   };
 }
 
-/** `anchorParam`'s day key back to a local `Date` — local midnight, matching `calendarGrid.ts`. */
 function parseAnchorKey(key: string): Date {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
-/**
- * Calendar: the Calendar Map and the Coming Up Rail, side by side.
- *
- * Not three tab-switched views any more. `GET /characters/{id}/calendar`
- * returns up to 50 events *from now only* and the cache replaces its row
- * wholesale, so a month grid spent most of its cells on days that structurally
- * cannot hold anything — and paging backwards said "No events this
- * month" however busy that month had really been (only the last two weeks
- * of started events are kept). The grid is now a map and
- * the list is always beside it (see the scope decision).
- *
- * It also merges in every other clock the Character can read: skill-queue
- * completions, industry job deliveries, PI extractor programs, contract and
- * order expiries. Each source fails on its own, which is why this route no
- * longer renders a page-wide re-login banner — a revoked calendar scope must
- * not blank five working clocks. The filter menu names the ones that need a
- * new login instead.
- */
-/** How many days the phone's Day Ticker scrolls through at a time. */
 const TICKER_DAYS = 14;
 
-/** Shared shape behind both `eventsWithOverrides` and `boardSources` below — same override lookup, two different id/response fields. */
 function applyResponseOverrides<T>(
   items: readonly T[],
   overrides: Map<number, CalendarRsvpResponse> | undefined,
@@ -145,7 +115,6 @@ export function Calendar() {
     { cacheKey: 'calendar' }
   );
   const isNarrow = useIsNarrow();
-  // Days are cut on the Time format's clock: the pilot's own, or EVE's (UTC).
   const zone = useTimeZone();
 
   const density = useCalendarDensity((state) => state.value);
@@ -167,16 +136,10 @@ export function Calendar() {
     useSharedPopTime
   );
 
-  // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
   const [defaultAnchorKey] = useState(() => dayKey(cellOf(Date.now(), zone)));
   const anchorCodec = useMemo(() => anchorParam(defaultAnchorKey), [defaultAnchorKey]);
   const [anchorKey, setAnchorKey] = useUrlParam('anchor', anchorCodec);
   const anchor = useMemo(() => parseAnchorKey(anchorKey), [anchorKey]);
-  // The URL write goes through a router transition that may not have landed
-  // by the next click (matches Mail.tsx's `dataRef`): `step()` reads this
-  // instead of the render-scope `anchor` so two clicks before that transition
-  // commits still advance from each other rather than both stepping off the
-  // same stale month.
   const anchorKeyRef = useRef(anchorKey);
   useEffect(() => {
     anchorKeyRef.current = anchorKey;
@@ -186,39 +149,15 @@ export function Calendar() {
     anchorKeyRef.current = key;
     setAnchorKey(key);
   }
-  // A selected day is a midnight on one clock; it names no day on the other,
-  // so a pick made before the Time format changed reads as no pick.
   const [selectedDay, setSelectedDay] = useState<{ zone: DayZone; ms: number } | null>(null);
   const selectedDayMs = selectedDay !== null && selectedDay.zone === zone ? selectedDay.ms : null;
   const setSelectedDayMs = (ms: number | null) => setSelectedDay(ms === null ? null : { zone, ms });
   const openParamId = useOpenParam();
-  // `?open=` selects the event as a click would; it shows once the events load.
   const [selectedEventId, setSelectedEventId] = useState<number | null>(openParamId);
   const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
-  // `?pop=` (a Shared Moon Pop notification) opens that Shared Pop once the board loads.
   const popParam = useSharedPopParam();
   const [selectedPopId, setSelectedPopId] = useState<string | null>(popParam);
 
-  /**
-   * RSVP responses applied locally, ahead of `data` catching up.
-   *
-   * `data` comes from `useRouteSnapshot`, a plain loader snapshot rather than
-   * a live query — patching the Dexie cache in `respondToCalendarEvent` does
-   * not by itself repaint this route. Forcing a `refresh()` instead would
-   * hit ESI live and risk reapplying its own still-propagating pre-RSVP
-   * response over what the pilot just clicked, so the override stands in
-   * for that source.
-   *
-   * Each is stamped with when it was answered (`atMs`, after the cache
-   * patch) and holds over any snapshot whose load *started* no later
-   * (`data.loadedAtMs` is taken at load start): such a snapshot read its data
-   * before the RSVP could show in it — including a reload already running,
-   * or one committing while the PUT is in flight (opening an event fetches
-   * its detail, and that cache write reloads the board). A snapshot started
-   * afterwards (manual refresh, background poll, remount) is trusted over
-   * the local guess — an override must not go on masking what ESI, another
-   * device, or another session says once fresher information arrives.
-   */
   const [responseOverrides, setResponseOverrides] = useState<
     ReadonlyMap<number, { response: CalendarRsvpResponse; atMs: number }>
   >(new Map());
@@ -231,27 +170,8 @@ export function Calendar() {
     return active.size > 0 ? active : undefined;
   }, [data, responseOverrides]);
 
-  /**
-   * The instant the snapshot was assembled, threaded into everything below.
-   *
-   * Taken from the load rather than read here: every surface on this page
-   * agreeing on one instant matters more than any of them being accurate to
-   * the second, and the Data Age badge above already says how old the whole
-   * view is.
-   */
   const nowMs = data?.loadedAtMs ?? 0;
 
-  /**
-   * Everything, with no forward window.
-   *
-   * An earlier draft capped the board at 30 days so the rail stayed short.
-   * That reproduced forwards the exact failure this page was rebuilt to fix:
-   * paging the map past the cap showed empty cells that were empty because of
-   * us, not because nothing was due. Every source here is naturally bounded
-   * (ESI returns at most 50 calendar events and 50 queue entries; jobs,
-   * contracts and orders are all small), and the rail's day grouping is what
-   * makes a long list readable.
-   */
   const eventsWithOverrides = useMemo(
     () =>
       data
@@ -265,17 +185,9 @@ export function Calendar() {
     [data, activeOverrides]
   );
 
-  /**
-   * `buildCharacterBoard` reads `calendarEvents` (each keyed by `id`, a
-   * stringified event id, per `toCalendarEventSources`), a separate,
-   * already-converted array from the raw `events` above — so the override
-   * has to be applied here too, not just to `events`.
-   */
   const boardSources = useMemo(
     () =>
       data &&
-      // A pop the corp also put in the in-game calendar is one row: the pop, at the Pop Time the
-      // viewer picked, and not the event (calendarSharedPops.ts).
       boardSourcesWithSharedPops(
         data,
         sharedPopTime,
@@ -310,8 +222,6 @@ export function Calendar() {
     [board, corpFilter, sharingCorpFilter, selected]
   );
   const loads = useMemo(() => countsByDay(visible, zone), [visible, zone]);
-  // Counted off the unfiltered board: a kind's own count must not drop to zero
-  // just because the pilot has it switched off in the menu showing that count.
   const counts = useMemo(() => countsByKind(board), [board]);
 
   const railItems = useMemo(
@@ -322,18 +232,7 @@ export function Calendar() {
     [visible, selectedDayMs, zone]
   );
 
-  /**
-   * The wide grid is week-aligned; the ticker is not.
-   *
-   * A month grid pushed into the ticker gives a phone six weeks of horizontal
-   * scroll beginning before today, which is the opposite of what the page is
-   * for. The ticker takes a rolling fortnight from the anchor instead, and the
-   * Month/Fortnight density stays a property of the grid that has densities.
-   */
   const days = useMemo(() => {
-    // `nowMs`, not the builders' `new Date()` default: `isToday` and the
-    // `isPast` the cells derive from `nowMs` must answer to one clock, or a
-    // render straddling midnight can ring one day and hatch it at once.
     const today = cellOf(nowMs, zone);
     if (isNarrow) return buildDaysFrom(anchor, TICKER_DAYS, today);
     return density === 'month'
@@ -347,20 +246,12 @@ export function Calendar() {
     const raid = data?.skyhookRaidDetails.find((r) => r.id === selectedSkyhookId);
     return raid === undefined ? null : skyhookRaidDetail(raid, nowMs, t, zone);
   }, [data, selectedSkyhookId, nowMs, t, zone]);
-  // Looked up in every live pop, not only the rows: a link still opens one hidden as a duplicate.
   const popDetail = useMemo(() => {
     const entry = data?.sharedPops.find((e) => e.pop.id === selectedPopId);
     return entry === undefined ? null : sharedPopDetail(entry, nowMs, t, zone, sharedPopTime);
   }, [data, selectedPopId, nowMs, t, zone, sharedPopTime]);
-  // `?pop=` also moves the map to the pop's day and scopes the rail to it (issue #6239), once:
-  // the first snapshot that holds the pop. A later reload must not pull the pilot back.
-  // Adjusted during render, not an effect (`react-hooks/set-state-in-effect`); only the URL
-  // write of the anchor waits for the effect below.
   const [popDayPending, setPopDayPending] = useState(popParam !== null);
   const [popAnchorKey, setPopAnchorKey] = useState<string | null>(null);
-  // A link to a pop that is gone (Expired, unshared, or out of the pilot's audiences) says so,
-  // once the finished load (not a partial or a retained snapshot) still lacks it. A failed read
-  // (`sharedMoonPops` undefined, or the load itself) proves nothing: the link is dropped quietly.
   const [popUnavailable, setPopUnavailable] = useState(false);
   if (popDayPending && data) {
     const entry = data.sharedPops.find((e) => e.pop.id === popParam);
@@ -399,9 +290,6 @@ export function Calendar() {
     setAnchor(density === 'month' ? addMonths(current, delta) : addWeeks(current, delta));
   }
 
-  // The rail isn't a DataTable (the map and the rail are views over the board),
-  // so the export reads `railItems`: every kind the rail lists, honouring the
-  // hidden-kind toggles and the selected day, in the rail's deadline order.
   const csvColumns = useMemo(() => calendarCsvColumns(t), [t]);
   const eventsExport = useTableExport({
     surface: 'calendar',
@@ -436,14 +324,11 @@ export function Calendar() {
         label={density === 'month' ? t('calendar.nextMonth') : t('calendar.nextFortnight')}
         onClick={() => step(1)}
       />
-      {/* Density is a property of the grid; the ticker is always a rolling fortnight. */}
       {!isNarrow && (
         <IconButton
           size="md"
           icon={<Icon.CalendarEvent />}
           label={t('calendar.density.fortnightView')}
-          // The name stays put and `pressed` carries the state; the bubble
-          // still says what a press will do.
           tooltip={
             density === 'month' ? t('calendar.density.toFortnight') : t('calendar.density.toMonth')
           }
@@ -505,13 +390,6 @@ export function Calendar() {
               onClose={() => setPopUnavailable(false)}
             />
           )}
-          {/*
-            The page no longer gates on one scope, so a refused source has to
-            announce itself somewhere the pilot will actually look. Naming the
-            sources in a line above the panes is that place — the filter menu
-            also marks them, but nobody opens a menu they have no reason to
-            open.
-          */}
           {(data?.reauthKinds.length ?? 0) > 0 && (
             <CalendarReauthNotice characterId={activeCharacterId} kinds={data?.reauthKinds ?? []} />
           )}

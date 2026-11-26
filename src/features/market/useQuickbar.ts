@@ -1,10 +1,3 @@
-/**
- * The Quickbar record for the active character, plus the writes every surface
- * that offers "Add to Quickbar" needs. Three pages now own an
- * `ItemContextMenu` — the Market Browser, Assets and Industry's materials
- * table — and each needs the same Dexie put + sync schedule; keeping one copy
- * means a new surface cannot forget the `isSyncConfigured()` guard.
- */
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type QuickbarItem } from '@/db';
 import { scheduleSync } from '@/sync';
@@ -17,17 +10,11 @@ import {
 } from './quickbar';
 
 export interface Quickbar {
-  /** Empty until the live query resolves, and with nobody active. */
   items: QuickbarItem[];
-  /** False with no active character — the Quickbar has nobody to save an item under. */
   available: boolean;
-  /** Replaces the whole list — the shape reorder/remove/bulk-add already work in. */
   write: (items: QuickbarItem[]) => Promise<void>;
-  /** Fire-and-forget single add, deduped by typeId. Matches `ItemContextMenu`'s handler signature. */
   add: (typeId: number, itemName: string) => void;
-  /** Fire-and-forget target set/clear (issue #680). `null` clears the item's price alert. */
   setTarget: (typeId: number, target: QuickbarTarget) => void;
-  /** Pins the item if needed and sets/clears its target in one write (issue #1427). */
   pinWithTarget: (typeId: number, itemName: string, target: QuickbarTarget) => void;
 }
 

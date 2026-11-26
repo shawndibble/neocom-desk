@@ -28,7 +28,6 @@ describe('DataTableSortPicker iconOnly', () => {
       />
     );
     const select = screen.getByRole('combobox', { name: /^Sort by, now Price/ });
-    // Only the native options carry text; the visible box is the icon alone.
     expect(select.parentElement?.querySelector('span')).toBeNull();
     expect(
       within(select)

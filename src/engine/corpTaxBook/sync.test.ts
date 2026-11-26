@@ -174,7 +174,6 @@ describe('detectGaps', () => {
       structureIds: [1, 2],
       oldestEsiDate: {},
     });
-    // ESI holds 21 Jun - 20 Jul (30 days); the sync day is partial, so it is lost too.
     expect(gaps).toEqual([
       { structureId: 1, from: '2026-06-01', to: '2026-06-20' },
       { structureId: 2, from: '2026-06-01', to: '2026-06-20' },
@@ -303,8 +302,6 @@ describe('donationsFromJournal', () => {
 });
 
 describe('stored rows a held or new donation is matched against (moon owner mining)', () => {
-  // Shaped like a real book: started 2026-11-12 billing from 2026-11-01, its Miner's ore all
-  // mined at two moon owners' refineries (rows the moon owner reads store, tagged with the owner).
   const BOOK = 98837836;
   const ME = 91262608;
   const feeders = [
@@ -340,7 +337,6 @@ describe('stored rows a held or new donation is matched against (moon owner mini
       senders: [],
     });
     expect(wanted).toEqual(new Map([[ME, '2026-11-01']]));
-    // Paid before the book's start: no mining it bills could have been owed then.
     expect(
       storedRowsWanted({
         ...book,
@@ -453,7 +449,6 @@ describe('reconcileExtractions', () => {
           oreLines: [{ typeId: 45492, quantity: 1 }],
         },
       ];
-      // Nothing to upload for the ore: the book's merge keeps what it holds.
       expect(reconcileExtractions([esi], [finished], stored)[0].oreLines).toBeUndefined();
     });
 
@@ -476,7 +471,6 @@ describe('reconcileExtractions', () => {
       expect(reconcileExtractions([], [finished], [stored])).toEqual([
         { ...stored, oreLines: [{ typeId: 45492, quantity: 200_000 }] },
       ]);
-      // One that already holds its ore, or that no notification names, is not uploaded again.
       const held = { ...stored, oreLines: [{ typeId: 45492, quantity: 1 }] };
       expect(reconcileExtractions([], [finished], [held])).toEqual([]);
       expect(reconcileExtractions([], [], [stored])).toEqual([]);
@@ -571,7 +565,6 @@ describe('extractionId stamping', () => {
     const late = row('2026-07-14');
     expect(stampExtractionIds([late], [pull])[0]).not.toHaveProperty('extractionId');
     expect(stampExtractionIds([late], [pull], { '1001': 96 })[0].extractionId).toBe(id);
-    // The default the old placement used, and what read-time placement says.
     expect(moonOnDay([toEngineExtraction(pull)], 1001, '2026-07-14').extractionId).toBeUndefined();
     expect(
       moonOnDay([toEngineExtraction(pull)], 1001, '2026-07-14', { '1001': 96 }).extractionId
@@ -586,16 +579,13 @@ describe('extractionId stamping', () => {
   it('plans a re-stamp only for rows whose stamp the corrected Extraction changes', () => {
     const rows = [row('2026-07-10', { extractionId: id }), row('2026-07-12', { extractionId: id })];
     expect(restampPlan(rows, [pull])).toEqual([]);
-    // Laser fired a day later: the first day is no longer covered... the window moves later.
     const corrected = { ...pull, laserFiredAt: '2026-07-11T12:00:00.000Z' };
     expect(restampPlan(rows, [corrected])).toEqual([{ row: rows[0], extractionId: undefined }]);
-    // A cancel clears every stamp.
     const cancelled = { ...pull, cancelledAt: '2026-07-10T13:00:00.000Z' };
     expect(restampPlan(rows, [cancelled]).map((x) => x.extractionId)).toEqual([
       undefined,
       undefined,
     ]);
-    // An unstamped row a new pull covers is stamped.
     expect(restampPlan([row('2026-07-11')], [pull])).toEqual([
       { row: row('2026-07-11'), extractionId: id },
     ]);

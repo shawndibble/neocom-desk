@@ -6,7 +6,6 @@ import { loadPublicContractOffers } from './publicContractOffers';
 const getDoc = vi.hoisted(() => vi.fn());
 const getDocs = vi.hoisted(() => vi.fn());
 
-// R2 is the only store (issue #4270): these spies prove nothing reaches Firestore.
 vi.mock('firebase/firestore/lite', () => ({
   getDoc,
   getDocs,

@@ -16,8 +16,6 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Collector books (issue #4507): a client never writes a feeder record, an invite
-// or a feeder pointer. An officer may read the feeder records; nobody reads the other two.
 let env: RulesTestEnvironment;
 const OFFICER = 1;
 const RECORD = 'corps/98000001/feeders/98000002';
@@ -36,7 +34,6 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    // `extractionsRefusedAt` (#6097) is server-written like the rest of the record.
     await setDoc(doc(db, RECORD), { status: 'active', extractionsRefusedAt: 1 });
     await setDoc(doc(db, PAYOUT), { amount: 1 });
     await setDoc(doc(db, INVITE), { collectorCorporationId: 98000001 });
@@ -76,7 +73,6 @@ describe('feeder paths', () => {
     await assertFails(getDoc(doc(db, POINTER)));
   });
 
-  // Issue #4520: the link in a removal's mail is function-only, like an invite.
   it.each(clients)('denies %s every read and write of a removal link', async (_n, ctx) => {
     const db = ctx(env);
     await assertFails(getDoc(doc(db, REMOVAL_LINK)));
@@ -91,7 +87,6 @@ describe('feeder paths', () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), RECORD)));
   });
 
-  // Issue #6097: the remembered Extractions refusal is the server's, like the rest of the record.
   it.each(clients)('denies %s setting or clearing the Extractions refusal', async (_n, ctx) => {
     const db = ctx(env);
     await assertFails(updateDoc(doc(db, RECORD), { extractionsRefusedAt: 2 }));
@@ -112,8 +107,6 @@ describe('feeder paths', () => {
   });
 });
 
-// Collector books (issue #4512): the moon owner's view. Readable only through its own access
-// record, never the raw book, another moon owner's view or the book's officer docs.
 describe('moon owner view', () => {
   const MOON_OWNER = 5;
   const FEEDER = 98000002;
@@ -256,7 +249,6 @@ describe('moon owner view', () => {
     await assertFails(getDocs(collection(officer, `${VIEW}/viewers`)));
   });
 
-  // Issue #5717 (ADR 0032): the Moon owners tab reads one summary per moon owner instead of every ledger row.
   describe('an officer of the book', () => {
     const officer = () => characterAuth(env, OFFICER, 'h').firestore();
 

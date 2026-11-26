@@ -1,12 +1,3 @@
-/**
- * Draws the Wallet net worth chart (issue #2935) with Recharts. Statically
- * imports `recharts`, so — same rule as `WalletBalanceChart` before it — this
- * must only ever be reached through a dynamic `import()`.
- *
- * One Character: layers stacked as areas. Several: one line per Character,
- * clickable to drill in. Days without a snapshot are estimated (joined from the
- * neighbouring snapshots) and sit under a dashed, hatched band.
- */
 import { scalePx } from '@/lib/fontScale';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -61,11 +52,6 @@ function dayLabel(x: number): string {
   return formatDateOnly(new Date(x), 'UTC');
 }
 
-/**
- * Contiguous runs of estimated days as [from, to] x ranges. A run is drawn from
- * the last real day before it to the next real day after it, so the whole
- * stretch the line is guessing across is marked, not just the days between.
- */
 function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
   const runs: [number, number][] = [];
   let lastReal: number | null = null;
@@ -82,7 +68,6 @@ function estimatedRuns(rows: readonly StackRow[]): [number, number][] {
     }
   }
   if (start !== null) runs.push([start, end]);
-  // A one-day run with no real day beside it still needs width to be drawn.
   return runs.map(([from, to]) => [from === to ? from - DAY_MS : from, to]);
 }
 
@@ -198,8 +183,6 @@ export default function NetWorthChart(props: NetWorthChartProps) {
   );
   const margin = { top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 };
 
-  // `role="img"` collapses its children into one opaque image for assistive
-  // tech, so the sr-only table is a sibling, not a child.
   return (
     <div>
       <div role="img" aria-label={label} className="h-64 w-full">

@@ -1,12 +1,3 @@
-/**
- * A Leg's systems as one cell each, coloured by security (the Route Safety
- * strip's idiom). Each cell's tooltip names its system, security and the last
- * hour's ship and pod kills; an unread feed reads "unknown", never zero.
- *
- * One `role="img"` with the same facts spoken, not a tab stop per cell
- * (DESIGN.md §7: colour is never the only signal): a 38-jump leg would be 38
- * stops, and Route Safety already holds the per-system table.
- */
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { summarizeRouteSafety, type RouteSafetyRow } from '@/engine/route/routeSafety';

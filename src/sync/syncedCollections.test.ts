@@ -12,15 +12,8 @@ import {
   type SyncedCollectionName,
 } from './syncedCollections';
 
-/**
- * The registry is the one place a synced collection is declared, so these
- * pins are what stop a refactor of it from quietly changing something that
- * already lives on a pilot's device or in Firestore. Every literal below was
- * read off the code as it stood before the registry existed (issue #2043).
- */
 describe('synced collection registry — persisted names', () => {
   it('spells out every declared name in SyncedCollectionName, and nothing more', () => {
-    // A Record over the union fails to compile if a member is missing here.
     const named: Record<SyncedCollectionName, true> = {
       plans: true,
       buildPlans: true,
@@ -66,8 +59,6 @@ describe('synced collection registry — persisted names', () => {
   });
 
   it('keeps the sync pass in its existing order', () => {
-    // syncCharacter walks this list in order; one collection throwing stops
-    // the pass, so the order is behavior, not presentation.
     expect(EDITABLE_COLLECTIONS.map((c) => c.remoteName)).toEqual([
       'plans',
       'buildPlans',
@@ -142,15 +133,6 @@ describe('synced collection registry — persisted names', () => {
   });
 });
 
-/**
- * The class of bug this pins: a field the UI writes onto a record that the
- * collection's remote mapping then forgets, so the value is saved locally
- * and quietly never leaves the device. A mapping lists its fields explicitly
- * — never a spread, because Firestore rejects `undefined` and a record can
- * carry local-only shapes — so nothing but a test can notice the omission.
- * `FULL_RECORDS` is typed `Required<...>`, so a new field fails typecheck
- * there until it is set, and then fails here until it is mapped.
- */
 describe('every declared collection round-trips local -> remote -> local', () => {
   it('has a full-record fixture for every declared collection', () => {
     expect(Object.keys(FULL_RECORDS).sort()).toEqual(
@@ -163,7 +145,6 @@ describe('every declared collection round-trips local -> remote -> local', () =>
 
     it('pushes every field, plus ownerHash and deleted: false', () => {
       const remote = c.toRemoteDoc(record, 'hash');
-      // Key by key, so a dropped field fails naming itself.
       for (const [key, value] of Object.entries(record)) {
         expect({ [key]: remote[key] }).toEqual({ [key]: value });
       }
@@ -179,25 +160,13 @@ describe('every declared collection round-trips local -> remote -> local', () =>
   });
 });
 
-/**
- * `firestore.rules` and `firestore.indexes.json` stay hand-written (they are
- * deployed by hand, and a generated rules file is a new trust surface). This
- * is the drift guard between them and the registry instead: a collection
- * declared without a rules block is denied on every write — and since
- * syncCharacter has no per-collection try/catch, one denied collection
- * fails the whole pass.
- */
 describe('declared collections vs the hand-written Firestore config', () => {
   const rules = readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8');
   const CHARACTER_MATCH = 'match /characters/{uid} {';
-  // Just the subcollections nested under characters/{uid}, not the
-  // top-level collections the dispatcher and shared caches use.
   const characterBlock = rules.slice(
     rules.indexOf(CHARACTER_MATCH) + CHARACTER_MATCH.length,
     rules.indexOf('match /deviceRegistrations/')
   );
-  // Read-only subcollections the Community callables write (admin SDK): a
-  // Character's membership index (issue #3596). Never synced from the client.
   const SERVER_WRITTEN_SUBCOLLECTIONS = ['communities', 'mailInviteQuota', 'requestMailQuota'];
   const ruledSubcollections = [...characterBlock.matchAll(/match \/(\w+)\/\{\w+\} \{/g)]
     .map((m) => m[1])
@@ -221,9 +190,6 @@ describe('declared collections vs the hand-written Firestore config', () => {
     expect([...ruledSubcollections].sort()).toEqual([...REMOTE_COLLECTION_NAMES].sort());
   });
 
-  // Every remote collection is read incrementally
-  // (`ownerHash == h AND updatedAt > cursor`), which needs this composite —
-  // synced settings too, since issue #5045.
   it.each(REMOTE_COLLECTION_NAMES)('has the incremental-pull composite index on %s', (name) => {
     expect(indexes).toContainEqual({
       collectionGroup: name,

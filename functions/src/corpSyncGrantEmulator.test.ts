@@ -1,7 +1,3 @@
-// The Corp Tax Book sync grant and the scheduled sync against the Firestore
-// emulator (issue #4068, ADR 0025). Runs only under `npm run test:rules` at the
-// repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
-// `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { minerPaymentCode } from './corpTaxBookLateNotice.js';
 import { lateNoticeFromStatementDoc } from './corpTaxBookLateNoticeBackfill.js';
@@ -38,18 +34,16 @@ const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
 const KEY = Buffer.alloc(32, 7);
 
-const DIRECTOR = 1; // CEO
-const ACCOUNTANT = 2; // also Station_Manager
+const DIRECTOR = 1;
+const ACCOUNTANT = 2;
 const JUNIOR = 3;
 const OTHER_ACCOUNTANT = 4;
 
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
-/** Refresh tokens SSO has revoked or let die. */
 const dead = new Set<string>();
 const revokedAtSso: string[] = [];
 let refreshFailure: Error | null = null;
-/** Counts the rotation: `rt-<char>-<n>`. */
 const generation = new Map<number, number>();
 
 const as = (roles: string[], ceo = false): CorpIdentity => ({
@@ -269,7 +263,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         clientId: 'client-1',
       });
       expect(JSON.stringify(doc)).not.toContain('rt-');
-      // The stored token is the rotated one SSO handed back, not the one the browser sent.
       expect(decryptRefreshToken(doc.encryptedRefreshToken, ACCOUNTANT, KEY, 'corpSyncGrant')).toBe(
         'rt-2-1'
       );
@@ -345,7 +338,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
     it('replaces the previous holder and revokes their token', async () => {
       await optIn(ACCOUNTANT);
-      // Audit ids sort by time, so the second opt-in must be later.
       now = T0 + 1000;
       await optIn(OTHER_ACCOUNTANT);
       const doc = (await grantDoc())!;
@@ -439,7 +431,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       });
       expect((await book().collection('extractions').get()).size).toBe(1);
 
-      // The donation is matched to the Miner who mined (character 50); nothing settles for good.
       const payment = (await book().collection('payments').doc('j1_1').get()).data();
       expect(payment).toMatchObject({ minerId: 'solo:50', amount: 10_000_000 });
       expect((await book().collection('meta').doc('paid').get()).data()?.ids).toBeUndefined();
@@ -466,12 +457,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         },
         systemIds: { '5000': 30000142 },
       });
-      // Nothing was issued, nothing mailed: the one notice is the seeded one, no verify links.
       expect((await book().collection('lateNotices').get()).size).toBe(1);
       expect((await book().collection('lateNoticeLinks').get()).size).toBe(0);
       expect((await db.collection('corpTaxBookTokens').get()).size).toBe(0);
 
-      // SSO rotated the token again on the run; the stored blob follows.
       const doc = (await grantDoc())!;
       expect(decryptRefreshToken(doc.encryptedRefreshToken, ACCOUNTANT, KEY, 'corpSyncGrant')).toBe(
         'rt-2-2'
@@ -530,7 +519,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       esiState.journal = ok([
         donation(2, `tax ${minerPaymentCode('solo:50')}`),
         donation(3, 'for MTOLD001'),
-        // A sender the book knows pays their own Miner, whatever code they wrote.
         { ...donation(4, 'for MTOLD001'), first_party_id: 50 },
       ]);
       await optIn(ACCOUNTANT);
@@ -538,14 +526,12 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       const payment = async (id: string) =>
         (await book().collection('payments').doc(id).get()).data();
       expect(await payment('j1_2')).toMatchObject({ minerId: 'solo:50' });
-      // A code only says whose money it is: no notice is pinned to it.
       expect(await payment('j1_3')).toMatchObject({ minerId: 'solo:60' });
       expect(await payment('j1_3')).not.toHaveProperty('statementId');
       expect(await payment('j1_4')).toMatchObject({ minerId: 'solo:50' });
     });
 
     it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {
-      // Billed through the day character 50 mined, and paid in full: nothing owed, nothing unbilled.
       await book()
         .collection('lateNotices')
         .doc('sPaid')
@@ -565,7 +551,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         characterId: 50,
         uid: 'char:50',
         amount: 10_000_000,
-        // Days before the donation below: another transfer, not a hand record of it (M8).
         at: '2026-10-10T12:00:00.000Z',
       });
       await optIn(ACCOUNTANT);
@@ -577,7 +562,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
     });
 
     it('matches a held donation once the lagging ledger shows the ore mined before it was paid', async () => {
-      // Held on an earlier run: the ledger had not yet shown character 50's mining of that day.
       await book().collection('payments').doc('j1_0').set({
         id: 'j1_0',
         source: 'donation',
@@ -597,7 +581,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
     describe('moon owner mining the book bills (stored rows only)', () => {
       const FEEDER = 98000077;
-      // Character 60 mined only at a moon owner's refinery: this run's own ledger never shows it.
       const fed = (date: string, quantity = 100) =>
         book().collection('observed').doc(`60_46281_${date}_7000`).set({
           structureId: 7000,
@@ -633,7 +616,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         await fed('2026-10-11');
         await heldDonation('j1_901', '2026-10-02T22:38:44.000Z');
         await heldDonation('j1_902', '2026-10-14T18:28:44.000Z');
-        // Paid before the book bills from: still credited to the Miner, the book ignores it.
         await heldDonation('j1_900', '2026-09-21T17:38:23.000Z');
         await optIn(ACCOUNTANT);
         await runScheduledCorpSyncs(syncDeps(), fakeEsi());
@@ -660,7 +642,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       it('credits a new donation to the Miner whose only unbilled ore is moon owner mining', async () => {
         await coverFrom('2026-10-01');
         await fed('2026-10-11');
-        // Known to the book: an earlier payment of theirs was credited.
         await book().collection('payments').doc('m0').set({
           id: 'm0',
           source: 'manual',
@@ -693,8 +674,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         .doc('s1')
         .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await optIn(ACCOUNTANT);
-      // The fake wallet answers the same journal for every division: division 2's copy is the
-      // Miner who owes paying where the book does not look.
       await runScheduledCorpSyncs(syncDeps(), fakeEsi());
       const noted = (await book().collection('meta').doc('uncounted').get()).data();
       expect(noted?.donations).toContainEqual(
@@ -733,15 +712,12 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         const first = now;
 
         now = T0 + 12 * H;
-        // A closed day cannot really grow; 999 only shows the row was left out of the merge.
         esiState.ledger = readAt([row('2026-10-10', 999), row('2026-10-17', 150)]);
         expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
         expect(await quantity('2026-10-10')).toBe(100);
-        // Yesterday is inside the grace: its growth still lands.
         expect(await quantity('2026-10-17')).toBe(150);
         expect(await through()).toEqual({ '5000': now });
         expect(now).toBeGreaterThan(first);
-        // The settled row's Character still gets its billed-by pointer.
         const pointer = await db.collection('corpTaxBookBilledBy').doc('char:50').get();
         expect(pointer.data()?.books).toHaveProperty(String(CORP));
       });
@@ -768,7 +744,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         expect(await through()).toBeUndefined();
 
         now = T0 + 12 * H;
-        // The first read missed pages: the rest of that closed day turns up now.
         esiState.ledger = readAt([row('2026-10-10', 160)]);
         await runScheduledCorpSyncs(syncDeps(), fakeEsi());
         expect(await quantity('2026-10-10')).toBe(160);
@@ -783,11 +758,9 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
         now = T0 + 12 * H;
         esiState.ledger = readAt([row('2026-10-10', 100)]);
-        // Once: a run reads every wallet division's journal (#6207).
         let recreated = false;
         const recreating: SyncEsi = {
           ...fakeEsi(),
-          // While the run reads ESI, the book is deleted and turned on again, empty.
           journal: async () => {
             if (recreated) return esiState.journal as never;
             recreated = true;
@@ -826,7 +799,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       it('records no read when the run’s merge fails, so the next run merges everything again', async () => {
         await optIn(ACCOUNTANT);
         now = T0 + 6 * H;
-        // A row the upload refuses fails the whole run before anything is merged.
         esiState.ledger = readAt([row('2026-10-10', 100), row('2026-12-01', 1)]);
         expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(0);
         expect(await through()).toBeUndefined();
@@ -839,8 +811,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
     describe('quiet runs (#5048)', () => {
       const H = 3_600_000;
-      // The real version stamps (#5047), as the deployed job runs under them; stamped once at
-      // the end of each run, since a stamp mid-run only contends with the run's own transactions.
       const versioned = <T>(run: () => Promise<T>) =>
         withBookVersions(
           (id, touched) => stampBook(db, id, touched),
@@ -850,8 +820,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         );
       const run = () => versioned(() => runScheduledCorpSyncs(syncDeps(), fakeEsi()));
       const marker = async () => (await book().collection('meta').doc(QUIET_DOC).get()).data();
-      // An Unmatched donation from a Character the book knows: a full run places it, a quiet one
-      // never reads it.
       const unmatched = () =>
         book().collection('payments').doc('j1_77').set({
           id: 'j1_77',
@@ -865,7 +833,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       const placed = async () =>
         (await book().collection('payments').doc('j1_77').get()).get('minerId') as
           string | undefined;
-      /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
       async function quietBook() {
         await optIn(ACCOUNTANT);
         for (let i = 1; i <= 2; i++) {
@@ -873,7 +840,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           await run();
         }
         expect(await marker()).toMatchObject({ at: now, known: [50] });
-        // Officers-only: the book doc, which any signed-in Character may read, carries none of it.
         expect(Object.keys((await book().get()).data() ?? {})).not.toContain(QUIET_DOC);
       }
 
@@ -881,15 +847,12 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
       it('skips the full read while the book is unchanged, and reads again once a stamp moves', async () => {
         await quietBook();
-        // Written with no stamp: a quiet run cannot see it, which shows it did not read payments.
         await unmatched();
         now += 6 * H;
         expect((await run()).synced).toBe(1);
         expect(await placed()).toBeUndefined();
-        // The ledger and the sync record still land on the quiet path.
         expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
 
-        // Any server write to payments moves the stamp: the next run reads in full and places it.
         await versioned(() => unmatched());
         now += 6 * H;
         await run();
@@ -900,8 +863,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       it('leaves extractions older than the marker window unread: a quiet run does not see them', async () => {
         await quietBook();
         const before = await marker();
-        // Written with no stamp, and too old to matter: a quiet run that read it would see
-        // the extractions fingerprint move and fall back to a full run, clearing this marker.
         await book().collection('extractions').doc('old').set({
           id: 'old',
           structureId: 1,
@@ -927,7 +888,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         now += 6 * H;
         await run();
         expect((await book().collection('payments').doc('j1_2').get()).exists).toBe(true);
-        // Nothing settled, but the run was not quiet: the old marker no longer vouches.
         expect(await marker()).toBeUndefined();
       });
 
@@ -963,7 +923,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           (await audit()).filter((a) => a.action === 'sync' && a.via === 'scheduled sync').length;
         now = T0 + 6 * H;
         await run();
-        // The first run brought rows, an Extraction and a donation: it is audited.
         expect(await syncs()).toBe(1);
         for (let i = 2; i <= 3; i++) {
           now = T0 + i * 6 * H;
@@ -972,7 +931,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         }
         expect(await syncs()).toBe(1);
 
-        // A new donation is a change again.
         (esiState.journal as { data: unknown[] }).data.push({
           id: 4,
           date: '2026-10-18T10:00:00Z',
@@ -1021,7 +979,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(esiState.calls).not.toContain('extractions');
       expect((await book().collection('observed').get()).size).toBe(1);
       expect((await status())?.status).toBe('active');
-      // Nor the Extraction started notifications: the book's Needs you says so.
       expect(esiState.calls).not.toContain('notifications');
       expect((await status())?.lastRun).toMatchObject({ outcome: 'synced', missing: ['ore'] });
     });
@@ -1047,7 +1004,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect((await book().get()).data()?.lastSync).toBeNull();
       expect((await book().collection('observed').get()).size).toBe(0);
       expect(esiState.calls).toEqual([]);
-      // The run's refresh rotated the token before the role check; that is the one revoked.
       expect(revokedAtSso).toEqual(['rt-2-2']);
       expect((await audit()).find((a) => a.action === 'scheduledSyncStopped')).toMatchObject({
         via: 'scheduled sync',
@@ -1069,7 +1025,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       await runScheduledCorpSyncs(syncDeps(), fakeEsi());
       expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'token-revoked' });
       expect(await grantDoc()).toBeUndefined();
-      // The dead token is not sent to SSO again to revoke.
       expect(revokedAtSso).toEqual([]);
     });
 
@@ -1091,7 +1046,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           },
         },
       });
-      /** A device registered for `characterId` with the given server events on. */
       const device = (characterId: number, events: string[]) =>
         db
           .collection('deviceRegistrations')

@@ -5,7 +5,6 @@ import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './sho
 
 const nameFor = (typeID: number) => `Item ${typeID}`;
 
-/** Built through the engine so the fixtures can never drift from what the panel copies. */
 function line(
   typeID: number,
   baseQuantity: number,
@@ -16,7 +15,6 @@ function line(
   return materialCostLines([{ typeID, baseQuantity, quantity }], hubPrices, sourcing)[0];
 }
 
-/** A synthetic Blueprint Acquisition row (issue #838) — never buyable via multibuy. */
 function blueprintLine(
   typeID: number,
   remainingQuantity: number
@@ -45,14 +43,11 @@ describe('shoppingListText', () => {
   });
 
   it('lists a material the plan advises building, like every other material', () => {
-    // The list carries no verdict: make-or-buy is about how to spend, not what
-    // the shopping trip needs.
     const advised = line(9840, 12, 12, { 9840: 100 });
     expect(shoppingListText([advised], nameFor)).toBe('Item 9840\t12');
   });
 
   it('writes quantities as raw digits, with no thousands separators', () => {
-    // A grouped "1,234,567" is not a number EVE multibuy accepts.
     const large = line(34, 1234567, 1234567);
     expect(shoppingListText([large], nameFor)).toBe('Item 34\t1234567');
   });

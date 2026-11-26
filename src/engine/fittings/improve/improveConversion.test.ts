@@ -14,10 +14,6 @@ import { buildVariationIndex } from '../../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from '../types';
 import { baseFittingStats } from '../__fixtures__/fittingStats';
 
-// 101/102 shield extenders (38, mid), 103 shield booster (40, mid), 201/202 armor plates
-// (329, low), 203 armor repairer (62, low), 204 armor hardener (328, low), 301 MWD (46),
-// 302 scram (52), 303 web (65), 304 cap recharger (43) — all mid — 305 gyrostabilizer
-// (59, low), 306 heat sink (205, low), 307 damage control (60, low), 401 armor rig (773).
 const GROUP: Record<number, number> = {
   101: 38,
   102: 38,
@@ -87,7 +83,6 @@ const fit = (modules: [FittingSlotKind, number, number][]): Fitting =>
     modules: modules.map(([slot, slotIndex, typeId]) => ({ slot, slotIndex, typeId })),
   }) as unknown as Fitting;
 
-// A shield tank: two extenders, MWD, scram, web, cap recharger; lows have a free slot.
 const shieldFit = fit([
   ['medium', 0, 101],
   ['medium', 1, 101],
@@ -99,7 +94,6 @@ const shieldFit = fit([
   ['low', 2, 306],
   ['low', 3, 307],
 ]);
-// An armor tank: two plates, a repairer; mids hold only tackle, so two are free.
 const armorFit = fit([
   ['medium', 0, 301],
   ['medium', 1, 302],
@@ -205,7 +199,6 @@ describe('Improve whole-tank conversion', () => {
     expect(conversions(candidates(armorFit, { defense: 'armor' }))).toEqual([]);
   });
 
-  // v1 never strips a rig, even with Include rigs ticked.
   it('never strips a rig, even when rigs are included', () => {
     const withRig = fit([
       ...shieldFit.modules.map((m): [FittingSlotKind, number, number] => [
@@ -237,7 +230,6 @@ describe('Improve whole-tank conversion', () => {
   });
 
   describe('scored whole by findImprovements', () => {
-    // Extenders are worth 500 EHP each (1000 for the pair), CPU 10 each; the armor plate's figures vary.
     const run = async (plateEhp: number, plateCpu: number) => {
       const model = async (f: Fitting): Promise<FittingStats> => {
         const b = baseFittingStats();
@@ -286,7 +278,6 @@ describe('Improve whole-tank conversion', () => {
   });
 
   describe('keeps the sustained tank', () => {
-    // The fit starts with `beforeSustained` sustained tank; a converted or swapped fit has `kept`.
     const run = async (beforeSustained: number, kept: number, conversion: boolean) => {
       const model = async (f: Fitting): Promise<FittingStats> => {
         const b = baseFittingStats();
@@ -434,7 +425,6 @@ describe('Improve whole-tank conversion', () => {
       stats: model,
       priceOf: () => 1,
     });
-    // The conversion and the swap are the only two calculations: no pair move was built.
     expect(calls).toBe(2);
     const all = [...result!.noDownside, ...result!.tradeOffs, ...result!.rejected];
     expect(all.filter((o) => o.candidate.conversion).every((o) => o.candidate === conversion)).toBe(

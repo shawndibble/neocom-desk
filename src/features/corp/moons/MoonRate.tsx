@@ -14,7 +14,6 @@ import { dateWithYear } from './moonsFormat';
 import { datedRateReady } from './rateForm';
 import { useBook } from './useBook';
 
-/** What the rate is set on: a moon the book knows, else the refinery (an idle one with no Extraction yet). */
 export interface RateTarget {
   structureId: number;
   moonId?: number;
@@ -29,12 +28,6 @@ const contextFor = (target: RateTarget, date: string, isGuest: boolean): RateCon
   isGuest,
 });
 
-/**
- * The rate in force on a moon's page and where it comes from, with a Change rate button for an
- * officer who can edit (#6322). It writes the same dated `addRate` as Settings > Rates, so each
- * shows the other's rate. The scope is the moon's, or the refinery's when no moon is known;
- * the officer is told which, never asked.
- */
 export function MoonRate({ target }: { target: RateTarget }) {
   const { t } = useTranslation();
   const { view, canEdit } = useBook();

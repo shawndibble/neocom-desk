@@ -1,8 +1,3 @@
-/**
- * "Go to" chips under Route Safety's destination field: the trade hubs and the
- * nearest Incursion's staging system, each one tap to the trip's next stop.
- * A place to go, never a verdict on it.
- */
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -19,7 +14,6 @@ export function QuickPicks({
   onPick,
 }: {
   current: Pick<CurrentSystemState, 'systemId' | 'loaded'>;
-  /** The trip's From and Stops. */
   taken: ReadonlySet<number>;
   onPick: (systemId: number) => void;
 }) {

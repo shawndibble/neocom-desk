@@ -1,7 +1,3 @@
-/**
- * The compose form's buyback fields (issue #4780) as typed text and ticks,
- * and the step back and forth between them and a `StandingRequest`. Pure.
- */
 import {
   BUYBACK_GROUP_KEYS,
   MAX_BUY_LINES,
@@ -14,11 +10,9 @@ import {
 } from '@/engine/communities/buyback';
 
 export interface BuybackDraft {
-  /** The rate as typed: "90", "92,5" or "92.5 %". */
   rate: string;
   rateBasis: RateBasis;
   hubId: BuybackHubId;
-  /** Null means the requester's own Character. */
   buyerCharacterId: number | null;
   groups: BuybackGroup[];
   types: { typeId: number; name: string }[];
@@ -33,12 +27,10 @@ export const emptyBuybackDraft = (): BuybackDraft => ({
   types: [],
 });
 
-/** The standing Request a draft describes, or null while the rate or the buy list is not valid. */
 export function draftToStanding(draft: BuybackDraft): StandingRequest | null {
   const rate = parseRate(draft.rate);
   if (rate === null) return null;
   const buyLines: BuybackLine[] = [
-    // Group order follows the table, so the same ticks always make the same Request.
     ...BUYBACK_GROUP_KEYS.filter((g) => draft.groups.includes(g)).map((group): BuybackLine => ({
       kind: 'group',
       group,

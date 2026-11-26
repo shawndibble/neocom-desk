@@ -1,8 +1,3 @@
-/**
- * Which audit entries are about one Miner, for their page's Activity: an entry that names them,
- * one of their notices, payments, declarations or disputes. An officer's answer to a declaration
- * or a dispute names only the declaration or the dispute, so those count too.
- */
 import { NOTICE_ID_FIELD } from '../../../../functions/src/corpTaxBookLateNotice';
 
 export interface MinerAuditSubjects {

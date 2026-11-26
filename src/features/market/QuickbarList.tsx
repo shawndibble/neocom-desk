@@ -1,8 +1,3 @@
-/**
- * The Quickbar (GLOSSARY.md): a flat, drag-ordered list of saved item
- * shortcuts, rendered in the Market Browser's left column below the tree.
- * Drag-and-drop mirrors the Skill Plan entry list (EntryList.tsx).
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   DndContext,
@@ -39,19 +34,16 @@ import { hasQuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
 import type { VsPaid } from './useQuickbarVsPaid';
 
-/** `+50%`, `-12%`, `0%`. */
 function formatPercent(percent: number): string {
   return `${percent > 0 ? '+' : ''}${percent}%`;
 }
 
 interface QuickbarRowProps {
   item: QuickbarItem;
-  /** Current price against what was paid; absent when no wallet basis covers the item. */
   vsPaid?: VsPaid;
   selected: boolean;
   onSelect: (typeId: number) => void;
   onRemove: (typeId: number) => void;
-  /** The neighbours it can swap with: the drag's single-pointer alternative (WCAG 2.5.7). */
   previousTypeId?: number;
   nextTypeId?: number;
   onReorder: (activeTypeId: number, overTypeId: number) => void;
@@ -134,7 +126,6 @@ function QuickbarRow({
             <span className="truncate">{item.name}</span>
             {hasTarget && (
               <span className="shrink-0 text-text-dim">
-                {/* Compact stays text: IskAmount's focusable trigger can't nest in this button. */}
                 {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
                   formatIskCompact(item.targetPrice!)}
               </span>
@@ -142,7 +133,6 @@ function QuickbarRow({
           </button>
         </div>
         {vsPaid && (
-          // Hidden below the list's own width, so the name keeps its room first.
           <HintText
             className={cx(
               'hidden shrink-0 font-semibold tabular-nums @[15rem]:inline',
@@ -172,7 +162,6 @@ function QuickbarRow({
 
 export interface QuickbarListProps {
   items: readonly QuickbarItem[];
-  /** Price against paid, by type id; omitted items show no chip. */
   vsPaid?: ReadonlyMap<number, VsPaid>;
   selectedTypeId: number | null;
   onSelect: (typeId: number) => void;
@@ -192,7 +181,6 @@ export function QuickbarList({
 }: QuickbarListProps) {
   const { t } = useTranslation();
   const sensors = useSensors(
-    // A 4px travel before a drag starts, so a tap on the grip is not a drag (as EntryList).
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );

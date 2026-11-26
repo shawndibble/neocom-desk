@@ -49,9 +49,6 @@ describe('resolveNames', () => {
   });
 
   it('serves fresh cached names without any request', async () => {
-    // The wait this removes: every route loader that resolves a name used to
-    // block on a live POST before it could render, even with every name
-    // already local.
     let called = false;
     await db.esiCache.put({ characterId: 0, key: 'name:1', value: 'Alice', fetchedAt: Date.now() });
     server.use(
@@ -85,9 +82,6 @@ describe('resolveNames', () => {
   });
 
   it('returns a lapsed cached name at once and refreshes it behind the caller', async () => {
-    // A name that has gone past its window is still a name. Blocking on it
-    // would put a whole page behind a lookup of something that almost never
-    // changes.
     const resolved = deferred();
     await db.esiCache.put({ characterId: 0, key: 'name:1', value: 'Old Corp', fetchedAt: 1 });
     server.use(
@@ -235,7 +229,6 @@ describe('resolveNames with an invalid id in the batch', () => {
       http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
         posts += 1;
         const ids = (await request.json()) as number[];
-        // Every other id is invalid: the worst case for bisecting.
         if (ids.some((id) => id % 2 === 0)) {
           return HttpResponse.json({ error: 'Ensure all IDs are valid' }, { status: 404 });
         }

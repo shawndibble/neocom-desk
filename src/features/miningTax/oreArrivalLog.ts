@@ -1,11 +1,3 @@
-/**
- * The device-kept record behind Settle up's "Ore still arriving" line
- * (`engine/miningTax/oreArrival.ts`): each recent entry's last known total and
- * when this device first saw it grow. Local, not synced — it is only what this
- * device happened to observe, and another device's fetches would make the
- * growth times wrong for this one. Holds today's and yesterday's entries only,
- * so it stays a few rows.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import {
   EMPTY_ORE_ARRIVAL_LOG,
@@ -18,8 +10,6 @@ import { isPlainRecord } from '@/engine/guards';
 export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
   key: 'miningTaxOreArrivals',
   defaultValue: EMPTY_ORE_ARRIVAL_LOG,
-  // Its own record, never edited by hand: a shape check is enough to fall
-  // back to empty after a format change rather than crash.
   parse: (raw) =>
     isPlainRecord(raw) &&
     isPlainRecord(raw.entries) &&
@@ -31,13 +21,6 @@ export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
       : null,
 });
 
-/**
- * Folds a ledger load into the log — every character whose fetch is newer than
- * the last one recorded. Never throws: this is a side record, and a failed
- * write (storage full, private browsing) must not fail the Tax tab's load. The
- * store applies the new log in memory before it writes, so this session still
- * has it.
- */
 export async function recordLedgerArrivals(
   ledgers: readonly CharacterMiningLedger[]
 ): Promise<void> {
@@ -59,7 +42,5 @@ export async function recordLedgerArrivals(
       );
     }
     if (log !== before) await useOreArrivalLog.getState().setValue(log);
-  } catch {
-    // Settle up then has less to compare against: it falls back to small print.
-  }
+  } catch {}
 }

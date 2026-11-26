@@ -7,21 +7,15 @@ import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 const COMMIT_DELAY_MS = 500;
 
 interface MaxIskInputProps {
-  /** The saved limit; null for none. */
   value: number | null;
   onChange: (value: number | null) => void;
 }
 
-/**
- * The plan's max ISK per haul. Blank is no limit. A bad entry keeps the last
- * good plan on screen; it is never read as no limit.
- */
 export function MaxIskInput({ value, onChange }: MaxIskInputProps) {
   const { t } = useTranslation();
   const errorId = useId();
   const [text, setText] = useState(value === null ? '' : maskNumber(value));
   const [seen, setSeen] = useState(value);
-  // The saved value arrives after hydration, or changes elsewhere: show it unless it is what was typed.
   if (value !== seen) {
     setSeen(value);
     const shown = text.trim() === '' ? null : (unmaskNumber(text) ?? null);
@@ -34,7 +28,6 @@ export function MaxIskInput({ value, onChange }: MaxIskInputProps) {
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  /** Re-plans once typing pauses: a tiny limit mid-entry ("5" of "5000000") would split into a haul per unit. */
   function onType(raw: string) {
     setText(raw);
     clearTimeout(timer.current);

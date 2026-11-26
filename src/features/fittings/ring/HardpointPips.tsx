@@ -11,27 +11,15 @@ import {
 } from '@/engine/fittings/ringLayout';
 import type { HardpointKind } from '@/engine/fittings/hardpoints';
 
-/** A pip's radius, and the band a pointer hovers to read a kind's numbers. */
 const PIP_RADIUS = 5;
 const PIP_HIT_WIDTH = 22;
-/** The hardpoint icon's side, ring units: a little wider than a pip. */
 const GLYPH_SIZE = 18;
 
-/**
- * CCP's own fitting-window hardpoint icons (the EVE University wiki's
- * `Icon_turret_hp.png` / `Icon_launcher_hp.png`), as the Add panel's slot
- * icons are (DESIGN.md §5's exception): a split hull's two rows of pips read
- * as the client draws them, not as two anonymous runs of dots.
- */
 const HARDPOINT_ICON: Readonly<Record<HardpointKind, string>> = {
   turret: '/images/fitting/hardpoint-turret.png',
   launcher: '/images/fitting/hardpoint-launcher.png',
 };
 
-/**
- * One kind of hardpoint on the rim's top gap: its icon by 12 o'clock, then a
- * pip each, filled where the high slots take one, red past what the hull has.
- */
 export function HardpointPips({
   kind,
   total,
@@ -40,7 +28,6 @@ export function HardpointPips({
 }: {
   kind: HardpointKind;
   total: number;
-  /** Null until every high-slot type is known: then nothing shows as taken. */
   used: number | null;
   compact: boolean;
 }) {

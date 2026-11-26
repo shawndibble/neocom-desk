@@ -1,12 +1,3 @@
-/**
- * The props that make `CharacterFilterControl` the page's scope control on the Overview and the
- * Corp Board: it reads the scope the drawn widgets share (or Mixed) and writes a choice onto
- * every widget that can take it (`setAllScopes`, one Undo). Scope itself stays per widget; this
- * is its bulk edit, so the picker is the same one every other page has.
- *
- * `null` when there is nothing to choose between: one Character on the Overview, fewer than two
- * corporations on the Corp Board.
- */
 import type {
   CharacterFilterControlProps,
   PickerChoice,
@@ -27,7 +18,6 @@ type PageScopeProps = Pick<
   'activeCharacterId' | 'value' | 'onChange' | 'mixed' | 'corporations' | 'characterCount'
 >;
 
-/** A widget's scope as the picker names it: the header Character is `'current'`. */
 const toChoice = (scope: WidgetScope): PickerChoice => (scope === 'header' ? 'current' : scope);
 const toScope = (choice: PickerChoice): WidgetScope =>
   choice === 'current' ? 'header' : (choice as WidgetScope);

@@ -19,7 +19,7 @@ describe('cashFlow', () => {
       line('2026-10-31', 600),
       line('2026-10-30', -200),
       line('2026-10-25', 400),
-      line('2026-10-24', 999), // 8 days back: outside a 7-day window
+      line('2026-10-24', 999),
     ];
     const flow = cashFlow(rows, 7, '2026-10-31');
     expect(flow).toMatchObject({ earned: 1000, spent: 200, net: 800 });
@@ -35,7 +35,6 @@ describe('cashFlow', () => {
 
   it('compares earned with the window before when the history reaches that far back', () => {
     const rows = [line('2026-10-01', 100), line('2026-10-20', 150), line('2026-10-28', 300)];
-    // 7-day windows: 10-25..10-31 earned 300; 10-18..10-24 earned 150.
     const flow = cashFlow(rows, 7, '2026-10-31');
     expect(flow.earnedBefore).toBe(150);
     expect(flow.partial).toBe(false);

@@ -3,13 +3,6 @@ import { Panel, StatChip, StatChips } from '@/components/ui';
 import { Wallet } from '@/routes/Wallet';
 import { NewComponent } from './NewComponent';
 
-/**
- * Worked example of the mockup workflow (docs/design/mockups/README.md): the
- * real Wallet page in the real shell, plus one proposed panel.
- *
- * New components in this mockup: `BalanceTrend` (the dashed, labelled panel).
- * Everything else is an existing primitive or the page itself.
- */
 const meta = {
   title: 'mockups/Wallet',
   tags: ['!manifest'],
@@ -35,10 +28,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Proposed Wallet › Balance with a 30-day trend panel above the balance. New component: BalanceTrend. */
 export const Proposed: Story = {};
 
-/** @summary The proposal in the phone shell. */
 export const ProposedPhone: Story = {
   globals: { viewport: { value: 'mobile1', isRotated: false } },
 };

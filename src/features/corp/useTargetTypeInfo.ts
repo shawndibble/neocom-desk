@@ -1,9 +1,3 @@
-/**
- * Names and categories for the types a stock target names but the corporation
- * owns none of: the asset read resolves labels only for types it holds, so a
- * qty-0 ledger row would otherwise read "Type #id" and a search could not find
- * it (issue #4671). Best-effort, like the Stock targets dialog's names.
- */
 import { useEffect, useState } from 'react';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadTypeCategories, type AssetCategory } from './assetCategories';
@@ -26,9 +20,7 @@ export function useTargetTypeInfo(typeIds: readonly number[]): TargetTypeInfo {
       ([names, categories]) => {
         if (live) setInfo({ names, categories });
       },
-      () => {
-        // Decoration only: the row keeps its "Type #id" fallback.
-      }
+      () => {}
     );
     return () => {
       live = false;

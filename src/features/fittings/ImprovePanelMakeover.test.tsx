@@ -32,7 +32,6 @@ const settings = (
   onChange,
 });
 
-/** A single swap of the same module as the Makeover's first row (Shield Power Relay II, low slot 0). */
 const singleOnRowOne = {
   candidate: { fromTypeId: 1422, toTypeId: 31796, at: [{ slot: 'low', slotIndex: 0 }] },
   fitting: {} as Fitting,
@@ -97,7 +96,6 @@ describe('Improve panel with a Makeover', () => {
     renderPanel(state({}));
     expect(screen.getByRole('heading', { name: 'Makeover' })).toBeInTheDocument();
     expect(applyButton()).toHaveTextContent(String(MAKEOVER_KEYS.length));
-    // its rows are the Makeover's own, not covers added from the footer
     expect(screen.queryByText(/Added to cover/)).toBeNull();
   });
 

@@ -17,7 +17,6 @@ describe('useRowSelection', () => {
     });
     act(() => result.current.selectAll());
     expect([...result.current.selected].sort()).toEqual([1, 2]);
-    // A key that stops being visible drops out of what is selected.
     rerender({ keys: [2] });
     expect([...result.current.selected]).toEqual([2]);
     act(() => result.current.clear());

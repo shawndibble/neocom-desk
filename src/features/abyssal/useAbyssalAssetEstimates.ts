@@ -1,9 +1,3 @@
-/**
- * MutaMarket estimates for the Assets page's abyssal modules: cached answers
- * first, then one bounded queue, rows on screen ahead of the background (rules
- * in scope decision `*-abyssal-estimates-in-asset-totals.md`). Answers land in
- * batches, so the tree rebuilds once per batch. Never imports: Item Detail's ask.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   abyssalItemRefs,
@@ -20,29 +14,22 @@ import {
 } from '@/market/mutamarket';
 import { useMutaplasmidLookup } from './mutaplasmidData';
 
-/** Modules looked up unasked per scope; rows on screen ask past it. */
 export const ABYSSAL_BACKGROUND_LOOKUPS = 100;
 const WORKERS = 4;
 const BATCH_MS = 300;
 
 export interface AbyssalAssetEstimates {
-  /** Null until the mutaplasmid data loads; nothing reads as abyssal until then. */
   isAbyssalType: ((typeId: number) => boolean) | null;
-  /** Item id -> ISK, for every abyssal item with a priced estimate. */
   values: ReadonlyMap<number, number>;
-  /** Item id -> the latest answer held, any status. */
   estimates: ReadonlyMap<number, AbyssalEstimate>;
-  /** Queue one module (a row on screen) ahead of the background; returns the cancel. */
   request: (item: AbyssalItemRef) => () => void;
 }
 
 const EMPTY = new Map<number, never>();
 const NOOP = () => {};
 
-/** The page's lookups and the batching of their answers; plain state, outside React. */
 class LookupQueue {
   private live = true;
-  /** Started (in flight or answered): never asked twice. */
   private readonly asked = new Set<number>();
   private rows: AbyssalItemRef[] = [];
   private background: AbyssalItemRef[] = [];
@@ -89,7 +76,6 @@ class LookupQueue {
     this.backgroundUsed = 0;
   }
 
-  /** Replace the background queue with these, within what's left of the allowance. */
   setBackground(items: readonly AbyssalItemRef[]): void {
     this.background = items
       .filter((item) => !this.asked.has(item.itemId))
@@ -139,7 +125,6 @@ class LookupQueue {
         const estimate = await getAbyssalEstimate(item.typeId, item.itemId, { characterId });
         this.land(item.itemId, estimate);
         if (estimate.status === 'unavailable') {
-          // Every other ask would only fail too: pause, and let this one be asked again.
           this.unavailableUntil = Date.now() + ABYSSAL_UNAVAILABLE_RETRY_MS;
           this.asked.delete(item.itemId);
         }
@@ -152,9 +137,7 @@ class LookupQueue {
 
 export function useAbyssalAssetEstimates(
   assets: readonly OwnedItem[],
-  /** The Character whose session reaches MutaMarket for this item. */
   characterIdFor: (itemId: number) => number | null,
-  /** The Characters in view: a new scope gets a fresh background allowance. */
   scope: string | number = ''
 ): AbyssalAssetEstimates {
   const lookup = useMutaplasmidLookup();
@@ -166,7 +149,6 @@ export function useAbyssalAssetEstimates(
         setEstimates((current) => new Map([...current, ...batch]))
       )
   );
-  // Set during render, not in an effect: rows' effects (their asks) run before this hook's.
   queue.setCharacterIdFor(characterIdFor);
   const held = useRef(estimates);
   useEffect(() => {

@@ -1,14 +1,7 @@
-/**
- * The saved half of the module browser's hull check (`hullFitService`): one
- * row per hull and skill set, so a return visit — even after a reload —
- * skips the engine. Device-local and rebuildable; every failure here is
- * swallowed, since a missing cache only means the check runs again.
- */
 import { db } from '@/db';
 import type { CandidateCheck } from './dogmaFittingEngine';
 import { packCheck, unpackCheck } from '@/engine/fittings/hullFitKey';
 
-/** Newest rows kept; a row is ~25 KB, and a pilot flies a handful of hulls. */
 const MAX_ROWS = 40;
 
 export async function loadSavedHullFit(key: string): Promise<Map<number, CandidateCheck> | null> {
@@ -39,7 +32,5 @@ export async function saveHullFit(
         .primaryKeys();
       await db.hullFitCache.bulkDelete(oldest);
     }
-  } catch {
-    // A full disk or a blocked database: the answer just isn't kept.
-  }
+  } catch {}
 }

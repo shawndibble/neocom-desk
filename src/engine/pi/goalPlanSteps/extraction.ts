@@ -1,12 +1,3 @@
-/**
- * Steps 4 and 5 of `planGoals`: greedy extraction (`fill`), then release and
- * refill until no goal gets further (`solveExtraction`). The fill order and
- * the release/refill rule are in the module header of `../goalPlan.ts`.
- *
- * Every function takes the `ExtractionProblem` it works on explicitly. Its
- * `host` is the one the factories were placed on in step 3 (`placeHost`) — not
- * the settled host (`settleHost`), which may differ.
- */
 import type { PiData } from '@/sde/types';
 import { piTier } from '../chain';
 import { colonyExtraction, type ExtractionWant } from '../colonyCapacity';
@@ -14,34 +5,25 @@ import type { Goal, PlannerColony, PlannerPolicy, RateSource } from '../goalType
 import type { PinCounts } from '../types';
 import { EPSILON, expandInto, madeNodes, perHour, schematicOf } from './shared';
 
-/** One demanded P1 and the colonies that could extract its P0. */
 export interface P1Row {
   p1: number;
   p0: number;
-  /** P1 units/h the planned goals need. */
   units: number;
   p1PerP0: number;
-  /** Colonies that yield `p0`, by planet id. */
   eligible: PlannerColony[];
 }
 
-/** Planned extraction, per planet id. */
 export type Wants = Map<number, ExtractionWant[]>;
 
 export interface ExtractionProblem {
   pi: PiData;
   policy: PlannerPolicy;
-  /** Every colony, by planet id. */
   colonies: readonly PlannerColony[];
-  /** Every chain node of the planned goals, per hour. */
   demand: ReadonlyMap<number, number>;
-  /** Per P1 goal, its target units/h. */
   p1GoalNeed: ReadonlyMap<number, number>;
   plannedHigh: readonly Goal[];
-  /** Demanded P1s, scarcest P0 first (fewest eligible colonies, then typeId). */
   rows: readonly P1Row[];
   rowByP0: ReadonlyMap<number, P1Row>;
-  /** The placed host (step 3) and the factories it carries, or null and `{}`. */
   host: PlannerColony | null;
   hostFactories: PinCounts;
   buyP1: boolean;
@@ -92,7 +74,6 @@ export function extractionProblem(args: {
   };
 }
 
-/** P1/h `ecus` ECUs on `p0` make on `c`. */
 export function slotP1(
   problem: ExtractionProblem,
   c: PlannerColony,
@@ -114,26 +95,18 @@ function fixedOn(problem: ExtractionProblem, c: PlannerColony): PinCounts {
   return c === problem.host ? problem.hostFactories : {};
 }
 
-/** True when the host's factories consume some of `p1` (beyond a P1 goal of it). */
 function feedsHost(problem: ExtractionProblem, p1: number): boolean {
   return (problem.demand.get(p1) ?? 0) - (problem.p1GoalNeed.get(p1) ?? 0) > EPSILON;
 }
 
-/** Strongest rate source first. */
 const RATE_SOURCE_RANK: Readonly<Record<RateSource, number>> = {
   measured: 0,
   'own-mean': 1,
   assumed: 2,
 };
 
-/** Most release/refill rounds; it converges in two or three on real colonies. */
 const MAX_ROUNDS = 8;
 
-/**
- * Greedy: add `row`'s P0 to colonies in the documented order until
- * `remaining` P1/h is covered or nothing more fits. Mutates `state`;
- * returns the P1/h added.
- */
 export function fill(
   problem: ExtractionProblem,
   state: Wants,
@@ -144,8 +117,6 @@ export function fill(
   const pending = new Set(problem.rows.map((r) => r.p0).filter((p0) => p0 !== row.p0));
   const contention = (c: PlannerColony) => [...pending].filter((p0) => c.ratePerEcu.has(p0)).length;
   const hostFirst = (c: PlannerColony) => (c === host && feedsHost(problem, row.p1) ? 0 : 1);
-  // Leave a working colony where it is: one that runs this P0 today keeps
-  // it before anyone else starts it, and a measured rate beats an estimate.
   const runsToday = (c: PlannerColony) =>
     (c.current.ecusByP0?.get(row.p0) ?? 0) > 0 || c.current.p0TypeIds.includes(row.p0) ? 0 : 1;
   const estimated = (c: PlannerColony) => RATE_SOURCE_RANK[c.ratePerEcu.get(row.p0)!.source];
@@ -188,7 +159,6 @@ export function fill(
   return added;
 }
 
-/** P1/h extracted per P1 type on `state`. */
 export function extractedFrom(problem: ExtractionProblem, state: Wants): Map<number, number> {
   const out = new Map<number, number>();
   for (const c of problem.colonies) {
@@ -203,26 +173,14 @@ export function extractedFrom(problem: ExtractionProblem, state: Wants): Map<num
 export interface Evaluation {
   extracted: Map<number, number>;
   supplied: (p1: number) => number;
-  /** Per planned P2+ goal, the fraction of its target reached. */
   highFraction: Map<number, number>;
-  /** P1/P2+ units/h the host consumes at those fractions. */
   hostUse: Map<number, number>;
-  /** Per P1 goal, the units/h it reaches. */
   p1GoalReach: Map<number, number>;
-  /** Per demanded P1, units/h actually consumed. */
   consumption: Map<number, number>;
-  /** P1s that hold some goal back. */
   binding: Set<number>;
-  /** Sum of every goal's reached fraction; what a refill round must raise. */
   score: number;
 }
 
-/**
- * What the goals reach on `state`'s extraction: each P2+ goal at its
- * scarcest P1's supply fraction (a shared short P1 rationed proportionally),
- * the host consuming exactly what those rates need, and each P1 goal taking
- * what is left of its type.
- */
 export function evaluate(problem: ExtractionProblem, state: Wants): Evaluation {
   const { demand, buyP1, pi, p1GoalNeed } = problem;
   const extracted = extractedFrom(problem, state);
@@ -268,7 +226,6 @@ export function evaluate(problem: ExtractionProblem, state: Wants): Evaluation {
   return { extracted, supplied, highFraction, hostUse, p1GoalReach, consumption, binding, score };
 }
 
-/** Colonies with `host` first, then by planet id: the host feeds itself before anyone ships it anything. */
 export function hostFirstOrder(
   colonies: readonly PlannerColony[],
   host: PlannerColony | null
@@ -276,7 +233,6 @@ export function hostFirstOrder(
   return [...colonies].sort((a, b) => Number(b === host) - Number(a === host));
 }
 
-/** Drop or shrink every slot beyond what `consumption` needs; the host's own slots are kept first. */
 export function release(
   problem: ExtractionProblem,
   state: Wants,
@@ -310,11 +266,6 @@ export function copyWants(state: Wants): Wants {
   return new Map([...state].map(([k, v]) => [k, [...v]]));
 }
 
-/**
- * Fill every row, then release extraction nothing consumes and try to raise
- * whatever binds — keeping a round only if some goal actually got further.
- * Returns the final extraction and what the goals reach on it.
- */
 export function solveExtraction(problem: ExtractionProblem): Evaluation & { wants: Wants } {
   let wants: Wants = new Map();
   for (const row of problem.rows) fill(problem, wants, row, row.units);

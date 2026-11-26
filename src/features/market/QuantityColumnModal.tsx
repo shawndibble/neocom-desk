@@ -1,22 +1,15 @@
-/**
- * "Which column is the quantity?" — opens when a pasted details-view copy has
- * text where the count belongs. The pilot picks the column; nothing is chosen
- * for them, and leaving it keeps the report-only result (#6281).
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Radio, Tooltip } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { AppraisalUnreadableLine } from '@/engine/market/appraisalPaste';
 
-/** How many reported lines the preview shows. */
 const PREVIEW_LINES = 3;
 
 interface QuantityColumnModalProps {
   open: boolean;
   onClose: () => void;
   onChoose: (column: number) => void;
-  /** The reported text-quantity lines; the preview shows the first few. */
   lines: readonly AppraisalUnreadableLine[];
   choices: readonly { column: number; sample: string }[];
 }

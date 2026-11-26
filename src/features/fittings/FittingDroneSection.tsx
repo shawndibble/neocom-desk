@@ -32,17 +32,8 @@ import {
   type EditContext,
 } from './RackListParts';
 
-/** Squares a drone row always shows — a full flight at Drones V. */
 const LAUNCH_SQUARES = 5;
 
-/**
- * A drone type's launch squares: one lit per drone of it in space. Clicking
- * a square launches up to it; clicking the highest lit one recalls it. A
- * square past what the Fitting carries, or past what bandwidth and the
- * pilot's drone count allow, is disabled — `aria-disabled` rather than the
- * native attribute, so its tooltip saying why stays reachable by hover, focus
- * and touch-and-hold.
- */
 function LaunchSquares({
   name,
   inSpace,
@@ -103,22 +94,9 @@ interface DroneSectionProps {
   edit: EditContext['edit'];
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
-  /**
-   * `list`: a section of the List, headed "Drones" under the List's own
-   * resource bars. `panel`: the Ring's drone panel or the phone's sheet —
-   * titled already, so no heading, and carrying its own bandwidth and bay bars.
-   */
   variant?: 'list' | 'panel';
 }
 
-/**
- * The Fitting's drones: each type with how many it carries (the bay count,
- * capped at what the bay holds — launched drones included) and launch
- * squares for how many of those are in space (these count toward DPS and
- * bandwidth, capped by it), and a way to add more. The List's Drones
- * section, the Ring's drone panel, and the phone Ring's Drones sheet.
- * Nothing on a hull that takes no drones.
- */
 export function DroneSection({
   fitting,
   catalogue,
@@ -133,13 +111,11 @@ export function DroneSection({
   const drop = useFittingDropTarget({ kind: 'drones' });
   const drones = droneGroups(fitting);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
-  // Before the ship data the bay's size is unknown, so nothing is capped yet.
   const bay: DroneBay | null =
     stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
   const launch = launchLimitsFrom(stats);
   if (!showsDrones(stats, drones.length)) return null;
   return (
-    // A drone dragged here (from the bay below, or the Add panel) launches.
     <div
       className={`space-y-1.5 rounded-xs ${drop.over ? 'ring-2 ring-accent/60' : drop.accepts ? 'outline-1 outline-dashed outline-accent' : ''}`}
       {...drop.props}

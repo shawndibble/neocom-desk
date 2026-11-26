@@ -4,7 +4,6 @@ import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { useMilestones } from '../useMilestones';
 
-/** Plan Milestones whose entry left the plan entirely: no row remains to flag, so they surface here. */
 export function OrphanedMilestoneNotices({
   orphanedMilestones,
   onRemove,

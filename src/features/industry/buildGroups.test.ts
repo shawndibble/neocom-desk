@@ -42,9 +42,6 @@ describe('parseBuildGroups', () => {
   });
 
   it('returns an empty map for anything that is not one', () => {
-    // Whatever the last device to sync wrote, possibly an older build or a
-    // hand-edited row — so it is validated rather than trusted, the same way
-    // customsOverride.ts validates its own blob.
     expect(parseBuildGroups(null)).toEqual({});
     expect(parseBuildGroups('nope')).toEqual({});
     expect(parseBuildGroups([])).toEqual({});
@@ -104,7 +101,6 @@ describe('addBuildGroup', () => {
   });
 
   it('allows two groups to share a name', () => {
-    // Groups are id-keyed, exactly as two Build Plans may share a name.
     const value = addBuildGroup(withBuildGroups({}, 1, groups('PvE')), 1, {
       id: 'g2',
       name: 'PvE',
@@ -145,8 +141,6 @@ describe('removeBuildGroup', () => {
   });
 
   it('drops the Character’s entry entirely once the last group goes', () => {
-    // Nothing to store is stored as nothing, so a device that made a group and
-    // deleted it is byte-identical to one that never did.
     const value = withBuildGroups({}, 1, groups('Only'));
     expect(removeBuildGroup(value, 1, 'g1')).toEqual({});
   });
@@ -154,9 +148,6 @@ describe('removeBuildGroup', () => {
 
 describe('withBuildGroups', () => {
   it('keeps an empty group, which is the whole reason this is not derived from the plans', () => {
-    // A group with no members has to exist between "create" and the first
-    // plan moved into it. A groupBy over the plans cannot represent that,
-    // which is why the names live here rather than being derived.
     const value = withBuildGroups({}, 1, [{ id: 'g1', name: 'Empty', order: 0 }]);
     expect(buildGroupsFor(value, 1)).toEqual([{ id: 'g1', name: 'Empty', order: 0 }]);
   });
@@ -390,8 +381,6 @@ describe('parseBuildGroups — snapshot', () => {
   });
 
   it('drops a group whose snapshot is malformed, rather than keeping the group without it', () => {
-    // A half-written snapshot is worse than none: silently dropping just the
-    // snapshot would apply the pilot's Retarget to nothing and never say so.
     const raw = { 1: [{ id: 'g1', name: 'G', order: 0, snapshot: { hubId: 'jita' } }] };
     expect(parseBuildGroups(raw)).toEqual({});
   });

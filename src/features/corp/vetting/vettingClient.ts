@@ -1,12 +1,3 @@
-/**
- * The real `VettingBackend`, over the `vetting` callable router. The pilot's side is public: no
- * Firebase session, proven by the handle's key (and, to read a character, that character's own
- * EVE access token). Officer calls are signed in and carry a fresh access token so the server
- * checks the role live. Only access tokens are ever sent; a refresh token never leaves Dexie.
- *
- * Firebase is reached through `await import()` only, so the public apply page's chunk does not
- * carry the SDK until its first call (`app/bootImportGraph.test.ts`).
- */
 import { isSyncConfigured } from '@/app/syncStatus';
 import { getValidAccessToken } from '@/auth/session';
 import type {
@@ -42,7 +33,6 @@ const ACTION = {
 
 type VettingAction = (typeof ACTION)[keyof typeof ACTION];
 
-/** The one seam to the `vetting` router. */
 async function route<Out>(
   name: VettingAction,
   data: Record<string, unknown>,
@@ -52,12 +42,10 @@ async function route<Out>(
   return callRouted<Record<string, unknown>, Out>(name, data, characterId);
 }
 
-/** A public call: no session, so no Character's Firebase app is asked for. */
 function open<Out>(name: VettingAction, data: Record<string, unknown>): Promise<Out> {
   return route<Out>(name, data, undefined);
 }
 
-/** A signed-in call, with the Character's access token for the server's live check. */
 async function signedIn<Out>(
   characterId: number,
   name: VettingAction,
@@ -75,7 +63,6 @@ const withHandle = (handle: VettingHandle): Record<string, unknown> => ({
   key: handle.key,
 });
 
-/** The invite code, only when the link carried one: an absent field, never an empty string. */
 const withInvite = (invite: string | undefined): Record<string, unknown> =>
   invite ? { invite } : {};
 
@@ -97,8 +84,6 @@ const client: VettingBackend = {
   decline: async (handle) => {
     await open<unknown>(ACTION.decline, withHandle(handle));
   },
-  // Vetting lives in the cloud backend; with none configured there is no request to find, not a
-  // failed load (as SRP's member page does).
   myRequests: async (characterId) =>
     isSyncConfigured() ? signedIn(characterId, ACTION.myRequests, {}) : [],
   overview: (characterId, corporationId) =>
@@ -131,7 +116,6 @@ const client: VettingBackend = {
     signedIn<VettingOverview>(characterId, ACTION.saveSettings, { corporationId, patch }),
 };
 
-/** The backend every vetting page calls: the stand-in when a story or e2e installed one. */
 export function vettingBackend(): VettingBackend {
   return vettingBackendOverride() ?? client;
 }

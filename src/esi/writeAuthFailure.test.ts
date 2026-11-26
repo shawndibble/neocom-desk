@@ -57,8 +57,6 @@ describe('reportWriteAuthFailure', () => {
   });
 
   it('stays quiet when the grant already holds the scope: a re-login could not fix that refusal', async () => {
-    // A recipient who blocked the sender, say. Re-requesting the same scopes
-    // would come back identical and be refused again, forever.
     await seedGrant([SEND_MAIL]);
     const { reported, unsubscribe } = listen();
 
@@ -70,8 +68,6 @@ describe('reportWriteAuthFailure', () => {
   });
 
   it('reports a 401 plainly even when the scope is held: a stale token is what a re-login fixes', async () => {
-    // Unlike a 403, a 401 says the credential itself was not accepted, and a
-    // fresh login replaces it. No Permission is named: the scope is not missing.
     await seedGrant([SEND_MAIL]);
     const { reported, unsubscribe } = listen();
 

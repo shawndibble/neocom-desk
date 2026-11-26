@@ -1,11 +1,3 @@
-/**
- * Freshness from `esiCacheMeta` (value-free) and ETag revalidation.
- *
- * The cost these pin is deserializing a cached value — megabytes for assets —
- * just to learn that it is stale, or to rewrite an identical payload after a
- * 304. `db.esiCache.get` is the only way a value is read, so it is what these
- * spy on.
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { HOUR_MS } from '@/lib/age';
@@ -111,8 +103,6 @@ describe('freshness from meta', () => {
   it('a value rewritten behind meta (raw IndexedDB, a pre-meta bundle) is judged by its own age', async () => {
     at(T0);
     await loadWithCacheStatus(CHAR_ID, KEY, async () => 'v');
-    // What e2e's expireCachedEsiRows does: backdate the value row through raw
-    // IndexedDB, which the Dexie middleware never sees.
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'old', fetchedAt: 1 });
     await db.esiCacheMeta.put({ characterId: CHAR_ID, key: KEY, fetchedAt: T0 });
     const fetchLive = vi.fn(async () => 'live');
@@ -205,10 +195,6 @@ describe('purges take meta with them', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// ETag revalidation
-// ---------------------------------------------------------------------------
-
 function esiResult<T>(over: Partial<EsiResult<T>>): EsiResult<T> {
   return { data: null, etag: null, pages: 1, expires: null, notModified: false, ...over };
 }
@@ -258,9 +244,7 @@ describe('conditional revalidation (ETag / 304)', () => {
     const meta = await db.esiCacheMeta.get([CHAR_ID, KEY]);
     expect(meta?.fetchedAt).toBe(later);
     expect(meta?.expiresAt).toBe(Date.parse(expires.toUTCString()));
-    // The value row itself is untouched.
     expect((await db.esiCache.get([CHAR_ID, KEY]))?.fetchedAt).toBe(T0);
-    // And the bump holds: the next read is fresh.
     expect(await isCacheFresh(CHAR_ID, KEY)).toBe(true);
   });
 
@@ -279,8 +263,6 @@ describe('conditional revalidation (ETag / 304)', () => {
     at(T0);
     const first = conditionalFetch(async () => esiResult({ data: 'v1', etag: '"e1"' }));
     await loadWithCacheStatus(CHAR_ID, KEY, first.fetchLive, { conditional: first.conditional });
-    // Someone rewrote the row without an ETag (a stale bundle, a test seed)
-    // but meta still names the old one.
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'other', fetchedAt: T0 });
     await db.esiCacheMeta.put({ characterId: CHAR_ID, key: KEY, fetchedAt: T0, etag: '"e1"' });
 
@@ -360,7 +342,6 @@ describe('conditional revalidation (ETag / 304)', () => {
     await db.esiCacheMeta.put({ characterId: CHAR_ID, key: KEY, fetchedAt: T0 + 5 });
     const rows = await readCachedRows<string>([CHAR_ID], KEY);
     expect(rows.get(CHAR_ID)?.fetchedAt).toEqual(new Date(T0));
-    // The load path's fallback read too.
     at(T0 + STALE_AFTER.default + 1);
     const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
       throw new Error('offline');
@@ -370,13 +351,8 @@ describe('conditional revalidation (ETag / 304)', () => {
 });
 
 describe('per-page conditional revalidation of a paginated list (ETag / 304)', () => {
-  /** A server-side page: its items and the ETag it currently carries. */
   type ServerPage = { items: string[]; etag: string };
 
-  /**
-   * Answers like `fetchAllPagesStatus` would against `server`: a page whose
-   * sent ETag still matches is a 304 (no items), anything else a 200.
-   */
   function pagedFetch(
     server: ServerPage[],
     sent: Array<ReadonlyArray<string | undefined>> = [],
@@ -479,7 +455,6 @@ describe('per-page conditional revalidation of a paginated list (ETag / 304)', (
       'x',
       'e',
     ]);
-    // And the new page ETags are what the next read sends.
     at(T0 + 2 * (STALE_AFTER.default + 1));
     const sent: Array<ReadonlyArray<string | undefined>> = [];
     const again = await reload(changed, sent);
@@ -524,7 +499,6 @@ describe('per-page conditional revalidation of a paginated list (ETag / 304)', (
 
   it('a 304 page whose stored row has since changed refetches unconditionally', async () => {
     await seed();
-    // Rewritten without page ETags behind meta's back; meta still names them.
     const meta = await db.esiCacheMeta.get([CHAR_ID, KEY]);
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: ['other'], fetchedAt: T0 });
     await db.esiCacheMeta.put(meta!);

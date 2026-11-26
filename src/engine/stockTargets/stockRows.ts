@@ -1,59 +1,32 @@
-/**
- * The rows of a **Stock List**: each **Stock Target** against what the pilot
- * has listed at the market, its **Shortfall**, how much of that the hangar there
- * covers, the cost to source the rest, and a status word (GLOSSARY.md). Running jobs shrink the part still to source, never the status.
- *
- * Pure: quantities and prices are read by the feature layer and passed
- * in, so the same rows drive the Stock tab, the Overview card and the
- * below-target alert without any of them disagreeing about what "low" means.
- */
-
 import type { HolderCount } from './onHand';
 
-/** Below this share of its Stock Target an item reads as Low. */
 export const LOW_FILL_RATIO = 0.5;
 
 export type StockStatus = 'out' | 'low' | 'ok' | 'over';
 
-/** Worst first. Also the order the filter chips list the statuses in. */
 export const STOCK_STATUSES: readonly StockStatus[] = ['out', 'low', 'ok', 'over'];
 
 export interface StockRowInput {
   typeId: number;
   target: number;
-  /** Units the pilot has listed for sale at the market: what the status is measured by. */
   listed: number;
-  /** Units in the pilot's hangars at the market's station, ready to list. */
   inHangar: number;
-  /** ISK per unit, or null when no price is known. */
   price: number | null;
-  /** Whose sell orders make up `listed`, biggest first. Attribution only: no status or total reads it. */
   listedBy?: readonly HolderCount[];
-  /** Whose hangars make up `inHangar`, biggest first. */
   inHangarBy?: readonly HolderCount[];
-  /** Units on own Item Exchange contracts at the market, already inside `listed`: shown apart, not added again. */
   onContract?: number;
-  /** Units the pilot's running manufacturing and reaction jobs will deliver to the market (issue #6429). */
   inJobs?: number;
-  /** When the soonest of those jobs ends, ISO. */
   nextJobEnd?: string;
 }
 
 export interface StockRow extends StockRowInput {
-  /** Stock Target minus listed. */
   shortfall: number;
-  /** The part of the Shortfall the hangar at the market covers. */
   fromHangar: number;
-  /** In jobs, normalized: what is already being made for the market. */
   inJobs: number;
-  /** The part of the Shortfall the running jobs cover once the hangar has covered its share. */
   fromJobs: number;
-  /** The rest of the Shortfall: to buy, build or haul in. */
   toSource: number;
-  /** Listed over Stock Target; above 1 when over. */
   fill: number;
   status: StockStatus;
-  /** What is still to source, times price. Zero when nothing is; null when unpriced. */
   costToFill: number | null;
 }
 
@@ -62,9 +35,7 @@ export interface StockSummary {
   low: number;
   ok: number;
   over: number;
-  /** Items whose hangar stock at the market can cover some of the Shortfall. */
   readyToList: number;
-  /** Sum of the known costs to fill; unpriced ones are counted separately. */
   costToFill: number;
   unpricedShort: number;
 }
@@ -103,11 +74,6 @@ function toRow(input: StockRowInput): StockRow {
 
 const STATUS_RANK: Record<StockStatus, number> = { out: 0, low: 1, ok: 2, over: 3 };
 
-/**
- * Worst first: by status, then the dearest shortfall (an unpriced shortfall
- * ranks just below the priced ones in its status, since its cost is unknown,
- * not small), then the emptiest.
- */
 function compareRows(a: StockRow, b: StockRow): number {
   const byStatus = STATUS_RANK[a.status] - STATUS_RANK[b.status];
   if (byStatus !== 0) return byStatus;
@@ -117,7 +83,6 @@ function compareRows(a: StockRow, b: StockRow): number {
   return a.fill - b.fill;
 }
 
-/** One row per usable Stock Target, worst first. A target of 0 or less is dropped. */
 export function buildStockRows(inputs: readonly StockRowInput[]): StockRow[] {
   return inputs
     .filter((input) => input.target > 0)
@@ -145,13 +110,10 @@ export function summarizeStock(rows: readonly StockRow[]): StockSummary {
 }
 
 export interface BuilderSplit {
-  /** Rows still to source that the pilot holds a blueprint for. */
   buildable: StockRow[];
-  /** Rows still to source with no blueprint: build after getting one, or buy. */
   needsBlueprintOrBuy: StockRow[];
 }
 
-/** The Builder view's two groups. Rows the listings or the hangar cover belong to neither. */
 export function splitForBuilders(
   rows: readonly StockRow[],
   canBuild: (typeId: number) => boolean
@@ -164,5 +126,4 @@ export function splitForBuilders(
   return split;
 }
 
-/** Worst first, as `compareRows` ranks: the Status column sorts by this. */
 export const stockStatusRank = (status: StockStatus): number => STATUS_RANK[status];

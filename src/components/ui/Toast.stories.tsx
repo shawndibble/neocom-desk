@@ -4,12 +4,6 @@ import { Toast } from './Toast';
 
 const noop = () => {};
 
-/**
- * Fixed-position confirmation, portalled to the body. Feedback cue (§6c
- * Undo): a plain or Undo toast expires; one offering only an action stays until dismissed.
- *
- * @summary Transient confirmation floating above the tab bar.
- */
 const meta = {
   title: 'ui/Toast',
   component: Toast,
@@ -20,10 +14,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Feedback cue (§6c Undo): a plain note ("Copied") that expires; hover or focus pauses it. */
 export const Plain: Story = { args: { onClose: noop } };
 
-/** @summary Feedback cue (§6c Undo): an Undo link; expires after 8s, or closes sooner on Escape or a route change. */
 export const WithUndo: Story = {
   args: {
     message: 'Plan deleted',
@@ -32,7 +24,6 @@ export const WithUndo: Story = {
   },
 };
 
-/** @summary Feedback cue (§6c Undo): one follow-up action ("Open") on a toast that stays until dismissed. */
 export const WithAction: Story = {
   args: {
     message: 'Appraisal saved',
@@ -41,17 +32,14 @@ export const WithAction: Story = {
   },
 };
 
-/** @summary Feedback cue (§6c Undo): `success` — an outcome that could have failed and didn't. Green border, check glyph, "Success" spoken. */
 export const ToneSuccess: Story = {
   args: { message: 'Moon settings saved', tone: 'success', onClose: noop },
 };
 
-/** @summary Feedback cue (§6c Undo): `danger` — an outcome that failed. Red border, warning glyph, "Error" spoken. */
 export const ToneDanger: Story = {
   args: { message: "Couldn't copy the multibuy list", tone: 'danger', onClose: noop },
 };
 
-/** @summary Feedback cue (§6c Undo): over a panel, where it must still stand out from the page. */
 export const OverPanel: Story = {
   args: {
     message: 'Auto-Integrity Preservation Seal moved to To buy',

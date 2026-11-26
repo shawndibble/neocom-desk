@@ -1,24 +1,3 @@
-/**
- * LP Store "Spend my LP" (issue #6199): which redemptions, and how many of each,
- * turn the pilot's LP balance with one store into the most ISK on instant sell.
- *
- * Greedy, one redemption at a time: each step takes the candidate offer with the
- * best marginal ISK/LP against **shared** book state. An output sold by two offers
- * fills one buy book, a required item two offers need comes off one sell book, and
- * depth one step consumed is gone for the next. Every step is priced as the
- * difference between walking the whole plan's units with and without it, so the
- * walkers stay the existing ones (`walkSellBook`, `walkSellIntoBuys`) and the plan
- * sells each type as one stack, as a pilot would. Owned turn-ins are used first, at
- * zero cost. Fees are `loyaltyOfferProfit`'s on the instant basis.
- *
- * It stops when the LP runs out, when nothing left is profitable, when the next
- * step earns under the floor (the pilot's LP Value, else the store's market rate,
- * else 70% of the plan's best step), or when no step left fits a known wallet
- * balance (a step the wallet can't cover is skipped, like one the LP can't). A required item the sell book can't fill, or an output with no
- * buy book, leaves that offer unpriced: it drops out, never counted free.
- *
- * Pure: the caller (`features/loyalty`) fetches the books.
- */
 import { walkSellBook } from '@/engine/industry/depthPrice';
 import type { SkillLevels } from '@/engine/industry/types';
 import { walkSellIntoBuys, type ReachableBuyOrder } from '@/engine/market/buyReach';
@@ -28,38 +7,27 @@ import { capListedPrice } from '@/engine/market/tradedPriceCheck';
 import type { LpRate } from './marketLpValue';
 import { loyaltyOfferProfit } from './offerProfit';
 
-/** With no LP Value and no market rate, a step under this share of the plan's best stops it. */
 export const FALLBACK_FLOOR_SHARE = 0.7;
 
 export interface SpendCandidate {
   offerId: number;
-  /** Per redemption. */
   lpCost: number;
   iskCost: number;
-  /** Per redemption: a blueprint's materials plus job fee, 0 for a plain item. */
   buildCost: number;
   requiredItems: readonly { typeId: number; quantity: number }[];
-  /** The type sold: the item, or a blueprint's product. Null when unknown. */
   outputTypeId: number | null;
-  /** Units of it one redemption hands over. */
   outputUnits: number | null;
-  /** The output's **Traded Price Ceiling**: a bid far above it counts at it. */
   outputPriceCeiling?: number | null;
 }
 
 export interface SpendPlanInput {
   candidates: readonly SpendCandidate[];
   lpBalance: number;
-  /** The active Character's wallet; null when unknown (no cap). */
   walletBalance: number | null;
-  /** `lpRate(own, market)`: the floor when it has a rate. */
   lpValue: LpRate;
   stationId: number;
-  /** The station's sell book per required type; absent = failed, so unpriced. */
   sellBooks: ReadonlyMap<number, readonly HubOrder[]>;
-  /** Reachable buy orders per output type; absent = failed, so unpriced. */
   buyBooks: ReadonlyMap<number, readonly ReachableBuyOrder[]>;
-  /** Units the pilot already owns per required type. */
   owned: ReadonlyMap<number, number>;
   skills: SkillLevels;
   standing?: ResolvedStandings;
@@ -68,10 +36,7 @@ export interface SpendPlanInput {
 export type SpendStopReason = 'lpExhausted' | 'nothingProfitable' | 'belowFloor' | 'wallet';
 
 export type SpendFloor =
-  /** `yours`: the pilot's LP Value; `market`: the store's market rate. */
-  | { rate: number; source: 'yours' | 'market' }
-  /** 70% of `best`, the plan's best step so far. */
-  | { rate: number; source: 'best'; best: number };
+  { rate: number; source: 'yours' | 'market' } | { rate: number; source: 'best'; best: number };
 
 function bestShareFloor(best: number): SpendFloor {
   return { rate: FALLBACK_FLOOR_SHARE * best, source: 'best', best };
@@ -79,19 +44,14 @@ function bestShareFloor(best: number): SpendFloor {
 
 export interface SpendStop {
   reason: SpendStopReason;
-  /** The offer the plan would have taken next (on `lpExhausted`, the best one the LP left can't pay for; on `wallet`, the best one the wallet can't cover); null when none was priced. */
   offerId: number | null;
-  /** That next step's marginal ISK/LP. */
   iskPerLp: number | null;
-  /** The floor in force, set on `belowFloor`. */
   floor: SpendFloor | null;
 }
 
 export interface SpendTurnIn {
   typeId: number;
-  /** Owned units used. */
   owned: number;
-  /** Units bought off the sell book. */
   bought: number;
 }
 
@@ -99,15 +59,11 @@ export interface SpendPlanRow {
   offerId: number;
   redemptions: number;
   lpSpent: number;
-  /** The store's ISK price plus any build cost. */
   iskCost: number;
-  /** Required items bought (owned ones are free). */
   turnInsCost: number;
   turnIns: SpendTurnIn[];
-  /** Gross instant revenue. */
   revenue: number;
   salesTax: number;
-  /** Revenue net of sales tax. */
   income: number;
   profit: number;
 }
@@ -116,7 +72,6 @@ export interface SpendPlanTotals {
   lpSpent: number;
   iskCost: number;
   turnInsCost: number;
-  /** ISK the plan needs up front: `iskCost + turnInsCost`. */
   purchases: number;
   revenue: number;
   salesTax: number;
@@ -128,10 +83,8 @@ export interface SpendPlanResult {
   rows: SpendPlanRow[];
   totals: SpendPlanTotals;
   lpLeft: number;
-  /** `profit / lpSpent`; null with nothing spent. */
   iskPerLp: number | null;
   stop: SpendStop;
-  /** Offers that dropped out because a book could not price their next step (some may have planned rows). */
   unpriced: number[];
 }
 
@@ -146,7 +99,6 @@ interface Step {
   iskPerLp: number;
 }
 
-/** One candidate's need per required type, summed. */
 function needsOf(candidate: SpendCandidate): Map<number, number> {
   const needs = new Map<number, number>();
   for (const item of candidate.requiredItems) {
@@ -157,13 +109,10 @@ function needsOf(candidate: SpendCandidate): Map<number, number> {
 
 export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
   const { stationId } = input;
-  /** Units of each required type the plan has used, owned and bought. */
   const used = new Map<number, number>();
-  /** Units of each output type the plan has sold. */
   const sold = new Map<number, number>();
 
   const buyCost = new Map<string, number | null>();
-  /** ISK to buy the first `units` off `typeId`'s sell book; null when it can't fill them. */
   const costOf = (typeId: number, units: number): number | null => {
     if (units <= 0) return 0;
     const key = `${typeId}:${units}`;
@@ -178,7 +127,6 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
 
   const cappedBooks = new Map<string, readonly ReachableBuyOrder[]>();
   const saleRevenue = new Map<string, number>();
-  /** Gross ISK for selling the first `units` of `typeId` into its buy book. */
   const revenueOf = (
     typeId: number,
     ceiling: number | null,
@@ -203,7 +151,6 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
     return revenue;
   };
 
-  /** The next redemption of `candidate` against the plan so far; null when unpriced. */
   const stepOf = (candidate: SpendCandidate): Step | null => {
     const turnIns: SpendTurnIn[] = [];
     let turnInsCost = 0;
@@ -262,15 +209,12 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
   let lpLeft = Math.max(0, input.lpBalance);
   let purchases = 0;
   let best = -Infinity;
-  /** Cached next steps; cleared for every candidate that shares a type with the one taken. */
   const steps = new Map<SpendCandidate, Step | null>();
   let stop: SpendStop;
 
   for (;;) {
     let next: Step | null = null;
-    /** The best priced step the LP left can't pay for: named when the LP runs out. */
     let outOfReach: Step | null = null;
-    /** The best priced step the wallet can't cover: skipped, and named when nothing else is affordable. */
     let overWallet: Step | null = null;
     for (const candidate of alive) {
       if (!steps.has(candidate)) steps.set(candidate, stepOf(candidate));
@@ -289,8 +233,6 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
     for (const c of dead) unpriced.push(c.offerId);
     alive = alive.filter((c) => steps.get(c) !== null);
 
-    // With nothing affordable, the best step the wallet can't cover is checked like any
-    // other: only one that would earn and clear the floor stops the plan for the wallet.
     const head = next ?? overWallet;
     if (head === null) {
       stop =
@@ -393,12 +335,10 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
   };
 }
 
-/** ISK one step needs up front: the store's price, any build cost and the turn-ins bought. */
 function purchaseOf(step: Step): number {
   return step.candidate.iskCost + step.candidate.buildCost + step.turnInsCost;
 }
 
-/** Every type a candidate touches: its required items and its output. */
 function typesOf(candidate: SpendCandidate): number[] {
   const types = candidate.requiredItems.map((item) => item.typeId);
   if (candidate.outputTypeId !== null) types.push(candidate.outputTypeId);

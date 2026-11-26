@@ -1,11 +1,3 @@
-/**
- * Vetting, both sides, against the Storybook stand-in backend (`src/storybook/vettingFixture.ts`
- * through `setVettingBackendOverride`): a Director's queue opens a report with its flags, and
- * the public apply link renders its start page with nobody logged in.
- *
- * Dev server only: the override is installed by importing those `/src` modules into the running
- * app, and the e2e build has no Firebase.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -19,33 +11,25 @@ import type {
 } from '../src/storybook/vettingFixture';
 import type { db } from '../src/db';
 
-/**
- * Installs the stand-in in the running app, then moves to `path` inside the same page load (a
- * full navigation would load the modules afresh and lose it). `path` may name the fixture's
- * corporation as `<corp>`. Resolves to how many Character rows were given a corporation.
- */
 async function installAndOpen(page: Page, path: string, characterId?: number): Promise<number> {
   return page.evaluate(
     async ({ path, characterId, corporationId }) => {
-      // Indirected through variables so `tsc` leaves them alone: dev-server URLs, not paths this
-      // spec's module graph resolves. The casts are checked against the real signatures.
       const urls = {
         db: '/src/db/index.ts',
         backend: '/src/features/corp/vetting/vettingBackend.ts',
         fixture: '/src/storybook/vettingFixture.ts',
       };
-      const backend = (await import(/* @vite-ignore */ urls.backend)) as {
+      const backend = (await import(urls.backend)) as {
         setVettingBackendOverride: typeof setVettingBackendOverride;
       };
-      const fixture = (await import(/* @vite-ignore */ urls.fixture)) as {
+      const fixture = (await import(urls.fixture)) as {
         createVettingFixture: typeof createVettingFixture;
         VETTING_FIXTURE_CORPORATION: typeof VETTING_FIXTURE_CORPORATION;
       };
       backend.setVettingBackendOverride(fixture.createVettingFixture());
       let updated = 0;
       if (characterId !== undefined) {
-        // The queue reads for the active pilot's corporation.
-        const store = (await import(/* @vite-ignore */ urls.db)) as { db: typeof db };
+        const store = (await import(urls.db)) as { db: typeof db };
         updated = await store.db.characters.update(characterId, { corporationId });
       }
       const target = path.replace(
@@ -99,7 +83,6 @@ test('a Director opens a review from the vetting queue and sees its flags', asyn
 
 test('the apply link shows its start page with nobody logged in', async ({ page }) => {
   await page.goto('./login');
-  // The app has booted once the login page's own button is up.
   await expect(page.getByRole('button', { name: /EVE Online/ }).first()).toBeVisible();
   await installAndOpen(page, '/apply/<corp>');
 
@@ -111,7 +94,6 @@ test('the apply link shows its start page with nobody logged in', async ({ page 
     page.getByText('Who sent and who received each mail. Never the subject or the text')
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' })).toBeVisible();
-  // No account: the app's rail is not drawn around a public page.
   await expect(page.getByRole('navigation')).toHaveCount(0);
 });
 
@@ -133,7 +115,6 @@ for (const width of [1024, 1280]) {
       const tableBox = (await table.boundingBox())!;
       expect(tableBox.x + tableBox.width, 'table inside its panel').toBeLessThanOrEqual(panel! + 1);
       await expectNoPageOverflow(page);
-      // Two lines of 14px text plus padding; three lines would clear it.
       expect((await row.boundingBox())!.height, 'queue row at most two lines').toBeLessThan(80);
     } else {
       await expect(charactersHeader).toBeVisible();
@@ -146,7 +127,6 @@ for (const width of [1024, 1280]) {
     const fit = await scrollerFit(declared);
     expect(fit, 'Declared characters has its own scroller').not.toBeNull();
     const box = (await declared.boundingBox())!;
-    // Inside its panel, or scrolling there: never past the border.
     const edge = await panelRight(declared);
     expect(fit!.right, 'scroller inside the panel').toBeLessThanOrEqual(edge! + 1);
     if (box.x + box.width > edge! + 1) expect(fit!.scrollWidth).toBeGreaterThan(fit!.clientWidth);

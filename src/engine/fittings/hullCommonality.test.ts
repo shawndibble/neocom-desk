@@ -13,7 +13,6 @@ import {
   type PropulsionKind,
 } from './hullCommonality';
 
-// Types 1..9 are group 100 + type (so each type is its own group); 20/21 share group 46.
 const groupOf = (typeId: number) => (typeId >= 20 ? 46 : 100 + typeId);
 const kindOf = (typeId: number): PropulsionKind | null =>
   typeId === 20 ? 'afterburner' : typeId === 21 ? 'mwd' : typeId === 30 ? 'mjd' : null;
@@ -71,7 +70,6 @@ describe('hullCommonality', () => {
   it('shares per propulsion kind, and never per variant', () => {
     expect(common.pve?.propulsion).toEqual({ afterburner: 0.6, mwd: 0.4, mjd: 0 });
     expect(commonPropulsionKind(common.pve)).toBe('afterburner');
-    // Only group ids are keys: no type id appears.
     expect([...(common.pve?.groupShare.keys() ?? [])].sort((a, b) => a - b)).toEqual([
       46, 101, 102, 103,
     ]);

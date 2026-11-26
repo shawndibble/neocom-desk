@@ -1,19 +1,13 @@
-/**
- * Where an Improve search stands when it has nothing to list: progress with
- * Cancel and "Show best so far", or why there is nothing to show.
- */
 import { useTranslation } from 'react-i18next';
 import { Button, LoadFailedState, ProgressBar, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import type { ImproveSearch } from './useImprove';
 
-/** The search's own state: progress, cancelled, below the budget's price, or failed. Nothing once done. */
 export function ImproveSearchStatus({
   search,
   round,
 }: {
   search: ImproveSearch;
-  /** A multi-round search (Makeover): the round it is in and the most it will run. */
   round?: { current: number; max: number };
 }) {
   const { t } = useTranslation();

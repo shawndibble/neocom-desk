@@ -36,8 +36,6 @@ describe('buildLocationPatch', () => {
   });
 
   it('keeps the id when ESI withheld the name, and stores no name', () => {
-    // The label that stands in for a withheld name is UI copy, so the record
-    // holds the id alone and the picker composes the rest.
     const patch = buildLocationPatch(option({ name: null }));
 
     expect(patch.buildLocationId).toBe(1);
@@ -52,8 +50,6 @@ describe('buildLocationPatch', () => {
   });
 
   it('clears rig and tax when the pick is an NPC station', () => {
-    // A station has no rig slots and no owner to set a tax, so neither is the
-    // pilot's to carry over from wherever they built last.
     const patch = buildLocationPatch(option({ facility: 'npcStation', name: 'Jita IV - Moon 4' }));
 
     expect(patch).toMatchObject({
@@ -63,8 +59,6 @@ describe('buildLocationPatch', () => {
   });
 
   it("leaves the station's own 0.25% to the engine rather than writing it onto the plan", () => {
-    // Cleared, not set to 0.25: the rate is CCP's, and `jobFee` reads it from
-    // the preset. Writing it onto the plan would freeze today's number.
     const patch = buildLocationPatch(option({ facility: 'npcStation' }));
     const fee = jobFee(1_000_000, 0.05, FACILITY_PRESETS.npcStation, patch.facilityTaxPct);
 

@@ -1,8 +1,3 @@
-/**
- * How long some skill levels take the active Character — prerequisites
- * included, at their attributes, implants and clone state — the schedule a
- * Skill Plan uses. Shared by What to train and Make it fit.
- */
 import { useMemo } from 'react';
 import type { SkillPlanRecord } from '@/db';
 import { normalizePlan } from '@/engine/skills/plan';
@@ -19,7 +14,6 @@ export function useTrainingSchedule(characterId: number) {
   const cloneStates = useCloneStates((state) => state.value);
   useHydratedStore(useCloneStates);
   const cloneState = cloneStateFor(cloneStates, characterId);
-  // Null before the Character's skills are in, or every row would time from level 0.
   const scheduleEntriesFor = useMemo(
     (): ScheduleEntries | null =>
       catalog && trainedSkillsKnown
@@ -37,11 +31,6 @@ export function useTrainingSchedule(characterId: number) {
   return { ...data, scheduleEntriesFor };
 }
 
-/**
- * Highest level `plan` trains each skill to — its derived prerequisite rows
- * included, so a level it already trains on the way to another entry isn't
- * offered again as a redundant entry.
- */
 export function usePlannedLevels(
   plan: SkillPlanRecord | undefined,
   catalog: { engineSkills: ReadonlyMap<number, EngineSkill> } | null | undefined,
@@ -54,16 +43,13 @@ export function usePlannedLevels(
     const raise = (skillTypeID: number, level: number) =>
       levels.set(skillTypeID, Math.max(levels.get(skillTypeID) ?? 0, level));
     for (const entry of plan.entries) raise(entry.skillTypeID, entry.targetLevel);
-    // Not before the Character's skills are in, or every prerequisite would count as untrained.
     if (!catalog || !trainedSkillsKnown) return levels;
     try {
       const known = plan.entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
       for (const step of normalizePlan(known, catalog.engineSkills, trainedSkills)) {
         raise(step.skillTypeID, step.level);
       }
-    } catch {
-      // A circular plan is the Skill Plan editor's to report; its entries still count.
-    }
+    } catch {}
     return levels;
   }, [plan, catalog, trainedSkills, trainedSkillsKnown]);
 }

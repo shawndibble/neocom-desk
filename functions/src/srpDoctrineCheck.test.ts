@@ -11,7 +11,6 @@ const slotted = (type: number, flag: number, qty = 1) => ({
   quantity_destroyed: qty,
   quantity_dropped: 0,
 });
-// SDE slot map: 405 high, 4395 rig; 47408 is an abyssal medium module.
 const HIGH = 405;
 const RIG = 4395;
 const MED_FLAG = 19;
@@ -42,9 +41,9 @@ describe('fittedFromKillmail', () => {
       victim([
         slotted(HIGH, 27, 2),
         slotted(RIG, 92),
-        slotted(HIGH, 5), // cargo flag
-        slotted(34, 27), // a charge-like item in a high slot: not in the slot map
-        slotted(RIG, 27), // wrong rack for its flag
+        slotted(HIGH, 5),
+        slotted(34, 27),
+        slotted(RIG, 27),
       ])
     );
     expect(f).toEqual({ hullTypeId: HULL, modules: [HIGH, HIGH], rigs: [RIG] });

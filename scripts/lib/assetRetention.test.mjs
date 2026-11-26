@@ -41,7 +41,6 @@ describe('planRetention', () => {
   });
 
   it('counts retention from when an asset left the build, not when it first shipped', () => {
-    // A chunk current for days, replaced today, must still be carried.
     const plan = planRetention({
       previous: { current: ['assets/x-old.js'], retired: {} },
       built: [],
@@ -91,8 +90,6 @@ describe('parseAssetHistory', () => {
   });
 
   it('drops any path that is not a flat file under assets/', () => {
-    // The file comes back off the live site; a bad entry must never let the
-    // deploy write outside dist/assets/ or carry index.html / sw.js.
     const text = JSON.stringify({
       current: ['assets/ok.js', '../etc/passwd', 'index.html', 'assets/../sw.js', 'assets/a/b.js'],
       retired: { 'assets/ok.css': NOW, 'sw.js': NOW, 'assets/bad.js': 'soon' },

@@ -74,7 +74,6 @@ describe('transactionMarginReport', () => {
 
 describe('pooledTransactionMargins', () => {
   it("prices a main's sale against an alt's buy, keeping each journal to its own Character", () => {
-    // Same ids on both wallets: renumbering keeps them apart.
     const altBuy = fill({ transaction_id: 1, journal_ref_id: 11 });
     const mainSale = fill({ ...SALE, transaction_id: 1, journal_ref_id: 12 });
     const { rows, margins } = pooledTransactionMargins([
@@ -107,8 +106,6 @@ describe('pooledTransactionMargins gaps', () => {
     expect(gaps.get(rows[0].transaction_id)).toBe('noBuy');
   });
 
-  // ESI's real transaction_tax lines carry no context, and a sale's
-  // journal_ref_id names neither its market_transaction line nor its tax line.
   describe('with a bare journal, as ESI sends it', () => {
     const at = '2026-01-02T00:00:00Z';
     const proceeds = (id: number, amount = 600): WalletJournalEntry => ({
@@ -157,7 +154,6 @@ describe('pooledTransactionMargins gaps', () => {
       };
       const { margins } = transactionMarginReport(
         [BUY, SALE, small],
-        // SALE's proceeds line has no tax line after it; `small`'s is complete.
         [proceeds(500), proceeds(502, 200), bareTax(503, -8.4)]
       );
       expect(margins.has(2)).toBe(false);

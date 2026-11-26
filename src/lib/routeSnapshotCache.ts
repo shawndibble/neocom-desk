@@ -1,59 +1,21 @@
-/**
- * The last snapshot each view loaded, keyed by Character and then by view:
- * held in memory for synchronous reads during render, and mirrored to Dexie
- * (`routeSnapshots`) so the first visit after a reload opens on it too
- * (decision 20261030-170439).
- *
- * `useRouteSnapshot` keeps its snapshot in `useState`, so it dies with the
- * component — and React Router unmounts a route on navigation. That made every
- * tab visit start from `null` with `loading` true, i.e. a spinner, even though
- * `esi/cache.ts` had the rows in Dexie the whole time. The app's promise is the
- * opposite (CLAUDE.md, `STALE_AFTER.default`): page-to-page navigation shows
- * what it already has and updates in place.
- *
- * The stored copy is only ever a first frame: the view's loader still runs and
- * replaces it. A row another build wrote (`__APP_RELEASE__`: its shape may
- * differ), or older than `MAX_AGE_MS`, is dropped on read.
- */
 import { db } from '@/db';
 import { isAnyCachePurgePending, isCachePurgePending, onCachePurged } from '@/esi/cachePurge';
 import { DAY_MS } from './age';
 
-/**
- * Character id → view name → that view's last snapshot.
- *
- * Nested rather than one flat `name:characterId` key so a purge is an outer
- * `delete`, with no string parsing to get subtly wrong for one id that happens
- * to end with another.
- */
 const byCharacter = new Map<number, Map<string, unknown>>();
 
-/**
- * The owner id for a value pooled across every Character on the account (all
- * their assets, their skills). Never a real Character id, and forgotten along
- * with any one Character's snapshots, since it carries that Character's data.
- */
 export const ACCOUNT_SNAPSHOT_ID = 0;
 
-/** Older than this, a stored snapshot is no longer worth showing as a first frame. */
 const MAX_AGE_MS = 7 * DAY_MS;
 
-/** How long a queued write may wait for an idle moment. */
 const IDLE_TIMEOUT_MS = 2000;
 
-/** Off under Vitest, so one test's snapshot can never return in another through a hydrate. */
 let persist = import.meta.env.MODE !== 'test';
 
-/**
- * Bumped by every purge (per Character, or `globalEpoch` for all): a hydrate
- * or a queued write that began under an older epoch is dropped, so a late
- * write can never bring a purged owner's rows back.
- */
 let globalEpoch = 0;
 const characterEpoch = new Map<number, number>();
 const epochOf = (characterId: number) => `${globalEpoch}:${characterEpoch.get(characterId) ?? 0}`;
 
-/** One Dexie read per Character per session; later misses wait on the same one. */
 const hydrations = new Map<number, Promise<void>>();
 
 interface PendingWrite {
@@ -63,20 +25,14 @@ interface PendingWrite {
   epoch: string;
 }
 const pendingWrites = new Map<string, PendingWrite>();
-/** The reference last stored per view: an unchanged snapshot is not cloned again. */
 const lastStored = new Map<string, unknown>();
 const warnedNotPlain = new Set<string>();
 let flushScheduled = false;
 
 const writeKey = (characterId: number, name: string) => `${characterId}\u0000${name}`;
 
-/** Views loaded (not just revived from Dexie) this session. */
 const sessionWritten = new Set<string>();
 
-/**
- * Whether structured clone gives `value` back intact. A class instance keeps
- * its fields but loses its methods, which fails only when a page calls one.
- */
 function isPlain(value: unknown, seen = new Set<unknown>()): boolean {
   if (value === null || typeof value !== 'object') {
     return typeof value !== 'function' && typeof value !== 'symbol';
@@ -118,13 +74,10 @@ async function writeOne(entry: PendingWrite): Promise<void> {
       appVersion: __APP_RELEASE__,
     });
   } catch {
-    // A full disk, a clone the check missed, a closing database: the memory
-    // copy still serves this session; only the stored one goes un-updated.
     lastStored.delete(key);
   }
 }
 
-/** Write every queued snapshot now. Also the idle callback's body. */
 export async function flushRouteSnapshotWrites(): Promise<void> {
   flushScheduled = false;
   const entries = [...pendingWrites.values()];
@@ -157,12 +110,10 @@ function remember(name: string, characterId: number, data: unknown): void {
   views.set(name, data);
 }
 
-/** The purge epoch a load starts under, for `writeRouteSnapshot`'s `startedAt`. */
 export function routeSnapshotEpoch(characterId: number): string {
   return epochOf(characterId);
 }
 
-/** Whether this session loaded the view, rather than only reviving it from Dexie. */
 export function hasSessionRouteSnapshot(name: string, characterId: number): boolean {
   return sessionWritten.has(writeKey(characterId, name));
 }
@@ -172,12 +123,7 @@ export function writeRouteSnapshot<T>(
   characterId: number,
   data: T,
   options: {
-    /**
-     * `routeSnapshotEpoch` as the load began: a purge since then means the
-     * data may be the previous owner's, so it is neither kept nor stored.
-     */
     startedAt?: string;
-    /** `false` keeps it in memory only: too large to clone on every load (the Industry catalog). */
     persist?: boolean;
   } = {}
 ): void {
@@ -194,10 +140,6 @@ export function writeRouteSnapshot<T>(
   scheduleFlush();
 }
 
-/**
- * Load one Character's stored snapshots into memory, once per session. Never
- * overwrites a snapshot this session already holds: that one is newer.
- */
 export function hydrateRouteSnapshots(characterId: number): Promise<void> {
   if (!persist) return Promise.resolve();
   const running = hydrations.get(characterId);
@@ -205,8 +147,6 @@ export function hydrateRouteSnapshots(characterId: number): Promise<void> {
   const epoch = epochOf(characterId);
   const hydration = (async () => {
     try {
-      // A purge that could not delete (`cachePurge` tier 3) must not be undone
-      // by reading the rows it left behind.
       const suppressed =
         characterId === ACCOUNT_SNAPSHOT_ID
           ? await isAnyCachePurgePending()
@@ -225,9 +165,7 @@ export function hydrateRouteSnapshots(characterId: number): Promise<void> {
         }
       }
       if (expired.length > 0) await db.routeSnapshots.bulkDelete(expired);
-    } catch {
-      // No stored copy is the old behaviour: the view loads as it always did.
-    }
+    } catch {}
   })();
   hydrations.set(characterId, hydration);
   return hydration;
@@ -239,17 +177,7 @@ function dropPending(characterId: number | null): void {
   }
 }
 
-/**
- * Drop every view's retained snapshot for one Character, in memory and in Dexie.
- *
- * Blunt on purpose, exactly as `purgeCharacterCache` is: over-forgetting costs
- * one Dexie re-read, under-forgetting is a privacy bug. That matters most for
- * `purgeCorpScopedCache`, which deletes only the `corp:` rows — forgetting
- * just as bluntly there is what keeps a previous corporation's board, roster
- * and assets off the screen after a corp change.
- */
 export function forgetRouteSnapshots(characterId: number): void {
-  // Account-wide values pool every Character, the purged one included.
   for (const id of [characterId, ACCOUNT_SNAPSHOT_ID]) {
     characterEpoch.set(id, (characterEpoch.get(id) ?? 0) + 1);
     byCharacter.delete(id);
@@ -271,18 +199,9 @@ export function forgetRouteSnapshots(characterId: number): void {
       .anyOf(characterId, ACCOUNT_SNAPSHOT_ID)
       .delete()
       .catch(() => undefined);
-  } catch {
-    // A broken store throws out of `where` synchronously. The rows stay on
-    // disk, but the purge's suppression keeps `hydrateRouteSnapshots` from
-    // reading them back.
-  }
+  } catch {}
 }
 
-/**
- * Every Character's, in memory and in Dexie: the cache-wide `esiCache.clear()`
- * fallback tier, Settings › Clear cache, and deleting all local data. Writes
- * queued or loads started before it are dropped (the epoch moves).
- */
 export async function clearRouteSnapshots(): Promise<void> {
   globalEpoch += 1;
   byCharacter.clear();
@@ -293,10 +212,6 @@ export async function clearRouteSnapshots(): Promise<void> {
   if (persist) await db.routeSnapshots.clear().catch(() => undefined);
 }
 
-/**
- * Test seam, and a reload's effect on this module: memory goes, Dexie stays.
- * Module state otherwise outlives a `beforeEach` that only clears Dexie.
- */
 export function resetRouteSnapshots(): void {
   globalEpoch += 1;
   byCharacter.clear();
@@ -307,7 +222,6 @@ export function resetRouteSnapshots(): void {
   flushScheduled = false;
 }
 
-/** Test seam: persistence is off under Vitest unless a test turns it on. */
 export function setRouteSnapshotPersistence(on: boolean): void {
   persist = on;
 }

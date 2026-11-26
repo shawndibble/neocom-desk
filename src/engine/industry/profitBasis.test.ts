@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { breakEvenPrice } from './fees';
 import { profitOnBasis, type ProfitBasisInput } from './profitBasis';
 
-// The Raven plan the redesign was drawn from: one run, 147.9M market price,
-// 86.8M total cost, 48.85M of owned Pyerite and Tritanium.
 const raven: ProfitBasisInput = {
   result: {
     profit: 52_275_610,

@@ -25,19 +25,15 @@ import type { WalletJournalEntry } from '@/esi/endpoints';
 
 interface WalletJournalPanelProps {
   activeCharacterId: number;
-  /** The Journal tab covers more than the active Character. */
   showingBeyondActive: boolean;
   iskPanelOpen: boolean;
   refreshCount: number;
   archive: WalletArchiveInfo | undefined;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
   journalNeedsReauth: boolean;
-  /** The active Character's own journal rows (empty = nothing to list). */
   journalLength: number;
-  /** The fan-out journals, once loaded; null while loading or failed. */
   allJournalsData: AllJournalsSnapshot | null;
   allJournalsLoading: boolean;
-  /** Null when the multi view has no Characters picked, so nothing is loading. */
   hasJournalSelection: boolean;
   onRetryAllJournals: () => void;
   journalFetchedAt: Date | null;
@@ -50,7 +46,6 @@ interface WalletJournalPanelProps {
   coverage: NonNullable<ComponentProps<typeof JournalTable>['panel']>['coverage'];
 }
 
-/** The Journal tab: a Character's (or several Characters') wallet journal and its filters. */
 export function WalletJournalPanel({
   activeCharacterId,
   showingBeyondActive,

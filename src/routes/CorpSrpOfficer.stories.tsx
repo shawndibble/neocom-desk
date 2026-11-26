@@ -28,7 +28,6 @@ const routes = (): FixtureRoute[] => [
   { path: /^\/characters\/\d+\/roles$/, respond: () => ({ body: { roles: ROLES[role] } }) },
 ];
 
-/** Adds what the result mail needs: the corporation's name and a mail send that answers a mail id. */
 const mailRoutes = (): FixtureRoute[] => [
   ...routes(),
   {
@@ -58,7 +57,6 @@ function SampleQueue({
   mode: SrpFixtureRole;
   scenario: SrpOfficerScenario;
 }) {
-  // A layout effect, so the stand-ins are in place before the page's load effects run; fresh per story.
   useLayoutEffect(() => {
     role = mode;
     setSrpBackendOverride(createSrpFixture(mode, 'configured'));
@@ -97,7 +95,6 @@ const openTab =
   (name: RegExp) =>
   async ({ canvasElement }: { canvasElement: HTMLElement }) => {
     const body = within(canvasElement);
-    // The tab bar is Tabs on a desktop and a SegmentedControl (pressed buttons) on a phone.
     await body.findAllByRole('checkbox');
     const control =
       body.queryByRole('tab', { name }) ?? (await body.findByRole('button', { name }));
@@ -111,13 +108,10 @@ const openClaim =
     await userEvent.click((await body.findAllByText(pilot))[0]!);
   };
 
-/** @summary The officer queue: five pending claims, one with no worked-out amount, and the activity feed. */
 export const Queue: Story = { decorators: [withQueue('director', 'queue')] };
 
-/** @summary The queue in the phone shell: dense cards, Select all in the list, Approve and Reject per card. */
 export const QueuePhone: Story = { ...Queue, globals: phone };
 
-/** @summary Two claims ticked: the bulk Approve (n) button. */
 export const Selected: Story = {
   ...Queue,
   play: async ({ canvasElement }) => {
@@ -128,40 +122,28 @@ export const Selected: Story = {
   },
 };
 
-/** @summary Two claims ticked on a phone: the bar pinned above the tab bar. */
 export const SelectedPhone: Story = { ...Selected, globals: phone };
 
-/** @summary Owed: approved claims waiting to be paid in game, with Copy amount and Mark paid. */
 export const Owed: Story = { ...Queue, play: openTab(/owed/i) };
 
-/** @summary Owed on a phone. */
 export const OwedPhone: Story = { ...Owed, globals: phone };
 
-/** @summary History: paid and rejected claims with their reasons. */
 export const History: Story = { ...Queue, play: openTab(/history/i) };
 
-/** @summary History on a phone. */
 export const HistoryPhone: Story = { ...History, globals: phone };
 
-/** @summary Nothing waiting. */
 export const Empty: Story = { decorators: [withQueue('director', 'empty')] };
 
-/** @summary Nothing waiting, phone shell. */
 export const EmptyPhone: Story = { ...Empty, globals: phone };
 
-/** @summary A pending claim's detail: facts, the Off doctrine diff against the nearest Doctrine Fit, killmail link, audit trail, Reject and Approve. The Pending queue flags the same claim Off doctrine. */
 export const DetailPending: Story = { ...Queue, play: openClaim('Varro Kestane') };
 
-/** @summary A pending claim whose fit matched a Doctrine Fit: the detail names it; the queue row carries no flag. */
 export const DetailOnDoctrine: Story = { ...Queue, play: openClaim('Lysa Kestane') };
 
-/** @summary The matched detail on a phone. */
 export const DetailOnDoctrinePhone: Story = { ...DetailOnDoctrine, globals: phone };
 
-/** @summary The detail on a phone: Reject and Approve pinned at the bottom. */
 export const DetailPendingPhone: Story = { ...DetailPending, globals: phone };
 
-/** @summary An approved claim whose amount an officer changed: computed figure, reason and audit trail. */
 export const DetailOverridden: Story = {
   ...Queue,
   play: async (ctx) => {
@@ -170,10 +152,8 @@ export const DetailOverridden: Story = {
   },
 };
 
-/** @summary The overridden detail on a phone. */
 export const DetailOverriddenPhone: Story = { ...DetailOverridden, globals: phone };
 
-/** @summary Reject dialog: the reason is required and goes to the pilot. */
 export const RejectDialog: Story = {
   ...Queue,
   play: async ({ canvasElement }) => {
@@ -182,10 +162,8 @@ export const RejectDialog: Story = {
   },
 };
 
-/** @summary Reject dialog in the phone shell: a bottom sheet. */
 export const RejectDialogPhone: Story = { ...RejectDialog, globals: phone };
 
-/** @summary Change amount, from the claim detail: the computed amount and basis stay visible. */
 export const ChangeAmountDialog: Story = {
   ...Queue,
   play: async (ctx) => {
@@ -195,10 +173,8 @@ export const ChangeAmountDialog: Story = {
   },
 };
 
-/** @summary Change amount in the phone shell. */
 export const ChangeAmountDialogPhone: Story = { ...ChangeAmountDialog, globals: phone };
 
-/** @summary An Accountant opens SRP: the queue is theirs, Settings is not listed. */
 export const AccountantQueue: Story = { decorators: [withQueue('accountant', 'queue')] };
 
 const approveFirst = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
@@ -214,7 +190,6 @@ const approveTwo = async ({ canvasElement }: { canvasElement: HTMLElement }) => 
   await userEvent.click(await body.findByRole('button', { name: /^approve \(2\)/i }));
 };
 
-/** @summary Approve with the mail permission: the result line says the pilot was mailed. */
 export const ApprovedMailed: Story = {
   ...Queue,
   parameters: {
@@ -224,14 +199,10 @@ export const ApprovedMailed: Story = {
   play: approveFirst,
 };
 
-/** @summary Mailed approve on a phone. */
 export const ApprovedMailedPhone: Story = { ...ApprovedMailed, globals: phone };
 
-/** @summary Bulk approve with the mail permission: one mail per pilot, summarised in one line. */
 export const BulkApprovedMailed: Story = { ...ApprovedMailed, play: approveTwo };
 
-/** @summary Approve without the mail permission: saved, "No mail sent", and a Grant note. */
 export const ApprovedNoMailPermission: Story = { ...Queue, play: approveFirst };
 
-/** @summary No-permission approve on a phone. */
 export const ApprovedNoMailPermissionPhone: Story = { ...ApprovedNoMailPermission, globals: phone };

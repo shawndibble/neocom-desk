@@ -1,9 +1,3 @@
-/**
- * The active haul (issue #4965): a Move plan's Haul route, saved as a local
- * snapshot when the pilot clicks Show my route. It has its own id and is never
- * recomputed from the plan afterwards, so re-planning the move cannot move a
- * Leg under a pilot who is already underway. Device-local, never synced.
- */
 import type { ConsolidationLine } from '@/engine/assets/consolidation';
 import type { MovePlan } from '@/engine/assets/movePlan';
 import type {
@@ -23,18 +17,12 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 
 export interface ActiveHaul {
-  /** Names this snapshot; a replacement gets a new one. */
   id: string;
   createdAt: number;
   capacityM3: number;
-  /** The max ISK per haul the route was worked out under; absent for none, and on a haul saved before the limit. */
   maxIskPerHaul?: number;
   destination: HaulPlace;
   plan: HaulPlan;
-  /**
-   * Ids of the Legs ticked done (#4968). Kept on the snapshot, so it is keyed
-   * to `id`: a replacement or a re-plan starts with none. Absent means none.
-   */
   doneLegIds?: number[];
 }
 
@@ -95,14 +83,12 @@ function parseActiveHaul(raw: unknown): ActiveHaul | null {
   return raw as ActiveHaul;
 }
 
-/** The saved active haul, or `null` for none. */
 export const useActiveHaul = createLocalSetting<ActiveHaul | null>({
   key: 'activeHaul',
   defaultValue: null,
   parse: (raw) => (raw === null ? null : parseActiveHaul(raw)),
 });
 
-/** One pickup's m³ the hauler can actually carry: unfit and over-limit stacks and too-big ships are left out. */
 function carriableM3(plan: MovePlan, characterId: number, locationId: number, totalM3: number) {
   const hauled = plan.active?.pickups.find(
     (h) => h.characterId === characterId && h.locationId === locationId
@@ -115,11 +101,6 @@ function carriableM3(plan: MovePlan, characterId: number, locationId: number, to
   return Math.max(0, totalM3 - lost);
 }
 
-/**
- * The item stacks of one pickup the hauler carries, by the same rule as
- * `carriableM3`: unfit and over-limit stacks and too-big ships come out; a stack with no known
- * volume was never in the pickup's m³. Quantities are what is left after those.
- */
 export function carriableStacks(
   plan: MovePlan,
   characterId: number,
@@ -157,25 +138,14 @@ export function carriableStacks(
 export interface BuildHaulArgs {
   plan: MovePlan;
   destination: HaulPlace;
-  /** Pickup location name by location id. */
   places: ReadonlyMap<number, string>;
-  /** Solar system of each pickup location. */
   systems: ReadonlyMap<number, number | null>;
-  /** The station or structure a pickup location is, for the stop's tag; absent for a container. */
   stationIds: ReadonlyMap<number, number>;
-  /** ISK of one unit by typeID; a type absent is unpriced. */
   unitIsk?: ReadonlyMap<number, number>;
-  /** Most one trip's load may be worth; null or absent for no limit. */
   maxIskPerHaul?: number | null;
   name: (typeId: number) => string;
 }
 
-/**
- * Works the Haul route out for a plan under the saved Jump Basis, from each
- * Character's Current System. A plan with no hauler (ships only, or nothing
- * any hull could carry) still routes its flights. `null` when the plan has
- * nothing to route or the stargate snapshot cannot be read.
- */
 export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul | null> {
   const { plan, destination, places, systems, stationIds, name, unitIsk } = args;
   const maxIskPerHaul = args.maxIskPerHaul ?? null;
@@ -227,16 +197,9 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
 
 export type ReplanResult =
   | { status: 'replanned'; haul: ActiveHaul }
-  /** A Character's hold is loaded and not yet delivered: re-planning would lose that delivery. */
   | { status: 'loaded'; names: string[] }
-  /** The stargate snapshot could not be read, or nothing is left to plan. */
   | { status: 'unknown' };
 
-/**
- * Re-optimises what is left of a haul from where each Character is (#4968).
- * The new snapshot has its own id and no ticks: Leg ids restart with the new
- * plan. Only on the pilot's ask; a tick never re-orders the route.
- */
 export async function replanActiveHaul(haul: ActiveHaul): Promise<ReplanResult> {
   const { characters, loaded } = replanInputs(haul.plan, haul.doneLegIds ?? []);
   if (loaded.length > 0) return { status: 'loaded', names: loaded };
@@ -272,7 +235,6 @@ function newId(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** Route Safety opened on one Leg: from its origin system to its destination stop, station tag and all. */
 export function legRouteHref(leg: HaulLeg): string | null {
   if (leg.to.systemId === null) return null;
   return routeStopsHref(leg.from?.systemId ?? null, [
@@ -280,7 +242,6 @@ export function legRouteHref(leg: HaulLeg): string | null {
   ]);
 }
 
-/** Route Safety through every stop of `legs` in order, from `from`: a Character's whole route in one trip. */
 export function sectionRouteHref(legs: readonly HaulLeg[], from: HaulPlace | null): string | null {
   const stops = legs.flatMap((leg) =>
     leg.to.systemId === null ? [] : [{ systemId: leg.to.systemId, stationId: leg.to.stationId }]

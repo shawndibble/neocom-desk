@@ -19,7 +19,6 @@ const GURISTAS = 500010;
 const ORE = ORE_FACTION_ID;
 const EDENCOM = 500027;
 
-// Class ids (shipTreeGroups).
 const CORVETTE = 4;
 const FRIGATE = 8;
 const NAVY_FRIGATE = 9;
@@ -51,7 +50,6 @@ function node(layout: ShipTreeLayout, id: number): ShipTreeNode {
 
 type Cmd = { c: 'M' | 'H' | 'V' | 'L'; x: number; y: number };
 
-/** An absolute M/H/V/L path as the pen positions after each command. */
 function parse(d: string): Cmd[] {
   const t = d.trim().split(/\s+/);
   const out: Cmd[] = [];
@@ -86,10 +84,6 @@ const onSegment = (p: Point, a: Cmd, b: Cmd) => {
   return within && Math.abs(cross) < 0.5 * Math.hypot(b.x - a.x, b.y - a.y) + 1e-9;
 };
 
-/**
- * The class whose connector an Ω sits on. Stacked children share their
- * trunk, so of the edges through the Ω the one ending nearest to it wins.
- */
 function omegaClass(layout: ShipTreeLayout, o: Point): number {
   let best: { id: number; dist: number } | null = null;
   for (const e of layout.edges) {
@@ -157,8 +151,6 @@ describe('Ω placement (real class data)', () => {
   });
 
   it('Caldari: Ω classIds', () => {
-    // Interceptor, Command Destroyer, Recon, Command Ship, Marauder,
-    // Dreadnought, Freighter, Transport Ship.
     const ids = layoutFor(CALDARI).omegas.map((o) => o.classId);
     expect(ids.sort((a, b) => a - b)).toEqual([10, 18, 24, 28, 32, 37, 40, 93]);
   });
@@ -169,8 +161,6 @@ describe('Ω placement (real class data)', () => {
 
   it('Caldari: each hull trunk between Navy and first T2, before the Dread, Freighter and Transport Ship', () => {
     const layout = layoutFor(CALDARI);
-    // Interceptor, Command Destroyer, Recon, Command Ship, Marauder,
-    // Dreadnought (main line), Freighter (industry), Transport Ship.
     expect(omegaClasses(layout)).toEqual([10, 18, 24, 28, 32, 37, 40, 93].sort((a, b) => a - b));
   });
 
@@ -205,8 +195,6 @@ describe('Ω placement (real class data)', () => {
   });
 
   it('ORE: before the Mining Barge, on the Expedition Frigate and Mining Command Destroyer trunks, on the hauler drop', () => {
-    // Mining Barge, Expedition Frigate, ORE Hauler, Mining Command Destroyer —
-    // none before Industrial Command Ship, Capital Industrial Ship or Freighter.
     expect(omegaClasses(layoutFor(ORE))).toEqual([42, 44, 48, 2112]);
   });
 
@@ -266,7 +254,6 @@ describe('structure (real class data)', () => {
       inside(e.from, `emblem ${e.factionID} line`);
     }
     inside(layout.root, 'root');
-    // MARGIN of room on the left and top.
     const minX = Math.min(layout.root.x, ...layout.nodes.map((n) => n.x));
     expect(minX).toBe(G.MARGIN);
   });
@@ -444,7 +431,7 @@ describe('layoutShipTree edge cases', () => {
 
   it('sizes a class by its hull count: up to 3 columns', () => {
     const layout = layoutFor(CALDARI);
-    const frigate = node(layout, FRIGATE); // 6 hulls
+    const frigate = node(layout, FRIGATE);
     expect(frigate.cols).toBe(3);
     expect(frigate.w).toBe(G.PAD_L + 3 * G.TILE + 2 * G.GAP);
     expect(frigate.h).toBe(2 * (G.TILE + G.GAP) - G.GAP);

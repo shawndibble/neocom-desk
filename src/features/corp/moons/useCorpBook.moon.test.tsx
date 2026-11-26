@@ -1,4 +1,3 @@
-// The moon page reads one pull's window and the moon docs (issue #5716); every other page the whole book.
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookRead } from '../taxBook/bookRead';
@@ -80,7 +79,6 @@ function book(): BookRead {
       extractions: [PULL],
     } as never,
     observed: [
-      // Frozen: before the window, priced by nobody.
       {
         structureId: 1,
         characterId: 5,
@@ -106,7 +104,6 @@ function book(): BookRead {
   };
 }
 
-/** The read the hook asked for: its scope, and nothing else. */
 const asked = (n: number) =>
   Object.fromEntries(
     Object.entries(readBook.mock.calls[n]![2] as Record<string, unknown>).filter(
@@ -114,7 +111,6 @@ const asked = (n: number) =>
     )
   );
 
-/** A moon read whose docs stood in: the pull's window only. */
 const scopedRead = (extractionId: string): BookRead => ({
   ...book(),
   observed: book().observed.slice(1),
@@ -142,7 +138,6 @@ describe('moon page read path', () => {
   });
 
   it('a missing doc reads the whole book and prices every day', async () => {
-    // readBook falls back to the whole book itself (moonRead.test.ts): no moon docs, every row.
     readBook.mockResolvedValue({ ...book(), forMoon: PULL_ID });
     const { result } = renderHook(() => useCorpBook(SYNC, undefined, { extractionId: PULL_ID }));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));

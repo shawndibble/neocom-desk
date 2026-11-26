@@ -6,12 +6,6 @@ import { reclaimBook } from '../taxBook/bookClient';
 import { DialogShell } from './BookDialogs';
 import { useBook } from './useBook';
 
-/**
- * The CEO's "Reclaim the book" (ADR 0023, issue #4269): the CEO becomes the
- * book's owner and every other officer must re-verify. Destructive, so a
- * confirm step says what happens first (§6c). Only the CEO sees it; the
- * callable re-checks the role live and stays the gate.
- */
 export function ReclaimBookSection() {
   const { t } = useTranslation();
   const { characterId, corporationId, verdict, reload } = useBook();
@@ -24,7 +18,6 @@ export function ReclaimBookSection() {
       const { officersRevoked } = await reclaimBook(characterId, corporationId);
       setRevoked(officersRevoked);
     } finally {
-      // Even a refusal may mean the screen is stale (the book or the role changed).
       reload();
     }
   };

@@ -3,7 +3,6 @@ import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { STATUS_TEXT_CLASS } from './statusTone';
 
-/** A status as a small tinted word — readable without its colour, and still one word on a dense phone card. */
 export function StatusPill({
   status,
   label,
@@ -11,7 +10,6 @@ export function StatusPill({
 }: {
   status: MiningTaxRowStatus;
   label: string;
-  /** Why the row is in this state, for a status whose row looks different (§6c: a tooltip, never the only place it's said). */
   hint?: string;
 }) {
   const pill = (

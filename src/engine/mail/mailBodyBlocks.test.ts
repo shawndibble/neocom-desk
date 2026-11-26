@@ -4,7 +4,6 @@ import { splitMailLines } from '@/engine/mail/mailBodyBlocks';
 type Block =
   { kind: 'text'; text: string } | { kind: 'table'; rows: string[][]; align: ('left' | 'right')[] };
 
-/** The prose/table split the reader makes, as plain data: blank edges around a table trimmed. */
 function splitMailBody(text: string): Block[] {
   const lines = text.split('\n');
   const found = splitMailLines(lines);

@@ -7,12 +7,6 @@ import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { callableErrorReason } from '@/lib/callableError';
 import { previewFeederInvite, type FeederInvitePreview } from '../taxBook/feederClient';
 
-/**
- * What an accounting corporation will see, what it cannot do, how to stop it,
- * and the one optional rate. Deliberately short. A blank rate is a complete
- * grant; the grant is a separate EVE login by an Accountant, so this screen only
- * collects the rate and sends the player there.
- */
 export function FeederConsent({
   characterId,
   code,
@@ -25,16 +19,13 @@ export function FeederConsent({
   characterId: number;
   code: string;
   busy: boolean;
-  /** Why the EVE login could not start, as text. */
   error?: string | null;
   onContinue: (requestedRatePct: number | undefined) => void;
   onBack: () => void;
-  /** Reads who the link is from; a seam for stories. */
   loadPreview?: typeof previewFeederInvite;
 }) {
   const { t } = useTranslation();
   const [rate, setRate] = useState('');
-  // Who the link is from and what it offers; a preview that cannot load leaves the screen as it was.
   const load = useCallback(
     () =>
       loadPreview(characterId, code).catch((e: unknown) => {

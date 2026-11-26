@@ -1,9 +1,3 @@
-/**
- * The action row every mail composer ends with: a secondary action on the left
- * (Discard draft / Cancel), Send on the right. Close, where there is one, lives
- * in the header instead. Shared by New Mail, Reply and Forward so they lay out
- * alike.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection, Spinner } from '@/components/ui';
@@ -12,7 +6,6 @@ import { cx } from '@/lib/cx';
 interface MailSendButtonProps {
   size: 'sm' | 'md';
   sending: boolean;
-  /** Disabled for any reason besides `sending` (over a limit, blocked). */
   blocked: boolean;
   onSend: () => void;
 }
@@ -40,9 +33,7 @@ function MailSendButton({ size, sending, blocked, onSend }: MailSendButtonProps)
 }
 
 interface MailComposeFooterProps extends MailSendButtonProps {
-  /** Left side: the secondary action and any status text. */
   children?: ReactNode;
-  /** Pinned to the bottom of a full-pane composer (never scrolls away). */
   pinned?: boolean;
 }
 

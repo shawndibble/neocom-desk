@@ -6,8 +6,6 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import * as routeChunks from './routeChunks';
 
-// Info modals load on first open (each renders nothing without a request), so
-// their tabs, skill plan and price code stay out of the boot chunk.
 const LazyPublicInfoModal = lazy(() =>
   routeChunks
     .guarded(() => import('@/components/PublicInfoModal'))
@@ -41,10 +39,6 @@ function SkillDetailModal() {
   ) : null;
 }
 
-/**
- * The info modals `App` mounts beside its routes, inside the router: the
- * `?info=` URL's entity route and the public, skill, item and place modals.
- */
 export function InfoModals() {
   return (
     <>

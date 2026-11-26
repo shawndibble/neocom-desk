@@ -6,46 +6,15 @@ export type IconButtonTone = 'default' | 'danger' | 'positive' | 'warning' | 'ac
 export type IconButtonSize = 'md' | 'sm' | 'row';
 
 export interface IconButtonClassNameOptions {
-  /**
-   * `ghost` (default) carries the hairline border of a Button. `plain` drops
-   * it, for affordances that sit inside a row and would otherwise draw a box
-   * around every line of a list.
-   */
   variant?: IconButtonVariant;
-  /** `danger` is the destructive treatment; `positive` the "worth doing" one; `warning` the amber caution one (`text-warning`); `accent` the blue "something is waiting on you" one (`text-accent`). */
   tone?: IconButtonTone;
-  /**
-   * `md` (default) is the toolbar size; `sm` is for controls nested in a
-   * dense row. `row` is `sm` on a pointer and the 36px touch tier below
-   * `md` — a row's own ⋮ or inline action, the thumb's only way in.
-   */
   size?: IconButtonSize;
-  /** Toggle state — takes the accent treatment when on. */
   pressed?: boolean;
   disabled?: boolean;
-  /**
-   * The button also shows a text label from `md` up, so it is wider than a
-   * square there. `'always'`: the label shows at every width, so the button is
-   * never a square (a "New to …?" explainer trigger, DESIGN.md §6c Header controls).
-   * Toolbar height only: `size` is not read.
-   */
   withText?: boolean | 'always';
   className?: string;
 }
 
-/**
- * The class string an icon-only control gets from its variant/tone/size.
- *
- * Its own module rather than an export off `IconButton.tsx` so that file keeps
- * exporting only components (`react-refresh/only-export-components`), and so a
- * non-button element that must look identical — a `react-router-dom` `Link`
- * that navigates rather than acting, say — can match it exactly instead of
- * hand-copying the cascade. Mirrors `buttonClassName` for the same reason.
- *
- * The size classes are the 36px touch tier below `md` or on a coarse pointer
- * (`touch:`) and the standard 36px control above it (DESIGN.md §3): a pointer
- * never gets the phone-sized box and a thumb never gets the mouse-sized one.
- */
 export function iconButtonClassName({
   variant = 'ghost',
   tone = 'default',
@@ -60,8 +29,6 @@ export function iconButtonClassName({
     interactiveClassName,
     focusRingClassName,
     disabledClassName,
-    // A labelled button keeps the square box below `md` and swaps to auto width
-    // above it: one size utility per breakpoint, never two fighting at `md:`.
     withText === 'always'
       ? 'h-9 gap-1.5 px-2.5 touch:min-w-9'
       : withText
@@ -73,11 +40,6 @@ export function iconButtonClassName({
           : size === 'row'
             ? 'size-9 md:size-7 touch:size-9'
             : 'size-9 md:size-7 touch:size-9',
-    // `border` alone here: each state below names its own border colour, so no
-    // two border-colour utilities ever land on the element at once. Tailwind
-    // resolves same-property utilities by stylesheet order, not by their order
-    // in this attribute, so "a later class overrides an earlier one" is not
-    // something to rely on.
     variant === 'ghost' && 'border',
     pressed === true
       ? cx(

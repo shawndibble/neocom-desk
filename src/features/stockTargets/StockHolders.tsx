@@ -1,15 +1,9 @@
-/**
- * Who holds a Stock row's Listed and In hangar counts (#5594): one holder reads
- * "40 · [portrait] Name"; several read "20 · [portraits] 2 characters" and open
- * the per-Character split. Attribution only, the counts are unchanged.
- */
 import { useTranslation } from 'react-i18next';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { CharacterAvatar, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { HolderCount } from '@/engine/stockTargets/onHand';
 import { formatNumber } from '@/lib/numberLocale';
 
-/** CharacterAvatar's smallest box is 28px: a cell wants 16px. */
 function HolderPortrait({ characterId }: { characterId: number }) {
   return (
     <span className="inline-flex shrink-0 align-middle [&>img]:size-4">
@@ -26,7 +20,6 @@ export function StockHolders({
 }: {
   total: number;
   holders: readonly HolderCount[];
-  /** The popover's title: "Listed by" or "Ready to list with". */
   heading: string;
   nameOf: (characterId: number) => string;
 }) {
@@ -60,7 +53,6 @@ export function StockHolders({
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" aria-label={heading}>
-            {/* A portalled popover still bubbles React events to the row (Show Info). */}
             <div
               className="flex min-w-48 flex-col gap-1 text-xs"
               onClick={(e) => e.stopPropagation()}
@@ -81,7 +73,6 @@ export function StockHolders({
   );
 }
 
-/** "Listing here: [portrait] Name, ..." under the market title: which alts this market belongs to. */
 export function ListingHereLine({
   characterIds,
   nameOf,

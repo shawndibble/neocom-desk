@@ -1,14 +1,3 @@
-/**
- * The one badge every Open Orders row carries (GLOSSARY.md's redesigned
- * Market > Open Orders tab). Colour marks **scope** only — station (danger),
- * system (warning), region (accent) — per docs/DESIGN.md §7's "colour is
- * never the only signal": every badge shows its own words too, and a kind
- * that isn't about distance gets the same neutral line/panel-2 treatment as
- * `ProductionRunStatusChip`'s tone map, not an invented colour of its own.
- * `belowFloor` is the one exception to "scope only" — it's the worst
- * outcome an order can be in (a guaranteed loss), so it gets a stronger,
- * more saturated red than `undercutStation`'s plain scope-danger.
- */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
@@ -31,7 +20,6 @@ export type OrderBadgeKind =
 
 type BadgeTone = 'danger-strong' | 'danger' | 'warning' | 'accent' | 'success' | 'neutral';
 
-/** Class strings lifted from this repo's own pills (`PlanVerdictHero`'s `PILL_TONE`, `ProductionRunStatusChip`'s `TONE_CLASS`) rather than invented. */
 const TONE_CLASS: Record<BadgeTone, string> = {
   'danger-strong': 'bg-danger/25 text-danger',
   danger: 'bg-danger/15 text-danger',
@@ -58,26 +46,11 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
 
 interface OrderProblemBadgeProps {
   kind: OrderBadgeKind;
-  /** Short trailing detail already formatted by the caller, e.g. "-8.4%" or "7 jumps"; `turnIn` adds "more" to its "~2K". */
   detail?: string;
   className?: string;
-  /**
-   * Drops the `InfoTooltip` "?" trigger, leaving a plain (non-focusable)
-   * pill. Default true everywhere the badge sits in ordinary flow. A caller
-   * that wraps the whole badge in its own `<button>` (`OpenOrdersList`'s
-   * tap-to-open row) must pass `false` — a `<button>` cannot legally contain
-   * another one, and the nested trigger would fight the row's own tap.
-   */
   interactive?: boolean;
 }
 
-/**
- * One order's problem (or lack of one) as a labelled pill, plus an
- * `InfoTooltip` "?" trigger carrying the one-sentence explanation —
- * `StatChip`'s pattern for a non-interactive pill, since the pill itself
- * (a `<span>`) has nothing to focus and Radix's `Tooltip.Trigger` needs a
- * real focusable child.
- */
 export function OrderProblemBadge({
   kind,
   detail,

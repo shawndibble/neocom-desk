@@ -63,43 +63,16 @@ import { RailNav } from './RailNav';
 import { ROUTE_OUTLET_ID, SkipLink } from './SkipLink';
 import { MobileMoreSheet, MORE_SHEET_ID } from './MobileMoreSheet';
 
-/**
- * Hidden entirely when Firebase isn't configured, rather than shown permanently
- * idle — a dot with nothing behind it just begs "why isn't this working".
- */
 function SyncStatusIndicator() {
   const { status, online } = useSyncStatus();
   return <SyncStatusDot status={status} online={online} />;
 }
 
-/**
- * The visible half of the sync signal, shell-wide (#1132). `SyncStatusDot`
- * carries its state in a `title=`/`aria-label` only and lives inside the
- * desktop-only rail, so below `md` a failing sync said nothing at all except
- * on `/skills/plans`, the one route that mounted this note for itself.
- *
- * Mounted at every width, not `md:hidden`: that route rendered the note on
- * desktop too, and hiding it above `md` would take away a signal desktop
- * already has. A desktop user seeing both this and the rail's red dot is the
- * intended overlap.
- *
- * No `isSyncConfigured()` gate, unlike the dot: `SyncErrorNote` renders
- * nothing outside the `error` state, and only `sync/planSync.ts` writes that
- * state — which never runs when sync isn't configured.
- *
- * Its own component, like `SyncStatusIndicator`, so a status tick re-renders
- * the note rather than the whole shell.
- */
 function SyncErrorBanner() {
   const { status, online } = useSyncStatus();
   return <SyncErrorNote status={status} online={online} />;
 }
 
-/**
- * Present only while the boot warm-up (`app/prefetch.ts`) has work outstanding.
- * Unlike the sync dot it has no resting state: a permanently-idle second dot
- * beside the first says nothing, and warming is over in seconds.
- */
 function PrefetchIndicator() {
   const { t } = useTranslation();
   const running = usePrefetch(isPrefetching);
@@ -122,19 +95,6 @@ interface ActiveCharacter {
   name: string;
 }
 
-/**
- * Content of `CharacterFooterLink`, shared by the rail and the sheet. It
- * renders through the gap where `activeCharacter` is still undefined — that
- * is just the Dexie lookup resolving on a cold load, and hiding it would
- * leave the Characters route, which appears nowhere else now, briefly
- * unreachable.
- *
- * Through that gap it holds the avatar's footprint so the layout doesn't
- * jump, and carries no text: the link's name comes from `aria-label` instead
- * (see `characterTriggerLabel`). A visible "Switch character" placeholder
- * would collide with the identically-worded shortcut description Settings
- * lists, which is a real ambiguity for a screen reader, not just for a test.
- */
 function CharacterTriggerFace({
   activeCharacter,
   size,
@@ -143,8 +103,6 @@ function CharacterTriggerFace({
   size?: 'sm';
 }) {
   if (!activeCharacter) {
-    // Borrows the portrait's own box so the placeholder doesn't change shape
-    // when the real one arrives.
     return (
       <span
         aria-hidden="true"
@@ -160,11 +118,6 @@ function CharacterTriggerFace({
   );
 }
 
-/**
- * Undefined once the Character is known: the visible name is then the better
- * accessible name, and an `aria-label` over it would only replace what the
- * user can see with something vaguer.
- */
 function characterTriggerLabel(
   activeCharacter: ActiveCharacter | undefined,
   t: (key: string) => string
@@ -178,13 +131,6 @@ const CHARACTER_TRIGGER = cx(
   focusRingInsetClassName
 );
 
-/**
- * The active Character, as a plain link to `/characters` — the one dedicated
- * portrait+name entry point (a bar tab can also reach the route, but not this
- * portrait), rather than a menu onto Characters *and* Settings, which is now
- * its own ordinary `NavItem` just above this. The name is the accessible name
- * (`characterTriggerLabel`) once known, so a real link, not a button.
- */
 function CharacterFooterLink({
   activeCharacter,
   size,
@@ -196,7 +142,6 @@ function CharacterFooterLink({
   size?: 'sm';
   className?: string;
   onClick?: () => void;
-  /** The page to return to once a Character is picked (#1764). */
   originPath?: string;
 }) {
   const { t } = useTranslation();
@@ -213,11 +158,6 @@ function CharacterFooterLink({
   );
 }
 
-/**
- * The rail's `CharacterFooterLink`, carrying the current page (path and
- * query) as its origin (#4691). Its own component because it reads the
- * location, which `Layout` must not.
- */
 function RailCharacterFooterLink({
   activeCharacter,
 }: {
@@ -227,10 +167,6 @@ function RailCharacterFooterLink({
   return <CharacterFooterLink activeCharacter={activeCharacter} originPath={pathname + search} />;
 }
 
-/**
- * Records each view visited for the More sheet's Recent row. Renders nothing;
- * its own component because it reads the location, which `Layout` must not.
- */
 function RecentNavRecorder() {
   const { pathname } = useLocation();
   const viewPath = viewPathFor(pathname);
@@ -240,52 +176,19 @@ function RecentNavRecorder() {
   return null;
 }
 
-/**
- * The global shortcut listener, as a component that renders nothing: its
- * `useNavigate` subscribes to the location, which `Layout` itself must not.
- */
 function KeyboardShortcuts() {
   useKeyboardShortcuts();
   return null;
 }
 
-/**
- * The route outlet and everything keyed off the current location: the page
- * fade, route focus, and the boundary that clears on navigation.
- *
- * Its own component so that `Layout` never reads the location. Pages write
- * their filters and sort into the query string as the pilot types, and each
- * of those writes is a new location; were `Layout` subscribed, every one would
- * re-render the whole shell — rail, tab bar, their live queries — for a change
- * only the page cares about. The nav links still track the route: `NavLink`
- * reads the location itself.
- */
 function RouteOutlet() {
   const { t } = useTranslation();
   const location = useLocation();
   const outletRef = useRef<HTMLDivElement>(null);
-  // `pageKeyFor` collapses a tab segment (`/contacts/across`) to its page: a
-  // tab switch is not a page change and does not fade the outlet (ADR 0015);
-  // the tab panel fades on its own (`useTabPanelProps`).
   useFadeOnChange(outletRef, pageKeyFor(location.pathname));
   useRouteFocus(outletRef, location.pathname, location.hash);
   return (
-    /*
-      Deliberately not `key={location.pathname}`, which would replay a CSS
-      animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`
-      match more than one pathname (`/corp/assets/*`, the tabbed pages'
-      `<path>/*` splats, and the four `:param` routes), and React Router keeps one component instance
-      across those — so re-keying would throw away Assets' search, filters
-      and selection on every drill-down and re-run its loader. Animating
-      the element in place keeps the instance and still replays.
-      `tabIndex={-1}`: where a page never renders an `<h1>`, route focus
-      (`routeFocus.ts`) lands here instead.
-    */
     <div ref={outletRef} id={ROUTE_OUTLET_ID} tabIndex={-1} className="focus:outline-none">
-      {/* Routes are code-split (`routeChunks.ts`): the shell stays put
-          while a page's chunk loads on its first visit, and a page that
-          throws — or whose chunk will not load — fails inside the shell,
-          clearing once the pilot navigates elsewhere. */}
       <ErrorBoundary inline resetKey={location.pathname}>
         <Suspense fallback={<Spinner block="page" label={t('common.loading')} />}>
           <Outlet />
@@ -295,13 +198,6 @@ function RouteOutlet() {
   );
 }
 
-/**
- * App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile.
- *
- * Reads no location (`RouteOutlet`), and memoized: it takes no props, so the
- * re-render its parent (`SignedInShell` in App.tsx, which does read the
- * location) gets on every query-string write stops here.
- */
 export const Layout = memo(function Layout() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -313,13 +209,8 @@ export const Layout = memo(function Layout() {
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
 
   const [moreOpen, setMoreOpen] = useState(false);
-  // Read once, not per rendering: the header bell (via context), the tab bar and
-  // the sheet are all mounted on every route, so a hook inside each would open
-  // several Dexie live queries over the same feed.
   const alertBadge = useAlertBadge();
-  // New Requests on the Communities item, read while the app is open (issue #3810).
   useRequestBadgePoll();
-  // The corp Moons dot's Needs you count and Automatic sync stop, between Moons visits (#6208).
   useMoonsAttentionPoll();
   const navBadge = useNavBadges();
   const settingsAttention = useSettingsNeedsAttention();
@@ -327,12 +218,6 @@ export const Layout = memo(function Layout() {
   const tabs = barTabs(useMobileTabs((state) => state.value));
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // The More sheet is mounted conditionally (`!isDesktop &&` below), not
-  // CSS-hidden: `showModal()` makes the page inert regardless of the dialog's
-  // own `display`, so growing past `md` while open left an invisible modal
-  // holding the whole app hostage. Unmounting instead lets `Modal`'s cleanup
-  // close it and restore focus; `moreOpen` resets so a resize back to mobile
-  // doesn't reopen it unasked.
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the sheet when the viewport grows past `md`
@@ -343,17 +228,9 @@ export const Layout = memo(function Layout() {
     <UnreadAlertsContext.Provider value={alertBadge}>
       <AlertsPanelProvider>
         <div className="flex min-h-dvh bg-bg text-text">
-          {/* Only where the rail shows: below `md` there is nothing to skip. */}
           {isDesktop && <SkipLink />}
-          {/* Desktop left rail */}
-          {/* z-30: above anything in the page (a column sliding out from behind it, like
-              Improve's), below the overlays (z-40 and up). */}
           <aside className="sticky top-0 z-30 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
             <div className="flex items-center gap-2 border-b border-line px-3 py-3">
-              {/* Logo and wordmark navigate together, as one unit: a site name
-              that goes home beside an inert logo is the odd half-measure.
-              The two status indicators stay outside the link — a sync dot
-              that navigates is nobody's expectation. */}
               <Link
                 to="/overview"
                 className={cx(
@@ -370,13 +247,7 @@ export const Layout = memo(function Layout() {
               <PrefetchIndicator />
               {isSyncConfigured() && <SyncStatusIndicator />}
             </div>
-            {/* The pages scroll (`RailNav`'s `overflow-y-auto`), which is what keeps
-            the footer below pinned: the rail is `h-screen`, so a tall list
-            (large text scale) would otherwise push it off the bottom. */}
             <RailNav />
-            {/* Footer: Help, Settings, then Character (very bottom). `border-t`: at short
-            heights the scrolling nav's last row is cut by this edge; the rule makes
-            that read as scroll, not overlap. */}
             <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
               {FOOTER_PAGES.map((page) =>
                 page.path === '/settings' ? (
@@ -388,9 +259,6 @@ export const Layout = memo(function Layout() {
                       attention={railSettingsAttention}
                       className="flex-1"
                     />
-                    {/* Mounted only where the rail shows: the rail is CSS-hidden below `md`,
-                        but the callout is a portaled popover that would escape it and
-                        point at nothing on a phone. */}
                     {isDesktop && <RailUpgradeButton />}
                   </div>
                 ) : (
@@ -408,7 +276,6 @@ export const Layout = memo(function Layout() {
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_var(--bottom-nav-clearance)_+_1rem))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_1rem))]">
             <PageHeaderSlotProvider>
-              {/* Corp Tax Book send queue (D16): only while mail is queued. */}
               <MailQueueMount />
               <OfflineBanner />
               <AlertCharacterSwitch />
@@ -421,11 +288,6 @@ export const Layout = memo(function Layout() {
             </PageHeaderSlotProvider>
           </main>
 
-          {/* Mobile bottom tab bar: the pilot's four destinations (`lib/mobileTabs.ts`,
-          set in Settings) + More. The count is fixed, which is what keeps
-          MOBILE_NAV_ITEM's equal-share split honest.
-          `env(safe-area-inset-bottom)` keeps the bar clear of the
-          home-indicator gesture area on notched phones. */}
           <nav
             aria-label={t('nav.mobileLabel')}
             className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
@@ -448,7 +310,6 @@ export const Layout = memo(function Layout() {
               aria-controls={MORE_SHEET_ID}
               onClick={() => setMoreOpen((open) => !open)}
               className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
-              // Settings lives in the sheet, so its dot rides here too (§6c).
               aria-label={
                 settingsAttention ? t('nav.needsAttention', { label: t('nav.more') }) : undefined
               }
@@ -468,11 +329,6 @@ export const Layout = memo(function Layout() {
           <KeyboardShortcuts />
           <GlobalPasteRouter />
           <CommandPaletteHost />
-          {/*
-        In the shell rather than in `App`, unlike the reload prompt: it is
-        about the *active Character*, so it belongs inside
-        `RequireCharacter`, where there is always one.
-      */}
           <CorpGrantPrompt />
           <InstallPrompt />
           <ForegroundNotificationPoller />

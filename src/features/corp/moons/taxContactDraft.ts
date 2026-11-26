@@ -1,7 +1,5 @@
-/** The Access tab's draft of the `taxContact` setting, and the patch it makes. */
 import type { TaxContact } from '@/engine/corpTaxBook/bookDocs';
 
-/** The mode radios; `ceo` stores nothing (the default). */
 export type TaxContactMode = 'ceo' | 'list' | 'officers';
 
 export interface TaxContactDraft {
@@ -21,7 +19,6 @@ export function draftFromContact(contact: TaxContact | undefined): TaxContactDra
   return { mode: 'ceo', listId: null, listName: '', officerIds: [] };
 }
 
-/** What the draft stores: an unfinished choice (no list picked, no officer named) is the CEO. */
 export function contactFromDraft(draft: TaxContactDraft): TaxContact | undefined {
   if (draft.mode === 'list' && draft.listId !== null) {
     return { kind: 'mailingList', id: draft.listId, name: draft.listName };
@@ -35,7 +32,6 @@ export function contactFromDraft(draft: TaxContactDraft): TaxContact | undefined
 const sameContact = (a: TaxContact | undefined, b: TaxContact | undefined) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-/** The `taxContact` for a settings patch: omitted when unchanged, null to go back to the CEO. */
 export function taxContactPatch(
   draft: TaxContactDraft,
   stored: TaxContact | undefined

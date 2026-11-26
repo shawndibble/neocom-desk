@@ -101,7 +101,6 @@ describe('corpCustomsOffices', () => {
       ].join(' · '),
       'overview.widgets.corpCustomsOffices.window{"start":"02","end":"04"}',
     ]);
-    // A level ESI did not send is left out, never shown as 0%.
     expect(rows[1]!.cells[2]).toBe('overview.widgets.corpCustomsOffices.rate.corporation 5%');
   });
 

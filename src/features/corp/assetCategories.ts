@@ -1,14 +1,3 @@
-/**
- * The Group column and Category filter of the corp assets ledger (issue
- * #4671): each type's top-level market group ("Ships", "Ship Equipment",
- * "Blueprints & Reactions"). The slim SDE carries category ids but no
- * category names, and the market catalogue carries named groups, so the
- * catalogue is what can be shown. A type outside it (an unlisted item) has no
- * category.
- *
- * Best-effort like the volume read: a catalogue that will not load leaves the
- * column and filter empty rather than failing the page.
- */
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import type { MarketGroupNode } from '@/sde/marketTypes';
@@ -18,10 +7,6 @@ export interface AssetCategory {
   name: string;
 }
 
-/**
- * A market group's top of ancestry (`root`) and the group directly beneath it
- * on that path (`child`; null when the group is the root itself).
- */
 export function marketGroupBranch(
   groups: ReadonlyMap<number, MarketGroupNode>,
   groupId: number
@@ -29,7 +14,6 @@ export function marketGroupBranch(
   let node = groups.get(groupId) ?? null;
   if (node === null) return null;
   let child: MarketGroupNode | null = null;
-  // Bounded: a malformed catalogue with a parent cycle must not hang the page.
   for (let hops = 0; node.parentId !== null && hops < 32; hops += 1) {
     const parent = groups.get(node.parentId);
     if (!parent) break;
@@ -39,7 +23,6 @@ export function marketGroupBranch(
   return { root: node, child };
 }
 
-/** The root of a market group's ancestry; the group itself when it has no parent. */
 export function rootMarketGroup(
   groups: ReadonlyMap<number, MarketGroupNode>,
   groupId: number

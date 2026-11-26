@@ -70,7 +70,6 @@ describe('unlockedBy', () => {
       added.productIds.every((pid) => canMake(graph, pid, new Set<PlanetType>([...ticked, 'lava'])))
     ).toBe(true);
     expect(added.productIds.length).toBeGreaterThan(0);
-    // The raws it yields light too, but are not "products".
     expect(added.highlight.size).toBeGreaterThan(added.productIds.length);
   });
 
@@ -117,7 +116,6 @@ describe('traceProduct', () => {
     const types = trace.planets.map((p) => p.type);
     expect(types.length).toBeGreaterThan(0);
     for (const p of trace.planets) expect(p.have).toBe(p.type === 'temperate');
-    // Every raw under the product is assigned to exactly one planet type of the cover.
     const raws = new Set(trace.planets.flatMap((p) => p.raws));
     expect(raws).toEqual(new Set([...trace.ids].filter((pid) => graph.byId.get(pid)!.tier === 0)));
   });
@@ -247,7 +245,6 @@ describe('unlockedRecipe', () => {
     expect(best!.useType).toBe('lava');
     expect(best!.hostTypes).toContain('lava');
     expect(best!.hostTypes).not.toContain('temperate');
-    // Not already a recipe the pilot's own planets host.
     expect(base.recipes.recipes.find((r) => r.typeId === best!.typeId)?.haveTypes ?? []).toEqual(
       []
     );

@@ -28,9 +28,9 @@ describe('resolveOrderBookRegion', () => {
 describe('regionsForSystems', () => {
   const DOMAIN_REGION_ID = 10000043;
   const systemsById = new Map([
-    [30000142, { regionId: THE_FORGE_REGION_ID }], // Jita
-    [30000144, { regionId: THE_FORGE_REGION_ID }], // Perimeter
-    [30002187, { regionId: DOMAIN_REGION_ID }], // Amarr
+    [30000142, { regionId: THE_FORGE_REGION_ID }],
+    [30000144, { regionId: THE_FORGE_REGION_ID }],
+    [30002187, { regionId: DOMAIN_REGION_ID }],
   ]);
 
   it('returns each region that holds at least one allowed system, once', () => {

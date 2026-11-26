@@ -6,12 +6,6 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { cx } from '@/lib/cx';
 import { useNeedsLogin } from '@/stores/authFailure';
 
-/**
- * "Log in again" on a Character whose login EVE refused (issue #6091): the
- * needs-login mark, shown where the Character is listed (Characters table
- * and cards, the Character switcher), with the same re-login the banner runs.
- * Renders nothing for a Character whose login works.
- */
 export function NeedsLoginAction({
   characterId,
   name,

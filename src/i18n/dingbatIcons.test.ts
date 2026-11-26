@@ -3,7 +3,6 @@ import { join, sep } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/** DESIGN.md §5: a typed dingbat is never an icon — use an `Icon.*` glyph. */
 const DINGBATS = /[●▲⇉⤳✓☑☐]/;
 
 function walk(dir: string, out: string[]) {

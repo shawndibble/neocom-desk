@@ -33,9 +33,7 @@ const leaderMock = vi.hoisted(() => {
       listeners.add(listener);
       return { isLeader: () => leader, leave: () => listeners.delete(listener) };
     },
-    /** Seats still standing — for the unmount assertion. */
     seats: () => listeners.size,
-    /** Simulate the election: another tab leads (`false`) or this one does. */
     setLeader(next: boolean) {
       leader = next;
       listeners.forEach((listener) => listener());
@@ -105,8 +103,6 @@ describe('idsToSweep', () => {
   });
 
   it('still ends on the active Character when only the others are due', () => {
-    // The boot sync, or an edit, just synced the active Character — but
-    // sweeping an alt after it would leave the session on the alt.
     expect(idsToSweep([1, 2], new Map([[1, NOW]]), NOW, 1)).toEqual([2, 1]);
   });
 
@@ -121,14 +117,12 @@ describe('useBackgroundSync', () => {
     return () => vi.useRealTimers();
   });
 
-  /** Mount, then let the boot delay pass — the first sweep's real starting point. */
   function mountPastBoot(ids: number[], active: number | null = ids[0] ?? null) {
     const hook = renderHook(() => useBackgroundSync(ids, active));
     vi.advanceTimersByTime(BACKGROUND_SYNC_BOOT_DELAY_MS);
     return hook;
   }
 
-  /** The Characters the sweep scheduled, in order. */
   const swept = () => syncMock.scheduleSync.mock.calls.map(([id]) => id);
 
   it('sweeps every character shortly after mount, not only the active one', () => {
@@ -160,8 +154,6 @@ describe('useBackgroundSync', () => {
     mountPastBoot([1, 2], 1);
     syncMock.scheduleSync.mockClear();
 
-    // The active Character comes round every five minutes; the alt waits out
-    // its own, longer gap.
     vi.advanceTimersByTime(BACKGROUND_SYNC_NON_ACTIVE_GAP_MS - BACKGROUND_SYNC_TICK_MS);
     expect(swept()).toContain(1);
     expect(swept()).not.toContain(2);
@@ -184,14 +176,11 @@ describe('useBackgroundSync', () => {
       ...(id === 1 ? { lastFullSyncAt: NOW } : {}),
       error: null,
     }));
-    // Character 2 is the active one here, so nothing else forces a re-sweep of 1.
     mountPastBoot([1, 2], 2);
     expect(swept()).toEqual([2]);
   });
 
   it('still sweeps a Character whose only recent pass was narrowed to an edit', () => {
-    // An edit's pass pulled only the collections it touched (issue #4896):
-    // the rest are as old as the last full pass, so the sweep is still due.
     syncMock.getSyncStatus.mockImplementation((id: number) => ({
       state: 'idle',
       lastSyncedAt: id === 1 ? NOW : null,
@@ -202,7 +191,6 @@ describe('useBackgroundSync', () => {
   });
 
   it('keeps the narrowed-pass window inside the active Character sweep gap', () => {
-    // Otherwise an edit could leave untouched collections staler than an idle tab.
     expect(PARTIAL_PASS_WINDOW_MS).toBeLessThanOrEqual(BACKGROUND_SYNC_MIN_GAP_MS);
   });
 
@@ -224,9 +212,6 @@ describe('useBackgroundSync', () => {
   });
 
   it('sweeps on the tick, for a tab that stayed visible the whole time', () => {
-    // visibilitychange never fires when the user switches to another
-    // application and the tab stays its window's foreground tab — the tick is
-    // the only thing covering that, and it is the reported case.
     mountPastBoot([1]);
     syncMock.scheduleSync.mockClear();
 
@@ -249,7 +234,6 @@ describe('useBackgroundSync', () => {
     mountPastBoot([1]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
 
-    // And the hidden mount must not have spent the gap the first real look wants.
     setVisibility('visible');
     becomeVisible();
     expect(swept()).toEqual([1]);
@@ -291,8 +275,6 @@ describe('useBackgroundSync', () => {
   });
 
   it('sweeps once the character list lands, not only on the empty first render', () => {
-    // useLiveQuery answers with [] before Dexie replies; the sweep has to
-    // survive that or it never runs at all.
     const { rerender } = renderHook(({ ids }) => useBackgroundSync(ids), {
       initialProps: { ids: [] as number[] },
     });
@@ -316,10 +298,10 @@ describe('useBackgroundSync', () => {
   });
 
   it('shares its sweep stamps, so a tab taking over does not re-sweep inside the gap', () => {
-    mountPastBoot([1]); // tab A
+    mountPastBoot([1]);
     syncMock.scheduleSync.mockClear();
 
-    mountPastBoot([1]); // tab B: its own refs, the same localStorage
+    mountPastBoot([1]);
 
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });

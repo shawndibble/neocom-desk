@@ -7,7 +7,6 @@ import { cx } from '@/lib/cx';
 import { MoonsHeader } from './corpTaxBookParts';
 import type { PopState } from './moonsAllMoonsFixtures';
 
-/** The page chrome: header, then the tabs line with the proposed Moons tab. */
 export function Page({ children }: { children: ReactNode }) {
   return <div className="mx-auto max-w-page space-y-4 px-4 py-4">{children}</div>;
 }
@@ -43,7 +42,6 @@ const STATE_TONE: Record<PopState, string> = {
   cancelled: 'text-text-faint',
 };
 
-/** An Extraction's state as a word (D14), as the book prints it today. */
 export function StateWord({ state }: { state: PopState }) {
   return (
     <span
@@ -57,7 +55,6 @@ export function StateWord({ state }: { state: PopState }) {
   );
 }
 
-/** A labelled way up from a drill-down page (§6c: never a bare CaretLeft). */
 export function Crumb({ label }: { label: string }) {
   return (
     <a
@@ -70,7 +67,6 @@ export function Crumb({ label }: { label: string }) {
   );
 }
 
-/** The moon name as a real link: accent at rest, underline on hover (§6c Entities). */
 export function MoonLink({ name, id }: { name: string; id?: string }) {
   return (
     <a href={`/corp/moons/moons/${id ?? 'm1'}`} className={entityLinkClassName('font-medium')}>

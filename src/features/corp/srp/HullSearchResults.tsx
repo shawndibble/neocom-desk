@@ -5,16 +5,10 @@ export interface HullSearchResult {
   scope: 'hull' | 'class';
   id: number;
   name: string;
-  /** A hull's class name; empty for a class. */
   classLabel: string;
-  /** Already has a row in the Hull Rules list. */
   listed: boolean;
 }
 
-/**
- * The add-hull-or-class search's result list. Feature-local: nothing else adds a hull to a
- * list this way. Every match is listed and the list scrolls; a capped list would hide hulls.
- */
 export function HullSearchResults({
   results,
   onAdd,

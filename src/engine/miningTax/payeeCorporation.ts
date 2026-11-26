@@ -1,10 +1,3 @@
-/**
- * Which corporation a typed Payee name names (#6205). Payee setup uses this to
- * suggest the link, and a Corp Tax Book takes an unlinked Payee named exactly
- * as its corporation as its own (`payeesOfBookCorporation`). Whole names only,
- * ignoring case and surrounding spaces: a pilot types names, and EVE names are
- * unique case-insensitively.
- */
 export interface NamedCorporation {
   corporationId: number;
   name: string;
@@ -21,23 +14,14 @@ export function corporationNamed<C extends NamedCorporation>(
   );
 }
 
-/** The Payee fields `payeesOfBookCorporation` reads. */
 export interface PayeeLike {
   id: string;
-  /** Payees are per Character: each Character's are judged apart. */
   characterId?: number;
   name: string;
   entityId?: number;
   entityKind?: 'corporation' | 'character' | 'alliance';
 }
 
-/**
- * The member's Payees that are a Corp Tax Book's corporation: one verified as it, or carrying its
- * id with no kind recorded; failing those, an unlinked one named exactly as it (EVE names are
- * unique). `link`:
- * the Payee is missing the verified link, and should be given it so every device agrees. Never one
- * linked to someone else, whatever its name.
- */
 export function payeesOfBookCorporation(
   payees: readonly PayeeLike[],
   corporation: NamedCorporation
@@ -50,7 +34,6 @@ export function payeesOfBookCorporation(
       ofOneCharacter(own, corporation).map((f) => [f.id, f.link] as const)
     )
   );
-  // In the order given, so a caller's first is the first Payee it passed.
   return payees.flatMap((p) => {
     const l = link.get(p.id);
     return l === undefined ? [] : [{ id: p.id, link: l }];
@@ -70,8 +53,6 @@ function ofOneCharacter(
           ? [{ id: p.id, link: true }]
           : []
   );
-  // A Payee already carrying the id is the corporation: a same-named unlinked one beside it stays
-  // the separate label its owner made.
   if (byId.length > 0) return byId;
   return payees.flatMap((p) =>
     p.entityId === undefined && corporationNamed(p.name, [corporation])
@@ -80,13 +61,6 @@ function ofOneCharacter(
   );
 }
 
-/**
- * The ids of every Payee record that is the corporation of one of the member's Corp Tax Books: the
- * Payees a book is the authority for (decision 20261122, one card per corporation). One carrying
- * the corporation's id (kind `corporation`, or none recorded) is it; one with no entity id at all
- * is it when named exactly as it (EVE names are unique, so an unlinked label of that name is the
- * same recipient, whether or not the link was ever made). One linked to anything else is never it.
- */
 export function bookOwnedPayeeIds(
   payees: readonly PayeeLike[],
   corporations: readonly NamedCorporation[]

@@ -88,11 +88,6 @@ describe('useAppraisal', () => {
     expect(result.current.compare).toBe(COMPARE_ROWS);
   });
 
-  /**
-   * The percentage is pure arithmetic and the hub's prices are usually
-   * cached, so making the pilot press the button again to see a figure that
-   * has already changed would just be a stale screen with a button on it.
-   */
   it('re-prices on its own when the percentage changes', async () => {
     const { result, rerender } = renderHook(
       ({ percent }) => useAppraisal(DEFAULT_TRADE_HUB, percent, null),
@@ -169,14 +164,9 @@ describe('useAppraisal', () => {
       refining: { stationRate: 0.5, taxRate: 0 },
       quantityColumn: null,
     });
-    // The comparison is hub-invariant on its own, but AC #689 says changing
-    // the primary hub still recomputes it — which only holds because it
-    // shares this effect's dependency array, not because compareHubs itself
-    // takes the hub as an argument.
     expect(compareHubs).toHaveBeenCalledTimes(2);
   });
 
-  /** AC: switching the active Character recomputes every row from scratch. */
   it('re-prices when the active Character changes', async () => {
     const { result, rerender } = renderHook(
       ({ characterId }) => useAppraisal(DEFAULT_TRADE_HUB, 90, characterId),
@@ -242,7 +232,6 @@ describe('useAppraisal', () => {
       quantityColumn: null,
     });
 
-    // The next ordinary re-price must not still be forcing a network round trip.
     rerender({ percent: 80 });
     await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(3));
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 80, null, {
@@ -278,12 +267,6 @@ describe('useAppraisal', () => {
     expect(result.current.text).toBe('Tritanium 5');
   });
 
-  /**
-   * `setText` then `appraise()` in the same handler would submit the text
-   * from *before* the pending `setText`, since `appraise` closes over the
-   * hook's own `text` state — the Quickbar-to-Appraisal handoff (#726) needs
-   * a single call that submits a given string directly.
-   */
   it('submits given text directly via appraiseText', async () => {
     const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
 

@@ -16,11 +16,6 @@ export const acceleratorExpiringCopy: DomainCopy<AcceleratorExpiringFire, NoName
       count: hoursOf(fire.thresholdMs),
     }),
   }),
-  /**
-   * Hedged: the pilot can swap a fresh accelerator in game (and type it into
-   * the Characters page) with the app closed, which falsifies the prediction
-   * before the push fires (`engine/projection.ts`'s `projectionWording`).
-   */
   push: (fire, character) => {
     assertProjectionWording('acceleratorExpiring', 'hedge');
     const hours = hoursOf(fire.thresholdMs);

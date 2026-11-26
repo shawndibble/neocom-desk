@@ -13,7 +13,6 @@ describe('timeAxisTicks', () => {
     expect(new Set(ticks).size).toBe(ticks.length);
     expect([...ticks].sort((a, b) => a - b)).toEqual(ticks);
     for (const t of ticks) {
-      // New York midnight in September is 04:00 UTC (EDT).
       expect(new Date(t).toISOString().slice(11)).toBe('04:00:00.000Z');
       expect(t).toBeGreaterThanOrEqual(min);
       expect(t).toBeLessThanOrEqual(max);
@@ -24,7 +23,6 @@ describe('timeAxisTicks', () => {
     const min = Date.parse('2026-10-30T12:00:00Z');
     const max = Date.parse('2026-11-05T12:00:00Z');
     const { ticks } = timeAxisTicks(min, max, 'America/New_York', 10);
-    // Nov 1 2026 is the fall-back day: midnights are 04:00Z before it, 05:00Z after.
     expect(ticks.map((t) => new Date(t).toISOString().slice(11, 13))).toEqual([
       '04',
       '04',

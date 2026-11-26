@@ -1,20 +1,9 @@
-/**
- * Extraction lifecycle and chunk estimate (D13, D14). An Extraction is
- * Extracting until its chunk arrives (Ready), Fractured when the laser is
- * fired or the chunk breaks on its own at `natural_decay_time`, and Expired
- * once the field is assumed gone: fracture + 48h by default, overridable per
- * structure up to 4 days. ESI lists only current extractions and no ore, so
- * the chunk's make-up comes from a moon drill notification, else a
- * linked Moon Ore Survey, else it is unknown.
- */
 import type { ObservedMiningEntry, OreLine } from './types';
 import { HOUR_MS } from '@/lib/age';
 
 export const DEFAULT_EXPIRY_HOURS = 48;
 export const MAX_EXPIRY_HOURS = 96;
-/** Sources disagree (20k, 30k, ~40k m³/h); the book makes it configurable. */
 export const DEFAULT_CHUNK_M3_PER_HOUR = 30_000;
-/** Every moon ore is 10 m³ per unit. */
 export const MOON_ORE_M3_PER_UNIT = 10;
 
 export interface Extraction {
@@ -23,11 +12,8 @@ export interface Extraction {
   moonId: number;
   startedAt: string;
   chunkArrivalAt: string;
-  /** ESI's `natural_decay_time`: when the chunk fractures on its own. */
   naturalDecayAt: string;
-  /** From the LaserFired notification. */
   laserFiredAt?: string;
-  /** From the ExtractionCancelled notification. */
   cancelledAt?: string;
 }
 
@@ -44,7 +30,6 @@ function iso(ms: number): string {
   return new Date(ms).toISOString();
 }
 
-/** When the chunk fractures (laser, else on its own) and the field is assumed gone, in any state. */
 export function fractureAndExpiry(ex: Extraction, expiryHours: number | undefined) {
   const fracturedBy: 'laser' | 'auto' = ex.laserFiredAt ? 'laser' : 'auto';
   const fracturedAt = Date.parse(ex.laserFiredAt ?? ex.naturalDecayAt);
@@ -63,7 +48,6 @@ export function extractionStatus(
   const planned = fractureAndExpiry(ex, opts.expiryHours);
   const { fracturedAt, fracturedBy } = planned;
   if (t < fracturedAt) return { state: 'ready' };
-  // An officer's Fully Mined flag ends the field when it was set, not at the clock expiry.
   const flaggedAt = opts.fullyMinedAt ? Date.parse(opts.fullyMinedAt) : NaN;
   const expiresAt = Number.isNaN(flaggedAt)
     ? planned.expiresAt
@@ -77,40 +61,28 @@ export function extractionStatus(
 }
 
 export interface ChunkSources {
-  /** Ore volumes from a moon drill notification (started, else finished or fractured). */
   notified?: readonly { typeId: number; volumeM3: number }[];
-  /** A linked Moon Ore Survey's composition, as fractions of the chunk. */
   survey?: readonly { typeId: number; fraction: number }[];
-  /** The survey's own measured volume: its first scan's rocks summed, in m³. */
   surveyVolumeM3?: number;
-  /** When that scan was taken, epoch ms; a scan outside this cycle's window is not used. */
   surveyAt?: number;
-  /** The structure's expiry hours, bounding the cycle a survey scan may belong to. */
   expiryHours?: number;
-  /** The book's manual chunk rate, the fallback behind a measured one. */
   chunkM3PerHour?: number;
-  /** The refinery's learned rate (`learnChunkRates`); preferred over the manual one. */
   measured?: LearnedChunkRate;
 }
 
-/** The recent cycles a refinery's measured rate is the median of. */
 export const MEASURED_RATE_WINDOW = 5;
 
 export interface LearnedChunkRate {
   m3PerHour: number;
-  /** How many extractions the median is over. */
   cycles: number;
 }
 
-/** The rate an estimate used, and where it came from. */
 export interface ChunkRate {
   m3PerHour: number;
   basis: 'measured' | 'manual' | 'default';
-  /** Cycles behind a measured rate. */
   cycles?: number;
 }
 
-/** Measured rate, else the book's manual one, else the default. */
 export function chunkRateFor(
   measured: LearnedChunkRate | undefined,
   manual: number | undefined
@@ -125,14 +97,9 @@ export interface MeasurableExtraction {
   structureId: number;
   startedAt: string;
   chunkArrivalAt: string;
-  /** The ExtractionStarted notification's ore, in units. */
   oreLines?: readonly { typeId: number; quantity: number }[];
 }
 
-/**
- * One cycle's real rate: the notified ore (10 m³ a unit) over the hours from
- * extraction start to chunk arrival. Unknown without a notification or time.
- */
 export function measureChunkRate(ex: MeasurableExtraction): number | undefined {
   if (!ex.oreLines?.length) return undefined;
   const hours = (Date.parse(ex.chunkArrivalAt) - Date.parse(ex.startedAt)) / HOUR_MS;
@@ -141,13 +108,6 @@ export function measureChunkRate(ex: MeasurableExtraction): number | undefined {
   return (units * MOON_ORE_M3_PER_UNIT) / hours;
 }
 
-/**
- * Each refinery's measured rate: the median over its last
- * `MEASURED_RATE_WINDOW` measurable cycles. A median, not the latest, because
- * one odd cycle (a rig swap mid-cycle, a notification for another chunk) must
- * not swing every later estimate; five cycles is about a month of weekly
- * pulls, short enough to follow a rig change within a few cycles.
- */
 export function learnChunkRates(
   extractions: readonly MeasurableExtraction[]
 ): Map<number, LearnedChunkRate> {
@@ -173,23 +133,12 @@ export function learnChunkRates(
   return learned;
 }
 
-/**
- * A linked Moon Ore Survey's first counted scan as the book keeps it on the Extraction, so the
- * chunk keeps its make-up after the Survey's share link expires: each ore's volume (rocks summed),
- * the scan's whole volume, and when it was taken.
- */
 export interface SurveyScanSnapshot {
-  /** When the scan was taken, epoch ms; absent for a scan with no time. */
   at?: number;
-  /** Every rock's volume, named or not (`scanVolume`), in m³. */
   volumeM3: number;
   ores: { typeId: number; volumeM3: number }[];
 }
 
-/**
- * A scan's rocks as a `SurveyScanSnapshot`. An ore the type lookup cannot name is left out of
- * `ores` but counted in the whole volume, as the live estimate counts it.
- */
 export function surveySnapshotOf(
   rocks: readonly { ore: string; volume: number }[],
   typeIdOf: (ore: string) => number | undefined,
@@ -212,18 +161,12 @@ export function surveySnapshotOf(
   };
 }
 
-/** A kept scan's ores as shares of its named volume (each ore's fraction sums to 1). */
 function snapshotFractions(s: SurveyScanSnapshot): { typeId: number; fraction: number }[] {
   const total = s.ores.reduce((sum, o) => sum + o.volumeM3, 0);
   if (total === 0) return [];
   return s.ores.map((o) => ({ typeId: o.typeId, fraction: o.volumeM3 / total }));
 }
 
-/**
- * A linked Moon Ore Survey's composition as shares of its volume: the rocks of
- * its first scan summed per ore. An ore the type lookup cannot name is left
- * out and the rest renormalised, so the shares always sum to 1.
- */
 export function surveyFractions(
   rocks: readonly { ore: string; volume: number }[],
   typeIdOf: (ore: string) => number | undefined
@@ -231,7 +174,6 @@ export function surveyFractions(
   return snapshotFractions(surveySnapshotOf(rocks, typeIdOf));
 }
 
-/** The chunk sources a kept scan gives `estimateChunk`. */
 export function snapshotSources(
   s: SurveyScanSnapshot
 ): Pick<ChunkSources, 'survey' | 'surveyVolumeM3' | 'surveyAt'> {
@@ -245,13 +187,10 @@ export function snapshotSources(
 export interface ChunkEstimate {
   source: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
-  /** The chunk rate a survey estimate was guessed at; absent when the survey's measured volume was used. */
   rate?: ChunkRate;
-  /** A survey estimate sized by the survey's own measured volume rather than a rate. */
   measuredVolume?: boolean;
 }
 
-/** Whether a scan taken at `at` can belong to this extraction's cycle: from chunk arrival to expiry. */
 function scanInCycle(ex: Extraction, at: number | undefined, expiryHours: number | undefined) {
   if (at === undefined) return true;
   return at >= Date.parse(ex.chunkArrivalAt) && at <= fractureAndExpiry(ex, expiryHours).expiresAt;
@@ -284,7 +223,6 @@ export function estimateChunk(ex: Extraction, sources: ChunkSources): ChunkEstim
   return { source: 'unknown', oreLines: [] };
 }
 
-/** The ore mined at the Extraction's refinery from its fracture day through its expiry day, per type. */
 export function minedDuringExtraction(
   ex: Extraction,
   entries: readonly ObservedMiningEntry[],
@@ -312,7 +250,6 @@ export interface OreProgress {
   left: number;
 }
 
-/** Mined vs left per ore type of the estimate, after fracture. */
 export function minedVsLeft(
   estimate: readonly OreLine[],
   mined: readonly OreLine[]

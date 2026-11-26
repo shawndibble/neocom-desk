@@ -1,13 +1,3 @@
-/**
- * The price check shared by every contract detail panel: what a contract's
- * items are worth at the Trade Hub, against the ask (or, for items for items,
- * Included against Requested). Glue between the pure
- * `engine/contracts/contractPriceCheck`, the price loader and the strings; a
- * panel works out its lines, ask and basis and renders what comes back
- * (decision 20261020-005242-contract-detail-price-check).
- *
- * The reader flips Buy and Sell; `defaultSide` is where it opens.
- */
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BundleSplit } from '@/engine/contracts/contractFlags';
@@ -37,49 +27,25 @@ export interface ContractPriceCheckView {
   hubMenu?: PriceCheckHubMenu;
   message?: string;
   busy: boolean;
-  /**
-   * The searched lines' value against the rest at the side on screen, when a
-   * search is active: what the padded-bundle sentence (#4773) is worded from.
-   */
   split?: BundleSplit & { restLines: number; side: PriceSide };
 }
 
 export interface ContractPriceCheckArgs {
-  /** What is being checked; a change loads prices again. */
   identity: string;
-  /** The caller's verdict that there is something to compare; `false` returns `null`. */
   enabled: boolean;
   included: readonly PriceCheckLine[];
   requested: readonly PriceCheckLine[];
-  /** ISK ask; 0 for none (items for items). */
   asking: number;
-  /** An Open Price of a past UTC day, or the live book. */
   basis: PriceBasisChoice;
   hub: TradeHub;
-  /** The page area `hub` was resolved for: the heading's hub opens its `HubMenu`. Absent, it is plain text. */
   hubArea?: PageHubArea;
   defaultSide: PriceSide;
-  /** Live sell prices for what the hub never lists (PLEX). Keep the map stable between renders: a new one reloads the prices. */
   sellOverrides?: ReadonlyMap<number, number>;
-  /** The item(s) the shopper searched for: splits the value into theirs and the rest. */
   searchedTypeIds?: ReadonlySet<number> | null;
-  /**
-   * What the lines the hub cannot price would fetch at other contracts' asks
-   * (Below market, #5427). Shown apart from the hub value and never in the
-   * difference. Only the board holds the snapshot this takes, so it is absent
-   * elsewhere.
-   */
   otherValue?: { value: number; lines: number } | null;
-  /**
-   * The reader would accept this contract (Contract Search, the public
-   * modal): the last row is a Saving, green when it is not a loss. Absent, the
-   * panel is neutral, since an own contract does not say which side the reader
-   * is on.
-   */
   asBuyer?: boolean;
 }
 
-/** The UTC day as "Aug 25": Open Prices are per UTC day, so it is never shifted to the viewer's zone. */
 function utcDayLabel(date: string): string {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
     month: 'short',
@@ -107,7 +73,6 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
   const { t } = useTranslation();
   const unavailableLabel = usePricesUnavailableLabel();
   const [side, setSide] = useState<PriceSide>(defaultSide);
-  // The page's Buy/Sell percent (#6531) scales the hub's prices; without a hub menu there is no percent to set.
   const pagePercent = usePricePercentFor(hubArea ?? 'contracts');
   const percent = hubArea ? pagePercent : DEFAULT_PRICE_PERCENT;
 
@@ -117,7 +82,6 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
   );
   const day = basis.kind === 'day' ? basis.date : null;
   const key = enabled ? `${identity}:${hub.id}:${day ?? 'live'}:${typeIds.join(',')}` : null;
-  // Keyed on the string above, not on the arrays, which are new every render.
   const loader = useCallback(
     () => loadContractPrices(hub, typeIds, basis, sellOverrides),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,7 +158,6 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     if (asking > 0)
       rows.push({ label: t('contractDetail.priceCheckAsking'), value: formatContractIsk(asking) });
     if (check.diff !== null) {
-      // Included against Requested is already the buyer's gain: more in than out.
       const saving = check.diff;
       const sentence = asBuyer
         ? pick(saving, {
@@ -265,7 +228,6 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     }
     if (check.diff !== null) {
       const sideLower = sideWord.toLowerCase();
-      // The ask below the hub is money kept, so the Saving is the diff turned over.
       const saving = -check.diff;
       const sentence = asBuyer
         ? pick(saving, {

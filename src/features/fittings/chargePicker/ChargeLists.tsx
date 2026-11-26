@@ -280,7 +280,6 @@ export function TypeDetail({
                   </span>
                   <span className={cx('text-right', pricey && 'text-warning')}>
                     {perMin === null ? '—' : formatIskExact(perMin)}
-                    {/* Colour is never the only signal (DESIGN.md §7). */}
                     {pricey && (
                       <Icon.PriceHigh
                         size={Icon.ICON_SIZE.sm}

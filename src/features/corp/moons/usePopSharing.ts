@@ -14,11 +14,6 @@ import {
 export type PopSharingLoad =
   { state: 'loading' } | { state: 'failed' } | { state: 'ready'; doc: PopSharingDoc };
 
-/**
- * The book's Pop Sharing settings (#6222), through the one cached read every list shares.
- * `reload` drops that read, so every mounted list reads the settings again; so does an edit
- * of them anywhere on the device.
- */
 export function usePopSharing(
   characterId: number,
   corporationId: number
@@ -48,10 +43,6 @@ export function usePopSharing(
 
 const NO_STATUS: Record<string, PopSharingCommunityStatus> = {};
 
-/**
- * Whether each Community the settings name carries the book's pops (#6223), read when the
- * settings load or change. Empty until read, or when the read fails: nothing is marked then.
- */
 export function usePopSharingCommunities(
   characterId: number,
   corporationId: number,
@@ -59,7 +50,6 @@ export function usePopSharingCommunities(
 ): Record<string, PopSharingCommunityStatus> {
   const load = useCallback(
     () => readPopSharingCommunities(characterId, corporationId),
-    // A new settings version re-reads behind the status on screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [characterId, corporationId, settingsVersion]
   );

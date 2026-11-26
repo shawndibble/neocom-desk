@@ -24,7 +24,6 @@ import { ContractDayHeader } from './ContractCells';
 import { ContractsFilterBar } from './ContractsFilterBar';
 import { CONTRACTS_HISTORY_COLUMN_IDS, type ContractsHistoryColumnId } from './contractsColumns';
 
-/** Module-level so the table's windowing and row memo see one stable function. */
 const contractRowKey = (contract: Contract) => contract.contract_id;
 
 interface Props {
@@ -39,11 +38,9 @@ interface Props {
   tableExport: ReturnType<typeof useTableExport<Contract>>;
   sortProps: ReturnType<typeof useUrlSort>;
   highlightedContractId: number | null;
-  /** The notices above the filter bar (cache age, truncation). */
   notices: ReactNode;
 }
 
-/** The History tab's filter bar, phone status chips and contracts table. */
 export function ContractsHistoryTable({
   filter,
   onFilterChange,
@@ -83,8 +80,6 @@ export function ContractsHistoryTable({
         }
       />
       {rows.length === 0 ? (
-        // Zero matches with no active filter can't happen today (an empty
-        // list is caught above), but the reset only belongs where a filter is on.
         isContractsFilterActive(filter) ? (
           <EmptyState
             title={t('contracts.noFilterMatches')}
@@ -104,11 +99,6 @@ export function ContractsHistoryTable({
         )
       ) : (
         <div className="relative overflow-x-auto">
-          {/* The desktop table can be wider than the content column beside the
-            nav rail (#3960): it scrolls inside this wrapper, never the page.
-            `relative` keeps the cells' absolutely positioned `sr-only` text
-            (the price's full ISK) inside the clip too, or its containing
-            block resolves above the wrapper and still widens the page. */}
           <DataTable
             {...tableExport.tableProps}
             label={t('contracts.title')}
@@ -128,8 +118,6 @@ export function ContractsHistoryTable({
             highlightRowKey={highlightedContractId}
             {...sortProps}
             stackLayout="dense"
-            // Issue days are sections on a phone, not folded duplicates:
-            // open, with members in line with the cards above them.
             className="dt-flat-groups"
             groupBy={{
               key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),

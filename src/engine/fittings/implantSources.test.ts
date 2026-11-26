@@ -39,7 +39,6 @@ describe('rankSources', () => {
   });
 
   it('puts an affordable LP offer first when ISK + LP × its rate is cheaper', () => {
-    // 1M ISK + 4,000 LP × 1,000 = 5M, against 10M at Jita.
     const sources = rankSources(1, [offer()], context());
     expect(sources.map((s) => [s.kind, s.cost])).toEqual([
       ['lp', 5_000_000],
@@ -123,7 +122,6 @@ describe('priceFix', () => {
   });
 
   it('spends one store’s LP once across the whole fix', () => {
-    // 6,000 LP buys one 4,000-LP offer; the second implant goes to market.
     const fix = priceFix([1, 2], () => [offer()], context({ lpBalance: () => 6_000 }));
     expect(fix!.sources.map((s) => s.kind)).toEqual(['lp', 'market']);
     expect(fix!.cost).toBe(15_000_000);
@@ -132,7 +130,6 @@ describe('priceFix', () => {
   it('lets one owned tag cover one offer, not two', () => {
     const withTag = offer({ requiredItems: [{ typeId: TAG, quantity: 1 }] });
     const fix = priceFix([1, 2], () => [withTag], context({ owned: (id) => (id === TAG ? 1 : 0) }));
-    // First: 5M (tag owned). Second: 5M + 1M for the tag it has to buy.
     expect(fix!.cost).toBe(11_000_000);
   });
 

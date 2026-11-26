@@ -10,7 +10,6 @@ describe('useScopedState', () => {
     });
     act(() => result.current[1]('saved'));
     expect(result.current[0]).toBe('saved');
-    // A fresh tuple with the same members is the same scope.
     rerender({ scope: ['plan-1', entries] as const });
     expect(result.current[0]).toBe('saved');
   });

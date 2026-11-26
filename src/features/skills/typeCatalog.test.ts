@@ -20,7 +20,6 @@ const SKILLS: SkillType[] = [
     secondaryAttr: 'willpower',
     prereqs: [],
   },
-  // Deliberately collides with a types.json name to prove items win.
   {
     typeID: 99999,
     name: 'Rifter',
@@ -42,7 +41,6 @@ vi.mock('@/sde/loadSde', () => ({
 const sde = await import('@/sde/loadSde');
 const { loadSkillNameMap } = await import('./typeCatalog');
 
-/** A fresh module per test, so the session-wide memo never leaks between tests. */
 async function freshLoadItemNameMap() {
   vi.resetModules();
   return (await import('./typeCatalog')).loadItemNameMap;
@@ -52,7 +50,7 @@ describe('loadSkillNameMap', () => {
   it('maps lowercase skill names to typeIDs', async () => {
     const map = await loadSkillNameMap();
     expect(map.get('gunnery')).toEqual({ typeID: 3336 });
-    expect(map.get('GUNNERY')).toBeUndefined(); // caller lowercases the lookup key
+    expect(map.get('GUNNERY')).toBeUndefined();
   });
 });
 

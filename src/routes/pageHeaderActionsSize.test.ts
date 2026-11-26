@@ -3,14 +3,8 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-/**
- * A route's `PageHeader` `actions` keep the default (md) control size — see
- * DESIGN.md's `PageHeader` row. Controls in a `Panel` `actions` slot are `sm`;
- * the page header is the one place they are not.
- */
 const ROUTES_DIR = __dirname;
 
-// The Planetary Industry header is under overhaul and is not held to this yet.
 const EXEMPT = /^PlanetaryIndustry/;
 
 function smControlsInPageHeaderActions(file: string): string[] {
@@ -23,7 +17,6 @@ function smControlsInPageHeaderActions(file: string): string[] {
   );
   const found: string[] = [];
 
-  // `size` on these is a glyph's size, not a control height.
   const NOT_CONTROLS = new Set(['Spinner', 'CharacterAvatar']);
 
   function isSmSizeAttribute(node: ts.Node): boolean {

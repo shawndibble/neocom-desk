@@ -5,7 +5,6 @@ import { indexedPages, isMissingIndex, isTopLevelChild } from './indexedSweep.js
 const doc = (path: string, value: number) =>
   ({ ref: { path }, get: () => value }) as unknown as QueryDocumentSnapshot;
 
-/** A query whose `get` answers from `rows` (or throws `fail`), honouring limit and startAfter. */
 function fakeQuery(rows: QueryDocumentSnapshot[], fail?: unknown) {
   const reads: number[] = [];
   const build = (limit = Infinity, after?: QueryDocumentSnapshot): Query =>
@@ -17,7 +16,6 @@ function fakeQuery(rows: QueryDocumentSnapshot[], fail?: unknown) {
         if (fail) throw fail;
         const start = after ? rows.indexOf(after) + 1 : 0;
         const docs = rows.slice(start, start + limit);
-        // Billed: one read per doc returned, and at least one per query.
         reads.push(Math.max(1, docs.length));
         return { docs };
       },

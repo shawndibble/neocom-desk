@@ -1,11 +1,3 @@
-/**
- * Prunes a built asset tree to the assets a predicate keeps (issue #5601).
- *
- * A kept asset keeps its whole container path; a station, ship, bay or
- * container with nothing kept beneath it (and not itself kept) is dropped.
- * Counts and values are recomputed over the kept assets only: an ancestor that
- * is itself filtered out contributes nothing of its own, just what is beneath.
- */
 import {
   assetStackValue,
   type AssetTreeNode,
@@ -43,7 +35,6 @@ export function pruneAssetTree(
     return { itemCount, estimatedValue };
   };
 
-  // A node's own kept stack plus everything already aggregated beneath it.
   function nodeTotals(node: AssetTreeNode): Totals {
     if (node.kind === 'bay') return node;
     const self = own(node.asset, keep(node.asset));
@@ -61,7 +52,6 @@ export function pruneAssetTree(
       return children.length > 0 ? { ...node, children, ...sum(children) } : null;
     }
     if (children.length === 0) {
-      // A kept container with nothing kept inside reads as a plain item.
       return keep(node.asset) ? { kind: 'item', asset: node.asset } : null;
     }
     return { ...node, children, ...sum(children) };

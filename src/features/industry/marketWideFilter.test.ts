@@ -67,7 +67,6 @@ describe('activeMarketWideFilters', () => {
     expect(active).toHaveLength(7);
     for (const pill of active) {
       const cleared = pill.clear(filter);
-      // One filter back at its default leaves every other pill standing.
       expect(activeMarketWideFilters(cleared, i18n.t).map((p) => p.label)).toEqual(
         active.filter((p) => p !== pill).map((p) => p.label)
       );

@@ -2,7 +2,6 @@ import type { Attributes } from '@/engine/types';
 import { RemapMarkerModal } from '../RemapMarkerModal';
 import type { useRemapMarkers } from './useRemapMarkers';
 
-/** The manual attribute editor for one Remap Marker, open while `editingMarkerIndex` is set. */
 export function RemapMarkerEditor({
   markers,
   baseline,

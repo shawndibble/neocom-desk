@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-/**
- * Prints the unit test files one CI shard should run, one per line:
- *   node scripts/test-shard.mjs --shard 3/4 [--from <file>]
- *
- * `--from` deals out the test files listed in <file> (one per line, as
- * `select-tests.mjs` writes it) instead of every test file in the repo.
- *
- * Weights live in scripts/test-shard-weights.json (seconds of wall time per
- * file). Refresh them from the `vitest-timing-shard-N` CI artifacts with
- *   node scripts/test-shard.mjs --weights vitest-timing-1.json vitest-timing-2.json ...
- * A file missing from the table is treated as median, so a new test file needs
- * no edit here to be run.
- */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { partitionByWeight } from './lib/e2eShards.mjs';
@@ -26,7 +13,6 @@ if (args.includes('--weights')) {
     .slice(args.indexOf('--weights') + 1)
     .map((path) => JSON.parse(readFileSync(path, 'utf8')));
   const weights = weightsFromVitestReports(reports);
-  // Reports with no test files must not overwrite the table with `{}`.
   if (Object.keys(weights).length === 0) {
     console.error('no test files found in those reports');
     process.exit(1);
@@ -42,7 +28,6 @@ if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || cur
   process.exit(2);
 }
 
-// Recursive, unlike `e2e/`, so ask git rather than read one directory.
 const files = args.includes('--from')
   ? readFileSync(flag('--from'), 'utf8').split('\n').filter(isUnitTestFile)
   : execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
@@ -50,6 +35,4 @@ const files = args.includes('--from')
       .filter(isUnitTestFile);
 const weights = JSON.parse(readFileSync(WEIGHTS_PATH, 'utf8'));
 const mine = partitionByWeight(files, weights, total)[current - 1];
-// Nothing at all for an empty shard: a bare newline would reach Vitest as one
-// empty filter, which it reads as "run everything".
 if (mine.length > 0) console.log(mine.join('\n'));

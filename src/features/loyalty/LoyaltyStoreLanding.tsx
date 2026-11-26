@@ -67,7 +67,6 @@ import { usePriceBasis } from './priceBasis';
 import { useLpLandingOfferColumns, useLpLandingStoreColumns } from './useLpLandingColumns';
 import { useLpStoreLanding } from './useLpStoreLanding';
 
-/** `all`, `none` or a faction id. */
 function factionParam(): UrlParamCodec<LpLandingFilters['faction']> {
   return {
     parse: (raw) => {
@@ -87,13 +86,11 @@ function minSellsParam(): UrlParamCodec<MinSellsPerDay> {
   };
 }
 
-/** The view and search box, in the URL (ADR 0015), so a view can be linked and Back returns to it. */
 const VIEW_PARAMS = {
   view: enumParam<LpLandingView>(['stores', 'offers'], 'stores'),
   q: textParam(),
 };
 
-/** Every filter in the URL too; hub and price basis are app-wide settings instead. */
 const FILTER = defineUrlFilter<LpLandingFilters>({
   faction: { key: 'faction', codec: factionParam() },
   range: { key: 'range', codec: enumParam(JUMP_RANGES, DEFAULT_LP_LANDING_FILTERS.range) },
@@ -111,17 +108,9 @@ const STORE_SORT_IDS = ['store', 'lpValue', ...LP_LANDING_STORE_COLUMN_IDS];
 const OFFER_SORT_IDS = ['item', 'iskPerLp', ...LP_LANDING_OFFER_COLUMN_IDS];
 
 const storeRowKey = (store: LpLandingStore) => store.corporationId;
-// Stores share offer ids (one navy offer runs in several corporations' stores).
 const offerRowKey = (offer: LpLandingOffer) =>
   `${offer.store.corporationId}:${offer.row.offer.offer_id}`;
 
-/**
- * `/wallet/lp-store` with no store open: every LP Store ranked by LP Value
- * (Stores) or every offer ranked by ISK/LP (Offers), under one search box and
- * one filter set (`lpLanding.ts`). A row opens that store's modal over this
- * page, on the offer for an Offers row. `active` false while that modal is
- * open: nothing behind it is priced (`useLpStoreLanding`).
- */
 export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -150,11 +139,9 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   function onFilterChange(next: LpLandingFilterValue) {
     if (next.hubId !== hubId) void pickHubFor('lpStore', next.hubId);
     if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
-    // Only the filter's own fields reach the URL.
     setFilters(next);
   }
 
-  // Deferred: a keystroke or chip click never waits on a pass over every offer.
   const deferredQuery = useDeferredValue(query);
   const bestOffers = useMemo(
     () => (view === 'stores' ? lpLandingBestOffers(data.offers, deferredFilters) : null),
@@ -193,11 +180,9 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
     LP_LANDING_OFFER_COLUMN_IDS,
     LP_LANDING_OFFER_PHONE_OFF
   );
-  // A pilot holding LP sees those stores first unless the URL names a sort.
   const storeSort = useUrlSort(STORE_SORT_KEY, lpLandingStoreSort(holdings), STORE_SORT_IDS);
   const offerSort = useUrlSort('offerSort', OFFERS_SORT, OFFER_SORT_IDS);
 
-  // The whole landing URL rides along, so Close after a reload rebuilds this view, not just the query.
   const crumb: LpSearchCrumbState = { from: 'lp-search', search: location.search };
   const openStore = (store: LpLandingStore) =>
     navigate(lpStorePath(store.corporationId), { state: crumb });
@@ -232,9 +217,6 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const shown = view === 'stores' ? shownStores.length : shownOffers.length;
   const total = view === 'stores' ? data.stores.length : data.offers.length;
   const offersPending = view === 'offers' && data.pricing;
-  // A linked "I can afford" / "Stores I hold LP with" waits for the balances, not "Nothing matches".
-  // So does the store list on its default sort, which puts held LP first: it never reorders
-  // under the pilot when they arrive. A sort the URL names needs no balances.
   const balancesPending =
     ((filters.mineOnly || filters.affordableOnly) && !data.balancesKnown) ||
     (view === 'stores' &&
@@ -411,7 +393,6 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
               )}
             </p>
           )}
-          {/* Sideways scroll, not a clipped last column, where the table is wider than the page (768px). */}
           <Panel padded={false}>
             <div className="overflow-x-auto">{body}</div>
           </Panel>

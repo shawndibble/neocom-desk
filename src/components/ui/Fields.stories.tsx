@@ -4,9 +4,6 @@ import { Field, Fields, FieldsHeading } from './Fields';
 import { NativeSelect } from './NativeSelect';
 import { TextInput } from './TextInput';
 
-/**
- * @summary Labelled-control grid: `Fields` sets the columns, each `Field` is one subgrid row with a label, control and optional note. A box sized like a field marks a control (§6c).
- */
 const meta = {
   title: 'ui/Fields',
   component: Fields,
@@ -33,13 +30,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary `compact`: two columns, dim labels, for a dense panel or modal. */
 export const Compact: Story = {};
 
-/** @summary `form`: stacked on a phone, label column beside the control at `lg`, hairlines between rows. */
 export const Form: Story = { args: { variant: 'form' } };
 
-/** @summary `inline` is for a lone checkbox in a `form` grid: control sits beside its label. */
 export const InlineCheckbox: Story = {
   args: { variant: 'form' },
   render: (args) => (
@@ -51,7 +45,6 @@ export const InlineCheckbox: Story = {
   ),
 };
 
-/** @summary `FieldsHeading`: two titled groups in one grid share a label column, so their controls line up. */
 export const WithHeadings: Story = {
   args: { variant: 'form' },
   render: (args) => (

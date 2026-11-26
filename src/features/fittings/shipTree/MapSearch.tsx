@@ -1,8 +1,3 @@
-/**
- * The Ship Tree's search (map and ladder), over every faction's hulls: "/" focuses it, Enter
- * picks the first hit, Escape clears. Picking a hull is the caller's —
- * another faction's switches the tree to it.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveStatus, SearchInput } from '@/components/ui';
@@ -23,7 +18,6 @@ export function MapSearch({
   data: ShipTreeData;
   statuses: ReadonlyMap<number, ShipTreeHullStatus>;
   onPick: (ship: ShipTreeShip) => void;
-  /** Width of the box; the result list matches it. */
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -63,8 +57,6 @@ export function MapSearch({
         aria-keyshortcuts="/"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && results[0]) {
-            // The Ship Info window takes focus as it opens; without this the
-            // same Enter would press whatever it focused (its close button).
             e.preventDefault();
             pick(results[0]);
           }
@@ -77,7 +69,6 @@ export function MapSearch({
       {results.length > 0 && (
         <ul
           aria-label={t('ships.tree.searchResults')}
-          // At least 20rem (or the screen), so names stay readable beside a narrow box.
           className="absolute z-20 mt-1 max-h-80 w-[max(100%,min(20rem,calc(100vw-2rem)))] overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
         >
           {results.map((s) => {

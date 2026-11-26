@@ -1,7 +1,3 @@
-// The Dexie boundary for encrypted export/import (issue #789). Wires the pure
-// `crypto.ts`/`payload.ts` modules to `db` — the only file in this feature
-// that reads or writes IndexedDB.
-
 import type { Table } from 'dexie';
 import { db } from '@/db';
 import { downloadTextFile } from '@/lib/download';
@@ -17,18 +13,8 @@ import {
 import { utcDay } from '@/engine/localDay';
 import { OVERVIEW_GROUPS_SETTING_KEY } from '@/features/character/overviewGroups';
 
-/**
- * Dexie table names for every Editable Data table a Character owns — the
- * synced collection registry's editable collections. Synced settings are
- * handled separately below by their `sync.` key allow-list, and the
- * Notification Feed is device-local by design, not Editable Data.
- *
- * The backup file keys rows by these names (ADR 0014), so they are part of
- * its format; `io.test.ts` restores a file written before the registry.
- */
 const EDITABLE_TABLES: readonly string[] = EDITABLE_COLLECTIONS.map((c) => c.table);
 
-/** Untyped view of one Editable Data table, for the generic read/write loops below. */
 function editableTable(name: string): Table<EditableRow, unknown> {
   return db.table<EditableRow, unknown>(name);
 }
@@ -40,33 +26,21 @@ async function readEditableTables(): Promise<Record<string, EditableRow[]>> {
   return Object.fromEntries(entries);
 }
 
-/**
- * Adds a new Character's Editable Data rows. A row whose id the device already holds (a payment
- * link another Character owns here, say) is left as it is: import never overwrites, and one
- * duplicate never fails the whole import with a ConstraintError.
- */
 async function writeEditableTables(editableTables: Record<string, EditableRow[]>): Promise<void> {
   for (const table of EDITABLE_TABLES) {
     const rows = editableTables[table];
     if (!rows?.length) continue;
     const target = editableTable(table);
-    // Every Editable Data table is keyed by `id`, the id the sync merges by.
     const held = await target.bulkGet(rows.map((r) => r.id));
     const fresh = rows.filter((_, i) => held[i] === undefined);
     if (fresh.length) await target.bulkAdd(fresh);
   }
 }
 
-/**
- * Synced settings, plus the device-local Overview character groups: a group is
- * a statement about several characters, so it follows the characters into a
- * backup. An older backup simply lacks the row, and import skips it if present.
- */
 function isBackedUpSetting(s: { key: string }): boolean {
   return isAllowedSyncedSettingKey(s.key) || s.key === OVERVIEW_GROUPS_SETTING_KEY;
 }
 
-/** Builds the full-device backup payload and encrypts it under `password`. */
 export async function exportBackup(
   password: string
 ): Promise<{ filename: string; contents: string }> {
@@ -83,7 +57,6 @@ export async function exportBackup(
   return { filename, contents: JSON.stringify(file, null, 2) };
 }
 
-/** {@link exportBackup} plus triggering the browser download. */
 export async function exportBackupToFile(password: string): Promise<void> {
   const { filename, contents } = await exportBackup(password);
   downloadTextFile(filename, contents, 'application/json');
@@ -104,26 +77,13 @@ function isBackupFile(value: unknown): value is BackupFile {
   );
 }
 
-/**
- * Decrypts `fileContents` under `password`, partitions it against what's
- * already on this device (issue #789's skip-whole-character-on-conflict
- * policy — see `payload.partitionImport`), and writes only the new rows.
- * Import never touches an existing Character's token or Editable Data.
- */
 export async function importBackup(fileContents: string, password: string): Promise<ImportSummary> {
   const parsed: unknown = JSON.parse(fileContents);
   if (!isBackupFile(parsed)) {
     throw new Error('Not a Neocom Desk backup file');
   }
-  // Decrypt outside the transaction — WebCrypto is not a Dexie operation, and
-  // Dexie's `rw` transactions abort if execution steps outside their table
-  // set for too long between operations.
   const payload = (await decryptExportPayload(parsed, password)) as BackupPayload;
 
-  // All reads and writes in one transaction: a failure partway through
-  // (a bulkAdd rejection, quota, etc.) must not leave a character's row
-  // written with its token missing, or any other partial import — this
-  // feature exists to recover credentials, not to lose them halfway.
   return db.transaction(
     'rw',
     [db.characters, db.tokens, db.settings, ...EDITABLE_TABLES.map(editableTable)],

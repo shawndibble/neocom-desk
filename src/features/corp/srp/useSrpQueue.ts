@@ -1,7 +1,3 @@
-/**
- * `/corp/srp` officer queue's data: verify the Character as an officer first, then read open claims;
- * History loads on its tab. Firestore lite has no listeners: actions patch what is on screen and re-read the activity.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
@@ -30,12 +26,10 @@ import {
 import type { SrpClaimValues } from '../srpTypes';
 import { runInBatches } from './srpQueue';
 
-/** Closed claims, loaded the first time the History tab opens. */
 export type SrpHistoryState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'failed' }
-  /** `more`: the read filled its limit, so older ones may exist. */
   | { status: 'ready'; claims: SrpClaim[]; limit: number; more: boolean };
 
 export type SrpQueueState =
@@ -44,7 +38,6 @@ export type SrpQueueState =
   | { status: 'failed'; message: string }
   | {
       status: 'ready';
-      /** Pending and Approved only. */
       claims: SrpClaim[];
       activity: SrpAuditEntry[];
       history: SrpHistoryState;
@@ -55,9 +48,7 @@ type ReadyState = Extract<SrpQueueState, { status: 'ready' }>;
 export interface SrpQueueData {
   state: SrpQueueState;
   reload: () => void;
-  /** Reads History if it was not read yet (or failed). */
   loadHistory: () => void;
-  /** Reads another page of older closed claims. */
   loadOlderHistory: () => void;
   approve: (item: SrpApproveItem) => Promise<SrpClaimOutcome>;
   approveMany: (items: SrpApproveItem[]) => Promise<SrpBatchOutcome>;
@@ -65,16 +56,13 @@ export interface SrpQueueData {
   change: (killmailId: number, amount: number, reason: string) => Promise<SrpClaimOutcome>;
   markPaid: (item: SrpMarkPaidItem) => Promise<SrpClaimOutcome>;
   markPaidMany: (items: SrpMarkPaidItem[]) => Promise<SrpBatchOutcome>;
-  /** One claim's audit trail, for its detail. */
   claimAudit: (killmailId: number) => Promise<SrpAuditEntry[]>;
-  /** One claim's ship value against its nearest Doctrine Fit's, for the officer appraisal. */
   claimValues: (killmailId: number) => Promise<SrpClaimValues>;
 }
 
 const DENIED = /permission-denied|unauthenticated|failed-precondition/;
 const HISTORY_PAGE = 100;
 
-/** What an officer's change did to a claim on screen. Closed ones leave the open list for History. */
 export function applyOutcomes(
   ready: ReadyState,
   outcomes: readonly SrpClaimOutcome[],
@@ -108,7 +96,6 @@ export function useSrpQueue(): SrpQueueData {
   const corporationId = useActiveCorporationId();
   const key =
     characterId === null || corporationId === null ? null : `${characterId}:${corporationId}`;
-  // Tagged with the Character and corporation it was read for, so a switch shows loading, never the old corp's queue.
   const [loaded, setLoaded] = useState<{ key: string; state: SrpQueueState } | null>(null);
   const state = useMemo<SrpQueueState>(
     () => (loaded !== null && loaded.key === key ? loaded.state : { status: 'loading' }),
@@ -118,7 +105,6 @@ export function useSrpQueue(): SrpQueueData {
     (next: SrpQueueState) => key !== null && setLoaded({ key, state: next }),
     [key]
   );
-  /** Changes the ready state in place; a no-op for any other state or a stale Character. */
   const patchReady = useCallback(
     (change: (ready: ReadyState) => ReadyState) =>
       setLoaded((prev) =>
@@ -163,7 +149,6 @@ export function useSrpQueue(): SrpQueueData {
     };
   }, [characterId, corporationId, attempt, setState]);
 
-  /** Re-reads the activity feed, and the open claims too when `claims` (after a refusal). */
   const refresh = useCallback(
     async (claims: boolean) => {
       if (characterId === null || corporationId === null) return;
@@ -173,9 +158,7 @@ export function useSrpQueue(): SrpQueueData {
           readSrpActivity(characterId, corporationId),
         ]);
         patchReady((ready) => ({ ...ready, claims: nextClaims ?? ready.claims, activity }));
-      } catch {
-        // The change itself went through; the next action or reload shows the rest.
-      }
+      } catch {}
     },
     [characterId, corporationId, patchReady]
   );
@@ -210,10 +193,6 @@ export function useSrpQueue(): SrpQueueData {
     }
   }, [state, readHistory]);
 
-  /**
-   * Runs a change and applies what the server answered to the screen. A refusal means the claim
-   * moved under the officer (or the amount did), so then the open claims are re-read.
-   */
   const act = useCallback(
     async <T>(
       run: (c: number, corp: number) => Promise<T>,

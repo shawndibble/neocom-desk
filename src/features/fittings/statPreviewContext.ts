@@ -9,7 +9,6 @@ export type Changes = ReadonlyMap<StatChangeKey, StatChangeValue>;
 
 export const StatPreviewContext = createContext<Changes | null>(null);
 
-/** The previewed changes among `keys`, in `keys` order. */
 export function useChangedKeys(keys: readonly StatChangeKey[] | undefined): StatChangeValue[] {
   const changes = useContext(StatPreviewContext);
   if (!changes || !keys) return [];
@@ -19,7 +18,6 @@ export function useChangedKeys(keys: readonly StatChangeKey[] | undefined): Stat
   });
 }
 
-/** The stats each collapsible section shows, so its header can say a change is inside it. */
 const SECTION_KEYS: Partial<Record<Section, readonly StatChangeKey[]>> = {
   exploration: [
     'dataStrength',
@@ -72,7 +70,6 @@ const SECTION_KEYS: Partial<Record<Section, readonly StatChangeKey[]>> = {
   ],
 };
 
-/** True when a previewed change sits inside section `id`. */
 export function useSectionPreviewed(id: Section): boolean {
   return useChangedKeys(SECTION_KEYS[id]).length > 0;
 }

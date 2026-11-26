@@ -46,7 +46,6 @@ function parsePositiveInt(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-/** `type` (a goal to seed) and `colony` — present only once chosen. */
 function positiveIntParam(): UrlParamCodec<number | null> {
   return {
     parse: (raw) => parsePositiveInt(raw),
@@ -55,43 +54,14 @@ function positiveIntParam(): UrlParamCodec<number | null> {
 }
 
 const PI_URL_PARAMS = {
-  // The Industry "PI Plan" context menu's deep link: seeds a goal, then clears.
   type: positiveIntParam(),
   goals: goalsParam(),
   off: idListParam(),
-  // A colony to open on the Colonies tab — the Goal Planner's colony links.
   colony: positiveIntParam(),
 };
 
-/**
- * Planetary Industry: colony health from extractor expiry — the one PI field
- * ESI keeps current without opening the colony in-client — and the chain
- * planner, as peer tabs rather than two routes.
- *
- * They are one page because the plan's inputs come from the colonies and
- * because a user with no colonies at all should land on the empty state and
- * be able to step straight to a plan: buying P1 needs no extractors, so the
- * planner answers on day one. A second nav entry would also cost a row in the
- * mobile nav sheet, which is the surface that can least afford one.
- *
- * The tab is a path segment (`/planetary-industry/plan`,
- * `/planetary-industry/map`); every input each peer tab needs to redraw
- * its answer stays a scoped query param on top of it — Plan's goals and
- * switched-off colonies (`?goals=`, `?off=`; `?type=` seeds a goal and is
- * cleared), the chosen question (`?q=`, PlanPanel) and Find best's filter
- * (`?fb.filter=`, `?fb.mode=`, FindBestPlan), Colonies' opened colony
- * (`?colony=`), Map's open product drawer (`?product=`, which every PI
- * product name links to) — so a plan
- * survives a reload and can be deep-linked into later. All fall
- * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
- * unknown value is handled by each param's own default rather than rendering
- * nothing.
- */
 export function PlanetaryIndustry() {
   const { t } = useTranslation();
-  // The pilot's own "expiring soon" lead time. Hydrated here, once, for the
-  // whole page: the Colonies tab reads the same store, and a hydrate per row
-  // would be a Dexie read per colony.
   useHydratedStore(useExpiringWindowHours);
   const [tab, setTab] = usePageTab(PI_TABS);
   const tabsId = useTabsId();
@@ -100,7 +70,6 @@ export function PlanetaryIndustry() {
     useUrlParams(PI_URL_PARAMS);
   const { data, error, loading, hydrated, activeCharacterId, refresh, refreshCount } =
     useRouteSnapshot(loadPiSnapshot, undefined, { cacheKey: 'planetary-industry' });
-  // Show info for every item name and menu on the three tabs.
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
   const location = useLocation();
@@ -113,8 +82,6 @@ export function PlanetaryIndustry() {
   }, [tab, location, navigate]);
   usePopScrollRestore();
 
-  // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
-  // Plan tab only, and only for a type the planner can plan.
   useEffect(() => {
     if (seedTypeId === null || tab !== 'plan') return;
     let cancelled = false;
@@ -143,8 +110,6 @@ export function PlanetaryIndustry() {
     needsReauth: data?.planetsNeedsReauth,
     fetchFailed: data?.planetsFetchFailed,
   });
-  // Another reader (a poll, a prefetch) can be refused after this snapshot loaded; the shell
-  // notice stays quiet on this page for that refusal, so the page banner must show it.
   const failure = useAuthFailure((state) => state.failure);
   const planetsRefused =
     failure?.kind === 'request' &&

@@ -12,7 +12,6 @@ import type { OrderProblem } from './orderProblems';
 
 const NOW = 1_700_000_000_000;
 
-/** `count` samples ending at `NOW`, one per hour, all of `problem`. */
 function run(count: number, problem: OrderProblem, from = NOW): OrderProblemSample[] {
   return Array.from({ length: count }, (_, i) => ({
     at: from - (count - 1 - i) * HOUR_MS,

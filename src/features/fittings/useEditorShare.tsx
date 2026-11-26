@@ -1,10 +1,3 @@
-/**
- * "Share to Community" in the open Fitting's Export menu (issue #3605): only for
- * a Fitting that is saved, since a Community holds the saved copy and follows
- * its later saves. Absent with no Community, direct with one, a submenu with
- * several — as on a library row. The Communities and which already hold this
- * Fitting are read once per open Fitting, not each time the menu opens.
- */
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -47,9 +40,7 @@ export function useEditorShare(
       const { loadShareStatus } = await import('@/features/communities/sharedFittings');
       const loaded = await loadShareStatus(characterId, { source: 'saved', key: recordId });
       setStatus({ recordId, ...loaded });
-    } catch {
-      // Offline or signed out of sync: no Share item, nothing else changes.
-    }
+    } catch {}
   }, [characterId, recordId]);
 
   useEffect(() => {
@@ -81,8 +72,6 @@ export function useEditorShare(
       ? t('fittings.share.unshareFrom', { community: community.name })
       : t('fittings.share.shareTo', { community: community.name });
 
-  // Sharing writes to the Community; offline it can only fail, so say why it is off (the reason sits
-  // under the item, as on Save to EVE, because a disabled menu item takes no hover for a tooltip).
   const offlineReason = online ? null : (
     <p className="max-w-64 px-3 pb-2 text-xs text-text-dim">
       {t('fittings.share.needsConnection')}
@@ -96,7 +85,6 @@ export function useEditorShare(
         <>
           <DropdownMenuItem
             aria-disabled={!online || undefined}
-            // Focusable so the offline note below can be read; selecting does nothing.
             onSelect={(event) => {
               if (!online) event.preventDefault();
               else void toggle(only);

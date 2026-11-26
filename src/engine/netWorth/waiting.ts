@@ -1,8 +1,3 @@
-/**
- * The Balance tab's "ISK waiting" and wallet Goal maths. Pure: Net Worth
- * Snapshots in, display-ready numbers out. Both read the same stored days as the
- * net worth chart, so nothing here needs a fresh ESI read.
- */
 import { DAY_MS } from '@/lib/age';
 import { shiftUtcDate } from '../localDay';
 import { layerValues } from './series';
@@ -15,13 +10,9 @@ export interface IskWaiting {
   total: number;
 }
 
-/** Days a Character's snapshots must span before a pace is worked out from them. */
 export const GOAL_MIN_SPAN_DAYS = 7;
-/** A Character whose newest snapshot is older than this many days is left out of the figures. */
 export const WAITING_STALE_DAYS = 7;
-/** Largest Goal target: past it the amount no longer round-trips through its text field. */
 export const GOAL_MAX_TARGET = 1e15;
-/** How far back the pace looks. */
 export const GOAL_WINDOW_DAYS = 30;
 
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
@@ -41,7 +32,6 @@ function byCharacter(rows: readonly NetWorthSnapshotRow[], today: string) {
   return map;
 }
 
-/** ISK parked in sell orders, buy-order escrow and contracts, at each fresh Character's newest day. */
 export function iskWaiting(rows: readonly NetWorthSnapshotRow[], today: string): IskWaiting {
   const out = { sellOrders: 0, escrow: 0, contracts: 0, total: 0 };
   for (const list of byCharacter(rows, today).values()) {
@@ -55,15 +45,11 @@ export function iskWaiting(rows: readonly NetWorthSnapshotRow[], today: string):
 }
 
 export interface GoalProgress {
-  /** Wallet ISK now: each Character's newest snapshot, summed. */
   current: number;
   target: number;
-  /** 0 to 1; 0 without a positive target. */
   fraction: number;
   reached: boolean;
-  /** Wallet gain per day over the window; null when too little history or not growing. */
   perDay: number | null;
-  /** UTC day the target is reached at that pace; null when reached or no pace. */
   projectedDay: string | null;
 }
 
@@ -105,12 +91,6 @@ export function goalProgress(input: {
   };
 }
 
-/**
- * Wallet ISK gained (or lost) over the window: each Character's newest snapshot
- * against its oldest one inside it, summed. Null with fewer than two days to
- * compare. Transfers between a pilot's own Characters cancel only when all are
- * in `rows`.
- */
 export function walletChange(rows: readonly NetWorthSnapshotRow[], today: string): number | null {
   const floor = shiftUtcDate(today, -GOAL_WINDOW_DAYS);
   let change = 0;

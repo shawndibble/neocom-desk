@@ -13,12 +13,6 @@ import { PayeeNameField } from '@/features/miningTax/PayeeNameField';
 
 const k = (key: string) => `corpTaxBook.moons.settings.taxContact.${key}`;
 
-/**
- * "Who answers members' tax questions" (Access tab): who also gets an EVE mail when a member asks
- * their corporation about mining tax. Needs you always gets the question; the mail is for officers
- * who are not in Neocom Desk. Officers are found by name with the Payee name search, so any
- * character can be named, not only ones already in the book.
- */
 export function TaxContactSection({
   characterId,
   corporationId,
@@ -26,7 +20,6 @@ export function TaxContactSection({
   onChange,
   disabled,
 }: {
-  /** The officer's character: whose mailing lists and name search it uses. */
   characterId: number;
   corporationId: number;
   draft: TaxContactDraft;
@@ -70,7 +63,6 @@ export function TaxContactSection({
     };
   }, [officerKey]);
 
-  // A stored list the officer is not on still shows, so saving does not silently drop it.
   const listOptions =
     draft.listId !== null && !lists.some((l) => l.id === draft.listId)
       ? [{ id: draft.listId, name: draft.listName }, ...lists]

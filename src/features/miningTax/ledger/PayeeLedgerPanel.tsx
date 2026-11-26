@@ -35,14 +35,11 @@ import { LedgerRowDetail } from './LedgerRowDetail';
 import { ledgerCsvColumns, ledgerWhat } from './ledgerCsv';
 import { lockRowBoundary } from './lockBoundary';
 
-/** The panel's filter and the words for each row, shared by its table and its export. */
 const LEDGER_KINDS: readonly PayeeLedgerKind[] = ['charge', 'payment', 'writeOff', 'notice'];
 
 interface LedgerFilter {
-  /** Inclusive `YYYY-MM-DD`; null is no bound. */
   startDate: string | null;
   endDate: string | null;
-  /** The kinds of row shown; every kind by default. */
   kinds: readonly PayeeLedgerKind[];
 }
 
@@ -52,10 +49,6 @@ const DEFAULT_LEDGER_FILTER: LedgerFilter = {
   kinds: LEDGER_KINDS,
 };
 
-/**
- * The rows the filter keeps. Each keeps the account's running balance: filtering hides rows, it
- * never re-adds them. The opening balance is what every later balance starts from: always kept.
- */
 function filterLedgerRows(rows: readonly PayeeLedgerRow[], filter: LedgerFilter): PayeeLedgerRow[] {
   return rows.filter(
     (r) =>
@@ -86,39 +79,16 @@ function activeLedgerFilters(filter: LedgerFilter, t: Translate): ActiveFilter<L
 export interface PayeeLedgerPanelProps {
   open: boolean;
   onClose: () => void;
-  /** The Payee (or a Corp Tax Book's Miner): the panel's title. */
   payeeName: string;
-  /** The Payee's Running account and what made it; null while it loads. */
   source: PayeeLedgerSource | null;
-  /** Ore names the caller already holds; an ore without one reads `#id`. */
   typeNames?: ReadonlyMap<number, string>;
-  /** Above the ledger: a pick between accounts, when the Payee has several (a book's Miners). */
   picker?: ReactNode;
-  /**
-   * Unlinks a payment (its id in `source.payments`) from a personal Payee: it pays nothing and
-   * is offered again. Absent for a Corp Tax Book's Payee, whose payments the corporation owns.
-   */
   onUnlinkPayment?: (paymentId: string) => void;
-  /**
-   * A Corp Tax Book's lock date (`YYYY-MM-DD`): a divider marks where history turns read-only.
-   * Absent for a personal Payee, whose ledger has none.
-   */
   lockDate?: string;
-  /**
-   * The old personal history of a Payee a Corp Tax Book now answers for: the rows only, with no
-   * balance and no status, since none of it is anyone's figure.
-   */
   history?: boolean;
-  /** A personal Payee's: opens the wallet payments to link to it (from a Marked paid row). */
   onLinkWalletPayment?: () => void;
 }
 
-/**
- * A Payee ledger (decision 20261120-235011): every charge, payment, write-off and late notice
- * of one Payee's Running account, newest first with a running balance, under its "Owes" or
- * "Paid through" status. One panel for a Corp Tax Book's Payee and a personal one: the caller
- * fills `source`. A row opens in place to say what it was.
- */
 export function PayeeLedgerPanel({
   open,
   onClose,
@@ -196,13 +166,8 @@ function LedgerStatus({ ledger }: { ledger: PayeeLedger }) {
 }
 
 const amountCell = (value: number) => (value === 0 ? '' : formatIsk(value));
-/**
- * What the account owes reads with a minus; a payment has none, so the two are told apart. A
- * negative charge (an Adjustment in the pilot's favour) lowers what is owed, so it reads like one.
- */
 const chargedCell = (value: number) =>
   value === 0 ? '' : value > 0 ? `−${formatIsk(value)}` : formatIsk(-value);
-/** The running balance: owed is red with a minus, money ahead is green, never the word "credit". */
 const balanceCell = (balance: number) =>
   balance < -0.005 ? formatIsk(-balance) : balance > 0.005 ? `−${formatIsk(balance)}` : '0';
 const balanceTone = (balance: number) =>
@@ -225,13 +190,9 @@ function LedgerBody({
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>(DEFAULT_LEDGER_FILTER);
-  // In date order: each row's balance is the account's balance after it, computed there.
   const rows = useMemo(() => filterLedgerRows(ledger.rows, filter), [ledger.rows, filter]);
-  // Shown newest first, like a bank statement: the latest payment is the top row, not the bottom
-  // of a long list. Only the order is reversed; no balance is recomputed.
   const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
   const csvColumns = useMemo(() => ledgerCsvColumns(t, history), [t, history]);
-  // The file stays in date order (oldest first), whichever way the table reads.
   const tableExport = useTableExport({
     surface: 'mining-tax-payee-ledger',
     rows,
@@ -320,11 +281,6 @@ function LedgerBody({
   );
 }
 
-/**
- * The ledger's table, for a page that holds its own frame: the Payee panel's, and an officer's
- * Miner page, which adds a row menu. `rows` in the order to show them: newest first in both, each
- * row's balance still the account's balance after it.
- */
 export function PayeeLedgerTable({
   rows,
   label,
@@ -337,23 +293,14 @@ export function PayeeLedgerTable({
   onLinkWalletPayment,
   ...rest
 }: {
-  /** Opens the wallet payments to link, from a Marked paid row's detail. */
   onLinkWalletPayment?: () => void;
-  /** Whether the running balance column is shown; an old history's rows carry none. */
   showBalance?: boolean;
   rows: readonly PayeeLedgerRow[];
   label: string;
   typeNames?: ReadonlyMap<number, string>;
-  /** A row's menu (right-click, touch-and-hold, ⋮); without it the rows have none. */
   rowContextMenu?: (row: PayeeLedgerRow, tr: ReactElement) => ReactElement;
-  /** Offers Unlink in a payment row's detail (a personal Payee's ledger, a legacy link too). */
   onUnlinkPayment?: (paymentId: string) => void;
-  /**
-   * A Corp Tax Book's lock date (`YYYY-MM-DD`): one divider marks where the rows before it turn
-   * read-only. Only for a book's ledger; a personal Payee's has no lock date, so passes none.
-   */
   lockDate?: string;
-  /** The lock date as the page writes dates; the table's own `YYYY-MM-DD` when left out. */
   lockDateLabel?: string;
 } & Omit<
   DataTableProps<PayeeLedgerRow>,
@@ -387,7 +334,6 @@ export function PayeeLedgerTable({
                   : undefined;
           return (
             <>
-              {/* A record an officer undid stays, struck through; its reversal follows. */}
               {r.reversed ? (
                 <span>
                   <span className="text-text-dim line-through decoration-text-faint">
@@ -403,8 +349,6 @@ export function PayeeLedgerTable({
           );
         },
       },
-      // A phone card has one amount: Charged and Credited are two columns of which each row
-      // fills one, so the card would print a blank labelled line for the other.
       ...(isPhone
         ? [
             {
@@ -441,7 +385,6 @@ export function PayeeLedgerTable({
               className: 'tabular-nums font-medium',
               cellClassName: (r) => balanceTone(r.balance),
               stackAffix: { before: `${t('miningTax.ledger.column.balance')} ` },
-              // The span carries the tone on a phone card too, whose meta line forces dim text.
               render: (r) => (
                 <span className={balanceTone(r.balance)}>{balanceCell(r.balance)}</span>
               ),

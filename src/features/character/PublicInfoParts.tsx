@@ -1,8 +1,3 @@
-/**
- * Components shared by the Show Info Corporation and Alliance tabs: a pilot
- * and a corporation, each with their picture, as a link that opens them in
- * the modal.
- */
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import { CharacterLink, CorporationLink } from '@/features/entities';
@@ -18,7 +13,6 @@ export function PersonLink({ id, name }: { id: number; name: string | null }) {
   );
 }
 
-/** A corporation with its logo; the name is the `CorporationLink` entity link. */
 export function CorporationEntry({ id, name }: { id: number; name: string | null }) {
   return (
     <span className="flex min-w-0 items-center gap-2">

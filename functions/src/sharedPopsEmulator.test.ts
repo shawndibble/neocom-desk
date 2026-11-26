@@ -1,5 +1,3 @@
-// Shared Pops against the Firestore emulator (#6223): publishing a book's pops and who may read
-// them. Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { beforeEach, expect, it } from 'vitest';
 import type { Caller } from './actorAuth.js';
@@ -25,19 +23,19 @@ import {
 
 const BOOK = 98000001;
 const ALLIANCE = 99000001;
-const OWNER = 98000555; // a moon owner feeding the book
+const OWNER = 98000555;
 const H = 3_600_000;
 const START = '2026-11-10T00:00:00.000Z';
 const ARRIVAL = '2026-11-15T00:00:00.000Z';
 const DECAY = '2026-11-15T03:00:00.000Z';
 let now = Date.parse(ARRIVAL) - 24 * H;
 
-const OFFICER = 21; // an Accountant of the book
+const OFFICER = 21;
 const CORPMATE = 31;
-const ALLY = 32; // in another corporation of the book's alliance
+const ALLY = 32;
 const STRANGER = 33;
-const FRIEND = 34; // a Member of the Community, in no audience otherwise
-const ADMIN = 41; // the Community's admin
+const FRIEND = 34;
+const ADMIN = 41;
 
 const affiliation: Record<number, Affiliation> = {
   [OFFICER]: { corporationId: BOOK, allianceId: ALLIANCE },
@@ -196,7 +194,6 @@ emulatorSuite('Shared Pops', () => {
   it("hides an opted-out or no longer handled moon owner's pops before any republish", async () => {
     await publishSharedPops(publishDeps(), BOOK);
     const feeder = book().collection('feeders').doc(String(OWNER));
-    // A publish that raced the opt-out, or a refresh after it that failed, leaves the doc as it was.
     await feeder.update({ popSharingOptOut: { by: 5, at: now } });
     expect(await seen(CORPMATE)).toEqual([40001]);
     await feeder.update({ popSharingOptOut: FieldValue.delete(), status: 'removed' });
@@ -236,10 +233,9 @@ emulatorSuite('Shared Pops', () => {
 
   it('shares into a Community only while an officer of the book is a Member there', async () => {
     await publishSharedPops(publishDeps(), BOOK);
-    // No officer has used the book: the Community shares nothing.
     expect(await seen(FRIEND)).toEqual([]);
     await stampEditorUse(db, BOOK, viewer(OFFICER), now - H);
-    expect(await seen(FRIEND)).toEqual([]); // an officer, but not a Member
+    expect(await seen(FRIEND)).toEqual([]);
     await join('c1', OFFICER);
     expect(await seen(FRIEND)).toEqual([40002]);
     expect(Object.fromEntries(await sharingCommunities(readDeps(), BOOK, ['c1', 'c2']))).toEqual({
@@ -257,7 +253,6 @@ emulatorSuite('Shared Pops', () => {
     expect(await seen(FRIEND)).toEqual([40002]);
     await stampFailedRoleCheck(db, BOOK, OFFICER, now);
     expect(await seen(FRIEND)).toEqual([]);
-    // The next editing use counts again.
     await stampEditorUse(db, BOOK, viewer(OFFICER), now + 1);
     expect(await seen(FRIEND)).toEqual([40002]);
   });
@@ -304,7 +299,7 @@ emulatorSuite('Shared Pops', () => {
       now
     );
     expect(await seen(FRIEND)).toEqual([]);
-    expect(await seen(ALLY)).toEqual([40002]); // the Alliance audience is not the Community's
+    expect(await seen(ALLY)).toEqual([40002]);
     expect((await listCommunityPopSharers(readDeps(), caller(ADMIN), 'c1')).sharers).toEqual([
       { corporationId: BOOK, sharing: true, blocked: true },
     ]);
@@ -321,16 +316,13 @@ emulatorSuite('Shared Pops', () => {
     await publishSharedPops(publishDeps(), BOOK);
     const sharers = async () =>
       (await listCommunityPopSharers(readDeps(), caller(ADMIN), 'c1')).sharers;
-    // No officer of the book is a Member: the settings name c1, but nothing shows there.
     expect(await sharers()).toEqual([{ corporationId: BOOK, sharing: false, blocked: false }]);
     await join('c1', OFFICER);
     await stampEditorUse(db, BOOK, viewer(OFFICER), now - H);
-    // Every pop past its retention: the published doc goes, the sharer stays listed and blockable.
     now = Date.parse(DECAY) + 48 * H + 72 * H;
     expect(await publishSharedPops(publishDeps(), BOOK)).toBeNull();
     expect((await sharedPopsRef(db, BOOK).get()).exists).toBe(false);
     expect(await sharers()).toEqual([{ corporationId: BOOK, sharing: true, blocked: false }]);
-    // Sharing off: no longer a sharer.
     await setSharing({ enabled: false });
     await publishSharedPops(publishDeps(), BOOK);
     expect(await sharers()).toEqual([]);
@@ -403,7 +395,6 @@ emulatorSuite('Shared Pops', () => {
       (p) => p.id === popId
     );
     expect(linked?.surveyId).toBe('abc234');
-    // An officer's own link wins from then on, and clears the pilot's.
     await editBookAs(
       bookDeps(),
       officerAccess({ canEdit: true }),
@@ -453,14 +444,12 @@ emulatorSuite('Shared Pops', () => {
     expect((await officerDoc.get()).get('editorCheckedAt')).toBe(now);
 
     await setSharing({ enabled: true, defaults: { audiences: [{ kind: 'corp' }] } });
-    // The role check stays fresh (10 minutes); the record keeps its stamp check time.
     const later = async (minutes: number) => {
       now += minutes * 60_000;
       await officerDoc.update({ checkedAt: now });
     };
     await later(30);
     await authorizeOfficer(bookDeps(), caller(OFFICER), call, 'view', { live: false });
-    // Within the hour: nothing looked at again.
     expect((await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`)).toBe(
       undefined
     );

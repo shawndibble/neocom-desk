@@ -50,7 +50,6 @@ describe('SkillsToBuyPanel', () => {
     usePagePricePercents.setState({ value: { skills: 90 }, hydrated: true });
     try {
       renderPanel(true, true);
-      // (1000 at the hub + 500 in the region) at 90%: 1,350, shown as 1.4K.
       expect(
         await screen.findByRole('button', { name: /^skills to buy.*1\.4K ISK/i })
       ).toBeInTheDocument();
@@ -67,7 +66,6 @@ describe('SkillsToBuyPanel', () => {
     const user = userEvent.setup();
     renderPanel(true, true);
 
-    // Skill 1 sells for 1000 at the hub; Skill 2 falls back to the 500 region price.
     const row = await screen.findByRole('button', { name: /^skills to buy.*1\.5K ISK/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Skill 1')).toBeNull();

@@ -10,9 +10,7 @@ const CORP_ROWS = [
   ['corporationID', 'size', 'factionID', 'corporationName'],
   ['1000002', 'L', '500001', 'CBD Corporation'],
   ['1000035', 'L', '500001', 'Caldari Navy'],
-  // A corp that belongs to no faction: a blank column, not zero.
   ['1000001', 'S', '', 'Doomheim'],
-  // A short row must not become a NaN key.
   [''],
 ];
 

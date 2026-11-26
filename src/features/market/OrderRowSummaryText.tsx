@@ -1,14 +1,3 @@
-/**
- * The plain-English half of an Open Orders row: what `orderRowSummary`
- * found, formatted and translated.
- *
- * Split from the badge rather than folded into it because the two answer
- * different questions — the badge says WHICH problem and is the thing the
- * eye scans a column of, this says WHAT is happening and is read one row at
- * a time. Keeping the formatting here (and the facts in the pure module) is
- * what lets the sentence be a single interpolated i18n string instead of
- * fragments concatenated in code, which no translator could reorder.
- */
 import { HintText } from '@/components/ui/HintText';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,11 +20,8 @@ export function OrderRowSummaryText({
   summary: given,
 }: {
   row: OpenOrderRow;
-  /** The row's already-derived summary (from `adviseOrder`); omitted, it is derived here. */
   summary?: OrderRowSummary | null;
-  /** Drops the match clause's `Tooltip` trigger, leaving plain text — same reasoning as `OrderProblemBadge`'s own `interactive` prop. */
   interactive?: boolean;
-  /** Appends "→ price" with a copy button to an undercut/outbid row — the desktop table only; the phone list's row is itself the tap target, so an inline button there would swallow it. */
   copyRelistPrice?: boolean;
 }): ReactElement | null {
   const { t } = useTranslation();
@@ -72,11 +58,6 @@ export function OrderRowSummaryText({
           )
         );
       }
-      // `summary.match` is only ever non-null once `suggestedPrice` is
-      // non-null too (`matchOutcome` in orderRowSummary.ts returns null
-      // otherwise), so this is safe to format unconditionally below.
-      // The match clause is the only one whose tone differs from the rest of
-      // the sentence — a loss there is the reason not to follow the rival.
       const matchTone = summary.match?.kind === 'loss' ? 'text-danger' : 'text-success';
       const matchText = parts[parts.length - 1];
       return (

@@ -1,15 +1,6 @@
-// Vetting: ESI rows to the dealings the checks read (vettingEngine.ts). Pure. A dealing keeps
-// who the other side was, when, and the source's own word for the row; never a mail subject or
-// body, a contract title or a journal description.
-
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import type { VettingCharacterInput, VettingDealing } from './vettingEngine.js';
 
-/**
- * Characters, player corporations and alliances all sit at or above this id. Below it are
- * NPC corporations, agents, factions and the system itself (a bounty from CONCORD, a station
- * fee), which no watchlist can hold and which would crowd out the rows that matter.
- */
 const PLAYER_ID_FLOOR = 90_000_000;
 
 function playerId(value: unknown): number | null {
@@ -55,7 +46,6 @@ export function contactDealings(rows: readonly unknown[]): VettingDealing[] {
   });
 }
 
-/** One dealing per mail header and other side: the sender, or each recipient of a mail sent. */
 export function mailDealings(characterId: number, rows: readonly unknown[]): VettingDealing[] {
   return rows.flatMap((row): VettingDealing[] => {
     if (!isPlainRecord(row)) return [];
@@ -77,7 +67,6 @@ export function mailDealings(characterId: number, rows: readonly unknown[]): Vet
   });
 }
 
-/** ISK the contract moves, from the issuer's side, where the type says which way it goes. */
 function issuerAmount(row: Record<string, unknown>): { amount: number; signed: boolean } | null {
   const price = isFiniteNumber(row.price) ? row.price : null;
   const reward = isFiniteNumber(row.reward) ? row.reward : null;
@@ -91,10 +80,6 @@ function issuerAmount(row: Record<string, unknown>): { amount: number; signed: b
   return price === null ? null : { amount: price, signed: false };
 }
 
-/**
- * The ISK a contract moved from this character's side, as `contractDealings` signs it; undefined
- * when the row gives none.
- */
 export function contractAmount(
   characterId: number,
   row: Record<string, unknown>
@@ -102,10 +87,8 @@ export function contractAmount(
   const issued = row.issuer_id === characterId;
   const moved = issuerAmount(row);
   if (issued || row.acceptor_id === characterId) {
-    // `|| 0`: a free contract is 0, never -0.
     return moved ? (moved.signed && !issued ? -moved.amount : moved.amount) || 0 : undefined;
   }
-  // Only assigned to this character, not accepted: nothing moved yet, so the price as given.
   return isFiniteNumber(row.price) ? row.price : undefined;
 }
 
@@ -149,7 +132,6 @@ export function historyOf(rows: readonly unknown[]): VettingCharacterInput['hist
   );
 }
 
-/** At most `max` dealings: every undated one (contacts), then the newest of the rest. */
 export function capDealings(dealings: readonly VettingDealing[], max: number): VettingDealing[] {
   if (dealings.length <= max) return [...dealings];
   const undated = dealings.filter((dealing) => dealing.at === null);

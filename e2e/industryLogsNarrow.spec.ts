@@ -1,17 +1,3 @@
-/**
- * Sold/Watch/Manual/Delete button group alignment on a stacked phone card
- * (issue #1053): `SoldSplitButton` renders its own `justify-end` wrapper,
- * which `.dt-stack td`'s CSS cannot reach — jsdom has no real layout engine,
- * so only a real browser can show the regression. Covers both consumers:
- * Industry's Logs tab (`ProductionLogPanel`) and a Build Plan's own
- * Production Runs panel (`ProductionRunsPanel`).
- *
- * A run (and, for the Build Plan panel, its plan) is seeded directly into
- * IndexedDB rather than driven through a "create plan, log a run" UI flow —
- * matches the raw-`indexedDB` precedent in `support/login.ts`'s
- * `expireCachedEsiRows`, run only after `loginAndSelectCharacter` so the
- * app's own Dexie schema has already opened the stores.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -19,7 +5,6 @@ import { CHARACTER_ID } from './support/fixtureData';
 
 const RUN_ID = 'e2e-run-1';
 const PLAN_ID = 'e2e-plan-1';
-/** Rifter / Rifter Blueprint — same pair `ProductionLogPanel.test.tsx` uses. */
 const PRODUCT_TYPE_ID = 587;
 const BLUEPRINT_TYPE_ID = 691;
 
@@ -75,12 +60,6 @@ async function seedFixtures(page: Page): Promise<void> {
   );
 }
 
-/**
- * Unfolds the runs table — both panels start it collapsed, but under
- * different copy (`ProductionLogPanel`'s "All production runs" vs
- * `ProductionRunsPanel`'s "Production Runs"), so the caller names its own
- * show-label and table-label.
- */
 async function expandRunsTable(page: Page, showLabel: string, tableLabel: string) {
   const toggle = page.getByRole('button', { name: showLabel, exact: true });
   await expect(toggle).toBeVisible();
@@ -88,13 +67,6 @@ async function expandRunsTable(page: Page, showLabel: string, tableLabel: string
   return page.getByRole('table', { name: tableLabel });
 }
 
-/**
- * The Sold-actions wrapper's `justify-content`, plus its left edge against
- * the rendered text of a genuine label/value sibling cell — not "Logged",
- * which is `dt-primary` (the card's hoisted title, with no label gutter of
- * its own). Scoped to the single seeded row so a future extra unlabelled
- * column can't make this silently match the wrong cell.
- */
 async function measure(page: Page, tableLabel: string) {
   return page.evaluate((label) => {
     const table = document.querySelector(`table[aria-label="${label}"]`)!;

@@ -25,7 +25,6 @@ describe('mailTarget (#6204)', () => {
       miner
     );
     expect(target.accounts).toEqual(['MOON TAXES']);
-    // The Miner's own Reason code, whichever notice the mail is for.
     expect(target.code).toBe(minerPaymentCode('solo:1'));
   });
 

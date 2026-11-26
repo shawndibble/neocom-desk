@@ -1,10 +1,5 @@
 import type { MiningLedgerEntry, OreLine } from './types';
 
-/**
- * Rebuilds the Mining Ledger Entry an Assignment-only (character, date,
- * system) stands for once ESI's 30-day window no longer returns it: the
- * covering Assignments' stored ore lines, summed per type.
- */
 export function entryFromAssignments(
   characterId: number,
   date: string,

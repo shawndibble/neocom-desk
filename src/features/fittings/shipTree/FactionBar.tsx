@@ -1,10 +1,3 @@
-/**
- * Every faction the tree has, one button each: emblem, name, and how many of
- * its hulls the pilot can fly. Scrolls sideways rather than wrapping. The
- * ladder's and a phone's picker; a wider map has `FactionGrid` inside it.
- * While the ladder is filtered, `matches` replaces each count with how many
- * hulls pass, and a faction with none dims but keeps its place.
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -30,7 +23,6 @@ export function FactionBar({
   data: ShipTreeData;
   factionID: number;
   statuses: ReadonlyMap<number, ShipTreeHullStatus>;
-  /** Hulls per faction that pass the ladder's filters; absent when nothing is filtered. */
   matches?: ReadonlyMap<number, number>;
   onFaction: (factionID: number) => void;
 }) {
@@ -52,10 +44,6 @@ export function FactionBar({
     <div
       role="group"
       aria-label={t('ships.tree.factions')}
-      // `relative`: the buttons' `sr-only` match counts are absolutely
-      // positioned, and without a positioned ancestor here they escape the
-      // scroller's clip and widen the page — a phone then zooms out to fit,
-      // pushing the tab bar off screen and cropping every bottom sheet.
       className="relative flex gap-1 overflow-x-auto pb-1"
     >
       {inGameFactionOrder(data.factions).map((f) => {

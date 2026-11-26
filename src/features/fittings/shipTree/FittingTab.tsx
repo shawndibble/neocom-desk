@@ -1,10 +1,3 @@
-/**
- * Ship Info › Fitting: the hull's slots, hardpoints and fitting resources
- * as CCP ships them (before the pilot's skills), in two columns (folded
- * behind a disclosure on a phone, so the fits start near the top), and Start
- * empty fit — a new, empty Fitting of the hull in the editor — or one of its
- * Popular fits.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +12,6 @@ import type { ShipTreeShip } from '@/sde/types';
 import { fittingEditLocation } from '../fittingRoutes';
 import { PopularFitsPanel } from '../PopularFitsPanel';
 
-/** T3 cruisers ship no slots of their own: the fitted subsystems add them. */
 function slotsFromSubsystems(ship: ShipTreeShip): boolean {
   const { highSlots, medSlots, lowSlots } = ship.stats;
   return ship.techLevel === 3 && highSlots + medSlots + lowSlots === 0;
@@ -29,7 +21,6 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
-  /** Which open failed: the bare hull (Start empty fit) or a Popular fit. */
   const [failed, setFailed] = useState<'hull' | 'popular' | null>(null);
   const s = ship.stats;
   const phone = useIsPhone();
@@ -141,7 +132,6 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
         shipTypeId={ship.typeID}
         hullName={ship.name}
         busy={busy}
-        // Last thing in the slide-over: let it use the full height, not a box.
         capped={false}
         onOpen={(loaded) => void openInEditor(loaded.fitting, 'popular')}
       />

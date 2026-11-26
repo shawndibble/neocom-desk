@@ -1,6 +1,5 @@
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 
-/** Identifies a gate by the skills it lacks, so rows can be told apart from the page's common one. */
 export function gateKey(verdict: SkillGateVerdict | undefined): string | null {
   if (!verdict?.gated) return null;
   return verdict.shortfall
@@ -9,7 +8,6 @@ export function gateKey(verdict: SkillGateVerdict | undefined): string | null {
     .join(',');
 }
 
-/** A gate shared by at least this many rows, and most gated rows, is the page's rule rather than a row's news. */
 const COMMON_GATE_MIN_ROWS = 3;
 
 export function commonGateKey(verdicts: ReadonlyMap<number, SkillGateVerdict>): string | null {

@@ -4,12 +4,6 @@ import type { TradeHub } from '@/market/hubs';
 import { hubForPayee } from './pricing';
 import { typeLabels } from './typeLabels';
 
-/**
- * The body of the Mining Tax "some ore could not be priced" banner. Decided
- * per hub: a hub that answered with no buy orders keeps the "move that payee
- * to a busier hub" advice, while a hub whose price source could not be reached
- * (offline) says so, since a busier hub would not help.
- */
 export function UnpricedOreDetail({
   unpricedByHub,
   unreachableHubs,
@@ -19,7 +13,6 @@ export function UnpricedOreDetail({
   unpricedByHub: ReadonlyMap<TradeHub['id'], ReadonlySet<number>>;
   unreachableHubs: ReadonlySet<TradeHub['id']>;
   typeNames: ReadonlyMap<number, string>;
-  /** Extra content after the explanation, e.g. the entries to open. */
   children?: ReactNode;
 }) {
   const { t } = useTranslation();

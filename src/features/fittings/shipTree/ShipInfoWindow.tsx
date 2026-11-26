@@ -1,9 +1,3 @@
-/**
- * The Ship Info window a hull opens (map click, ladder tap): the hull's
- * header, then four tabs as in game — Attributes, Fitting, Skills &
- * Mastery, Blueprint. On a desktop a right slide-over, non-modal so the
- * tree behind keeps steering it; on a phone a bottom sheet.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, SlideOver, TabPanel, Tabs, Toast, useTabsId } from '@/components/ui';
@@ -20,7 +14,6 @@ import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
 
 type InfoTab = 'attributes' | 'fitting' | 'skills' | 'blueprint';
-/** The desktop slide-out's max width in rem — keep in step with its `max-w-[40rem]!` below. */
 export const SHIP_INFO_WINDOW_REM = 40;
 const TABS: readonly InfoTab[] = ['attributes', 'fitting', 'skills', 'blueprint'];
 export function ShipInfoWindow({
@@ -36,7 +29,6 @@ export function ShipInfoWindow({
   const isPhone = useIsPhone();
   const tabsId = useTabsId();
   const [tab, setTab] = useState<InfoTab>('attributes');
-  // Here rather than in the tab, so Undo survives a tab switch or a new hull.
   const [added, setAdded] = useState<AddedToPlan | null>(null);
   const target = useTargetPlan(source.characterId);
 
@@ -46,7 +38,6 @@ export function ShipInfoWindow({
       <Tabs
         tabsId={tabsId}
         label={t('ships.info.tabsLabel')}
-        // A phone's sheet can't fit all four full labels.
         tabs={TABS.map((id) => ({
           id,
           label: t(isPhone ? `ships.info.tabsShort.${id}` : `ships.info.tabs.${id}`),
@@ -54,7 +45,6 @@ export function ShipInfoWindow({
         value={tab}
         onChange={(id) => setTab(id as InfoTab)}
       />
-      {/* Keyed by hull: retargeting the window starts each tab afresh. */}
       <TabPanel key={ship.typeID} tabsId={tabsId} tabId={tab}>
         {tab === 'attributes' && <AttributesTab ship={ship} source={source} />}
         {tab === 'fitting' && <FittingTab ship={ship} />}
@@ -101,13 +91,6 @@ function InfoSurface({
   phone: boolean;
   children: ReactNode;
 }) {
-  // One dismissal contract on both surfaces: Escape, the ✕ and Back close it.
-  // Back works through the `?ship=` URL entry (ShipTreeTab), not an overlay entry.
-  // Below `sm` it is a bottom sheet (grabber, swipe down, scrim). From `sm` up
-  // — touch tablets included — it stays the non-modal `SlideOver`, because the
-  // tree behind it must stay live to pick the next ship; `SlideOver` carries a
-  // visible close button, Escape, and the shared Back hook, so a tablet needs
-  // no sheet to get the same ways out.
   if (phone) {
     return open ? (
       <Modal open onClose={onClose} title={title} placement="sheet" closeOnBack={false}>

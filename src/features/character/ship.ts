@@ -1,16 +1,3 @@
-/**
- * The hull the active Character is flying, for the D-Scan danger read's
- * "Your ship" default (`esi-location.read_ship_type.v1`, its own Permission
- * `currentShip`).
- *
- * Same stance as `location.ts`: a Character who logged in before the scope
- * existed hasn't granted it, and a 403 there is a missing grant, not a real
- * auth failure, so it must not trip the shell-wide re-auth banner for what is
- * only a convenient default. Only a 401 (or a failed token refresh) counts.
- *
- * Unlike a location, a ship changes when the pilot undocks in another hull, so
- * the freshness window is short (90 s), not the app-wide ten minutes.
- */
 import { useEffect, useState } from 'react';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { loadWithCache } from '@/esi/cache';
@@ -19,15 +6,12 @@ import { getCharacterShip, type CharacterShip } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-// The whole ship, not just its type: the Active Fit needs its item id. A new key, since the old one held a bare type id.
 const CACHE_KEY = 'characterShip:full';
 export const SHIP_STALE_AFTER_MS = 90_000;
 const SHIP_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterShip'];
 
-/** A read of the flown hull, with when ESI last said so. */
 export interface ShipTypeRead {
   typeId: number | null;
-  /** The cached row's own age (a cache hit is older than the call); null when nothing was read. */
   fetchedAt: Date | null;
 }
 
@@ -48,12 +32,10 @@ export async function loadCharacterShipTypeRead(characterId: number): Promise<Sh
   return { typeId: result?.data?.ship_type_id ?? null, fetchedAt: result?.fetchedAt ?? null };
 }
 
-/** The flown ship whole (item id, hull, name): the Active Fit finds its modules among the assets by that item id. */
 export async function loadCharacterShip(characterId: number): Promise<CharacterShip | null> {
   return (await loadShipRow(characterId))?.data ?? null;
 }
 
-/** The type id of the ship the character is flying, or null if unresolvable (missing grant, offline, or uncached). */
 export async function loadCharacterShipTypeId(characterId: number): Promise<number | null> {
   return (await loadCharacterShipTypeRead(characterId)).typeId;
 }
@@ -65,15 +47,8 @@ export interface CharacterShipState {
   status: CharacterShipStatus;
 }
 
-/**
- * The active Character's current ship type. `needsScope` when the stored grant
- * lacks the scope (the caller offers the existing Grant flow and falls back to
- * a manual pick); `unavailable` when the call came back empty (offline, error).
- */
 export function useCharacterShipTypeId(): CharacterShipState {
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
-  // `undefined` until the stored grant has been read: hold the fetch back
-  // until then, or an ungranted Character would spend a call on a 403.
   const granted = useGrantedScopes();
   const lacksScope =
     granted !== undefined &&

@@ -28,11 +28,6 @@ interface Inputs {
   prices: PriceMap | undefined;
 }
 
-/**
- * Clones route view state: sort, nicknames, the best-clone verdict (the
- * engine does the numbers) and the sorted clone list. The route keeps the
- * snapshot load and the layout; this holds everything derived from them.
- */
 export function useClonesView({
   data,
   activeCharacterId,
@@ -71,7 +66,6 @@ export function useClonesView({
   const cloneLabel = (clone: JumpClone) => cloneOwnName(clone, nicknames) ?? locationLabel(clone);
 
   const verdictCard: CloneVerdictCardState | null = (() => {
-    // No jump clone to compare against, so there is no verdict to give.
     if (!data || clones.length === 0) return null;
     const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
     const gate = cloneVerdictGate(

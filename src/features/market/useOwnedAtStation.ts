@@ -1,8 +1,3 @@
-/**
- * Stock every Character holds at one place (station or structure), for the
- * Appraisal's "Minus owned", plus the places that hold stock for its picker.
- * Cache-first via `loadAllCharactersAssets`; idle (null) when off.
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   ownedAnywhere,
@@ -15,16 +10,12 @@ import { loadStationName } from '@/features/character/stations';
 import { loadStructureNameNoRoster } from '@/features/character/structures';
 
 export interface OwnedAtStation {
-  /** Null while off, loading, or when nothing could be read. */
   owned: ReadonlyMap<number, number> | null;
   loading: boolean;
-  /** Stations and structures that hold counted stock; empty until read. */
   places: readonly OwnedPlace[];
-  /** Resolved place names by id; an unreadable structure has none. */
   placeNames: ReadonlyMap<number, string>;
 }
 
-/** One place's stock (station or structure id), or `'all'` for everything held anywhere. */
 export type OwnedScope = number | 'all';
 
 type AssetLists = Parameters<typeof ownedAnywhere>[0];
@@ -47,7 +38,6 @@ export function useOwnedAtStation(enabled: boolean, scope: OwnedScope): OwnedAtS
         const resolved = new Map<number, string>();
         await Promise.all(
           ownedPlaces(loaded).map(async (place) => {
-            // Ask a Character that holds stock there; no roster sweep, so a refusal costs one call.
             const holder = entries.find((entry) =>
               entry.assets.some((a) => a.location_type === 'other' && a.location_id === place.id)
             );

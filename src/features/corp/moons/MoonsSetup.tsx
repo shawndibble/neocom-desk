@@ -20,13 +20,6 @@ import { TurnOnBook } from './TurnOnBook';
 
 type Step = 'choices' | 'own' | 'collect' | 'consent';
 
-/**
- * The Moons page of a corporation with no book: three choices side by side (run
- * its own book, let an accounting corporation handle it, collect for others), a
- * pasted invite link or code, or, once an accounting corporation handles it, the
- * moon owner's page. A corporation is a moon owner or has its own book, never
- * both, so only one of those is ever offered.
- */
 export function MoonsSetup({
   characterId,
   corporationId,
@@ -38,7 +31,6 @@ export function MoonsSetup({
   corporationId: number;
   verdict: OfficerVerdict;
   onDone: () => void;
-  /** Their own book was just turned on: the page runs its first sync. */
   onTurnedOn?: () => void;
 }) {
   const { t } = useTranslation();
@@ -53,7 +45,6 @@ export function MoonsSetup({
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // The grant round trip lands back here with its result as router state: keep it once, then drop it.
   const [grant] = useState(
     () => (location.state as Partial<FeederGrantCallbackState> | null)?.feederGrant
   );
@@ -66,7 +57,6 @@ export function MoonsSetup({
   );
   useEffect(() => {
     if (grant) navigate(location.pathname, { replace: true, state: null });
-    // Only on arrival: `grant` is fixed for this mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -183,8 +173,6 @@ export function MoonsSetup({
       }}
     />
   );
-  // A corporation an accounting corporation handled before sees that history above the choice;
-  // any it left before that keep theirs below (#4621).
   const older = status.status === 'none' ? (status.previousCollectorIds ?? []).slice(1) : [];
   return (
     <>

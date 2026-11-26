@@ -1,9 +1,3 @@
-/**
- * Loads contract ask estimates (issue #6431) for the owned types that have no
- * market price: the Public Contract Offers index first (a type with fewer than
- * the minimum offers is never downloaded), then only the shards of the rest.
- * Best-effort: no snapshot means no estimates, never a failed page.
- */
 import {
   contractAskEstimates,
   MIN_ASK_ESTIMATE_CONTRACTS,

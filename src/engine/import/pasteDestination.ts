@@ -1,23 +1,3 @@
-/**
- * Where a page-level paste belongs (the app-wide paste router,
- * `app/GlobalPasteRouter.tsx`): an EFT fit opens in Fittings, an item list —
- * an inventory copy, a multibuy, a contract's contents — in the Appraisal,
- * a Survey Scanner copy in the Mining Survey tab,
- * a blueprint list in a new Build Group, a Local list or D-Scan in Pilot Lookup,
- * a skill plan (in-game or EVEMon text) in the Skills planner, and anything
- * else is left alone.
- *
- * Destinations live in one registry, `PASTE_DETECTORS`. Its order IS the
- * priority: the first detector to claim a paste wins, so a new format goes
- * where it cannot hijack an earlier one. Adding a destination = its id in
- * `PasteDestination`, one entry here, one route in `GlobalPasteRouter` (the
- * typecheck flags a missing one), and its Help strings.
- *
- * Deliberately conservative, since the router acts on pastes the pilot never
- * aimed at a field: a fit needs a header naming a real hull, and an item list
- * needs most of its lines to be real item names. A pasted URL, a chat line or
- * a sentence that happens to start with "Tritanium" stays a no-op.
- */
 import { isSurveyScanText } from '@/engine/survey/parseScan';
 import { looksLikeBlueprintList } from '@/engine/import/blueprintList';
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
@@ -30,24 +10,12 @@ export type PasteDestination =
   'survey' | 'fitting' | 'dscan' | 'blueprintList' | 'skillPlan' | 'appraisal' | 'pilotList';
 
 export interface PasteSources {
-  /** The market catalogue, keyed by lower-case item name. */
   catalogue: AppraisalCatalogue;
-  /** Lower-case names of every hull — the only thing an EFT header may name. */
   hullNames: ReadonlySet<string>;
-  /** Skill names, lower-case — the Skills planner importer's own catalog. */
   skillByName: SkillCatalog;
-  /**
-   * Lower-case name of every blueprint and reaction formula, buildable or not.
-   * Absent (or empty) means no blueprint list can be recognised.
-   */
   blueprintNames?: ReadonlySet<string>;
 }
 
-/**
- * What a detector makes of a paste: `match` claims it, `veto` ends detection
- * with no destination (the text is unmistakably this format but unusable —
- * lower-priority detectors must not reinterpret it), `pass` defers to the next.
- */
 export type PasteVerdict = 'match' | 'veto' | 'pass';
 
 export interface PasteDetector<Id extends string = PasteDestination> {
@@ -55,14 +23,8 @@ export interface PasteDetector<Id extends string = PasteDestination> {
   detect: (text: string, sources: PasteSources) => PasteVerdict;
 }
 
-/**
- * Every destination, highest priority first. The Help page lists them in this
- * order, with its strings under `shortcuts.pasteDestinations.<id>`.
- */
 export const PASTE_DETECTORS: readonly PasteDetector[] = [
   {
-    // First, and strict: every line must be a Survey Scanner row (units, m3,
-    // distance), which no item list, fit or Local list ever is.
     id: 'survey',
     detect: (text) => (isSurveyScanText(text) ? 'match' : 'pass'),
   },
@@ -70,29 +32,20 @@ export const PASTE_DETECTORS: readonly PasteDetector[] = [
     id: 'fitting',
     detect: (text, { hullNames }) => {
       if (!looksLikeEftFit(text)) return 'pass';
-      // A bracketed first line is a fit or nothing: reading a malformed one as
-      // loose items would appraise the pilot's fit body under a broken header.
       const shipName = parseEftFit(text).shipName.trim().toLowerCase();
       return shipName !== '' && hullNames.has(shipName) ? 'match' : 'veto';
     },
   },
   {
-    // Ahead of the item list: a D-Scan's rows also read as `Name<tab>...`, but
-    // every one starting with a numeric type id is unmistakably a scan.
     id: 'dscan',
     detect: (text) => (classifyPilotPaste(text)?.kind === 'dscan' ? 'match' : 'pass'),
   },
   {
-    // Ahead of the item list, which a blueprint list also reads as: most
-    // lines being blueprints makes it a Build Group, never an appraisal.
     id: 'blueprintList',
     detect: (text, { blueprintNames }) =>
       blueprintNames && looksLikeBlueprintList(text, blueprintNames) ? 'match' : 'pass',
   },
   {
-    // Ahead of the item list, and all-or-nothing: skill books are market items,
-    // so "Gunnery 5" reads either way, but an item list brings a quantity
-    // (`x2`, `500`), a price or a non-skill name the planner's parser rejects.
     id: 'skillPlan',
     detect: (text, { skillByName }) => {
       const plan = parseSkillPlanPaste(text, skillByName);
@@ -105,20 +58,15 @@ export const PASTE_DETECTORS: readonly PasteDetector[] = [
       const entries = parseAppraisalPaste(text);
       if (entries.length === 0) return 'pass';
       const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
-      // A strict majority: a list the pilot copied out of the game rarely has
-      // more than a stray unknown line, while prose rarely has more than one hit.
       return matched.length > unmatched.length ? 'match' : 'pass';
     },
   },
   {
-    // Last, so an item list never reads as pilot names: two or more lines that
-    // all look like names (a Local list).
     id: 'pilotList',
     detect: (text) => (classifyPilotPaste(text)?.kind === 'local' ? 'match' : 'pass'),
   },
 ];
 
-/** The first detector to claim `text`, or null when none is confident. */
 export function detectPasteDestination<Id extends string>(
   text: string,
   sources: PasteSources,

@@ -33,7 +33,7 @@ describe('IskFigureGroup', () => {
     expect(figures()[1]).toHaveFocus();
     press(figures()[1], 'End');
     expect(figures()[2]).toHaveFocus();
-    expect(fireEvent.keyDown(figures()[2], { key: 'ArrowDown' })).toBe(true); // end: page scrolls
+    expect(fireEvent.keyDown(figures()[2], { key: 'ArrowDown' })).toBe(true);
     expect(figures()[2]).toHaveFocus();
     press(figures()[2], 'Home');
     expect(figures()[0]).toHaveFocus();

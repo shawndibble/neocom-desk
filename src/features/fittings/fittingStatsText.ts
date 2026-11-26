@@ -1,10 +1,3 @@
-/**
- * "Copy stats as text": a Fitting's headline stats as plain lines, to paste
- * into chat or a doc. Every label goes through i18next like the rest of the
- * stats column; the numbers are rounded as the column shows them.
- * Every `toFixed` here is clipboard text, so the mark stays `.` whatever the
- * display setting is.
- */
 import { formatSeconds } from '@/lib/duration';
 import { alignTimeSeconds, resistPct } from '@/engine/fittings/stats';
 import type { FittingStats, Resonances } from '@/engine/fittings/types';
@@ -21,7 +14,6 @@ function resists(layer: Resonances): string {
     .join('/');
 }
 
-/** A signed figure with a true minus, as the stats column shows a delta. */
 function signed(value: number, digits: number): string {
   const magnitude = Math.abs(value).toFixed(digits);
   if (Number(magnitude) === 0) return magnitude;
@@ -36,7 +28,6 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
     stats.offense.overheated.dps.toFixed(1) !== stats.offense.dps.toFixed(1)
       ? k('dpsOverheated', { value: stats.offense.overheated.dps.toFixed(1) })
       : '';
-  // Reload only costs ammo-fed weapons anything; lasers and drones read the same.
   const sustainedDps =
     stats.offense.sustainedDps.toFixed(1) !== stats.offense.dps.toFixed(1)
       ? k('dpsSustained', { value: stats.offense.sustainedDps.toFixed(1) })
@@ -86,7 +77,6 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
       ? [
           k('drones', {
             dps: stats.droneDps.toFixed(1),
-            // One decimal, as the editor shows it (a 12.5 Mbit/s hull is not 13), no trailing .0.
             used: String(Number(stats.droneBandwidthUsed.toFixed(1))),
             total: String(Number(stats.droneBandwidthTotal.toFixed(1))),
           }),

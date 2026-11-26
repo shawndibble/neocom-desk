@@ -29,9 +29,6 @@ describe('loadPublicContractItems', () => {
   it('maps a 404 (ESI no longer recognizes the contract as public) to a "not-found" outcome, not a failure', async () => {
     getPublicContractItems.mockRejectedValue(new EsiError(404, 'not found'));
 
-    // A distinct contractId from the previous test: the cache is keyed by
-    // contractId and shared across tests in this file, so reusing one would
-    // read the earlier cached row instead of exercising the mock.
     const result = await loadPublicContractItems(67890);
 
     expect(result?.data).toEqual({ kind: 'not-found' });

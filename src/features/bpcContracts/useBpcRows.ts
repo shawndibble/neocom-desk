@@ -18,7 +18,6 @@ interface BpcRowsInput {
   sourceData: BpcSourceData;
 }
 
-/** Stage 1 (prepare: source/space/jump/filter narrowing) then stage 2 (rank), run by `useBpcOfferSearch`. */
 export function useBpcRows({
   uiFilter,
   selectedTypeId,
@@ -35,7 +34,6 @@ export function useBpcRows({
     }),
     [uiFilter, selectedTypeId, sources]
   );
-  // Stage 1 never reads the type query, so a keystroke reruns only stage 2.
   const stableFilter = useMemo<BpcPrepareInput['filter']>(
     () => ({
       regionId: uiFilter.regionId,
@@ -56,11 +54,8 @@ export function useBpcRows({
       uiFilter.hidePlex,
     ]
   );
-  // The URL parse returns a new Set on every write; key on content so a
-  // keystroke's `sourcing.q` write doesn't rerun stage 1.
   const sourcesKey = sourceToggleKey(sources);
   const stableSources = useMemo(() => sourceToggleSet(sourcesKey), [sourcesKey]);
-  // Deferred so a filter edit doesn't block input while the full snapshot reruns.
   const deferredStableFilter = useDeferredValue(stableFilter);
   const deferredQuery = useDeferredValue(query);
   const prepareInput = useMemo<BpcPrepareInput>(

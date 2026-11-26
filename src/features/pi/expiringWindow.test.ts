@@ -23,10 +23,6 @@ async function hydrated(): Promise<number> {
 
 describe('EXPIRING_WINDOW_HOUR_OPTIONS', () => {
   it('offers only windows shorter than a program a pilot would actually install', () => {
-    // Efficient play installs well under two days (`engine/pi/extraction.ts`:
-    // three-day resets yield 2.46x a single 14-day program). An option at or
-    // past the program's own length is lit from install — see below for what
-    // that costs.
     expect(Math.max(...EXPIRING_WINDOW_HOUR_OPTIONS)).toBeLessThanOrEqual(24);
     expect(EXPIRING_WINDOW_HOUR_OPTIONS).toEqual([1, 6, 12, 24]);
   });
@@ -36,8 +32,6 @@ describe('EXPIRING_WINDOW_HOUR_OPTIONS', () => {
   });
 
   it('leaves a 48-hour program un-flagged at install on every option', () => {
-    // The property the list exists to guarantee. A window >= the program's
-    // length makes `extractorState` say `expiring-soon` for its whole life.
     const programMs = 48 * HOUR_MS;
     for (const hours of EXPIRING_WINDOW_HOUR_OPTIONS) {
       expect(extractorState(NOW + programMs, NOW, hours * HOUR_MS)).toBe('active');
@@ -45,10 +39,6 @@ describe('EXPIRING_WINDOW_HOUR_OPTIONS', () => {
   });
 
   it('still lets a decayed colony report as decayed', () => {
-    // `colonyAttention` tests expiring-soon before decayed, so an over-long
-    // window makes the reset-cadence nudge unreachable. A 48h program half
-    // spent is 24h out — the boundary of the widest option — so this is the
-    // tightest case that must still resolve to `decayed`.
     const status = { idle: false, soonestExpiryMs: NOW + 25 * HOUR_MS, decayed: true };
     for (const hours of EXPIRING_WINDOW_HOUR_OPTIONS) {
       expect(colonyAttention(status, NOW, hours * HOUR_MS)).toBe('decayed');
@@ -70,8 +60,6 @@ describe('useExpiringWindowHours', () => {
   });
 
   it('falls back to the default for a window this build no longer offers', async () => {
-    // 48 was offered before; a pilot who picked it must not keep a value the
-    // control cannot show them, and cannot un-pick.
     await db.settings.put({ key: PI_EXPIRING_WINDOW_SETTING_KEY, value: 48 });
     expect(await hydrated()).toBe(DEFAULT_EXPIRING_WINDOW_HOURS);
   });

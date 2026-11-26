@@ -4,7 +4,6 @@ import type { DscanTypeInfo } from './dscanRoles';
 import type { DscanRow } from './parsePilotPaste';
 
 const SHIP = 6;
-// typeId -> [name, groupId, categoryId]
 const TYPES: Record<number, [string, number, number]> = {
   1: ['Drake Navy Issue', 419, SHIP],
   2: ['Scimitar', 832, SHIP],
@@ -31,7 +30,6 @@ const infoOf = (typeId: number): DscanTypeInfo | undefined => {
 };
 const nameOf = (typeId: number) => TYPES[typeId]?.[0] ?? `#${typeId}`;
 
-/** `n` rows of one type, spread evenly between `lo` and `hi` km. */
 const rows = (typeId: number, n: number, lo = 10, hi = lo, name = ''): DscanRow[] =>
   Array.from({ length: n }, (_, i) => ({
     typeId,
@@ -87,7 +85,6 @@ describe('buildReadout: readings', () => {
   });
 
   it('counts a booster once toward the mining share', () => {
-    // 3 of 7 are miners or boosters: under half, however many are Orcas.
     expect(read(rows(8, 2), rows(7, 1), rows(1, 4)).reading).not.toBe('mining');
   });
 

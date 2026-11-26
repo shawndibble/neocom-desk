@@ -1,14 +1,7 @@
-/**
- * A P3/P4 tile's multi-planet chain estimate: the shorthand figure, dimmed
- * and marked "Est." so it never reads as a one-planet figure. No ▲ ≈ ▼: those
- * compare a one-planet figure with its planet's simplest product. Decorative: the
- * tile's accessible name and tooltip carry the exact figure and its wording.
- */
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 
-/** The "Est." chip a chain figure carries; the Map legend shows the same one. */
 export function ChainEstimateMark({ tight = false }: { tight?: boolean }) {
   const { t } = useTranslation();
   return (
@@ -29,7 +22,6 @@ export function ChainTileFigure({
   className,
 }: {
   iskPerDay: number;
-  /** The mark under the figure: a desk tile is narrow, and two short lines fit its height. */
   stacked?: boolean;
   className?: string;
 }) {

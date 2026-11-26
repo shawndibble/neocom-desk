@@ -19,7 +19,6 @@ interface Filters {
 
 const DEFAULTS: Filters = { unreadOnly: false, space: SPACES, minReward: '', hideRisky: false };
 
-/** The route's half of the contract: which filters are on, in a few words each. */
 function activeFilters(value: Filters): ActiveFilter<Filters>[] {
   const active: ActiveFilter<Filters>[] = [];
   if (value.space.length < SPACES.length)
@@ -116,15 +115,10 @@ const FILTERED: Filters = {
   hideRisky: true,
 };
 
-/** @summary Search plus a funnel. Desktop: filters open in a box under the row and apply at once. */
 export const Desktop: Story = {};
 
-/**
- * @summary Filters on: one line of pills under the row, then Clear all. The funnel slides the box into the pills' slot, so nothing shows twice.
- */
 export const WithActiveFilters: Story = { args: { value: FILTERED } };
 
-/** @summary A narrow panel: the pills that do not fit fold into "+N" rather than wrapping. */
 export const ActiveFiltersOverflow: Story = {
   args: { value: FILTERED },
   decorators: [
@@ -136,16 +130,13 @@ export const ActiveFiltersOverflow: Story = {
   ],
 };
 
-/** @summary At 390 wide the funnel opens a bottom sheet; each pick applies at once, and its footer says how many rows are left. */
 export const PhoneSheet: Story = {
   args: { value: FILTERED, resultCount: 312 },
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
-/** @summary The funnel opens a popover anchored to it, for a panel title bar with no room beneath. No pill line. */
 export const PopoverSurface: Story = { args: { pointerSurface: 'popover', value: FILTERED } };
 
-/** @summary `trailing` view controls after the funnel, so the funnel sits beside the search box. */
 export const WithTrailing: Story = {
   args: {
     trailing: (
@@ -157,9 +148,6 @@ export const WithTrailing: Story = {
   },
 };
 
-/**
- * @summary One key filter shown in the row on desktop (`inline`): no pill for it, and the box leaves it out. The phone sheet holds it with the rest.
- */
 export const InlineKeyFilter: Story = {
   args: { value: FILTERED },
   render: function Render(args) {
@@ -200,7 +188,6 @@ export const InlineKeyFilter: Story = {
   },
 };
 
-/** @summary `inlinePlacement="below"`: a narrow column's key filter on a line of its own under search and funnel. */
 export const InlineKeyFilterBelow: Story = {
   ...InlineKeyFilter,
   decorators: [

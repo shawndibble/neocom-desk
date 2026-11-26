@@ -8,12 +8,6 @@ import type { PriceMap } from '@/features/character/CloneCard';
 
 const EMPTY_PRICES: PriceMap = new Map();
 
-/**
- * Implant values at the market hub: lowest sell there, else lowest in its
- * region. A progressive enhancement: the list shows before any price.
- * `undefined` while loading; a failed read yields an empty map (every implant
- * unpriced) rather than an endless wait.
- */
 export function useImplantPrices(typeIds: readonly number[]): PriceMap | undefined {
   const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useHydratedStore(useMarketHub);
@@ -33,6 +27,5 @@ export function useImplantPrices(typeIds: readonly number[]): PriceMap | undefin
     [hub, priceIds]
   );
   const { status, data } = useKeyedLoad(priceKey, load, !hubHydrated || priceIds.length === 0);
-  // A failed read leaves every implant unpriced rather than an endless wait.
   return status === 'ready' ? data : status === 'failed' ? EMPTY_PRICES : undefined;
 }

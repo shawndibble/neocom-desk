@@ -1,12 +1,3 @@
-/**
- * "I already paid", checked before anyone is asked: the mining-tax resolve mockups' wallet
- * check (docs/design/mockups/mining-tax-resolve).
- *
- * The pilot's own journal entry already says how much, when, its journal ref and who received
- * it. So the app checks first — the corporation's wallet as the book last synced it (every
- * division), or, for ISK paid to a person, that person's own wallet on their own device — and
- * an officer only ever sees a claim with the search already done.
- */
 import type { ReactNode } from 'react';
 import { Button, Panel, Radio, TextArea, plainTextActionClassName } from '@/components/ui';
 import { Pill, type PillTone } from '@/components/ui/Pill';
@@ -28,7 +19,6 @@ import { Choice, Group, QueueCard, ResolveDialog, SendsTo } from './miningTaxRes
 const noop = () => {};
 const textAction = plainTextActionClassName('min-h-9 md:min-h-6');
 
-/** What the wallet check found: one word or two, and a tone that says whether it is settled. */
 function Found({ tone, children }: { tone: PillTone; children: ReactNode }) {
   return <Pill tone={tone}>{children}</Pill>;
 }
@@ -42,7 +32,6 @@ function DialogFooter({ label }: { label: string }) {
   );
 }
 
-/** One transfer from the pilot's journal and what the check made of it. */
 function CheckedTransfer({
   status,
   amount,
@@ -70,12 +59,6 @@ function CheckedTransfer({
   );
 }
 
-// --- The pilot -----------------------------------------------------------------
-
-/**
- * Two uncredited donations, checked against the corporation's wallet: one was there all along
- * and is credited on the spot; only the other goes to an officer, with the search attached.
- */
 export function ResolvePaidChecked() {
   const [found, missing] = DONATIONS;
   return (
@@ -133,7 +116,6 @@ export function ResolvePaidChecked() {
   );
 }
 
-/** A billed day the pilot paid — but to the CEO, not the corporation. They pick the payment; the app names who has it. */
 export function ResolvePaidPerson() {
   return (
     <ResolveDialog
@@ -193,9 +175,6 @@ export function ResolvePaidPerson() {
   );
 }
 
-// --- The officer ---------------------------------------------------------------
-
-/** Claims the check settled with nobody involved: one quiet line, with Undo. */
 function AutoCredited() {
   return (
     <NewComponent name="AutoCreditedLine">
@@ -210,7 +189,6 @@ function AutoCredited() {
   );
 }
 
-/** Needs you with every "says they paid" card already checked against the corporation's wallet. */
 export function OfficerVerified() {
   const { division, old } = CLAIMS;
   const missing = DONATIONS[1];
@@ -255,7 +233,6 @@ export function OfficerVerified() {
   );
 }
 
-/** The CEO's own Needs you: tax paid to him personally, checked in his own wallet on his own device. */
 export function OfficerPaidToYou() {
   const theirs = CLAIMS.notInYours;
   return (

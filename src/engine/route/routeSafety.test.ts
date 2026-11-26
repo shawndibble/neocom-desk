@@ -143,7 +143,6 @@ describe('summarizeRouteSafety', () => {
   });
 });
 
-/** A hand-built row: zero kills, known security, not a chokepoint, unless overridden. */
 function row(systemId: number, overrides: Partial<RouteSafetyRow> = {}): RouteSafetyRow {
   return {
     systemId,
@@ -163,7 +162,6 @@ function row(systemId: number, overrides: Partial<RouteSafetyRow> = {}): RouteSa
 
 const noZkill = () => 0;
 
-/** Each stretch as a short string: a system's id, or `quiet[a,b,c]`. */
 function shape(stretches: ReturnType<typeof foldQuietStretches>): string[] {
   return stretches.map((stretch) =>
     stretch.kind === 'system'

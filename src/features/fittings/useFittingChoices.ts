@@ -1,9 +1,3 @@
-/**
- * Every Fitting the active Character can pick for a side question — the
- * Applied DPS overlay, a Projected-effects source: their saved ones (Dexie)
- * and their In-game ones (ESI, once granted), as one list with a way to turn
- * a pick into a domain `Fitting`.
- */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
@@ -13,7 +7,6 @@ import { useInGameFittings } from './useLibraryFittings';
 import { useSavedFittingRecords } from './useSavedFittingRecords';
 
 export interface FittingChoice {
-  /** A saved Fitting's record id, or `game-<fitting_id>` for an In-game one. */
   id: string;
   name: string;
 }
@@ -21,12 +14,8 @@ export interface FittingChoice {
 export interface FittingChoices {
   saved: FittingChoice[];
   inGame: FittingChoice[];
-  /** Saved first, then In-game. */
   all: FittingChoice[];
-  /** False until the saved list and, when granted, the In-game list have loaded. */
   ready: boolean;
-  /** The picked Fitting, or null when it is gone or won't decode. */
-  /** `code`: a saved Fitting's own share code, for a link that opens exactly it. */
   resolve: (id: string) => Promise<{ name: string; fitting: Fitting; code?: string } | null>;
 }
 
@@ -51,8 +40,6 @@ export function useFittingChoices(characterId: number | null): FittingChoices {
   );
   const all = useMemo(() => [...saved, ...inGame], [saved, inGame]);
 
-  // Read through a ref so `resolve` keeps one identity: callers key effects on
-  // it, and a list refresh must not redraw a pick that didn't change.
   const latest = useRef({ records, inGameFittings });
   useEffect(() => {
     latest.current = { records, inGameFittings };

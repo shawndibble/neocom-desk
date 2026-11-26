@@ -4,7 +4,6 @@ import type { SparkChartModel } from './types';
 
 const SPARK_HEIGHT = 22;
 
-/** A small line per row, labelled at the start and with its latest figure at the end. */
 export function Sparklines({ model, maxRows }: { model: SparkChartModel; maxRows: number }) {
   return (
     <div aria-hidden="true" className="grid gap-1.5">

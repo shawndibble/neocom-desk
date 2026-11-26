@@ -4,11 +4,6 @@ import { fittingCanFly } from './useCompareCanFly';
 
 const cache = new WeakMap<Fitting, Map<number, boolean>>();
 
-/**
- * Whether the Character can fly the Fitting, from their own trained skills;
- * `null` when its skill requirements couldn't be determined (not cached, so a
- * later call retries).
- */
 export async function canFlyForCharacter(
   fitting: Fitting,
   characterId: number

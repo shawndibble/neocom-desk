@@ -61,7 +61,6 @@ describe('sharedMoonPopEntries', () => {
     const pops = [pop({ viewerCharacterIds: [8] })];
     expect(sharedMoonPopEntries(pops, 7, 0, new Set())).toEqual([]);
     expect(sharedMoonPopEntries(pops, 8, 0, new Set())).toHaveLength(1);
-    // An older server names no Characters: every Character counts.
     expect(sharedMoonPopEntries([pop()], 7, 0, new Set())).toHaveLength(1);
   });
 

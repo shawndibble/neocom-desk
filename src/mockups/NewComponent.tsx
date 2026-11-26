@@ -1,11 +1,5 @@
 import type { ReactNode } from 'react';
 
-/**
- * Marks a piece of a mockup that is not an existing `src/components/ui`
- * primitive. The label is part of the picture, so a reviewer sees which parts
- * of the proposal need a new component. Every use is also listed in the
- * story's description (docs/design/mockups/README.md).
- */
 export function NewComponent({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div

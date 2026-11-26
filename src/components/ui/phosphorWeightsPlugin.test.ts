@@ -8,13 +8,11 @@ import { isPhosphorDefsId, stripPhosphorWeights } from './phosphorWeightsPlugin'
 const entry = (weight: string, d: string) =>
   `  [\n    "${weight}",\n    /* @__PURE__ */ e.createElement(e.Fragment, null, /* @__PURE__ */ e.createElement("path", { d: "${d}" }))\n  ]`;
 
-/** The shape of `@phosphor-icons/react/dist/defs/Check.es.js` (v2.1.x), paths shortened. */
 const SNIPPET = [
   'import * as e from "react";',
   'const a = /* @__PURE__ */ new Map([',
   [
     entry('bold', 'M1'),
-    // duotone spans several lines and nests its own `[`/`{`.
     `  [\n    "duotone",\n    /* @__PURE__ */ e.createElement(e.Fragment, null, /* @__PURE__ */ e.createElement(\n      "path",\n      {\n        d: "M2",\n        opacity: "0.2"\n      }\n    ))\n  ]`,
     entry('fill', 'M3'),
     entry('light', 'M4'),

@@ -1,8 +1,3 @@
-/**
- * What the chart's colours and lines mean: a swatch per ore layer (the same
- * tones the layers are drawn in) and the mining-rate bars. The chart itself
- * carries no labels for these.
- */
 import { useTranslation } from 'react-i18next';
 import type { SurveySummary } from '@/engine/survey/series';
 import { oreTone } from './surveyTones';

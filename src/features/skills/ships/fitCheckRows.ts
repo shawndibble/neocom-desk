@@ -1,4 +1,3 @@
-/** One display row per skill a pasted fit needs. Pure — seconds come from `computeSkillPlanSchedule`'s own steps, not re-derived here. */
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import { skillTrainingStatus, type SkillTrainingStatus } from '../skillStatus';
 
@@ -10,7 +9,6 @@ export interface FitCheckRow {
   currentLevel: number;
   targetLevel: number;
   status: FitCheckStatus;
-  /** Seconds still needed to reach `targetLevel`; 0 once `status` is 'trained'. */
   seconds: number;
 }
 

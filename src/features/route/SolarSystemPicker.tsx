@@ -1,10 +1,3 @@
-/**
- * A solar system picker: a button that opens a search over every solar system
- * in the local snapshot, so picking one costs no ESI request.
- *
- * Shared by the Jump Range's Current System picker and Route Safety's From and
- * To (issue #2328). The snapshot is only fetched once the popover first opens.
- */
 import { useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -29,26 +22,16 @@ const MATCH_LIMIT = 8;
 
 export interface SolarSystemPickerProps {
   value: number | null;
-  /** `station` is set when a station or structure was picked: `systemId` is its system. */
   onChange: (systemId: number, station?: PickedStation) => void;
-  /** The trigger's accessible name. */
   ariaLabel: string;
-  /** What the trigger shows; defaults to the picked system's name, or `placeholder`. */
   triggerLabel?: ReactNode;
-  /** Shown on the trigger with nothing picked, when `triggerLabel` is not given. */
   placeholder?: string;
   disabled?: boolean;
-  /** A line above the search box. */
   hint?: ReactNode;
-  /** Below the results; `close` shuts the popover. */
   footer?: (close: () => void) => ReactNode;
-  /** Systems left out of the results, such as ones already on a list. */
   exclude?: ReadonlySet<number>;
-  /** Each result also shows its security status. */
   showSecurity?: boolean;
-  /** The trigger button, for a caller handing focus to it. */
   triggerRef?: Ref<HTMLButtonElement>;
-  /** Also search stations and known structures, not only systems (issue #4964). */
   places?: boolean;
 }
 
@@ -70,7 +53,6 @@ export function SolarSystemPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(open);
-  // Retry's notice unmounts when the read restarts: focus waits on the popover body.
   const [bodyRef, , holdRetryFocus] = useRetryFocus(
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     open
@@ -110,8 +92,6 @@ export function SolarSystemPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        {/* Shrinks inside a tight row and ends in an ellipsis rather than
-            widening the page or wrapping to a second line (issue #2519). */}
         <Button
           ref={triggerRef}
           disabled={disabled}
@@ -138,7 +118,6 @@ export function SolarSystemPicker({
             {...combo.inputProps}
           />
           {systemsFailed && (
-            // The list never loaded, so no result is a statement about any system.
             <div className="flex flex-col items-start gap-1.5">
               <p className="text-warning">{t('jumpRange.systemsFailed')}</p>
               <Button

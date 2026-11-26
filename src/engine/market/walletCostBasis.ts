@@ -1,22 +1,7 @@
-/**
- * Wallet Cost Basis: what a character's unlinked sell orders of one type
- * cost, worked out FIFO from their own wallet transactions (issue #1422).
- *
- * Personal buys of the type are lots, oldest first; personal sells consume
- * them oldest first. The unit cost is the weighted average of the *newest*
- * `pool` units still left — the pool being the units the character has on
- * open sell orders — with a lot split at the boundary prorated. A basis is
- * only offered when the history actually covers every unit; a shortfall is
- * reported as `partial` or `historyShort` rather than guessed.
- *
- * Pure: the caller need not pre-filter — other types and corp trades are
- * ignored here.
- */
 import { parseInstant } from '../esiInstant';
 
 export interface WalletTrade {
   transactionId: number;
-  /** ISO timestamp. */
   date: string;
   typeId: number;
   quantity: number;
@@ -25,28 +10,18 @@ export interface WalletTrade {
   isPersonal: boolean;
 }
 
-/**
- * Units that entered stock without a wallet buy: a Production Run's output,
- * priced at materials cost + job fee over quantity (issue #6381). They join
- * the FIFO queue as lots, so a wallet sell consumes them like any other.
- */
 export interface ProductionLot {
-  /** ISO timestamp the run was logged. */
   date: string;
   typeId: number;
   quantity: number;
-  /** Total cost of the run over its quantity. */
   unitCost: number;
 }
 
 export interface WalletCostBasisInput {
   transactions: readonly WalletTrade[];
-  /** Production Runs of this type, joining the buys as lots. */
   productionLots?: readonly ProductionLot[];
   typeId: number;
-  /** Units on the character's unlinked sell orders of this type. */
   pool: number;
-  /** The wallet fetch stopped at its page cap, so older history may exist. */
   truncated?: boolean;
 }
 
@@ -58,7 +33,6 @@ export type WalletCostBasisResult =
       buyCount: number;
       oldestBuy: string;
       newestBuy: string;
-      /** The buys priced, newest first; the boundary buy's quantity is the part used. */
       buys: WalletBuyUsed[];
       truncated: boolean;
     }
@@ -82,14 +56,13 @@ export function walletCostBasis(input: WalletCostBasisInput): WalletCostBasisRes
   const truncated = input.truncated ?? false;
   if (!(pool > 0)) return null;
 
-  // A run sorts before a same-instant fill: it was delivered, then sold.
   const fills = input.transactions
     .filter((t) => t.isPersonal && t.typeId === typeId && t.quantity > 0)
     .map((t) => ({ ...t, id: t.transactionId }));
   const runs = (input.productionLots ?? [])
     .filter((l) => l.typeId === typeId && l.quantity > 0)
     .map((l) => ({
-      id: -1, // before any same-instant fill (ids are positive)
+      id: -1,
       date: l.date,
       quantity: l.quantity,
       unitPrice: l.unitCost,

@@ -3,7 +3,6 @@ import { claimValuesOf, parseClaimValuesInput } from './srpClaimValues.js';
 import type { SrpKillmailSource } from './srpKillmail.js';
 import type { DoctrineFit } from './srpTypes.js';
 
-// 405 is a high-slot module, 421 a mid-slot one and 4395 a rig in the SDE's fitting racks.
 const PRICES = new Map([
   [10, 100],
   [405, 10],
@@ -29,7 +28,7 @@ const victim = {
   items: [
     { item_type_id: 405, flag: 27, quantity_destroyed: 1 },
     { item_type_id: 405, flag: 28, quantity_destroyed: 1 },
-    { item_type_id: 421, flag: 5, quantity_destroyed: 50 }, // cargo
+    { item_type_id: 421, flag: 5, quantity_destroyed: 50 },
   ],
 };
 const doctrine: DoctrineFit = {

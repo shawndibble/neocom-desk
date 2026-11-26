@@ -18,15 +18,8 @@ import { SlotCard, SlotName, type EditContext } from './RackListParts';
 
 export interface ModuleRowProps extends EditContext {
   module: FittingModule;
-  /** This module's own calculation — null while it's being worked out. */
   result: FittingModuleResult | null;
-  /** The active Character lacks the skills for it. */
   cantUse: boolean;
-  /**
-   * A row of the List (or a rack sheet): a drop target, dragged by its grip
-   * on a pointer, with Move up / down / to slot in its menu. Off in the
-   * module dialog, which shows one module alone.
-   */
   inRack?: boolean;
 }
 
@@ -51,9 +44,6 @@ export function ModuleRow({
   const name = catalogueTypeName(catalogue, module.typeId);
   const { slot, slotIndex, typeId } = module;
 
-  // Offer only states the module can reach — every state until its own
-  // calculation says otherwise — and show the one it reached: a pasted fit
-  // asks for "active" everywhere, which a passive module or rig runs online.
   const maxState = result?.maxState ?? 'overload';
   const shownState = shownModuleState(slot, result?.state, module.state);
   const states = reachableModuleStates(maxState, shownState);
@@ -135,8 +125,4 @@ export function ModuleRow({
   );
 }
 
-/**
- * A List select's touch tier: 36px below `md`, its own `sm` height above.
- * `NativeSelect` puts `className` on its wrapper, hence the child selector.
- */
 const TOUCH_SELECT_CLASS = '[&>select]:min-h-9 md:[&>select]:min-h-7';

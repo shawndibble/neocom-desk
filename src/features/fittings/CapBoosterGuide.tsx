@@ -21,21 +21,17 @@ import type { WeaponChargeGroup } from './useChargeChoices';
 
 interface Props {
   group: WeaponChargeGroup;
-  /** Loads the charge into every fitted booster of the group. */
   onLoad?: (chargeTypeId: number) => void;
-  /** Wraps a loadable row in the Add panel's drag and right-click menu. */
   wrapRow?: (chargeTypeId: number, row: ReactNode) => ReactNode;
   pricesLoading: boolean;
 }
 
 const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.4rem_2.4rem_1.8rem_3.8rem_2.4rem]';
 
-/** "Navy 800": the table's name for a charge, its size and version. */
 function shortName(name: string): string {
   return name.replace(/\s*Cap Booster\s*/, ' ').trim();
 }
 
-/** "62%" stable, "1m 35s" to empty: the two read apart without colour. */
 function capShort(capacitor: CapacitorStatus): string {
   return capacitor.stable
     ? `${Math.round(capacitor.stablePercentage)}%`
@@ -64,7 +60,6 @@ function rowLabel(t: TFunction, c: ChargeChoice, worse: ChargeChoice | null): st
       ? t('fittings.capGuide.noPrice')
       : t('fittings.chargePicker.isk', { isk: formatIskExact(c.price) }),
     ...(perGj === null ? [] : [t('fittings.capGuide.iskPerGj', { value: iskGjText(perGj) })]),
-    // The dimmed row's reason, which the label would otherwise hide.
     ...(c.skillMissing
       ? [t('fittings.chargePicker.needsSkill')]
       : worse
@@ -73,13 +68,6 @@ function rowLabel(t: TFunction, c: ChargeChoice, worse: ChargeChoice | null): st
   ].join(', ');
 }
 
-/**
- * A cap booster group's Charge Picker: what's loaded and how the capacitor
- * fares on it, three quick picks (the smallest charge that holds the
- * capacitor, the most GJ/s, the cheapest GJ that holds it), then every
- * charge from smallest to biggest — each worked out with the whole Fitting
- * loaded (`engine/fittings/capBoosterChoice.ts`).
- */
 export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props) {
   const { t } = useTranslation();
   const choices = useMemo(

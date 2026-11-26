@@ -1,17 +1,3 @@
-/**
- * The non-EFT "Load" sources (issue #1541): an in-game DNA string or
- * `<url=fitting:…>` chat link, an eveship.fit link, an EVE Workbench fit link
- * (#2483) and a killmail (the victim's fit). All of it is pure — fetching a
- * killmail or a Workbench fit's EFT lives with the caller; here a killmail is
- * already an ESI `victim` object, and a Workbench link is only its fit id.
- *
- * Every loader returns `LoadParts` (`load.ts`), the same as the EFT loader,
- * so `toLoadOutcome` and the "lines that weren't recognised" list carry over
- * unchanged. Like the EFT
- * loader, a rack comes from `FittingSlotMap`, never from position: DNA has no
- * slot information at all, and a killmail's flag says which slot but not
- * whether the item is a module or the charge loaded in it.
- */
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fittings/fittingShare';
 import type { EftSlotLookup } from './eftLoader';
 import type { LoadParts, LoadWarning, LoadWarningKind } from './load';
@@ -30,26 +16,18 @@ export type LoadInput =
   | { kind: 'dna'; dna: string }
   | { kind: 'share'; code: string }
   | { kind: 'killmail'; killmailId: number; hash?: string }
-  /**
-   * An EVE Workbench fit page (`/fit/<id>[/<slug>]`). The id is a GUID on a
-   * real link but is passed through as written, so a malformed one still
-   * reads as "Workbench has no such fit" rather than "unrecognised".
-   */
   | { kind: 'eveWorkbench'; fitId: string }
   | { kind: 'unknown' };
 
 const DNA = /^\d+(?::\d+_?;\d+)+:*$/;
 const DNA_IN_TEXT = /fitting:(\d+(?::\d+_?;\d+)+:*)/i;
 const EFT_HEADER = /^\s*\[[^\]\n]+,[^\]\n]*\]/;
-/** A bare `[Ship]`; tried last, since a chat paste's `[ timestamp ]` prefix looks the same. */
 const BARE_EFT_HEADER = /^\s*\[[^\]\n]+\]/;
 const ZKILL = /zkillboard\.com\/kill\/(\d+)/i;
 const ESI_KILL = /\/killmails\/(\d+)\/([0-9a-f]{40})/i;
-/** `/fit/<id>[/<slug>]`; the id may be empty, which still reads as a Workbench link. */
 const WORKBENCH_FIT_PATH = /^\/fit(?:\/([^/]*))?(?:\/|$)/i;
 
 function classifyPlain(text: string): LoadInput {
-  // eveship.fit may tag the payload with its kind (`dna:587:…`).
   const trimmed = text.trim().replace(/^dna:(?=\d)/i, '');
   if (EFT_HEADER.test(trimmed)) return { kind: 'eft', text: trimmed };
   if (DNA.test(trimmed)) return { kind: 'dna', dna: trimmed };
@@ -59,7 +37,6 @@ function classifyPlain(text: string): LoadInput {
   return { kind: 'unknown' };
 }
 
-/** Works out which Load source a pasted string is. Never throws. */
 export function classifyLoadInput(input: string): LoadInput {
   const text = input.trim();
   const esi = ESI_KILL.exec(text);
@@ -70,10 +47,7 @@ export function classifyLoadInput(input: string): LoadInput {
   if (/^https?:\/\//i.test(text)) {
     try {
       const url = new URL(text);
-      // This app's own Fitting Share Code (a Fitting's Export menu): the code rides in `?f=`.
       const code = url.searchParams.get('f');
-      // Matched on the path's end, so both `/ships/fittings` (since the
-      // section became Ships) and the older `/fittings` read back.
       if (code && /\/fittings(\/edit)?\/?$/.test(url.pathname)) return { kind: 'share', code };
       const workbenchFit = WORKBENCH_FIT_PATH.exec(url.pathname);
       if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && workbenchFit) {
@@ -83,9 +57,7 @@ export function classifyLoadInput(input: string): LoadInput {
         const fit = url.searchParams.get('fit') ?? decodeURIComponent(url.hash.replace(/^#/, ''));
         return classifyPlain(fit);
       }
-    } catch {
-      // not a URL after all
-    }
+    } catch {}
     return { kind: 'unknown' };
   }
   return classifyPlain(text);
@@ -103,7 +75,6 @@ function sortModules(modules: FittingModule[]): void {
   );
 }
 
-/** DNA is `hullId:typeId;qty:typeId;qty::`, with no slot information. */
 export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadParts {
   const [hull, ...entries] = dna.split(':').filter((part) => part !== '');
   const hullTypeId = Number(hull);
@@ -143,7 +114,6 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
     } else if (rack === undefined) {
       cargo.push({ typeId, quantity });
     } else {
-      // DNA folds identical modules into one `id;count` entry.
       for (let i = 0; i < quantity; i++) {
         const slotIndex = next[rack];
         if (slotIndex >= MAX_SLOTS_PER_CATEGORY) {
@@ -172,7 +142,6 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
   };
 }
 
-/** The parts of ESI's killmail `victim` this reads. */
 export interface KillmailVictim {
   ship_type_id: number;
   items?: {
@@ -210,12 +179,6 @@ function mergeCargo(items: FittingCargoItem[]): FittingCargoItem[] {
   return [...byType].map(([typeId, quantity]) => ({ typeId, quantity }));
 }
 
-/**
- * A killmail lists what was fitted (destroyed) and what survived as loot
- * (dropped) side by side; the fit is both, so the two quantities are summed.
- * Only the drone bay and cargo hold carry over besides the slots — anything
- * else (fighter bay, ore hold, …) isn't part of a Fitting.
- */
 export function killmailVictimToLoadResult(
   victim: KillmailVictim,
   slotByTypeId: EftSlotLookup
@@ -223,7 +186,7 @@ export function killmailVictimToLoadResult(
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
-  const charges = new Map<number, number>(); // flag → charge typeId
+  const charges = new Map<number, number>();
 
   for (const item of victim.items ?? []) {
     const quantity = (item.quantity_destroyed ?? 0) + (item.quantity_dropped ?? 0);

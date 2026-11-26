@@ -335,7 +335,6 @@ describe('removeCharacter', () => {
 
     await removeCharacter(1);
 
-    // The `@/sync` mock exposes no remote purge — calling one would throw.
     expect(syncMock.clearCharacterSyncBookkeeping).toHaveBeenCalledWith(1);
     const keys = (await db.settings.toArray()).map((row) => row.key);
     expect(keys.filter((key) => key.startsWith('remotePurgePending.'))).toEqual([]);

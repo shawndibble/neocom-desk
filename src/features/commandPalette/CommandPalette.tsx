@@ -82,7 +82,6 @@ function signedStanding(standing: number): string {
   return standing > 0 ? `+${standing}` : String(standing);
 }
 
-/** The live reads behind the shipped groups, turned into providers. */
 function useShippedProviders(): {
   providers: PaletteProvider[];
   destinations: NavDestination[];
@@ -100,8 +99,6 @@ function useShippedProviders(): {
   const characters = useCharacters();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
-  // Cache-only and live (Dexie re-reads it on a cache or grant change), never
-  // per keystroke: typing neither waits on it nor fetches.
   const contacts = useLiveQuery(loadPaletteContacts, [], NO_CONTACTS);
   const assets = useLiveQuery(loadPaletteAssets, [], NO_ASSETS);
   const assetsScope = useLiveQuery(loadPaletteAssetsScope, []);
@@ -119,9 +116,6 @@ function useShippedProviders(): {
     [locked, corpVisible, capabilities, srpVisible, t, hiddenTabPaths]
   );
 
-  // Its own memo, keyed only on what it reads: the provider holds the loaded
-  // corporation list, so a Character-list or nav-lock change must not throw
-  // it away and flash the group back to loading.
   const lpStores = useMemo(
     () =>
       createLpStoresProvider({
@@ -136,12 +130,10 @@ function useShippedProviders(): {
     [activeCharacterId, navigate, t]
   );
 
-  // Same reason as LP Stores: it holds the loaded Ship Tree.
   const ships = useMemo(
     () =>
       createShipsProvider({
         loadShipTree,
-        // Over an open Ship Info window, replace: one Back still leaves the tree.
         onOpen: (typeID) =>
           void navigate(`/ships/tree?ship=${typeID}`, { replace: shipWindowOpen }),
       }),
@@ -246,7 +238,6 @@ function useShippedProviders(): {
       ships,
       createMarketItemsProvider({
         catalogue: marketItemCatalogue,
-        // The Market Browser, carrying the hub or region it is already on.
         onSelect: ({ typeId }) => void navigate(marketItemUrl(typeId, location.search)),
       }),
     ],
@@ -273,21 +264,6 @@ interface CommandPaletteProps {
   onClose: () => void;
 }
 
-/**
- * The Command Palette (#2318): one search box over grouped results — Pages,
- * Commands, Characters, Assets, Market Items (#2319), LP Stores, Contacts —
- * each group a provider (`types.ts`).
- *
- * A hand-built ARIA combobox (decision 20260905-114550), after
- * `BuildLocationPicker`: DOM focus stays in the input, and the highlighted
- * option is named by `aria-activedescendant`. The listbox holds one
- * `role="group"` per provider, labelled by its heading, so a screen reader
- * says which group an option is in. The highlight is one index across every
- * group, so the arrows run straight over a group boundary.
- *
- * Rendered only while open (`CommandPaletteHost`), so each opening starts
- * with an empty query and the first result highlighted.
- */
 export function CommandPalette({ onClose }: CommandPaletteProps) {
   const { t } = useTranslation();
   const baseId = useId();
@@ -296,21 +272,15 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
   const { providers, destinations } = useShippedProviders();
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  // Only the latest paste may navigate, whichever classifies first.
   const latestPaste = useRef(0);
-  // The rail's layouts only: below `md` the More sheet already showed Recent
-  // before the palette opened.
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   const recent = useRecentNav((state) => state.value);
   const [query, setQuery] = useState('');
   const found = usePaletteSearch(providers, query);
   const groups = useMemo(() => rankGroups(found, query), [found, query]);
-  // Sections the pilot has arrowed into show every row; the rest show a few.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
 
-  // Keyed by group and result id, not position, so an async group landing
-  // above the highlight does not move it onto a different row.
   const allOptions = groups.flatMap((group) =>
     group.results.map((result, row) => ({
       groupId: group.provider.id,
@@ -319,19 +289,14 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       result,
     }))
   );
-  // The highlighted row's section stays open, so a section landing late cannot
-  // collapse the row the pilot is on.
   const highlightedGroupId = allOptions.find((option) => option.key === highlightedKey)?.groupId;
   const rowCounts = visibleRowCounts(
     groups,
     highlightedGroupId === undefined ? expanded : new Set(expanded).add(highlightedGroupId)
   );
-  // What is on screen. Hidden rows take no index: arrowing onto one expands its section first.
   const options = allOptions.filter((option) => option.row < (rowCounts.get(option.groupId) ?? 0));
   const [altOutcome, setAltOutcome] = useState<PaletteAltOutcome>(null);
-  /** A second Shift+Enter while one is sending must not send twice. */
   const altInFlight = useRef(false);
-  // A new query starts back at the top: Enter then takes the best match.
   const [prevQuery, setPrevQuery] = useState(query);
   if (prevQuery !== query) {
     setPrevQuery(query);
@@ -344,13 +309,10 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
   const optionDomId = (index: number) => `${baseId}-option-${index}`;
   const activeDescendant = highlightedIndex === null ? undefined : optionDomId(highlightedIndex);
 
-  // `Modal` focuses its own body on open; this effect runs after the dialog's
-  // (a child's effects run first), so the input takes focus from there.
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  // A closed palette (Escape, a pick) must not be navigated by a paste still classifying.
   useEffect(
     () => () => {
       latestPaste.current = -1;
@@ -358,10 +320,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
     []
   );
 
-  // The item catalogue starts loading as the palette opens, not at the third
-  // keystroke — and off the render path, so typing never waits on it. Each
-  // opening retries a failed load once; a failure is the Market Items
-  // group's to report.
   useEffect(() => {
     marketItemCatalogue.load({ retry: true }).catch(() => {});
   }, []);
@@ -371,7 +329,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
     document.getElementById(activeDescendant)?.scrollIntoView?.({ block: 'nearest' });
   }, [activeDescendant]);
 
-  /** Shift+Enter or the row's button: the second action, palette kept open to show its outcome. */
   function activateAlt(result: PaletteResult) {
     const action = result.altAction;
     if (!action) return;
@@ -388,26 +345,16 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
   }
 
   function activate(result: PaletteResult) {
-    // Closed first: the dialog's teardown hands focus back to where it came
-    // from, and a navigation's own route focus then lands after it.
     onClose();
     result.run();
   }
 
-  /**
-   * A multi-line paste the app recognises (a fit, a skill plan, an item list…)
-   * goes where `GlobalPasteRouter` would send it, no confirm step. The text
-   * still lands in the input meanwhile, so one that matches nothing — or an
-   * item list read offline, which says nothing here — just stays as typed.
-   * A single line is a search.
-   */
   function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
     const text = event.clipboardData.getData('text/plain');
     const id = ++latestPaste.current;
     if (!text.trim().includes('\n')) return;
     void routePaste(text, { pathname, search }).then(({ route }) => {
       if (id !== latestPaste.current || route === null) return;
-      // Closed first, as `activate` does, so focus hands back before the route's own.
       onClose();
       void navigate(...route);
     });
@@ -422,15 +369,12 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
       case 'End': {
         if (allOptions.length === 0) return;
         event.preventDefault();
-        // Options are not focusable, so Tab would only leave the input and
-        // strand Enter: it steps the highlight like the arrows instead.
         const key: ComboboxNavKey =
           event.key === 'Tab'
             ? event.shiftKey
               ? 'ArrowUp'
               : 'ArrowDown'
             : (event.key as ComboboxNavKey);
-        // Steps over every row, hidden ones too: landing on one opens its section.
         const current =
           highlightedIndex === null
             ? null
@@ -457,8 +401,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
         activate(options[highlightedIndex].result);
         break;
       case 'Escape':
-        // Handled here rather than left to the dialog's `cancel`: in a search
-        // field with text the browser spends Escape on clearing it first.
         event.preventDefault();
         onClose();
         break;
@@ -474,10 +416,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
           return destination ? [destination] : [];
         })
       : [];
-  // The error row is not an option, so the live count alone would hide it.
   const failedGroups = groups.filter((group) => group.status === 'error');
-  // Group error rows are `aria-hidden` (a listbox child that is not an
-  // option); the status region carries them instead.
   const statusParts = [
     t('commandPalette.resultsCount', { count: allOptions.length }),
     ...new Set(
@@ -513,7 +452,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
             id={listboxId}
             role="listbox"
             aria-label={t('commandPalette.resultsLabel')}
-            // The input stays put above; only the results scroll.
             className="flex max-h-[min(30rem,calc(70dvh-9rem))] scroll-py-2 flex-col gap-2 overflow-y-auto overscroll-contain"
           >
             {groups.map((group) => {
@@ -524,7 +462,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                     role="presentation"
                     className={cx(eyebrowClassName, 'flex items-center gap-2 px-2 pb-1')}
                   >
-                    {/* The group's name is the label alone: the count is heard in the status region. */}
                     <span id={headingId} className="flex items-center gap-2">
                       {t(group.provider.labelKey)}
                       {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}
@@ -561,7 +498,6 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
                               role="option"
                               aria-selected={highlighted}
                               aria-keyshortcuts={result.altAction ? 'Shift+Enter' : undefined}
-                              // Keeps focus in the input, as every combobox here does.
                               onMouseDown={(event) => event.preventDefault()}
                               onClick={() => activate(result)}
                               className={cx(

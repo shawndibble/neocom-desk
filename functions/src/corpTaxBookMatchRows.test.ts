@@ -21,7 +21,6 @@ describe('storedRowsWanted: which stored rows a donation is matched against', ()
     const wanted = storedRowsWanted({
       held: [
         { characterId: 10, at: '2026-10-05T00:00:00Z' },
-        // Paid before the book started: nothing it paid is billed.
         { characterId: 40, at: '2026-09-01T00:00:00Z' },
       ],
       senders: [20],

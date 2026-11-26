@@ -82,7 +82,6 @@ describe('recordOrderProblemSamples', () => {
       NOW + SPACING
     );
     const stored = await loadOrderProblemSamples([10]);
-    // Order 1 is still open, so its earlier reading survives; no false 'healthy' joined it.
     expect(stored.get(1)).toEqual([{ at: NOW, problem: 'undercutStation' }]);
     expect(stored.has(2)).toBe(false);
   });
@@ -146,8 +145,6 @@ describe('recordOrderProblemSamples', () => {
       [10, 20],
       NOW
     );
-    // Character 20's orders could not be read this time: it is absent from
-    // both the readings and the character list.
     await recordOrderProblemSamples(
       [{ orderId: 1, characterId: 10, problem: 'healthy' }],
       [10],

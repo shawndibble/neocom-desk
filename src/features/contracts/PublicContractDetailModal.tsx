@@ -1,42 +1,3 @@
-/**
- * Full detail for one public contract, opened from a row in BPC Search or the
- * Contracts page's Search tab. Generalized out of `BpcContractModal` (issue
- * #928): the row a shopper clicked is only one line — a blueprint, a stack of
- * Tritanium — and a contract routinely bundles several, so "what else is on
- * this?" is a question no results table can answer on its own.
- *
- * A shopper asks two things of it: does this contract have what I need, and is
- * the cost fair? So the panel leads with the asking price and what is in it —
- * the line they searched for tagged "Your search", the rest dimmed — then a
- * live price check against the reader's Trade Hub (opening on sell orders:
- * what taking it outright costs), then where it is. A blueprint copy has no
- * market price, so its check is per run against similar copies instead.
- * Nothing has happened to a listed contract yet, so there is no timeline, only
- * the expiry. Decision 20261020-005242-contract-detail-price-check.
- *
- * Item lines come from the public ESI route, which needs no scope — the
- * character-scoped one the Contracts page's own History tab uses cannot serve
- * these at all, since no character here is party to them.
- *
- * Where the contract *is*, though, does need a character: a public contract is
- * as likely to sit in a player structure as an NPC station, and
- * `/universe/structures/{id}` is ACL-checked per character. So the location
- * goes through `loadContractLocationName` — the same station-or-structure
- * resolution the personal Contracts view uses — under the active Character.
- *
- * Callers supply the header figures (price, quantity, a blueprint's ME/TE/runs)
- * since what is worth showing there differs by row shape — everything below
- * that (location, expiry, contract id, contents) is the same for any public
- * contract.
- *
- * The contents list carries what judging the bundle needs and nothing else: an
- * icon per line so a pile is scannable rather than read word by word, ESI's
- * per-stack records merged into one line per item (`mergeContractItemLines`),
- * and the two sides of an item_exchange split under their own headings instead
- * of tagged inline — what the buyer hands over first, since that is the ask
- * being judged. Every line right-clicks into the same item actions the rest of
- * the app offers.
- */
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
@@ -100,46 +61,19 @@ export interface PublicContractDetailModalStatChip {
 
 export interface PublicContractDetailModalProps {
   title: string;
-  /**
-   * Whose token resolves a player-structure location. Neither BPC Search nor
-   * Contracts Search is per-Character itself — both read a shared snapshot —
-   * but the structure endpoint behind the location is, and its ACL is per
-   * Character.
-   */
   characterId: number;
   contractId: number;
   locationId: number;
   regionName: string;
-  /** The offer's solar system, when known; shown as the Route Safety link (rows list it as plain text). */
   system?: { id: number; name: string } | null;
-  /** Epoch ms. */
   dateExpired: number;
-  /** Header figures the caller already knows how to word — price, ME/TE, a haul's reward. The first leads. */
   statChips: readonly PublicContractDetailModalStatChip[];
-  /**
-   * What the contract costs in ISK, for the price check; `null` or absent when
-   * there is no real ISK figure (a barter, a PLEX ask with no PLEX price yet).
-   */
   askingIsk?: number | null;
-  /**
-   * The item type(s) the shopper searched for: their line is tagged and the
-   * value split into theirs and the rest. `null` or absent means no search is
-   * active, so nothing is tagged.
-   */
   searchedTypeIds?: ReadonlySet<number> | null;
-  /**
-   * A blueprint listing's per-run comparison with similar copies, replacing the
-   * hub price check. `null` is "asked, too few similar copies"; absent means
-   * this is not a blueprint listing.
-   */
   bpcCheck?: BpcPerRunCheck | null;
-  /** The Items board's flag on this row (#4773), worded here beside the price check. */
   flag?: ContractFlag | null;
-  /** The pilot's flag multiple, named in the overpriced sentence so the setting is findable. */
   flagMultiple?: number;
-  /** Which side of the hub book the price check opens on; default sell orders. */
   defaultPriceSide?: PriceSide;
-  /** Below market's estimate for the lines the hub cannot price (#5427); absent outside that board. */
   otherValue?: { value: number; lines: number } | null;
   onClose: () => void;
 }
@@ -149,7 +83,6 @@ interface ItemsState {
   typeNames: Map<number, string>;
 }
 
-/** The price check reads the live book, not a past day. */
 const LIVE = { kind: 'live' } as const;
 
 export function PublicContractDetailModal({
@@ -178,7 +111,6 @@ export function PublicContractDetailModal({
   const [location, setLocation] = useState<string | null | undefined>(undefined);
   const [items, setItems] = useState<ItemsState | null | undefined>(undefined);
   const [abyssalValue, setAbyssalValue] = useState<AbyssalContractValue | undefined>(undefined);
-  // Session-only view filter: not remembered or synced, and back to the full list for the next contract.
   const [abyssalOnlyFor, setAbyssalOnlyFor] = useState<number | null>(null);
   const abyssalOnly = abyssalOnlyFor === contractId;
 
@@ -206,8 +138,6 @@ export function PublicContractDetailModal({
         return;
       }
       const outcome = result.data;
-      // Names for every line, not just the one the row was found through —
-      // the bundle is the point.
       const typeNames =
         outcome.kind === 'items'
           ? await loadTypeNames(outcome.items.map((item) => item.type_id))
@@ -219,8 +149,6 @@ export function PublicContractDetailModal({
     };
   }, [contractId, itemsAttempt]);
 
-  // Merged before anything reads the lines, so the price check and the
-  // rendered list are counting the same things.
   const lines = useMemo(
     () =>
       items && items.outcome.kind === 'items'
@@ -230,18 +158,14 @@ export function PublicContractDetailModal({
   );
   const included = lines.filter((line) => line.isIncluded);
   const requested = lines.filter((line) => !line.isIncluded);
-  // What the list shows; the price check above keeps reading the full lines.
   const shownLines = abyssalOnly ? lines.filter((line) => isAbyssalType?.(line.typeId)) : lines;
   const shownIncluded = shownLines.filter((line) => line.isIncluded);
   const shownRequested = shownLines.filter((line) => !line.isIncluded);
 
-  // Which line(s) the shopper asked for. With no match nothing is tagged, so a
-  // search that is not about this contract's contents never greys it out.
   const anySearched = searchedTypeIds !== null && lines.some((l) => searchedTypeIds.has(l.typeId));
   const searchedMark = (line: ContractItemLine): boolean | undefined =>
     anySearched ? searchedTypeIds!.has(line.typeId) : undefined;
 
-  // PLEX trades only on its own market, so no hub lists it: price it from there.
   const hasPlex = lines.some((line) => line.typeId === PLEX_TYPE_ID);
   const plexPrice = usePlexPrice(hasPlex);
   const sellOverrides = useMemo(
@@ -250,8 +174,6 @@ export function PublicContractDetailModal({
   );
   const checkLines = useMemo(() => {
     const abyssal = (line: ContractItemLine) => isAbyssalType?.(line.typeId) ?? false;
-    // A copy shares its type with the original, which trades at the hub; the
-    // copy never does, so it is never valued from that book.
     const toLine = (line: ContractItemLine) => ({
       typeId: line.typeId,
       quantity: line.quantity,
@@ -285,9 +207,6 @@ export function PublicContractDetailModal({
     asBuyer: true,
   });
 
-  // Flag sentences (#4773): the row's flag, and the padded-bundle share, which
-  // only this panel can say because it holds every line and its price. A flag
-  // states the condition and what it would cost instead, never a verdict.
   const flagNotes = useMemo(() => {
     const notes: string[] = [];
     if (flag) notes.push(flagDetail(flag, hub, t));
@@ -320,8 +239,6 @@ export function PublicContractDetailModal({
     return notes;
   }, [flag, flagMultiple, priceCheck, hub, t]);
 
-  // Each abyssal module is valued at its own MutaMarket estimate, apart from the
-  // hub figure (it has no market price).
   useEffect(() => {
     if (checkLines.abyssal.length === 0) return;
     let cancelled = false;
@@ -336,14 +253,6 @@ export function PublicContractDetailModal({
     };
   }, [checkLines.abyssal, characterId]);
 
-  /**
-   * Only an item_exchange contract asking for something in return has two
-   * sides to tell apart. On a one-sided contract the split would be a heading
-   * over the whole list and an empty second section, so a single section
-   * carries the whole list — headed for the side it actually holds, since a
-   * list of things the reader must *supply* must never read as a list of
-   * things they get.
-   */
   const twoSided = included.length > 0 && requested.length > 0;
   const oneSidedHeading =
     requested.length > 0 && included.length === 0
@@ -398,10 +307,6 @@ export function PublicContractDetailModal({
             onRetry={() => setItemsAttempt((n) => n + 1)}
           />
         ) : items.outcome.kind === 'not-found' ? (
-          // ESI no longer recognizes this contract_id as public — it has
-          // expired, been fulfilled, or was withdrawn since the snapshot
-          // that surfaced this row. An ordinary outcome for a row clicked
-          // some time after it synced, not a fetch failure.
           <EmptyState
             title={t('contractDetail.noLongerListedTitle')}
             hint={t('contractDetail.noLongerListedHint')}
@@ -411,7 +316,6 @@ export function PublicContractDetailModal({
         ) : twoSided ? (
           <>
             <ItemGroup
-              // Keyed on contractId so each group's expanded state resets when another contract opens.
               key={`${contractId}-hand`}
               heading={t('contractDetail.youHandOverHeading')}
               lines={shownRequested}
@@ -488,10 +392,6 @@ export function PublicContractDetailModal({
   );
 }
 
-/**
- * A blueprint copy has no market price (it circulates only by contract), so it
- * is held per run against similar copies. `null` is "too few similar copies".
- */
 function BpcPriceCheck({ check }: { check: BpcPerRunCheck | null }) {
   const { t } = useTranslation();
   if (check === null) {
@@ -516,9 +416,7 @@ function BpcPriceCheck({ check }: { check: BpcPerRunCheck | null }) {
     },
   ];
   if (check.diff !== null) {
-    // Under the median per run is money kept: the Saving is the diff turned over.
     const saving = -check.diff;
-    // Judged on the printed saving, so the words match the figure and its tone.
     const direction = percentDirection(saving);
     rows.push({
       label: t('contractDetail.priceCheckSaving'),
@@ -541,19 +439,9 @@ function BpcPriceCheck({ check }: { check: BpcPerRunCheck | null }) {
   );
 }
 
-/** A group longer than this shows only this many lines until expanded. */
 const ITEM_CAP = 10;
-/** A group this short shows everything: hiding a row or two behind a button saves nothing. */
 const ITEM_NO_CAP_MAX = 12;
 
-/**
- * One headed list of lines. `searched` is `undefined` when no search is
- * active; otherwise it says whether a line is the one asked for.
- *
- * Display-only cap: searched lines are pinned first, then the list stops at
- * `ITEM_CAP` behind a "Show N more" button. The caller's price check reads the
- * full `lines`, never what is visible here.
- */
 function ItemGroup({
   heading,
   lines,
@@ -607,17 +495,6 @@ function ItemGroup({
   );
 }
 
-/**
- * One line. The name is a link to the Market Browser, which also gives the row
- * its keyboard focus: a right-click menu opened with Shift+F10 fires from
- * whatever is focused inside the row, so the link doubles as the menu's
- * keyboard handle and the row needs no `tabIndex` of its own competing with it
- * for a tab stop.
- *
- * `searched`: `true` is the line the shopper searched for (tagged), `false` an
- * extra (dimmed), `undefined` no search (plain). The tag is a word, so the dim
- * is never the only signal.
- */
 function ContractItemRow({
   line,
   name,
@@ -632,7 +509,6 @@ function ContractItemRow({
     <BuildPlanContextMenu
       typeId={line.typeId}
       itemName={name}
-      // This line's own ME/TE/runs, when ESI reported all three.
       seed={planSeedForLine(line)}
       trigger={
         <li

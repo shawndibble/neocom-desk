@@ -61,8 +61,6 @@ describe('BootScreen', () => {
 
   it('announces the stall hint through a live region that was already mounted (issue #1494)', () => {
     render(<BootScreen gate="root" />);
-    // Present, and empty, before the stall: a live region inserted together
-    // with its text is not reliably announced.
     const region = screen.getByTestId('boot-stall-status');
     expect(region).toHaveAttribute('role', 'status');
     expect(region).toBeEmptyDOMElement();
@@ -113,8 +111,6 @@ describe('BootScreen', () => {
     act(() => {
       screen.getByRole('button', { name: 'Reload' }).click();
     });
-    // The gate resolving on its own mid-recovery — recoverFromStalledBoot is
-    // mocked, so nothing here actually reloads the page.
     unmount();
     expect(reportBootStallResolved).toHaveBeenCalledWith(true);
   });
@@ -122,9 +118,6 @@ describe('BootScreen', () => {
 
 describe('a gate whose Dexie read never settles', () => {
   it('reaches the escape hatch through RequireCharacter', () => {
-    // The symptom itself, not just the component: a pending read leaves
-    // `useLiveQuery` at `undefined`, and the gate must still mount BootScreen
-    // with a live timer.
     render(
       <MemoryRouter initialEntries={['/mail']}>
         <RequireCharacter />

@@ -1,15 +1,3 @@
-/**
- * A **Stock List** as a link code, so one pilot can hand the list to another
- * (a corp's market manager to its builders). Only the list travels — its name,
- * market and Stock Targets — never anything counted from the sender's assets:
- * the receiver saves a copy and counts it against their own.
- *
- * Wire format, before `encodeURIComponent`: `2|name|locationId|typeId:target,...`,
- * ids and quantities in base36. Version 1 (no market) never shipped. Plain text rather than deflated: a market list is
- * a few hundred items at most, and the Appraisal share decision
- * (`20260911-110045`) found base36 pairs short enough without compression.
- * Decoding never throws: a pasted code is player-controlled.
- */
 import { MAX_STOCK_TARGET, type StockTarget } from './stockLists';
 
 const VERSION = '2';
@@ -38,8 +26,6 @@ function base36Int(text: string): number | null {
 }
 
 export function decodeStockListShare(code: string): SharedStockList | null {
-  // A link's query string is decoded once already (`searchParams.get`): decoding a
-  // name with a "%" in it again would throw. Only a still-encoded code is decoded.
   let text = code;
   if (!code.includes('|')) {
     try {

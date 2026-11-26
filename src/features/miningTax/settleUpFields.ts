@@ -7,7 +7,6 @@ export const SETTLE_FIELD_LABEL = eyebrowClassName;
 
 export const SETTLE_METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
 
-/** Which row was last copied, for its "Copied" tick. */
 export function useCopiedField() {
   const [copied, setCopied] = useState<string | null>(null);
   async function copy(kind: string, text: string) {

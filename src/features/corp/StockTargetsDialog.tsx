@@ -1,10 +1,3 @@
-/**
- * "Stock targets" on the Corp assets page: every stock target the pilot has
- * set for one corporation, with the means to add a target for any item (found
- * by name, even one the corporation owns none of), change one, or remove one.
- * Edits save at once, as they do in the Target cell. The item search is the
- * market catalogue every other item picker reads.
- */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -29,7 +22,6 @@ export interface StockTargetsDialogProps {
   corporationId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Units the corporation owns per type (the ledger's usable stock), to show beside each target. */
   ownedByTypeId?: ReadonlyMap<number, number>;
 }
 
@@ -41,7 +33,6 @@ export function StockTargetsDialog({
 }: StockTargetsDialogProps) {
   const { t } = useTranslation();
   const { hydrated, targets, setTarget, removeTarget } = useCorpStockTargets(corporationId);
-  // A write before the stored value has loaded, or with no corporation, is lost: don't offer one.
   const canEdit = hydrated && corporationId !== null;
   const names = useTypeNames(open ? [...targets.keys()] : []);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -110,9 +101,7 @@ function useTypeNames(typeIds: readonly number[]): ReadonlyMap<number, string> {
       (loaded) => {
         if (live) setNames(loaded);
       },
-      () => {
-        // Names are decoration; a row falls back to "Type 34".
-      }
+      () => {}
     );
     return () => {
       live = false;
@@ -143,7 +132,6 @@ function TargetRow({
     if (draft === null) return;
     const value = Math.floor(Number(draft));
     setDraft(null);
-    // Clearing the field removes the target, as in the ledger's Target cell.
     if (draft.trim() === '') onRemove();
     else if (Number.isFinite(value) && value >= 1 && value !== target) onChange(value);
   }
@@ -174,7 +162,6 @@ function TargetRow({
             e.preventDefault();
             commit();
           } else if (e.key === 'Escape' && draft !== null) {
-            // Reverts the field, not the dialog.
             e.preventDefault();
             e.stopPropagation();
             setDraft(null);

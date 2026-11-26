@@ -1,9 +1,3 @@
-/**
- * The empty Survey page's "Additional information": where the field is, who gets
- * the moon tax and at what rate, and notes, filled in before the first scan so the
- * Survey the scan starts carries them. A saved template fills these boxes too; they
- * stay editable. Held by the page (`SurveyTab`) as a `StartDraft` (`startDraft.ts`).
- */
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { SurveyDetailsFields } from './SurveyDetailsFields';

@@ -8,9 +8,6 @@ import { guarded } from '@/app/routeChunks';
 import { ShareShell } from '@/features/share/ShareShell';
 import { loadShare, type LoadShareResult, type StoredShare } from '@/features/share/shareStore';
 
-// One chunk per share type, so a link downloads only the screen it opens: a
-// survey link must not carry the appraisal, D-scan and fitting screens (the
-// last one drags in the dogma engine). `src/app/bootImportGraph.test.ts` pins it.
 const AppraisalSharedView = lazy(() =>
   guarded(() => import('./sharedLink/AppraisalSharedView')).then((m) => ({
     default: m.AppraisalSharedView,
@@ -43,11 +40,6 @@ function ShareLoading() {
   );
 }
 
-/**
- * A short start link (`survey-start`): opens the Survey start page with the stored
- * query. The start page re-validates every value, as for a hand-written link, so
- * this only checks the payload is a plain query string of a sane size.
- */
 function StartLinkRedirect({ payload }: { payload: unknown }) {
   const { t } = useTranslation();
   const search = (payload as { search?: unknown } | null)?.search;
@@ -59,7 +51,6 @@ function StartLinkRedirect({ payload }: { payload: unknown }) {
   return <Navigate to={`/survey?${search}`} replace />;
 }
 
-/** The page a stored share's `type` names. */
 function SharedScreen({ share, shareId }: { share: StoredShare; shareId: string }) {
   switch (share.type) {
     case 'appraisal':
@@ -75,20 +66,11 @@ function SharedScreen({ share, shareId }: { share: StoredShare; shareId: string 
   }
 }
 
-/**
- * A stored **Share Link**, `/s/<id>`: reads the share from Firestore and
- * opens the page its `type` names, showing what was shared at the time it was
- * shared. One route for every share type, so a page that becomes shareable
- * adds a case here rather than a route. Outside `RequireCharacter` and
- * `ScopeGate` deliberately — whoever was sent the link may have no account
- * (`routeScopes.test.ts` asserts the exemption).
- */
 export function SharedLink() {
   const { t } = useTranslation();
   useMarkPublicRouteRendered();
   const { shareId = '' } = useParams();
   const [loaded, setLoaded] = useState<LoadState>(null);
-  // Bumped by Try again after a failed read, to fetch the share once more.
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -101,17 +83,13 @@ export function SharedLink() {
     };
   }, [shareId, attempt]);
 
-  // A result for a different id (the visitor followed another link) is stale.
   const result = loaded?.shareId === shareId ? loaded.result : null;
-  // Try again unmounts while the share loads, so the always-mounted wrapper below holds focus.
   const [retryRef, , holdRetryFocus] = useRetryFocus<HTMLDivElement>(
     result === null ? 'busy' : result.ok || result.reason !== 'failed' ? 'ok' : 'failed',
     shareId
   );
 
   if (result?.ok) {
-    // The same focus target as the loading and failed states below, so a
-    // retry that succeeds lands focus here instead of on <body>.
     return (
       <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
         {result.cachedAt !== undefined && (

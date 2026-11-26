@@ -13,14 +13,8 @@ import {
   menuSubContentClassName,
 } from './menuStyles';
 
-/**
- * Right-click menu. Wraps `radix-ui`'s ContextMenu — see docs/adr/0004 for
- * why: focus movement, typeahead, roving tabindex, submenu timing and
- * screen-reader behaviour are exactly the parts worth not hand-rolling.
- */
 export const ContextMenu = ContextMenuPrimitive.Root;
 export const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
-/** A submenu: a panel beside the menu, or — on a phone — its items in place (`inlineSubmenu.tsx`). */
 export function ContextMenuSub(props: ComponentProps<typeof ContextMenuPrimitive.Sub>) {
   const inline = useInlineSubmenus();
   if (inline) return <InlineSubRoot>{props.children}</InlineSubRoot>;
@@ -36,8 +30,6 @@ export function ContextMenuContent({
   collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.Content>) {
-  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
-  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
   return (
     <ContextMenuPrimitive.Portal container={container}>
@@ -59,7 +51,6 @@ export function ContextMenuItem({
 
 export const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
 
-/** One of a set of choices, the current one ticked — as `DropdownMenuCheckboxItem` marks its own. */
 export function ContextMenuRadioItem({
   className,
   children,
@@ -75,7 +66,6 @@ export function ContextMenuRadioItem({
   );
 }
 
-/** A toggle, ticked while on — as `DropdownMenuCheckboxItem` marks its own. */
 export function ContextMenuCheckboxItem({
   className,
   children,
@@ -91,7 +81,6 @@ export function ContextMenuCheckboxItem({
   );
 }
 
-/** A small-caps caption heading the items below it — as `DropdownMenuLabel`. */
 export function ContextMenuLabel({
   className,
   ...props
@@ -146,8 +135,6 @@ export function ContextMenuSubContent({
   collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
-  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
-  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
   const inline = useInlineSub();
   if (inline) {

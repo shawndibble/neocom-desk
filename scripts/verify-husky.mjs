@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// Verify the husky pre-commit hook is actually installed and runnable.
-//
-// `npx husky` (run by `npm install`'s `prepare` script, or explicitly by
-// scripts/next-ticket/setup-worktree.mjs) exits 0 unconditionally in husky
-// v9 — even when it silently did nothing, e.g. because `.git` couldn't be
-// found or the underlying `git config core.hooksPath ...` write failed. Its
-// exit code is therefore not proof the hook is live. This checks the actual
-// on-disk result instead: that `core.hooksPath` is set and that the file it
-// points at actually exists (and, on POSIX, is executable).
-//
-// Usage:
-//   node scripts/verify-husky.mjs          # verify only; exit 1 if broken
-//   node scripts/verify-husky.mjs --fix    # if broken, try `npx husky` once, then re-verify
-//
-// Also exports `verifyHuskyHook(cwd)` for reuse by
-// scripts/next-ticket/setup-worktree.mjs, so worktree setup can fail loudly
-// instead of trusting `npx husky`'s exit code.
 
 import fs from 'node:fs';
 import path from 'node:path';

@@ -56,7 +56,6 @@ describe('walletCostBasis', () => {
         trade({ date: '2026-01-02T00:00:00Z', quantity: 10, unitPrice: 200 }),
       ],
     });
-    // 10 x 200 + 5 x 100 = 2500 / 15
     expect(result).toMatchObject({
       status: 'covered',
       unitsCovered: 15,
@@ -135,7 +134,6 @@ describe('walletCostBasis', () => {
         trade({ transactionId: 5, date: '2026-01-01T00:00:00Z', quantity: 5, isBuy: false }),
       ],
     });
-    // the sell (id 5) consumes id 2's lot first, leaving id 9's
     expect(result).toMatchObject({ status: 'covered', unitCost: 300 });
   });
 });

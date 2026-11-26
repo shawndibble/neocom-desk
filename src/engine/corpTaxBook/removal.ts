@@ -1,27 +1,16 @@
-/**
- * Removing a moon owner (issue #4520, spec #4504): a 24-hour pending removal
- * that starts counting when the mail goes out, who is mailed, and who may end
- * it early. Pure. Mirrored in `functions/src/corpTaxBookEngine.ts` (parity test).
- */
-
 import { moonOwnerMailRecipients } from './ownerRateMail';
 import type { Payee } from './payouts';
 import { HOUR_MS } from '@/lib/age';
 
-/** How long a removal waits once its mail is sent. */
 export const REMOVAL_WAIT_MS = 24 * HOUR_MS;
 
-/** Code-only: the payee-force guard looks back this far from the start of a removal. */
 const PAYEE_LOOKBACK_MS = 48 * HOUR_MS;
 
-/** A started removal. The clock (`effectiveAt`) is set when the mail is sent, never before. */
 export interface Removal {
   startedAt: number;
   startedBy: number;
   startedByName: string;
-  /** When the notice went out (the mail queue's send time, or the officer's confirmation). */
   noticeAt?: number;
-  /** `noticeAt` plus 24 hours; absent until the notice is out. */
   effectiveAt?: number;
 }
 
@@ -32,7 +21,6 @@ export interface RemovalState {
   removal?: Removal;
 }
 
-/** A removal can start on an active moon owner only, and not twice. */
 export function canStartRemoval(state: RemovalState): boolean {
   return state.status === 'active';
 }
@@ -49,7 +37,6 @@ export function startRemoval(
   };
 }
 
-/** The notice went out: the 24 hours run from here. Idempotent: the first notice wins. */
 export function recordRemovalNotice(state: RemovalState, noticeAt: number): RemovalState {
   const { removal } = state;
   if (state.status !== 'pending-removal' || !removal || removal.effectiveAt !== undefined) {
@@ -61,29 +48,21 @@ export function recordRemovalNotice(state: RemovalState, noticeAt: number): Remo
   };
 }
 
-/** Any Collector Accountant or higher (the caller checks the role); back to active. */
 export function cancelRemoval(state: RemovalState): RemovalState {
   if (state.status !== 'pending-removal') throw new Error('no removal is pending');
   return { status: 'active' };
 }
 
-/** The wait is over. A removal whose notice never went out never takes effect on its own. */
 export function isRemovalDue(state: RemovalState, now: number): boolean {
   const at = state.removal?.effectiveAt;
   return state.status === 'pending-removal' && at !== undefined && at <= now;
 }
 
-/**
- * Whom the one mail goes to: the moon owner's CEO and its payee through the shared
- * `moonOwnerMailRecipients` (#4515) first, since a copy to one of them starts the clock (#4617),
- * then the book's other officers. The officer who started it is not mailed; nobody twice.
- */
 export function removalRecipients(input: {
   officerIds: readonly number[];
   startedBy: number;
   ceoId: number | null;
   payee?: Payee;
-  /** The payee corporation's CEO, when the payee is a corporation. */
   payeeCeoId?: number | null;
 }): number[] {
   const out = new Set<number>(moonOwnerMailRecipients(input));
@@ -91,12 +70,6 @@ export function removalRecipients(input: {
   return [...out];
 }
 
-/**
- * May the payee end a removal at once? Not when the payee was set or changed
- * within 48 hours before the removal started, or at any time after it started,
- * and never when the accounting side set it (its officer could name their own alt
- * and skip the 24-hour wait). Deliberately silent in every player-facing surface.
- */
 export function payeeMayForce(input: {
   payeeChangedAt: number | undefined;
   removalStartedAt: number;
@@ -108,10 +81,6 @@ export function payeeMayForce(input: {
   return payeeChangedAt < removalStartedAt - PAYEE_LOOKBACK_MS;
 }
 
-/**
- * Who may use the payee's link: the payee when it is a player, the corporation's
- * CEO when it is a corporation.
- */
 export function isPayeeActor(input: {
   payee: Payee | undefined;
   characterId: number;
@@ -124,7 +93,6 @@ export function isPayeeActor(input: {
     : input.payeeCorporationCeoId === characterId;
 }
 
-/** A payee set or changed: the new payee and when. Re-saving the same payee changes nothing. */
 export function withPayee<T extends { payee?: Payee }>(
   rec: T,
   payee: Payee,

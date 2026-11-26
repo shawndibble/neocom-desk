@@ -1,14 +1,7 @@
-// The Janice proxy's request handling, kept apart from the Worker entry so
-// vitest can run it. See README.md for why a Worker sits in front of Janice.
-
 export const JANICE_ORIGIN = 'https://janice.e-351.com';
 export const MAX_BODY_BYTES = 50 * 1024;
 export const ALLOWED_ORIGINS = ['https://neocomdesk.com', 'https://dev.neocomdesk.com'];
 
-/**
- * Janice market ids by Trade Hub id (GET /api/rest/v2/markets). Keep the keys
- * in step with TRADE_HUBS in src/market/hubs.ts; a Worker can't import from src.
- */
 export const HUB_MARKETS = {
   jita: 2,
   amarr: 115,
@@ -30,11 +23,6 @@ function respond(status, body, origin) {
 
 const fail = (status, error, origin) => respond(status, { error }, origin);
 
-/**
- * The request body as text, or null once it passes `limit` bytes. Read as a
- * stream so a chunked body with no Content-Length is stopped too, instead of
- * being buffered whole first.
- */
 async function readCapped(request, limit) {
   if (Number(request.headers.get('content-length')) > limit) return null;
   if (!request.body) return '';
@@ -102,7 +90,6 @@ export async function handleRequest(request, env, fetchFn = fetch) {
     market: String(market),
     pricing: 'buy',
     pricingVariant: 'immediate',
-    // Janice stores this as a label; it does not scale its own figures.
     pricePercentage: String(pricePercent / 100),
     persist: 'true',
     designation: 'appraisal',

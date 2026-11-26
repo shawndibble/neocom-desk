@@ -14,45 +14,22 @@ import { resolvesOn } from './useCorpStateText';
 import { OverlapNotice } from './OverlapNotice';
 import { acknowledgeOverlap, overlapAckKey, readOverlapAcks } from './overlapAck';
 
-/** Shared, so the memos below don't see a new empty array on every render. */
 const NO_SIBLINGS: readonly BookRowView[] = [];
 
 interface Props {
   view: BookRowView;
   corpName: string;
-  /** Where the book recorded the ore, for a Conflict: the refinery, else the system. */
   recordedAt: string;
-  /**
-   * Other books' Conflict lines on the same day and system. A Conflict's fix then covers
-   * them all: one take-over removes what each corporation recorded, which is the split.
-   */
   siblings?: readonly BookRowView[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
   typeNames: ReadonlyMap<number, string>;
-  /** A change landed: reload the ledger. */
   onChanged: () => void;
-  /**
-   * A message reached the corporation (#6206): reload the books. With it, "I paid it another way"
-   * on a day a Late notice asked for goes to the corporation instead of staying a device-only note,
-   * and a Conflict offers "Tell {corp}".
-   */
   onBookChanged?: () => void;
-  /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Late notice. */
   onResolve?: (target: ResolveTarget) => void;
-  /** Who is asking and who answers the book's tax questions: a Conflict's "Tell" mails them too. */
   mail?: MailContext;
 }
 
-/**
- * Finds the miner's own Assignments behind a book row's overlap and wires the
- * notice's two buttons (issue #4517). Renders nothing without an overlap, or
- * after the miner said they paid it another way.
- *
- * A Conflict day gets `ConflictNotice` instead, whatever was acknowledged: saying
- * "I paid it another way" changes nothing the book bills, so the conflict stays,
- * and hiding its explanation left a pill with no way to find the clashing entry.
- */
 export function CorpOverlapNotice({
   view,
   corpName,
@@ -145,13 +122,11 @@ export function CorpOverlapNotice({
     );
   }
   const declare =
-    // Only while the day a Late notice asked for is still owed: a paid one has nothing to declare.
     onResolve &&
     view.noticeId !== undefined &&
     (view.state === 'billed' || view.declaration !== undefined) ? (
       <CorpDeclareSlot view={view} onResolve={onResolve} />
     ) : undefined;
-  // A declaration goes to the corporation, so the device's own note no longer hides the notice.
   if (!overlap || acked === null || (!declare && acked.has(key))) return null;
 
   return (

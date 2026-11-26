@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bakeDecryptors, bakeInvention, GENERIC_DECRYPTOR_GROUP_ID } from './invention.mjs';
 
-// Rifter Blueprint (691) rows as they stand in Fuzzwork dump 3607705: it
-// manufactures a Rifter (activity 1), copies (5) and invents the Wolf (11372)
-// and Jaguar (11401) blueprints (8). Research rows (3, 4) are left in to show
-// they are ignored.
 const RIFTER_BP = 691;
 const rifterRows = {
   activities: [
@@ -160,13 +156,10 @@ describe('bakeDecryptors', () => {
       [1124, runs],
     ]);
 
-  // In-game values (EVE University wiki, Invention): Accelerant +20% chance,
-  // +2 ME, +10 TE, +1 run; Attainment +80%, -1 ME, +4 TE, +4 runs.
   it('reads chance multiplier, ME, TE and runs off the generic decryptors only', () => {
     const types = [
       decryptor(34201, 'Accelerant Decryptor'),
       decryptor(34202, 'Attainment Decryptor'),
-      // Pre-Crius faction decryptor: still in the dump, no longer in game.
       decryptor(21574, 'Esoteric Accelerant', 731),
       { ...decryptor(34999, 'Unpublished Decryptor'), published: false },
     ];

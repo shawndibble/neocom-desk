@@ -63,7 +63,6 @@ describe('a shared appraisal that carries refine figures', () => {
     const result = appraisalShareViewFromSnapshot(snapshot);
     if (!result.ok) throw new Error('view');
     const { value } = result;
-    // 10 portions x floor(16,000 x 0.9) Pyerite x 10 ISK, at 90%
     expect(value.appraisal.rows[0].refineTotal).toBeCloseTo(10 * 14_400 * 10 * 0.9, 6);
     expect(value.refining).toEqual({ yieldRate: 0.66, taxRate: 0 });
     expect(value.mineralNames.get(35)).toBe('Pyerite');
@@ -89,7 +88,6 @@ describe('a shared appraisal that carries refine figures', () => {
       modifiers: NO_CHARACTER_MODIFIERS,
       refining: { stationRate: 0.5, taxRate: 0.1 },
     });
-    // Scrap-free fixture: no specialisation skill, so only the facility rate applies.
     expect(mine[0].refine?.detail?.efficiency).toBe(0.5);
     expect(mine[0].refine?.valueAtFullPrice).toBeCloseTo(10 * 8000 * 10 * 0.9, 6);
   });

@@ -1,14 +1,3 @@
-/**
- * Vetting settings, for a Director, in four sections: General (on or off, what applicants
- * read), Applicants (minimums, questions, invite-only), Decisions (sign-offs, what a no tells
- * the pilot, the mail and the reviewers' notification) and the Watchlist.
- *
- * Sections follow the app's own Settings page: from `md` a rail of real links beside one section
- * (`/corp/vetting/settings/<section>`), and on a phone, which has no room for a second column,
- * every section in one page under its heading. Text, numbers and ticks are edits to one draft
- * that spans the sections, saved from the `UnsavedChangesBar` as SRP's settings are; turning
- * vetting on or off and the watchlist each save by themselves.
- */
 import { useId, useRef, useState } from 'react';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useTranslation } from 'react-i18next';
@@ -82,7 +71,6 @@ const KINDS: readonly VettingKind[] = ['application', 'promotion'];
 const SIGN_OFF_CHOICES = ['1', '2', '3'] as const;
 const WORDINGS: readonly VettingRejection['wording'][] = ['rejected', 'notNow'];
 
-/** "12 / 600" under a text field with a limit. */
 function Counter({ used, max }: { used: number; max: number }) {
   const { t } = useTranslation();
   return (
@@ -93,16 +81,11 @@ function Counter({ used, max }: { used: number; max: number }) {
 }
 
 interface VettingSettingsViewProps {
-  /** Whose search permission the watchlist's name suggestions run under. */
   characterId: number;
   settings: VettingSettings;
-  /** The section a path below Settings names. A phone shows them all. */
   section: VettingSettingsSection;
-  /** Live invite links, for the count beside the button that opens them. */
   invites: number;
-  /** Saves one change, or the draft; rejects with the server's refusal. */
   onSave: (patch: VettingSettingsPatch) => Promise<void>;
-  /** Opens the invite links, which any reviewer manages from the queue. */
   onManageInvites: () => void;
 }
 
@@ -120,12 +103,10 @@ export function VettingSettingsView({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
-  // The edits not yet saved; null while the form shows what is saved.
   const [draft, setDraft] = useState<VettingSettingsForm | null>(null);
   const [saveFailed, setSaveFailed] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const nextKey = useRef(0);
-  // DESIGN.md §7: an action that removes its own control hands focus to the neighbouring row.
   const focusAfterCommit = useFocusAfterCommit();
   const controls = useRef(new Map<string, HTMLButtonElement>());
   const control = (id: string) => (el: HTMLButtonElement | null) => {
@@ -146,7 +127,6 @@ export function VettingSettingsView({
   const dirty = formIsDirty(form, settings);
   const edited = new Set(dirtySections(form, settings));
 
-  /** One change that saves by itself: on or off, a watchlist entry. */
   const save = async (what: string, change: VettingSettingsPatch): Promise<boolean> => {
     if (busy !== null) return false;
     setBusy(what);
@@ -213,7 +193,6 @@ export function VettingSettingsView({
     },
   ];
 
-  /** Removes one entry; the row goes, so focus moves to the next, the one before, or the list's top. */
   const removeWatch = async (id: number) => {
     const index = settings.watchlist.findIndex((entry) => entry.id === id);
     const next = settings.watchlist[index + 1]?.id;
@@ -406,8 +385,6 @@ export function VettingSettingsView({
                           <span aria-hidden="true">{t('vetting.settings.questions.required')}</span>
                         </label>
                         <span className="flex items-center gap-1">
-                          {/* Inert at either end, never `disabled`: the button a move leaves at
-                              the end keeps keyboard focus. */}
                           <IconButton
                             ref={control(`up:${question.key}`)}
                             icon={<Icon.Ascending size={Icon.ICON_SIZE.sm} />}
@@ -434,7 +411,6 @@ export function VettingSettingsView({
                             label={t('vetting.settings.questions.remove', { n })}
                             onClick={() => {
                               edit(removeQuestion(form, question.key));
-                              // The next question, else the one before, else Add question.
                               focusAfterCommit(
                                 at(`remove:${form.questions[index + 1]?.key}`),
                                 at(`remove:${form.questions[index - 1]?.key}`),
@@ -561,7 +537,6 @@ export function VettingSettingsView({
       </>
     ),
     watchlist: (
-      // Takes focus when the last entry is removed (it has no ring: it is not a control).
       <div ref={watchHeadingRef} className="focus:outline-none">
         <Panel
           title={t('vetting.settings.watchlist.title')}
@@ -592,14 +567,12 @@ export function VettingSettingsView({
               <label htmlFor={`${uid}-watch`} className="block text-xs text-text-dim">
                 {t('vetting.settings.watchlist.addLabel')}
               </label>
-              {/* Picking a suggestion fills the name; the server still resolves it exactly. */}
               <PayeeNameField
                 id={`${uid}-watch`}
                 characterId={characterId}
                 value={name}
                 onChange={setName}
                 onPick={(match) => setName(match.name)}
-                // The Payee form's default placeholder would mislead here.
                 placeholder=""
               />
             </div>
@@ -669,7 +642,6 @@ export function VettingSettingsView({
           </UnsavedChangesBar>
         )}
       </div>
-      {/* The only thing this toast ever reports is a save that went through. */}
       {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
     </div>
   );

@@ -1,8 +1,3 @@
-/**
- * Show Info › Interactions, mail: headers between the viewer's Characters and
- * the other player, read from the Dexie cache only (no new request, no scope,
- * no bodies). The mapping is pure; `mailSource` is the loading around it.
- */
 import type { Interaction } from '@/engine/interactions/interactions';
 import type { MailHeader } from '@/esi/endpoints/mail';
 import type { Translate } from '@/lib/translate';

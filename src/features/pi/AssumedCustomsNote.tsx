@@ -6,10 +6,6 @@ import { PLAN_CUSTOMS_HREF, PLAN_PATH } from './piPlanLink';
 import { customsRatePercent } from './customsRate';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 
-/**
- * Says an ISK figure leans on the assumed customs rate, and sends the pilot to
- * where it is set (Plan's colony customs fields). Renders nothing when no figure is assumed.
- */
 export function AssumedCustomsNote({
   names,
   className,
@@ -18,7 +14,6 @@ export function AssumedCustomsNote({
   className?: string;
 }) {
   const { t } = useTranslation();
-  // Already on Plan: name the question the link opens, not the tab.
   const onPlan = useLocation().pathname.startsWith(PLAN_PATH);
   if (names.length === 0) return null;
   return (

@@ -17,7 +17,6 @@ describe('buildIcsFile', () => {
     expect(ics).toContain('UID:123456@neocom-desk');
     expect(ics).toContain('DTSTAMP:20260901T000000Z');
     expect(ics).toContain('DTSTART:20260903T200000Z');
-    // 90 minutes after 20:00 = 21:30.
     expect(ics).toContain('DTEND:20260903T213000Z');
     expect(ics).toContain('SUMMARY:Fleet Op');
     expect(ics).toContain('DESCRIPTION:Bring T2 fits.');

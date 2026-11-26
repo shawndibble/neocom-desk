@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateShareId, isShareId, SHARE_ID_LENGTH } from './shareId';
 
-/** A byte source that replays a fixed sequence, so an id is predictable. */
 function bytes(...values: number[]) {
   return (length: number) => {
     const out = new Uint8Array(length);
@@ -23,8 +22,6 @@ describe('generateShareId', () => {
   });
 
   it('rejects bytes that would bias the alphabet rather than wrapping them', () => {
-    // 248..255 sit past the last whole multiple of 31 (8 × 31 = 248); taking
-    // them mod 31 would make 0–7 likelier than the rest.
     let call = 0;
     const source = (length: number) => {
       call++;

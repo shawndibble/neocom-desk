@@ -1,19 +1,3 @@
-/**
- * Re-dates `marketOrderFilled` feed rows to the sale that emptied the order.
- *
- * The poll that notices a fill can't date it — ESI never says when an order
- * filled — so `recordFeedNotification` writes the row at the poll's time with
- * a `fillMatch`, and the Alerts page marks it provisional. Each later poll
- * runs this: it reads the wallet transactions, asks `engine/market/fillTime`
- * whether the sale is visible yet, and once it is, moves `firedAt` back to it
- * and stamps `fillSettledAt`. The wallet refreshes hourly, so a row usually
- * settles within the hour.
- *
- * A row settles without a re-date when the answer can never come: the wallet
- * scope is missing or revoked, provably fresh data holds no matching sale, or
- * the row has aged past what the transactions endpoint returns. Leaving those
- * marked provisional would promise an update that is not coming.
- */
 import { DAY_MS } from '@/lib/age';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -26,15 +10,11 @@ import { isProvisionalFill, type ProvisionalFillRow } from './feed';
 
 const WALLET_SCOPE = ESI_REGISTRY.getCharacterWalletTransactions.scope;
 
-/** ESI's transactions endpoint reaches back about a month; a row older than that will never find its sale. */
 const SETTLE_WINDOW_MS = 30 * DAY_MS;
 
-/** What the wallet said, or why it can never say. */
 export type WalletReading =
   | { kind: 'transactions'; rows: readonly FillTransaction[]; fetchedAtMs: number }
-  /** No scope, or the grant was revoked: no later poll will do better. */
   | { kind: 'unavailable' }
-  /** A transient failure — leave everything for the next poll. */
   | { kind: 'retry' };
 
 export interface FillSettlement {
@@ -42,7 +22,6 @@ export interface FillSettlement {
   firedAt: number;
 }
 
-/** Which rows conclude this poll, and the date each settles on. Pure. */
 export function planFillSettlements(
   rows: readonly ProvisionalFillRow[],
   wallet: WalletReading,
@@ -79,7 +58,6 @@ async function readWallet(
   scopes: ReadonlySet<string>
 ): Promise<WalletReading> {
   if (!scopes.has(WALLET_SCOPE)) return { kind: 'unavailable' };
-  // Background at the ESI gate, like every other poll fetch (issue #2271).
   const { cached, needsReauth } = await inBackgroundLane(() =>
     loadWalletTransactionsWithStatus(characterId)
   );
@@ -92,11 +70,6 @@ async function readWallet(
   };
 }
 
-/**
- * One Character's pass. Reads the wallet only when that Character has a
- * provisional row, so the common case costs one indexed Dexie query. Never
- * throws: a failure here must not cost the rest of the poll.
- */
 export async function settleFillTimes(
   characterId: number,
   scopes: ReadonlySet<string>,
@@ -117,17 +90,12 @@ export async function settleFillTimes(
           .where('id')
           .equals(id)
           .modify((row) => {
-            // Never later than it was: `mergeFeedRecord` keeps the earlier date anyway.
             row.firedAt = Math.min(row.firedAt, firedAt);
             row.fillSettledAt = nowMs;
-            // The remote copy is now out of date — clearing this is what makes
-            // `sync/merge.mergeFeed` push the row again.
             delete row.syncedAt;
           });
       }
     });
     scheduleSync(characterId, { collections: ['notificationFeed'] });
-  } catch {
-    // Retried on the next poll: the rows are still provisional.
-  }
+  } catch {}
 }

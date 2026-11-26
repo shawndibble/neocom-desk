@@ -1,13 +1,3 @@
-/**
- * Every write the Build Plan page makes to its own plan, as handlers: plain
- * edits, location moves (which remember the place and recall what the pilot
- * told the app about it), sourcing edits and the craft/buy and Include
- * Reactions toggles. The write itself is `onChange` — `buildPlanStore.ts` owns
- * the Dexie transaction and the sync.
- *
- * Also returns the refs the page's facility-recall effect reads, so that
- * effect and these handlers see the same latest plan.
- */
 import { useEffect, useRef } from 'react';
 import type { BuildPlanRecord } from '@/db';
 import type { IndustryActivity, MaterialSourcing } from '@/engine/industry/types';
@@ -36,17 +26,10 @@ export function usePlanEdits(
     latestOnChange.current = onChange;
   });
 
-  /** A plan edit that is not the pilot choosing a place — see {@link update}. */
   function editPlan(patch: PlanPatch) {
     onChange({ kind: 'edit', patch });
   }
 
-  /**
-   * Every control's edit. One that moves the plan's location — or its
-   * Reaction Location — also remembers the result as where the pilot's next
-   * plan of that activity starts. Edits that touch no location fields
-   * remember nothing, so this is safe for every control on the page.
-   */
   function update(patch: PlanPatch, { moved = false }: { moved?: boolean } = {}) {
     editPlan(patch);
     if (!moved) rememberFacilityFromEdit(patch);
@@ -56,13 +39,6 @@ export function usePlanEdits(
     }
   }
 
-  /**
-   * Saves what the pilot just set for this facility — rigs, tax and the cost
-   * index they typed (the field only exists where ESI has none) — so any other
-   * plan built there starts with it
-   * (`facilityMemory.ts`). A cleared index is forgotten, so a deliberate clear
-   * is not undone by the recall on the next visit.
-   */
   function rememberFacilityFromEdit(patch: PlanPatch) {
     const next = { ...plan, ...patch };
     if ('costIndexOverridePct' in patch && patch.costIndexOverridePct === undefined) {
@@ -78,20 +54,11 @@ export function usePlanEdits(
     if (Object.keys(memory).length > 0) void rememberFacility(next, memory);
   }
 
-  /**
-   * Moves the plan to another place, then fills in what the pilot already told
-   * the app about it. The override is tied to the system it was read for, so it
-   * is dropped first; the recall may bring one back for the new place. Skips
-   * `rememberFacilityFromEdit`: the plan still carries the old place's rigs for
-   * a moment, and filing those under the new one would poison it.
-   */
   function movePlan(patch: PlanPatch) {
     update({ ...patch, costIndexOverridePct: undefined }, { moved: true });
     const place = { ...plan, ...patch };
     const key = facilityMemoryKey(place);
     void recallFacility(place).then((memory) => {
-      // The pilot moved again while this was read: the answer is for a place
-      // they have already left.
       if (!memory || facilityMemoryKey(latestPlan.current) !== key) return;
       update(patchFromMemory(memory, place.facility), { moved: true });
     });
@@ -105,14 +72,6 @@ export function usePlanEdits(
     changeSourcing([{ typeID, patch }]);
   }
 
-  /**
-   * Switches one material between being bought and being produced here.
-   *
-   * The whole list is rewritten rather than the single entry toggled in place,
-   * because it is a plain field on the record — unlike `materialSourcing`,
-   * which is a nested map and so needs the read-modify-write path a
-   * `sourcing` change takes.
-   */
   function toggleBuildHere(typeID: number) {
     const current = plan.buildHere ?? [];
     update({
@@ -122,31 +81,12 @@ export function usePlanEdits(
     });
   }
 
-  /**
-   * Marks several materials as produced here in one write, for the To buy
-   * heading's "build all cheaper parts" link. One `update`, not a loop of
-   * `toggleBuildHere`: each toggle rewrites the list from the same render's
-   * `plan.buildHere`, so a second toggle in the same tick would drop the first.
-   */
   function buildHereAll(typeIDs: readonly number[]) {
     const current = plan.buildHere ?? [];
     const added = typeIDs.filter((id) => !current.includes(id));
     if (added.length > 0) update({ buildHere: [...current, ...added] });
   }
 
-  /**
-   * Include Reactions (issue #698). Turning it on for the first time — no
-   * Reaction Location configured yet — pre-fills the whole Reaction Location
-   * from the remembered reaction default (`reactionFacilityDefaults.ts`), the
-   * place the pilot last set reactions to run. Turning it off only clears the
-   * flag: the Reaction Location itself is left alone, so flipping it back on
-   * doesn't lose whatever the pilot configured.
-   *
-   * Through `editPlan`, not `update`: the pre-fill *is* the remembered
-   * default, so writing it back would only re-stamp it as a fresh choice.
-   * Awaits hydration, so a click that lands before the stored record has
-   * loaded still pre-fills the remembered place, not the built-in default.
-   */
   function toggleIncludeReactions(next: boolean) {
     if (next && plan.reactionFacility === undefined) {
       void loadActivityFacilityDefaults().then(({ reaction: seed }) =>
@@ -155,8 +95,6 @@ export function usePlanEdits(
           reactionFacility: seed.facility,
           reactionRigFit: seed.rigFit,
           reactionFacilityTaxPct: seed.facilityTaxPct ?? undefined,
-          // Only what the record holds: an absent band already reads as
-          // highsec, and an absent system as the hub's.
           ...(seed.security !== undefined ? { reactionSecurity: seed.security } : {}),
           ...(seed.buildSystemId !== undefined && seed.buildSystemName !== undefined
             ? {

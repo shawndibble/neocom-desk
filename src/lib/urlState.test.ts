@@ -352,8 +352,6 @@ describe('defineUrlFilter', () => {
     expect(emptyParams).toEqual({
       'orders.side': null,
       'orders.q': '',
-      // boolParam(true)'s own default, not `false` — the point of deriving
-      // this instead of writing it by hand.
       'orders.hideHealthy': true,
     });
   });

@@ -13,7 +13,6 @@ import { CharacterPermissionStrip } from './CharacterPermissionStrip';
 const TOTAL = COUNTED_PERMISSIONS.length;
 const allScopes = SCOPE_GROUPS.flatMap((group) => [...scopesForGroup(group)]);
 
-/** A Character granting the first `n` Permissions. */
 async function seed(id: number, name: string, n: number) {
   await seedCharacter(id, name, { addedAt: id });
   await seedGrant(

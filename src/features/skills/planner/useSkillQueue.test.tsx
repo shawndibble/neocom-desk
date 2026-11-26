@@ -16,7 +16,6 @@ function result(entries: SkillQueueEntry[]): CachedResult<SkillQueueEntry[]> {
   return { data: entries, fetchedAt: new Date(), fromCache: false, truncated: false };
 }
 
-/** Flush the microtask queue (the mocked loader's resolved promise) without relying on RTL's waitFor, which polls with real timers and hangs under `vi.useFakeTimers()`. */
 async function flush() {
   await act(async () => {
     await Promise.resolve();
@@ -99,7 +98,6 @@ describe('useSkillQueue periodic ESI refetch (#408)', () => {
       renderHook(() => useSkillQueue(1));
       await flush();
       setHidden(true);
-      // Hidden across the 5-minute tick; shown two seconds before the 10-minute one.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10 * 60_000 - 2_000);
       });

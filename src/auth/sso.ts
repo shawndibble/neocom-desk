@@ -1,19 +1,6 @@
-// EVE SSO v2 OAuth endpoints (PKCE, public client).
-// Token endpoint is CORS-open for browser SPAs; it does NOT allow an
-// Authorization header — client_id goes in the form body instead.
-
 const AUTHORIZE_URL = 'https://login.eveonline.com/v2/oauth/authorize';
 const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
 
-/**
- * How long a token-endpoint POST (login exchange or refresh) may take before
- * it's abandoned. Previously unbounded: a request that never got a response
- * (proxy/network stall, not a rejection) left its caller's `await` unsettled
- * forever — `Callback.tsx`'s "Completing login…" spinner, and, via
- * `session.ts`'s `getValidAccessToken` calling `refreshToken`, app boot
- * itself. Exported (and overridable per-call below) only so tests can drive
- * a hang without waiting out the real value.
- */
 const SSO_REQUEST_TIMEOUT_MS = 15_000;
 
 export interface TokenResponse {
@@ -25,13 +12,6 @@ export interface TokenResponse {
 
 export class AuthError extends Error {
   constructor(
-    /**
-     * OAuth error code, e.g. "invalid_grant"; "unknown_error" for a non-2xx,
-     * non-JSON body; "network_error" for a request that never reached a
-     * response at all (offline, DNS, TLS); "timeout" specifically when
-     * `SSO_REQUEST_TIMEOUT_MS` was hit. Only "invalid_grant" means the grant
-     * itself is dead — see `tokenProvider.ts`'s `isTotalAuthFailure`.
-     */
     readonly code: string,
     readonly description: string,
     readonly status: number
@@ -65,11 +45,6 @@ async function postToken(
   body: Record<string, string>,
   timeoutMs: number = SSO_REQUEST_TIMEOUT_MS
 ): Promise<TokenResponse> {
-  // Neither a network failure nor a timeout is proof the grant itself is
-  // bad, so neither must collide with 'invalid_grant' (`tokenProvider.ts`'s
-  // `isTotalAuthFailure` treats only that code as a reason to sign out).
-  // Distinguish them anyway, rather than one generic code, so a genuine
-  // timeout isn't reported the same as being offline.
   const timeoutOrNetworkError = (err: unknown): AuthError => {
     const isTimeout = err instanceof DOMException && err.name === 'TimeoutError';
     return new AuthError(
@@ -94,11 +69,6 @@ async function postToken(
   try {
     json = await res.json();
   } catch (err) {
-    // The same timeout can also fire mid-body-read (headers arrived, then
-    // the body stalled) — that must be reported as a timeout too, not folded
-    // into the generic "body wasn't JSON" fallback below, which would report
-    // a misleading `unknown_error` on whatever status the headers happened
-    // to carry.
     if (err instanceof DOMException && err.name === 'TimeoutError')
       throw timeoutOrNetworkError(err);
     json = null;
@@ -136,7 +106,6 @@ export function refreshToken(opts: {
   refreshToken: string;
   timeoutMs?: number;
 }): Promise<TokenResponse> {
-  // Response may rotate the refresh token — caller must persist the newest one.
   return postToken(
     {
       grant_type: 'refresh_token',

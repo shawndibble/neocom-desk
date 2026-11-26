@@ -6,7 +6,6 @@ import { lineageOf } from './snapshotLineage';
 import type { ReactNode } from 'react';
 
 const load = vi.fn();
-// A spy tracks a rejected promise it returned as unhandled, so a failure is raised outside it.
 let failing = false;
 vi.mock('./goalPlannerSnapshot', () => ({
   loadGoalPlannerSnapshot: (id: number) =>

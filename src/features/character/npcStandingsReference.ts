@@ -1,12 +1,3 @@
-/**
- * What the Standings table reads beside the Character's standings: the pilot's
- * social skills, the NPC corporation data (a corporation's faction, names), the
- * agents data and the stations with the jumps to them. Each is optional: one that cannot be read leaves its part
- * of the table empty rather than guessed (`NpcStandingsReference`).
- *
- * The corporation to faction map is `loadCorporationFactions`, built from
- * `npcCorporations.json`, which holds every NPC corporation.
- */
 import { loadCorporationFactions } from '@/features/standings/corporationFactions';
 import { loadStandingSkills } from '@/features/standings/standingSkills';
 import { loadJumpsFromCurrent } from '@/features/standings/stationJumps';
@@ -29,7 +20,6 @@ export function npcCorporationLookup(
   };
 }
 
-/** `withAgents`: the pilot holds a standing with an agent, so the (large) agents file is worth reading. */
 export async function loadNpcStandingsReference(
   characterId: number,
   withAgents: boolean

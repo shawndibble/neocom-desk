@@ -34,7 +34,6 @@ describe('wallet journal columns', () => {
     const blocks = container.querySelectorAll('span[class~="max-sm:block"]');
     expect(blocks).toHaveLength(2);
     expect(blocks[0].textContent).not.toBe(blocks[1].textContent);
-    // Desktop reads as the unsplit timestamp.
     expect(container.textContent).toBe(
       new Date(entry.date).toLocaleString(undefined, {
         year: 'numeric',

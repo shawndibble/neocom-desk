@@ -1,13 +1,5 @@
-/**
- * Folding identical blueprint copies into one phone card. Two BPCs of the
- * same print, owned by the same pilot, sitting in the same place with the
- * same research and runs left price identically and act identically, so the
- * phone lists show them once with a count. Anything that tells them apart
- * (location, ME/TE, runs, owner) keeps them as separate cards.
- */
 import type { CharacterBlueprint } from '@/esi/endpoints';
 
-/** `ownerKey` is the caller's own owner identity (a Character id, or corp). */
 export function identicalBlueprintKey(ownerKey: string, blueprint: CharacterBlueprint): string {
   return [
     ownerKey,
@@ -20,13 +12,10 @@ export function identicalBlueprintKey(ownerKey: string, blueprint: CharacterBlue
 }
 
 export interface IdenticalGroup<T> {
-  /** The row the card renders from — the group's first in input order. */
   first: T;
-  /** Every row in the group, `first` included, in input order. */
   members: readonly T[];
 }
 
-/** Groups in the order each key first appears, so a sorted input stays sorted. */
 export function groupIdentical<T>(
   rows: readonly T[],
   keyOf: (row: T) => string

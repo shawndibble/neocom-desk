@@ -8,10 +8,6 @@ import { loadRequirementsForTypes } from './skillRequirements';
 
 export type FittingGap = CharacterFlyGap & { names: ReadonlyMap<number, string> };
 
-/**
- * `unloaded`: the Character's /skills read failed. `unconfirmed`: they miss
- * nothing known, but some of the Fitting's requirements couldn't be looked up.
- */
 export type FittingGapAnswer =
   { state: 'ready'; gap: FittingGap } | { state: 'unconfirmed' } | { state: 'unloaded' };
 
@@ -19,13 +15,11 @@ const gapCache = new WeakMap<Fitting, Map<number, FittingGapAnswer>>();
 
 async function computeGap(fitting: Fitting, characterId: number): Promise<FittingGapAnswer> {
   const now = Date.now();
-  // Both loads read ESI's cache, so the skills are fetched once.
   const [corrected, requirements, inputs] = await Promise.all([
     loadCorrectedSkills(characterId, now),
     loadRequirementsForTypes(fittingRequirementTypeIds(fitting)),
     loadPlanScheduleInputs(characterId, now),
   ]);
-  // An empty skill map would read as "missing everything".
   if (corrected.skillsResult == null) return { state: 'unloaded' };
   const { missing } = computeSkillGaps(fitting, requirements.byType, corrected.effective);
   if (missing.length === 0 && requirements.unknownTypeIds.length > 0) {
@@ -52,11 +46,6 @@ async function computeGap(fitting: Fitting, characterId: number): Promise<Fittin
   return { state: 'ready', gap: { ...gap, names } };
 }
 
-/**
- * The Character's own missing skills for the Fitting and the time to train
- * them, scheduled like "What to train". Only `ready` answers are cached, so
- * an unreadable one retries on the next call.
- */
 export async function fittingGapForCharacter(
   fitting: Fitting,
   characterId: number
@@ -70,7 +59,6 @@ export async function fittingGapForCharacter(
   return answer;
 }
 
-/** The cached answer, if this Fitting + Character was already worked out; never starts a load. */
 export function cachedFittingGap(fitting: Fitting, characterId: number): FittingGapAnswer | null {
   return gapCache.get(fitting)?.get(characterId) ?? null;
 }

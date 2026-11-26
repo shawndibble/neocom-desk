@@ -20,44 +20,17 @@ interface PlanHeaderProps {
   totalSeconds: number;
   skillCount: number;
   projectedFinish: Date | null;
-  /** null when the plan has no valid entries to optimize. */
   badge: OptimizationBadge | null;
-  /**
-   * The soonest not-yet-reached Plan Milestone (GLOSSARY.md), or null when the
-   * plan has none still ahead — a reached or orphaned one never shows here
-   * (`engine/skillPlanMilestones.ts`'s `nextMilestone`).
-   */
   nextMilestone: { name: string; finish: Date } | null;
-  /** Share of the plan already trained; omitted by callers with no plan basis. */
   progress?: PlanProgress;
-  /**
-   * The What-If Implants lens against the clone's real implants; omitted or
-   * null while the plan is costed on the real implants.
-   */
   whatIf?: { lens: string; verdict: WhatIfVerdict } | null;
-  /**
-   * True when the what-if implants made the remap saving smaller than it is
-   * on the real ones; adds a "?" tooltip saying why (`remapSavingsShrank`).
-   */
   savingsShrankWithImplants?: boolean;
-  /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
-  /**
-   * The open plan's name; when given it replaces the generic panel title. Editable
-   * only when `onRename` is too — beside the plan list (wide screens) renaming lives
-   * in that list's row menu, so the header shows plain text there.
-   */
   name?: string;
   onRename?: (name: string) => void;
-  /** Focus (and select) the name field on mount, for a plan just created. */
   focusName?: boolean;
 }
 
-/**
- * Plan-at-a-glance header: total time, skill count, projected finish, a live
- * remap-savings badge, the next Plan Milestone still ahead, and the what-if
- * lens's gain or loss.
- */
 export function PlanHeader({
   totalSeconds,
   skillCount,
@@ -75,8 +48,6 @@ export function PlanHeader({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const nameRef = useRef<HTMLInputElement>(null);
-  // null while not editing, so the field shows `name` itself and follows a
-  // rename made elsewhere (the list) or a switch to another plan.
   const [draftName, setDraftName] = useState<string | null>(null);
   useEffect(() => {
     if (!focusName) return;
@@ -94,14 +65,6 @@ export function PlanHeader({
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
 
   return (
-    // Still pinned, but now the *only* pinned thing on the page, so its
-    // offset is a plain `top-0` rather than a number measured off a
-    // neighbour. The entry list has its own cap, yet the window can still
-    // scroll when the sidebar beside it outgrows the viewport (a long plan
-    // list plus an expanded optimize result) — and this strip is the plan's
-    // headline numbers, which should survive that. What retires #221/#229 is
-    // that there is no second sticky panel below needing this one's rendered
-    // height; nothing here has to stay in sync with anything.
     <Panel
       title={name === undefined || !onRename ? (name ?? t('plans.headerTitle')) : undefined}
       leading={

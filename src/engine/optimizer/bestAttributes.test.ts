@@ -33,14 +33,13 @@ describe('bestAttributes', () => {
 
   it('maxes primary then secondary for a single attribute pair', () => {
     const skills = skillMap(skill(1, 'perception', 'willpower'));
-    const steps: PlanStep[] = [{ skillTypeID: 1, level: 1 }]; // 250 SP
+    const steps: PlanStep[] = [{ skillTypeID: 1, level: 1 }];
     const { attributes, seconds } = bestAttributes(steps, skills);
     expect(attributes.perception).toBe(27);
     expect(attributes.willpower).toBe(21);
     expect(attributes.intelligence).toBe(17);
     expect(attributes.memory).toBe(17);
     expect(attributes.charisma).toBe(17);
-    // 250 SP at 27 + 21/2 = 37.5 SP/min -> 400 s
     expect(seconds).toBeCloseTo(400, 9);
   });
 
@@ -48,7 +47,6 @@ describe('bestAttributes', () => {
     const skills = skillMap(skill(1, 'perception', 'willpower'));
     const steps: PlanStep[] = [{ skillTypeID: 1, level: 1 }];
     const { seconds } = bestAttributes(steps, skills, { perception: 5 });
-    // 250 SP at (27+5) + 21/2 = 42.5 SP/min
     expect(seconds).toBeCloseTo((250 / 42.5) * 60, 9);
   });
 
@@ -85,7 +83,6 @@ describe('bestAttributes', () => {
     const implants = { memory: 3 };
     const { seconds } = bestAttributes(steps, skills, implants);
 
-    // Independent brute force: sp per pair is 1415 (perc/will, rank 1 to L2) + 500 (int/mem rank 2 L1).
     let best = Infinity;
     for (let i = 0; i <= 10; i++)
       for (let m = 0; m <= 10; m++)
@@ -101,8 +98,6 @@ describe('bestAttributes', () => {
   });
 
   it('shifts the optimum when implants change relative marginal value', () => {
-    // Two pairs with equal SP; heavy implants on int/mem lower the marginal
-    // value of allocating there, pushing points toward perception/willpower.
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory')
@@ -125,7 +120,6 @@ describe('bestAttributes with Boosters', () => {
   const START = new Date('2026-08-30T00:00:00Z');
   const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);
 
-  // Two pairs so the optimizer has a real trade-off to get wrong.
   const skills = skillMap(
     skill(1, 'perception', 'willpower', 5),
     skill(2, 'intelligence', 'memory', 5)
@@ -154,9 +148,6 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('treats a Booster outlasting the whole segment exactly like a permanent implant', () => {
-    // The uniform case: every step trains at the boosted rate, so the answer
-    // must match folding the bonus into implants. This is also the branch
-    // that must NOT fall into the slow walk.
     const bonus = { intelligence: 8, memory: 8, perception: 8, willpower: 8, charisma: 8 };
     const asImplants = bestAttributes(steps, skills, bonus);
     const asBooster = bestAttributes(
@@ -184,10 +175,6 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('agrees with computeSchedule for the allocation it picks', async () => {
-    // The load-bearing test: the optimizer's own seconds must equal what the
-    // shipped scheduler produces for the same attributes, implants and
-    // Booster. If the two ever diverge, the planner shows one number and the
-    // optimizer optimizes another — which is the D6 defect in a new place.
     const { computeSchedule } = await import('@/engine/schedule');
     const bonus = { intelligence: 12, perception: 12 };
     const boosters = [{ bonus, expiresAt: after(4000) }];
@@ -203,11 +190,6 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('agrees with computeSchedule when two Boosters expire at different times', async () => {
-    // Same load-bearing check as above, but for the piecewise case: two
-    // Boosters with different expiries. `computeSchedule` already tracks each
-    // Booster's own liveness independently (`attributeAt` in schedule.ts), so
-    // this is the cross-check that the optimizer's new piecewise walk landed
-    // on the same semantics rather than a second, disagreeing model of it.
     const { computeSchedule } = await import('@/engine/schedule');
     const boosters = [
       { bonus: { intelligence: 12 }, expiresAt: after(2000) },
@@ -225,17 +207,11 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('can choose a different allocation than it would without the Booster', () => {
-    // A Booster large enough on one pair should pull the optimum away from
-    // the unboosted choice; if it never does, the parameter is decorative.
     const lopsided: PlanStep[] = [
       { skillTypeID: 1, level: 3 },
       { skillTypeID: 2, level: 5 },
     ];
     const plain = bestAttributes(lopsided, skills);
-    // Read straight away. On Node 24.22.2 CI (#6256) a result object's `seconds` read back
-    // as a *later* call's value after other work ran, while the value read at return was right
-    // (as #3074 saw). The engine is pure and nothing writes to a returned result, so the test
-    // keeps the figure it was handed rather than re-reading the object.
     const plainSeconds = plain.seconds;
     const boosted = bestAttributes(
       lopsided,
@@ -253,9 +229,6 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('pins exact single-Booster seconds and attributes (regression against the piecewise walk)', () => {
-    // Locked to pre-piecewise-refactor output at double precision: the single
-    // Booster path must stay bit-identical once the walk generalizes to carry
-    // more than one Booster's worth of breakpoints.
     const midExpiry = bestAttributes(
       steps,
       skills,
@@ -322,15 +295,6 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('credits two Boosters with different expiries each for their own lifetime', () => {
-    // The bug: stacking both bonuses until the EARLIEST expiry, then dropping
-    // to zero, undercredits the longer-lived Booster for the time between the
-    // two expiries. The fix must land in that gap: better than crediting
-    // neither bonus there, and no better than crediting both (which would
-    // mean the short Booster's own expiry was ignored).
-    //
-    // A single intelligence/memory pair, sized so unboosted training runs well
-    // past both expiries — long enough for all three regimes (both boosted,
-    // long-only, neither) to actually be walked in every scenario below.
     const pairSkills = skillMap(skill(1, 'intelligence', 'memory', 5));
     const pairSteps: PlanStep[] = [{ skillTypeID: 1, level: 4 }];
     const shortBonus = { intelligence: 6 };
@@ -350,8 +314,6 @@ describe('bestAttributes with Boosters', () => {
         startDate: START,
       }
     );
-    // Undercrediting comparator: exactly what today's earliest-cutoff bug
-    // computes — both bonuses stacked until the short one lapses, then zero.
     const undercredited = bestAttributes(
       pairSteps,
       pairSkills,
@@ -364,8 +326,6 @@ describe('bestAttributes with Boosters', () => {
         startDate: START,
       }
     );
-    // Overcrediting comparator: as if the long bonus alone ran the full
-    // long-Booster window with no early loss of the short one's contribution.
     const fullyBoth = bestAttributes(
       pairSteps,
       pairSkills,
@@ -383,9 +343,6 @@ describe('bestAttributes with Boosters', () => {
   });
 
   it('honours a segment that starts partway through the Booster window', () => {
-    // placeRemaps evaluates later segments that begin after earlier ones have
-    // trained, so a segment's remaining Booster life is shorter than the
-    // Booster's total life. Same Booster, later start = less benefit.
     const bonus = { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 };
     const expiresAt = after(6000);
     const early = bestAttributes(
@@ -429,7 +386,6 @@ describe('bestAttributes with Boosters', () => {
     const total = scheduled[scheduled.length - 1].cumulativeSeconds;
     expect(result.seconds).toBeCloseTo(total, 6);
 
-    // The deferred Booster must not be as good as one live from t=0.
     const immediate = bestAttributes(
       steps,
       skills,
@@ -464,7 +420,6 @@ describe('allocationCostTable', () => {
   );
 
   it('covers every legal remap spread', () => {
-    // 14 free points over 5 attributes, none above 10: C(18,4) - 5*C(7,4).
     expect(allocationCostTable(['intelligence|memory']).count).toBe(2885);
   });
 
@@ -492,8 +447,6 @@ describe('allocationCostTable', () => {
   });
 
   it('agrees with bestAttributesForPairs on the winning spread', () => {
-    // The table is only useful if summing sp x secondsPerSp reproduces the
-    // brute force. Same optimum, same attributes, to float tolerance.
     const spByPair = new Map([
       ['intelligence|memory', 500_000],
       ['perception|willpower', 120_000],

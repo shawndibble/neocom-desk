@@ -1,9 +1,3 @@
-/**
- * Columns of the LP Store landing's two tables (`lpLanding.ts`). Each table
- * has two fixed columns (its identity and its ranking figure, the latter the
- * phone card's corner) and optional ones the column picker controls. Cells
- * hold plain text: the row's click opens the store (DESIGN.md §6c Restraint).
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTableDenseCell, IskAmount, type DataTableColumn } from '@/components/ui';
@@ -33,13 +27,9 @@ export function useLpLandingStoreColumns({
 }: {
   systemName: (systemId: number) => string | null;
   factionName: (factionId: number) => string | null;
-  /** Distances resolved; until then a store without one is unknown, not unreachable. */
   distancesKnown: boolean;
-  /** Offers are still being priced, so no store has a best offer yet. */
   pricing: boolean;
-  /** LP Values are still being worked out. */
   valuing: boolean;
-  /** The pilot's own LP Value (0 = each store's), so a balance's worth matches the summary's. */
   ownLpValue: number;
 }) {
   const { t } = useTranslation();
@@ -51,7 +41,6 @@ export function useLpLandingStoreColumns({
       minWidth: '13rem',
       sortValue: (row) => row.name,
       render: (row) => {
-        // An unread faction list leaves the caption blank rather than saying "No faction".
         const faction =
           row.factionId === null ? t('loyaltyStore.landing.noFaction') : factionName(row.factionId);
         return (
@@ -210,7 +199,6 @@ function concordRateOf(row: LpLandingStore) {
   return concordRate({ id: row.corporationId, factionId: row.factionId ?? undefined });
 }
 
-/** The store's LP Value per CONCORD LP; null with no exchange or no LP Value. */
 function concordValue(row: LpLandingStore): number | null {
   const rate = concordRateOf(row);
   return rate === null ? null : iskPerConcordLp(row.lpValue, rate.rate);
@@ -249,7 +237,6 @@ export function useLpLandingOfferColumns({
         id: 'store',
         header: t('loyaltyStore.landing.colStore'),
         minWidth: '11rem',
-        // By distance, nearest first: a searched item lists its closest seller on top.
         sortValue: (offer) => offer.store.nearest?.jumps,
         sortFirst: 'asc',
         render: ({ store }) => (
@@ -278,7 +265,6 @@ export function useLpLandingOfferColumns({
               {t('loyaltyStore.landing.turnInsNone')}
             </span>
           ) : (
-            // desktopOnly: no tap-reveal, so a click here opens the store like the rest of the row.
             <HintText
               desktopOnly
               content={row.requiredItems
@@ -295,7 +281,6 @@ export function useLpLandingOfferColumns({
         align: 'right',
         width: '11ch',
         headerClassName: 'whitespace-nowrap',
-        // Unavailable sorts last, apart from a real zero.
         sortValue: (offer) => offer.row.sellsPerDay ?? undefined,
         sortFirst: 'desc',
         cellClassName: () => 'tabular-nums',

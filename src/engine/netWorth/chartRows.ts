@@ -1,8 +1,3 @@
-/**
- * Chart-ready rows for the net worth chart (issue #2935): one stacked row per
- * day for a single Character, one value per Character per day for several.
- * Pure; the Recharts component only draws what these say.
- */
 import { DAY_MS } from '@/lib/age';
 import { utcDay } from './snapshot';
 import {
@@ -16,10 +11,8 @@ import {
 
 export interface StackRow {
   day: string;
-  /** UTC midnight, epoch ms — the numeric x axis. */
   x: number;
   kind: PointKind;
-  /** True when the day has no snapshot and the layers are a guess. */
   estimated: boolean;
   values: LayerValues;
   total: number;
@@ -27,14 +20,12 @@ export interface StackRow {
 
 const ZERO: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0, contracts: 0 };
 
-/** A day before the first record: the first row's layers, drawn as a guess. */
 export const guessStackRow = (first: StackRow): StackRow => ({
   ...first,
   kind: 'wallet-only',
   estimated: true,
 });
 
-/** Days with no snapshot are drawn from `estimateLayers` and flagged `estimated`. */
 export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): StackRow[] {
   const estimates = estimateLayers(series.points);
   return series.points.map((point, i) => {
@@ -55,13 +46,6 @@ export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): S
   });
 }
 
-/**
- * Exactly the last `days` days of rows, counted back from the newest row. Rows
- * are daily and ascending. A series that starts later than the window is
- * extended back to it with copies of its first row (`guess` marks them), so the
- * chart always spans the range picked and the stretch before any record reads
- * as a guess from the first entry.
- */
 export function lastDays<R extends { day: string; x: number }>(
   rows: readonly R[],
   days: number,
@@ -80,16 +64,10 @@ export function lastDays<R extends { day: string; x: number }>(
 
 export type LineRow = { day: string; x: number } & Record<string, number | string | null>;
 
-/** Key of a Character's value in a `LineRow`. */
 export function lineKey(characterId: number): string {
   return `c${characterId}`;
 }
 
-/**
- * Per-Character net worth by day. A day with no snapshot plots the estimate
- * from `estimateLayers`, so a missed day joins its neighbours instead of
- * dipping to the wallet alone.
- */
 export function lineRows(
   seriesById: ReadonlyMap<number, CharacterSeries>,
   shown: readonly LayerId[]
@@ -119,16 +97,10 @@ export function lineRows(
 
 export interface TooltipLine<L> {
   line: L;
-  /** The line's position in the chart's own order: what picks its colour and dash. */
   colorIndex: number;
   value: number | null;
 }
 
-/**
- * One day's tooltip entries, highest value first so the list reads in the
- * order the dots stack. Ties keep chart line order; Characters with no point
- * that day go last.
- */
 export function tooltipLines<L extends { characterId: number }>(
   row: LineRow,
   lines: readonly L[]

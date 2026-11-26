@@ -213,7 +213,6 @@ describe('learnedSystemsOf', () => {
         refinerySystems: { [String(TATARA)]: 30002187, [String(ATHANOR)]: 30000142 },
         refineryStructures: {
           [String(TATARA)]: { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: 1 },
-          // A refused lookup carries no system: the learned one stays.
           [String(ATHANOR)]: { checkedAt: 1, denied: true },
         },
       },

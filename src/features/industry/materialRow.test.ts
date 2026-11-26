@@ -3,7 +3,6 @@ import { materialCostLines } from '@/engine/industry/sourcing';
 import type { HubPrices, MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
 import { buyPricedLine, materialRowState } from './materialRow';
 
-/** Built through the engine so a fixture can never claim a cost line the engine wouldn't produce. */
 function line(quantity: number, hubPrices: HubPrices, sourcing?: MaterialSourcingMap) {
   const material: MaterialCostLine = materialCostLines(
     [{ typeID: 34, baseQuantity: quantity, quantity }],
@@ -31,8 +30,6 @@ describe('materialRowState', () => {
   });
 
   it('still reports an override that happens to equal the hub price', () => {
-    // The tag cannot be derived by comparing numbers — this is why the raw
-    // overrides are read rather than the resolved unit price.
     expect(line(1000, { 34: 5 }, { 34: { overridePrice: 5 } })().priceSource).toBe('override');
   });
 
@@ -96,8 +93,6 @@ describe('buyPricedLine', () => {
   });
 
   it('gives a row being built the price it would have been bought at', () => {
-    // What `resolveMaterial` produces for a built material: no unit price,
-    // because it isn't bought at one.
     const built: MaterialCostLine = { ...material, unitPrice: null, lineCost: 0 };
 
     expect(buyPricedLine(built, undefined, { 34: 5 }).unitPrice).toBe(5);

@@ -1,6 +1,3 @@
-/**
- * Picks the backend (`override ?? real`) at call time so the public signature stays the op's own.
- */
 export const delegate =
   <B extends object>(backend: () => B) =>
   <K extends keyof B>(op: K) =>

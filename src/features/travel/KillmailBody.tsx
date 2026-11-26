@@ -1,8 +1,3 @@
-/**
- * One killmail's expanded body: the victim's fit with Open in Fittings, and for
- * a loss what it cost (`LossSummary`). Shared by Pilot Lookup's rows and the
- * Wallet's insurance-payout modal, so the two can never drift apart.
- */
 import { useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +21,6 @@ interface KillmailBodyProps {
   detail: KillmailDetail | null;
   read: Expanded | undefined;
   typeLabel: TypeLabel | null;
-  /** The body's wrapper; the row gives it an id and a border, the modal neither. */
   className?: string;
   id?: string;
 }

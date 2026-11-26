@@ -11,21 +11,14 @@ import { useBook } from './useBook';
 
 const k = (key: string) => `corpTaxBook.moons.setupChecklist.${key}`;
 
-/** Per viewer and device: a convenience, so `localStorage` (one key per book). */
 const dismissedKey = (corporationId: number) =>
   `corpTaxBook.setupChecklistDismissed:${corporationId}`;
 
-/** Where each step is done: a Settings tab. */
 const SETTINGS_TAB: Partial<Record<SetupStep['id'], SettingsTab>> = {
   rate: 'rates',
   autoSync: 'access',
 };
 
-/**
- * "Set up the book" on the Overview: a short checklist for an officer who can edit,
- * shown until every step is done or it is dismissed. Each step is read off the book the page
- * already holds; a step to do carries the one button that goes where it is done.
- */
 export function SetupChecklist() {
   const { t } = useTranslation();
   const { view, names, data, canEdit, corporationId, openSettings } = useBook();
@@ -45,7 +38,6 @@ export function SetupChecklist() {
     });
   }, [view, names, data.scheduledSync]);
 
-  // Done once is done for good: a schedule that stops later is the health strip's to say.
   useEffect(() => {
     if (canEdit && list.complete) writeLocal(dismissedKey(corporationId), 'done');
   }, [canEdit, list.complete, corporationId]);
@@ -59,7 +51,6 @@ export function SetupChecklist() {
   const action = (step: SetupStep) => {
     if (step.state !== 'todo') return null;
     const tab = SETTINGS_TAB[step.id];
-    // The page's own settings dialog; outside the page (a story) the step has no button.
     if (tab) {
       if (!openSettings) return null;
       return (
@@ -113,12 +104,10 @@ export function SetupChecklist() {
                     <span className="size-4 rounded-full border border-line-bright" />
                   )}
                 </span>
-                {/* A phone drops the button under the words, never squeezing them. */}
                 <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
                   <span className="min-w-0 flex-1 basis-60">
                     <span className={cx('block', done && 'text-text-dim')}>
                       {t(k(`${step.id}.title`))}
-                      {/* The visible note already says "Checking…". */}
                       {step.state !== 'checking' && (
                         <span className="sr-only"> {t(k(done ? 'stateDone' : 'stateTodo'))}</span>
                       )}

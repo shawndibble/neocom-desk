@@ -22,12 +22,6 @@ import {
 
 const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
 
-/**
- * Every problem worth a funnel chip. The same set a deep link may name, and
- * deliberately the same constant: the funnel and the URL are two ways to reach
- * one filter, and `healthy` is excluded from both for the reason
- * `FILTERABLE_PROBLEMS` gives.
- */
 const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
 
 const EXPIRING_WITHIN_DAY_OPTIONS = [3, 7, 14, 30] as const;
@@ -41,7 +35,6 @@ interface OpenOrdersFilterFieldsProps {
   showLocationFilter: boolean;
 }
 
-/** The funnel box's fields: side, problems, cost basis, expiry, size, location, sort. */
 export function OpenOrdersFilterFields({
   draft,
   setDraft,
@@ -85,11 +78,6 @@ export function OpenOrdersFilterFields({
                 label={t(`market.orders.group.${problem}`)}
                 count={count}
                 selected={selected}
-                // A zero-count problem still renders, still a real
-                // focusable button, so the player can see it's clean
-                // rather than wonder where it went — the `0` itself
-                // is the cue; no `opacity-50` fade below AA on top of
-                // it (issue #1491).
                 onToggle={() =>
                   setDraft({
                     ...draft,

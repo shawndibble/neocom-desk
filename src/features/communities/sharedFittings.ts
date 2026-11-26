@@ -1,15 +1,3 @@
-/**
- * Shared Fittings client (issue #3605, ADR 0018): a Member copies a Fitting's
- * Fitting Share Code into a Community, and every Member reads them from that
- * Community's `fittings` collection. Rules gate reads by membership and writes
- * by the owning Character (`firestore.rules`); leaving or removal deletes them
- * server-side. Everything here is best-effort and never throws into the
- * caller's own save or delete — a share that fails to follow a re-save is the
- * one thing worse than a stale copy, and the stale copy is only until the next
- * save.
- *
- * Firestore here is the `lite` build (no listeners), so callers refetch.
- */
 import {
   collection,
   deleteDoc,
@@ -48,12 +36,10 @@ import {
 } from './communityStore';
 import { MINUTE_MS } from '@/lib/age';
 
-/** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
 const MAX_CODE_LENGTH = 90_000;
 const MAX_NAME_LENGTH = 200;
 const BATCH_SIZE = 400;
 
-/** What a Member pushes for one Fitting: its row in the library, and the code that opens it. */
 export interface SharedFittingInput extends SharedFittingKey {
   name: string;
   code: string;
@@ -63,7 +49,6 @@ function fittingsOf(db: Firestore, communityId: string) {
   return collection(db, 'communities', communityId, 'fittings');
 }
 
-/** The hull's name for a Fitting Share Code; null when the code no longer decodes. */
 export async function hullNameForCode(code: string): Promise<string | null> {
   const decoded = await decodeFittingShare(code);
   if (!decoded.ok) return null;
@@ -93,19 +78,11 @@ async function toDoc(characterId: number, input: SharedFittingInput) {
   };
 }
 
-/**
- * How long `loadCommunityFittingsCached` reuses a Community's shared Fittings. This
- * device's own shares and unshares drop it at once; another Member's show within it.
- */
 export const SHARED_FITTINGS_TTL_MS = 10 * MINUTE_MS;
 
 const fittingsCache = createReadCache<SharedFitting[]>();
 const fittingsKey = (characterId: number, communityId: string) => `${characterId}:${communityId}:`;
 
-/**
- * Runs a write to a Community's shared Fittings, then drops that cached list: after the
- * write, so a read that was in flight during it is dropped too, and even when it failed.
- */
 async function changingFittings<T>(
   characterId: number,
   communityId: string,
@@ -118,7 +95,6 @@ async function changingFittings<T>(
   }
 }
 
-/** Every Fitting shared into one Community, by anyone, read now (and remembered). */
 export async function loadCommunityFittings(
   characterId: number,
   communityId: string
@@ -132,10 +108,6 @@ export async function loadCommunityFittings(
   );
 }
 
-/**
- * As `loadCommunityFittings`, reused for `SHARED_FITTINGS_TTL_MS`: the Fittings start screen
- * and the editor's share status open often and change rarely.
- */
 export async function loadCommunityFittingsCached(
   characterId: number,
   communityId: string,
@@ -177,7 +149,6 @@ async function readCommunityFittings(
   return loaded;
 }
 
-/** The Fittings (by `fittingChoiceKey`) this Character has shared into one Community. */
 export async function loadMySharedFittingKeys(
   characterId: number,
   communityId: string
@@ -206,7 +177,6 @@ export async function loadMySharedFittingKeys(
   return keys;
 }
 
-/** The Communities this Character is in, every Fitting shared into each, and who (by uid) shared them. */
 export async function loadSharedFittings(characterId: number): Promise<{
   communities: CommunitySummary[];
   fittings: SharedFitting[];
@@ -227,13 +197,11 @@ export async function loadSharedFittings(characterId: number): Promise<{
   });
 }
 
-/** The Communities this Character is in, and which of them already hold this one Fitting. */
 export async function loadShareStatus(
   characterId: number,
   key: SharedFittingKey
 ): Promise<{ communities: CommunitySummary[]; sharedIn: Set<string> }> {
   const docId = sharedFittingId(uidForCharacter(characterId), key);
-  // From the Community's shared list, which this device's own shares keep current.
   return withMyCommunities(characterId, async (communities) => {
     const held = await Promise.all(
       communities.map(async (community) =>
@@ -251,10 +219,8 @@ export async function loadShareStatus(
   });
 }
 
-/** What toggling a Fitting in a Community did, for the notice it leaves. */
 export type ShareOutcome = 'shared' | 'unshared' | 'cannot' | 'failed';
 
-/** Shares the Fitting if it is not in the Community yet, unshares it if it is. Never throws. */
 export async function toggleShare(
   characterId: number,
   communityId: string,
@@ -280,7 +246,6 @@ export async function toggleShare(
   }
 }
 
-/** Shares (or replaces) one Fitting in one Community. False when it can't be shared (unreadable or too large). */
 export async function shareFitting(
   characterId: number,
   communityId: string,
@@ -323,7 +288,6 @@ export async function unshareFitting(
   );
 }
 
-/** Shares many at once ("share all my Fittings"); returns how many went up. */
 export async function shareFittings(
   characterId: number,
   communityId: string,
@@ -354,7 +318,6 @@ export async function shareFittings(
   return docs.length;
 }
 
-/** Stops sharing every Fitting this Character put in one Community. */
 export async function unshareAllFittings(characterId: number, communityId: string): Promise<void> {
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
@@ -368,7 +331,6 @@ export async function unshareAllFittings(characterId: number, communityId: strin
   });
 }
 
-/** The logout prompt's "remove my shared Fittings": every Community, best effort per Community. */
 export async function unshareAllFittingsEverywhere(characterId: number): Promise<void> {
   const communities = await loadMyCommunities(characterId);
   await Promise.allSettled(
@@ -376,11 +338,6 @@ export async function unshareAllFittingsEverywhere(characterId: number): Promise
   );
 }
 
-/**
- * A saved Fitting was re-saved: pushes the new code and time to every
- * Community it is already shared to. Never throws; skipped when this device
- * has no sync set up (a Character signed in nowhere shared nothing).
- */
 export async function followSavedFitting(
   characterId: number,
   record: { id: string; name: string; code: string }
@@ -392,8 +349,6 @@ export async function followSavedFitting(
     });
     await ensureSignedIn(characterId);
     const db = getSyncFirestore(characterId);
-    // The list may be cached; each copy's existence is read fresh, so one deleted on another
-    // device is never brought back.
     await withMyCommunities(characterId, (communities) =>
       Promise.all(
         communities.map(async (community) => {
@@ -402,7 +357,6 @@ export async function followSavedFitting(
             getDoc(doc(fittingsOf(db, community.id), docId)),
             loadFittingsAll(characterId, community.id),
           ]);
-          // Deleted since this save began: don't bring it back.
           if (
             followsSave(existing.exists(), allExcluded, key) &&
             (await localDb.fittings.get(record.id))
@@ -416,12 +370,9 @@ export async function followSavedFitting(
         })
       )
     );
-  } catch {
-    // Best effort: the copy stays as it was until the next save.
-  }
+  } catch {}
 }
 
-/** A saved Fitting was deleted: removes its shared copies from every Community. Never throws. */
 export async function unshareDeletedFitting(characterId: number, fittingId: string): Promise<void> {
   try {
     const communities = await loadMyCommunities(characterId);
@@ -430,7 +381,5 @@ export async function unshareDeletedFitting(characterId: number, fittingId: stri
         unshareFitting(characterId, community.id, { source: 'saved', key: fittingId })
       )
     );
-  } catch {
-    // Best effort; the Community's own cleanup on leave still removes it.
-  }
+  } catch {}
 }

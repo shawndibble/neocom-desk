@@ -1,24 +1,13 @@
-/**
- * Mutaplasmids and mutated items, pure (GLOSSARY **Mutated module**,
- * **Mutaplasmid**, **Roll**, **Abyssal type**); the data is handed in by
- * `features/abyssal/mutaplasmidData.ts`. Many bases share one abyssal type
- * (every heavy neutralizer makes the same one), so the type never names its base.
- */
 import type { MutaplasmidAttributeRange, MutaplasmidData } from '@/sde/types';
 import type { Fitting, ItemMutation } from './types';
 
-/** One mutaplasmid, as the lookup hands it out. */
 export interface Mutaplasmid {
   typeId: number;
-  /** The abyssal type it makes. */
   resultTypeId: number;
-  /** The base types it applies to, ascending. */
   baseTypeIds: readonly number[];
-  /** What it rolls: multiplier ranges on the base's own value, by attribute id ascending. */
   attributes: readonly MutaplasmidAttributeRange[];
 }
 
-/** An attribute's roll range in absolute values, `min <= max`. */
 export interface RollRange {
   min: number;
   max: number;
@@ -26,24 +15,13 @@ export interface RollRange {
 }
 
 export interface MutaplasmidLookup {
-  /** An abyssal (mutated) type: what some mutaplasmid produces. */
   isAbyssalType(typeId: number): boolean;
   mutaplasmid(typeId: number): Mutaplasmid | undefined;
-  /** Every mutaplasmid that applies to this base type, by type id. Empty for a type no mutaplasmid takes. */
   mutaplasmidsForBase(baseTypeId: number): readonly Mutaplasmid[];
-  /** Every mutaplasmid that produces this abyssal type, by type id. */
   mutaplasmidsForResult(resultTypeId: number): readonly Mutaplasmid[];
-  /** The abyssal type `mutaplasmid` makes out of `base`, or null when it does not apply to it. */
   resultingType(baseTypeId: number, mutaplasmidTypeId: number): number | null;
-  /**
-   * The absolute range `attributeId` rolls in under `mutaplasmidTypeId`,
-   * given the base type's own value of it; null when that mutaplasmid does
-   * not roll it.
-   */
   rollRange(mutaplasmidTypeId: number, attributeId: number, baseValue: number): RollRange | null;
-  /** Dogma attribute id by internal name (`capacitorNeed`), for any attribute a mutaplasmid rolls. */
   attributeId(name: string): number | undefined;
-  /** Internal name (`capacitorNeed`) by dogma attribute id, for any attribute a mutaplasmid rolls. */
   attributeName(attributeId: number): string | undefined;
 }
 
@@ -96,11 +74,6 @@ export function mutaplasmidLookup(data: MutaplasmidData): MutaplasmidLookup {
   };
 }
 
-/**
- * How good a roll is, 0 (worst) to 1 (best), in the attribute's own direction —
- * a high activation cost is a bad roll. Clamped to the range; a range with
- * no width reads as best.
- */
 export function rollQuality(value: number, range: RollRange): number {
   const width = range.max - range.min;
   if (width <= 0) return 1;
@@ -108,12 +81,6 @@ export function rollQuality(value: number, range: RollRange): number {
   return range.highIsGood ? t : 1 - t;
 }
 
-/**
- * `mutation` made legal for an item of `typeId`: only the attributes its
- * mutaplasmid rolls (finite values) survive. Null when base, mutaplasmid and
- * type don't belong together, or with no data. Needed because the engine takes
- * any attribute it is handed as the item's own.
- */
 export function normaliseMutation(
   typeId: number,
   mutation: ItemMutation,
@@ -136,12 +103,10 @@ export function normaliseMutation(
   };
 }
 
-/** Whether any module or drone in `fitting` carries a mutation. */
 export function hasMutations(fitting: Fitting): boolean {
   return fitting.modules.some((m) => m.mutation) || fitting.drones.some((d) => d.mutation);
 }
 
-/** Every mutation through `normaliseMutation`, one that fails it dropped; the same Fitting when nothing changes. */
 export function normaliseFittingMutations(
   fitting: Fitting,
   lookup: MutaplasmidLookup | null
@@ -165,19 +130,12 @@ export function normaliseFittingMutations(
   return changed ? { ...fitting, modules, drones } : fitting;
 }
 
-/** The fields of ESI's `GET /dogma/dynamic/items/{type_id}/{item_id}/` this reads. */
 export interface DynamicItemAttributes {
   source_type_id: number;
   mutator_type_id: number;
   dogma_attributes: readonly { attribute_id: number; value: number }[];
 }
 
-/**
- * An abyssal item's `ItemMutation` from ESI's dynamic item: its base, its
- * mutaplasmid, and — out of the full attribute set ESI sends — only the
- * attributes that mutaplasmid rolls. Null when the item does not match
- * `typeId` or the data this build carries.
- */
 export function mutationFromDynamicItem(
   typeId: number,
   item: DynamicItemAttributes,
@@ -194,11 +152,6 @@ export function mutationFromDynamicItem(
   );
 }
 
-/**
- * What the UI badges (decision `20261016-093132`): `'none'` not abyssal; `'rolled'` exact;
- * `'rollsUnknown'` base and mutaplasmid known, the base's values stated; `'baseUnknown'` no
- * mutation (killmail, In-game Fitting, bare EFT line, ESI miss) — the engine adds only the slot.
- */
 export type MutationStatus = 'none' | 'rolled' | 'rollsUnknown' | 'baseUnknown';
 
 export function mutationStatus(
@@ -210,7 +163,6 @@ export function mutationStatus(
   return Object.keys(item.mutation.attributes).length === 0 ? 'rollsUnknown' : 'rolled';
 }
 
-/** `item` re-typed as `typeId`, its mutation dropped unless the type stays: a variant is another item. */
 export function withoutMutation<T extends { typeId: number; mutation?: ItemMutation }>(
   item: T,
   typeId: number

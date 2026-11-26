@@ -1,10 +1,3 @@
-/**
- * Gathers what `stillToApprove` reads for one Character, from what the device
- * already knows: its Alerts Grants, the book it last opened as an editor, the
- * hidden corporations and the Not now answers. The one network read is the
- * Character's public affiliation and corporation (no scope), and only when there
- * is a book to offer a corporation to.
- */
 import { db } from '@/db';
 import { stillToApprove, type Approval } from '@/engine/character/finishSetup';
 import { useEditedBookStore } from '@/features/corp/moons/editedBook';
@@ -26,7 +19,6 @@ export async function loadStillToApprove(
   const bookStore = useEditedBookStore.getState();
   if (!bookStore.hydrated) await bookStore.hydrate();
   let book = useEditedBookStore.getState().value ?? undefined;
-  // The editor has to still be on this device to sign the corp onto the book.
   if (book && !(await db.characters.get(book.editorCharacterId))) book = undefined;
   let ceoOf: { corporationId: number; name: string } | undefined;
   let hidden: number[] = [];
@@ -47,8 +39,6 @@ export async function loadStillToApprove(
     alertsHeld: grants[characterId]?.status === 'active',
     notNow: await readNotNow(characterId),
   });
-  // Plan the alerts sign-in as Settings' walk would, so the grant needs no second one; the
-  // step lists what it reads before Continue, which is the consent (ADR 0030).
   const planned = await Promise.all(
     items.map(async (item) => {
       if (item.kind !== 'alerts') return item;

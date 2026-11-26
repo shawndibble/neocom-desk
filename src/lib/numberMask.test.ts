@@ -14,9 +14,6 @@ describe('maskNumber', () => {
   });
 
   it("keeps the value's own decimals rather than fixing a precision", () => {
-    // The difference from `formatIsk`, and the reason this exists: a field
-    // showing "6,622" for a stored 6,622.35 would round the player's own
-    // number away in front of them.
     expect(maskNumber(6622.35)).toBe('6,622.35');
     expect(maskNumber(0.05)).toBe('0.05');
     expect(maskNumber(1234.5)).toBe('1,234.5');
@@ -33,7 +30,6 @@ describe('unmaskNumber', () => {
   it('accepts separators and padding, so a pasted number works', () => {
     expect(unmaskNumber('1,250')).toBe(1250);
     expect(unmaskNumber(' 338,600 ')).toBe(338600);
-    // Some tools export with spaces as the group separator.
     expect(unmaskNumber('1 000 000')).toBe(1000000);
   });
 
@@ -43,8 +39,6 @@ describe('unmaskNumber', () => {
   });
 
   it('rejects blank, garbage and negatives as "nothing set"', () => {
-    // Same contract the sourcing fields already had: clearing the box is how
-    // you unset the override, and nonsense must not become a price.
     expect(unmaskNumber('')).toBeUndefined();
     expect(unmaskNumber('   ')).toBeUndefined();
     expect(unmaskNumber('abc')).toBeUndefined();

@@ -3,13 +3,11 @@ import type { FittingSlotKind } from '@/engine/fittings/types';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
-/** Whether the hull takes the module in that rack and the pilot can fly it; undefined: not known (assumed yes). */
 export type FitCheck = (
   slot: FittingSlotKind,
   typeId: number
 ) => { fitsHull: boolean; canFly: boolean } | undefined;
 
-/** The engine's hull and skill check of one module on the open Fitting's hull, for its pilot. */
 export function fitCheckOf(variants: VariantEvaluator): FitCheck {
   return (slot, typeId) =>
     variants.engine
@@ -17,7 +15,6 @@ export function fitCheckOf(variants: VariantEvaluator): FitCheck {
       .get(typeId);
 }
 
-/** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
 export function modulePool(catalogue: FittingCatalogue, fitCheck: FitCheck): ModulePool {
   const listed = new Set(catalogue.marketTypes.map((entry) => entry.typeId));
   const flyable = new Map<string, boolean>();
@@ -27,7 +24,6 @@ export function modulePool(catalogue: FittingCatalogue, fitCheck: FitCheck): Mod
     typeIdsInGroup: (groupId) => catalogue.typeIdsByGroup.get(groupId) ?? [],
     published: (typeId) => listed.has(typeId),
     nameOf: (typeId) => catalogue.types[String(typeId)]?.name,
-    // A fitted module the pilot lacks skills for is replaced; its hull fit is not asked again.
     pilotCanFly: (slot, typeId) => {
       const key = `${slot}:${typeId}`;
       let ok = skilled.get(key);
@@ -38,7 +34,6 @@ export function modulePool(catalogue: FittingCatalogue, fitCheck: FitCheck): Mod
       }
       return ok;
     },
-    // A candidate the pilot lacks skills for goes under Train instead.
     flyable: (slot, typeId) => {
       const key = `${slot}:${typeId}`;
       let ok = flyable.get(key);

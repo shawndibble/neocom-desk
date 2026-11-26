@@ -1,8 +1,3 @@
-/**
- * What every step of one Improve search shares, built once: the variation
- * index, the catalogue's module pool (with its hull and skill checks
- * memoized), the Job setting, and the abort signal.
- */
 import type { ModulePool } from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
 import { jobSettingOf, searchSpace, type JobSetting } from '@/engine/fittings/improve';
@@ -14,7 +9,6 @@ export interface SearchContext {
   request: ImproveRequest;
   ports: ImproveSearchPorts;
   signal: AbortSignal;
-  /** The open Fitting: the ports' own. */
   fitting: Fitting;
   index: VariationIndex;
   pool: ModulePool;

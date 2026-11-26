@@ -1,33 +1,18 @@
-/**
- * What an owned blueprint copy is worth on the Assets pages — priced from
- * Public Contract Offers, never the market's average price. A copy shares
- * its original's typeID, and ESI's average price for that typeID is the
- * original's, so a copy library valued that way reads as thousands of
- * originals (a 117M copy stash showed as 2.1T).
- *
- * See `docs/context/decisions/20260930-120122-asset-value-prices-blueprint-copies-from-contract-listings.md`.
- */
-
 import { median } from './math';
 import type { BpcContractRow } from './contracts/bpcSearch';
 
-/** One asset row flagged `is_blueprint_copy`, joined to its blueprint record when that is readable. */
 export interface OwnedBlueprintCopyAsset {
   itemId: number;
   typeId: number;
-  /** Absent when the blueprints endpoint is unreadable (scope or corp role): the copy prices at the ME0/TE0 tier. */
   me?: number;
   te?: number;
-  /** Remaining runs; absent alongside `me`/`te`. */
   runs?: number;
 }
 
-/** One contract's asking rate for copies of one type — at one ME/TE, or `mixed` across several. */
 interface CopyRate {
   typeId: number;
   me: number;
   te: number;
-  /** Copies of one blueprint at differing ME/TE: a last-resort rate for the type, matched to no tier. */
   mixed: boolean;
   iskPerRun: number;
   iskPerCopy: number;
@@ -37,18 +22,6 @@ function tierKey(typeId: number, me: number, te: number): string {
   return `${typeId}:${me}:${te}`;
 }
 
-/**
- * Folds Offer rows into one rate per contract. A contract carrying any
- * other item type is skipped (its price is the bundle's, not this
- * blueprint's), and so is one that also sells the original (`runs: -1`,
- * same typeID). A contract of copies of one blueprint divides its price
- * evenly across every copy and run it sells; when those copies differ in
- * ME/TE the rate is marked `mixed`, a fallback for when no single-tier
- * contract matches. Every line
- * is grouped before any is judged, so one bad line voids its whole contract
- * rather than leaving its siblings to carry the full ask. Auctions, PLEX asks
- * and zero-price barters have no price a buyer can pay.
- */
 function contractRates(offers: readonly BpcContractRow[]): CopyRate[] {
   const byContract = new Map<number, BpcContractRow[]>();
   for (const row of offers) {
@@ -84,14 +57,6 @@ function contractRates(offers: readonly BpcContractRow[]): CopyRate[] {
   return rates;
 }
 
-/**
- * Each owned copy's value, keyed by `itemId`. Matches the copy's own ME/TE
- * first, then ME0/TE0, then any contract of this blueprint's copies at
- * mixed ME/TE, then 0 — never the original's price. The median
- * Offer sets the rate, so one lowball or troll ask cannot swing a total.
- * A copy with known runs is worth the median ISK/run times its runs; one
- * without is worth the median per-copy ask.
- */
 export function blueprintCopyValues(
   copies: readonly OwnedBlueprintCopyAsset[],
   offers: readonly BpcContractRow[]

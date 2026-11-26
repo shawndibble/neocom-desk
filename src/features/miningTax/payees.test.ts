@@ -124,8 +124,6 @@ describe('rememberPayeeEntity', () => {
     expect((await rememberPayeeEntity(first, 90_000_002)).entityId).toBe(90_000_002);
   });
 
-  // A Payee verified as a corporation or character is who it is: paying its CEO or an officer
-  // once must not re-point it (it then stopped matching its Corp Tax Book).
   it('never re-points a Payee verified as someone else', async () => {
     const payee = await createPayee(CHAR_A, {
       name: 'Bureau',
@@ -140,7 +138,6 @@ describe('rememberPayeeEntity', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
-  // A dialog's copy read before the Payee was verified must not re-point it now.
   it('judges the stored Payee, not a stale unlinked copy', async () => {
     const stale = await createPayee(CHAR_A, { name: 'Bureau', defaultTaxPct: 5 });
     await linkPayeeToCorporation(stale.id, 98_837_836);
@@ -167,7 +164,6 @@ describe('rememberPayeeEntity', () => {
 describe('linkPayeeToCorporation', () => {
   it('links the stored Payee as the corporation, read fresh, and syncs', async () => {
     const payee = await createPayee(CHAR_A, { name: 'Bureau', defaultTaxPct: 5 });
-    // Edited since the caller's copy was read: the link keeps the edit.
     await updatePayee(payee, { name: 'Bureau', defaultTaxPct: 7 });
     vi.clearAllMocks();
 
@@ -362,8 +358,6 @@ describe('Payee entity kind', () => {
     expect((await rememberPayeeEntity(bare, 90_000_002, 'character')).entityKind).toBe('character');
   });
 
-  // Re-pointing a verified Payee to a payment's recipient is what made a member's Corp Tax Book
-  // Payee stop matching its book: a verified link is kept (`never re-points a Payee verified …`).
   it('rememberPayeeEntity keeps a verified Payee, and re-learns only an unverified one', async () => {
     const verified = await createPayee(CHAR_A, {
       name: 'Landlord',

@@ -15,23 +15,19 @@ import type { PickerStack } from './movePlanInput';
 import { PlaceName } from './PlaceName';
 
 interface PickerListProps {
-  /** Stacks by Character, then by pickup location. */
   grouped: ReadonlyMap<number, ReadonlyMap<number, PickerStack[]>>;
   characterName: (characterId: number) => string;
   placeLabel: (locationId: number) => string;
   typeName: (typeId: number) => string;
-  /** Per-unit packaged volume by type. */
   unitM3: ReadonlyMap<number, number>;
   hueOf: (locationId: number) => number;
   selected: ReadonlySet<string>;
   onToggle: (keys: readonly string[], on: boolean) => void;
   collapsed: ReadonlySet<string>;
   onToggleCollapsed: (groupKey: string) => void;
-  /** Pickup locations the destination covers: nothing there needs moving. */
   atDestination: ReadonlySet<number>;
 }
 
-/** What to move: each Character's pickup locations on the rail, stacks ticked inside. */
 export function PickerList({
   grouped,
   characterName,
@@ -189,7 +185,6 @@ function PickerCharacter({
   );
 }
 
-/** A stack's row: name, quantity and packaged volume. On a phone the quantity drops under the name. */
 function StackRow({
   checked,
   disabled,
@@ -255,7 +250,6 @@ function StackRow({
   );
 }
 
-/** Select-all box for a group: ticked when every key is, mixed when some are. */
 function GroupCheckbox({
   keys,
   selected,

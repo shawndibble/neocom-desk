@@ -18,7 +18,6 @@ import { inventionQuote } from '@/engine/industry/invention';
 import type { InventionQuoteResult } from './inventionSources';
 
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
-// Sisters of EVE LP sells for 1,000 ISK on the market, Other Corp's for 500; any other store has no rate.
 vi.mock('@/features/loyalty/marketLpValue', () => ({
   loadMarketLpValues: vi.fn(
     async (ids: Iterable<number>) =>
@@ -264,7 +263,6 @@ describe('BlueprintAcquisitionModal — Contracts', () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent(/Original \(BPO\).*20,000,000 ISK.*Cheapest/);
     expect(items[1]).toHaveTextContent(/Copy, 10 runs.*30,000,000 ISK.*3,000,000 ISK\/run/);
-    // The station name resolves after the row first renders (as "Unknown Structure"), so wait for it.
     await waitFor(() =>
       expect(within(contracts).getAllByRole('listitem')[1]).toHaveTextContent('Jita IV - Moon 4')
     );
@@ -473,7 +471,6 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
     const lp = section('LP Store');
     expect(await within(lp).findByText(/Sisters of EVE/)).toBeInTheDocument();
     expect(within(lp).getByText(/12,000,000 ISK \+ 950,000 LP/)).toBeInTheDocument();
-    // The LP is already earned: only the 12M ISK is charged.
     expect(
       await within(lp).findByText(/12,000,000 ISK, LP counted as already earned/)
     ).toBeInTheDocument();
@@ -484,7 +481,6 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
     mockedFindLpOfferMatches.mockResolvedValue(lpResult([lpMatch()]));
     renderModal();
     const lp = section('LP Store');
-    // 12M ISK + 950k LP at 1,000 ISK/LP.
     expect(
       await within(lp).findByText(/962,000,000 ISK with LP at your 1,000 ISK.LP/)
     ).toBeInTheDocument();

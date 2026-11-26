@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BREAK_EVEN_MAX_RUNS, breakEvenRuns } from './breakEvenRuns';
 
-// Fixed cost 1000 up front (a BPO), +10 profit per run.
 const withFixedCost = (runs: number) => 10 * runs - 1000;
 
 describe('breakEvenRuns', () => {
@@ -34,7 +33,6 @@ describe('breakEvenRuns', () => {
   });
 
   it('copes with a stepped profit curve', () => {
-    // Profit only turns positive once 12+ runs fit one cheaper tier.
     expect(breakEvenRuns((r) => (r >= 12 ? 1 : -1), 1)).toBe(12);
   });
 });

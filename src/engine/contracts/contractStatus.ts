@@ -1,18 +1,7 @@
-/**
- * Which contract statuses are still live.
- *
- * Split out of `features/character/contracts.ts` so a pure caller can ask the
- * question without pulling the fetch-and-cache layer — and with it Dexie —
- * into its module graph. `calendarBoardSources.ts` is that caller: it declares
- * itself pure, and a value import from the loader module quietly made that
- * untrue.
- */
 import type { Contract } from '@/esi/endpoints';
 
-/** Open or being worked, as opposed to the character's mostly-historical contract list. */
 const ACTIVE_STATUSES = new Set<Contract['status']>(['outstanding', 'in_progress']);
 
-/** Finished, whichever side's view of it ESI reports. */
 export function isFinishedContractStatus(status: string): boolean {
   return status === 'finished' || status === 'finished_issuer' || status === 'finished_contractor';
 }
@@ -21,11 +10,6 @@ export function isActiveContractStatus(status: Contract['status']): boolean {
   return ACTIVE_STATUSES.has(status);
 }
 
-/**
- * ESI keeps an accepted courier `outstanding` — the accepted state shows only in
- * `acceptor_id` and `date_accepted` — so `in_progress` is never sent in practice.
- * Read it as `in_progress` here, once, so every surface that asks sees the real state.
- */
 export function withAcceptedCourierInProgress<
   T extends Pick<Contract, 'type' | 'status' | 'acceptor_id' | 'date_accepted'>,
 >(contract: T): T {
@@ -43,11 +27,6 @@ export function withAcceptedCourierInProgress<
 
 export type ContractStatusTone = 'neutral' | 'success' | 'warning' | 'danger';
 
-/**
- * The tint of a contract's status pill: done well, still live, failed, or
- * simply withdrawn. A cancelled or deleted contract is not a failure, so it
- * stays neutral rather than red.
- */
 export function contractStatusTone(status: Contract['status']): ContractStatusTone {
   switch (status) {
     case 'finished':

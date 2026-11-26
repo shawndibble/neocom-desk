@@ -1,9 +1,3 @@
-/**
- * The wormhole and jump-bridge rules as Settings → Travel shows them: the very
- * controls Route Safety's sidebar uses (`RouteHoleFields`), bound straight to
- * the saved defaults every jump count follows — there is no link to override
- * here, so a change is just the new setting.
- */
 import { useState } from 'react';
 import { Spinner } from '@/components/ui';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
@@ -24,7 +18,6 @@ export function SavedRouteNetworkFields() {
   const systems = useSolarSystemIndex();
   const [dialog, setDialog] = useState<AnsiblexDialogMode | null>(null);
 
-  // Held until every setting is read, so a click cannot write a default over a stored value.
   if (!holeQuery.hydrated || !bridgeQuery.hydrated) return <Spinner />;
   return (
     <>

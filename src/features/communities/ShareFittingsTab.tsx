@@ -29,7 +29,6 @@ import {
   type SharedFittingInput,
 } from './sharedFittings';
 
-/** The source and key a `fittingChoiceKey` was made from. */
 function keyOf(choiceKey: string): Pick<SharedFittingInput, 'source' | 'key'> {
   const source = choiceKey.startsWith('game-') ? 'game' : 'saved';
   return { source, key: choiceKey.slice(source.length + 1) };
@@ -37,23 +36,12 @@ function keyOf(choiceKey: string): Pick<SharedFittingInput, 'source' | 'key'> {
 
 interface Loaded {
   fittings: SharedFittingInput[];
-  /** The Fittings stopped since "share all" went on; null when it is off. */
   allExcluded: Set<string> | null;
-  /** The Fittings this Character has in the Community now. */
   shared: Set<string>;
 }
 
-/** The deferred-commit id of "stop sharing all"; only one is ever pending. */
 const STOP_ALL_ID = 'stop-all';
 
-/**
- * The Fittings tab's My sharing (issue #3605): what this Character shares, one
- * row per Fitting with Stop sharing, and Add Fittings for the rest. "Share all
- * my Fittings" is a standing switch: later saves are pushed too
- * (`followSavedFitting`), and a Fitting stopped under it is remembered so a
- * re-save does not bring it back, until it is added again. The Community's own
- * copy is the truth for what is shared; only the switch is kept on this device.
- */
 export function ShareFittingsTab({
   characterId,
   communityId,
@@ -63,7 +51,6 @@ export function ShareFittingsTab({
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  // Stopping everything shows at once but writes after its Undo toast, so Undo is just not writing.
   const pendingOff = useDeferredCommits();
   const stoppingAll = pendingOff.hiddenIds.has(STOP_ALL_ID);
   const [adding, setAdding] = useState(false);
@@ -100,15 +87,12 @@ export function ShareFittingsTab({
   const sharedRows = useMemo(() => {
     if (!loaded) return [];
     const local = new Map(fittings.map((input) => [fittingChoiceKey(input), input]));
-    // A Fitting the Community holds but this device no longer has (deleted in
-    // game, scope lost) still gets a row, so it can still be stopped.
     const rows = [...loaded.shared].map(
       (key) => local.get(key) ?? { ...keyOf(key), name: unavailable, code: '' }
     );
     return namedLike(rows, needle);
   }, [fittings, loaded, needle, unavailable]);
   const shownRows = sharedRows.slice(0, ROW_LIMIT);
-  // Everything not shared now, including a Fitting stopped under "share all".
   const addable = useMemo(
     () =>
       loaded
@@ -135,8 +119,6 @@ export function ShareFittingsTab({
     try {
       await shareFittings(characterId, communityId, current.fittings);
     } catch (error) {
-      // Some may have gone up: they stay listed and can be stopped, but the
-      // switch goes back off so the rest can be added by hand.
       await saveFittingsAll(characterId, communityId, null);
       throw error;
     }
@@ -165,10 +147,6 @@ export function ShareFittingsTab({
 
   async function add(current: Loaded, input: SharedFittingInput): Promise<Loaded> {
     const key = fittingChoiceKey(input);
-    // Under "share all" a stopped Fitting is an exclusion: adding it back lifts
-    // it, so its later saves follow again. Lifted first, so a failure here
-    // shares nothing (run() then reloads the truth); a share that does not go
-    // through puts the exclusion back.
     const before = current.allExcluded;
     const lifted = before?.has(key) ?? false;
     let allExcluded = before;
@@ -259,7 +237,6 @@ export function ShareFittingsTab({
                   else stopButtons.current.delete(key);
                 }}
                 onClick={() => {
-                  // Stopping removes the row: focus the next Stop sharing, else the search.
                   const near = [shownRows[index + 1], shownRows[index - 1]].map(
                     (other) => () =>
                       other ? (stopButtons.current.get(fittingChoiceKey(other)) ?? null) : null
@@ -274,7 +251,6 @@ export function ShareFittingsTab({
           )}
         </ul>
       )}
-      {/* While Add is open the notice shows in it: the page behind is inert. */}
       {notice !== null && !adding && <InlineError>{notice}</InlineError>}
       <ToastStack
         items={pendingOff.items}

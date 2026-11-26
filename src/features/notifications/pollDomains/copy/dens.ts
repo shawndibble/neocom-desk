@@ -6,7 +6,6 @@ import { assertProjectionWording, type PushCopy } from '@/engine/projection';
 import type { PlanetNames } from './colonies';
 import { type DomainCopy, fired, HOUR_MS } from './shared';
 
-/** Hours as the lead window reads: whole hours, never "0". */
 function hoursOf(thresholdMs: number): number {
   return Math.max(1, Math.round(thresholdMs / HOUR_MS));
 }
@@ -31,11 +30,6 @@ export const mercenaryDenReinforcedCopy: DomainCopy<MercenaryDenReinforcedFire, 
       }),
     };
   },
-  /**
-   * Hedged, unlike the live path: a Projection is never re-checked, and a den
-   * can leave reinforcement early, so the title carries the doubt too (a push
-   * is often read as one lock-screen line).
-   */
   push: (fire, character, names) => {
     assertProjectionWording('mercenaryDenReinforced', 'hedge');
     const planet = names.planet ?? `#${fire.planetId}`;

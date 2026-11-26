@@ -18,7 +18,6 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const BLUEPRINTS: BlueprintMap = {
-  // Rifter Blueprint -> Rifter
   '638': {
     name: 'Rifter Blueprint',
     time: 1200,
@@ -65,9 +64,6 @@ describe('BuildPlanContextMenu', () => {
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    // 587 (Rifter), not 638 (its blueprint) — `/industry?product=` looks the
-    // typeID up in the catalog's `byProductTypeID`, so the blueprint's own ID
-    // would silently resolve to nothing.
     expect(await screen.findByTestId('location')).toHaveTextContent('/industry/plans?product=587');
   });
 
@@ -111,9 +107,6 @@ describe('BuildPlanContextMenu', () => {
   });
 
   it('offers one label whether or not the row carries a seed', async () => {
-    // Per the decision recorded with #636: one action, one vocabulary — a
-    // seeded row must not grow a second, differently-worded Build Plan entry
-    // beside the plain one.
     renderMenu(638, { me: 10, te: 20, runs: 5 });
     fireEvent.contextMenu(screen.getByTestId('row'));
 
@@ -128,7 +121,6 @@ describe('BuildPlanContextMenu', () => {
     fireEvent.contextMenu(screen.getByTestId('row'));
 
     expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-    // No name was passed, so there is nothing to copy or to compare by.
     expect(screen.queryByRole('menuitem', { name: 'Copy name' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Add to Compare' })).not.toBeInTheDocument();
   });

@@ -31,8 +31,6 @@ function plan(buyTiers: PlannerPolicy['buyTiers'], colonies = TWO_BARREN()) {
 }
 
 describe('planGoals — buying P2 and P3', () => {
-  // A barren colony yields neither Heavy Metals nor Non-CS Crystals, so
-  // Consumer Electronics cannot be made; Mechanical Parts can.
   it('buys the P2 that cannot be made when P2 is allowed, and still makes the rest', () => {
     const result = plan([2]);
     expect(result.shortfalls).toEqual([]);
@@ -40,7 +38,6 @@ describe('planGoals — buying P2 and P3', () => {
     const bought = result.buys.find((b) => b.typeId === CONSUMER_ELECTRONICS);
     expect(bought?.tier).toBe(2);
     expect(bought?.unitsPerHour).toBeGreaterThan(0);
-    // Robotics is made on the colony from the bought P2.
     expect(result.factoryHost).not.toBeNull();
     expect(result.flows).toContainEqual(
       expect.objectContaining({
@@ -75,7 +72,6 @@ describe('planGoals — buying P2 and P3', () => {
     if (economics.status !== 'costed') throw new Error('expected a priced plan');
     const units = result.buys.find((b) => b.typeId === CONSUMER_ELECTRONICS)!.unitsPerHour;
     expect(economics.buys).toBeCloseTo(units * 5000, 6);
-    // Every leg into a colony pays import customs, the bought P2 among them.
     const imports = result.flows
       .filter((f) => f.to !== 'hub' && f.from !== f.to)
       .reduce(
@@ -135,7 +131,6 @@ describe('planGoals — buying P2 and P3', () => {
   });
 
   it('buys only the missing part of a P2 when colonies fall short of it', () => {
-    // Two barren colonies reach half of 10 Mechanical Parts an hour.
     const ask = (buyTiers: PlannerPolicy['buyTiers']) =>
       planGoals(
         {

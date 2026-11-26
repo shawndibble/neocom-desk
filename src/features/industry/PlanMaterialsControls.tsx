@@ -28,12 +28,6 @@ interface PlanMaterialsControlsProps {
   update: (patch: PlanPatch) => void;
 }
 
-/**
- * Lives in the Materials panel, not in the settings block above it: it
- * governs one number in one column of the table below it — the owned quantity
- * "use detected" offers — and nothing else on the plan. Beside Facility and
- * Trade hub it read as another thing about where the job runs.
- */
 export function PlanMaterialsControls({
   plan,
   catalog,
@@ -50,12 +44,6 @@ export function PlanMaterialsControls({
 }: PlanMaterialsControlsProps) {
   return (
     <div className="mb-3 flex flex-col gap-3">
-      {/*
-        One row, two labelled groups: the strategy applies the moment
-        it is picked (Undo in the toast), and everything about which
-        owned stock the table counts sits behind one Owned button —
-        read once per plan, not on every visit.
-      */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <BuildPlanAutoBuildControl
           maxDepth={autoBuildMaxDepth}

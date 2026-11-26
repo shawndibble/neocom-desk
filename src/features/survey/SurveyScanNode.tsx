@@ -1,10 +1,3 @@
-/**
- * One scan's node on the volume chart. For the survey's owner (`onRemove`
- * given) it is its own context-menu trigger: right-click, or touch-and-hold,
- * offers "Remove scan". One trigger per node means the menu only replaces the
- * browser's own over a node, and always knows which scan it was opened for.
- * A wider invisible circle makes a finger or a click land on it.
- */
 import { useTranslation } from 'react-i18next';
 import {
   ContextMenu,
@@ -15,7 +8,6 @@ import {
 import { formatEveClock } from '@/engine/survey/chatMessage';
 
 interface SurveyScanNodeProps {
-  /** Epoch ms of the scan, which also names the node. */
   at: number;
   cx: number;
   cy: number;

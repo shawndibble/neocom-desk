@@ -6,17 +6,11 @@ import {
   type StandingChain,
 } from '@/engine/standings';
 
-/** What a Standings row or modal is about; an agent's corporation comes from the agents data. */
 export type ChainTarget =
   | { kind: 'faction'; id: number }
   | { kind: 'corporation'; id: number }
   | { kind: 'agent'; id: number; corporationId: number };
 
-/**
- * The chain of standings that govern `target`, faction first. A standing the
- * pilot has no row for reads as 0. A corporation whose faction is not in
- * `corporationFactions` gets no faction link and counts as lawful.
- */
 export function buildChain(
   target: ChainTarget,
   standings: readonly CharacterStandingEntry[],

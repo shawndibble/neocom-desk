@@ -40,7 +40,6 @@ describe('summarizeKills', () => {
     );
     expect(result.bySpace.nullsec).toEqual({ count: 2, lastMs: NOW - 2 * HOUR_MS });
     expect(result.bySpace.lowsec).toEqual({ count: 1, lastMs: NOW - 5 * DAY_MS });
-    // Older than the window: not counted, but the date still says how stale it is.
     expect(result.bySpace.highsec).toEqual({ count: 0, lastMs: NOW - 40 * DAY_MS });
     expect(result.bySpace.wormhole).toEqual({ count: 0, lastMs: null });
     expect(result.recentCount).toBe(3);

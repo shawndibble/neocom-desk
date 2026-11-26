@@ -39,13 +39,6 @@ type LoadState =
   | { status: 'gone' }
   | { status: 'failed' };
 
-/**
- * The guest verify page (issue #4066, D27): a late notice read with the link's token alone, no
- * login and no Character. It leads with what the Miner's Running account owes now and how to pay,
- * lists only the days still owed (one line each, opening to its ore), and keeps every day and
- * payment in a Ledger that stays closed until asked for. A notice whose account the officer's
- * client has not counted lists its own lines instead.
- */
 export function VerifyPage({ token }: { token: string }) {
   const { t } = useTranslation();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
@@ -108,7 +101,6 @@ export function VerifyPage({ token }: { token: string }) {
 function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayload }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
-  // The wire still names the late notice `statement`, in the shape older servers stored it.
   const { statement: notice, terms } = payload;
   const rows = useMemo(() => verifyRows(notice.lines), [notice.lines]);
 
@@ -128,19 +120,13 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
   }, [payload.corporationId, notice.corporationName]);
   const corp = corpName ?? t('corpTaxBook.verify.theCorp');
 
-  // What the Miner's account owes now; the notice's own figure stands in until an officer's tab
-  // has counted the account. Money pays the oldest day first: no payment is this notice's own.
   const account = payload.account ?? null;
   const owing = account ? account.owed : notice.amount;
   const rates = ratesUsed(rows);
-  // The days still owed, when the officer's client recorded them: the page then lists those and
-  // keeps everything paid in the ledger, instead of every line of this notice. When they do not
-  // add up to what is owed (a few ISK of rounding aside), the page keeps the notice's lines.
   const recordedDays = account?.unpaidDays;
   const unpaidSum = recordedDays?.reduce((sum, d) => sum + d.owed, 0) ?? 0;
   const unpaidDays =
     recordedDays && owing - unpaidSum <= recordedDays.length + 1 ? recordedDays : undefined;
-  // Days mined since the last notice are on no notice: the recorded days add them to the ledger.
   const ledger = useMemo(() => {
     const known = new Set(payload.ledger.days.map((d) => d.date));
     const days = [
@@ -153,8 +139,6 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
   }, [payload.ledger, unpaidDays]);
 
   const lastDeclaration = payload.declarations.at(-1);
-  // The wallet divisions the book reads (#6204). Only a book that reads past the Master Wallet has
-  // a choice to name: a donation from outside the corporation has no division to pick.
   const divisionNames = readDivisionNames(terms.divisionNames);
   const wallet =
     terms.divisions.length > 0 && !(terms.divisions.length === 1 && terms.divisions[0] === 1)
@@ -291,7 +275,6 @@ function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayloa
   );
 }
 
-/** A label and its value, with a Copy button so the pilot can paste it into EVE's transfer window. */
 function PayField({
   label,
   value,
@@ -349,7 +332,6 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-/** The one thing a miner can change here: a late notice still comes if they fall behind. */
 function StopReminders({ token, initial }: { token: string; initial: boolean }) {
   const { t } = useTranslation();
   const [stopped, setStopped] = useState(initial);

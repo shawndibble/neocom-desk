@@ -24,11 +24,6 @@ function todayInput(): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
-/**
- * The two dialogs `useRunLoss`'s state drives (issue #2851): the Mark as
- * lost / Edit loss form with its live net-loss preview, and the one-step
- * remove confirmation. Mount once alongside the table, like `SaleLinkingModals`.
- */
 export function RunLossModals({ loss }: { loss: RunLoss }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();

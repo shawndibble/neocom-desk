@@ -169,7 +169,6 @@ describe('planCaveats', () => {
       ]),
       valuedAtAsk: new Set([COOLANT, ROBOTICS, WATER, REACTIVE_METALS, ELECTROLYTES]),
     });
-    // Robotics is bought, Water never reaches the hub, Electrolytes nobody sells.
     expect(caveats.valuedAtAsk).toEqual([REACTIVE_METALS, COOLANT]);
   });
 
@@ -191,7 +190,6 @@ describe('planCaveats', () => {
 describe('slotEstimate', () => {
   it("is null for this colony's own measured program at today's ECU count", () => {
     expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), 1)).toBeNull();
-    // Nothing known about today: the measured rate stands.
     expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), undefined)).toBeNull();
   });
 
@@ -281,7 +279,6 @@ describe('changeSteps', () => {
       kind: 'stop',
       stop: [{ p0TypeId: NOBLE_GAS, ecus: 1 }],
       extract: [{ p0TypeId: IONIC, p1TypeId: ELECTROLYTES, ecus: 1, basicFactories: 1 }],
-      // A colony-to-colony leg is new: a colony left alone only sells.
       ships: [{ typeId: ELECTROLYTES, to: 2, isNew: true }],
     });
     expect(steps[1]).toMatchObject({
@@ -291,7 +288,6 @@ describe('changeSteps', () => {
       extract: [{ p0TypeId: AQUEOUS }],
       ships: [{ typeId: COOLANT, to: 'hub', isNew: false }],
     });
-    // Already running what its Baseline sells: as is, and not needed.
     expect(steps[2]).toMatchObject({ planetId: 3, kind: 'as-is', notNeeded: true, switchTo: [] });
   });
 
@@ -377,7 +373,6 @@ describe('shortfallHint', () => {
   });
 
   it("with buying off, names the engine's re-target candidates", () => {
-    // Colony 2 yields it too but is at the ECU cap: the engine leaves it out.
     const rows = [row(1, 'barren'), row(2, 'gas'), row(3, 'temperate')];
     expect(
       shortfallHint(

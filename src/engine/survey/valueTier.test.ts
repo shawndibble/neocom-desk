@@ -6,11 +6,11 @@ const ore = (name: string, unitPrice: number | null) => ({ ore: name, unitPrice 
 describe('oreValueTiers', () => {
   it('grades each ore by unit price between the cheapest and dearest: gray, blue, yellow, orange', () => {
     const tiers = oreValueTiers([
-      ore('Best', 100), // top of the range
-      ore('Close', 90), // 80%
-      ore('Middling', 70), // 60%
-      ore('Lean', 40), // 30%
-      ore('Poor', 10), // bottom of the range
+      ore('Best', 100),
+      ore('Close', 90),
+      ore('Middling', 70),
+      ore('Lean', 40),
+      ore('Poor', 10),
     ]);
     expect(tiers.get('Best')).toBe('orange');
     expect(tiers.get('Close')).toBe('orange');

@@ -1,12 +1,3 @@
-/**
- * One-off (#6450): a grouping made before the fix left the absorbed Miners' Statements,
- * payments and the rest under their old ids, so an alt kept its own row in the Miners table.
- * This moves them onto the group, the way a new grouping now does. Dry run unless `--apply`;
- * a re-run finds nothing left. A dissolved group's old id is listed, not moved.
- *
- *   cd functions && npm run build
- *   GOOGLE_APPLICATION_CREDENTIALS=... node scripts/rekey-grouped-miners.mjs <projectId> [--apply] [corporationId ...]
- */
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { applyRekeyBackfill, planRekeyBackfill } from '../lib/corpTaxBookRekeyBackfill.js';

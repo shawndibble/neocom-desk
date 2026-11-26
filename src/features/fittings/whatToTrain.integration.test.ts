@@ -30,18 +30,6 @@ import {
 
 const require = createRequire(import.meta.url);
 
-/**
- * "What to train" end to end on a player's railgun Rokh, through the real
- * `computeFittingStats` (fetch and Cache Storage stubbed to serve the pinned
- * engine and SDE from node_modules), pinning the Overall order that scope
- * decision `20261002-234731-what-to-train-weighted-overall-weapon-reach-ranked`
- * set. The order rests on the pinned `@eveshipfit/dogma-engine` +
- * `@eveshipfit/sde` (ADR 0016): if a bump moves it, re-check the order
- * against that decision rather than just re-pinning. Skill type ids were
- * looked up by exact name in `public/data/skills.json`, 2026-10-02.
- */
-
-/** The fit, as shared from the live site. */
 const ROKH_SHARE =
   '2.RcvLCoMwEIXhF5pFZnJRjrs-SisGo6kSwUvJwxdTaFbzDYc_8JYVhgsCnw7iSqnUlabSVrrK5s9OgdMJIYaZBwgJ9u2CkAanD4QM2j5CyILHu4n9TA66T5BO4VpK2uxS0t_V4BDKPL3ulDGprezl77JfDSws8THCQpFf5b45xz6AyY0Q15JPB_j5JjdB9hc1Gkx8neCcH8sSvw';
 
@@ -55,7 +43,6 @@ const TRAJECTORY_ANALYSIS = 3317;
 const DRONE_INTERFACING = 3442;
 const MINMATAR_DRONE_SPECIALIZATION = 12485;
 
-/** The levels that player's "What to train" list showed; everything else at V. */
 const PLAYER_LEVELS: [number, number][] = [
   [CONTROLLED_BURSTS, 4],
   [LARGE_HYBRID_TURRET, 3],
@@ -157,7 +144,6 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
     const fitting = shareToFitting(decoded.value, 'Boom');
     const levels = new Map((await allSkillTypeIds()).map((id): [number, number] => [id, 5]));
     for (const [id, level] of PLAYER_LEVELS) levels.set(id, level);
-    // The player flies Tech I rails: no Large Railgun Specialization yet.
     levels.set(LARGE_RAILGUN_SPECIALIZATION, 0);
     const pilot = buildPilotProfile(levels, []);
 
@@ -176,8 +162,6 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
         levels: pilot.skillLevels,
         requirements: (typeId, rack) =>
           engine.moduleSkillRequirements(fitting.shipTypeId, rack, typeId),
-        // The engine's requirements already reach down the prerequisite
-        // chain; a real schedule only adds training times.
         schedule: (entries) =>
           entries.map((e) => ({ skillTypeID: e.skillTypeID, level: e.targetLevel, seconds: 1 })),
         compare: async (variant, trained) => ({
@@ -217,7 +201,6 @@ describe('Tech II upgrades on that Rokh (real WASM + real pinned SDE)', () => {
 });
 
 describe('An Orca over CPU on its drone rigs (real WASM + real pinned SDE)', () => {
-  /** A player's Orca: two drone rigs whose CPU drawback Drones Rigging shrinks. */
   const ORCA_SHARE =
     '2.Lc3BCsIwDIDhp-ltQpJaxOw2PHjzog_QdYpSJy7gVqUPL212-kj4Q0YaMzCGXpgaZNzfH0wNcXqWhV3drjq1BUaZ9UCG2quWUX61R0naxUU7tHWOfahz7Nc_85WpzbtlYscu54Rvnj8NfmEoJpwUKYQI7G-Qs3Fdt7kcjTsYgrN_RUNwkuD_';
   const DRONES_RIGGING = 26255;
@@ -237,7 +220,6 @@ describe('An Orca over CPU on its drone rigs (real WASM + real pinned SDE)', () 
     if (!decoded.ok) throw new Error('share code did not decode');
     fitting = shareToFitting(decoded.value, 'Orca');
     const ids = await allSkillTypeIds();
-    // Everything at V but Drones Rigging, untrained: 48.1 tf over, as the player saw.
     const levels = new Map(ids.map((id): [number, number] => [id, 5]));
     levels.set(DRONES_RIGGING, 0);
     pilot = buildPilotProfile(levels, []);

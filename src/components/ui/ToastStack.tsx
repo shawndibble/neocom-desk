@@ -8,21 +8,12 @@ export interface ToastStackItem {
 }
 
 interface ToastStackProps {
-  /** Oldest first; the newest sits at the bottom, older ones rise out of its way. */
   items: readonly ToastStackItem[];
   undoLabel: string;
   onUndo: (id: string) => void;
-  /** An entry's clock ran out, Escape or its close button was used, or the route changed. */
   onClose: (id: string) => void;
 }
 
-/**
- * Several Undo toasts at once, for an action that can repeat before the first
- * Undo expires (delete a plan, then another). Each entry is a plain `Toast`
- * with its own Undo and its own 8s clock; the stack only places them. The
- * caller caps the list (`useDeferredCommits` pushes the oldest out at 3).
- * Same placement and portalling as a single `Toast`.
- */
 export function ToastStack({ items, undoLabel, onUndo, onClose }: ToastStackProps) {
   const portalContainer = usePortalContainer();
   if (items.length === 0) return null;

@@ -10,22 +10,14 @@ import { proofSenders, type ResolveTarget } from './targets';
 
 interface Args {
   corpView: CorpBookView | null;
-  /** A tracked Character's name, for the mail. */
   nameOf: (characterId: number) => string;
   reloadCorpBooks: () => void;
-  /** The member's own payments, for "Which payment was it?". */
   madePayments: readonly MadePayment[];
-  /** `paymentLinkKey`s a link holds: those payments pay a personal Payee, never a claim. */
   linked: ReadonlySet<string>;
   onPay: (corporationId: number) => void;
-  /** Opens a book day's own row (its Conflict takeover lives there). */
   onOpenDay: (row: BookRowView) => void;
 }
 
-/**
- * The Tax tab's Resolve dialog (resolving in the app): which problem it is open on, the dialog
- * itself, and the member's own "Not paying" set it hides problems under.
- */
 export function useResolve({
   corpView,
   nameOf,

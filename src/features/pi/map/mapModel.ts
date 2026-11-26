@@ -1,12 +1,3 @@
-/**
- * The PI Map's own logic, pure over `PiData` and the recommendation model's
- * output. Nothing here prices anything: every one-planet ISK figure the Map
- * shows is read off `PlanAdvice` (`productFigure`, `unlockedRecipe`) so it is
- * the number Plan shows for the same product; a P3/P4's chain estimate comes
- * from `useChainEstimates`, the same as All products, or, for a ticked what-if
- * planet, `useWhatIfChains`. This module only decides what is
- * reachable, what a chain looks like, and how the panels sit.
- */
 import { piTier } from '@/engine/pi/chain';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
@@ -16,10 +7,8 @@ import type { PlanAdvice } from '../planAdviceModel';
 
 export type MapTier = 0 | 1 | 2 | 3 | 4;
 
-/** The detail panel docks beside the map only when the map panel is at least this wide. */
 export const DOCK_MIN_PANEL_WIDTH = 1500;
 
-/** The in-game order of planet types, which is also the planets column's order. */
 const PLANET_ORDER: readonly PlanetType[] = [
   'barren',
   'gas',
@@ -31,18 +20,14 @@ const PLANET_ORDER: readonly PlanetType[] = [
   'temperate',
 ];
 
-/** An extractor pulls a raw material; anything made runs in the factory its schematic names. */
 export type MapFacility = 'extractor' | PiFactoryKind;
 
 export interface MapProduct {
   typeId: number;
   name: string;
   tier: MapTier;
-  /** Direct inputs, none for a raw resource. */
   inputs: number[];
-  /** Every raw resource under it (itself for a raw one), sorted by typeId. */
   raws: number[];
-  /** Planet types that yield it (raw) or carry a factory for it (made). */
   hosts: PlanetType[];
   facility: MapFacility;
 }
@@ -55,7 +40,6 @@ export interface MapGraph {
 
 const byName = (a: MapProduct, b: MapProduct) => a.name.localeCompare(b.name);
 
-/** P0 alphabetical; P1 in the order of the raw it refines, so the two columns line up; P2 to P4 alphabetical. */
 export function buildMapGraph(pi: PiData): MapGraph {
   const byId = new Map<number, MapProduct>();
   const rawLeaves = (id: number): number[] => {
@@ -101,7 +85,6 @@ export function buildMapGraph(pi: PiData): MapGraph {
   return { tiers, byId, planetTypes: PLANET_ORDER.filter((type) => present.has(type)) };
 }
 
-/** Can these planet types, together, make it: every raw under it comes off one of them, and one hosts its factory. */
 export function canMake(graph: MapGraph, typeId: number, types: ReadonlySet<PlanetType>): boolean {
   const product = graph.byId.get(typeId);
   if (!product) return false;
@@ -111,13 +94,10 @@ export function canMake(graph: MapGraph, typeId: number, types: ReadonlySet<Plan
 }
 
 export interface Unlocked {
-  /** Everything that lights, raws included. */
   highlight: ReadonlySet<number>;
-  /** The made products it unlocks (P1 up), tier then name. */
   productIds: number[];
 }
 
-/** What adding planet types (the ones not already ticked) makes possible over the ticked ones, all together. */
 export function unlockedBy(
   graph: MapGraph,
   types: ReadonlySet<PlanetType>,
@@ -142,34 +122,21 @@ export function unlockedBy(
 
 export interface TracedPlanet {
   type: PlanetType;
-  /** The pilot has a colony on this type. */
   have: boolean;
-  /** The raw resources this planet is chosen for. */
   raws: number[];
-  /** Everything this planet can make by itself on the way, raw first. */
   made: number[];
 }
 
 export interface Trace {
   product: number;
-  /** The product and everything under it. */
   ids: ReadonlySet<number>;
-  /** `[from, to]`: a wire from an input to what it feeds. */
   edges: ReadonlyArray<readonly [number, number]>;
-  /** `[planet type, raw]`: a wire from a planet to a raw it supplies. */
   planetEdges: ReadonlyArray<readonly [PlanetType, number]>;
   planets: TracedPlanet[];
-  /** When one planet could do it all, every type that could. Empty otherwise. */
   alternatives: PlanetType[];
-  /** What no single planet makes alone, tier then name: made where the goods are brought together. */
   rest: number[];
 }
 
-/**
- * Ids split into one group per tier, lowest first, keeping the given order
- * inside a tier: parallel inputs sit side by side, and only a step up a tier
- * reads as "then".
- */
 export function groupByTier(graph: MapGraph, ids: Iterable<number>): number[][] {
   const byTier = new Map<MapTier, number[]>();
   for (const id of ids) {
@@ -182,14 +149,12 @@ export function groupByTier(graph: MapGraph, ids: Iterable<number>): number[][] 
   return [...byTier.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
 }
 
-/** The chain behind a product, back to the planet types that supply it, preferring the pilot's. */
 export function traceProduct(
   graph: MapGraph,
   typeId: number,
   who: {
     owned: ReadonlySet<PlanetType>;
     ticked: ReadonlySet<PlanetType>;
-    /** Planet types to choose first: the ones a Plan pick is built on. */
     prefer?: readonly PlanetType[];
   }
 ): Trace {
@@ -284,53 +249,31 @@ export function traceProduct(
   return { product: typeId, ids, edges, planetEdges, planets, alternatives, rest };
 }
 
-/** What the recommendation model says about one product on the map. */
 export type ProductFigure =
   | {
       kind: 'ranked';
-      /** ISK a day from one planet of `useType`, after customs and sales tax. */
       iskPerDay: number;
-      /** m³ a day that planet ships: the hauling load. */
       m3PerDay: number;
       useType: PlanetType;
       hostTypes: PlanetType[];
       haveTypes: PlanetType[];
-      /** Against the simplest product on `useType`; null when it has no reference. */
       verdict: 'better' | 'same' | 'worse' | null;
       isReference: boolean;
       versus: { typeId: number; name: string; planetType: PlanetType; iskPerDay: number } | null;
-      /** The lowest Command Center level that hosts it, when the pilot's cannot yet. */
       needsCcLevel: number | null;
     }
   | {
       kind: 'unranked';
       reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' | 'no-fit';
-      /**
-       * A P3 or P4's multi-planet chain estimate, once priced: its own figure,
-       * never a ranked one-planet recipe (`chainEstimateModel.ts`).
-       */
       chain?: ChainEstimateView;
-      /**
-       * The Bigger chain the ticked what-if planet makes possible, when the
-       * pilot hauls between planets: a multi-planet estimate with that planet
-       * added, never a pick (`biggerChainsModel.ts`).
-       */
       whatIf?: { types: readonly PlanetType[]; iskPerDay: number; planets: number };
     };
 
-/** The multi-planet figure a P3/P4 tile shows: the what-if planet's Bigger chain first, else its chain estimate. */
 export function tileChainIsk(figure: ProductFigure): number | null {
   if (figure.kind !== 'unranked') return null;
   return (figure.whatIf ?? figure.chain)?.iskPerDay ?? null;
 }
 
-/**
- * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from
- * several planets, so it has no per-planet figure, and a P1 or P2 the hub does
- * not price has none either: unknown, never zero (`pricesFailed`: every product is
- * unpriced, so every unranked one says so). `advice` must be built with
- * `recipeFilter: 'any'`.
- */
 export function productFigure(
   advice: PlanAdvice,
   typeId: number,
@@ -349,7 +292,6 @@ export function productFigure(
     );
     return {
       kind: 'unranked',
-      // With the hub unread nothing is priced; "no fit at this level" would be a false reason.
       reason:
         pricesFailed || advice.recipes.unpriced.includes(typeId)
           ? 'unpriced'
@@ -372,11 +314,6 @@ export function productFigure(
   };
 }
 
-/**
- * The best one-planet recipe a new planet of one of `types` adds: one only
- * those types can host among the pilot's. `advice` is built with them as
- * what-ifs, so the figure is priced for them, not for another host.
- */
 export function unlockedRecipe(
   advice: PlanAdvice,
   types: ReadonlySet<PlanetType>,
@@ -393,7 +330,6 @@ export function unlockedRecipe(
 
 export type DetailMode = 'sheet' | 'drawer' | 'docked';
 
-/** Where the detail panel goes: a bottom sheet on a phone, else docked or a drawer by the map panel's own width. */
 export function detailMode(args: { panelWidth: number; phone: boolean }): DetailMode {
   if (args.phone) return 'sheet';
   return args.panelWidth >= DOCK_MIN_PANEL_WIDTH ? 'docked' : 'drawer';

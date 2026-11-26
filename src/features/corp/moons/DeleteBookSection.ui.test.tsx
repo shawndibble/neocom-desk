@@ -57,7 +57,6 @@ function renderSection(
   return { reload, onDelete };
 }
 
-/** The confirm shares the opener's name; it renders after it. */
 const lastButton = async (name: string) => (await screen.findAllByRole('button', { name })).at(-1)!;
 const openButton = () => screen.queryByRole('button', { name: 'Delete the book' });
 

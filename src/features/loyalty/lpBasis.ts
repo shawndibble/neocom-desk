@@ -1,11 +1,3 @@
-/**
- * What the LP Store's ISK-per-LP figure is per: the offer's own corporation LP
- * (the default and today's behaviour) or CONCORD LP, converted at the
- * corporation's exchange rate (`engine/loyalty/concordExchange.ts`). Only the
- * displayed figure and its sort change; the offer's profit does not.
- *
- * A device-local UI preference like `priceBasis.ts`, never synced (GLOSSARY.md).
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export type LpBasis = 'lp' | 'concord';

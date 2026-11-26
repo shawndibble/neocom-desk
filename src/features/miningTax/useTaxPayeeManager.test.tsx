@@ -8,7 +8,6 @@ vi.mock('@/lib/useIsNarrow', () => ({ useIsNarrow: () => false }));
 
 const characters = [{ characterId: 90000001, characterName: 'Kestrel Vane' }] as TrackedCharacter[];
 
-/** A Corp Tax Book view with one book, and what it has of the member's: `rows` billed, a pending day or not. */
 function view(p: { rows?: number; pendingFrom?: string }): CorpBookView {
   return {
     overlay: { rows: Array.from({ length: p.rows ?? 0 }, () => ({})) },
@@ -32,8 +31,6 @@ describe('useTaxPayeeManager: the first-Payee empty state', () => {
   });
 
   it("is not shown for a member whose first day in a book is still today's mining", () => {
-    // Nothing is billed until the day closes, but the book has a pending record of the member's
-    // ore, and a donation they sent is credit on its account: the ledger has to show both.
     expect(needsFirstPayee(view({ pendingFrom: '2026-11-22' }))).toBe(false);
   });
 

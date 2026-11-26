@@ -34,11 +34,6 @@ const ECU = 2848;
 const LAUNCHPAD = 2256;
 const BASIC = 2469;
 
-/**
- * Round, deterministic prices for every planetary commodity: P0 at 5, P1 near
- * 1,500, P2 near 36,000, so a made tier visibly out-earns raw and the ranking has
- * something to rank.
- */
 function pricesFor(): { prices: Record<number, number>; buyPrices: Record<number, number> } {
   const prices: Record<number, number> = {};
   const buyPrices: Record<number, number> = {};
@@ -104,7 +99,6 @@ const TEMPERATE_ID = 40000001;
 const OCEANIC_ID = 40000002;
 const GAS_ID = 40000003;
 
-/** A temperate colony pulling Microorganisms on two 7-head ECUs, linked to its pad. */
 function temperateDetail(expiresInHours = 70, qty = 6_000): CharacterPlanetDetail {
   return {
     pins: [
@@ -121,7 +115,6 @@ function temperateDetail(expiresInHours = 70, qty = 6_000): CharacterPlanetDetai
   };
 }
 
-/** An oceanic colony with only a pad: nothing extracted, nothing measurable. */
 const oceanicDetail: CharacterPlanetDetail = {
   pins: [pin(1, LAUNCHPAD)],
   links: [],
@@ -196,8 +189,6 @@ describe('buildPlanAdvice: today', () => {
       taxRate: colony.taxRate,
       salesTaxPct: hubBooks(PRICES, 5).salesTaxPct,
     }).iskPerHour!;
-    // 7 days between hauls fills this colony's pad, so only the stalled share differs.
-    // The factory suggestion adds a refinement the colony does not run: not part of today's ore.
     const inPlace = colony.quickWins
       .filter((win) => !isFactoryWin(win))
       .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
@@ -223,7 +214,6 @@ describe('buildPlanAdvice: today', () => {
     const buyback = buildPlanAdvice(input({ market: { kind: 'buyback', pct: 80 } }));
     expect(temperate(buyback).todayPerDay!).toBeLessThan(temperate(hub).todayPerDay!);
     expect(buyback.market).toEqual({ kind: 'buyback', pct: 80 });
-    // A buyback is collected at home: no route to the market.
     expect(buyback.haul.route).toEqual({ kind: 'local' });
   });
 });
@@ -256,12 +246,10 @@ describe('buildPlanAdvice: quick wins', () => {
     const storage = week.quickWins.find((win) => win.detail.kind === 'storage');
     expect(storage).toBeDefined();
     expect(storage!.gainPerDay).toBeGreaterThan(0);
-    // What storage saves is shown, but it adds nothing to the colony after its quick wins.
     const adds = week.quickWins
       .filter((win) => !isSaving(win.detail))
       .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
     expect(week.afterQuickWinsPerDay).toBeCloseTo(week.todayPerDay! + adds, 6);
-    // A pilot who hauls daily does not stall, so there is nothing to win and today is the full rate.
     const daily = temperate(buildPlanAdvice(input()));
     expect(daily.quickWins.some((win) => win.detail.kind === 'storage')).toBe(false);
     expect(daily.todayPerDay!).toBeGreaterThan(week.todayPerDay!);
@@ -274,11 +262,6 @@ describe('buildPlanAdvice: quick wins', () => {
   });
 });
 
-/**
- * A colony whose ground yields little raw ore: refining it beats selling it, so
- * there is a rebuild worth making. The default fixture's rich ground out-earns
- * every made tier, which is the Keep case.
- */
 function leanSnapshot(upgradeLevel = 4): PlannerSnapshot {
   return snapshot({
     colonies: [
@@ -288,10 +271,6 @@ function leanSnapshot(upgradeLevel = 4): PlannerSnapshot {
   });
 }
 
-/**
- * Bacteria priced below the ore it is made from, so refining it in place is no
- * quick win: these tests are about a rebuild, not the basic-factory suggestion.
- */
 function leanInput(overrides: Partial<PlanAdviceInput> = {}): PlanAdviceInput {
   const prices = { ...PRICES.prices, [2393]: 50 };
   return input({
@@ -336,11 +315,9 @@ describe('buildPlanAdvice: rebuild', () => {
     for (const option of [picked.pick, picked.alternative]) {
       if (option) expect(option.recipe.extracts).toEqual([AQUEOUS_LIQUIDS]);
     }
-    // The unrestricted pick works another resource, so the override is what narrowed it.
     const open = rebuildOf();
     if (open.status !== 'change') throw new Error('expected a change');
     expect(open.alternative?.recipe.extracts).not.toEqual([AQUEOUS_LIQUIDS]);
-    // Absent, empty, or on another planet: the same answer as no override at all.
     expect(rebuildOf(new Map())).toEqual(rebuildOf());
     expect(rebuildOf(new Map([[TEMPERATE_ID, []]]))).toEqual(rebuildOf());
     expect(rebuildOf(new Map([[OCEANIC_ID, [MICROORGANISMS]]]))).toEqual(rebuildOf());
@@ -439,7 +416,6 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(advice.haul.tripsPerWeek).toBe(7);
     expect(advice.haul.m3PerTrip).toBeGreaterThan(0);
     expect(advice.haul.fit).not.toBeNull();
-    // The nullsec colony's route did not resolve: the exposure is unknown, not zero.
     expect(advice.haul.route).toEqual({ kind: 'unknown' });
     const solo = buildPlanAdvice(
       input({
@@ -504,11 +480,9 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
       rateSource: advice.rankingBasis.rateSource,
       haulDays: 3,
     });
-    // A buyback pays 80% of the hub's sale price, with no sales tax.
     const id = Number(Object.keys(PRICES.buyPrices)[0]);
     expect(advice.chainBasis.books.revenuePrices[id]).toBeCloseTo(PRICES.buyPrices[id] * 0.8, 6);
     expect(advice.chainBasis.books.salesTaxPct).toBe(0);
-    // The ranking never takes a P3 or P4: the estimate is its own figure.
     expect(advice.recipeRows.every((row) => row.tier === 1 || row.tier === 2)).toBe(true);
   });
 
@@ -550,7 +524,6 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(tagged.length).toBeGreaterThan(0);
     expect(tagged.every((r) => r.needsCcLevel! > 0 && r.needsCcLevel! <= 5)).toBe(true);
     expect(tagged.some((r) => r.tier === 2)).toBe(true);
-    // The shared ranking (Plan, Map) stays within the trained skill.
     expect(low.recipes.recipes.every((r) => r.needsCcLevel === undefined)).toBe(true);
     expect(low.recipes.recipes).toEqual([]);
     expect(low.recipes.bestAnywherePerDay).toBeNull();
@@ -594,7 +567,6 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
   });
 
   it('shows the same figures as the standalone ranker for the same rows', () => {
-    // The ranking is exactly rankRecipes over the model's rows: Map and Plan share one number.
     const advice = buildPlanAdvice(input());
     const again = rankRecipes({
       rows: advice.recipes.recipes.map((r) => ({
@@ -697,7 +669,6 @@ describe('buildPlanAdvice: more quick wins', () => {
     });
     const links = (ids: number[]) =>
       ids.map((id) => ({ source_pin_id: 3, destination_pin_id: id, link_level: 0 }));
-    // One colony makes Bacteria, the other Water: no single colony can make Test Cultures.
     const makesBacteria: CharacterPlanetDetail = {
       pins: [
         ecuPin(1, MICROORGANISMS, 5, 70, 6_000),
@@ -761,8 +732,6 @@ describe('buildPlanAdvice: more quick wins', () => {
     });
     const links = (ids: number[]) =>
       ids.map((id) => ({ source_pin_id: 3, destination_pin_id: id, link_level: 0 }));
-    // Uttindar V: five Bacteria factories on one ECU that feeds about four, so one sits idle.
-    // The idle win spends their room on heads; the network plan spends it on a factory.
     const idleHost: CharacterPlanetDetail = {
       pins: [
         ecuPin(1, MICROORGANISMS, 5, 70, 12_000),
@@ -797,7 +766,6 @@ describe('buildPlanAdvice: more quick wins', () => {
           }),
         })
       );
-    // Control: with every factory fed, the network plan does offer the host a factory.
     const fed = { ...idleHost, pins: idleHost.pins.filter((p) => p.pin_id !== 8) };
     expect(
       temperate(adviceWith(fed)).quickWins.some((win) => win.id.includes(':room-factories:'))
@@ -809,7 +777,6 @@ describe('buildPlanAdvice: more quick wins', () => {
         (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
         win.detail.kind === 'spare-room'
     );
-    // The heads earn more than the factory, so they keep the room.
     expect(claims.map((win) => win.detail.kind)).toEqual(['idle-factories']);
     const shown = (wins: typeof host.quickWins) =>
       wins

@@ -1,23 +1,3 @@
-/**
- * The arithmetic behind an Appraisal's Refine figure, laid out so a pilot can
- * check it against another tool: which minerals the pile refines into, at what
- * price, less the facility's tax, plus the units too few to fill a portion,
- * against what the same pile fetches sold as is. Everything is priced on one
- * Price Basis (the buy orders, the sell orders, or halfway between), and
- * `buildRefineComparison` does all three at once.
- *
- * Pure. It re-derives nothing the Appraisal already decided: the recipe, the
- * yield applied and the prices read all arrive on each item's
- * `refine.detail` (`computeAppraisalRefine`), so a live result and a shared
- * snapshot go through this one function. An item with no `detail` has no
- * breakdown and is counted in `skipped`.
- *
- * The comparison is deliberately the table's: `rowFigures(...).refine.verdict`
- * judges a row as refined value plus leftover units, at the row's as-is unit
- * price on the basis, against its as-is total on the basis
- * (`asIsFigures`), and this does the same over the whole pile. A row with no
- * as-is price on the basis is no comparison there: not a win.
- */
 import { reprocessingYield } from '@/engine/industry/reprocessing';
 import { netOfReprocessingTax } from '@/engine/industry/refiningSetup';
 import { asIsFigures } from './appraisalRowFigures';
@@ -33,25 +13,18 @@ import {
 
 export interface RefineBreakdownInput {
   appraisal: Pick<Appraisal, 'rows' | 'items'>;
-  /** The percentage of market the appraisal was priced at. */
   pricePercent: number;
-  /** The facility's fee, a fraction (0.01 = 1%). */
   taxRate: number;
-  /** Narrow to one item for a single row's breakdown. */
   onlyTypeId?: number;
-  /** Which side of the book the minerals and the as-is pile are priced on; default the buy orders. */
   basis?: RefineBasis;
 }
 
 export interface RefineMineralLine {
   typeId: number;
   quantity: number;
-  /** ISK a unit at 100% of market on the breakdown's basis; null where that side has no price. */
   price: number | null;
-  /** The same mineral's buy and sell unit prices, whatever the basis; null where that side has none. */
   buyPrice: number | null;
   sellPrice: number | null;
-  /** The quantity at `pricePercent` of that price, before tax; 0 where unpriced. */
   value: number;
 }
 
@@ -63,48 +36,31 @@ export interface RefineItemLine {
   portionSize: number;
   unitsLeftOver: number;
   efficiency: number;
-  /** Material type id -> quantity returned, for the row's own arithmetic. */
   outputs: { typeId: number; perPortion: number; quantity: number }[];
-  /** Minerals at `pricePercent`, less tax. */
   refined: number;
   leftoverValue: number;
-  /** Selling the pasted quantity as is, on the breakdown's basis. */
   asIs: number;
   wins: boolean;
 }
 
 export interface RefineBreakdown {
-  /** The side of the book everything here is priced on. */
   basis: RefineBasis;
   items: RefineItemLine[];
-  /** Largest value first. */
   minerals: RefineMineralLine[];
-  /** Minerals at `pricePercent`, before tax. */
   mineralValue: number;
   tax: number;
-  /** Minerals less tax: what the table's Refine figure and the header chip sum to. */
   net: number;
   unitsLeftOver: number;
   leftoverValue: number;
-  /** `net` plus the leftover units sold as is: what refining the pile leaves you holding. */
   total: number;
-  /** The same pile sold as is, on the basis. */
   asIs: number;
   difference: number;
   refineWins: boolean;
   efficiencyMin: number | null;
   efficiencyMax: number | null;
-  /**
-   * The total efficiency, as a fraction, above which refining beats selling as
-   * is, holding the items' efficiencies in proportion. Null when no yield
-   * gets there, or when there is nothing to refine.
-   */
   breakEvenEfficiency: number | null;
-  /** False when a mineral had no price, so `total` is a floor. */
   pricedAll: boolean;
-  /** Items left out for carrying no refine data. */
   skipped: number;
-  /** Items nobody buys as is here, so selling them as is counts for 0. */
   unbuyable: number;
 }
 
@@ -114,7 +70,6 @@ interface Refinable {
   detail: NonNullable<NonNullable<AppraisalItem['refine']>['detail']>;
 }
 
-/** One mineral's unit price on a basis; undefined where a side it needs has none. */
 function mineralPrice(
   detail: AppraisalRefineDetail,
   typeId: number,
@@ -152,7 +107,6 @@ function netMineralValue(
   return { value: netOfReprocessingTax(value, taxRate), leftover };
 }
 
-/** The lowest and highest efficiency the items were refined at; null when none carries refine detail. */
 export function refineEfficiencyRange(
   items: readonly AppraisalItem[]
 ): { min: number; max: number } | null {
@@ -160,7 +114,6 @@ export function refineEfficiencyRange(
   return all.length === 0 ? null : { min: Math.min(...all), max: Math.max(...all) };
 }
 
-/** How far a yield can be scaled before refining stops losing; searched up to this multiple. */
 const MAX_BREAK_EVEN_SCALE = 8;
 const BREAK_EVEN_STEPS = 40;
 
@@ -244,7 +197,6 @@ export function buildRefineBreakdown({
       refined,
       leftoverValue: itemLeftover,
       asIs: itemAsIs,
-      // No as-is price on this basis is no comparison, as in the table: not a win.
       wins: !unpriced && refined + itemLeftover > itemAsIs,
     });
   }
@@ -276,12 +228,6 @@ export function buildRefineBreakdown({
   };
 }
 
-/**
- * Bisects the multiple of every item's efficiency at which refine ties selling
- * as is, then states it as an efficiency: the multiple times the items'
- * mean, weighted by what each refines to. The total only ever rises with the
- * yield (more minerals, never fewer), so the search is sound.
- */
 function breakEvenEfficiency(
   items: readonly RefineItemLine[],
   refinables: readonly Refinable[],
@@ -311,11 +257,6 @@ function breakEvenEfficiency(
   return high * mean;
 }
 
-/**
- * Whether a basis can be priced for these items: the sell and split sides need
- * the minerals' sell prices, which a share link from before they travelled
- * with it does not carry. The buy side is always there.
- */
 export function basisAvailable(
   appraisal: Pick<Appraisal, 'items'>,
   basis: RefineBasis,
@@ -327,12 +268,10 @@ export function basisAvailable(
     .every((item) => !item.refine?.detail || item.refine.detail.materialSellPrices !== undefined);
 }
 
-/** The breakdown on every basis. The buy side is always there; the others need the sell side to have been read. */
 export type RefineComparison = Record<RefineBasis, RefineBreakdown | null> & {
   buy: RefineBreakdown;
 };
 
-/** The breakdown on every price basis at once, for the side-by-side comparison. */
 export function buildRefineComparison(
   input: Omit<RefineBreakdownInput, 'basis'>
 ): RefineComparison {
@@ -346,14 +285,8 @@ export function buildRefineComparison(
   } as RefineComparison;
 }
 
-/** An item whose sell price is this many times its buy price is lopsided: a thin book, not a market. */
 export const LOPSIDED_SELL_RATIO = 10;
 
-/**
- * Items whose sell price dwarfs their buy price, which props up the Sell and
- * Split bases (one uncompressed ore sat at 46x its compressed price). The
- * figures stay as the market shows them; this is what lets a caller say so.
- */
 export function lopsidedItems(
   items: readonly Pick<AppraisalItem, 'typeId' | 'name' | 'buy' | 'sell'>[],
   onlyTypeId?: number

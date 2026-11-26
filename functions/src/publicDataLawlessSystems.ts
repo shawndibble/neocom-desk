@@ -1,16 +1,9 @@
-/**
- * The lawless-systems job for the GitHub Actions runner (`scripts/public-data/lawless-systems.mjs`,
- * `.github/workflows/public-data-lawless-systems.yml`): fetches CCP's insurgency feed and
- * publishes the lawless system ids to R2, where the app reads them with a plain fetch.
- */
 import { ESI_USER_AGENT } from './esiClient.js';
 import { INSURGENCY_URL, parseLawlessSystemIds } from './lawlessSystems.js';
 import { r2ConfigFromEnv } from './publicDataActiveWars.js';
 import { createR2Put, type R2Put } from './r2Client.js';
 
-/** What the app reads: `{ systemIds, updatedAt }`, what `src/features/travel/lawlessSystems.ts` reads. */
 export const LAWLESS_SYSTEMS_R2_KEY = 'lawless-systems/systems.json';
-/** Runs are 15 minutes apart: five minutes is the longest a CDN copy is worth keeping. */
 const HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=300',
@@ -22,7 +15,6 @@ export interface PublicLawlessSystemsDeps {
   now?: () => number;
 }
 
-/** Fetches the feed and publishes it; true when it wrote. Every run writes, so `updatedAt` is "last confirmed". */
 export async function publishLawlessSystems(deps: PublicLawlessSystemsDeps): Promise<boolean> {
   const response = await (deps.fetchImpl ?? fetch)(INSURGENCY_URL, {
     headers: {
@@ -34,7 +26,6 @@ export async function publishLawlessSystems(deps: PublicLawlessSystemsDeps): Pro
   });
   if (!response.ok) return false;
   const body: unknown = await response.json().catch(() => null);
-  // A changed or broken body is not "nothing lawless": publish nothing, let the object age.
   if (!Array.isArray(body)) return false;
   const next = { systemIds: parseLawlessSystemIds(body), updatedAt: (deps.now ?? Date.now)() };
   await deps.put(LAWLESS_SYSTEMS_R2_KEY, JSON.stringify(next), HEADERS);

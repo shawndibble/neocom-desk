@@ -50,8 +50,6 @@ describe('ensurePayee', () => {
     expect(await db.payees.count()).toBe(1);
   });
 
-  // A Payee must be someone in EVE: a name nobody has, a name two answer to, or
-  // a lookup that failed creates nothing and says which.
   it.each([
     [{ status: 'none' }, 'none'],
     [
@@ -67,7 +65,6 @@ describe('ensurePayee', () => {
     expect(await db.payees.count()).toBe(0);
   });
 
-  // Two Survey surfaces asking at once both pass the first name check before EVE answers.
   it('makes one Payee when two requests race through the lookup', async () => {
     const [a, b] = await Promise.all([
       findOrCreatePayee(1, 'Moon Corp', 10),
@@ -82,7 +79,6 @@ describe('ensurePayee', () => {
     const first = await ensurePayee(1, 'Moon Corp', 10);
     lookupMock.lookupPayeeName.mockClear();
     const again = await ensurePayee(1, 'moon corp', 15);
-    // A Payee found by name is not looked up again.
     expect(lookupMock.lookupPayeeName).not.toHaveBeenCalled();
     expect(again.id).toBe(first.id);
     expect(again.name).toBe('Moon Corp');

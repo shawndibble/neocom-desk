@@ -1,15 +1,3 @@
-/**
- * The This character / All characters pick each page last held, remembered
- * across visits and app restarts. Device-local view state, like column and
- * sort prefs: one row, one entry per page, because "All characters" is a
- * deliberate, heavier view on Assets that must not carry over to the others.
- *
- * Order on opening a page: a filter in the URL, then this page's pick, then
- * the synced Settings default (`defaultCharacterFilter.ts`), which only seeds
- * a page that has no pick yet. Pages hand `useCharacterFilterPick` to
- * `useRememberedUrlParams`, which owns the URL-wins rule: a pick is written
- * only from a change to the control, never from a link.
- */
 import { useCallback, useMemo } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -22,9 +10,6 @@ export const CHARACTER_FILTER_PICKS_SETTING_KEY = 'characterFilterPicks';
 export const CHARACTER_FILTER_PAGES = [
   'assets',
   'wallet',
-  // Industry's one page-wide picker. `jobs` and `opportunities` were its two
-  // per-panel pickers before they merged; kept so their stored picks still
-  // parse and seed `industry` (`industryCharacterPick`), never written again.
   'industry',
   'jobs',
   'opportunities',
@@ -69,11 +54,6 @@ export const useCharacterFilterPicks = createLocalSetting<CharacterFilterPicks>(
   parse: parseCharacterFilterPicks,
 });
 
-/**
- * The value `page` opens on when the URL names none, and how to remember an
- * edit. `firstVisit` replaces the Settings default for a page that has always
- * opened on its own value (Mining Tax on All) until the pilot picks.
- */
 export function useCharacterFilterPick(
   page: CharacterFilterPage,
   firstVisit?: CharacterFilterValue
@@ -92,8 +72,6 @@ export function useCharacterFilterPick(
   );
   const remember = useCallback(
     async (value: CharacterFilterValue) => {
-      // Hydrate first: writing before the stored row is read would replace
-      // every other page's pick with this one.
       const store = useCharacterFilterPicks.getState();
       await store.hydrate();
       const { value: picks, setValue } = useCharacterFilterPicks.getState();
@@ -104,10 +82,6 @@ export function useCharacterFilterPick(
   return { pick, remember };
 }
 
-/**
- * `useRememberedUrlParams`' stored side for a group whose `key` field is a
- * `characterFilterParam`.
- */
 export function useRememberedCharacterFilter<S extends UrlParamSchema>(
   page: CharacterFilterPage,
   key: keyof S & string,

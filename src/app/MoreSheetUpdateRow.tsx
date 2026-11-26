@@ -4,12 +4,6 @@ import { ActionResult } from '@/features/settings/settingsFields';
 import { useApplyUpdate } from '@/features/settings/useUpdateState';
 import { useUpdateStatus } from './updateAvailable';
 
-/**
- * The phone's one-press update, a full-width accent row at the top of the More
- * sheet's pages. Shown only while a newer build waits; the same row grammar as
- * Settings → "Update available". When the page stays up, the reason shows under
- * the row.
- */
 export function MoreSheetUpdateRow() {
   const { t } = useTranslation();
   const available = useUpdateStatus((state) => state.status === 'available');

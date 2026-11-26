@@ -1,16 +1,3 @@
-/**
- * Typed ESI (EVE Swagger Interface) HTTP client.
- *
- * Decoupled from auth/storage: token lookup is injected via configureEsi.
- * Every request pins X-Compatibility-Date and identifies the app via
- * X-User-Agent, per ESI guidelines.
- *
- * This is the one choke point every ESI call in the app passes through, which
- * is why the app-wide error/rate budget (`./budget.ts`, issue #655) is applied
- * here and nowhere else: a request is admitted by the gate, its response is
- * folded back into the budget, and its in-flight permit is released before any
- * backoff so a waiting retry cannot hold the ceiling shut behind it.
- */
 import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
 import { passEsiGate, observeEsiResponse } from './budget';
@@ -26,8 +13,6 @@ import type { EsiEndpointId } from './registry';
 import { COMPATIBILITY_DATE } from './compatibilityDate';
 import { USER_AGENT } from './userAgent';
 
-// `EsiError` lives in `./errors` so the budget can throw one without importing
-// the client back (issue #655), but this stays its canonical import path.
 export {
   EsiError,
   EsiBudgetError,
@@ -41,110 +26,36 @@ export const ESI_BASE_URL = 'https://esi.evetech.net';
 export { COMPATIBILITY_DATE };
 export { USER_AGENT };
 
-/**
- * How long one `esiFetch` call may take, **queue included**, before it is
- * abandoned. One clock covers waiting at the gate, waiting for a permit, the
- * fetch and the body read — a promise about the whole call, not about the
- * connection alone.
- *
- * `esiFetch` had no timeout at all, which was survivable while a hung socket
- * only stalled its own call site. It is not survivable now that every request
- * holds one of `budget.ts`'s `ESI_MAX_IN_FLIGHT` app-wide permits: twelve hung
- * sockets would be the app's whole ESI layer. Deliberately generous — this is
- * the "this call is dead" bound, not a latency target; `esi/cache.ts`'s 250ms
- * grace race is what keeps a merely slow call off the screen.
- *
- * **Must stay below `auth/session.ts`'s `EXPIRY_BUFFER_MS` (60s).** The token is
- * fetched *before* the gate, and `getValidAccessToken` only guarantees it is
- * good for that buffer. Capping the whole call at half of it is what makes it
- * impossible for a request that queued behind a fan-out to go out with an
- * expired token — which would 401, and paint the shell-wide re-auth banner over
- * what is really just congestion. Raise this above 60s and that starts
- * happening; `budget.test.ts` pins the relationship.
- *
- * The accepted consequence of one clock: a request that spent most of it queued
- * gets a short fetch window, so the tail of a very deep backlog fails into the
- * cache rather than merely finishing late. That is the intended trade — a
- * backlog that cannot drain inside 30s is one the app should stop growing.
- */
 export const REQUEST_TIMEOUT_MS = 30_000;
 
 export type GetToken = (characterId: number) => Promise<string>;
 
 let tokenProvider: GetToken | null = null;
 
-/** Inject (or clear) the access-token provider used for authenticated calls. */
 export function configureEsi(config: { getToken: GetToken | null }): void {
   tokenProvider = config.getToken;
 }
 
 export interface EsiFetchOptions {
-  /** When set, the request is authenticated with a Bearer token for this character. */
   characterId?: number;
   query?: Record<string, string | number | boolean | undefined>;
   page?: number;
-  /** Previously seen ETag; sent as If-None-Match. A 304 yields data: null. */
   etag?: string;
   signal?: AbortSignal;
-  /** HTTP method; defaults to GET. */
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  /** JSON-serialized as the request body when `method` is 'POST' or 'PUT'. */
   body?: unknown;
-  /**
-   * Identifies the call for the activity log (issue #32). Every
-   * `endpoints/` wrapper passes its own registry key; omitted only by
-   * direct `esiFetch` callers (tests) that don't need an entry.
-   */
   endpointId?: EsiEndpointId;
-  /**
-   * The gate lane to queue in (issue #2271). Omitted, it is whatever lane was
-   * ambient when `esiFetch` was called (`lane.ts`) — foreground unless a
-   * background caller set one. Passed explicitly only inside `src/esi`, where
-   * a lane has to outlive an `await` (a paginated walk's later pages).
-   */
   lane?: EsiLane;
 }
 
 export interface EsiResult<T> {
-  /** Response body, or null when the server answered 304 Not Modified. */
   data: T | null;
   etag: string | null;
-  /** Total pages from X-Pages; 1 when the endpoint is not paginated. */
   pages: number;
-  /** Raw Expires header, for cache-freshness display. */
   expires: string | null;
-  /**
-   * The server answered 304 to our If-None-Match: what the caller holds is
-   * still current. Distinct from `data: null`, which a 204 also produces.
-   */
   notModified: boolean;
 }
 
-/**
- * BUG #3: distinguishes "not logged in / needs re-login" from "offline /
- * ESI down" so read-through caches can surface a re-auth affordance instead
- * of silently going stale forever. Two shapes cover it:
- *  - EsiError with 401 (bad/expired token) or 403 (token valid but missing
- *    the scope this endpoint needs — same reasoning as
- *    src/features/industry/jobs.ts's existing needsReauth handling).
- *  - AuthError (src/auth/sso): getValidAccessToken's own refresh call fails
- *    (e.g. a revoked/expired refresh token) *before* esiFetch ever makes a
- *    request, so it never becomes an EsiError at all.
- *
- * An `AuthError` with status 0 (`network_error`, `timeout`) is neither: SSO
- * never answered, so nothing says the grant is bad. It is a network failure
- * like any other, and reading it as an auth failure had an offline pilot with
- * an expired access token shown a re-login prompt and, on `skipCacheOnAuthFailure`
- * loaders, an emptied view.
- *
- * Nor is an SSO outage or throttle (5xx, 429: `isSsoUnavailable`): EVE's login
- * service being down for a minute said nothing about the grant, and reading it
- * as one put a re-login banner on every view loading at that moment — the
- * "log in twice for no reason" the issue reported.
- *
- * Nor is a 403 that names a missing corporation role: the token is fine, the
- * Character lacks the in-game role, and no login can grant that.
- */
 export function isAuthFailure(err: unknown): boolean {
   if (err instanceof EsiError) {
     if (err.status === 401) return true;
@@ -153,29 +64,16 @@ export function isAuthFailure(err: unknown): boolean {
   return err instanceof AuthError && err.status !== 0 && !isSsoUnavailable(err);
 }
 
-/** SSO answered with an outage or a throttle: its own trouble, not the grant's. */
 export function isSsoUnavailable(err: AuthError): boolean {
   return err.status >= 500 || err.status === 429;
 }
 
-/** ESI's 403 for a Character without the corporation role an endpoint needs. */
 export function isMissingRole(err: unknown): boolean {
   if (!(err instanceof EsiError) || err.status !== 403) return false;
   const said = (err.body as { error?: unknown } | undefined)?.error;
   return /required role/i.test(`${err.message} ${typeof said === 'string' ? said : ''}`);
 }
 
-/**
- * Did the call fail for want of a network, rather than because of anything
- * ESI or SSO said? True for the offline refresh failure (`EsiOfflineError`),
- * a `fetch` that rejected with a `TypeError` (offline, DNS, TLS), an
- * `AuthError` SSO never answered (status 0), and a timeout (`EsiTimeoutError`,
- * or the `TimeoutError` an `AbortSignal.timeout` raises).
- *
- * Advisory, like `navigator.onLine`: the answer is for copy ("you're offline")
- * and never gates a request. A budget refusal (`EsiBudgetError`) is not one:
- * ESI was reachable, the app declined to ask.
- */
 export function isOfflineFailure(err: unknown): boolean {
   if (err instanceof EsiOfflineError || err instanceof EsiTimeoutError) return true;
   if (err instanceof AuthError) return err.status === 0;
@@ -183,39 +81,16 @@ export function isOfflineFailure(err: unknown): boolean {
   return err instanceof TypeError;
 }
 
-/**
- * Did a write time out after it may have left? For copy on a write that must
- * not claim "not done": the request was sent (`EsiTimeoutError.sent`) or a raw
- * `TimeoutError` fired, so ESI may well have acted on it. A timeout while still
- * queued for a permit (`sent: false`) never left, and is not one.
- */
 export function isUnconfirmedWrite(err: unknown): boolean {
   if (err instanceof EsiTimeoutError) return err.sent;
   return err instanceof DOMException && err.name === 'TimeoutError';
 }
 
-/**
- * The narrower question a few loaders ask: was the credential itself refused,
- * as opposed to a 403 (which for a structure market or a citadel name is an
- * ACL no re-login can fix)? A 401, or a refresh SSO answered with a failure.
- * Offline and timeouts are not.
- */
 export function isCredentialFailure(err: unknown): boolean {
   if (err instanceof EsiError) return err.status === 401;
   return isAuthFailure(err);
 }
 
-/**
- * The token, with a refresh that never reached SSO (`AuthError` status 0:
- * offline, DNS, timeout) rethrown as `EsiOfflineError`. Nothing says the grant
- * is bad, so callers see an ordinary network failure. It happens before the
- * request scope and the gate, so it is neither logged as activity nor counted
- * against the error budget.
- *
- * `navigator.onLine` is deliberately not consulted: it reads false on some VPNs
- * and virtual adapters while ESI is reachable, and a truly offline fetch fails
- * fast anyway.
- */
 async function accessTokenOrOffline(getToken: GetToken, characterId: number): Promise<string> {
   try {
     return await getToken(characterId);
@@ -245,25 +120,10 @@ function parsePages(response: Response): number {
 }
 
 interface RequestScope {
-  /** Aborts when the caller cancels, or when the request runs out of time. */
   readonly signal: AbortSignal;
   dispose(): void;
 }
 
-/**
- * The lifetime of one `esiFetch` call: the caller's cancellation and the
- * timeout, folded into one signal.
- *
- * It spans the **whole** call, retry and body read included, not just the
- * `fetch`. `fetch` ties the response's body stream to the signal it was given,
- * so a scope that ended when the headers arrived would leave `response.json()`
- * on a slow body uncancellable and untimed — which is how the caller's
- * `AbortSignal` behaved before this existed.
- *
- * The timeout aborts through a controller of our own rather than the caller's,
- * so a request that ran out of time stays distinguishable from one the caller
- * cancelled: only a cancellation is exempt from the activity log.
- */
 function openRequestScope(caller?: AbortSignal): RequestScope {
   const controller = new AbortController();
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -284,17 +144,6 @@ function openRequestScope(caller?: AbortSignal): RequestScope {
   };
 }
 
-/**
- * One HTTP request, admitted by the app-wide gate.
- *
- * The permit is released in `finally`, before the caller decides anything about
- * a retry — a retry that waited while still holding its permit would take one
- * of `ESI_MAX_IN_FLIGHT` slots out of the app for the length of the backoff.
- *
- * The response is timestamped with when it was *sent*, not when it arrived: the
- * budget uses that to tell a genuine recovery from a straggler that was already
- * on the wire when the circuit shut.
- */
 async function gatedFetch(
   url: URL,
   init: RequestInit,
@@ -305,7 +154,6 @@ async function gatedFetch(
   try {
     release = await passEsiGate(signal, lane);
   } catch (err) {
-    // Timed out before a permit came free: nothing went to ESI (issue #2271).
     if (err instanceof EsiTimeoutError) throw new EsiTimeoutError(err.timeoutMs, false);
     throw err;
   }
@@ -315,8 +163,6 @@ async function gatedFetch(
     observeEsiResponse(response.status, response.headers, startedAt);
     return response;
   } catch (err) {
-    // Runtimes disagree on whether `fetch` rejects with the abort *reason* or a
-    // generic AbortError; the reason we asked it to abort for is the honest one.
     if (err instanceof Error && err.name === 'AbortError' && signal.reason) throw signal.reason;
     throw err;
   } finally {
@@ -340,30 +186,15 @@ async function errorFromResponse(
     ) {
       message = (body as { error: string }).error;
     }
-  } catch {
-    // Non-JSON error body; keep the status message.
-  }
+  } catch {}
   return new EsiError(response.status, message, body, endpointId);
 }
 
-/**
- * Fetch one ESI resource. Public when characterId is omitted, authenticated
- * otherwise. Throws EsiError on any non-2xx/304 response.
- *
- * Throttling is the app-wide budget's job (`./budget.ts`), not this function's:
- * every request is admitted by the gate, every response is fed back to it, and
- * the one retry a 429/420 still gets is the gate's decision rather than a blind
- * sleep. A caller can therefore be refused *before* a request is made, with an
- * `EsiBudgetError` — an `EsiError` carrying 420 or 429, which `esi/cache.ts`
- * answers from the stored row exactly as it answers a 5xx.
- */
 export async function esiFetch<T>(
   path: string,
   options: EsiFetchOptions = {}
 ): Promise<EsiResult<T>> {
   const { characterId, query, page, etag, signal, method = 'GET', body, endpointId } = options;
-  // Read before the token await below, which ends the ambient lane's scope.
-  // Foreground reads for the active Character queue ahead of the rest (#2281).
   const lane = gateLane(options.lane ?? currentEsiLane(), characterId);
   const url = buildUrl(path, query, page);
 
@@ -387,10 +218,6 @@ export async function esiFetch<T>(
     const init: RequestInit = { method, headers, body: requestBody };
     let response = await gatedFetch(url, init, scope.signal, lane);
     if (response.status === 429 || response.status === 420) {
-      // The response has already been folded into the budget, so re-entering
-      // the gate *is* the backoff: it waits out a short reset the server named
-      // and refuses a long one. Refused, we keep the server's own error rather
-      // than swapping in a synthetic one — this caller did reach ESI.
       try {
         response = await gatedFetch(url, init, scope.signal, lane);
       } catch (retryErr) {
@@ -399,9 +226,6 @@ export async function esiFetch<T>(
       }
     }
 
-    // 304 (cache revalidation) and 204 (a write's empty response, e.g. the
-    // mail-read PUT) both carry no body — `.json()` on either throws, not a
-    // real failure.
     if (response.status === 304 || response.status === 204) {
       recordEsiActivity(endpointId, characterId, 'success');
       return {
@@ -414,9 +238,6 @@ export async function esiFetch<T>(
     }
     if (!response.ok) throw await errorFromResponse(response, endpointId);
 
-    // Parsed before recordActivity: a body that fails to parse is this
-    // request's outcome, not a second event stacked on top of a 'success'
-    // already recorded for it.
     const data = (await response.json()) as T;
     recordEsiActivity(endpointId, characterId, 'success');
     return {
@@ -427,15 +248,7 @@ export async function esiFetch<T>(
       notModified: false,
     };
   } catch (err) {
-    // A cancelled route load (useRouteSnapshot discarding a stale response)
-    // never reached a real outcome — not activity worth showing a user. Name
-    // check, not `instanceof DOMException`: msw/undici don't agree on the
-    // concrete error class, only on `name`.
     if (err instanceof Error && err.name === 'AbortError') throw err;
-    // Nor did a request the budget declined to send: no route was called, so
-    // there is no ESI activity to show. Logging one would fill `/settings`
-    // with errors during a throttle, for zero traffic — the same reasoning
-    // that exempts a cancellation.
     if (err instanceof EsiBudgetError) throw err;
     recordEsiActivity(endpointId, characterId, outcomeForError(err));
     throw err;
@@ -444,12 +257,10 @@ export async function esiFetch<T>(
   }
 }
 
-/** Shared with `paginated.ts` and the wallet-transactions loop, so a multi-request read logs once, not once per page. */
 export function outcomeForError(err: unknown): 'authFailure' | 'error' {
   return isAuthFailure(err) ? 'authFailure' : 'error';
 }
 
-/** No-op when the caller didn't identify the endpoint (direct esiFetch callers in tests). */
 export function recordEsiActivity(
   endpointId: EsiEndpointId | undefined,
   characterId: number | undefined,

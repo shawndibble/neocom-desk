@@ -1,13 +1,3 @@
-/**
- * The marker LOOKUP failing must not fail anything either. A store that throws
- * *synchronously* on `where(...)`, which is how a closed or schema-broken
- * Dexie behaves, would escape straight past the two unguarded callers:
- * `esi/cache.ts`'s read path and `auth/session.persistTokens`.
- *
- * Own file, see `cachePurgeHydration.test.ts`: sharing with anything that
- * hydrates successfully would warm the memo, and these assertions would pass
- * without ever calling `db.settings.where`.
- */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { loadWithCache } from './cache';
@@ -28,8 +18,6 @@ function breakSettingsLookup(): void {
 
 afterEach(async () => {
   vi.restoreAllMocks();
-  // Suppression is module state: a tier-3 test would otherwise leak into the
-  // next. (Between test FILES vitest already gives a fresh registry.)
   await clearCachePurgePending(CHAR_ID);
 });
 
@@ -53,8 +41,6 @@ describe('isCachePurgePending when the marker lookup itself fails', () => {
   });
 
   it('keeps the whole purge path total when EVERY store throws', async () => {
-    // What `auth/session.persistTokens` depends on: lookup plus purge is a
-    // total function, so login and refresh complete whatever Dexie does.
     breakSettingsLookup();
     const boom = () => {
       throw new Error('DatabaseClosedError');
@@ -65,7 +51,6 @@ describe('isCachePurgePending when the marker lookup itself fails', () => {
 
     await expect(isCachePurgePending(CHAR_ID)).resolves.toBe(false);
     await expect(purgeCharacterCacheOrSuppress(CHAR_ID)).resolves.toBe('suppressed');
-    // Suppression survives in memory even though nothing could be written.
     await expect(isCachePurgePending(CHAR_ID)).resolves.toBe(true);
   });
 

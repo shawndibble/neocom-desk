@@ -1,17 +1,3 @@
-/**
- * Slot-aware job schedule for a build tree: when each job starts and finishes
- * on the Characters' real job slots, sub-jobs in parallel, a parent waiting on
- * every sub-job it consumes. One job per node: a node's runs are never split
- * across slots here. A job past its blueprint's max production limit is
- * already several nodes by the time it arrives (`planJobNodes`).
- *
- * Greedy list scheduling: repeatedly take the ready job (every dependency
- * scheduled) that can start earliest, ties going to the longest remaining path
- * to the root, then input order, and put it on the slot in its pool that frees
- * first. Each pool starts from the slots busy right now. With several
- * Characters each has its own pools; a job goes to the eligible Character who
- * finishes it first, timed with that Character's own seconds.
- */
 import {
   JOB_SLOT_CATEGORIES,
   slotFreeTimes,
@@ -22,19 +8,12 @@ import {
 
 export interface ScheduleNode {
   id: string;
-  /** Job duration. */
   seconds: number;
   category: JobSlotCategory;
-  /** Ids of the jobs whose output this job consumes; it starts once all have finished. */
   deps: readonly string[];
-  /**
-   * Per-Character duration, for the Characters who can run this job (those
-   * with the blueprint in reach). Absent: any Character, at `seconds`.
-   */
   secondsByCharacter?: ReadonlyMap<number, number>;
 }
 
-/** One Character's job-slot skills and the jobs already occupying their slots. */
 export interface ScheduleCharacter {
   characterId: number;
   skills: JobSlotSkills;
@@ -43,33 +22,24 @@ export interface ScheduleCharacter {
 
 export interface ScheduledJob {
   id: string;
-  /** The Character running it; set by `scheduleJobsAcrossCharacters` only. */
   characterId?: number;
   startMs: number;
   finishMs: number;
-  /** Dependency height: 0 for a job with no sub-jobs, else one more than its tallest sub-job. */
   stage: number;
 }
 
 export interface ScheduleStage {
-  /** Earliest start among the stage's jobs. */
   startMs: number;
-  /** In input order. */
   jobIds: string[];
 }
 
 export interface JobSchedule {
-  /** In input order. */
   jobs: ScheduledJob[];
-  /** Jobs grouped by dependency height, lowest first: the order the tree builds in. */
   stages: ScheduleStage[];
-  /** When the last job finishes (`nowMs` with no jobs). */
   finishMs: number;
-  /** Most jobs running at once, across every pool. */
   peakSlots: number;
 }
 
-/** The tree on one Character's slots. */
 export function scheduleJobs(
   nodes: readonly ScheduleNode[],
   character: { skills: JobSlotSkills; jobs: readonly JobSlotJob[] },
@@ -86,10 +56,6 @@ export function scheduleJobs(
   };
 }
 
-/**
- * The tree on several Characters' slots. Throws when a job's eligible
- * Characters (`secondsByCharacter`) include none of `characters`.
- */
 export function scheduleJobsAcrossCharacters(
   nodes: readonly ScheduleNode[],
   characters: readonly ScheduleCharacter[],
@@ -116,7 +82,6 @@ export function scheduleJobsAcrossCharacters(
     visiting.delete(i);
     return stage[i];
   };
-  // Longest path (in seconds) from a job through its consumers to the root.
   const visitTail = (i: number): number =>
     (remainingPathSeconds[i] ??=
       nodes[i].seconds + parents[i].reduce((m, p) => Math.max(m, visitTail(p)), 0));
@@ -129,7 +94,6 @@ export function scheduleJobsAcrossCharacters(
         JOB_SLOT_CATEGORIES.map((c) => [c, slotFreeTimes(character, c, nowMs)])
       ) as Record<JobSlotCategory, number[]>
   );
-  // Who can run each job, and for how long.
   const options = nodes.map((n) => {
     const eligible = characters.flatMap((c, ci) => {
       const seconds = n.secondsByCharacter ? n.secondsByCharacter.get(c.characterId) : n.seconds;
@@ -151,7 +115,6 @@ export function scheduleJobsAcrossCharacters(
     nodes.forEach((n, i) => {
       if (scheduled[i] || !n.deps.every((dep) => scheduled[index.get(dep)!])) return;
       const ready = n.deps.reduce((t, dep) => Math.max(t, finishMs[index.get(dep)!]), nowMs);
-      // The eligible Character who finishes it first (earlier-listed on a tie).
       let start = Infinity;
       let slot = -1;
       let char = -1;
@@ -205,7 +168,6 @@ export function scheduleJobsAcrossCharacters(
     s.jobIds.push(job.id);
   }
 
-  // A finish at t frees its slot before a start at t takes one.
   const events = jobs
     .flatMap((j) => [
       { at: j.startMs, delta: 1 },

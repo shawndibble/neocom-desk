@@ -1,10 +1,4 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
-/**
- * Every active Incursion, nearest first from the pilot's Current System with
- * their own jump basis: the one read behind Route Safety's "Incursions near
- * you" (#3540) and the Overview's Incursions card (#3541), so the two can
- * never disagree about a distance.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildIncursionRows, type IncursionRow } from '@/engine/incursions/incursionRows';
 import {
@@ -15,17 +9,13 @@ import {
 import { loadConstellationNames, loadIncursions, type IncursionsFeed } from './incursionsData';
 
 export interface IncursionsRead {
-  /** `undefined` while reading; `null` when the feed could not be read and nothing was cached. */
   feed: IncursionsFeed | null | undefined;
-  /** Nearest first; empty until the feed is read. */
   rows: IncursionRow[];
   constellationNames: ReadonlyMap<number, string>;
   jumpsStatus: JumpDistanceStatus;
-  /** Back to "reading…" and read the feed again. */
   retry: () => void;
 }
 
-/** `refreshKey`: bump it to re-read the feed in place, keeping the last rows meanwhile. */
 export function useIncursions(
   current: Pick<CurrentSystemState, 'systemId' | 'loaded'>,
   refreshKey = 0

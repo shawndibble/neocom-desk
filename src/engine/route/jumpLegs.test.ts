@@ -3,7 +3,6 @@ import type { JumpGraph } from './jumpRoute';
 import type { JumpSystem } from './jumpDrive';
 import { hullJumpDrive, jumpWayFacts, routeWithJumps } from './jumpLegs';
 
-// A gate chain 1-2-3-4-5-6 along x, one ly apart per step (systems 3.. are lowsec).
 function chain(count: number, highsec: number[] = []) {
   const graph = new Map<number, number[]>();
   const systems: JumpSystem[] = [];
@@ -115,9 +114,7 @@ describe('jumpWayFacts', () => {
     expect(facts.jumps).toBe(2);
     expect(facts.totalLy).toBe(7);
     expect(facts.fuel).toBe(700);
-    // After a 4 ly jump the timer is 5 min; fatigue 50 min.
     expect(facts.arriveMinutes).toBeGreaterThanOrEqual(5);
-    // Second jump: fatigue grows, and decays only by the wait in between.
     expect(facts.fatigueMinutes).toBeGreaterThan(0);
   });
 

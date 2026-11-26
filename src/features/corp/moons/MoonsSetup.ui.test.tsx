@@ -151,7 +151,6 @@ describe('MoonsSetup', () => {
   });
 
   it("starts a former moon owner's own book on the day its coverage ended", async () => {
-    // Today, so the leave day is always later than the start of the month (a fixed date stopped qualifying on the 1st of the next month).
     const leaveDay = utcDay();
     getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: leaveDay });
     renderSetup();

@@ -3,11 +3,6 @@ import { LiveStatus } from '@/components/ui';
 import { useOnline } from '@/stores/network';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 
-/**
- * The one "prices unavailable" notice, shared by Plan, Map and Colonies. Prices
- * that could not be read are unknown, never zero: a tab shows this and hides
- * every figure that derives from them, rather than drawing "0 ISK".
- */
 export function PricesUnavailable() {
   const { t } = useTranslation();
   const online = useOnline();

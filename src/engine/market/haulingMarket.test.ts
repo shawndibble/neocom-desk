@@ -38,7 +38,7 @@ describe('summarizeDemand', () => {
     const points = Array.from({ length: 24 }, (_, i) => day(i, 10, 100));
     const s = summarizeDemand(points, '2026-09-26');
     expect(s.daysWithTrades).toBe(24);
-    expect(s.dailyVolume).toBeCloseTo(8); // 240 units over 30 days
+    expect(s.dailyVolume).toBeCloseTo(8);
     expect(s.demand).toBe('most-days');
   });
 
@@ -72,7 +72,7 @@ describe('summarizeDemand', () => {
 
   it('prices recent sales as the volume-weighted median over the last 7 days', () => {
     const points = [day(0, 10, 200), day(1, 30, 100), day(20, 1000, 1)];
-    expect(summarizeDemand(points, '2026-09-26').recentSalePrice).toBeCloseTo(100); // 30 of 40 units sold at 100
+    expect(summarizeDemand(points, '2026-09-26').recentSalePrice).toBeCloseTo(100);
   });
 
   it('falls back to the 30-day median when nothing traded in the last 7 days', () => {
@@ -89,7 +89,6 @@ describe('summarizeDemand', () => {
 });
 
 describe('summarizeDemand listing side', () => {
-  // A day with one listing bought (high) and one dump into a buy order (low): its average is a price nobody paid.
   const split = (offset: number): MarketHistoryPoint => ({
     ...day(offset, 2, 157_155_000),
     highest: 289_000_000,
@@ -176,9 +175,7 @@ describe('estimateSale', () => {
 
   it('counts units within 1% of the price as ahead, since those sellers will relist below you', () => {
     const e = estimateSale({ ladder, dailyVolume: 5, recentSalePrice: 500 })!;
-    // 100 and 100.5 sit within 1% of the ~99.9 price; 130 does not.
     expect(e.unitsAhead).toBe(30);
-    // reference lot = one day's sales (5): (30 + 5) / 5 = 7 days
     expect(e.daysToSell).toBeCloseTo(7);
   });
 
@@ -190,9 +187,9 @@ describe('estimateSale', () => {
 
   it("caps the units worth bringing at a share of a week's sales minus those ahead, never below 1", () => {
     const e = estimateSale({ ladder, dailyVolume: 20, recentSalePrice: 500 })!;
-    expect(e.demandCapUnits).toBe(27); // (140 - 30) * 0.25
+    expect(e.demandCapUnits).toBe(27);
     const fast = estimateSale({ ladder, dailyVolume: 1_000_000, recentSalePrice: 500 })!;
-    expect(fast.demandCapUnits).toBe(1_750_000 - 8); // a quarter of a week, not all of it
+    expect(fast.demandCapUnits).toBe(1_750_000 - 8);
     const thin = estimateSale({ ladder, dailyVolume: 0.1, recentSalePrice: 500 })!;
     expect(thin.demandCapUnits).toBe(1);
   });
@@ -249,7 +246,6 @@ describe('lotEconomics', () => {
     const r = lotEconomics({ buyLadder, expectedPrice: 1200, quantity: 10, fees: FEES });
     expect(r.filled).toBe(10);
     expect(r.cost).toBe(10_000);
-    // Accounting V: 3.375% tax. Broker Relations IV, base standings: 3% - 1.2% = 1.8%.
     const gross = 12_000;
     const fees = gross * 0.03375 + gross * 0.018;
     expect(r.profit).toBeCloseTo(gross - fees - 10_000);
@@ -305,7 +301,6 @@ describe('hubLadders', () => {
         { price: 100, volume_remain: 4, is_buy_order: false, location_id: 1 },
         { price: 99, volume_remain: 9, is_buy_order: false, location_id: 2 },
         { price: 90, volume_remain: 6, is_buy_order: true, location_id: 1 },
-        // A dearer buy order elsewhere in the region: its range is not read, so it never counts.
         { price: 98, volume_remain: 50, is_buy_order: true, location_id: 2 },
       ],
       1
@@ -316,7 +311,6 @@ describe('hubLadders', () => {
 });
 
 describe('walkInstant', () => {
-  // Accounting V: 3.375% sales tax, no broker fee (nothing is listed).
   const origin: LadderLevel[] = [
     { price: 100, units: 10, orders: 1 },
     { price: 105, units: 20, orders: 2 },
@@ -328,8 +322,6 @@ describe('walkInstant', () => {
   ];
 
   it('pairs the cheapest sells with the dearest buys and stops at the first unit that loses money', () => {
-    // 5 @100→115, 5 @100→110, 7 @105→110; then 105→108 nets 104.355 < 105 and the walk stops
-    // partway through the origin's 105 level.
     const r = walkInstant({ originLadder: origin, destBuyLadder: destBuys, accountingLevel: 5 });
     expect(r.units).toBe(17);
     expect(r.cost).toBe(1735);
@@ -349,7 +341,6 @@ describe('walkInstant', () => {
   });
 
   it('never takes a unit that only breaks even', () => {
-    // Accounting 0: 7.5% of 200 is 15, so a 185 buy nets exactly zero.
     const r = walkInstant({
       originLadder: [{ price: 185, units: 10, orders: 1 }],
       destBuyLadder: [{ price: 200, units: 10, orders: 1 }],
@@ -412,7 +403,6 @@ describe('thresholds', () => {
 });
 
 describe('demandFromAggregate', () => {
-  // The same points and aggregate as functions/src/marketHistoryVolume.test.ts folds.
   const TODAY = '2026-10-15';
   const point = (
     date: string,

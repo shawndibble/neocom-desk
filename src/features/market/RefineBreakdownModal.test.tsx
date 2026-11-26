@@ -12,10 +12,6 @@ const NAMES = new Map([
   [MEXALLON, 'Mexallon'],
 ]);
 
-/**
- * A 100-portion ore returning 16,000 Pyerite and 800 Mexallon per portion. The minerals buy for 10 and
- * 50 and sell for 8 and 70; the ore buys for 1,000 and sells for `sell`.
- */
 function ore(
   typeId: number,
   name: string,
@@ -79,7 +75,6 @@ describe('RefineBreakdownModal', () => {
     for (const name of ['Buy orders', 'Split', 'Sell orders']) {
       expect(within(table).getByText(name)).toBeInTheDocument();
     }
-    // 1,500 units, 90%: 1.0M + 0.5M sold as is on buy; refined 2.7M.
     expect(within(table).getAllByText('Selected')).toHaveLength(1);
     expect(within(table).getByRole('row', { name: /Buy orders/ })).toHaveTextContent('Selected');
     expect(within(table).getByRole('row', { name: /Sell orders/ })).not.toHaveTextContent(
@@ -88,7 +83,6 @@ describe('RefineBreakdownModal', () => {
   });
 
   it('says once what to do on the selected basis, without naming the other bases', () => {
-    // The ore sells for 5,000: listing it as is beats refining on the sell side, though refining wins on buy.
     const lopsided = buildAppraisal(
       [ore(1, 'Zeolites', 1000, 0.9, { sell: 5000 }), ore(2, 'Coesite', 500, 0.9, { sell: 5000 })],
       100
@@ -126,7 +120,6 @@ describe('RefineBreakdownModal', () => {
   it('prices everything below on the selected basis', () => {
     open({ basis: 'sell' });
     const minerals = screen.getByRole('table', { name: 'Minerals you get' });
-    // 15 portions refine into 216,000 Pyerite (x8) and 10,800 Mexallon (x70) on the sell side.
     expect(within(minerals).getByRole('cell', { name: '1,728,000' })).toBeInTheDocument();
     expect(within(minerals).getByRole('cell', { name: '756,000' })).toBeInTheDocument();
     expect(screen.getByText('Minerals you get, on sell orders')).toBeInTheDocument();
@@ -271,7 +264,6 @@ describe('RefineBreakdownModal, typing the reprocessing yield', () => {
     const user = userEvent.setup();
     const onYield = vi.fn();
     open({ editSetup: { onYield, onTax: vi.fn() } });
-    // 0.9 efficiency over a 0.66 base yield is a x1.3636 skills multiplier.
     await user.click(screen.getByRole('button', { name: /Edit Reprocessing yield/ }));
     const field = screen.getByRole('textbox', { name: 'Reprocessing yield' });
     await user.clear(field);

@@ -13,7 +13,6 @@ import { PlanToolAction } from './PlanToolAction';
 import type { usePlanOptimize } from './usePlanOptimize';
 import type { usePlanToolActions } from './usePlanToolActions';
 
-/** The tools pane's Actions section: the remap budget, the Optimize menu and the plan-editing actions. */
 export function ActionsToolSection({
   remapInfo,
   remapCount,
@@ -55,7 +54,6 @@ export function ActionsToolSection({
     handleAddMarker,
   } = toolActions;
 
-  /** The Optimize menu's items, in display order — one shared shape (label, hint, disabled, handler) instead of near-identical `DropdownMenuItem` blocks. */
   const optimizeMenuItems: OptimizeMenuItem[] = [
     {
       key: 'for-me',
@@ -99,8 +97,6 @@ export function ActionsToolSection({
 
   return (
     <div className="space-y-2">
-      {/* Read-only: the optimizer's whole remap budget comes from EVE
-              now, not a free-typed number the optimizer half ignored. */}
       <p className="text-[0.6875rem] text-text-dim">
         {remapInfo
           ? `${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${
@@ -137,7 +133,6 @@ export function ActionsToolSection({
           label={t('plans.fitGoal.add')}
           onClick={onAddFitGoal}
         />
-        {/* Absent, not greyed, when there is nothing to remove (or trained skills are unknown). */}
         {trainedSkillsKnown && hasTrainedEntries && (
           <PlanToolAction
             icon={<Icon.Done size={Icon.ICON_SIZE.sm} />}
@@ -156,17 +151,7 @@ export function ActionsToolSection({
           />
         )}
         {markerConfirm && <PlanConfirmation message={t('plans.markerAdded')} />}
-        {/* Standing, not a post-click toast: the moment the plan carries
-                a Remap Marker, what it saves is a fact about the plan, and
-                waiting behind a click hid it from the user who placed the
-                marker precisely to find out. The Modal the button opens is
-                still the place to *accept* the spread. */}
         {markersVerdict && (
-          // Success green only when the markers actually save something.
-          // A standing line saying "no remap improves this plan" painted
-          // green would be a status color used decoratively (DESIGN.md
-          // §6) — tolerable for a two-second toast, not for something
-          // that never leaves the pane.
           <p
             className={
               markersVerdict.kind === 'saves' ? 'text-xs text-success' : 'text-xs text-text-dim'

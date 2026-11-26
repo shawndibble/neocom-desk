@@ -1,9 +1,5 @@
 import { expect, type Page } from '@playwright/test';
 
-/**
- * Presses a secondary action of a Payee card on the Tax tab ("Ledger", "Link payment"): the text
- * action beside Settle up from `sm` up, the card's ⋮ menu item on a phone.
- */
 export async function pressCardAction(
   page: Page,
   action: 'Ledger' | 'Link payment',
@@ -17,7 +13,6 @@ export async function pressCardAction(
       ? scope.getByRole('button', { name: /^Open the ledger of / })
       : scope.getByRole('button', { name: 'Link payment', exact: true });
   const more = scope.getByRole('button', { name: /^More actions for / }).first();
-  // The card may not have rendered yet: wait for either control before choosing the path.
   await expect
     .poll(async () => (await direct.first().isVisible()) || (await more.isVisible()))
     .toBe(true);

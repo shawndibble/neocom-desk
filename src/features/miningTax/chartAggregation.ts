@@ -1,12 +1,3 @@
-/**
- * Pure per-day and per-type folding for the Mining Yield Overview's m³ and
- * Count chart metrics (issue #2160). The ISK metric's own dailyRate/
- * typeComparison aggregation stays inline in `OverviewTab.tsx` — these mirror
- * only the two new metrics, reusing `sumVolume`/`sumUnits`'s row-level logic.
- * A day or type mixing known- and unknown-volume ore renders its known total;
- * a day or type with nothing known renders as a real 0 — never omitted, and
- * never a false zero standing in for a day/type that wasn't mined at all.
- */
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
 import { sumUnits } from './oreBreakdown';
@@ -17,13 +8,6 @@ export interface DailyMetricPoint {
   value: number;
 }
 
-/**
- * One point per day in `dates`, each day's known m³ total. The ledger has no
- * time of day, so no honest per-hour figure exists (see the range's decision
- * doc). A day mixing known- and
- * unknown-volume lines sums only the known ones; a day with none known reads
- * as a true 0, not a hidden bar.
- */
 export function dailyVolumePoints(
   rows: readonly MiningYieldRow[],
   dates: readonly string[],
@@ -42,7 +26,6 @@ export function dailyVolumePoints(
   return dates.map((date) => ({ date, value: byDate.get(date) ?? 0 }));
 }
 
-/** Same per-day total as `dailyVolumePoints`, for item quantity instead of m³. */
 export function dailyCountPoints(
   rows: readonly MiningYieldRow[],
   dates: readonly string[]
@@ -54,11 +37,6 @@ export function dailyCountPoints(
   return dates.map((date) => ({ date, value: byDate.get(date) ?? 0 }));
 }
 
-/**
- * Total m³ per ore type across every row. A type with no known unit volume at
- * all still gets a bar — at 0, same as the daily chart's own "nothing known"
- * case — rather than disappearing from the chart entirely.
- */
 export function typeVolumeComparison(
   rows: readonly MiningYieldRow[],
   typeNames: ReadonlyMap<number, string>,
@@ -78,7 +56,6 @@ export function typeVolumeComparison(
   }));
 }
 
-/** Total item quantity per ore type across every row, matching the table's own `sumUnits` totals. */
 export function typeCountComparison(
   rows: readonly MiningYieldRow[],
   typeNames: ReadonlyMap<number, string>

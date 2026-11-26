@@ -1,25 +1,3 @@
-/**
- * The Appraisal tab's state, held at route level rather than inside
- * `AppraisalPanel`.
- *
- * Two things follow from that, and both are the reason it is a hook:
- *
- * - **A pasted list survives a tab switch.** `Market.tsx` renders the panel
- *   behind `section === 'appraisal'`, so the component unmounts the moment
- *   you look at the Browser. Losing a forty-line paste to a misclick is not
- *   a state anyone would design on purpose.
- * - **The page header can drive it.** The Appraisal tab shares the Market
- *   page's trade-hub picker and refresh button, so the header needs to know
- *   whether there is anything to re-price and whether a re-price is already
- *   in flight.
- *
- * The text in the box and the text that was appraised are separate: typing
- * does not re-price, pressing Appraise does. Once a result exists, changing
- * the hub or the percentage re-prices on its own — the percentage is pure
- * arithmetic and the hub's prices are usually already cached, so making the
- * pilot press the button again to see a number that has already changed
- * would just be a stale screen with a button on it.
- */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TradeHub } from '@/market/hubs';
 import {
@@ -33,42 +11,23 @@ import { useAppraisalLive, type LiveProgress } from './useAppraisalLive';
 import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/refiningSetup';
 
 export interface AppraisalController {
-  /** What is in the box. */
   text: string;
   setText: (next: string) => void;
-  /**
-   * Sets the text and submits it in one call, rather than `setText` followed
-   * by `appraise()` — `appraise` closes over `text`, so a caller submitting a
-   * value it just computed (not one the pilot typed) needs the value applied
-   * directly instead of racing the state update.
-   */
   appraiseText: (next: string) => void;
-  /** The text that was priced; empty until the first Appraise, and again after Clear. */
   submitted: string;
-  /** The tab column the pilot picked as the quantity of `submitted`'s text lines; null before a pick. */
   quantityColumn: number | null;
-  /** Re-prices the submitted paste's text-quantity lines from this tab column. */
   chooseQuantityColumn: (column: number) => void;
-  /** Null until the first Appraise, and again after Clear. */
   result: AppraisalOutcome | null;
-  /** The same pile priced at all 5 Trade Hubs. Null and set together with `result`. */
   compare: HubComparisonRow[] | null;
   loading: boolean;
-  /** The catalogue could not be loaded; the paste itself is untouched. */
   failed: boolean;
-  /** True when there is text to appraise. */
   canAppraise: boolean;
   appraise: () => void;
   clear: () => void;
-  /** Re-price the current list, bypassing the price cache and refetching the live books. */
   refresh: () => void;
-  /** How far the live hub books have got: `result`'s rows swap to them as they land (issue #5591). */
   live: LiveProgress;
-  /** The same for the other four hubs, fetched only while Compare Hubs is open. */
   compareLive: LiveProgress;
-  /** Tells the controller Compare Hubs is open, so the other hubs' books are fetched only then. */
   setCompareOpen: (open: boolean) => void;
-  /** Resolves with the result once every row has a live price or has failed; a copy waits on it. */
   settleLive: () => Promise<AppraisalOutcome | null>;
 }
 
@@ -77,34 +36,22 @@ export function useAppraisal(
   pricePercent: number,
   characterId: number | null,
   refining: RefiningSetup = DEFAULT_REFINING_SETUP,
-  // False until the pilot's stored Refining Setup is read, so a first appraisal
-  // is not priced at the 50% default and then redone.
   refiningReady = true
 ): AppraisalController {
   const { stationRate, taxRate } = refining;
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState('');
-  // The pilot's pick, tied to the paste it was made for: replacing the paste
-  // retires the pick without any reset to remember.
   const [pick, setPick] = useState<{ text: string; column: number } | null>(null);
   const quantityColumn = pick !== null && pick.text === submitted ? pick.column : null;
-  // The cached (Fuzzwork) outcome; `useAppraisalLive` swaps rows to live books on top of it.
   const [base, setBase] = useState<AppraisalOutcome | null>(null);
   const [baseCompare, setBaseCompare] = useState<HubComparisonRow[] | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  // Bumped by the refresh button only. Part of the effect's dependencies so a
-  // second press re-runs it even though nothing else changed.
   const [forceTick, setForceTick] = useState(0);
-  // Whether the run the effect is about to start was asked for by refresh.
-  // A ref, not state: it must not itself trigger the effect.
   const forced = useRef(false);
 
   useEffect(() => {
-    // Nothing submitted yet, or `clear` just reset it — and `clear` resets the
-    // result itself rather than letting this effect do it, so that an empty
-    // `submitted` never has to write state from inside an effect body.
     if (submitted.trim() === '' || !refiningReady) return;
 
     const force = forced.current;
@@ -127,7 +74,6 @@ export function useAppraisal(
         setBase(outcome);
         setBaseCompare(compareRows);
       } catch {
-        // Only the catalogue load throws; prices degrade to nulls in place.
         if (cancelled) return;
         setBase(null);
         setBaseCompare(null);
@@ -154,13 +100,8 @@ export function useAppraisal(
 
   const appraiseText = useCallback((next: string) => {
     setText(next);
-    // A replaced paste drops the pick for good, so pasting the old text back
-    // later does not revive it. The same text re-run keeps it.
     setPick((current) => (current?.text === next ? current : null));
-    // Guarded rather than left to the effect: an empty submit would otherwise
-    // leave the previous result on screen with nothing backing it.
     if (next.trim() === '') return;
-    // Hydrated first: saving over an unread list would drop what is stored.
     void useRecentAppraisals
       .getState()
       .hydrate()
@@ -169,12 +110,9 @@ export function useAppraisal(
         return setValue(addRecent(value, next, Date.now()));
       });
     setSubmitted(next);
-    // Re-submitting the same text unchanged must still re-run, or the
-    // button does nothing after a failure.
     setForceTick((tick) => tick + 1);
   }, []);
 
-  // `setText(text)` here is a no-op re-set of the value it already holds.
   const appraise = useCallback(() => appraiseText(text), [text, appraiseText]);
 
   const clear = useCallback(() => {

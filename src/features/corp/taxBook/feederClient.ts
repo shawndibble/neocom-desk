@@ -1,8 +1,3 @@
-/**
- * The moon owner's side of a Collector book, client side: pasting an invite,
- * reading where the corporation stands, and leaving. The grant itself is
- * `feederGrant.ts`. Player-facing text never says feeder or Collector.
- */
 import { getValidAccessToken } from '@/auth/session';
 import type { ArchiveReason } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
@@ -11,12 +6,10 @@ import { callableErrorReason } from '@/lib/callableError';
 import { callSignedIn } from '@/sync/signedInCallable';
 import type { PayeeSetResult } from './feederViewClient';
 
-/** The query parameter an invite link carries its code in. */
 export const INVITE_PARAM = 'invite';
 
 const CODE = /^[A-Za-z0-9_-]{8,}$/;
 
-/** The code in a pasted invite link, or a bare code; `null` when it is neither. */
 export function parseInviteInput(input: string): string | null {
   const text = input.trim();
   if (text === '') return null;
@@ -29,7 +22,6 @@ export function parseInviteInput(input: string): string | null {
   }
 }
 
-/** A link to paste into EVE chat or mail. */
 export function inviteLink(origin: string, code: string): string {
   return `${origin}/corp/moons?${INVITE_PARAM}=${encodeURIComponent(code)}`;
 }
@@ -41,11 +33,9 @@ export interface FeederRefinery {
 }
 
 export type FeederSetupStatus =
-  /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day). */
   | {
       status: 'none';
       ownBookFrom?: string;
-      /** Accounting corporations it left, newest first (#4621); absent from an older server. */
       previousCollectorIds?: number[];
     }
   | {
@@ -60,11 +50,9 @@ export type FeederSetupStatus =
       isHolder: boolean;
       refineries: FeederRefinery[];
       owedIsk: number | null;
-      /** Accounting corporations it left before, newest first (#4621); absent from an older server. */
       previousCollectorIds?: number[];
     };
 
-/** Where this corporation stands as a moon owner. Roles are checked live, so the access token travels. */
 export async function getFeederStatus(
   characterId: number,
   corporationId: number
@@ -77,16 +65,13 @@ export async function getFeederStatus(
       { corporationId, accessToken }
     );
   } catch (error) {
-    // A member who may not see the corporation's standing sees the ordinary choices.
     if (callableErrorReason(error) === 'not-your-feeder') return { status: 'none' };
     throw error;
   }
 }
 
-/** What an invite link offers, for the consent screen. Fails with reason `invite-invalid` for a dead link. */
 export interface FeederInvitePreview {
   collectorCorporationId: number;
-  /** The book's own name setting; null when never set. */
   collectorName: string | null;
   offeredOwnerRatePct: number | null;
 }
@@ -98,7 +83,6 @@ export function previewFeederInvite(
   return callSignedIn(characterId, 'previewCorpTaxBookFeederInviteCallable', { code });
 }
 
-/** Leave the accounting corporation: revokes the grant at SSO and deletes it. Immediate. */
 export async function leaveFeeder(
   characterId: number,
   corporationId: number
@@ -110,7 +94,6 @@ export async function leaveFeeder(
   });
 }
 
-/** A new invite link for a book that collects for others; `offeredOwnerRatePct` is optional. */
 export async function createFeederInvite(
   characterId: number,
   corporationId: number,
@@ -124,7 +107,6 @@ export async function createFeederInvite(
   });
 }
 
-/** An open invite link; only its id is stored, never the code. */
 export interface OpenInvite {
   inviteId: string;
   createdBy: number;
@@ -132,7 +114,6 @@ export interface OpenInvite {
   offeredOwnerRatePct?: number;
 }
 
-/** Agree a rate with a moon owner; it wins over the rate they asked for, from `asOf` (today when absent). */
 export async function setFeederRate(
   characterId: number,
   corporationId: number,
@@ -150,13 +131,11 @@ export async function setFeederRate(
   });
 }
 
-/** Names who a moon owner is paid as, from the accounting side (#4653); the moon owner can too. */
 export async function setBookFeederPayee(
   characterId: number,
   corporationId: number,
   feederCorporationId: number,
   payee: Payee,
-  /** This officer can mail: the answer names whom to tell. */
   notify: boolean
 ): Promise<PayeeSetResult> {
   const accessToken = await getValidAccessToken(characterId);
@@ -169,7 +148,6 @@ export async function setBookFeederPayee(
   });
 }
 
-/** Labels one of the moon owner's refineries for both sides; null clears it (#4640). */
 export async function setRefineryLabel(
   characterId: number,
   corporationId: number,
@@ -187,10 +165,6 @@ export async function setRefineryLabel(
   });
 }
 
-/**
- * Archives one of the moon owner's refineries, or restores it (#6298). Hides only; the book keeps
- * every row. `reason` is what the page offered it for, `manual` when nothing.
- */
 export async function setRefineryArchive(
   characterId: number,
   corporationId: number,
@@ -210,7 +184,6 @@ export async function setRefineryArchive(
   });
 }
 
-/** Settle a moon owner otherwise (or back to normal) from today, with an optional note. */
 export async function setFeederMode(
   characterId: number,
   corporationId: number,
@@ -228,7 +201,6 @@ export async function setFeederMode(
   });
 }
 
-/** "I've sent it": records a payout at once; the wallet journal attaches to it later. Whole ISK. */
 export async function recordFeederPayout(
   characterId: number,
   corporationId: number,
@@ -244,7 +216,6 @@ export async function recordFeederPayout(
   });
 }
 
-/** Mark a detected payment "not a payout" (or put it back). It keeps its journal entry, so it is never found again. */
 export async function markFeederPayout(
   characterId: number,
   corporationId: number,
@@ -262,7 +233,6 @@ export async function markFeederPayout(
   });
 }
 
-/** Hands over the donations the wallet sent so they attach to recorded payouts. Uses the cached officer check. */
 export async function reconcileFeederPayouts(
   characterId: number,
   corporationId: number,
@@ -271,12 +241,10 @@ export async function reconcileFeederPayouts(
   return callSignedIn(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
     corporationId,
     accessToken: await getValidAccessToken(characterId),
-    // Old servers require it; the new one reads the journal itself.
     outgoing,
   });
 }
 
-/** Revoke an open invite link. */
 export async function revokeFeederInvite(
   characterId: number,
   corporationId: number,
@@ -290,7 +258,6 @@ export async function revokeFeederInvite(
   });
 }
 
-/** The book's open invite links, newest first. Uses the cached officer check: no access token. */
 export async function listFeederInvites(
   characterId: number,
   corporationId: number
@@ -303,21 +270,13 @@ export async function listFeederInvites(
   return invites;
 }
 
-/** Removing a moon owner (#4520): the server's answer when a removal starts. */
 export interface StartedRemoval {
   startedAt: number;
-  /** The code for the "Remove now" link in the mail; never shown elsewhere. */
   code: string;
-  /** Character ids the one mail goes to. */
   recipients: number[];
-  /**
-   * The moon owner's CEO and payee among them: only a copy to one of them starts the 24 hours
-   * (#4617). Absent from a server that predates the split.
-   */
   ownerRecipients?: number[];
 }
 
-/** Start a 24-hour removal. The 24 hours begin when the notice is sent. */
 export async function startFeederRemoval(
   characterId: number,
   corporationId: number,
@@ -331,7 +290,6 @@ export async function startFeederRemoval(
   });
 }
 
-/** The notice went out: the removal's 24 hours run from `sentAt`. The first notice wins. */
 export async function recordFeederRemovalSent(
   characterId: number,
   corporationId: number,
@@ -347,17 +305,12 @@ export async function recordFeederRemovalSent(
   });
 }
 
-/**
- * The moon owner's ledger can't be read: claims this stale spell's one mail (#6210). Nobody
- * named: another officer already claimed it, or the ledger reads again.
- */
 export async function claimFeederStaleMail(
   characterId: number,
   corporationId: number,
   feederCorporationId: number
 ): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
   const accessToken = await getValidAccessToken(characterId);
-  // This client's mail queue marks the mail sent, so an unsent claim may lapse to another officer.
   return callSignedIn(characterId, 'claimCorpTaxBookFeederStaleMailCallable', {
     corporationId,
     accessToken,
@@ -366,10 +319,6 @@ export async function claimFeederStaleMail(
   });
 }
 
-/**
- * The claiming officer's queue sent a copy of the stale-ledger mail (#6210): the claim is final.
- * Unmarked, it lapses after a few hours so another officer's client sends it instead.
- */
 export async function markFeederStaleMailSent(
   characterId: number,
   corporationId: number,
@@ -385,7 +334,6 @@ export async function markFeederStaleMailSent(
   });
 }
 
-/** Cancel a pending removal; returns whom the short cancellation mail goes to. */
 export async function cancelFeederRemoval(
   characterId: number,
   corporationId: number,
@@ -399,10 +347,6 @@ export async function cancelFeederRemoval(
   });
 }
 
-/**
- * The payee's "Remove now" page: one answer for a link that cannot be used, whatever the reason
- * (expired, over, guarded, or the wrong person), with when the removal takes effect, if known.
- */
 export type RemovalLinkState =
   | { available: false; effectiveAt: number | null }
   | {
@@ -416,7 +360,6 @@ export function getRemovalLink(characterId: number, code: string): Promise<Remov
   return callSignedIn(characterId, 'getCorpTaxBookRemovalLinkCallable', { code });
 }
 
-/** End the removal now, as the payee. `ended: false` is the same neutral answer as an expired link. */
 export function forceRemoval(
   characterId: number,
   code: string

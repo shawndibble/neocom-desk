@@ -1,17 +1,3 @@
-// One scheduled sync of one corporation's Corp Tax Book (issue #4068, ADR 0025):
-// the server-side twin of the officer visit in src/features/corp/taxBook/
-// syncCorpTaxBook.ts. It reads what ESI holds with the grant holder's token,
-// uploads it monotonically, records the gaps and re-matches Unmatched donations
-// (`rematchUnmatched`) — through the same `syncBookAs` / `editBookAs` the
-// callables use, so the audit log and `lastSync` read as they do for a visit.
-// Money pays a Miner's oldest unpaid day on its own, so nothing is settled here.
-// The pure decisions are the mirror in corpTaxBookSyncEngine.ts.
-//
-// What it must never do is issue a Late notice or send mail; those stay officer
-// actions. That is enforced by what this file imports (no issuing helper) and by
-// `ScheduledAction`, the only edits it can ask for. It also does not group the
-// officer's own Characters (that needs the officer's device).
-
 import { utcDay } from './timeConstants.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { DocumentSnapshot, Firestore } from 'firebase-admin/firestore';
@@ -79,22 +65,14 @@ import {
 import { loadMatchBook } from './corpTaxBookDonationMatchStore.js';
 import { billableStoredRows, minedSinceStart, storedRowsWanted } from './corpTaxBookMatchRows.js';
 
-/** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
 export const DONATIONS_PER_CALL = 500;
 export const EXTRACTIONS_PER_CALL = 200;
 
-/** Why the schedule for a corporation stopped; the health strip words each of these. */
 export type StopReason = (typeof SCHEDULED_STOP_REASONS)[number];
 
-/** A source a scheduled run could not read. */
 export type ScheduledMissingSource = 'extractions' | 'donations' | 'ore';
 
-/**
- * `esi-refused`: ESI refused the holder's token on the observer list or a ledger
- * even though the role check passed. One refusal skips the run; the same one on
- * the next run stops the schedule (`runOne`).
- */
 export type SkipReason = 'esi-unavailable' | 'esi-budget' | 'esi-refused' | 'no-refineries';
 
 export type BookSyncResult =
@@ -104,10 +82,6 @@ export type BookSyncResult =
       extractions: number;
       donationsAdded: number;
       reassigned: number;
-      /**
-       * Sources the holder could not read this time; the rest still synced. `ore`: the holder
-       * lacks Station_Manager, so neither the Extractions nor their ore are read.
-       */
       missing: ScheduledMissingSource[];
       truncated: boolean;
       reassignError?: string;
@@ -115,7 +89,6 @@ export type BookSyncResult =
   | { kind: 'skipped'; reason: SkipReason }
   | { kind: 'stopped'; reason: StopReason };
 
-/** The only edit a scheduled run may make: re-match a donation. */
 type ScheduledAction = { action: 'assignPayment'; paymentId: string; minerId: string };
 
 interface Data {
@@ -129,17 +102,13 @@ export interface AdminBookState {
   miners: (MinerLike & Data)[];
   payments: (SettlePayment & { characterId?: number })[];
   extractions: SyncExtraction[];
-  /** Per refinery, the last read merged in full: which rows are final (corpTaxBookObservedThrough.ts). */
   observedThrough: ObservedThrough;
-  /** The book doc's `createdAt`: tells this book from one deleted and turned on again. */
   createdAt: unknown;
-  /** The stamps of the collections read here, as the book doc showed them first (corpTaxBookQuietRun.ts). */
   versions: Record<string, string> | null;
 }
 
 type BookSnap = DocumentSnapshot;
 
-/** The book doc's part of the state; `readBookStateAdmin` adds the collections. */
 function bookDocState(snap: BookSnap) {
   const data = snap.data() as Data;
   return {
@@ -157,11 +126,6 @@ async function readActiveBook(db: Firestore, corporationId: number): Promise<Boo
   return snap.exists && snap.get('active') === true ? snap : null;
 }
 
-/**
- * A quiet run's state: the book doc and the extractions from the marker's cut-off on, and none of
- * the collections the quiet marker vouches for (they stay empty: nothing on the quiet path reads
- * them).
- */
 async function readQuietBookState(
   snap: BookSnap,
   extractionsSince: string
@@ -178,7 +142,6 @@ async function readQuietBookState(
   };
 }
 
-/** The sync's reads of the book, with the admin SDK (the client reads the same collections under the rules). */
 export async function readBookStateAdmin(
   db: Firestore,
   corporationId: number
@@ -216,17 +179,10 @@ interface Feed {
 export interface RunBookSyncArgs {
   deps: BookDeps;
   esi: SyncEsi;
-  /** The role check made with the holder's token this run; never persisted. */
   access: OfficerAccess;
   accessToken: string;
   corporationId: number;
-  /**
-   * Whether the grant this run started under is still the one held. Checked once the
-   * ESI reads are in and before anything is written, so a revoke or replacement that
-   * landed during the (slow) reads does not leave the old holder writing.
-   */
   stillHeld: () => Promise<boolean>;
-  /** Refinery → solar system, remembered from earlier runs. */
   systemHints: Readonly<Record<number, number>>;
 }
 
@@ -239,9 +195,6 @@ export async function runBookSync(
   const startedAt = deps.now();
   const head = await readActiveBook(db, corporationId);
   if (!head) return { kind: 'stopped', reason: 'book-off' };
-  // A book unchanged since a run that had nothing to match or re-match skips reading its Miners,
-  // notices and payments (corpTaxBookQuietRun.ts) — unless the ESI reads below bring something
-  // new, when it reads them after all.
   const headState = bookDocState(head);
   const markerRef = head.ref.collection(META).doc(QUIET_DOC);
   const markerSnap = await markerRef.get();
@@ -252,14 +205,10 @@ export async function runBookSync(
     ? await readQuietBookState(head, vouching.extractionsSince)
     : await readBookStateFrom(head);
 
-  // --- ESI reads (nothing is written until all of them are in) -------------
   const observers = await esi.observers(corporationId, accessToken);
   if (observers.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
   if (observers.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
   if (observers.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
-  // An empty list is not a successful sync (decision 20261020-103802), unless the book has
-  // moon owners: then its own refineries are not what it reads, and the journal, settling
-  // and payouts still run (#4616).
   if (observers.data.length === 0 && !(await hasMoonOwners(db, corporationId))) {
     return { kind: 'skipped', reason: 'no-refineries' };
   }
@@ -276,7 +225,6 @@ export async function runBookSync(
     const ledger = await esi.ledger(corporationId, structureId, accessToken);
     if (ledger.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
     if (ledger.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
-    // A refinery that did not answer is a missing read, not an empty ledger: abandon the run.
     if (ledger.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
     const rows = observedRowsFromLedger(structureId, ledger.data, ledger.fetchedAt, corporationId);
     feed.rows.push(...rows);
@@ -284,8 +232,6 @@ export async function runBookSync(
     ledgerReads.push({ structureId, fetchedAt: ledger.fetchedAt, truncated: ledger.truncated });
     feed.oldestEsiDate[structureId] = rows.map((r) => r.date).sort()[0];
 
-    // Remembered, else what stored rows already carry (an officer's visit set it), else ask ESI:
-    // a row written without it would replace one that had it (quantity grows, the row is swapped).
     const known =
       args.systemHints[structureId] ?? (await storedSystem(db, corporationId, structureId));
     if (known !== undefined) {
@@ -298,8 +244,6 @@ export async function runBookSync(
 
   const missing: ScheduledMissingSource[] = [];
   const canExtract = access.isStationManager;
-  // A lacking role, not a failed read: every run until it changes. A book with no refinery of its
-  // own (only moon owners) has no chunk of its own to read.
   if (!canExtract && observers.data.length > 0) missing.push('ore');
   let esiExtractions: Awaited<ReturnType<SyncEsi['extractions']>> | null = null;
   let notifications: MoonNotification[] = [];
@@ -344,7 +288,6 @@ export async function runBookSync(
     quiet = false;
   }
 
-  // --- Decide ---------------------------------------------------------------
   const now = deps.now();
   const gaps = mergeGaps(
     before.lastSync?.gaps ?? [],
@@ -363,19 +306,13 @@ export async function runBookSync(
       : [];
 
   const stored = new Set(before.payments.map((p) => p.id));
-  // Quiet: every donation is one the quiet run saw stored (quietAfterReads).
   const fresh = (quiet ? [] : donations)
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
-  // #6207: what looks like tax paid into a division the book does not read. Only on a full run,
-  // which holds the Miners and balances it rests on; a quiet one leaves the stored list as it was.
   const elsewhere = quiet
     ? null
     : await readDonationsElsewhere(esi, corporationId, before.divisions, accessToken);
-  // Whose money each donation is (corpTaxBookDonationMatch.ts), for every sender this run decides
-  // on: its new donations, those elsewhere, and the Unmatched ones it re-matches. A quiet run
-  // matches nothing, so reads none of it.
   const book = quiet
     ? undefined
     : await loadMatchBook(
@@ -391,13 +328,10 @@ export async function runBookSync(
         ],
         feed.rows.map((r) => r.characterId)
       );
-  // The rows donations are matched against: this read's, and the moon owners' mining the book
-  // bills, which only the stored rows hold.
   const rows: { characterId: number; date: string; quantity: number }[] = [
     ...feed.rows,
     ...(book ? await billedStoredRows(db, corporationId, before, book, fresh, now) : []),
   ];
-  // Every Character the run knew, for the quiet marker: one new to it could match a donation.
   const known = new Set<number>([
     ...rows.map((r) => r.characterId),
     ...before.miners.flatMap((m) => m.characterIds),
@@ -416,9 +350,6 @@ export async function runBookSync(
     extractions.length > 0 ? extractions : before.extractions,
     systemIds
   );
-  // Rows a full earlier read already merged at their final quantity would write nothing:
-  // leave them out of the merge and its per-row reads. They still refresh the billed-by
-  // pointers, which record that this sync saw the Character.
   const settled: ObservedRow[] = [];
   const toMerge: ObservedRow[] = [];
   for (const r of placed) (isSettledRow(r, before.observedThrough) ? settled : toMerge).push(r);
@@ -427,7 +358,6 @@ export async function runBookSync(
 
   if (!(await args.stillHeld())) return { kind: 'skipped', reason: 'esi-unavailable' };
 
-  // --- Upload (the first call carries everything but the overflow) ----------
   const call = (
     part: Partial<Record<'observed' | 'extractions' | 'donations' | 'uncounted', unknown[]>>,
     extra: { donationsRead?: boolean } = {}
@@ -439,7 +369,6 @@ export async function runBookSync(
       donations: fresh,
       ...(uncounted ? { uncounted } : {}),
     },
-    // Members' "not credited" notes wait on a sync that read the wallet, not on any sync.
     { donationsRead }
   );
   const receipt = await syncBookAs(deps, access, first, {
@@ -453,15 +382,11 @@ export async function runBookSync(
     await syncBookAs(deps, access, call({ extractions: rest }), { scheduled: true });
   }
   if (settled.length > 0) await writeBilledByPointers(deps, corporationId, settled);
-  // Only now, with every row of this run merged: a failed merge above leaves the
-  // watermark where it was, so the next run merges those rows again.
   const observedThrough = advanceObservedThrough(before.observedThrough, ledgerReads);
   if (!isDeepStrictEqual(observedThrough, before.observedThrough)) {
     await db.runTransaction(async (tx) => {
       const ref = bookRef(db, corporationId);
       const held = await tx.get(ref);
-      // A book deleted and turned on again during the run starts with no rows: it must not
-      // inherit the old book's watermark, or its closed days would never be merged.
       if (!held.exists || held.get('createdAt') !== before.createdAt) return;
       tx.update(ref, { observedThrough });
     });
@@ -476,16 +401,10 @@ export async function runBookSync(
       SCHEDULED_VIA
     );
 
-  // --- Re-match Unmatched donations -----------------------------------------
-  // Quiet: the quiet run re-matched nothing, and no Unmatched donation or known Character is new.
   const { assigned, error: reassignError } = book
     ? await reassignUnmatched(edit, before, book, utcDay(deps.now()))
     : { assigned: new Map<string, string>(), error: undefined };
 
-  // --- Quiet marker ---------------------------------------------------------
-  // A full run that had nothing to match or re-match vouches for the book as it read
-  // it, so the next runs can skip that read while nothing changes; any other full run clears
-  // an older marker. Best effort: without a marker the next run just reads in full.
   if (!quiet) {
     const extractionsSince = extractionsSinceOf(startedAt);
     const next: QuietMarker | null =
@@ -522,7 +441,6 @@ export async function runBookSync(
     }
   }
 
-  // --- Moon owner payouts: what the wallet sent, attached to what was recorded --------
   try {
     await reconcileFeederPayouts(deps, corporationId, outgoing);
   } catch (e) {
@@ -542,10 +460,6 @@ export async function runBookSync(
   };
 }
 
-/**
- * Donations into every wallet division the book does not read (#6207), or null unless each one
- * answered: the stored list is replaced, so an unread division must not read as an empty one.
- */
 async function readDonationsElsewhere(
   esi: SyncEsi,
   corporationId: number,
@@ -561,19 +475,9 @@ async function readDonationsElsewhere(
   return found;
 }
 
-/** Stored rows read per run at most: one query per Character, so the read stays bounded. */
 const STORED_ROWS_CHARACTERS = 50;
-/** The scheduled sync's interval: each run starts the capped reads one window further on. */
 const STORED_ROWS_ROTATION_MS = 2 * 60 * 60 * 1000;
 
-/**
- * The stored rows the book bills that a held or would-be-held donation is matched against
- * (`storedRowsWanted`): its moon owners' mining, which this run's ledger read never holds. Without
- * them a Miner who mined only at a moon owner's refinery owes nothing as far as the run can see,
- * and their donation is held for review for good. Read only for the Characters those donations'
- * Miners hold, from the first day that can count; none when nothing is held and every new donation
- * already matches. Best effort: a failed read leaves the hold for the next run.
- */
 async function billedStoredRows(
   db: Firestore,
   corporationId: number,
@@ -603,11 +507,9 @@ async function billedStoredRows(
   if (wanted.size === 0) return [];
   try {
     const ref = bookRef(db, corporationId);
-    // A row mined after the last of these payments can never count toward one of them.
     const through = [...held.map((p) => p.at), ...fresh.map((d) => d.at)]
       .map((at) => at.slice(0, 10))
       .reduce((a, b) => (b > a ? b : a), '');
-    // Past the cap, each run starts further along the list, so no Character's hold is never read.
     const all = [...wanted];
     const start =
       all.length > STORED_ROWS_CHARACTERS
@@ -644,8 +546,6 @@ async function reassignUnmatched(
   book: MatchBook,
   today: string
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
-  // A sender the book knows credits their Miner, owing or not (#6300); a donation held under #6207
-  // clears here; one an officer has to place (ambiguous) waits for them (`rematchUnmatched`).
   const assigned = new Map<string, string>();
   let error: string | undefined;
   for (const { paymentId, minerId } of rematchUnmatched(
@@ -657,21 +557,17 @@ async function reassignUnmatched(
       await edit({ action: 'assignPayment', paymentId, minerId });
       assigned.set(paymentId, minerId);
     } catch (e) {
-      // A refused assignment is not the sync's, and never stops the next one: report the first,
-      // the next run tries again.
       error ??= e instanceof Error ? e.message : String(e);
     }
   }
   return { assigned, ...(error !== undefined ? { error } : {}) };
 }
 
-/** Whether the book holds any moon owner record, current or past (payouts to a past one still reconcile). */
 async function hasMoonOwners(db: Firestore, corporationId: number): Promise<boolean> {
   const snap = await bookRef(db, corporationId).collection(FEEDERS).limit(1).get();
   return !snap.empty;
 }
 
-/** The system a refinery's stored rows already carry, if any. */
 async function storedSystem(
   db: Firestore,
   corporationId: number,

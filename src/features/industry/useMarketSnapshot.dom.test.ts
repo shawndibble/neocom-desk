@@ -83,8 +83,6 @@ describe('useMarketSnapshot', () => {
     mockedLoad.mockResolvedValue(snapshot({ hubPrices: { 35: 2 } }));
     rerender({ typeIds: [35] });
 
-    // Synchronous, render-phase reset: loading flips true before the new
-    // fetch has had any chance to resolve.
     expect(result.current.loading).toBe(true);
     await waitFor(() =>
       expect(result.current.snapshot).toEqual(snapshot({ hubPrices: { 35: 2 } }))
@@ -110,7 +108,7 @@ describe('useMarketSnapshot', () => {
     rerender({ tick: 1 });
 
     expect(result.current.loading).toBe(true);
-    expect(result.current.snapshot).toEqual(first); // still the old data, not cleared
+    expect(result.current.snapshot).toEqual(first);
 
     const second = snapshot({ hubPrices: { 34: 2 } });
     resolveSecond(second);
@@ -139,7 +137,6 @@ describe('useMarketSnapshot', () => {
 
     resolveFirst(snapshot({ hubPrices: { 34: 1 } }));
     await Promise.resolve();
-    // The stale [34] response must not overwrite the current [35] result.
     expect(result.current.snapshot).toEqual(second);
   });
 

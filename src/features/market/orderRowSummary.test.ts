@@ -91,7 +91,6 @@ describe('orderRowSummary', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 400, fill: 390 },
     };
-    // undercutPrice(450) = 449.90, one legal tick under the rival, not the tie 450 used to be.
     const summary = orderRowSummary(row);
     if (summary?.kind !== 'undercut') throw new Error('expected an undercut summary');
     expect(summary.match?.kind).toBe('profit');

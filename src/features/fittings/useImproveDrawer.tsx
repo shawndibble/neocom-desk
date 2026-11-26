@@ -37,29 +37,18 @@ const sameModules = (a: Fitting, b: Fitting) => a === b || moduleKey(a) === modu
 
 interface UseImproveDrawerArgs {
   workspace: FittingWorkspace;
-  /** Null on the Start screen, where there is nothing to improve. */
   fitting: Fitting | null;
   catalogue: FittingCatalogue | null;
   targetProfiles: TargetProfiles;
   edit: FittingWorkspace['edit'];
-  /** The active Character, for Train; null shows no Train section. */
   characterId: number | null;
-  /** Loads charges, for "Load best charge". */
   charges: ChargeLoading;
-  /** The Fitting's calculation, for the Charge Picker's figures; null while it loads. */
   context: FittingContext | null;
   moduleResults: FittingModuleResult[] | null;
-  /** Opens Make it fit on a budget, for "Fix this first". */
   openMakeItFit: (resource: FitResource) => void;
-  /** Asks the stats column to open What to train, for Skills' "See all" link. */
   showWhatToTrain: () => void;
 }
 
-/**
- * Improve: `open()` from the header's ⋮ menu, and the `drawer` (with its
- * Undo toast) to render once in the editor. A `SlideOver` beside the fit on
- * desktop, so the Ring stays steerable; a bottom sheet on a phone.
- */
 export function useImproveDrawer({
   workspace,
   fitting,
@@ -76,24 +65,16 @@ export function useImproveDrawer({
   open: () => void;
   close: () => void;
   drawer: ReactNode;
-  /** Desktop: the open panel as a page column, for FittingEditorLayout's `improveColumn`; null when shut or on a phone. */
   column: ReactNode;
-  /** Open as that column (desktop). */
   docked: boolean;
-  /** The stat changes to preview in the stats column; null when Improve is shut or nothing is ticked or hovered. */
   preview: FittingStatsDelta | null;
-  /** What the previewed rows add to the fit's price (buy mode); null when none or not comparable. */
   previewIsk: number | null;
 } {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  // The container's footer, where the panel puts its selection and Apply bar.
   const [footerTarget, setFooterTarget] = useState<HTMLDivElement | null>(null);
-  // One remembered goal, Job and Explore space per hull role: a Hulk does not start on the Drake's More damage.
   const role = hullRoleOf(hullOf(fitting, catalogue));
-  // The remembered settings are read before the first search, so a reload never searches with the defaults.
   const remembered = useImproveSettings(role);
-  // Not remembered: a Defense Choice, the Officer tick and mutated swaps are about this fit.
   const [perFit, setPerFit] = useState<Pick<ImproveChoices, PerFitField>>({
     defense: 'keep',
     includeOfficer: false,
@@ -108,30 +89,20 @@ export function useImproveDrawer({
     if (fit.length > 0) setPerFit((prev) => ({ ...prev, ...Object.fromEntries(fit) }));
     if (kept.length > 0) void remembered.set(Object.fromEntries(kept));
   };
-  // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
   const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
   const [previewIsk, setPreviewIsk] = useState<number | null>(null);
   const onPreview = useCallback((delta: FittingStatsDelta | null, isk: number | null = null) => {
     setPreview(delta);
     setPreviewIsk(isk);
   }, []);
-  // The Fitting before the last Apply and the one it made, for the toast's Undo; null once it is gone.
   const [undo, setUndo] = useState<{ before: Fitting; applied: Fitting; message: string } | null>(
     null
   );
-  // Back to the Start screen closes it, so the next Fitting doesn't open into a search.
   if (fitting === null && isOpen) setIsOpen(false);
-  // A later edit (a Ring change while the toast is up) ends the Undo: restoring would discard it.
   const undoable = undo !== null && fitting !== null && sameModules(fitting, undo.applied);
-  // What the last implant put in the set was, for its confirmation toast.
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
-  // A column beside the editor from desktop up; below it (phone and tablet, where the
-  // stats are a tab of their own) a sheet.
   const asColumn = useIsDesktop();
-  // The column's heading takes focus as it opens, so a keyboard user lands in it;
-  // closing gives focus back to what held it (the ⋮ menu's button, which the menu
-  // has refocused by then: `useOpenAfterMenu`), as the slide-out used to.
   const columnHeading = useRef<HTMLHeadingElement | null>(null);
   const columnRef = useFitToViewport<HTMLDivElement>(isOpen && asColumn);
   const opener = useRef<HTMLElement | null>(null);
@@ -144,14 +115,11 @@ export function useImproveDrawer({
     return () => {
       const back = opener.current;
       opener.current = null;
-      // Only when focus was in the column (it goes with it): closed by picking an
-      // empty slot, focus is already where the pilot is working.
       const active = document.activeElement;
       const lost = active === null || active === document.body || !!column?.contains(active);
       if (lost && back?.isConnected) back.focus({ preventScroll: true });
     };
   }, [isOpen, asColumn, columnRef]);
-  // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
   const { groups: chargeGroups } = useChargeChoices({
     fitting: isOpen ? fitting : null,
     context,
@@ -178,7 +146,6 @@ export function useImproveDrawer({
       before: fitting,
       applied,
       message: t('fittings.improve.chargesLoaded', {
-        // Cargo can run out before every empty weapon is loaded.
         count: applied.modules.filter((m, i) => m.chargeTypeId !== fitting.modules[i]?.chargeTypeId)
           .length,
       }),
@@ -196,7 +163,6 @@ export function useImproveDrawer({
       before: fitting,
       applied,
       message: t('fittings.improve.crystalsLoaded', {
-        // `accepts` can skip a miner the calculation has not reached yet.
         count: applied.modules.filter((m, i) => m.chargeTypeId !== fitting.modules[i]?.chargeTypeId)
           .length,
       }),
@@ -205,7 +171,6 @@ export function useImproveDrawer({
 
   function apply(options: ImproveOption[]) {
     if (!fitting) return;
-    // One edit for every ticked row, so Back undoes them together.
     const applied = options.reduce(
       (acc, option) => applyImproveCandidate(acc, option.candidate),
       fitting
@@ -270,7 +235,6 @@ export function useImproveDrawer({
         openMakeItFit(resource);
       }}
       freeSections={
-        // Only once the baseline is known to fit: an over-budget fit shows Fix this first alone.
         fitting &&
         search.before &&
         overBudgetResources(search.before).length === 0 && (
@@ -308,26 +272,15 @@ export function useImproveDrawer({
     />
   );
 
-  // Only once a search found something: the bar (ImproveFooter) is
-  // drawn for results alone, and an empty footer is a stray line.
   const doneState = search.state.status === 'done' ? search.state : null;
   const found = doneState !== null && hasImproveResults(doneState, { blocked: false });
   const footer = found && <div ref={setFooterTarget} />;
 
-  // Desktop: a column in the page, left of the editor (FittingEditorLayout's
-  // `improveColumn`), where the docked browser sits: never over the nav, and the
-  // stats stay in view while rows are ticked. Sticky, a viewport tall, with its own
-  // scroll and the selection bar below it.
   const column = fitting && isOpen && asColumn && (
-    // Escape closes it, as it did the slide-out, from anywhere in it (its heading
-    // takes focus on open), unless a dialog opened from it owns the key.
     <div
       ref={columnRef}
-      // The class height is the fallback; useFitToViewport sets the real one.
       className="slide-in-left sticky top-3 h-[calc(100vh-1.5rem)]"
       onKeyDown={(event) => {
-        // Not one a popup inside it already handled (a Select's list, a tooltip: React
-        // bubbles their portalled keys through here), nor one a dialog owns.
         if (
           event.key !== 'Escape' ||
           event.defaultPrevented ||
@@ -364,8 +317,7 @@ export function useImproveDrawer({
         >
           {body}
         </Modal>
-      ) : // Desktop: `column`, a column in the page itself.
-      null}
+      ) : null}
       {undo && undoable && (
         <Toast
           message={undo.message}

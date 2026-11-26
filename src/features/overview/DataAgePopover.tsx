@@ -19,15 +19,6 @@ import type { FetchRow } from './widgets/headerSummary';
 import { boardKey, useWidgetBoard } from './widgets/board';
 import { getKind, widgetKeys } from './widgets/kinds';
 
-/**
- * The button on a board's tab row ("Data updated 2m ago") and the popover
- * it opens: one row per widget kind with its own age, and Refresh all. Drawn
- * from plain props so the signed-out landing page's demo shows the very same
- * control over sample reads (`OverviewDataAge` feeds it the live ones).
- *
- * Its tooltip names the stalest widget; a click opens the per-widget table, so
- * "14h ago" is never a mystery.
- */
 export function DataAgePopover({
   fetchedAt,
   breakdown,
@@ -35,13 +26,10 @@ export function DataAgePopover({
   onRefresh,
   note,
 }: {
-  /** The stalest read, which sets the age the button shows. */
   fetchedAt: Date;
-  /** Stalest first (`fetchBreakdown`), so the row that sets the age leads. */
   breakdown: readonly FetchRow[];
   now: number;
   onRefresh: () => void;
-  /** A line about how fresh the data can be at all (the Corp Board's hourly cache). */
   note?: string;
 }) {
   const { t } = useTranslation();

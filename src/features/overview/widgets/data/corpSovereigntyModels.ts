@@ -1,14 +1,3 @@
-/**
- * The Sovereignty widget (issue #4775): the corp's skyhooks, one row each, by
- * when their theft window opens, and the adapters that lend raid windows and
- * hub reagent run-outs to Due soon. Same contract as `models.ts`: pure,
- * derived at render time.
- *
- * ESI sends no skyhook silo capacity, so a skyhook shows its unsecured stock
- * (what a raid takes) as ISK, or as units when a reagent has no price; never a
- * percent and never "0 ISK". Sov hubs are not rows: their reagent bay is a fuel
- * clock in Due soon.
- */
 import {
   severityForRemaining,
   worstSeverity,
@@ -44,11 +33,8 @@ import type { Translate } from '@/lib/translate';
 import { HOUR_MS, DAY_MS } from '@/lib/age';
 
 const W = 'overview.widgets.corpSovereignty';
-/** Gantt horizon. */
 const CHART_AHEAD_MS = 48 * HOUR_MS;
-/** The Number counts skyhooks open now or opening within this. */
 const HEADLINE_HORIZON_MS = 6 * HOUR_MS;
-/** ESI's skyhook state enum; anything else reads as unknown. */
 const SKYHOOK_STATES = new Set([
   'Unspecified',
   'ShieldVulnerable',
@@ -58,7 +44,6 @@ const SKYHOOK_STATES = new Set([
   'HullVulnerable',
 ]);
 
-/** A price that is missing, zero or negative is no price: show units, never 0 ISK. */
 function priceOf(feed: CorpSovereigntyFeed, typeId: number): number | undefined {
   const price = feed.prices.get(typeId);
   return price !== undefined && price > 0 ? price : undefined;
@@ -68,7 +53,6 @@ function systemOf(feed: CorpSovereigntyFeed, row: CorpSovereigntyRow): string {
   return (row.systemId === null ? undefined : feed.systemNames.get(row.systemId)) ?? UNKNOWN;
 }
 
-/** A skyhook by its planet ("X-7OMU IV"), else its system. */
 function nameOf(feed: CorpSovereigntyFeed, row: CorpSovereigntyRow): string {
   return row.planetName ?? systemOf(feed, row);
 }
@@ -79,13 +63,11 @@ function windowOf(row: CorpSovereigntyRow): RaidWindow | null {
     : { startMs: row.windowStartMs, endMs: row.windowEndMs };
 }
 
-/** Null when the window was not read: unknown, never safe. */
 function stateOf(row: CorpSovereigntyRow, now: number): RaidState | null {
   const window = windowOf(row);
   return window === null ? null : raidState(window, now, row.kind);
 }
 
-/** Due soon's view of the windows: every one ESI sent both ends of. */
 export function toBoardSovereignty(feed: CorpSovereigntyFeed): BoardSovereigntySource[] {
   return feed.rows.flatMap((row) => {
     const window = windowOf(row);
@@ -95,7 +77,6 @@ export function toBoardSovereignty(feed: CorpSovereigntyFeed): BoardSovereigntyS
   });
 }
 
-/** Due soon's view of the hubs: when each reagent bay runs out. */
 export function toBoardHubFuel(feed: CorpSovereigntyFeed): BoardHubFuelSource[] {
   return feed.rows.flatMap((row) => {
     const runsOutMs = row.hubBay === null ? null : hubReagentsRunOutMs(row.hubBay);
@@ -103,14 +84,12 @@ export function toBoardHubFuel(feed: CorpSovereigntyFeed): BoardHubFuelSource[] 
   });
 }
 
-/** A countdown that never claims more precision than the hour-old read behind it. */
 function untilText(t: Translate, remainingMs: number): string {
   return remainingMs < CORP_CACHE_WINDOW_MS
     ? t('corp.board.underCacheWindow')
     : formatCountdown(remainingMs / 1000);
 }
 
-/** An open window is critical; one opening within a day, a warning. */
 function tone(row: CorpSovereigntyRow, now: number): DeadlineSeverity {
   const state = stateOf(row, now);
   if (state === 'open' || state === 'overtime') return 'critical';
@@ -119,14 +98,12 @@ function tone(row: CorpSovereigntyRow, now: number): DeadlineSeverity {
     : 'clear';
 }
 
-/** Soonest first: open windows, then upcoming; closed or unknown last. */
 function sortKey(row: CorpSovereigntyRow, now: number): number {
   const state = stateOf(row, now);
   if (state === null || state === 'closed') return Infinity;
   return Math.max(row.windowStartMs ?? now, now);
 }
 
-/** The unsecured stock: units, and ISK only when every reagent in it has a price. */
 function atRisk(
   feed: CorpSovereigntyFeed,
   row: CorpSovereigntyRow
@@ -256,8 +233,6 @@ export const corpSovereignty: Builder = (feeds, { t, now, scopeAll }) => {
     };
   }
 
-  // Next wants clocks still ahead: an open window is underway, and a dry hub is
-  // already overdue in Due soon.
   const nextWindow = skyhooks.find((row) => stateOf(row, now) === 'upcoming');
   const nextRunOut = toBoardHubFuel(data)
     .filter((hub) => hub.runsOutMs > now)
@@ -317,7 +292,6 @@ export const corpSovereignty: Builder = (feeds, { t, now, scopeAll }) => {
   );
 };
 
-/** Theft windows that open or are open in the next 48 hours; undefined with none. */
 function raidChart(
   t: Translate,
   data: CorpSovereigntyFeed,
@@ -342,7 +316,6 @@ function raidChart(
   const fallback = hbarsFromRows(
     t,
     bars.map(({ window, ...bar }) => {
-      // Sooner = longer bar: the share of CHART_AHEAD_MS already elapsed.
       const share = 1 - Math.max(0, window.startMs - now) / CHART_AHEAD_MS;
       return { ...bar, value: share, share };
     }),

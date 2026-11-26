@@ -1,19 +1,9 @@
-/**
- * The ship-lost alert (issue #4772): one fire per loss killmail of a tracked
- * Character that the previous poll had not seen. zKillboard lists losses by
- * id and never edits one, so the baseline of ids seen is the whole identity —
- * no edge trigger needed.
- */
 export interface ShipLossEntrySnapshot {
   killmailId: number;
-  /** The killmail's own time, in epoch ms. */
   timeMs: number;
-  /** The hull that died; absent when zKillboard sent only the hash. */
   shipTypeId?: number;
   systemId?: number;
-  /** zKillboard's total value; absent when it states none. */
   value?: number;
-  /** The Character's minimum-ISK setting as it stood when this poll ran — see `WalletJournalEntrySnapshot`. */
   thresholdIsk: number;
 }
 
@@ -32,12 +22,6 @@ export interface ShipLostFire {
   value?: number;
 }
 
-/**
- * Fires per loss id not in `prev`, oldest first. No baseline fires nothing:
- * the first poll after enabling the event seeds it. A loss under the minimum
- * is dropped for good, since the next baseline holds it. With a minimum set, a
- * loss with no stated value is dropped too: it cannot be shown to reach it.
- */
 export function diffShipLost(
   characterId: number,
   prev: ShipLossSnapshot | undefined,

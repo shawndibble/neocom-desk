@@ -1,4 +1,3 @@
-/** Table columns shared by the Corp Tax Book mockups (#4056). */
 import { RowCaret, type DataTableColumn } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import type { DayLine, PaymentLine } from './corpTaxBookFixtures';

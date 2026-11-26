@@ -1,8 +1,3 @@
-/**
- * Open Orders' work-through mode, on screen. The start action and progress end
- * the headline's quiet line; the current order opens in its modal, which adds
- * the walk's notes and a Next button. A passed row keeps its status.
- */
 import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -43,7 +38,6 @@ function TextAction({
   );
 }
 
-/** "Work through (12)" at the end of the headline's quiet line, or "3 of 12 · Stop" while running. */
 export function WorkThroughSummaryTail() {
   const { t } = useTranslation();
   const context = useContext(WorkThroughContext);
@@ -83,7 +77,6 @@ function priceLine(price: WorkThroughPrice | null, t: TFunction) {
   return t('market.orders.workThrough.unavailable');
 }
 
-/** The red line a below-floor order carries: what the new price loses, or that the cost is unknown. */
 function LossLine({ row, context }: { row: OpenOrderRow; context: WorkThroughContextValue }) {
   const { t } = useTranslation();
   const price = context.workThrough.preview;
@@ -119,7 +112,6 @@ function OwnerNote({ row, context }: { row: OpenOrderRow; context: WorkThroughCo
   );
 }
 
-/** The modal's walk notes: where the walk stands, what the price read says when it gave none, the loss, the owner. */
 export function WorkThroughModalNotes({ row }: { row: OpenOrderRow }) {
   const { t } = useTranslation();
   const context = useContext(WorkThroughContext);
@@ -151,7 +143,6 @@ export function WorkThroughModalNotes({ row }: { row: OpenOrderRow }) {
   );
 }
 
-/** The modal's Next: the one control that passes the order, fixed or not. The last order reads "All N done". */
 export function WorkThroughNextButton({ className }: { className?: string }) {
   const { t } = useTranslation();
   const context = useContext(WorkThroughContext);
@@ -167,21 +158,18 @@ export function WorkThroughNextButton({ className }: { className?: string }) {
   );
 }
 
-/** What a passed row says: "Not changed", from an orders read after the press. Kept after Stop. */
 function RowStatus({ orderId, context }: { orderId: number; context: WorkThroughContextValue }) {
   const { t } = useTranslation();
   if (!context.workThrough.notChangedIds.has(orderId)) return null;
   return <span className="text-xs text-warning">{t('market.orders.workThrough.notChanged')}</span>;
 }
 
-/** Where a row stands in the walk: the current one, one already passed, or neither. */
 function useRowWorkThrough(row: OpenOrderRow) {
   const context = useContext(WorkThroughContext);
   if (context === null) return null;
   return context.workThrough.handled.has(row.orderId) ? { context } : null;
 }
 
-/** A desktop row's status for an order already passed, in place of its summary sentence. */
 export function WorkThroughTableSlot({
   row,
   fallback,
@@ -194,7 +182,6 @@ export function WorkThroughTableSlot({
   return <RowStatus orderId={row.orderId} context={place.context} />;
 }
 
-/** A phone row's status for an order already passed, below the row's own button (buttons don't nest). */
 export function WorkThroughListSlot({ row }: { row: OpenOrderRow }) {
   const place = useRowWorkThrough(row);
   if (place === null) return null;

@@ -1,4 +1,3 @@
-/** The officer's read-only killmail, opened over a claim's slide-over: facts, the fit with doctrine marks, the appraisal comparison. */
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import { useIsPhone } from '@/lib/useIsPhone';

@@ -16,7 +16,6 @@ const explore = (strength: number, coherence: number) =>
     explore: {
       ...NO_EXPLORE,
       modules: 3,
-      // A Data Analyzer: its strength is the data sites' figure.
       hacking: { strength, coherence, cycleSeconds: 10 },
       dataStrength: strength,
       scanning: { strength: 10, duration: 0, deviation: 0 },

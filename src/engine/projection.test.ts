@@ -35,8 +35,6 @@ import { HOUR_MS } from '@/lib/age';
 const T0 = 1_700_000_000_000;
 
 describe('projectionWording', () => {
-  // A refuel falsifies the first two; a reset run falsifies the planetary
-  // pair; topping up the queue in the EVE client falsifies the last.
   it.each([
     'structureFuelLow',
     'planetaryExtractionDone',
@@ -129,9 +127,6 @@ describe('projectSkillQueue', () => {
       { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + PROJECTION_HORIZON_MS },
     ];
     const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
-    // Position 0 (fireAt === nowMs) never becomes a skillLevelComplete row (it's
-    // not the last entry, but it's also not in the future), and position 1 (the
-    // last entry, fireAt exactly at the horizon edge) is included.
     expect(rows).toHaveLength(1);
     expect(rows[0].eventId).toEqual('characterNotTraining');
     expect(rows[0].fireAt).toEqual(T0 + PROJECTION_HORIZON_MS);
@@ -147,7 +142,7 @@ describe('projectSkillQueue', () => {
   });
 
   it('keys characterNotTraining by the day the queue actually goes idle (fireAt), not the projection day — the best available proxy for what the Foreground Poller will later see, though not a guarantee (see projection.ts header)', () => {
-    const finishMs = T0 + 60 * HOUR_MS; // lands on a different UTC day than T0
+    const finishMs = T0 + 60 * HOUR_MS;
     const entries = [{ skillId: 1, finishedLevel: 5, queuePosition: 0, finishMs }];
     const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
     const fire: NotificationFire = {
@@ -268,18 +263,12 @@ describe('projectSkillQueue', () => {
       thresholdMs: endingLeadMs,
     };
     expect(ending?.occurrenceKey).toEqual(occurrenceKey(fire, T0 + 999_999));
-    // A different lead time is a different occurrence (the re-arm case) —
-    // the key must not collide just because finishMs is unchanged.
     expect(ending?.occurrenceKey).not.toEqual(
       occurrenceKey({ ...fire, thresholdMs: 12 * HOUR_MS }, T0 + 999_999)
     );
   });
 
   it('renders skillQueueEnding push copy under its declared hedge wording without throwing', () => {
-    // `skillQueueCopy.push` calls `assertProjectionWording('skillQueueEnding',
-    // 'hedge')` internally and throws if that ever drifts from
-    // `projectionWording`'s own mapping — this exercises that path for real,
-    // not just the wording table above.
     const entries = [
       {
         skillId: 3300,
@@ -415,10 +404,6 @@ describe('projectColonies', () => {
   });
 
   it('states planetaryExtractionDone as a prediction, never as an observation', () => {
-    // A pilot who restarts the programs in game before this fires gets the
-    // push anyway — nothing between here and delivery can re-check it (ADR
-    // 0010). The live path keeps SHARED_NOTIFICATION_WORDING's "has stopped",
-    // which it has actually observed.
     const colonies = [
       {
         planetId: 40000001,
@@ -436,8 +421,6 @@ describe('projectColonies', () => {
     const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
     expect(extractionDone?.body).toContain('was due to stop');
     expect(extractionDone?.body).not.toContain('has stopped');
-    // The headline is the whole claim on a lock screen, so it hedges too —
-    // this is the sentence the bug report actually quoted.
     expect(extractionDone?.title).not.toEqual(
       SHARED_NOTIFICATION_WORDING.planetaryExtractionDone.title
     );
@@ -544,7 +527,6 @@ describe('projectSkyhookRaids', () => {
     expect(above[1].occurrenceKey).toMatch(/:danger$/);
     const below = project([hook(T0 + 10 * HOUR_MS, { minUnits: 1000 })]);
     expect(below[1].occurrenceKey).toMatch(/:open$/);
-    // An unread silo is never called safe.
     const unread = project([hook(T0 + 10 * HOUR_MS, { minUnits: 1000, unsecuredUnits: null })]);
     expect(unread[1].occurrenceKey).toMatch(/:danger$/);
   });
@@ -658,7 +640,6 @@ describe('projectEveNotificationReinforcementExit', () => {
       type: 'StructureUnderAttack',
       senderId: 1000132,
       senderType: 'corporation',
-      // 36,000,000,000 ticks (100ns units) = 3,600,000 ms = 1 hour.
       text: 'structureID: 111\ntimeLeft: 36000000000\n',
       timestamp: T_ISO,
       ...overrides,

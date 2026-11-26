@@ -1,17 +1,3 @@
-/**
- * Build Group detail's buy-materials table at 390px (issue #2215, reworked by
- * DESIGN.md §6c restraint): the figures are read across columns, so on a phone
- * it is a dense two-line card (`responsive="stack"`, `stackLayout="dense"`, #6561):
- * material and Still to buy on line one, Qty and the Owned input on line two,
- * the low-value Volume left off (`data-dense-omit`); never a sideways page scroll.
- *
- * A Rifter Blueprint (typeID 691) member at 20 runs supplies both edge cases:
- * Tritanium's quantity (640,000) is six digits, and only Tritanium has a
- * `market/fuzzwork.co.uk` price in the shared mock (`mockEsi.ts`'s
- * `FUZZWORK_AGGREGATES`) — Pyerite, Mexallon and Isogen come back with no
- * orders, so their rows carry the "No price" warning the still-to-buy column
- * shows.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -22,9 +8,7 @@ const GROUP_ID = 'g1';
 const GROUP_NAME = 'Test Group';
 const GROUP_MATERIALS_LABEL = 'Everything this group needs';
 
-/** Tritanium: the only material `FUZZWORK_AGGREGATES` prices, and the Rifter Blueprint's largest material — six digits at 20 runs. */
 const TRITANIUM = 34;
-/** Pyerite: unpriced in the shared mock, so its still-to-buy cell carries the warning. */
 const PYERITE = 35;
 
 async function seedGroupWithPlan(page: Page): Promise<void> {
@@ -71,11 +55,9 @@ interface CellBox {
   left: number;
   width: number;
   text: string;
-  /** Content wider/taller than the cell's own box — the clipping a paired card's narrower cell can produce that a bounding-box-only check would miss. */
   overflows: boolean;
 }
 
-/** One buy-materials row's cells, keyed by `data-row-key` (the material's typeId) — position-independent, since sort order isn't asserted here. */
 async function readRow(page: Page, typeId: number): Promise<{ display: string; cells: CellBox[] }> {
   const row = page.locator(
     `table[aria-label="${GROUP_MATERIALS_LABEL}"] tr[data-row-key="${typeId}"]`
@@ -123,17 +105,14 @@ test.describe('Build Group detail — buy-materials table on a phone', () => {
     await page.setViewportSize(PHONE);
     await page.goto(`./industry/groups/${GROUP_ID}`);
 
-    // `stackLayout="dense"` (#6561): the row is a flex card, not a table row.
     const { display, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('flex');
     const visible = cells
       .filter((cell) => cell.width > 0)
       .map((cell) => cell.label)
       .sort();
-    // The trailing blank cell is the row's More actions button.
     expect(visible).toEqual(['', 'Material', 'Owned', 'Qty', 'Still to buy']);
 
-    // The six-digit case: Qty still holds its own figure without clipping it.
     const qty = cellFor(cells, 'Qty');
     expect(qty.text).toContain('640,000');
     expect(qty.overflows).toBe(false);

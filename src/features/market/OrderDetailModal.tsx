@@ -1,30 +1,3 @@
-/**
- * Full breakdown of one open order (GLOSSARY.md's redesigned Market > Open
- * Orders tab): what to do about it, the numbers behind that call, who is
- * cheaper and where, and — for a sell order — the cost-basis ledger the
- * floor came from.
- *
- * `OrderDetailModal` takes the order, the page snapshot and the page's one
- * Order Detail (`useOrderDetail`), which owns every fetch behind it;
- * `useOpenOrderDetail` asks for what this order needs and assembles the
- * view (`orderDetailView.ts`). `OrderDetailContent` below only renders that
- * finished view and asks for more via `onCheckDeeper`.
- *
- * The station/system/region three-way state a caller must not collapse:
- * - Station is always eager (`stationChecked` false only means the Fuzzwork
- *   aggregate call itself failed for this station — genuinely rare).
- * - System and region come from `deep`, fetched on demand. `deep === null`
- *   means "not checked yet" for BOTH; once it has run, `'system' in
- *   deep`'s undercut result can still be absent — my own order's system id
- *   could not be recovered from the region book (`openOrdersModel.ts`'s
- *   `deriveSystemId`) — which must render as "not checked" too, never as
- *   "checked, clean".
- *
- * An order whose item an Active campaign turn-in takes (#6708) — a sell order
- * filed `turnInPays`, or any buy order — shows the turn-in (`TurnInDetailBody`)
- * in the modal's main area, about the order's own Character, with one line
- * on what it pays over the order's price.
- */
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, StatChip, StatChips } from '@/components/ui';
@@ -61,21 +34,12 @@ import type { TurnInOfferDetail } from '@/features/campaigns/useTurnIns';
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
   snapshot: OrderDetailSnapshot;
-  /**
-   * The page's one Order Detail. Page-level rather than the modal's own:
-   * its caches outlive this modal (which remounts per order and unmounts on
-   * close, and reopening an order must not refetch), and its region and
-   * structure books also reclassify the worklist's rows.
-   */
   detail: OrderDetail;
-  /** A work-through is showing this order: the modal adds the walk's notes and Next. */
   walking?: boolean;
-  /** The Active turn-in for the order's item, when one takes it. */
   turnIn?: TurnInOfferDetail | null;
   onClose: () => void;
 }
 
-/** The full breakdown of one open order. */
 export function OrderDetailModal({
   row,
   snapshot,
@@ -105,12 +69,10 @@ export type OrderDetailContentProps = OrderDetailView & {
   onClose: () => void;
 };
 
-/** The modal's four folding sections, all folded on arrival. */
 export type OrderDetailSectionId = 'numbers' | 'whoCheaper' | 'costBasis' | 'exits';
 
 const NONE_OPEN: ReadonlySet<OrderDetailSectionId> = new Set();
 
-/** The modal itself, rendering a finished view — `OrderDetailModal` is what a page mounts. */
 export function OrderDetailContent({
   row,
   deep,
@@ -135,10 +97,6 @@ export function OrderDetailContent({
   const isPhone = useIsPhone();
   const nowTick = useNow();
   const turnInHeadingId = useId();
-  // All folded: verdict, Copy and the facts are the answer, each trailing read
-  // its summary. A page remounts per orderId, but a work-through keeps one
-  // modal across orders: the open set is tagged with its order, so Next folds
-  // everything again.
   const [opened, setOpened] = useState<{ orderId: number; ids: ReadonlySet<OrderDetailSectionId> }>(
     { orderId: row.orderId, ids: new Set() }
   );
@@ -159,7 +117,6 @@ export function OrderDetailContent({
   const advice = adviseOrder(row);
   const verdict = verdictFigures(row, advice);
   const { keepPerUnit } = verdict;
-  // The verdict's own price first; else the walk's one-tick price (an undercut order).
   const walkPrice = useWalkCopyPrice(walking);
   const copyPrice = verdict.copyPrice ?? walkPrice;
   const station =
@@ -170,8 +127,6 @@ export function OrderDetailContent({
   const region = deepScopeState('region', row, deep, location);
   const sell = computeSellThrough(row, deep, history, new Date(nowTick));
 
-  // "Cheapest here" is the station tier: the price a buyer standing in this
-  // station sees first. Exact, never shorthand.
   const cheapestHere = (() => {
     switch (station.kind) {
       case 'rival':
@@ -197,7 +152,6 @@ export function OrderDetailContent({
       placement={isPhone ? 'sheet' : 'center'}
       footer={
         walking ? (
-          // Copy keeps the full width on a phone, Next under it; one row from `md`.
           <div className="flex w-full flex-col gap-2 md:flex-row md:justify-end">
             {phoneCopy}
             <WorkThroughNextButton className="w-full md:w-auto" />
@@ -233,8 +187,6 @@ export function OrderDetailContent({
         </StatChips>
 
         {turnIn && orderShowsTurnIn(row) && (
-          // Its own titled block, apart from the order's verdict above: a bid that is fine as a
-          // bid can still be beaten by turning the items in.
           <section aria-labelledby={turnInHeadingId} className="rounded-xs border border-line">
             <h3 id={turnInHeadingId} className={cx(eyebrowClassName, 'px-3 pt-3')}>
               {t('market.orders.turnIn.heading')}
@@ -270,7 +222,6 @@ export function OrderDetailContent({
             expanded={isExpanded('numbers')}
             onToggle={() => toggleSection('numbers')}
           />
-          {/* Cost basis and exits are sell-side ideas: a buy order has neither (#1733). */}
           {!row.isBuyOrder && (
             <OrderCostSection
               row={row}

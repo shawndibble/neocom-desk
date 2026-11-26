@@ -1,8 +1,3 @@
-/**
- * Sell to (issue #4780): a Member's pasted pile in, a Quote for one standing
- * Request out. The pure steps live in `src/engine/communities/buyback.ts`; this
- * is the thin layer that reaches the catalogue, the SDE and the hub prices.
- */
 import {
   buildQuote,
   type PastedItem,
@@ -17,11 +12,9 @@ import { getHubPrices } from '@/market/prices';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 
 export interface PileQuote extends QuoteResult {
-  /** Pasted names that are no item the catalogue knows. */
   unmatched: string[];
 }
 
-/** The Quote for `text` on `standing`, at the hub it names. Throws only if the catalogue cannot load. */
 export async function quotePile(
   text: string,
   standing: StandingRequest,
@@ -44,7 +37,6 @@ export async function quotePile(
     };
   });
   const hub = TRADE_HUBS.find((h) => h.id === standing.hubId);
-  // The callable only stores a known hub: a missing one must not quietly price at Jita.
   if (!hub) throw new Error(`Unknown Trade Hub ${standing.hubId}`);
   const prices =
     items.length === 0

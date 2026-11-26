@@ -1,8 +1,3 @@
-/**
- * One claim's detail in a `SlideOver`: the facts, the amount with how it was
- * reached, the audit trail, and the state's actions (pinned at the bottom on a phone). A row click
- * opens it, so the row itself carries nothing extra for it.
- */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Eyebrow, SlideOver, Spinner, textActionClassName } from '@/components/ui';
@@ -50,7 +45,6 @@ function useClaimAudit(claim: SrpClaim, load: (killmailId: number) => Promise<Sr
   return read.status === 'ready' ? read.data : read.status === 'failed' ? 'failed' : null;
 }
 
-/** The claim's Jita appraisals (the lost ship and the nearest Doctrine Fit, no cargo), read once per claim. */
 function useClaimValues(
   claim: SrpClaim,
   load: (killmailId: number) => Promise<SrpClaimValues>

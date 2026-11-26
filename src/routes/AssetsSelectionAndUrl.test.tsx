@@ -147,9 +147,6 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
-    // The cargo's 50 × 5 ISK, not the Drake's 50M: the hull is never added.
-    // The ISK part holds an `IskAmount` (shorthand plus its exact figure as
-    // hidden text), so match the part span by its shorthand and suffix.
     const [iskPart] = await screen.findAllByText(
       (_, element) =>
         element?.tagName === 'SPAN' &&
@@ -185,9 +182,6 @@ describe('multi-select and bulk actions (issue #90)', () => {
   });
 
   it('adds every selected item to the Quickbar via the bulk action bar', async () => {
-    // Both items at one location so both are on screen together — the
-    // default fixture spreads them across two locations on purpose, to keep
-    // the location-scoping tests unambiguous.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
@@ -220,7 +214,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
   });
 
   it('leaves a Mutated module out of the bulk Quickbar add: it has no market', async () => {
-    await db.quickbars.clear(); // the test above leaves its two items there
+    await db.quickbars.clear();
     abyssalEstimate.mockResolvedValue({
       status: 'unknown',
       value: null,
@@ -245,7 +239,6 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Heavy Abyssal Energy Neutralizer');
-    // Estimate asked for = lookup loaded, so the bulk add can tell the type is Abyssal.
     await waitFor(() => expect(abyssalEstimate).toHaveBeenCalled());
 
     await clickTool(user, 'Select');
@@ -454,7 +447,6 @@ describe('view state in the URL (issue #1306)', () => {
       'aria-checked',
       'true'
     );
-    // Min value sits in the funnel box; Escape closes the Tools menu first.
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByLabelText('Minimum value')).toHaveValue('10,000');
@@ -521,7 +513,6 @@ describe('view state in the URL (issue #1306)', () => {
     window.history.replaceState({}, '', '/assets/items/60003760?q=pyerite');
     renderAssetsRoute();
 
-    // Search wins over browsing, as it does when typed.
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     expect(window.location.pathname).toBe('/assets/items/60003760');

@@ -1,13 +1,3 @@
-/**
- * One route system's zKillboard kills from the last hour (issue #2329): a
- * count linking to zKillboard, then where they happened. Gates on the path
- * are highlighted, and sit on the row itself; the rest open in the row's
- * detail (issue #2474).
- *
- * Counts, places and times only (decision `20260912-172628`): "3 kills at
- * Stargate (Nourvukaiken), last one 32 min ago", "Smartbombs involved" —
- * never a word about what that means for the pilot.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner, plainTextActionClassName } from '@/components/ui';
@@ -88,12 +78,6 @@ function LocationLine({
   );
 }
 
-/**
- * The row's own line (issue #2474): the count, then only the kills on a gate
- * along the route. Kills anywhere else wait in the row's detail
- * (`RecentKillsDetail`), so a row stays short. The on-route line wraps in a
- * narrow column rather than widening the table past its panel.
- */
 export function RecentKillsCell({
   systemId,
   systemName,
@@ -117,7 +101,6 @@ export function RecentKillsCell({
   return (
     <span
       className="inline-flex flex-wrap items-center gap-x-3 text-left"
-      // Nothing to say on a phone card's meta line; the table column keeps it.
       data-dense-omit={summary.count === 0 ? '' : undefined}
     >
       {summary.count > 0 ? (
@@ -156,7 +139,6 @@ export function RecentKillsCell({
   );
 }
 
-/** Every kill location off the route's own gates, for the row's expanded detail. */
 export function RecentKillsDetail({
   cell,
   systemId,

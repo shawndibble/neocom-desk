@@ -6,7 +6,6 @@ import { db } from '@/db';
 import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { loadCharacterClones, loadImplantDetails } from './clones';
 
-// Default: the baked shard lacks the type, so ESI handlers serve it.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const CHAR_ID = 91;
@@ -128,7 +127,6 @@ describe('loadImplantDetails', () => {
         [331, 2],
       ],
     });
-    // No ESI handler: an ESI read would fail on the unhandled request.
     const result = await loadImplantDetails([10209]);
     expect(result.get(10209)).toEqual({
       description: '+5 Memory',

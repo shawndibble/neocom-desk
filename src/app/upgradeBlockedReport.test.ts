@@ -10,7 +10,6 @@ beforeEach(() => captureMessage.mockClear());
 describe('subscribeToUpgradeBlockedReports', () => {
   it('reports a blocked upgrade with both schema versions', () => {
     const unsubscribe = subscribeToUpgradeBlockedReports();
-    // Native IndexedDB numbers — Dexie v10 -> v11.
     emitUpgradeBlocked({ oldVersion: 100, newVersion: 110 });
     expect(captureMessage).toHaveBeenCalledWith('IndexedDB upgrade blocked by another connection', {
       level: 'warning',

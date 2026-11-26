@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/**
- * Substrings identifying each of the four ESI writes the app makes, one per
- * write. Every copy that claims to enumerate "the writes" must mention all
- * four, or the lists drift apart (the FAQ once said "Three things" and
- * omitted the Fitting write — see issue #1796). The FAQ states them in its
- * "Does Neocom Desk change anything in EVE?" answer, `notes.writes`.
- */
 const WRITE_MARKERS = ['read in EVE', 'calendar invite', 'through your', 'Fitting to EVE'];
 
 const FAQ_DESCRIPTION = en.settings.faq.store.notes.writes;

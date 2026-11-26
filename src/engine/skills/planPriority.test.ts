@@ -60,7 +60,6 @@ describe('effectivePriority', () => {
   });
 
   it('a prerequisite inherits the highest urgency among everything that needs it', () => {
-    // Skill 1 is a prereq of both skill 2 (low) and skill 3 (high).
     const skills = skillMap(
       skill(1),
       skill(2, [{ typeID: 1, level: 1 }]),

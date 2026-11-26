@@ -21,7 +21,6 @@ function cert(overrides = {}) {
 
 describe('bakeCertificates', () => {
   it('maps the five named grades by name, never by key order', () => {
-    // CCP's objects list the keys alphabetically: advanced, basic, elite, improved, standard.
     const [c] = bakeCertificates(
       [
         cert({

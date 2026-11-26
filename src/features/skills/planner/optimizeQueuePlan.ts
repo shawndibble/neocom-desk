@@ -9,7 +9,6 @@ import { remapBudget, type RemapAvailability } from './remapAvailability';
 import { applyOptimizerRemapSegments } from './skillPlanEdit';
 
 interface OptimizeQueueArgs {
-  /** The live skill queue as plan entries, already deduped. */
   entries: readonly PlanEntry[];
   inputs: PlanScheduleInputs;
   remapInfo: RemapAvailability | null;
@@ -19,27 +18,17 @@ interface OptimizeQueueArgs {
 }
 
 export type OptimizeQueueOutcome =
-  /** Nothing is queued, so there is nothing to optimize. */
   | { kind: 'empty' }
-  /** No remap makes the queue meaningfully faster, so no plan is worth making. */
   | { kind: 'optimal' }
   | {
       kind: 'plan';
       plan: SkillPlanRecord;
       savingsSeconds: number;
       remapsPlaced: number;
-      /** The entry the first Remap Marker sits in front of. */
       firstRemapEntry: PlanEntry | undefined;
-      /** Set when the last remap is the on-cooldown yearly one: the date it becomes usable. */
       yearlyRemapAfter?: Date;
     };
 
-/**
- * "Optimize queue": a Skill Plan made from the live skill queue with the
- * best Remap Markers already placed. Remaps are placed on the plan's own
- * schedule, which waits only on the live queue, and re-priced the way the
- * editor prices them, so the savings quoted here are the ones the plan shows.
- */
 export function optimizeQueuePlan({
   entries,
   inputs,

@@ -4,17 +4,10 @@ export type SettingsSectionId = (typeof SETTINGS_TABS)['tabs'][number]['id'];
 
 export interface SettingsGroup {
   readonly id: 'preferences' | 'defaults' | 'account' | 'data';
-  /** i18next key for the group heading in the rail. */
   readonly labelKey: string;
   readonly sections: readonly SettingsSectionId[];
 }
 
-/**
- * How the Settings rail files its sections. The order here is the order on
- * screen; a section's label is its `SETTINGS_TABS` entry (`app/pageTabs.ts`),
- * so a section added there and not listed here is routable but has no rail
- * entry — the Settings tests walk every id to catch that.
- */
 export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'preferences',
@@ -38,11 +31,6 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   },
 ];
 
-/**
- * The groups to show, minus what this Character cannot use. Corporation
- * defaults are hidden rather than locked, the same rule the corp nav follows:
- * a setting for a page you cannot open is noise.
- */
 export function visibleSettingsGroups(access: { corp: boolean }): SettingsGroup[] {
   return SETTINGS_GROUPS.map((group) => ({
     ...group,
@@ -52,5 +40,4 @@ export function visibleSettingsGroups(access: { corp: boolean }): SettingsGroup[
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
 
-/** Translation key naming a Settings section: the rail, the index and the page header all show it. */
 export const settingsSectionLabelKey = (id: string) => LABEL_KEYS.get(id) ?? id;

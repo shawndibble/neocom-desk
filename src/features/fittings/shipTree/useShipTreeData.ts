@@ -1,14 +1,3 @@
-/**
- * Everything the Ship Tree tab draws from, loaded once: the tree itself,
- * Masteries, the skill catalog, and the active Character's skills, clone
- * and attributes — plus every hull's status, computed once per change.
- *
- * With no active Character the catalog is still loaded (Alpha caps drive
- * the Ω marks, skill names the bonuses and pirate emblems) and statuses are
- * computed against no trained skills, so the whole tree renders dim. With
- * one, no status is computed until its skills have been read — until then
- * the tree renders dim rather than guessing from an empty skill sheet.
- */
 import { useMemo, useState } from 'react';
 import { hullStatuses } from '@/engine/shipTree/status';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
@@ -36,9 +25,7 @@ const loadTreeAndCatalog = () =>
 export interface ShipTreeSource {
   data: ShipTreeData;
   masteries: MasteryMap;
-  /** Whether `masteries` is the real file (`loaded`), still on its way, or could not be loaded (then it is empty, and a hull's lack of an entry means nothing). */
   masteriesStatus: 'loading' | 'loaded' | 'unavailable';
-  /** Tries `masteries.json` again after `unavailable`. */
   retryMasteries: () => void;
   catalog: SkillCatalog;
   characterId: number | null;
@@ -46,19 +33,12 @@ export interface ShipTreeSource {
   statuses: ReadonlyMap<number, ShipTreeHullStatus>;
   trainedLevel: (skillTypeID: number) => number;
   alphaMaxLevel: (skillTypeID: number) => number;
-  /** A skill's name, or `#id` when the catalog doesn't know it. */
   skillName: (skillTypeID: number) => string;
-  /** The active Character's attributes, implants and clone — what a training-time estimate needs. Meaningless with no Character; callers gate on `characterId !== null` first. */
   attributes: Attributes;
   implants: Implants;
   cloneState: CloneState;
 }
 
-/**
- * `source` is null until the tree and the skill catalog have both loaded;
- * `'failed'` when either can't be, and then `retry` loads them again (so does
- * the connection coming back).
- */
 export function useShipTreeData(characterId: number | null): {
   source: ShipTreeSource | null | 'failed';
   retry: () => void;

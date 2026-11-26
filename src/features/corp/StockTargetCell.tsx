@@ -1,11 +1,3 @@
-/**
- * The Target cell of the corp assets ledger: the corporation's stock target for
- * one item type, edited in place. At rest it is a value (or a dim "—") in the
- * §6c popover-value cue, a dashed accent underline meaning "click to change
- * this". Click or Enter swaps it for a number field: Enter or leaving the field
- * saves, Escape cancels, and only a truly empty field removes the target; an
- * entry that is not a whole number of at least 1 shows why and stays open.
- */
 import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FieldError, TextInput } from '@/components/ui';
@@ -19,11 +11,8 @@ export function StockTargetCell({
   onChange,
   onRemove,
 }: {
-  /** Names the control for a screen reader: "Target for Tritanium". */
   itemName: string;
-  /** The current target, or undefined when the type has none. */
   target: number | undefined;
-  /** A whole number of at least 1. */
   onChange: (target: number) => void;
   onRemove: () => void;
 }) {
@@ -32,24 +21,19 @@ export function StockTargetCell({
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  // Escape and Enter finish the edit themselves; the blur that follows must not save again.
   const done = useRef(false);
-  // A number field reports unparsable text ("1e") as an empty value; badInput tells them apart.
   const badInput = useRef(false);
 
-  /** `keyboard` exits (Enter, Escape) hand focus back to the cell; a blur never does. */
   function finish(save: boolean, keyboard: boolean) {
     if (done.current) return;
     if (save && draft !== null) {
       const text = draft.trim();
       if (text === '' && !badInput.current) {
-        // Only a truly empty field removes the target.
         if (target !== undefined) onRemove();
       } else {
         const value = text === '' ? Number.NaN : Number(text);
         const whole = Math.floor(value);
         if (!Number.isFinite(value) || whole < 1) {
-          // Keep the field open and say why; nothing is saved or removed.
           setInvalid(true);
           return;
         }
@@ -59,7 +43,6 @@ export function StockTargetCell({
     done.current = true;
     setDraft(null);
     setInvalid(false);
-    // The button remounts after the field unmounts.
     if (keyboard) requestAnimationFrame(() => buttonRef.current?.focus());
   }
 
@@ -116,7 +99,6 @@ export function StockTargetCell({
             e.preventDefault();
             finish(true, true);
           } else if (e.key === 'Escape') {
-            // Cancels the edit, not an enclosing dialog or panel.
             e.preventDefault();
             e.stopPropagation();
             finish(false, true);

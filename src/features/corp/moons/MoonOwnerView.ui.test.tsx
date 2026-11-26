@@ -94,7 +94,6 @@ describe('MoonOwnerView', () => {
       balanceIsk: 0,
     });
     expect(screen.getByText(/No rate is agreed yet, so nothing is owed to you\./)).toBeVisible();
-    // The history in the fixture still holds a past "agreed 8%": it must not read as a rate set.
     expect(screen.queryByText(/Rate set to/)).toBeNull();
     expect(screen.getByText('No rate is set.')).toBeVisible();
   });

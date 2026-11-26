@@ -1,13 +1,3 @@
-/**
- * Pilot Lookup (issue #2331): search a pilot by name and see who they
- * are (public ESI) and what zKillboard states about their kills and losses.
- *
- * Numbers, never verdicts (decision `20260912-172628`): the card states a
- * danger ratio of 68%, it never calls the pilot hostile or safe.
- *
- * One pilot opens Show Info (`?info=character-<id>`, shareable); an older
- * `?pilot=<id>` link still renders the profile in the page.
- */
 import {
   useEffect,
   useLayoutEffect,
@@ -70,7 +60,6 @@ export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
   const [openAfterClear, setOpenAfterClear] = useState<number | null>(null);
   useEffect(() => {
     if (openAfterClear === null || params.pilot !== null) return;
-    // After the commit, so the info navigator has seen the cleared location.
     const id = setTimeout(() => {
       setOpenAfterClear(null);
       openPublicInfoModal('character', openAfterClear);
@@ -78,17 +67,13 @@ export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
     return () => clearTimeout(id);
   }, [openAfterClear, params.pilot]);
   const location = useLocation();
-  // The pasted list lives here, not in the URL, so it survives a trip to one
-  // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
   const [list, setList] = useState<PilotPaste | null>(null);
   const [handledListKey, setHandledListKey] = useState<string | null>(null);
-  // "Open Neocom Desk" on a Shared D-Scan arrives as `?share=<id>`.
   useSharedDscanSeed((text) => {
     const pasted = classifyPilotPaste(text);
     if (pasted !== null) setList(pasted);
   });
 
-  // Adopted during render, once per navigation (`location.key`), rather than in an effect.
   const routedText = (location.state as Partial<PilotListState> | null)?.pilotListText;
   if (routedText && handledListKey !== location.key) {
     setHandledListKey(location.key);
@@ -101,23 +86,17 @@ export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
       <PageHeader title={t('travel.title')} />
       {tabBar}
       <TabPanel tabsId={tabsId} tabId="pilot" className="space-y-4">
-        {/* Each Panel's backdrop-blur is its own stacking context; lifting this one keeps the suggestion list above the panel below. */}
         <Panel className="relative z-20">
           <PilotSearch
             resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
             list={list}
             onList={(paste) => {
               setList(paste);
-              // A list replaces the one pilot on screen, so the pilot leaves the URL.
               if (paste !== null && params.pilot !== null)
                 setParams({ pilot: null }, { push: true });
             }}
             onSelect={(pilot) => {
               setList(null);
-              // One pilot opens Show Info (corp, alliance, history, interactions tabs).
-              // An older `?pilot=` link is cleared first, so its in-page profile doesn't
-              // sit behind the modal; the modal opens once that URL write has landed,
-              // because both write the query string from the location they last rendered.
               if (params.pilot === null) openPublicInfoModal('character', pilot.characterId);
               else {
                 setParams({ pilot: null });
@@ -142,11 +121,9 @@ type ResolveState =
   | { kind: 'idle' }
   | { kind: 'resolving' }
   | { kind: 'not-found'; name: string }
-  /** A line of a several-line list doesn't look like a pilot name. */
   | { kind: 'bad-lines' }
   | { kind: 'failed' };
 
-/** A phone keyboard has no Shift+Enter, so there Enter always adds a line. */
 function hasCoarsePointer(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 }
@@ -157,7 +134,6 @@ function PilotSearch({
   onList,
   onSelect,
 }: {
-  /** The pilot in the URL once its profile has loaded. */
   resolved: PilotSummary | null;
   list: PilotPaste | null;
   onList: (paste: PilotPaste | null) => void;
@@ -171,20 +147,15 @@ function PilotSearch({
   const [suggestions, setSuggestions] = useState<PilotSummary[]>([]);
   const [open, setOpen] = useState(false);
   const [resolve, setResolve] = useState<ResolveState>({ kind: 'idle' });
-  // Only the newest search may write results: ESI can answer out of order.
   const latestSearch = useRef(0);
-  // Likewise for an exact-name lookup: typing again supersedes one in flight.
   const latestLookup = useRef(0);
-  // The pilot whose name the box last showed, and whether the user is editing it.
   const seededId = useRef<number | null>(null);
   const typing = useRef(false);
-  // The box takes one name per line; suggestions are for the line the caret is on.
   const [caret, setCaret] = useState(0);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const pendingCaret = useRef<number | null>(null);
 
   useEffect(() => {
-    // The pilot left the URL: coming back to it must seed again, even over edited text.
     if (resolved === null) seededId.current = null;
     const seed = searchBoxSeed({
       resolved,
@@ -200,7 +171,6 @@ function PilotSearch({
 
   const multi = isMultiLine(query);
   const exact = query.trim();
-  // The name being typed is the caret's line: it alone gets suggestions.
   const trimmed = lineAt(query, caret).text.trim();
   const shown = canSuggest && trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH ? suggestions : [];
   const listOpen = open && shown.length > 0;
@@ -209,7 +179,6 @@ function PilotSearch({
   useEffect(() => {
     if (!canSuggest || activeCharacterId === null) return;
     if (trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH) return;
-    // A seeded or chosen name is already a pilot; only the user's typing asks ESI for matches.
     if (!typing.current) return;
     const ticket = ++latestSearch.current;
     const controller = new AbortController();
@@ -220,7 +189,6 @@ function PilotSearch({
           setSuggestions(hits);
         })
         .catch(() => {
-          // An aborted search is superseded, not failed; a real failure still leaves exact-name lookup.
           if (ticket !== latestSearch.current || controller.signal.aborted) return;
           setSuggestions([]);
         });
@@ -231,7 +199,6 @@ function PilotSearch({
     };
   }, [canSuggest, activeCharacterId, trimmed]);
 
-  // After a pick fills a line of a list, the caret goes to the end of that line.
   useLayoutEffect(() => {
     if (pendingCaret.current === null) return;
     areaRef.current?.setSelectionRange(pendingCaret.current, pendingCaret.current);
@@ -241,7 +208,6 @@ function PilotSearch({
 
   function choose(pilot: PilotSummary) {
     if (multi) {
-      // Part of a list: fill the line being typed, and look the list up when asked.
       const next = replaceLine(query, caret, pilot.name);
       pendingCaret.current = next.caret;
       typing.current = true;
@@ -275,7 +241,6 @@ function PilotSearch({
     }
   }
 
-  /** One name looks that pilot up; several lines look the whole list up. */
   function submit() {
     const names = namesOf(query);
     if (names.length >= 2) {
@@ -311,9 +276,6 @@ function PilotSearch({
         e.preventDefault();
         choose(picked);
       } else if (!multi && !hasCoarsePointer()) {
-        // One name: Enter looks it up. Shift+Enter starts a list; once there is
-        // one, Enter adds a line and Ctrl+Enter looks the list up. A phone's
-        // Enter always adds a line, so its Look up button is the way.
         e.preventDefault();
         submit();
       }
@@ -339,7 +301,6 @@ function PilotSearch({
                 autoComplete="off"
                 value={query}
                 onChange={(e) => {
-                  // Typing supersedes a lookup in flight, and another query's hits must not linger.
                   latestLookup.current++;
                   typing.current = true;
                   setQuery(e.target.value);
@@ -381,7 +342,6 @@ function PilotSearch({
                         i === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
                       )}
                       onMouseEnter={() => combo.setHighlight(i)}
-                      // Keeps the input focused — a plain click would blur it first and close the list.
                       onMouseDown={(e) => {
                         e.preventDefault();
                         choose(pilot);
@@ -405,8 +365,6 @@ function PilotSearch({
             </Button>
           </Tooltip>
           {list !== null && (
-            // A pasted list collapses out of the box; the box stays, so one pilot can be
-            // looked up without clearing the list first. Clear drops the list.
             <Button type="button" onClick={() => onList(null)}>
               {t('travel.pilot.list.clear')}
             </Button>
@@ -417,7 +375,6 @@ function PilotSearch({
             </span>
           )}
           {list?.kind === 'dscan' && (
-            // The scan's size is on the page below; Share sits in the top right corner.
             <div className="ml-auto flex max-w-full flex-wrap justify-end gap-2 self-start">
               <DscanShareControl paste={list} characterId={activeCharacterId} />
             </div>
@@ -445,7 +402,6 @@ type ProfileState =
   | { kind: 'failed' }
   | { kind: 'ready'; profile: PilotProfile };
 
-/** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
 function PilotResult({
   characterId,
   onResolved,
@@ -484,7 +440,6 @@ function PilotResult({
     setAttempt((n) => n + 1);
   }
 
-  // One wrapper in every state, so focus on Retry has somewhere to stay while the profile loads.
   const wrap = (children: ReactNode) => (
     <div ref={resultRef} tabIndex={-1} className="outline-none">
       {children}

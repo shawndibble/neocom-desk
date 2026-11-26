@@ -1,9 +1,3 @@
-/**
- * What "share all my Fittings" puts in a Community (issue #3605): every saved
- * Fitting, plus the Character's In-game Fittings as snapshots when ESI will
- * give them. An In-game Fitting the app can't read right now is simply left
- * out, never an error: the saved ones still go.
- */
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
@@ -33,8 +27,6 @@ export async function collectFittingsToShare(characterId: number): Promise<Share
         });
       }
     }
-  } catch {
-    // Scope not granted, or ESI is down: share what the app itself holds.
-  }
+  } catch {}
   return inputs;
 }

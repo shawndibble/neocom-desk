@@ -39,8 +39,6 @@ describe('OverviewSubNav', () => {
     const nav = screen.getByRole('navigation', { name: 'Overview' });
     const links = within(nav).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual(['Overview', 'Clones', 'Employment']);
-    // The tabs group these views visually; they are not re-parented under
-    // /overview, so every existing bookmark and shortcut still resolves.
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/overview',
       '/clones',
@@ -82,16 +80,12 @@ describe('OverviewSubNav', () => {
     renderSubNav();
 
     const nav = screen.getByRole('navigation', { name: 'Overview' });
-    // The tab remounts inside its Tooltip once the lock resolves, so re-query.
     const clonesLink = () => within(nav).getByRole('link', { name: 'Clones' });
     await waitFor(() => expect(clonesLink().querySelector('.bg-warning')).toBeInTheDocument());
     const clones = clonesLink();
-    // A Tooltip, not a native title: it reaches keyboard and touch users.
     expect(clones).not.toHaveAttribute('title');
     await userEvent.hover(clones);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a new login');
-    // Informational only, exactly as in the rail — the link still navigates
-    // and /clones' ScopeGate is where the explanation lives.
     expect(within(nav).getByRole('link', { name: 'Clones' })).toHaveAttribute('href', '/clones');
   });
 

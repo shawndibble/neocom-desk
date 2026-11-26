@@ -7,7 +7,6 @@ const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
 
 let lastBody: URLSearchParams | null = null;
 let lastAuthHeader: string | null = null;
-/** Set by the "hangs forever" tests below to make the mock handler never respond. */
 let hang = false;
 
 mswServer(
@@ -29,7 +28,7 @@ mswServer(
         access_token: 'access-2',
         token_type: 'Bearer',
         expires_in: 1199,
-        refresh_token: 'refresh-2', // rotated
+        refresh_token: 'refresh-2',
       });
     }
     return HttpResponse.json(
@@ -109,10 +108,6 @@ describe('exchangeCode', () => {
     expect(authErr.status).toBe(400);
   });
 
-  // A hung token endpoint (no response, no error) previously left this
-  // `await` unsettled forever — the "Completing login…" spinner never
-  // resolved. `timeoutMs` is overridden here so the test doesn't wait out
-  // the real production default.
   it('rejects with a timeout AuthError instead of hanging forever when the endpoint never responds', async () => {
     hang = true;
     const err = await exchangeCode({
@@ -145,8 +140,6 @@ describe('refreshToken', () => {
     ).rejects.toBeInstanceOf(AuthError);
   });
 
-  // Boot/`getValidAccessToken` calls this to refresh a near-expired token; a
-  // hung endpoint here previously stalled boot itself, not just login.
   it('rejects with a timeout AuthError instead of hanging forever when the endpoint never responds', async () => {
     hang = true;
     const err = await refreshToken({

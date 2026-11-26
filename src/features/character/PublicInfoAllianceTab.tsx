@@ -1,17 +1,3 @@
-/**
- * Alliance tab body for `PublicInfoModal`, laid out like the Corporation tab
- * so the two read as one design: who the alliance is (logo, ticker, executor,
- * founder and founding corporation, founding date), how it fights (the
- * Snuggly↔Dangerous and Solo↔Gang meters first, then one line of figures and
- * its most-flown hulls), and who is in it — every member corporation, each
- * opening in the modal. Lazy-loaded, like the other tabs.
- *
- * The alliance record is loaded by the modal; the parts hanging off it —
- * zKillboard stats, the member list, the names — load here, each on its own,
- * so one slow or failed lookup never blanks the rest. The pilot count is
- * zKillboard's own (`memberCount`): ESI states no alliance-wide headcount,
- * and summing every member corp's record would cost a request per corp.
- */
 import { formatCount } from '@/lib/formatCount';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useCallback, useState } from 'react';

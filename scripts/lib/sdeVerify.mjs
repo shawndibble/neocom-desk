@@ -1,6 +1,3 @@
-// Pure comparison of CCP's live ESI type data against our baked entries (#2885).
-// No network, no fs: scripts/sde-verify.mjs fetches, this decides.
-
 const EPSILON = 1e-9;
 
 const sameValue = (a, b) =>
@@ -10,12 +7,6 @@ const sameValue = (a, b) =>
 
 const ESI_FIELD = { name: 'name', groupID: 'group_id', volume: 'volume' };
 
-/**
- * @param esiType  `/universe/types/{id}` payload
- * @param baked    { typeID, fields?: {name,groupID,volume}, attributes?: [{id,name?,value?,pinned?}] }
- * @param attributeNames  { [attributeId]: ESI attribute name }
- * @returns mismatches; `pinned` ones fail the run, the rest only print
- */
 export function compareType(esiType, baked, attributeNames) {
   const out = [];
   const typeID = baked.typeID;
@@ -75,10 +66,6 @@ export function renderDiff(mismatches) {
     .join('\n');
 }
 
-/**
- * What the scheduled workflow does with the `sde-drift` issue.
- * @param existingIssue  the open `sde-drift` issue ({number}) or null
- */
 export function driftIssueAction(mismatches, existingIssue) {
   const pinned = mismatches.filter((m) => m.pinned);
   if (pinned.length === 0) {

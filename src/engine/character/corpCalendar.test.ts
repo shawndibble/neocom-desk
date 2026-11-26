@@ -5,7 +5,6 @@ import { buildCharacterBoard } from './board';
 import { toCorpCalendarSources } from './corpCalendar';
 import { countsByDay, filterByCorporation } from './deadlines';
 
-// 23:30 EVE time: a day later than the local day anywhere west of Greenwich.
 const NOW = Date.UTC(2026, 10, 12, 23, 30);
 
 const LABELS = new Map([
@@ -53,7 +52,6 @@ function twoCorporations() {
     {
       corporationId: 2,
       items: corpBoard({
-        // The same structure id in a second corporation's read must not collide.
         structures: [structure(100, 'Perimeter - Holding Raitaru', NOW + 5 * DAY_MS)],
         extractions: [
           {

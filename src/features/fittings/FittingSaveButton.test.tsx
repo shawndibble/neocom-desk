@@ -6,7 +6,6 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { FittingSaveButton } from './FittingSaveButton';
 
-/** The Save to EVE item navigates, so the button needs a router. */
 const render = (ui: ReactElement) => renderBare(ui, { wrapper: MemoryRouter });
 
 function setup(canSave: boolean, onSave = vi.fn()) {
@@ -112,7 +111,6 @@ describe('FittingSaveButton', () => {
       await user.click(screen.getByRole('button', { name: 'More save options' }));
       expect(await screen.findByRole('menuitem', { name: /^Save to My Fittings/ })).toBeTruthy();
       expect(screen.getByRole('menuitem', { name: 'Save to EVE' })).toBeTruthy();
-      // No copy to make of a Fitting that was never saved.
       expect(screen.queryByRole('menuitem', { name: /Save as new/ })).toBeNull();
     });
 

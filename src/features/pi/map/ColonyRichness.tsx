@@ -1,13 +1,3 @@
-/**
- * The richness override for one of the pilot's own colonies (issue #2685): the
- * Map drawer `?planet=<id>` opens, and the Colonies row links to.
- *
- * "Which of these would you pull here?" is a membership question, so it is a
- * chip row, one tap per answer (the control the Advisor's resource picker
- * was). The pick narrows the resources this colony's rebuild advice and the
- * Plan solver score (`richnessOverride.ts`), on Plan, Map and Colonies alike.
- * Optional: with nothing picked, every resource the planet type yields counts.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useRef, useState } from 'react';
@@ -34,13 +24,10 @@ export function ColonyRichness({
 }: {
   planetId: number;
   type: PlanetType;
-  /** Every P0 this planet type yields. */
   resources: readonly RichnessResource[];
-  /** Shown only where the drawer's own close is absent (the docked panel). */
   onClose?: () => void;
 }) {
   const { t } = useTranslation();
-  // An array, so "no row yet" (empty) differs from "not read yet" (undefined).
   const rows = useLiveQuery(
     () => db.planetRichness.where('planetId').equals(planetId).toArray(),
     [planetId]
@@ -50,9 +37,6 @@ export function ColonyRichness({
   const yields = new Set(resources.map((resource) => resource.typeId));
   const savedPicks = (saved?.order ?? []).filter((id) => yields.has(id));
 
-  // Taps build on the pick shown, not the last save, and writes run one after
-  // another: a quick second tap must not drop the first, nor a clear race a
-  // pending save. Once the live query shows what was written it is the source.
   const savedKey = savedPicks.join(',');
   const [shown, setShown] = useState<{ key: string; picks: number[] | null }>({
     key: savedKey,
@@ -61,7 +45,6 @@ export function ColonyRichness({
   if (shown.key !== savedKey) setShown({ key: savedKey, picks: null });
   const picked = shown.key === savedKey && shown.picks ? shown.picks : savedPicks;
   const queue = useRef<Promise<void>>(Promise.resolve());
-  // The picks stay shown when a save fails, so the error says they are not saved.
   const [saveFailed, setSaveFailed] = useState(false);
   const change = (next: number[]) => {
     setShown({ key: savedKey, picks: next });

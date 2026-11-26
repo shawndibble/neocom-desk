@@ -1,13 +1,3 @@
-/**
- * The applied-DPS graphs (issue #1546): against range and against target
- * speed, with an optional second Fitting overlaid. Statically imports
- * `recharts`, so — same rule as `industry/ProductionProfitChart.tsx` — this
- * must only ever be reached through a dynamic `import()`.
- *
- * The overlay is told apart by form, not colour (docs/DESIGN.md: dashed
- * against solid before reaching for a second hue): both lines are `accent`,
- * the overlay dashed, and the key draws the dash too.
- */
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
@@ -27,7 +17,6 @@ import { STAT_EYEBROW } from './statKit';
 import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 
 export interface AppliedDpsRow {
-  /** Metres (range graph) or m/s (speed graph). */
   x: number;
   primary: number;
   overlay?: number;
@@ -36,9 +25,7 @@ export interface AppliedDpsRow {
 interface AppliedDpsChartProps {
   range: AppliedDpsRow[];
   speed: AppliedDpsRow[];
-  /** Metres — the fixed range the speed graph is worked out at. */
   speedAtRange: number;
-  /** The overlaid Fitting's name; absent when nothing is overlaid. */
   overlayName?: string;
 }
 
@@ -121,8 +108,6 @@ function Graph({
     [xHeader, formatX, primaryName, overlayName]
   );
 
-  // `role="img"` collapses its content for assistive tech, so the sr-only
-  // table is a sibling, never a child.
   return (
     <div className="space-y-1">
       <h4 className={STAT_EYEBROW}>{label}</h4>
@@ -169,7 +154,6 @@ function Graph({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">
         <DataTable
           columns={columns}

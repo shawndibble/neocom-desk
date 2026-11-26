@@ -9,11 +9,6 @@ export interface ProductionRunInputErrors {
   cost?: true;
 }
 
-/**
- * Refuses a Production Run that can't be a real build: no units, or no cost at
- * all. One of Material cost / Job fee at 0 is fine (owned materials, an offset);
- * only both at 0 is refused. Callers parse a blank field to 0 first.
- */
 export function validateProductionRunInput({
   quantity,
   materialCost,

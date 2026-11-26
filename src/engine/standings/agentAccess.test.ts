@@ -17,7 +17,6 @@ const link = (kind: ChainLink['kind'], id: number, effective: number): ChainLink
   base: effective,
   effective,
 });
-/** A chain of faction, corporation and (optional) agent effective standings. */
 const chainOf = (faction: number, corporation: number, agent?: number): StandingChain => ({
   criminal: false,
   links: [

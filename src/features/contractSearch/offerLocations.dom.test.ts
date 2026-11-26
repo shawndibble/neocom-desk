@@ -45,7 +45,7 @@ beforeEach(() => {
   mockedLookupNpcStation.mockImplementation(async (locationId: number) => {
     if (locationId === JITA_STATION) return JITA;
     if (locationId === UNREADABLE) return undefined;
-    return null; // a player structure by elimination
+    return null;
   });
   mockedLookupSolarSystem.mockImplementation(async (systemId: number) =>
     systemId === JITA_SYSTEM ? JITA_SYSTEM_ENTRY : null
@@ -116,7 +116,6 @@ describe('useOfferLocations', () => {
     const firstMap = result.current;
     mockedLookupNpcStation.mockClear();
 
-    // A fresh array, same ids — e.g. a `useRouteSnapshot` revalidation.
     rerender({ rows: [offerRow({ contractId: 99 })] });
 
     expect(result.current).toBe(firstMap);

@@ -1,5 +1,3 @@
-// The dev-only emulator switch (issue #4190): off by default, never in a
-// production build, and each connector is called at most once.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const connectAuthEmulator = vi.fn();
@@ -85,9 +83,6 @@ describe('firebaseApp emulator switch', () => {
     expect(connectFunctionsEmulator).toHaveBeenCalledWith({ kind: 'functions' }, '127.0.0.1', 5001);
   });
 
-  // `getAuth` passes `browserPopupRedirectResolver`, which loads Google's gapi
-  // iframe (apis.google.com, third-party cookies) the moment Auth starts. The
-  // app signs in only with custom tokens, so it never needs a popup or redirect.
   it('initializes Auth once, without a popup/redirect resolver, keeping getAuth persistence', async () => {
     vi.stubEnv('DEV', false);
     const mod = await load();

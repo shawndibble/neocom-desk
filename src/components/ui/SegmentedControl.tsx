@@ -10,53 +10,23 @@ import { Tooltip } from './Tooltip';
 
 interface SegmentedControlOption<T extends string> {
   value: T;
-  /** Already-translated label. */
   label: string;
-  /**
-   * Inert and muted. The group's other segments stay live. A disabled segment
-   * never shows as pressed, even when it matches `value`: it is not acting.
-   */
   disabled?: boolean;
-  /**
-   * Why it is disabled, in a tooltip. Keeps the segment hoverable and focusable
-   * (`aria-disabled` instead of the native attribute) so the bubble can be read;
-   * the click does nothing either way. Only read when `disabled`.
-   */
   disabledReason?: string;
 }
 
 interface SegmentedControlProps<T extends string> {
-  /** Already-translated accessible name for the group. */
-  /** @summary Already-translated accessible name for the group. */
   label: string;
-  /** @summary The 2–4 choices, each with a value and label. */
   options: readonly SegmentedControlOption<T>[];
-  /** @summary The selected option's value. */
   value: T;
-  /** @summary Called with the value the user picked. */
   onChange: (value: T) => void;
-  /** Height from the shared control scale; `md` (default) is 36px on a phone, 36px for a pointer. */
   size?: ControlSize;
-  /** Stretch to the container's full width, segments sharing it equally. */
   fill?: boolean;
-  /** Micro-label casing (default). Turn off for labels that are units or codes, like `30d`. */
   uppercase?: boolean;
-  /** Id(s) of a hint describing the group, for `aria-describedby`. */
   describedBy?: string;
   className?: string;
 }
 
-/**
- * Pick exactly one of a few views: one joined group, one selected look
- * (`FilterChip`'s accent tint plus a 2px accent underline, so it isn't colour alone). A `role="group"` of `aria-pressed` buttons, not
- * a tablist — it switches what a panel shows rather than navigating between
- * places (`Tabs`), and it needs no open-then-pick step (`Select`).
- *
- * Not a `FilterChip` either: a chip toggles a filter on and off independently,
- * while exactly one segment here is always on and picking it again is a no-op.
- *
- * @summary Pick exactly one of 2–4 views in one joined group of buttons; not tabs and not a filter toggle.
- */
 export function SegmentedControl<T extends string>({
   label,
   options,
@@ -75,8 +45,6 @@ export function SegmentedControl<T extends string>({
       aria-describedby={describedBy}
       className={cx(
         'overflow-hidden rounded-xs border border-line',
-        // The height is the group's, border included, so it matches a Button of the
-        // same size beside it; the segments stretch to fill it.
         controlHeightClassName[size],
         fill ? 'flex w-full' : 'inline-flex',
         className
@@ -95,7 +63,6 @@ export function SegmentedControl<T extends string>({
             onClick={explained ? undefined : () => onChange(option.value)}
             className={cx(
               'inline-flex items-center justify-center px-3',
-              // A filled control shares its width evenly, so a long label wraps rather than clipping.
               fill ? 'min-w-0 text-center leading-tight' : 'whitespace-nowrap',
               interactiveClassName,
               focusRingInsetClassName,

@@ -26,7 +26,6 @@ export function AssetsPageHeader({
   tab: string;
   assetsData: AssetsData;
   assetsRows: AssetsRows;
-  /** Who the Ships or Move tab's own read left out (`useReportSkipped`); Items uses its search's. */
   tabMissingNames?: readonly string[];
 }) {
   const {
@@ -49,9 +48,6 @@ export function AssetsPageHeader({
   const { selectMode, toggleSelectMode } = assetsRows;
   const { t } = useTranslation();
   const isNarrow = useIsNarrow();
-  // One picker for all three tabs. Absent while a `?char=<id>` link names the
-  // page's Character (a fixed subject, named in `meta` instead) and for a
-  // one-Character account, where both options resolve to the same pilot.
   const scope =
     viewedCharacterId === undefined && crossCharacterCandidates.length > 1 ? (
       <CharacterFilterControl
@@ -62,8 +58,7 @@ export function AssetsPageHeader({
         missingNames={
           tab === 'items'
             ? activeCrossCharacterData?.skipped.map((c) => c.name)
-            : // Only "All" leaves anyone out; a This-character read that failed is the tab's own error.
-              shipsFilterIsAll
+            : shipsFilterIsAll
               ? tabMissingNames
               : undefined
         }
@@ -95,8 +90,6 @@ export function AssetsPageHeader({
               <TableActionsMenu
                 name={t('assets.title')}
                 label={t('assets.tools.label')}
-                // Below `md` the word wrapped the title row (a `?char=` link's
-                // "<name> only" readout beside it): the menu takes its icon-only ⋮ form.
                 triggerText={isNarrow ? undefined : t('assets.tools.label')}
                 tableExport={assetsExport}
                 size="md"
@@ -112,7 +105,6 @@ export function AssetsPageHeader({
                   {t('assets.select.toggle')}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
-                {/* While a refresh runs it stays focusable and says so, rather than going native-disabled. */}
                 {loading ? (
                   <DisabledMenuItem reason={t('assets.refreshing')}>
                     {t('assets.refresh')}

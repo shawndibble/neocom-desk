@@ -1,9 +1,3 @@
-/**
- * Draws the Mining Yield Overview tab's two charts with Recharts (issue
- * #671). Statically imports `recharts`, so — same rule as
- * `market/PriceHistoryChart.tsx` — this must only ever be reached through a
- * dynamic `import()` from `OverviewTab.tsx`, never imported eagerly.
- */
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { Eyebrow } from '@/components/ui/Eyebrow';
@@ -50,16 +44,13 @@ export interface DailyRatePoint {
 
 export type TypeComparisonPoint = RankedType;
 
-/** Bars the ore-type chart draws before folding the rest into "Other". */
 const TOP_TYPE_LIMIT = 8;
 
-/** A drawn bar — one type, or the "Other" roll-up carrying the types it folds. */
 interface ComparisonBar extends TypeComparisonPoint {
   folded?: TypeComparisonPoint[];
 }
 
 interface MiningYieldChartsProps {
-  /** Which quantity the two charts plot (issue #2160). ISK keeps every prior behaviour byte-for-byte; volume/count are a separate, simpler render. */
   metric: ChartMetric;
   dailyRate: DailyRatePoint[];
   dailyVolume: DailyMetricPoint[];
@@ -67,31 +58,25 @@ interface MiningYieldChartsProps {
   typeComparison: TypeComparisonPoint[];
   typeVolumeComparison: ValueRanked[];
   typeCountComparison: ValueRanked[];
-  /** Issue #1281's page switch — raw-only bars with end labels and a note, no refined series at all. Ignored for volume/count, which never show a refined series or Legend. */
   showRefining: boolean;
 }
 
-/** A drawn bar for the volume/count comparison chart — one type, or the "Other" roll-up carrying the types it folds. */
 interface MetricComparisonBar extends ValueRanked {
   folded?: ValueRanked[];
 }
 
 type MetricKind = 'volume' | 'count';
 
-/** `formatCompactNumber`, plus an "m³" suffix for the volume metric — count has no unit. */
 function formatMetricCompact(metric: MetricKind, value: number): string {
   return metric === 'volume' ? `${formatCompactNumber(value)} m³` : formatCompactNumber(value);
 }
 
-/** Grouped with up to 3 decimals, plus an "m³" suffix for the volume metric — the sr-only tables' full-precision figure. */
 function formatMetricFull(metric: MetricKind, value: number): string {
   return metric === 'volume' ? `${formatFull(value)} m³` : formatFull(value);
 }
 
-/** The rate chart's per-metric knobs: where a point's figure lives, and how each surface prints it. */
 interface RateSpec {
   valueOf: (point: never) => number;
-  /** The figure's line in the tooltip. */
   tooltip: (value: number) => string;
   valueLabelKey: string;
   basisKey: string;
@@ -117,7 +102,6 @@ function metricRateSpec(metric: MetricKind): RateSpec {
   };
 }
 
-/** The daily-rate tooltip for every metric: the day, its figure and the basis. */
 export function RateTooltip({
   active,
   payload,
@@ -142,7 +126,6 @@ export function RateTooltip({
   );
 }
 
-/** One series of the ore-type chart, as the tooltip reads it. */
 interface CompareRow {
   typeId: number;
   typeName: string;
@@ -189,7 +172,6 @@ function compareSeries(metric: ChartMetric, showRefining: boolean): CompareSerie
   ];
 }
 
-/** The ore-type tooltip for every metric: the type, one line per series, and what an "Other" bar folds. */
 function CompareTooltip({
   active,
   payload,
@@ -222,7 +204,6 @@ function CompareTooltip({
   );
 }
 
-/** The note under the chart says the ore is compressed, so the axis drops the repeated prefix. */
 function stripCompressedPrefix(name: string, compressed: boolean): string {
   return compressed ? name.replace(/^Compressed /, '') : name;
 }
@@ -235,16 +216,12 @@ interface RatePanelProps<P> {
   rows: P[];
   rowKey: (row: P) => string;
   columns: DataTableColumn<P>[];
-  /** Pixel width of the Y axis' tick column, before font scaling. */
   axisWidth: number;
-  /** SVG axis text: IskAmount can't render inside the chart (documented exception). */
   tickFormatter: (value: number) => string;
   tooltip: (props: TooltipContentProps) => ReactElement;
-  /** The `<Bar>`. */
   bars: ReactNode;
 }
 
-/** The daily-rate card: a bar per day over a screen-reader table of the same rows. */
 function RatePanel<P>({
   title,
   basis,
@@ -284,8 +261,6 @@ function RatePanel<P>({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      {/* A sibling of the `role="img"` box, never a child — see WalletBalanceChart. */}
-      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">
         <DataTable columns={columns} responsive="table" rows={rows} rowKey={rowKey} label={title} />
       </div>
@@ -295,15 +270,12 @@ function RatePanel<P>({
 
 interface ComparePanelProps<B, R> {
   title: string;
-  /** The drawn bars (top types plus an "Other" roll-up). */
   bars: B[];
-  /** Every type, for the screen-reader table — the drawn bars fold the tail. */
   rows: R[];
   rowKey: (row: R) => number;
   columns: DataTableColumn<R>[];
   height: number;
   marginRight: number;
-  /** SVG axis text: IskAmount can't render inside the chart (documented exception). */
   tickFormatter: (value: number) => string;
   tooltip: (props: TooltipContentProps) => ReactElement;
   series: ReactNode;
@@ -311,7 +283,6 @@ interface ComparePanelProps<B, R> {
   note?: string | null;
 }
 
-/** The ore-type card: horizontal bars, ore names read left of the bar instead of slanted under it. */
 function ComparePanel<B, R>({
   title,
   bars,
@@ -359,7 +330,6 @@ function ComparePanel<B, R>({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">
         <DataTable columns={columns} responsive="table" rows={rows} rowKey={rowKey} label={title} />
       </div>
@@ -368,12 +338,6 @@ function ComparePanel<B, R>({
   );
 }
 
-/**
- * The two charts for every metric: ISK keeps its per-day price-source colours,
- * its raw/refined pair and the show-refining switch; volume and count (issue
- * #2160) are the single-series, raw-only shape — no refined series, no Legend,
- * whatever the toggle says, since neither has a refined side.
- */
 function MetricChartPair({
   metric,
   dailyRate,
@@ -411,9 +375,6 @@ function MetricChartPair({
     metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
   );
 
-  // Screen-reader tables, one per chart: `role="img"` hides the bars, and
-  // the ore chart folds its tail into "Other", so the table carries every
-  // type rather than the drawn bars.
   const iskRateColumns = useMemo<DataTableColumn<DailyRatePoint>[]>(
     () => [
       {
@@ -499,7 +460,6 @@ function MetricChartPair({
   const otherLabel = (count: number) => t('miningTax.overview.otherTypes', { count });
 
   return (
-    // Two cards, same gap as the stat cards above them.
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       {isIsk ? (
         <RatePanel
@@ -585,7 +545,6 @@ interface CompareVariantProps<R> {
   note: string | null;
 }
 
-/** The ISK ore-type card: raw (and, with refining on, refined) value per type. */
 function IskComparePanel({
   title,
   typeComparison,
@@ -599,8 +558,6 @@ function IskComparePanel({
   showRefining: boolean;
 }) {
   const { t } = useTranslation();
-  // Past TOP_TYPE_LIMIT the rest fold into one "Other" bar, so the card
-  // stops growing with the number of types; the table below lists every one.
   const { top, other } = topTypesWithOther(typeComparison, {
     limit: TOP_TYPE_LIMIT,
     by: showRefining ? 'both' : 'raw',
@@ -624,8 +581,6 @@ function IskComparePanel({
       rows={typeComparison}
       rowKey={(point) => point.typeId}
       columns={columns}
-      // Same row height with refining on or off — the raw and refined bars split
-      // the row — so toggling refining only adds the legend's height.
       height={Math.max(256, bars.length * 24 + (showRefining ? 56 : 32))}
       marginRight={showRefining ? 16 : 56}
       tickFormatter={formatIskCompact}
@@ -644,7 +599,6 @@ function IskComparePanel({
               <LabelList
                 dataKey="rawValue"
                 position="right"
-                // SVG label text: IskAmount can't render inside the chart (documented exception).
                 formatter={(value: unknown) => formatIskCompact(Number(value))}
                 style={TICK_STYLE}
               />
@@ -664,7 +618,6 @@ function IskComparePanel({
   );
 }
 
-/** The volume/count ore-type card: always the "raw only" row height and margin — there is never a second series. */
 function MetricComparePanel({
   title,
   metric,

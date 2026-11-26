@@ -1,15 +1,3 @@
-// registerDevice: register one device's FCM token against every Character it
-// holds, in one call. See issue #356, ADR 0010, GLOSSARY.md round 44/45
-// ("Projections and device registrations are uploaded through one callable").
-//
-// Verification is per-Character rather than all-or-nothing: a device can hold
-// several Characters, and one stale/expired access token among them (a
-// Character the user hasn't opened in a while) should not stop the others
-// from registering. A rejected character is simply left out of the written
-// `characterIds` and reported back — never written under an id its token did
-// not verify to, which is what stops a caller from claiming a characterId it
-// doesn't hold.
-
 import { verifyEveAccessToken, type VerifyOptions } from './verifyEveToken.js';
 import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
@@ -22,31 +10,12 @@ export type { ProjectionRowInput };
 export interface DeviceCharacterInput {
   characterId: number;
   accessToken: string;
-  /**
-   * This Character's whole 72-hour Projection window, as this device sees it —
-   * replaces this device's previous rows for the Character wholesale, never
-   * another device's (issue #2240).
-   */
   projectionRows: ProjectionRowInput[];
-  /**
-   * The raw ESI notification types this device has enabled for the browser
-   * channel for this Character (issue #3755, ADR 0020). Replaces this
-   * device's own previous list; never another device's. Absent (an older
-   * client) leaves the stored list untouched.
-   */
   eveTypes?: string[];
-  /**
-   * The server-pushed Notification Events (issue #5121) this device enabled
-   * for the browser channel for this Character: sorted, de-duplicated ids.
-   * Same per-device rule as `eveTypes`; absent (an older client) leaves the
-   * stored list untouched. Ids this server does not handle are stored anyway.
-   */
   serverEvents?: string[];
-  /** What the server needs to evaluate them (price targets, the ship-lost minimum). Absent keeps the stored inputs. */
   serverInputs?: ServerEventInputs;
 }
 
-/** Bounds a hostile or buggy client's `eveTypes` upload; the real list is a few dozen. */
 export const MAX_EVE_TYPES = 200;
 const MAX_EVE_TYPE_LENGTH = 100;
 
@@ -54,26 +23,15 @@ export interface RegisterDeviceInput {
   deviceId: string;
   fcmToken: string;
   characters: DeviceCharacterInput[];
-  /**
-   * This device's quiet time (issue #4566). Absent (an older client) leaves the
-   * stored window untouched; `null` clears it.
-   */
   quietHours?: QuietHours | null;
-  /**
-   * This device's Travel Settings, as the nearby-alerts poller counts jumps
-   * under them (issue #5122). Absent (an older client, or a value that does not
-   * parse) leaves the stored rules untouched.
-   */
   routeRules?: NearbyRouteRules;
 }
 
 export interface DeviceRegistrationDoc {
   fcmToken: string;
-  /** Replaces the previous value wholesale — never merged (see docstring above). */
   characterIds: number[];
 }
 
-/** One verified character's Projection rows, ready to write to the `projections` collection. */
 export interface CharacterProjection {
   characterId: number;
   rows: ProjectionRowInput[];
@@ -81,19 +39,10 @@ export interface CharacterProjection {
 
 export interface RegisterDeviceResult {
   registration: DeviceRegistrationDoc;
-  /** characterIds whose access token did not verify (or verified to a different character). */
   rejected: number[];
-  /**
-   * Projection rows for verified characters only — a rejected character's
-   * rows are dropped for the same reason its characterId is: never written
-   * under an id its token did not verify to.
-   */
   projections: CharacterProjection[];
-  /** Each verified character's enabled browser types, keyed by characterId; absent when the client sent none. */
   eveTypesByCharacter: Record<number, string[]>;
-  /** Each verified character's server-pushed event ids; absent when the client sent none. */
   serverEventsByCharacter: Record<number, string[]>;
-  /** Each verified character's server inputs; absent when the client sent none. */
   serverInputsByCharacter: Record<number, ServerEventInputs>;
 }
 
@@ -128,7 +77,6 @@ function parseProjectionRow(raw: unknown, path: string): ProjectionRowInput {
   };
 }
 
-/** `eveTypes` is optional so an older client's upload still parses (leaving the stored list alone). */
 function parseEveTypes(raw: unknown, path: string): string[] | undefined {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) throw new Error(`${path}, if present, must be an array`);
@@ -141,15 +89,9 @@ function parseEveTypes(raw: unknown, path: string): string[] | undefined {
   return [...new Set(raw as string[])].sort();
 }
 
-/** Avoided Systems, including pod-kill / EDENCOM / Triglavian ones; New Eden has ~8,500 gated systems. */
 export const MAX_AVOIDED_SYSTEMS = 10_000;
 const ROUTE_PREFERENCES = ['shortest', 'prefer-highsec', 'avoid-highsec'] as const;
 
-/**
- * Lenient, unlike most of the registration: the rules only feed nearby alerts,
- * so a value that does not parse is dropped (the stored rules stay) instead of
- * refusing the whole upload with its Projection and types.
- */
 function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
   if (!isPlainRecord(raw)) return undefined;
   const { preference, securityPenalty, avoid } = raw;
@@ -173,15 +115,8 @@ function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
   };
 }
 
-/**
- * A deviceId becomes a `deviceRegistrations` doc id and the prefix of every
- * projection row id (issue #2240), so it must be a safe Firestore id: no `/`,
- * no `.`/`..`, bounded length. The client's `crypto.randomUUID()` and its
- * base36 fallback (`src/sync/deviceId.ts`) both fit.
- */
 const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
-/** Validate the callable's raw `request.data`. Throws a plain Error on any shape violation. */
 export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   if (!isRecord(data)) throw new Error('Request body must be an object');
 
@@ -237,12 +172,6 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   };
 }
 
-/**
- * Verify every Character's access token and build the registration doc from
- * whichever pass. Never throws on a per-character verification failure — see
- * module docstring; `logError` receives no token material (only characterId
- * and the failure message), per ADR 0001.
- */
 export async function buildDeviceRegistration(
   input: RegisterDeviceInput,
   verifyOptions: VerifyOptions,

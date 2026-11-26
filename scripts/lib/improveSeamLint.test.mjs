@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 
-/**
- * Pins the no-restricted-imports pattern that keeps the Improve engine behind
- * `@/engine/fittings/improve` (its index.ts). Runs the real config.
- */
 const eslint = new ESLint();
 
 async function deepErrors(source, filePath) {

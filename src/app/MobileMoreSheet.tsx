@@ -47,31 +47,9 @@ interface MobileMoreSheetProps {
   open: boolean;
   onClose: () => void;
   locked: ReadonlySet<string>;
-  /**
-   * The active Character's portrait link, which `Layout` owns, given the page
-   * to return to once a Character is picked (#1764).
-   */
   renderCharacterLink: (originPath: string) => ReactNode;
 }
 
-/**
- * The phone's More sheet (scope decision
- * `20261002-145653-rail-opens-the-current-page-icons-hiding-and`): a search
- * field that opens the command palette, a short Recent row, then every page
- * as icon tiles, grouped like the rail — including the four the bottom bar
- * holds, because the sheet covers the bar and a pilot opening More expects the
- * whole map (`20261018-013019`). Pages
- * only — a page's views are reached through its own tabs, Recent and search,
- * which keeps the sheet to about a dozen choices.
- *
- * Pages the pilot hid fold into one row that opens in place, so the sheet
- * still reaches every page (“never in neither”). Corp
- * pages show only while the Character has corp access, each for its own capability; Settings, Help and the
- * Character link have permanent rows at the foot.
- *
- * A real modal: it covers the viewport, so the tab bar underneath must not stay
- * reachable. Links close it on click so it never hangs over the next route.
- */
 export function MobileMoreSheet({
   open,
   onClose,
@@ -87,11 +65,8 @@ export function MobileMoreSheet({
   const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
-  // The phone's own hide editor: the rail's lives on desktop only.
   const [editing, setEditing] = useState(false);
 
-  // Recent's labels only, so no live lock or corp reads: those decide
-  // what a destination is marked with, not what it is called.
   const destinations = useMemo(
     () =>
       listNavDestinations({
@@ -125,16 +100,12 @@ export function MobileMoreSheet({
 
   function openSearch() {
     onClose();
-    // After the sheet's dialog has closed: the palette never opens over another.
     setTimeout(() => useCommandPalette.getState().show(), 0);
   }
 
   const navBadge = useNavBadges();
-  // Corp is in `groups` only while visible (`inSheet`), and never locked.
   const tile = (page: NavPage, presentation: 'tile' | 'bar' = 'tile') => {
     const bar = presentation === 'bar';
-    // Edit mode overlays the hide toggle: a tile's corner, a bar's trailing
-    // edge, with the bar's padding making room so it never covers the label.
     const editable = editing && canHide(page.path);
     const link = (
       <NavItem
@@ -173,8 +144,6 @@ export function MobileMoreSheet({
       title={t('nav.more')}
       placement="sheet-full"
     >
-      {/* Pages from the top; the footer rows sit at the foot, so a tall
-          phone leaves the gap between the two rather than above the search. */}
       <div className="flex min-h-full flex-col gap-3 pb-3">
         <button
           type="button"
@@ -228,7 +197,6 @@ export function MobileMoreSheet({
               </h3>
             )}
             {group.labelKey === null ? (
-              // The headless group: one or two short rows rather than tiles.
               <div className={cx('grid gap-1.5', group.pages.length > 1 && 'grid-cols-2')}>
                 {group.pages.map((page) => tile(page, 'bar'))}
               </div>

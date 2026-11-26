@@ -1,11 +1,3 @@
-/**
- * Resolves a completed job's "Log production" row action (issue #1787) to a
- * target Build Plan: the character's own plans building the job's blueprint,
- * or a freshly created one when none exist. `ActiveJobsPanel` picks among the
- * result (0/1/many) and navigates the pilot to whichever plan wins, carrying
- * the job's own runs/cost as a `jobProductionSeed` for the plan page to
- * prefill Log Production with — see `BuildPlanDetail`'s `pendingLogProduction`.
- */
 import { db, type BuildPlanRecord } from '@/db';
 import { loadBlueprintCatalog } from './blueprintCatalog';
 import { loadNewPlanHubInputs, mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
@@ -13,11 +5,9 @@ import { createBuildPlans } from './buildPlanStore';
 import { loadActivityFacilityDefaults } from './facilityDefaults';
 import type { ActiveJob } from './jobs';
 
-/** The job-derived numbers Log Production should start from, once a target plan is known. */
 export interface JobProductionSeed {
   runs: number;
   jobFee: number;
-  /** ESI `job_id` the run is logged from, stored on the Production Run so Job History can match it exactly. */
   jobId?: number;
 }
 
@@ -31,7 +21,6 @@ export function jobProductionSeed(
   };
 }
 
-/** The character's own Build Plans that build this job's blueprint — the candidates "Log production" resolves against. */
 export async function findMatchingBuildPlans(
   characterId: number,
   job: Pick<ActiveJob, 'blueprint_type_id'>
@@ -40,13 +29,6 @@ export async function findMatchingBuildPlans(
   return plans.filter((plan) => plan.blueprintTypeID === job.blueprint_type_id);
 }
 
-/**
- * Creates a sensibly-defaulted Build Plan for a job with no existing match
- * (same defaulting `newBuildPlan` gives every other creation path — location
- * from the remembered default for the blueprint's activity, hub from
- * `newPlanHubId`: the Industry page hub, else the character's most recent plan). Returns its id, or null if the job's
- * blueprint isn't in the SDE catalog (not expected for a real ESI job).
- */
 export async function createBuildPlanForJob(
   characterId: number,
   job: Pick<ActiveJob, 'blueprint_type_id'>
@@ -56,8 +38,6 @@ export async function createBuildPlanForJob(
   if (!entry) return null;
   const existing = await db.buildPlans.where('characterId').equals(characterId).toArray();
   await loadNewPlanHubInputs();
-  // Off disk, hydrated first: a row action can run before any Industry page
-  // has mounted to hydrate the stores.
   const plan = newBuildPlan(
     characterId,
     entry,

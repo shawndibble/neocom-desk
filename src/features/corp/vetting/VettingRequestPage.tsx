@@ -1,11 +1,3 @@
-/**
- * `/vetting`: a member's side of a review an officer asked for before a promotion. Who asked
- * and for which role, the characters already on this device (read with the token they hold, no
- * second sign-in when it covers what the report reads), then Share or Decline. Once shared it is
- * the same status view an applicant sees.
- *
- * Only access tokens are sent, one per character, straight to the server's read.
- */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -42,9 +34,7 @@ type Load =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; handle: VettingHandle | null };
 
 interface VettingRequestPageProps {
-  /** The vetting sign-in this visit came back from, if it did. */
   login: VettingLoginOutcome | null;
-  /** Starts a vetting sign-in for a character whose device grant does not cover the report. */
   onSignIn: (corporationId: number, reviewId: string) => void;
 }
 
@@ -52,7 +42,6 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
   const { t } = useTranslation();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const characters = useCharacters();
-  // Only each Character's granted scopes leave the token read, never a token (ADR 0001).
   const scopesById = useGrantedScopesByCharacter() ?? NO_SCOPES;
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   const [status, setStatus] = useState<VettingStatus | null>(null);
@@ -70,7 +59,6 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
 
   useEffect(() => {
     if (characterId === null) return;
-    // Once per Character and attempt, with no cancel flag (see `ApplyPage`).
     const key = `${characterId}:${attempt}`;
     if (started.current === key) return;
     started.current = key;
@@ -84,7 +72,6 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
           handle = request.handle;
           found = request.status;
         } else {
-          // Already shared: the request is no longer waiting, but its status is still the pilot's.
           handle = readVettingHandle(`request:${characterId}`);
           if (handle) {
             try {

@@ -5,7 +5,6 @@ import { systemAdvice } from './systemPlanetModel';
 import { DAY_MS } from '@/lib/age';
 
 const INSTALL = Date.parse('2026-09-01T00:00:00Z');
-/** Mid-program for every fixture extractor below (`extractorPin`'s 14-day program), so the existing fixtures read as still running unless a test says otherwise. */
 const NOW = INSTALL + 3 * DAY_MS;
 
 const pi = piFixture({
@@ -50,7 +49,6 @@ function detail(
   return { links, pins, routes: [] };
 }
 
-/** A Temperate ECU on CCP's own worked baseline: 6,965 a cycle, 30-minute cycles, 14 days. */
 function extractorPin(pinId: number, productTypeId: number): PlanetPin {
   return {
     pin_id: pinId,
@@ -99,22 +97,14 @@ describe('systemAdvice', () => {
       launchpad: 1,
     });
     expect(advice.colony.pinLoad.extractorHeads).toBe(4);
-    // The colony's own upgrade level, never the pilot's skill ceiling.
     expect(advice.colony.upgradeLevel).toBe(4);
     expect(advice.colony.budget).toEqual({ cpu: 21_315, powergrid: 17_000 });
-    // 1,874,985 units over 336 hours, from the decay curve — never
-    // qty_per_cycle, which would say 13,930.
     expect(advice.colony.extractedPerHour).toEqual([
       { typeId: 2073, unitsPerHour: expect.closeTo(1_874_985 / 336, 0) },
     ]);
     expect(advice.colony.production).toEqual([{ schematicId: 133, count: 1 }]);
   });
 
-  /**
-   * `expiryMs` was already measured per extractor but nothing downstream
-   * read it, so a program that ran out kept contributing its last-known
-   * sustained rate to "earning now" forever.
-   */
   it('earns 0 from an extractor past its own expiry, and reports it stopped', () => {
     const stoppedAt = INSTALL + 14 * DAY_MS;
     const nowMs = stoppedAt + 5 * 3_600_000;
@@ -190,9 +180,6 @@ describe('systemAdvice', () => {
     expect(advice.kind).toBe('unbuilt');
     if (advice.kind !== 'unbuilt') throw new Error('unreachable');
     expect(advice.planetType).toBe('barren');
-    // Every P0 a Barren planet yields — which of them is worth extracting is
-    // a richness question no ESI field answers, so the card names them all
-    // and ranks none.
     expect(advice.localResources.map((r) => r.name)).toEqual([
       'Microorganisms',
       'Aqueous Liquids',
@@ -201,9 +188,6 @@ describe('systemAdvice', () => {
   });
 
   it('sizes each colony against its own Command Center, not one shared budget', () => {
-    // Two colonies in one system at different upgrade levels. Reading the
-    // budget off the character's skill would give both the same number and
-    // overstate the un-upgraded one.
     const advice = systemAdvice(
       {
         nowMs: NOW,
@@ -231,9 +215,7 @@ describe('systemAdvice', () => {
       {
         nowMs: NOW,
         planets: [
-          // Type lookup failed — we do not know what this is.
           { planetId: 40_000_007, name: 'Ashab VII', typeId: null },
-          // Type resolved to Planet (Shattered), which maps to no PlanetType.
           { planetId: 40_000_003, name: 'Ashab X', typeId: 30_889 },
         ],
         colonies: [],
@@ -245,8 +227,6 @@ describe('systemAdvice', () => {
   });
 
   it('still types a built colony whose planet lookup failed, from ESI’s own field', () => {
-    // `/characters/{id}/planets` carries `planet_type` directly, so an owned
-    // colony never depends on the /universe/planets lookup succeeding.
     const [advice] = systemAdvice(
       {
         nowMs: NOW,
@@ -262,8 +242,6 @@ describe('systemAdvice', () => {
 
   it('marks a planet no colony can be placed on rather than calling it unbuilt', () => {
     const [advice] = systemAdvice(
-      // 30889 is Planet (Shattered): a real planet in a real system that the
-      // payload maps to no PlanetType, because none of the eight fits it.
       {
         nowMs: NOW,
         planets: [{ planetId: 40_000_003, name: 'Ashab X', typeId: 30_889 }],
@@ -311,10 +289,6 @@ describe('systemAdvice', () => {
 
 describe('link cost', () => {
   it('reports how many links the colony has, because their cost is not in the load', () => {
-    // A link draws CPU and Powergrid (dogma 15/49 base, 1633/1634 per km) and
-    // nothing here charges for it — the distance term needs a per-planet
-    // radius the app has no source for. So the count is surfaced and the card
-    // stops claiming headroom it cannot stand behind.
     const advice = systemAdvice(
       {
         nowMs: NOW,

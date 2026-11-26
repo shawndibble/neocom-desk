@@ -6,14 +6,12 @@ import { typeLabels } from './typeLabels';
 
 interface PricingGapLinksProps {
   gaps: readonly PricingGap[];
-  /** Which of a gap's ore types the banner is naming. */
   pick: (gap: PricingGap) => number[];
   typeNames: ReadonlyMap<number, string>;
   systemName: (dr: DisplayRow) => string;
   onOpen: (dr: DisplayRow) => void;
 }
 
-/** Buttons that open each affected entry, naming the ore at fault — the table itself never shows per-ore prices. */
 export function PricingGapLinks({
   gaps,
   pick,

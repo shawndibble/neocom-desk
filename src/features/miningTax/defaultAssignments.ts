@@ -1,9 +1,3 @@
-/**
- * Default Systems at work (GLOSSARY.md): as a Character's moon ore reaches the Mining Ledger, ore
- * mined in a system one of their Payees defaults is assigned to that Payee, at the Payee's rate
- * and Trade Hub. Run from the Tax tab's load after the Survey connections, so a Survey always
- * has first claim (`snapshot.ts`). What it may touch is planned by `planDefaultAssign`.
- */
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { db } from '@/db';
 import { planDefaultAssign } from '@/engine/miningTax/defaultSystems';
@@ -17,16 +11,8 @@ import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 
-/**
- * Assigns, for each ledger, what its Character's Default Systems plan, one Assignment per entry,
- * each priced at its Payee's hub on the mined date. Resolves to the Assignments made; an entry
- * that fails to price or save is skipped, and tried again on the next load. A Payee a Corp Tax
- * Book is the authority for is never assigned to: the book bills that corporation, and nothing
- * here could settle the day.
- */
 export async function applyDefaultSystems(
   ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
-  /** Every personal Payee's account (`loadPayeeRunningAccounts`), read from Dexie when absent. */
   accounts?: Pick<PayeeRunningAccounts, 'isBookOwned'>
 ): Promise<MiningTaxAssignmentRecord[]> {
   const created: MiningTaxAssignmentRecord[] = [];
@@ -67,9 +53,7 @@ export async function applyDefaultSystems(
           byDefault: true,
         });
         if (result.ok) created.push(result.value);
-      } catch {
-        // No prices yet (offline): the next load tries again.
-      }
+      } catch {}
     }
   }
   return created;

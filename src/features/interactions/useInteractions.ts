@@ -10,16 +10,13 @@ export interface InteractionsInput {
   scope: InteractionScope;
   otherId: number;
   otherName: string;
-  /** The Characters the scope covers: one for "This character", the roster for "All". */
   characterIds: readonly number[];
-  /** The viewer's corporation, for the corporation scope. */
   corporationId: number | null;
   t: Translate;
 }
 
 export interface InteractionsResult {
   rows: Interaction[];
-  /** At least one source failed: the rows are what the others returned. */
   incomplete: boolean;
 }
 
@@ -34,10 +31,6 @@ const personalSources = (): Promise<PersonalSource[]> =>
 const corpSourceList = (): Promise<readonly CorpSource[]> =>
   import('./corpSources').then((m) => m.corpSources);
 
-/**
- * Runs every source for the scope and merges what they return, newest first. A
- * source that fails costs only its own rows (`incomplete`), never the tab.
- */
 export async function loadInteractions(input: InteractionsInput): Promise<InteractionsResult> {
   const { scope, otherId, otherName, characterIds, corporationId, t } = input;
   const runs: Promise<Interaction[]>[] =

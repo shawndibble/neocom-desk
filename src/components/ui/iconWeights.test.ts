@@ -3,14 +3,6 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ALLOWED_ICON_WEIGHTS, ICON_WEIGHT, PHOSPHOR_WEIGHTS } from './iconWeights';
 
-/**
- * Guard for `phosphorWeightsPlugin`: production builds strip every Phosphor
- * weight not in `ALLOWED_ICON_WEIGHTS`, so an icon asked to render one would
- * come out blank. `IconProps`' narrowed `weight` type catches most of that at
- * compile time; this catches the rest (a cast, an object literal, a context
- * provider) by scanning the source for weight names.
- */
-
 const SRC = join(__dirname, '..', '..');
 
 function sourceFiles(dir: string): string[] {
@@ -34,8 +26,6 @@ describe('Phosphor icon weights', () => {
     for (const file of sourceFiles(SRC)) {
       if (file.endsWith('iconWeights.ts')) continue;
       const source = readFileSync(file, 'utf8');
-      // The value of a `weight=` / `weight:` — a whole `{…}` JSX expression or
-      // everything up to the next `,`/`;`/`}` — even when it spans lines.
       for (const match of source.matchAll(WEIGHT_VALUE)) {
         const line = source.slice(0, match.index).split('\n').length;
         for (const [, weight] of match[1].matchAll(WEIGHT_NAME)) {

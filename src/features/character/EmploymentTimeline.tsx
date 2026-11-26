@@ -1,17 +1,3 @@
-/**
- * The career timeline shared by the Employment History page and the Public
- * Info modal's Employment tab: headline figures, then one card per corporation
- * stint down a rail. Presentational only: `employmentHistory.ts` derives every
- * figure and flag, so nothing here recomputes them.
- *
- * Each stint's date range shows once. On the page at `md` and up it sits in the
- * gutter beside the rail; everywhere else (a phone, and always in the modal,
- * which is too narrow for a gutter) it sits under the name.
- *
- * An NPC corporation stint (idle time, or a stop between player corps) draws
- * as a slim dimmed line instead of a card: an NPC tag in place of the stint
- * pills, and no logo or bar.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatChip, StatChips } from '@/components/ui';
@@ -23,13 +9,8 @@ import { corporationLogoUrl } from '@/lib/eveImages';
 import type { EmploymentHistoryRow, EmploymentSummary } from './employmentHistory';
 import { monthYear } from './publicInfoStyles';
 
-/** A bar never shrinks below this, so a two-day stint still shows a sliver. */
 const MIN_BAR_PERCENT = 2;
 
-/**
- * The stint's name and tags, then its date range under them wherever the page's
- * gutter doesn't carry it. Shared by the card and the slim NPC line.
- */
 function StintHeading({
   row,
   name,
@@ -43,7 +24,6 @@ function StintHeading({
   current: boolean;
   range: string;
   page: boolean;
-  /** Tags after CURRENT: the card's stint pills, or the NPC line's NPC tag. */
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -91,7 +71,6 @@ export function EmploymentSummaryChips({
       {longest && (
         <StatChip
           label={t('employmentHistory.summary.longest')}
-          // A corporation name can outgrow a phone; the timeline below has it in full.
           truncate
           value={
             <>
@@ -108,18 +87,10 @@ export function EmploymentSummaryChips({
 }
 
 interface EmploymentTimelineProps {
-  /** Most-recent first, as `deriveEmploymentHistoryRows` returns them. */
   rows: readonly EmploymentHistoryRow[];
   names: ReadonlyMap<number, string>;
   label: string;
-  /**
-   * The corporation the page's CURRENT chip must match: the character's own,
-   * so an ongoing row the character record hasn't caught up to (or has no
-   * corporation yet) stays plain. The modal has no character record and
-   * ignores it, so its ongoing row is always CURRENT.
-   */
   currentCorporationId?: number;
-  /** `modal` never draws the date gutter. */
   variant?: 'page' | 'modal';
 }
 

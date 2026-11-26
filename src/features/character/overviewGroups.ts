@@ -1,11 +1,3 @@
-/**
- * Overview character groupings: device-local, per parity plan §5.7 — same
- * rationale as skills/comparisons.ts. A grouping is a statement about several
- * characters at once, so it cannot live under any single character's sync
- * scope, and EVE SSO offers no account identity to hang it on. Stored as one
- * array-valued key carrying its own updatedAt, shaped like a synced key would
- * be but without the `sync.` prefix that would turn syncing on.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { CharacterGroup } from './groups';
 
@@ -43,7 +35,6 @@ export const useOverviewGroups = createLocalSetting<OverviewGroupsValue>({
   parse: parseOverviewGroupsValue,
 });
 
-/** Applies a `groups.ts` mutator to a value and stamps `updatedAt` — the one place that pairing happens. */
 export function updateGroups(
   value: OverviewGroupsValue,
   updater: (groups: CharacterGroup[]) => CharacterGroup[],

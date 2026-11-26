@@ -1,9 +1,3 @@
-/**
- * Pieces the three Corp Tax Book layout options (#4056) have in common: the
- * page header with the Corp sub-nav (plus its new Moons entry), status words,
- * the send-queue table, and the tables every option shows somewhere. Each
- * option file composes these differently; nothing here is a layout.
- */
 import type { ReactElement, ReactNode } from 'react';
 import {
   Button,
@@ -42,7 +36,6 @@ import {
 } from './corpTaxBookFixtures';
 import { isk, queueCounts } from './corpTaxBookFormat';
 
-/** The Corp sub-nav as it stands, plus the Moons entry D21 adds. */
 function CorpSubNavWithMoons() {
   const entries = ['Overview', 'Members', 'Wallet', 'Assets', 'Moons'];
   return (
@@ -66,7 +59,6 @@ function CorpSubNavWithMoons() {
   );
 }
 
-/** D9: who last fed the book, and when. */
 function SyncMeta() {
   return (
     <span className="text-xs text-text-dim">
@@ -75,7 +67,6 @@ function SyncMeta() {
   );
 }
 
-/** D21: settings open from the page header (the gear opens this page's settings). */
 function BookSettingsButton() {
   return <IconButton icon={<Icon.Settings />} label="Corp Tax Book settings" />;
 }
@@ -84,7 +75,6 @@ function RefreshButton() {
   return <IconButton icon={<Icon.Refresh />} label="Sync now" />;
 }
 
-/** D7: the audit log, shown as an activity feed. Opens a side panel over the page. */
 function ActivityButton() {
   return (
     <Button size="sm" variant="ghost">
@@ -94,11 +84,6 @@ function ActivityButton() {
   );
 }
 
-/**
- * D9: how fresh the book is and what is missing from it. The strip stays
- * collapsed (one line) until opened, like the personal tab's, but a gap is a
- * warning so it leads and the page never reads as complete when it is not.
- */
 export function BookHealthStrip() {
   return (
     <AttentionStrip
@@ -151,7 +136,6 @@ export function MoonsTabs({ value }: { value: MoonsTab }) {
   );
 }
 
-/** `/corp/moons` header: the title, sync line, Corp sub-nav and page controls. */
 export function MoonsHeader({ lead }: { lead?: ReactNode }) {
   return (
     <PageHeader
@@ -177,7 +161,6 @@ const STATE_TONE: Record<ExtractionState, string> = {
   Expired: 'text-text-faint',
 };
 
-/** An Extraction's state as a word (D14): readable without its colour. */
 export function StateWord({ state }: { state: ExtractionState }) {
   return (
     <span
@@ -209,7 +192,6 @@ export function OverdueWord({ days }: { days: number | null }) {
   return <span className="font-semibold whitespace-nowrap text-danger">Overdue {days}d</span>;
 }
 
-/** Ore make-up of a chunk, or D13's fallback. */
 export function OreLine({ ores }: { ores: { ore: string; share: number }[] | null }) {
   if (!ores)
     return (
@@ -221,7 +203,6 @@ export function OreLine({ ores }: { ores: { ore: string; share: number }[] | nul
   return <span>{ores.map((o) => `${o.ore} ${o.share}%`).join(' · ')}</span>;
 }
 
-/** D13: mined vs left after fracture. */
 export function MinedBar({ pct, label }: { pct: number | null; label: string }) {
   if (pct === null) return <span className="text-text-dim">—</span>;
   return (
@@ -291,7 +272,6 @@ const queueColumns: DataTableColumn<QueueItem>[] = [
   },
 ];
 
-/** D16: one row per mail in the send queue. Read-only apart from Retry on a failure. */
 export function QueueTable({ items }: { items: QueueItem[] }) {
   return (
     <DataTable
@@ -306,7 +286,6 @@ export function QueueTable({ items }: { items: QueueItem[] }) {
   );
 }
 
-/** The queue's one-line summary: counts as words, and an ETA while it runs. */
 export function QueueSummary({ items }: { items: QueueItem[] }) {
   const c = queueCounts(items);
   const done = c.waiting === 0 && c.paused === 0;
@@ -338,12 +317,6 @@ export function QueueSummary({ items }: { items: QueueItem[] }) {
   );
 }
 
-/**
- * The top-bar progress chip (D16), on every page while a queue runs. `cue`
- * follows §6c for what a click does: a popover (CaretDown in a bordered
- * chip), a side panel (bordered button, trailing CaretRight), or a page
- * (a ghost button that navigates).
- */
 export function MailQueueChip({
   items,
   cue,
@@ -351,7 +324,6 @@ export function MailQueueChip({
 }: {
   items: QueueItem[];
   cue: 'popover' | 'panel' | 'link';
-  /** Wraps the button, e.g. in a `PopoverTrigger`. */
   renderButton?: (button: ReactElement) => ReactNode;
 }) {
   const c = queueCounts(items);
@@ -400,7 +372,6 @@ export function MailQueueChip({
   );
 }
 
-/** D16's notice on Send: EVE's hidden mail limit, worked out for this batch. */
 export function MailLimitNotice({ count }: { count: number }) {
   const minutes = Math.ceil(count / 5);
   return (
@@ -421,7 +392,6 @@ export function MailLimitNotice({ count }: { count: number }) {
   );
 }
 
-/** D28: the member's figures beside the book's for one day. */
 export function CorpBookDiff() {
   return (
     <NewComponent name="CorpBookDiff">
@@ -463,7 +433,6 @@ export function CorpBookDiff() {
   );
 }
 
-/** D27: the guest's opt-out. The monthly Late notice still goes. */
 export function StopReminders({ checked }: { checked: boolean }) {
   return (
     <label
@@ -484,7 +453,6 @@ export function StopReminders({ checked }: { checked: boolean }) {
   );
 }
 
-/** The verify page's own top line: no shell, no login (D27). */
 export function VerifyTopBar() {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
@@ -497,7 +465,6 @@ export function VerifyTopBar() {
   );
 }
 
-/** A labelled way up from a drill-down page (§6c: never a bare CaretLeft). */
 export function Crumb({ label }: { label: string }) {
   return (
     <a

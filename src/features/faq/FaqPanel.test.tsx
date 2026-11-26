@@ -25,13 +25,11 @@ import {
 const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
 const functionsFile = (file: string) =>
   readFileSync(resolve(process.cwd(), 'functions/src', file), 'utf8');
-/** The day count of a `NAME = <days> * 24 ...` constant in a functions file. */
 const daysIn = (source: string, name: string) =>
   Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(source)?.[1]);
 
 const QUESTIONS = 26;
 
-/** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {
   const result = render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -46,11 +44,6 @@ function questionButtons(): HTMLElement[] {
   return screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-expanded'));
 }
 
-/**
- * Which words in the "settings" line account for each allow-listed synced key.
- * The line covers all of them at once, so it is the phrasing rather than the
- * bullet that has to keep up.
- */
 const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.notificationFeedPrefs': /notification preferences/i,
   'sync.piCustomsRates': /customs rate overrides/i,
@@ -125,17 +118,10 @@ function syncedItemIds(): Set<string> {
   return new Set(group?.items.map((item) => item.id) ?? []);
 }
 
-/** The always-open sub-list under the "find skills to train" question. */
 const TRAIN_SKILLS_STEPS = 6;
-/** The bullets of "How do I make ISK?" and "What do highsec… mean?". */
 const NEW_TO_EVE_BULLETS = 4 + 4;
 
 describe('FaqPanel — What We Store', () => {
-  // Which line accounts for each remote collection is declared on the
-  // collection itself (`faqItem` in sync/syncedCollections.ts), a required
-  // field — so a new synced collection cannot be declared without whoever
-  // adds it deciding what the pilot is told. Several collections share one
-  // line on purpose ("Production Runs, and the sales and orders you linked").
   it('accounts for every collection that actually leaves the device', () => {
     const ids = syncedItemIds();
     for (const collection of REMOTE_COLLECTIONS) {
@@ -173,9 +159,6 @@ describe('FaqPanel — What We Store', () => {
   });
 
   it('has no synced line that no longer corresponds to anything stored', () => {
-    // The other direction: a collection removed from sync must not leave the
-    // user told we still hold it. `settings` is the one line covering both
-    // synced setting keys, so it is expected on both sides.
     const claimed = new Set<string>(REMOTE_COLLECTIONS.map((c) => c.faqItem));
     for (const id of syncedItemIds()) {
       expect(claimed, `"${id}" is listed as synced but maps to no collection`).toContain(id);
@@ -183,12 +166,6 @@ describe('FaqPanel — What We Store', () => {
   });
 
   it('names every setting that leaves the device', () => {
-    // The settings line used to name a count, which stopped scaling the moment
-    // a third preference synced. What has to stay true is the promise it ends
-    // on — "nothing else on this page leaves your device" — so each allowed key
-    // is pinned to the words that account for it, in the same two-file spirit
-    // as `syncedSettings.ts`: adding a key fails this until whoever added it
-    // decides what the reader is told.
     renderFaq();
     const shown = document.body.textContent ?? '';
     for (const key of SYNCED_SETTING_KEYS) {
@@ -245,17 +222,12 @@ describe('FaqPanel — What We Store', () => {
   });
 
   it('has no group listing things we do not hold', () => {
-    // Dropped on purpose: a list of what is *not* stored is unfalsifiable by
-    // the reader and unbounded by nature. The groups account for what
-    // exists; absence from all of them is the answer.
     expect(WHAT_WE_STORE_GROUPS).toHaveLength(4);
     renderFaq();
     expect(screen.queryByRole('heading', { name: /never collected/i })).not.toBeInTheDocument();
   });
 
   it('states the cases where something does leave the device', () => {
-    // The section is worth less than nothing if it overclaims. These three are
-    // the real exceptions, and each is named rather than implied.
     renderFaq();
 
     expect(screen.getByText(/push notifications, if on/i)).toBeInTheDocument();
@@ -267,9 +239,6 @@ describe('FaqPanel — What We Store', () => {
   });
 
   it('says when a removed character’s synced copy actually leaves our servers', () => {
-    // Removal is local-only; the remote docs go with the
-    // `purgeStaleAccounts` inactivity purge. Saying "removed means deleted"
-    // would be the one outright false sentence in the section.
     renderFaq();
     expect(
       screen.getByText(/deleted after 90 days with no device syncing it/i)
@@ -281,7 +250,6 @@ describe('FaqPanel — What We Store', () => {
     expect(
       screen.getByText(/is not uploaded, apart from what you choose to share/i)
     ).toBeInTheDocument();
-    // The intro used to say EVE data "stays on this device" without exception.
     expect(screen.getByText(/exceptions are listed below/i)).toBeInTheDocument();
   });
 
@@ -362,9 +330,6 @@ describe('FaqPanel: New to EVE?', () => {
 
 describe('FaqPanel: Communities', () => {
   const COMMUNITY_MATCH = 'match /communities/{communityId} {';
-  // Everything between the shared Community block and the collection-group
-  // read rule that follows it (the per-Character `communities` index is in
-  // the characters block, before it).
   const communityBlock = rules.slice(
     rules.indexOf(COMMUNITY_MATCH, rules.indexOf('Communities (issue #3596, ADR 0018)')),
     rules.indexOf('match /{path=**}/pledges/')
@@ -373,7 +338,6 @@ describe('FaqPanel: Communities', () => {
   it('maps every collection the rules let Communities use to a line the pilot is told', () => {
     const names = [...communityBlock.matchAll(/match \/(\w+)\/\{\w+\}/g)]
       .map((match) => match[1])
-      // The block's own `communities/{communityId}` line.
       .filter((name) => name !== 'communities');
     expect(names.length).toBeGreaterThan(5);
     for (const name of names) {
@@ -489,7 +453,6 @@ describe('FaqPanel: corporation records', () => {
   });
 
   it('keeps the SRP log and billed-by retention equal to the code that deletes them (#4942)', () => {
-    // The sweep deletes a claim's SRP log entries with it; deleteBook clears its pointers.
     expect(functionsFile('srpCleanup.ts')).toMatch(/isSrpAuditForClaim/);
     expect(functionsFile('corpTaxBookStore.ts')).toMatch(
       /await deleteBilledByPointers\(deps, call\.corporationId\)/
@@ -527,7 +490,6 @@ describe('FaqPanel: Using Neocom Desk', () => {
 
   it('lists the ways to find skills to train under a FAQ question', () => {
     renderFaq();
-    // "What ship can I fly?" names Certified Plans and Ships › Tree too.
     const answer = within(document.getElementById('train-skills')!);
     expect(answer.getByText(/From skill queue/i)).toBeInTheDocument();
     expect(answer.getByText(/Certified Plan/i)).toBeInTheDocument();

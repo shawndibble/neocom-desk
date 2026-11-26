@@ -1,8 +1,3 @@
-/**
- * The Characters card header at 1024 and 1440 (#1943). jsdom has no layout, so
- * whether the name survives beside the ACTIVE marker and the controls can only
- * be measured in a real browser.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -48,7 +43,6 @@ async function measure(page: Page) {
   const card = page.getByRole('listitem').filter({ hasText: LONG_NAME }).first();
   const name = card.getByText(LONG_NAME, { exact: true });
   const star = card.getByRole('button', { name: /^(Star|Unstar) /i });
-  // Remove lives in the card's trailing ⋮ menu (#6565), so the ⋮ is the control to keep inside.
   const remove = card.getByRole('button', { name: `More actions for ${LONG_NAME}` });
   await expect(name).toBeVisible();
   const [cardBox, nameBox, starBox, removeBox, overflow] = await Promise.all([

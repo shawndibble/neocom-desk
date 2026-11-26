@@ -136,8 +136,6 @@ describe('scrubEvent', () => {
   });
 
   it('redacts span descriptions and span data, which carry the full URL', () => {
-    // Shape taken from a real transaction envelope: browser.* timing spans
-    // describe themselves with the whole URL, and `url.full` repeats it.
     const event = {
       type: 'transaction',
       spans: [
@@ -158,7 +156,6 @@ describe('scrubEvent', () => {
       'url.full': 'https://neocomdesk.com/callback?code=[redacted]',
       'url.path': '/callback',
     });
-    // Non-string attributes survive untouched.
     expect(scrubbed.spans?.[1]?.data).toEqual({ 'sentry.sample_rate': 1 });
   });
 

@@ -13,11 +13,6 @@ import { PI_EXPIRING_WINDOW_SETTING_KEY } from '@/features/pi/expiringWindow';
 import { FACILITY_DEFAULTS_SETTING_KEY } from '@/features/industry/facilityDefaults';
 import { STARRED_CHARACTERS_SETTING_KEY } from '@/features/character/starredCharacters';
 
-/**
- * Pinned literal, exactly as `sync/syncedSettings.test.ts` pins its own list.
- * Adding a key is a two-file edit on purpose — see the module comment for what
- * belongs and, more importantly, what must never be added.
- */
 const PINNED = [
   'assetsItemSort',
   'assetsRoutePreference',
@@ -56,8 +51,6 @@ describe('VIEW_PREFERENCE_KEYS', () => {
   });
 
   it('never clears a preference that has its own Settings control', () => {
-    // A pilot who set one of these deliberately would not expect a button
-    // labelled "view preferences" to revert it.
     for (const key of [
       FONT_SCALE_KEY,
       TIME_FORMAT_SETTING_KEY,
@@ -74,7 +67,6 @@ describe('VIEW_PREFERENCE_KEYS', () => {
   });
 
   it('never clears user-created content', () => {
-    // These are work the pilot did on purpose, not a remembered sort order.
     for (const key of [
       STARRED_CHARACTERS_SETTING_KEY,
       'overviewGroups',
@@ -92,8 +84,6 @@ describe('VIEW_PREFERENCE_KEYS', () => {
   });
 
   it('lists keys the app actually declares', () => {
-    // Spot-check against the real constants, so a renamed key fails here
-    // rather than silently dropping out of the reset.
     expect(VIEW_PREFERENCE_KEYS).toContain(CALENDAR_VIEW_KEY);
     expect(VIEW_PREFERENCE_KEYS).toContain(ASSET_SORT_SETTING_KEY);
   });

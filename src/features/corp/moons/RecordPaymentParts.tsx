@@ -1,8 +1,3 @@
-/**
- * The Record payment dialog's two richer parts: the outcome panel (which days
- * the ISK pays or part-pays, oldest first, and what is owed or held after,
- * read from `previewMinerPayment`) and the picker for an Unmatched donation.
- */
 import { useTimeZone } from '@/lib/timeFormat';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,10 +10,8 @@ import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
 import { atDate, clockAt, isk, shortDate } from './moonsFormat';
 
-/** A picker over this many donations gets a search box; fewer read at a glance. */
 const DONATION_SEARCH_FROM = 4;
 
-/** "After this payment": the days it reaches, oldest first, then the balance. */
 export function PaymentOutcomePanel({
   outcome,
   minerName,
@@ -72,7 +65,6 @@ export function PaymentOutcomePanel({
   );
 }
 
-/** Pick one Unmatched donation, searchable by sender or amount once there are a few. */
 export function DonationPicker({
   donations,
   nameOf,
@@ -95,7 +87,6 @@ export function DonationPicker({
         (d) =>
           nameOf(d.characterId).toLowerCase().includes(needle) ||
           (digits !== '' && String(Math.round(netPayment(d))).includes(digits)) ||
-          // The chosen donation stays listed, so a search never hides what Assign will send.
           d.id === value
       )
     : donations;

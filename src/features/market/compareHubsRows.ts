@@ -5,7 +5,6 @@ import type { HubId, UseCompareHubsResult } from './useCompareHubs';
 
 export interface CompareHubRow extends CompareSetItem {
   quotes: Readonly<Record<HubId, HubQuoteState>>;
-  /** A hub whose price read failed: its cells show "—", not "No sellers". */
   unreachable: Readonly<Record<HubId, boolean>>;
   bestSellHub: HubId | null;
   bestBuyHub: HubId | null;
@@ -13,7 +12,6 @@ export interface CompareHubRow extends CompareSetItem {
 
 const HUB_ORDER = COMPARED_HUBS.map((hub) => hub.id);
 
-/** One row per Compare Set item, each hub's best sell/buy and the row's best marks. */
 export function buildCompareHubRows(
   items: readonly CompareSetItem[],
   { hubs }: Pick<UseCompareHubsResult, 'hubs'>

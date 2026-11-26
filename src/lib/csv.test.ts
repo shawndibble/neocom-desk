@@ -109,8 +109,6 @@ describe('csvFilename', () => {
   });
 
   it('uses local calendar parts, not the UTC date', () => {
-    // 2026-01-01T00:30 local is still 2025-12-31 in UTC for any negative
-    // offset — the file is named for the user's day, not Greenwich's.
     const localNewYear = new Date(2026, 0, 1, 0, 30);
     expect(csvFilename('jobs', localNewYear)).toBe('neocom-jobs-2026-01-01.csv');
   });

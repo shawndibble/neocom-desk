@@ -11,17 +11,12 @@ import { useFittingItemActions } from './fittingItemActions';
 import { CatalogueLoadingNote } from './FittingDataNotices';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
-/**
- * Add cargo: any market item, found by name, in the quantity asked — the
- * hold takes what the ring has no slot for (ammo, paste, filaments, a depot).
- */
 export function CargoTab({
   catalogue,
   cargo,
   onAddCargo,
 }: {
   catalogue: FittingCatalogue | null;
-  /** What the hold already carries: those results get the List cargo row's menu. */
   cargo: Fitting['cargo'];
   onAddCargo: (typeId: number, quantity: number) => void;
 }) {

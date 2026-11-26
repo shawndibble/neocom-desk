@@ -50,11 +50,6 @@ describe('partitionStarredFirst', () => {
     ]);
   });
 
-  /**
-   * The whole point of partitioning rather than sorting: the chosen sort key
-   * still decides the order inside both halves, so a star raises one card
-   * without scrambling the rest of the list.
-   */
   it('preserves the incoming order within both halves', () => {
     expect(partitionStarredFirst([PILOT_C, PILOT_A, PILOT_B], [PILOT_B, PILOT_C])).toEqual([
       PILOT_C,
@@ -70,7 +65,6 @@ describe('partitionStarredFirst', () => {
     ]);
   });
 
-  /** A star on a character filtered out of this list (search, or another group) adds no phantom row. */
   it('ignores starred ids that are not in the list', () => {
     expect(partitionStarredFirst([PILOT_A], [PILOT_C])).toEqual([PILOT_A]);
   });

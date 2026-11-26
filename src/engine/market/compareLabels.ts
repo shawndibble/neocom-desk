@@ -1,20 +1,5 @@
-/**
- * Short column labels for the Compare drawer's Attributes matrix: the words
- * every compared item's name shares ("Large Shield Extender") move into one
- * caption, so each column keeps only what tells it apart ("II", "Caldari
- * Navy"). Five variants then fit a 390px phone side by side instead of each
- * full name wrapping to four lines in a 4rem column.
- *
- * Whole words only, matched case-sensitively as the SDE spells them, and a
- * word repeated within a name is stripped only as many times as every name
- * repeats it. If stripping would leave any name empty (one item's name is
- * nothing but the shared words), the full names are kept: a blank column
- * header is worse than a long one.
- */
 export interface CompareLabels {
-  /** The words every name shares, in the first name's order; null when nothing was stripped. */
   shared: string | null;
-  /** One label per input name, in input order. */
   labels: string[];
 }
 
@@ -38,7 +23,6 @@ export function shortCompareLabels(names: readonly string[]): CompareLabels {
   }
   if (![...common.values()].some((count) => count > 0)) return unchanged;
 
-  /** Marks each word as shared (stripped) or distinguishing (kept). */
   function sharedFlags(words: readonly string[]): boolean[] {
     const remaining = new Map(common);
     return words.map((word) => {

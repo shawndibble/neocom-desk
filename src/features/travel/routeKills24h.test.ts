@@ -53,7 +53,6 @@ describe('loadRouteKills24h', () => {
     expect(result.get(1)).toBeNull();
     expect(result.get(3)).toBeNull();
     expect(result.get(99)).toBeNull();
-    // A failure is not cached: the next look asks again.
     await loadRouteKills24h([1], 1_500);
     expect(fetchRegion).toHaveBeenCalledTimes(3);
   });

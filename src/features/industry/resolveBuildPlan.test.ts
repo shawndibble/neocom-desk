@@ -97,7 +97,6 @@ function sources(catalog: BlueprintCatalog, overrides: Partial<BuildPlanSources>
   } satisfies BuildPlanSources;
 }
 
-/** Every Blueprint Acquisition row anywhere in the resolved tree for one blueprint type. */
 function acquisitionRows(result: BuildResult | null, blueprintTypeID: number): ResolvedMaterial[] {
   const rows: ResolvedMaterial[] = [];
   const walk = (materials: readonly ResolvedMaterial[]) => {
@@ -111,8 +110,6 @@ function acquisitionRows(result: BuildResult | null, blueprintTypeID: number): R
 }
 
 describe('resolveBuildPlan', () => {
-  // Plan product 1 <- bp 100: components 300 (bp 200) and 310 (bp 210), both
-  // of which consume 400 (bp 401). One owned run of bp 401 covers one branch.
   const branching = catalogOf([
     entry(100, 1, [
       { typeID: 300, quantity: 1 },
@@ -184,7 +181,6 @@ describe('resolveBuildPlan', () => {
     const first = resolveBuildPlan(plan(), src, market);
     const second = resolveBuildPlan(plan(), src, market);
 
-    // The owned BPC covers the run: an acquisition row with nothing to buy.
     for (const resolved of [first, second]) {
       expect(resolved.resolvedMe).toBe(10);
       expect(resolved.resolvedTe).toBe(20);
@@ -215,7 +211,6 @@ describe('resolveBuildPlan', () => {
       { withGroupResult: true }
     );
 
-    // Each pass claims bp 401 on its own: neither sees the other's nested claim.
     expect(
       acquisitionRows(resolved.result, 401).filter((r) => r.remainingQuantity === 0)
     ).toHaveLength(1);
@@ -234,7 +229,6 @@ describe('resolveBuildPlan', () => {
     const withCorp = resolveBuildPlan(plan({ includeCorpAssets: true }), src, market);
     const withoutCorp = resolveBuildPlan(plan({ includeCorpAssets: false }), src, market);
 
-    // An owned BPO: nothing to acquire, at the corp copy's own ME.
     expect(withCorp.resolvedMe).toBe(8);
     expect(acquisitionRows(withCorp.result, 100)).toEqual([]);
     expect(acquisitionRows(withoutCorp.result, 100)).toEqual([
@@ -258,7 +252,6 @@ describe('resolveBuildPlan', () => {
   });
 
   describe('Reaction Location (issue #698)', () => {
-    // Manufactured product 1 consumes 500, which only a reaction formula makes.
     const catalog = catalogOf([
       entry(100, 1, [{ typeID: 500, quantity: 100 }]),
       entry(600, 500, [{ typeID: 34, quantity: 100 }], {
@@ -275,7 +268,6 @@ describe('resolveBuildPlan', () => {
     const prices = snapshot({ 1: 1_000_000, 500: 5000, 34: 10_000 }, 0.01);
 
     function resolveAt(reactionSystemCostIndex: number | null) {
-      // Both blueprints owned: an unpriced acquisition row would blank the totals.
       return resolveBuildPlan(
         reactionPlan,
         sources(catalog, { ownedBlueprints: [owned(100, -1), owned(600, -1)] }),
@@ -290,7 +282,6 @@ describe('resolveBuildPlan', () => {
 
       expect(dear.makeOrBuyContext?.reactionFacility?.systemCostIndex).toBe(0.5);
       expect(dear.result!.totalCost).toBeGreaterThan(cheap.result!.totalCost);
-      // Nothing owned, so the group pass must price exactly like the normal one.
       expect(dear.groupResult!.totalCost).toBe(dear.result!.totalCost);
       expect(cheap.groupResult!.totalCost).toBe(cheap.result!.totalCost);
     });
@@ -339,7 +330,6 @@ describe('resolveBuildPlan', () => {
         snapshot: prices,
         depthPrices: { 34: 7 },
       });
-      // The highest buy order plus an untrained Character's 3% placement fee.
       expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBeCloseTo(4.12);
     });
 
@@ -359,7 +349,6 @@ describe('resolveBuildPlan', () => {
       const resolved = resolveBuildPlan(plan({ materialPriceBasis: 'buy' }), trained, {
         snapshot: prices,
       });
-      // 1.5% from Broker Relations V, plus the hub's 5% Safety Tax.
       expect(resolved.result?.materials.find((m) => m.typeID === 34)?.unitPrice).toBeCloseTo(4.26);
     });
 
@@ -385,7 +374,6 @@ describe('resolveBuildPlan', () => {
     const src = sources(catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]), {
       ownedBlueprints: [owned(100, 1)],
     });
-    // Runs of 0 clamp to 1, which the one-run owned BPC covers.
     const resolved = resolveBuildPlan(plan({ runs: 0 }), src, {
       snapshot: snapshot({ 1: 1000, 34: 5, 100: 10_000 }),
     });
@@ -396,8 +384,6 @@ describe('resolveBuildPlan', () => {
 });
 
 describe('invention as a blueprint source (issue #3990)', () => {
-  // T2 bp 100 (product 1) is invented from T1 bp 50 (product 5): one datacore
-  // at 1,000 ISK, 50% base chance, 10 runs a copy.
   const catalog = catalogOf([
     entry(50, 5, [{ typeID: 34, quantity: 10 }]),
     entry(100, 1, [{ typeID: 34, quantity: 10 }]),
@@ -427,8 +413,6 @@ describe('invention as a blueprint source (issue #3990)', () => {
       sources(catalog, { ownedBlueprints: [owned(50, -1, 0)], inventionMarket }),
       market
     );
-    // Each job fee: 2% × EIV 10 × (0.25% NPC tax + 4% SCC) = 0.0085.
-    // Expected cost per copy = (1,000 + 2 × 0.0085) ÷ 50%.
     const [row] = acquisitionRows(resolved.result, 100);
     expect(row!.unitPrice).toBeCloseTo(2_000.034, 6);
     expect(row!.acquisitionTier).toMatchObject({ me: 2, te: 4, invented: true });
@@ -466,7 +450,6 @@ describe('invention as a blueprint source (issue #3990)', () => {
       market
     );
     const [row] = acquisitionRows(resolved.result, 100);
-    // Parity: (1,000 + 100 + 2 × 0.0085) ÷ (50% × 1.5), not the cheaper Opt. Attainment.
     expect(row!.unitPrice).toBeCloseTo(1_100.017 / 0.75, 6);
     expect(row!.acquisitionTier).toMatchObject({ me: 3, te: 2, invented: true });
   });
@@ -507,9 +490,6 @@ describe('invention as a blueprint source (issue #3990)', () => {
 });
 
 describe('make-or-buy advice agrees with the plan it advises (blueprint cost)', () => {
-  // Plan product 1 <- bp 100 needs one 300; 300 <- bp 200 from one Tritanium.
-  // Materials plus fee make 300 far cheaper to build than its hub price of
-  // 100 — until the bp 200 BPO (hub price 1,000) has to be bought first.
   const catalog = catalogOf([
     entry(100, 1, [{ typeID: 300, quantity: 1 }]),
     entry(200, 300, [{ typeID: 34, quantity: 1 }]),
@@ -556,7 +536,6 @@ describe('make-or-buy advice agrees with the plan it advises (blueprint cost)', 
 });
 
 describe('blueprint purchases are charged once per plan, not once per node', () => {
-  // Same shape as `branching` above: 300 and 310 both consume one 400 (bp 401).
   const branching = catalogOf([
     entry(100, 1, [
       { typeID: 300, quantity: 1 },
@@ -596,7 +575,6 @@ describe('blueprint purchases are charged once per plan, not once per node', () 
   });
 
   it('counts BPC runs, not units, for a recipe that makes several units per run', () => {
-    // 20 of 300 at 10 per run is 2 runs — one 2-run BPC, not ten of them.
     const catalog = catalogOf([
       entry(100, 1, [{ typeID: 300, quantity: 20 }]),
       entry(200, 300, [{ typeID: 34, quantity: 1 }], { productQuantity: 10 }),

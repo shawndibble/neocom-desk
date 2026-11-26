@@ -1,15 +1,6 @@
-/**
- * Plan Milestone (GLOSSARY.md) UI-layer CRUD: `SkillPlanRecord.milestones` is
- * read through `normalizeMilestones` on every read (a malformed or
- * over-length row from an older build or a sync race degrades gracefully
- * rather than corrupting the list), same convention as markers.ts's
- * `normalizeMarkers`. Status against the live schedule (projected / reached /
- * orphaned) is `engine/skillPlanMilestones.ts`'s job, not this module's.
- */
 import { evaluateFitGoal } from '@/engine/fitGoal';
 import type { PlanEntry, PlanMilestone, PlanStep } from '@/engine/types';
 
-/** Beyond this a name reads as a paragraph, not a goal label. */
 export const MAX_MILESTONE_NAME_LENGTH = 60;
 
 function isPlanMilestoneShape(value: unknown): value is PlanMilestone {
@@ -29,17 +20,10 @@ function cleanName(name: string): string {
   return name.trim().slice(0, MAX_MILESTONE_NAME_LENGTH);
 }
 
-/** `engine/skillPlanMilestones.ts` looks a milestone up by this same (skillTypeID, level) pair — two milestones sharing one would collapse to whichever the lookup map kept. */
 function anchorKey(anchor: Pick<PlanMilestone, 'skillTypeID' | 'level'>): string {
   return `${anchor.skillTypeID}:${anchor.level}`;
 }
 
-/**
- * Read-side clamp: drop malformed rows, trim names, cap their length, and
- * collapse two milestones sharing an anchor to the first — a sync race or a
- * pre-upsert write (see `addMilestone`) should never leave a second one that
- * the by-anchor status lookup would then silently swallow.
- */
 export function normalizeMilestones(raw: readonly PlanMilestone[] | undefined): PlanMilestone[] {
   const seenAnchors = new Set<string>();
   return (raw ?? [])
@@ -47,8 +31,6 @@ export function normalizeMilestones(raw: readonly PlanMilestone[] | undefined): 
     .map((m) => ({ ...m, name: cleanName(m.name) }))
     .filter((m) => m.name !== '')
     .filter((m, i, all) => {
-      // Fit goals share anchors freely (two Fittings can finish on one skill),
-      // so they dedupe by Fitting instead.
       if (m.fittingId !== undefined) {
         return all.findIndex((other) => other.fittingId === m.fittingId) === i;
       }
@@ -59,12 +41,6 @@ export function normalizeMilestones(raw: readonly PlanMilestone[] | undefined): 
     });
 }
 
-/**
- * "Add milestone": names a new goal anchored to one entry row's skill/level.
- * An upsert, not a bare append — the UI only ever offers "Add" on a row with
- * none, but replacing whatever already sits at that anchor (rather than
- * appending a second one) keeps that an invariant rather than a UI courtesy.
- */
 export function addMilestone(
   milestones: readonly PlanMilestone[] | undefined,
   anchor: { skillTypeID: number; level: number },
@@ -78,7 +54,6 @@ export function addMilestone(
   return [...normalized, { id: crypto.randomUUID(), name: trimmed, ...anchor }];
 }
 
-/** A blank rename leaves the existing name in place rather than clearing it. */
 export function renameMilestone(
   milestones: readonly PlanMilestone[] | undefined,
   id: string,
@@ -97,7 +72,6 @@ export function removeMilestone(
   return normalizeMilestones(milestones).filter((m) => m.id !== id);
 }
 
-/** Adds a goal for a saved Fitting, or moves the existing one for it to `anchor`; never a second per Fitting. */
 export function upsertFitGoal(
   milestones: readonly PlanMilestone[] | undefined,
   fitting: { id: string; name: string },
@@ -116,13 +90,6 @@ export function upsertFitGoal(
   return existing ? normalized.map((m) => (m === existing ? next : m)) : [...normalized, next];
 }
 
-/**
- * Re-points every fit goal at the latest step its Fitting needs in the plan's
- * current order, and renames it after the Fitting. Returns `milestones`
- * itself when nothing moved. A fit goal whose Fitting isn't in `fits`
- * (deleted, still loading, undecodable) or whose needs the plan no longer
- * covers is left alone; PlanEditor marks the uncovered ones orphaned.
- */
 export function reanchorFitGoals(
   milestones: readonly PlanMilestone[] | undefined,
   fits: ReadonlyMap<string, { name: string; needed: readonly PlanEntry[] }>,

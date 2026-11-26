@@ -1,11 +1,3 @@
-/**
- * Calendar's Map / Coming Up rail split at pointer widths (issue #1638).
- *
- * The Map panel used to hold a fixed 38rem from `md` up, so at 1024px the
- * Coming Up rail was squeezed to ~165px: due times wrapped to three lines and
- * the RSVP badge was clipped. The rail now holds 30rem (at most 45% of the
- * row, at least 18rem) and the Map takes the rest, so it grows on wide pages.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -72,6 +64,5 @@ test('at 1440px the rail holds 30rem and the Map fills the rest', async ({ page 
   const { rail, map } = await seedEventsAndOpen(page, { width: 1440, height: 900 });
 
   expect((await rail.boundingBox())!.width).toBe(480);
-  // The Map grows past its old fixed 38rem.
   expect((await map.boundingBox())!.width).toBeGreaterThan(608);
 });

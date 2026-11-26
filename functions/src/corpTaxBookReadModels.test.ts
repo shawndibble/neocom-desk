@@ -36,7 +36,6 @@ describe('buildReadModels: the Overview’s Extractions', () => {
   });
 
   it('keeps a pull its refinery’s own expiry still holds', () => {
-    // Fractured on 17 Nov: the default 48 hours ran out on the 19th, a 72-hour expiry holds it.
     const late = pull('late', '2026-11-17T00:00:00Z');
     expect(
       buildReadModels({ expiryHours: {}, extractions: [late] }, NOW).overview.extractions

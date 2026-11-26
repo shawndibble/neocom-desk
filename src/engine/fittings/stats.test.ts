@@ -103,8 +103,6 @@ describe('extractFittingStats', () => {
   });
 
   it("reads hull resists from the ship's own resonance ids (EM 113, thermal 110, kinetic 109, explosive 111)", () => {
-    // Literal ids, not DOGMA_ATTRIBUTE: a fixture built from the constants
-    // under test would agree with a wrong constant.
     const ship = new Map([
       [113, { value: 0.67 }],
       [110, { value: 0.6 }],
@@ -370,7 +368,6 @@ describe('extractOffense', () => {
 
     expect(offense.weapons[0].spool).toBeUndefined();
     expect(offense.weapons[1].spool?.unspooledDps).toBeCloseTo(10, 6);
-    // 2 / 0.1 = 20 cycles of 4 s.
     expect(offense.weapons[1].spool?.secondsToFull).toBeCloseTo(80, 6);
   });
 
@@ -392,8 +389,8 @@ describe('extractOffense', () => {
         { typeId: 2048, quantity: 1, isDrone: false },
       ],
       [
-        weaponResult(0, 204, 'online'), // an online launcher still reports a volley
-        weaponResult(0, 0), // active, but no charge loaded
+        weaponResult(0, 204, 'online'),
+        weaponResult(0, 0),
         { attributes: new Map(), state: 'active' as const, max_state: 'active' as const },
       ],
       null
@@ -418,7 +415,6 @@ describe('extractOffense', () => {
     expect(offense.weapons[0].overheated?.dps).toBeCloseTo(61.6, 6);
     expect(offense.weapons[0].overheated?.volley).toBeCloseTo(350, 6);
     expect(offense.weapons[1].overheated).toBeNull();
-    // Rows that can't overheat count at their normal value in the overheated total.
     expect(offense.overheated?.dps).toBeCloseTo(181.6, 6);
     expect(offense.overheated?.volley).toBeCloseTo(830, 6);
   });
@@ -450,7 +446,6 @@ describe('extractOffense', () => {
     expect(offense.weapons.map(weaponRowKey)).toEqual(['module:3186:230', 'drone:2488:']);
   });
 
-  /** `weaponResult` plus the given attributes on the item, and on its charge. */
   function rangedResult(own: Record<number, number>, charge?: Record<number, number>) {
     const toMap = (values: Record<number, number>) =>
       new Map(Object.entries(values).map(([id, value]) => [Number(id), { value }] as const));
@@ -554,7 +549,6 @@ describe('extractOffense', () => {
     };
   }
 
-  /** A strip miner, cap booster or disruptor: takes a charge, has no rate of fire. */
   function optionalChargeResult(chargeGroup: number) {
     return {
       attributes: new Map([
@@ -573,9 +567,9 @@ describe('extractOffense', () => {
     const offense = extractOffense(
       [empty(17912), empty(2024), empty(2109), { ...BLASTER, chargeTypeId: undefined }],
       [
-        optionalChargeResult(482), // Modulated Strip Miner II: mining crystals
-        optionalChargeResult(87), // Medium Capacitor Booster II: cap booster charges
-        optionalChargeResult(909), // Tracking Disruptor II: its scripts
+        optionalChargeResult(482),
+        optionalChargeResult(87),
+        optionalChargeResult(909),
         chargeSlotResult('active'),
       ],
       null
@@ -624,11 +618,6 @@ describe('extractOffense', () => {
     expect(offense.chargelessWeaponCount).toBe(0);
   });
 
-  /**
-   * A loaded weapon's firing and magazine, as the pinned engine reports it: a
-   * launcher carries only a rate of fire (no `cycleTime`), and a laser has no
-   * `chargeRate` at all — both read off a live run, 2026-09-29.
-   */
   function magazineWeapon(
     dps: number,
     magazine: { rateOfFire: number; chargeAmount?: number; chargeRate?: number; reload: number },
@@ -725,7 +714,6 @@ describe('extractOffense', () => {
       null
     );
 
-    // 10 × 0.5 (100 s running, 100 s reloading) + 30 × 1 (never reloads).
     expect(offense.weapons[0].count).toBe(2);
     expect(offense.weapons[0].sustainedDps).toBeCloseTo(35, 9);
     expect(offense.sustainedDps).toBeCloseTo(35, 9);
@@ -745,7 +733,6 @@ describe('extractOffense', () => {
     expect(offense.weapons[0].sustainedDps).toBeCloseTo(10 * (100 / 150), 9);
     expect(offense.weapons[0].overheated?.sustainedDps).toBeCloseTo(12.5 * (80 / 130), 9);
     expect(offense.weapons[1].overheated).toBeNull();
-    // The five drones count at their own sustained figure in the overheated total.
     expect(offense.overheated?.sustainedDps).toBeCloseTo(12.5 * (80 / 130) + 24 * 5, 9);
   });
 
@@ -760,8 +747,6 @@ describe('extractOffense', () => {
   });
 
   it('does not count a charge-taking module as chargeless when a charge is already loaded', () => {
-    // e.g. a mining laser with a crystal fitted: it deals no damage (not a
-    // weapon), so it must not be mistaken for a weapon missing its charge.
     const offense = extractOffense(
       [{ typeId: 4001, chargeTypeId: 5001, quantity: 1, isDrone: false }],
       [chargeSlotResult('active')],
@@ -850,7 +835,6 @@ describe('unheatedIfChanged', () => {
 
 describe('alignTimeSeconds', () => {
   it('is the game’s align time: ln 4 × inertia × mass in millions of kg', () => {
-    // A 14,700 t cruiser at 0.51 inertia aligns in about 10.4 s.
     expect(alignTimeSeconds(14_700_000, 0.51)).toBeCloseTo(10.393, 3);
   });
 
@@ -908,7 +892,6 @@ describe('extractDroneLimits', () => {
 
 describe('extractFittingStats — warp speed', () => {
   it('is base warp speed (1281) times the hull’s warp speed multiplier (600), in AU/s', () => {
-    // Literal ids: a Rifter's base is 1 and its multiplier 5 — the base alone is 1 on every hull.
     const ship = new Map([
       [1281, { value: 1 }],
       [600, { value: 5 }],
@@ -958,7 +941,6 @@ describe('extractCapacitorBudget', () => {
       running(1, { capacitorPeakLoad: 20 }),
       running(2, { capacitorPeakLoad: -400 / 12, capacitorInjectionAmount: 400, cycleTime: 12000 }),
       running(3, { capacitorPeakLoad: -7.2 }),
-      // Online, not running: draws nothing whatever its figure says.
       running(4, { capacitorPeakLoad: 50 }, { state: 'online' }),
     ];
     const budget = extractCapacitorBudget(
@@ -991,12 +973,10 @@ describe('extractCapacitorBudget', () => {
       [booster.result],
       attrs({ capacitorPeakRecharge: 30 })
     );
-    // 1200 GJ over three 12 s cycles and a 10 s reload: 26.1 GJ/s, not 33.3.
     expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
   });
 
   it('averages a loaded ancillary armor repairer’s draw over its reload', () => {
-    // Medium AAR: eight 9 s cycles of paste, then a 60 s reload — duty 72/132.
     const aar = running(
       33076,
       {
@@ -1066,9 +1046,7 @@ describe('extractCapBoosterFigures', () => {
     const figures = extractCapBoosterFigures(items, ship, results, [0, 2]);
     expect(figures?.injection).toBe(400);
     expect(figures?.boostsPerLoad).toBe(3);
-    // Two boosters, each 1200 GJ over three 12 s cycles and a 10 s reload.
     expect(figures?.gjPerSecond).toBeCloseTo((2 * 1200) / 46, 6);
-    // The reloads cost injection, so the headline is the stats panel's reload-aware one, not the engine's 62%.
     expect(figures?.capacitor).toEqual(extractFittingStats(items, ship, results).capacitor);
     expect(figures?.capacitor).not.toEqual({ stable: true, stablePercentage: 62 });
   });
@@ -1125,7 +1103,6 @@ describe('extractTank', () => {
   it('reads burst per layer off the ship and sustained from the local repairers, scaled to EHP/s', () => {
     const modules = [
       running(1, { shieldBoostRate: 40, capacitorPeakLoad: 20 }),
-      // A remote armor repairer: it has a range, and what it repairs is someone else's.
       running(2, { armorRepairRate: 50, capacitorPeakLoad: 10, maxRange: 6000 }),
     ];
     const tank = extractTank(
@@ -1142,11 +1119,9 @@ describe('extractTank', () => {
     );
 
     expect(tank.burst).toEqual({ shield: 40, armor: 0, hull: 0 });
-    // 10 GJ/s go to the remote rep, 10 are left for the booster's 20.
     expect(tank.capFraction).toBeCloseTo(0.5, 6);
     expect(tank.sustained.shield).toBeCloseTo(20, 6);
     expect(tank.passiveShield).toBe(5);
-    // Shield EHP/HP is 2: burst 80 + passive 10; sustained 40 + 10.
     expect(tank.burstEffective).toBeCloseTo(90, 6);
     expect(tank.sustainedEffective).toBeCloseTo(50, 6);
   });
@@ -1172,7 +1147,6 @@ describe('extractTank', () => {
       layers
     );
     const duty = 72 / 132;
-    // 10 GJ/s of recharge against an averaged 30 × duty draw, not the full 30.
     expect(tank.capFraction).toBeCloseTo(10 / (30 * duty), 6);
     expect(tank.sustained.armor).toBeCloseTo(78 * duty * tank.capFraction, 6);
   });
@@ -1182,12 +1156,10 @@ describe('extractTank', () => {
     const tank = extractTank(
       [rep.item],
       [rep.result],
-      // 30 HP/s of its own, 200 HP/s landing from a logistics ship.
       attrs({ armorRepairRate: 230, capacitorPeakRecharge: 5, capacitorPeakLoad: 10 }),
       layers
     );
     expect(tank.burst.armor).toBe(230);
-    // Its own rep gets half the capacitor it needs; the incoming reps all land.
     expect(tank.sustained.armor).toBeCloseTo(15 + 200, 6);
   });
 
@@ -1235,11 +1207,9 @@ describe('extractTank', () => {
     const tank = extractTank(
       [booster.item, rep.item],
       [booster.result, rep.result],
-      // The engine nets the booster at its full rate: 40 − 33.3.
       attrs({ armorRepairRate: 60, capacitorPeakRecharge: 10, capacitorPeakLoad: 40 - 400 / 12 }),
       layers
     );
-    // Recharge 10 + 1200/46 injected feeds 36.1 of the rep's 40 GJ/s.
     expect(tank.capFraction).toBeCloseTo((10 + 1200 / 46) / 40, 6);
     expect(tank.sustained.armor).toBeCloseTo((60 * (10 + 1200 / 46)) / 40, 6);
   });
@@ -1334,7 +1304,6 @@ describe('extractFittingStats resources', () => {
       fuelTypeId: 16274,
       fuelPerLightYear: 3000,
     });
-    // Every hull reads the consumption default; only the range says there's a drive.
     expect(
       extractFittingStats([], attrs({ jumpDriveConsumptionAmount: 1000 }), []).jumpDrive
     ).toBeNull();

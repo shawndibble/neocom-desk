@@ -11,16 +11,11 @@ import { formatCount } from '@/lib/formatCount';
 
 interface NowTrainingCardProps {
   row: QueueRowView;
-  /** The level queued right behind this one, if any. */
   next?: QueueRowView;
   catalog: SkillCatalog;
   nowMs: number;
 }
 
-/**
- * The level training right now, big: what, how long, how far along. The one
- * thing a pilot opens this page for.
- */
 export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();

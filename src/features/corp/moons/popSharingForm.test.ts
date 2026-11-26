@@ -26,7 +26,6 @@ describe('popSharingForm', () => {
     expect(
       moonPatch({ notes: 'x', showOre: false }, settings, new Set(['popTime', 'notes']))
     ).toEqual({ set: { popTime: 'auto-fracture' }, clear: ['showOre'] });
-    // Unchanged: nothing to send.
     expect(moonPatch({ notes: 'x' }, settings, new Set(['notes']))).toEqual({ set: {}, clear: [] });
   });
 

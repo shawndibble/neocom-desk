@@ -40,7 +40,6 @@ function Harness() {
 }
 
 async function openSheet() {
-  // jsdom's `matchMedia` never matches; the bottom sheet needs the narrow query to.
   stubViewport(NARROW_QUERY);
   const user = userEvent.setup();
   render(<Harness />);
@@ -50,7 +49,6 @@ async function openSheet() {
 
 afterEach(async () => {
   cleanup();
-  // Let each test's deferred history cleanup land before the next one starts.
   await waitFor(() => expect(overlayEntry()).toBeUndefined());
   window.history.replaceState(null, '');
 });

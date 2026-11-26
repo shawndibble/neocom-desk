@@ -18,7 +18,6 @@ describe('Bars on a zero axis', () => {
     const { container } = render(<Chart model={base} size="M" />);
     const bars = [...container.querySelectorAll<HTMLElement>('span > i')];
     expect(bars).toHaveLength(3);
-    // The loss starts at the floor and is the only bar in the negative hue.
     expect(bars[1]!.style.bottom).toBe('0%');
     expect(bars[1]!.style.backgroundColor).toContain('isk-neg');
     expect(bars[0]!.style.backgroundColor).toContain('accent');

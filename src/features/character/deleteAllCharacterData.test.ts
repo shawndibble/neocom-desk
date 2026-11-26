@@ -32,8 +32,6 @@ const pushMock = vi.hoisted(() => ({
   scheduleProjectionRebuild: Object.assign(vi.fn(), { cancel: vi.fn() }),
   unregisterProjectionRegistration: vi.fn(async () => {}),
 }));
-// The real one reaches Firebase, whose heartbeat database then stays open and
-// blocks the next test's delete until DATABASE_DELETE_TIMEOUT_MS.
 const alertsGrantMock = vi.hoisted(() => ({
   deleteAlertGrantsBestEffort: vi.fn<(characterIds: number[]) => Promise<void>>(async () => {}),
 }));
@@ -60,7 +58,6 @@ async function seedCharacter(characterId: number): Promise<void> {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  // `deleteAllLocalData` deletes the database and leaves it closed.
   if (!db.isOpen()) await db.open();
   syncMock.purgeCharacterRemoteData.mockImplementation(async () => {});
   await Promise.all([
@@ -78,7 +75,6 @@ describe('purgeAllRemoteCharacterData', () => {
     await seedCharacter(2);
     let inFlight = 0;
     syncMock.purgeCharacterRemoteData.mockImplementation(async (id) => {
-      // One Firebase session is shared, so the purges must not overlap.
       expect(++inFlight).toBe(1);
       expect(await db.tokens.get(id)).toBeDefined();
       await Promise.resolve();
@@ -233,7 +229,6 @@ describe('deleteAllLocalData', () => {
   it('fails, with every login already gone, when the database delete never finishes', async () => {
     await seedCharacter(1);
     const remove = vi.spyOn(db, 'delete').mockReturnValue(new Promise(() => {}) as never);
-    // Only the timeout is faked: fake-indexeddb schedules on the other timers.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       let settled = false;
@@ -241,8 +236,6 @@ describe('deleteAllLocalData', () => {
         settled = true;
       });
       const failed = expect(done).rejects.toThrow(/blocked/);
-      // The steps before the delete are real IndexedDB work; keep advancing
-      // until the delete's own timeout has been armed and has fired.
       while (!settled) await vi.advanceTimersByTimeAsync(DATABASE_DELETE_TIMEOUT_MS);
       await failed;
     } finally {

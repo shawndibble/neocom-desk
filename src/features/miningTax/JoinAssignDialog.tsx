@@ -27,7 +27,6 @@ import { Well } from '@/components/ui/Well';
 
 export interface JoinCandidate {
   row: MoonMiningTaxRow;
-  /** `null` when this date is still unassigned. */
   assignment: MiningTaxAssignmentRecord | null;
 }
 
@@ -35,27 +34,10 @@ interface JoinAssignDialogProps {
   open: boolean;
   onClose: () => void;
   primary: JoinCandidate;
-  /** Every other same-system, same-character, ungrouped, assignable row — already filtered for the merge rule (an already-assigned `primary` only ever lists an unassigned candidate or one sharing its Payee and tax %). */
   candidates: readonly JoinCandidate[];
-  /**
-   * Whether `candidates` arrives as a list to pick from or as one already
-   * chosen. `'none'` (the default) is the row-detail entry point: "join this
-   * with something", every same-system row on offer. `'all'` is the selection
-   * toolbar's Combine, where the pilot has already ticked exactly what they
-   * meant — the list becomes a confirmation they can still untick from.
-   */
   initialSelection?: 'none' | 'all';
   payees: readonly PayeeRecord[];
   typeNames: ReadonlyMap<number, string>;
-  /**
-   * Prices at a given Payee's trade hub, on a given date. Resolved here
-   * rather than passed as one map, because the Payee a join settles on is
-   * decided *in* this dialog: either the terms an already-assigned member
-   * locks in, or the one the pilot picks below — and each Payee may bill at
-   * its own hub. The date varies per member too (a join's whole purpose is
-   * combining entries from *different* mined dates), so each still-unassigned
-   * member is priced at its own `entry.date`, not one shared date.
-   */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
   onJoined: () => void;
@@ -65,27 +47,6 @@ function candidateKey(candidate: JoinCandidate): string {
   return candidate.assignment?.id ?? `${candidate.row.entry.date}:unassigned`;
 }
 
-/**
- * Joins the currently-open row with one or more compatible same-system entries
- * into one combined obligation (issue #523's "join entries" — a mining
- * session spanning midnight UTC shows up as two Mining Ledger Entries even
- * though a corp's own billing treats it as one; issue #539 lifted the
- * two-member cap, which was only ever in this picker — `joinAssignments` and
- * `flatten` were N-ary from the start).
- *
- * Deliberately no editable value fields here (unlike `AssignDialog`): once
- * two dates are joined each keeps its own independently hub-priced value —
- * a blended, hand-typed total across two different ledger entries has no
- * single obvious meaning. A correction after the fact goes through the
- * combined entry's Edit (`EntryEditDialog`), which keeps each day's own
- * value, not this dialog.
- *
- * Payee/tax % are only pickable when *neither* side is assigned yet; the
- * moment either side already has an Assignment, joining means adopting that
- * Assignment's Payee/tax % for the whole group (the still-unassigned side
- * gets a fresh Assignment created against it) rather than renegotiating
- * terms an existing obligation already settled.
- */
 export function JoinAssignDialog({
   open,
   onClose,
@@ -99,9 +60,6 @@ export function JoinAssignDialog({
   onJoined,
 }: JoinAssignDialogProps) {
   const { t } = useTranslation();
-  // Lazily initialised, never re-synced: the dialog is mounted fresh on each
-  // open (the route renders it conditionally), so there is no stale-props case
-  // to reconcile.
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() =>
     initialSelection === 'all' ? new Set(candidates.map(candidateKey)) : new Set()
   );
@@ -110,14 +68,6 @@ export function JoinAssignDialog({
   const { pending: saving, error: saveError, run } = useLedgerAction();
 
   const selected = candidates.filter((c) => selectedKeys.has(candidateKey(c)));
-  /**
-   * The merge rule, from the same place the selection toolbar gets it.
-   * `candidates` is pre-filtered against the *primary*, which is not enough
-   * once several can be ticked at once: when the primary is still unassigned
-   * that filter passes every assigned candidate through, so two of them on
-   * different Payees could otherwise be joined and one side's terms silently
-   * dropped.
-   */
   const agreed = agreedTerms(
     [primary, ...selected]
       .map((c) => c.assignment)
@@ -153,18 +103,12 @@ export function JoinAssignDialog({
   async function handleJoin() {
     if (!canJoin || effectivePayeeId === null || effectivePayeeId === undefined) return;
     const hubId = payees.find((p) => p.id === effectivePayeeId)?.hubId;
-    // A member's ore claimed since this dialog's snapshot also lands on
-    // `onJoined`: refresh rather than create a second claim on it.
     await run(
       () =>
         combine(
           [primary, ...selected].map(memberInput),
           effectivePayeeId,
           effectiveTaxPct,
-          // Every member of a join shares one Payee (that is the merge rule), so
-          // one hub prices the whole group — the Payee's, never the device's —
-          // but each member keeps its own mined date, hence a resolver rather
-          // than one flat map.
           (date) => pricesFor(hubId, date)
         ),
       onJoined

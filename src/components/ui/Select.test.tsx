@@ -25,9 +25,6 @@ function Harness() {
 }
 
 describe('Select', () => {
-  // Tailwind v4's `outline-none` sets `--tw-outline-style: none`, which the
-  // `focus-visible:outline-2` ring then inherits — so the two together draw
-  // nothing and a keyboard user cannot see where focus is (WCAG 2.4.7).
   it('shows the accent focus ring on keyboard focus', () => {
     render(<Harness />);
     const el = screen.getByRole('combobox', { name: 'Region' });
@@ -84,12 +81,6 @@ describe('Select', () => {
     expect(screen.getByRole('combobox', { name: 'Region' })).toHaveTextContent('Domain');
   });
 
-  /**
-   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
-   * layer with everything outside it inert. A list portalled to `document.body`
-   * — Radix's default — would render behind that and take no clicks, which is
-   * the whole reason `SelectContent` reads a container off context.
-   */
   it('portals its list inside a Modal, not to the body', async () => {
     const user = userEvent.setup();
     render(

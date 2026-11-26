@@ -1,19 +1,3 @@
-/**
- * The active Character's corporation as a second owned-stock source (issue
- * #798): a "Corp Assets" toggle on a Build Plan folds the corp's hangars in
- * alongside the existing all-account personal detection, when the active
- * Character can read them (corp Director only — `canReadAssets`).
- *
- * Kept out of `useDetectedOwnedStock.ts`'s `useOwnedStockSnapshot` on
- * purpose: that hook loads once, above `BuildPlanDetail`'s `key={plan.id}`
- * remount boundary, because personal detection pools every authenticated
- * Character regardless of which plan is open. Corp scope is different — it
- * has to re-resolve whenever the *active* Character (and so, possibly, its
- * corporation) changes, not when the open plan changes — so it gets its own
- * hook, loaded independently above the same boundary in `Industry.tsx` and
- * merged into `detectOwnedStock`'s input only for a plan whose own
- * `includeCorpAssets` flag is on.
- */
 import { useCallback, useEffect } from 'react';
 import type { OwnedStockSource } from '@/engine/industry/ownedStock';
 import { loadCorporationAssets } from '@/features/corp/assets';
@@ -25,16 +9,9 @@ import { usePublicInfo } from '@/stores/publicInfo';
 
 export interface CorpOwnedStockResult {
   source: OwnedStockSource;
-  /** The corp's asset list was capped or missing pages — its contribution is a floor, not exact. */
   truncated: boolean;
 }
 
-/**
- * The active Character's corporation's assets as an owned-stock source, or
- * `null` when the read failed outright (offline, or nothing cached yet) —
- * distinct from an empty hangar, which is a real, present source with no
- * assets in it.
- */
 export async function loadCorpOwnedStockSource(
   characterId: number,
   corporationId: number
@@ -48,17 +25,10 @@ export async function loadCorpOwnedStockSource(
 }
 
 export interface CorpOwnedStockState {
-  /** `null` while unavailable, still loading, or the read failed outright. */
   source: OwnedStockSource | null;
   corporationId: number | null;
   corporationName: string | null;
-  /**
-   * Whether the active Character can read corp assets at all — gates the
-   * Build Plan's "Corp Assets" toggle itself, not just whether a source is
-   * currently in hand.
-   */
   available: boolean;
-  /** The corp's asset list was capped or missing pages. */
   incomplete: boolean;
 }
 
@@ -70,12 +40,6 @@ const UNAVAILABLE: CorpOwnedStockState = {
   incomplete: false,
 };
 
-/**
- * Call once, above whatever remount boundary switches the open Build Plan —
- * same rule as `useOwnedStockSnapshot`. Re-resolves whenever the active
- * Character (or its corporation) changes; `loadCorporationAssets` is
- * cache-first, so that re-resolution is cheap.
- */
 export function useCorpOwnedStockSource(): CorpOwnedStockState {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const corporationId = useActiveCorporationId();
@@ -94,9 +58,6 @@ export function useCorpOwnedStockSource(): CorpOwnedStockState {
     if (activeCharacterId !== null) void loadPublicInfo(activeCharacterId);
   }, [activeCharacterId, loadPublicInfo]);
 
-  // A read that cannot complete is simply no corp contribution, the same
-  // way a failed personal Character read is in `loadOwnedStockSnapshot` —
-  // detection degrades rather than erroring.
   const loader = useCallback(
     () => loadCorpOwnedStockSource(activeCharacterId ?? 0, corporationId ?? 0).catch(() => null),
     [activeCharacterId, corporationId]

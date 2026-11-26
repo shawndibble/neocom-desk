@@ -112,7 +112,6 @@ describe('looksLikeId', () => {
   });
 
   it('rejects what can never be an id', () => {
-    // Dogma parks an unused reference slot at 0, and ESI sends floats.
     expect(looksLikeId(0)).toBe(false);
     expect(looksLikeId(-1)).toBe(false);
     expect(looksLikeId(1.5)).toBe(false);

@@ -8,11 +8,9 @@ import { GrantAgainBanner } from './GrantAgainBanner';
 import { fixtureView, nameOf } from './ownerViewFixtures';
 
 const noop = async () => undefined;
-/** The fixtures' names plus the moon owner corporation (98) and a player payee (77). */
 const names = (id: number) =>
   id === 98 ? 'Ashfall Mining Collective' : id === 77 ? 'Kestrel Vane' : nameOf(id);
 
-/** @summary The moon owner's page (Page B): statement first, who mined, payments and rate. */
 const meta = {
   title: 'corp/MoonOwnerView',
   component: MoonOwnerView,
@@ -32,7 +30,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Page B with the rate override line ("Rate set to 8% by ... You asked for 6%."). */
 export const Normal: Story = {};
 
 const twoMonths = fixtureView();
@@ -44,10 +41,8 @@ twoMonths.days = [
   },
 ];
 
-/** @summary Mining across two months: the Month filter in the Mined header narrows the day-by-day table. */
 export const TwoMonths: Story = { args: { view: twoMonths } };
 
-/** @summary Refineries through the label chain: a label either side set, the structure name the grant read, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
 export const RefineryLabels: Story = {
   args: {
     view: {
@@ -75,12 +70,10 @@ export const RefineryLabels: Story = {
   },
 };
 
-/** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change. */
 export const PayeeSet: Story = {
   args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
 };
 
-/** @summary The accounting corporation changed the payee (#4653): the strip with Dismiss, and "Set by … on …" on the line. */
 export const PayeeChangedByAccounting: Story = {
   args: {
     view: fixtureView({
@@ -90,7 +83,6 @@ export const PayeeChangedByAccounting: Story = {
   },
 };
 
-/** @summary This side set the payee: "Set by you on …", no strip. */
 export const PayeeSetByYou: Story = {
   args: {
     view: fixtureView({
@@ -100,7 +92,6 @@ export const PayeeSetByYou: Story = {
   },
 };
 
-/** @summary A grant from before refinery names were read (#4654): the optional Grant again prompt above the page. */
 export const RefineryNamesNotGranted: Story = {
   args: {
     view: fixtureView({ refineryNamesGranted: false }),
@@ -108,7 +99,6 @@ export const RefineryNamesNotGranted: Story = {
   },
 };
 
-/** @summary The ledger cannot be read: stale banner with Reconnect above the page. */
 export const Stale: Story = {
   args: {
     view: fixtureView({ staleSince: Date.UTC(2026, 9, 11) }),
@@ -116,7 +106,6 @@ export const Stale: Story = {
   },
 };
 
-/** @summary Compensated another way: the note, mined volume and value, nothing owed in ISK. */
 export const SettledOtherwise: Story = {
   args: {
     view: fixtureView({
@@ -127,7 +116,6 @@ export const SettledOtherwise: Story = {
   },
 };
 
-/** @summary After leaving with a balance still owed: card, history, payouts. */
 export const AfterLeavingOwed: Story = {
   args: {
     view: fixtureView({ status: 'left', leftAt: Date.UTC(2026, 9, 12) }),
@@ -142,7 +130,6 @@ export const AfterLeavingOwed: Story = {
   },
 };
 
-/** @summary After leaving and settled: the card folds to one line with Dismiss. */
 export const AfterLeavingSettled: Story = {
   args: {
     view: fixtureView({ status: 'left', balanceKind: 'even', balanceIsk: 0 }),
@@ -157,7 +144,6 @@ export const AfterLeavingSettled: Story = {
   },
 };
 
-/** @summary No rate set: nothing is owed and the page says so. */
 export const NoRate: Story = {
   args: {
     view: fixtureView({
@@ -171,7 +157,6 @@ export const NoRate: Story = {
   },
 };
 
-/** @summary The accounting corporation started a removal: the strip, with End it now for the moon owner's officers. */
 export const RemovalPending: Story = {
   args: {
     view: fixtureView({ status: 'pending-removal' }),

@@ -10,7 +10,6 @@ const KIND: Record<number, 'turret' | 'launcher' | null> = {
 };
 let inFlight = 0;
 let maxInFlight = 0;
-// 99 stands for a type ESI couldn't supply.
 vi.mock('./hardpointKinds', () => ({
   loadHardpointKind: async (typeId: number) => {
     inFlight += 1;
@@ -51,15 +50,12 @@ describe('useFittingHardpoints', () => {
     const { result } = renderHook(() => useFittingHardpoints(RIFTER));
     await waitFor(() => expect(result.current.kindOf(2889)).toBe('turret'));
     expect(result.current.kindOf(10631)).toBe('launcher');
-    // A mid-slot type is never looked up; a high-slot utility module would be null.
     expect(result.current.kindOf(3244)).toBeUndefined();
   });
 
   it('stays unknown while a high-slot type can’t be fetched, rather than showing its pip free', async () => {
     const { result } = renderHook(() => useFittingHardpoints(WITH_UNKNOWN));
-    // What is known still badges its tile. Waited for, not slept on: the lookup is async and a fixed delay raced it on a loaded CI runner.
     await waitFor(() => expect(result.current.kindOf(2889)).toBe('turret'));
-    // The unfetchable type keeps the counts unknown.
     expect(result.current.used).toBeNull();
   });
 
@@ -70,8 +66,6 @@ describe('useFittingHardpoints', () => {
 
   it('caps how many high-slot types it looks up at once (N+1 fan-out)', async () => {
     maxInFlight = 0;
-    // More distinct high-slot types than the fan-out's concurrency cap, so an
-    // unbounded `Promise.all` would fire them all at once.
     const many: Fitting = {
       ...RIFTER,
       modules: Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, index) => ({

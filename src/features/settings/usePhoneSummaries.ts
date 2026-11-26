@@ -14,11 +14,6 @@ import { useAssumedTe } from '@/features/industry/assumedTe';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 
-/**
- * One line per section for the phone list, from settings already in memory —
- * no network. A section with nothing cheap to say (Permissions, App & backup, Log out
- * & delete, Activity Log, FAQ) gets none.
- */
 export function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
   const { t } = useTranslation();
   const scale = useFontScale((state) => state.value);
@@ -29,7 +24,6 @@ export function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> 
   const characterFilter = useDefaultCharacterFilter((state) => state.value);
   const darkAfterDays = useDarkThreshold((state) => state.value);
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
-  // Only the Travel panel hydrates this otherwise, and the phone list does not mount it.
   useHydratedStore(useAvoidedSystems);
   const routePreference = useDefaultRoutePreference((state) => state.value);
   useHydratedStore(useDefaultRoutePreference);

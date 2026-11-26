@@ -1,14 +1,3 @@
-/**
- * Fitting Price breakdown at 390px (#3682): name, Qty, Unit price and Total
- * hung off a compact `responsive="table"` in a ~366px modal body. On a phone
- * the unit price is shed (`phoneHidden`; Total / Qty gives it) and the item
- * name is pinned (`stickyStart`), so the table never scrolls sideways and the
- * full ISK total stays whole. From `sm` up all four columns stay.
- *
- * Playwright rather than jsdom: column hiding and overflow are CSS a real
- * engine has to evaluate. The Price section waits on the dogma engine's WASM
- * + SDE download, so it gets the cold-runner headroom the other fitting specs use.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -19,7 +8,6 @@ const TABLET = { width: 768, height: 1024 };
 
 const STATS_TIMEOUT = { timeout: 30_000 };
 
-/** Two guns at 250M each: a 500M ISK line, the widest figure a real fit meets. */
 const EFT = [
   '[Rifter, Appraisal Test]',
   '125mm Gatling AutoCannon I',
@@ -34,7 +22,6 @@ async function openBreakdown(page: Page, size: { width: number; height: number }
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   await page.getByLabel('Link or text').fill(EFT);
   await page.getByRole('button', { name: 'Load', exact: true }).click();
-  // Below desktop the Ring, the List and the stats are one row of tabs.
   await page.getByRole('tab', { name: 'Stats', exact: true }).click();
   await page.getByRole('button', { name: /^Price/ }).click();
   await page.getByRole('button', { name: 'Appraise' }).click(STATS_TIMEOUT);

@@ -19,12 +19,6 @@ import { rangeLines } from '../rangeText';
 import { useFittingItemActions } from '../fittingItemActions';
 import { fmt0, fmt1 } from './fixedFormat';
 
-/**
- * A row's DPS and volley — under "Overheat all", in the warning tone where
- * heat changed them. `figures` picks the same row out of either calculation.
- * Sustained DPS (with reload), where reloading costs anything, is a dim
- * `line` under the figures (the total) or their `tooltip` (a weapon row).
- */
 function DamageFigures({
   stats,
   figures,
@@ -35,15 +29,12 @@ function DamageFigures({
   stats: FittingStats;
   figures: (stats: FittingStats) => DamageFiguresValue;
   sustained?: 'tooltip' | 'line';
-  /** The fit's total: a previewed change to its DPS, volley or sustained DPS shows in place. */
   previewed?: boolean;
-  /** A spool weapon's row: its DPS reads unspooled → spooled, its volley says it is unspooled. */
   spool?: SpoolFigures;
 }) {
   const { t } = useTranslation();
   const sustainedLabel = (s: FittingStats) =>
     t('fittings.stats.sustainedDps', { value: fmt1(figures(s).sustainedDps) });
-  // Only where reloading costs something as shown: never lasers or drones.
   const { dps, sustainedDps } = figures(stats);
   const reloads = fmt1(sustainedDps) !== fmt1(dps);
   const tooltip = sustained === 'tooltip' && reloads ? sustainedLabel(stats) : undefined;
@@ -94,7 +85,6 @@ function DamageFigures({
   );
 }
 
-/** "spools up in ~2 min" — seconds under a minute and a half, whole minutes beyond. */
 function spoolTimeText(t: TFunction, seconds: number): string {
   return seconds < 90
     ? t('fittings.stats.spoolsUpSeconds', { count: Math.max(1, Math.round(seconds)) })
@@ -104,10 +94,6 @@ function spoolTimeText(t: TFunction, seconds: number): string {
 const FIRING: readonly FittingItemState[] = ['active', 'overload'];
 const STATE_ORDER: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
 
-/**
- * The fitted modules an Offense row stands for — its type, holding its
- * charge, firing — with the state they share and the highest all can reach.
- */
 function weaponGroup(
   row: WeaponRow,
   fitting: Fitting,
@@ -140,7 +126,6 @@ function weaponGroup(
   };
 }
 
-/** The Offense section's rows — a weapon group, drone stack or squadron each — and their total. */
 export function OffenseRows({
   stats,
   typeName,
@@ -166,7 +151,6 @@ export function OffenseRows({
           name: typeName(row.typeId),
         });
         const hasMenu = group !== null && group.modules.length > 0;
-        // Its charge and reach on one dim line, the reach as the HUD tooltip reads it (`rangeText.ts`).
         const detail = joinDetail([
           row.chargeTypeId === undefined ? undefined : typeName(row.chargeTypeId),
           row.isDrone

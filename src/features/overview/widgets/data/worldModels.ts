@@ -1,10 +1,3 @@
-/**
- * Builders for the space and ledger kinds: incursions, realized profit and
- * mining yield. Same contract as `models.ts`: pure, derived at render time.
- * Each builds its own Table (real columns, priorities as `tableModel.ts`
- * reads them), a Number that is a headline plus one fact the headline lacks,
- * and a chart that names what it draws.
- */
 import { DAY_MS } from '@/lib/age';
 import { eveClock } from '@/lib/eveTime';
 import { utcDay } from '@/engine/localDay';
@@ -41,8 +34,6 @@ const iskCell = (isk: number, text = formatIskCompactSigned(isk)): TableCell => 
   iskAmount: isk,
 });
 
-// --- Incursions -------------------------------------------------------------------
-
 function incursionSystem(t: Translate, data: IncursionsBoardData, id: number): string {
   return data.systemNames.get(id) ?? t('travel.stops.unnamed', { id });
 }
@@ -54,7 +45,6 @@ export const incursions: Builder = (feeds, { t }) => {
   if (!data) return blank(to, statusOf(feed));
   const nearest = data.rows[0];
   const tone = incursionsSeverity(data) ?? 'clear';
-  // Jumps to the nearest is the question; with no origin to count from, the active count is all there is.
   const number: NumberModel =
     nearest && nearest.jumps !== null
       ? {
@@ -140,9 +130,6 @@ export const incursions: Builder = (feeds, { t }) => {
   };
 };
 
-// --- Realized profit --------------------------------------------------------------
-
-/** "+12M vs the previous 30 days": a Profit window against the one before it. */
 export function vsPrevious(t: Translate, delta: number, range: number): NumberSecondary {
   return {
     text: t('overview.widgets.profit.vsPrevious', {
@@ -154,7 +141,6 @@ export function vsPrevious(t: Translate, delta: number, range: number): NumberSe
   };
 }
 
-/** The logged runs in the window, the window before it and each product's line, as both Profit sources read them. */
 function readBuilds(data: ProfitWidgetData, now: number, range: number) {
   const inRange = data.runs.filter(
     (run) => run.loggedAt >= now - range * DAY_MS && run.loggedAt <= now
@@ -175,7 +161,6 @@ function readBuilds(data: ProfitWidgetData, now: number, range: number) {
   return { inRange, previous, total, products, nameOf };
 }
 
-/** The Builds side of Profit on Both; no earlier runs is no window before. */
 export function buildsSource(data: ProfitWidgetData, now: number, range: number): SourceProfit {
   const { previous, total, products, nameOf } = readBuilds(data, now, range);
   return {
@@ -190,7 +175,6 @@ export function buildsSource(data: ProfitWidgetData, now: number, range: number)
   };
 }
 
-/** Profit on Builds: what the logged industry runs made. */
 export const buildProfit: Builder = (feeds, { t, now, range }) => {
   const feed = feeds.profit;
   const data = feed?.data ?? null;
@@ -207,7 +191,6 @@ export const buildProfit: Builder = (feeds, { t, now, range }) => {
     buckets
   );
 
-  // The headline is the window's total; against the window before it is the fact it lacks. No earlier runs, no claim.
   const secondary =
     previous.length > 0
       ? vsPrevious(t, total - previous.reduce((sum, run) => sum + run.profit, 0), range)
@@ -290,8 +273,6 @@ export const buildProfit: Builder = (feeds, { t, now, range }) => {
           },
   };
 };
-
-// --- Mining yield -----------------------------------------------------------------
 
 export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) => {
   const feed = feeds.miningYield;
@@ -380,7 +361,6 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
       value: formatIskCompact(average),
       iskAmount: average,
       unit: t(`${D}.miningYield.unit`),
-      // The headline is the average; the best day is the fact it lacks. The history caveat lives in the chart caption.
       secondary:
         best > 0
           ? { text: t(`${D}.miningYield.bestDay`, { value: formatIskCompact(best) }) }
@@ -423,16 +403,12 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
   };
 };
 
-// --- Skyhook raids ---------------------------------------------------------------
-
-/** Stand-in until the registry loads `sovRaidsModel.ts` (`loadBuild`): loading even over a restored snapshot; a failed read still shows failed. */
 const sovRaidsPending: Builder = (feeds) =>
   blank(
     '/travel/route',
     statusOf(feeds.sovRaids, { loading: !feeds.sovRaids?.error, hasData: false })
   );
 
-/** The game clock: UTC, read from the ticking `now`, so no feed and nothing to wait for. */
 export const eveTime: Builder = (_feeds, { t, now }) => ({
   ...blank(null, {
     hasStaleData: false,
@@ -450,7 +426,6 @@ export const eveTime: Builder = (_feeds, { t, now }) => ({
   summary: t('overview.widgets.eveTime.summary', { time: eveClock(now) }),
 });
 
-/** The kinds built in this file and its siblings, each with the feeds it reads. */
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   eveTime: { feeds: [], scope: 'character', build: eveTime },
   industry: { feeds: ['industry'], scope: 'account', build: industry },
@@ -465,7 +440,6 @@ export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   militaryCampaigns: {
     feeds: ['militaryCampaigns'],
     scope: 'account',
-    // Loading until the real builder lands: it reads the turn-in wording.
     build: (feeds) => blank(null, statusOf(feeds.militaryCampaigns, { loading: true })),
     loadBuild: () => import('./militaryCampaignsModels').then((m) => m.militaryCampaigns),
   },

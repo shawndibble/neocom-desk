@@ -20,7 +20,6 @@ const gate = (id: number): { entry: { kind: 'gate' } } & { systemId: number } =>
 });
 const start = (id: number) => ({ systemId: id, entry: null });
 
-/** 1 -> 2 -> 3. System 2's gates sit `apartAu` apart; the end gates are 1 AU out. */
 function gatesApart(apartAu: number): GatePositions {
   return {
     1: [2, AU_MM, 0, 0],
@@ -81,7 +80,6 @@ describe('tripTime', () => {
     const time = tripTime(rows, [2], gatesApart(10), FAST)!;
     const align = alignTimeSeconds(FAST.massKg, FAST.agility);
     const warp = (au: number) => warpSeconds(au * 149_597_870_700, 5, FAST.maxVelocityMs);
-    // start: 1 AU to its gate; middle: gate to gate, 10 AU; end: 1 AU from its gate.
     const expected = 3 * align + warp(1) + warp(10) + warp(1) + 2 * GATE_SESSION_SECONDS;
     expect(time.warpToZeroSeconds).toBeCloseTo(expected, 0);
   });
@@ -103,7 +101,6 @@ describe('tripTime', () => {
     const through = tripTime(rows, [], gatesApart(10), FAST)!;
     const stop = tripTime(rows, [1], gatesApart(10), FAST)!;
     const align = alignTimeSeconds(FAST.massKg, FAST.agility);
-    // Through: one 10 AU warp. Stop: gate 1 is at the star (0 AU), gate 3 is 10 AU out.
     expect(stop.warpToZeroSeconds - through.warpToZeroSeconds).toBeCloseTo(align, 0);
   });
 

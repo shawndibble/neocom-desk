@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './mutaplasmids.mjs';
 
-// Shaped like CCP's dynamicItemAttributes.jsonl rows (build 3607705): the
-// Decayed and Unstable 500MN Microwarpdrive mutaplasmids, trimmed.
 const DECAYED_MWD = {
   _key: 47299,
   attributeIDs: [
@@ -37,8 +35,8 @@ describe('bakeMutaplasmids', () => {
   it('resolves highIsGood: the row’s own override, else the attribute’s', () => {
     const baked = bakeMutaplasmids([DECAYED_MWD], ATTRIBUTES);
     const [capacitor, speed] = baked.mutaplasmids['47299'].attributes;
-    expect(capacitor.highIsGood).toBe(false); // attribute default
-    expect(speed.highIsGood).toBe(false); // row override beats the attribute's true
+    expect(capacitor.highIsGood).toBe(false);
+    expect(speed.highIsGood).toBe(false);
   });
 
   it('names every mutated attribute by its internal (EFT) name', () => {

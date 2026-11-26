@@ -1,13 +1,7 @@
-/**
- * The onboarding banner must not cover the keyboard-focused control (WCAG
- * 2.4.11 Focus Not Obscured). Asserted on rendered bounding boxes while
- * tabbing through /settings/notifications with the install banner showing.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_NAME } from './support/fixtureData';
 
-// The Install Prompt is mobile-only by user agent, so the page claims to be Android Chrome.
 test.use({
   userAgent:
     'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',

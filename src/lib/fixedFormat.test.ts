@@ -37,7 +37,6 @@ describe('fixed formatters', () => {
     }
     vi.stubGlobal('Intl', { ...Intl, NumberFormat: OldNumberFormat });
     try {
-      // A digit count no other test has built, so the formatter is made fresh.
       expect(fixedFormat(6)(-0.0000001)).toBe('0.000000');
       expect(fixedFormat(6)(-1.5)).toBe('-1.500000');
     } finally {

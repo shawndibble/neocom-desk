@@ -23,7 +23,6 @@ function runOf(marks: readonly Mark[]): FormatRun {
   };
 }
 
-/** The format at the caret, or over everything the selection covers. */
 export function formatStateOfEditor(editor: Editor): FormatState {
   const { selection, doc, storedMarks } = editor.state;
   if (selection.empty) return formatStateOfRuns([runOf(storedMarks ?? selection.$from.marks())]);
@@ -34,11 +33,6 @@ export function formatStateOfEditor(editor: Editor): FormatState {
   return formatStateOfRuns(runs);
 }
 
-/**
- * The selection, the caret, or the whole link they sit in. A caret at a link's
- * edge is outside it (the mark is non-inclusive, as `formatStateOfEditor` reads
- * it); a selection counts as in the link only when wholly within its range.
- */
 export function linkTargetOfEditor(editor: Editor): LinkTarget {
   const { selection, doc } = editor.state;
   const { from, to, empty } = selection;
@@ -68,7 +62,6 @@ export function linkTargetOfEditor(editor: Editor): LinkTarget {
   };
 }
 
-/** The marks (minus any link) of the first character of the range, or at the caret. */
 export function linkCarryMarks(editor: Editor, from: number): { type: string; attrs?: object }[] {
   const { selection, doc, storedMarks } = editor.state;
   const marks =

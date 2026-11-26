@@ -1,14 +1,3 @@
-/**
- * The raw fire a server-pushed event carries (issue #5121): the push's `fire`
- * field, JSON of the same fire the Foreground Poller's diff would have built
- * (`functions/src/serverEvents.ts` builds it). The service worker parses it
- * here, renders it with the app's own copy (`serverEventCopy.ts`) and keys the
- * feed row with `occurrenceKey` — the Foreground Poller's own derivation, so the
- * open app finds the row instead of filing a second one.
- *
- * Strict per event: anything that does not read as that event's fire is null,
- * and the push falls back to the sender's plain title and body.
- */
 import type {
   CommunityJoinRequestFire,
   CommunityMemberJoinedFire,
@@ -87,7 +76,6 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
     characterName: is.string,
     stoppedAt: is.number,
   }),
-  // Lenient on the optional parts: a push without a sender or subject still reads as a new mail.
   newMail: shapeGuard<NewMailPushFire>({
     eventId: is.oneOf(['newMail'] as const),
     characterId: is.number,
@@ -115,10 +103,6 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
   }),
 };
 
-/**
- * The fire inside a push, or null. It must be the event and Character the
- * push itself names: a fire for someone else must never be filed under them.
- */
 export function parseServerEventFire(
   eventId: string,
   characterId: number,

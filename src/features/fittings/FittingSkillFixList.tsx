@@ -1,9 +1,3 @@
-/**
- * Training that makes a Fitting fit — over-budget fixes (`findSkillFixes`), or
- * the skills it is missing: each fix's skill levels, the time they take
- * (prerequisites included) and Add to plan — or the plan that already trains
- * them. Shared by What to train, where it heads the list, and Make it fit.
- */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { SkillFix } from '@/engine/fittings/skillFixes';
@@ -21,28 +15,16 @@ import type { ScheduleEntries } from './useModuleUpgrades';
 
 interface Props {
   fixes: readonly Pick<SkillFix, 'entries'>[];
-  /** The skill catalogue; undefined while it loads. */
   skills: ReadonlyMap<number, EngineSkill> | undefined;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  /** Null before the Character's skills are in. */
   scheduleEntriesFor: ScheduleEntries | null;
-  /** The target Skill Plan; null when the Character has none yet, undefined while plans load. */
   plan: SkillPlanRecord | null | undefined;
-  /** The highest level the plan trains each skill to, prerequisite rows included. */
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => void;
-  /** Why each row fixes the fit; default: it brings the Fitting under budget. */
   reason?: string;
-  /**
-   * The fixes are all needed (missing skills), so they train on one schedule:
-   * each row shows its share, a shared prerequisite counted once, and the rows
-   * add up to the "Missing N skills" total. Otherwise each fix is an
-   * alternative and is timed alone.
-   */
   together?: boolean;
 }
 
-/** Each fix's schedule: its share of one combined schedule, or alone; null before skills load. */
 function fixSchedules(
   fixes: readonly Pick<SkillFix, 'entries'>[],
   scheduleEntriesFor: ScheduleEntries | null,
@@ -59,7 +41,6 @@ function fixSchedules(
   );
 }
 
-/** Quickest to train first; a fix not yet timed last. */
 export function SkillFixList({
   fixes,
   skills,
@@ -78,7 +59,6 @@ export function SkillFixList({
     .map((fix, index) => {
       const scheduled = schedules[index];
       const seconds = scheduled?.reduce((sum, step) => sum + step.seconds, 0) ?? null;
-      // A step for a skill the fix doesn't name is a prerequisite.
       const includesPrerequisites =
         scheduled?.some((step) => !fix.entries.some((e) => e.skillTypeID === step.skillTypeID)) ??
         false;
@@ -122,7 +102,6 @@ export function SkillFixList({
                 ) : (
                   formatCountdown(seconds)
                 )}
-                {/* Once the catalogue is in: an empty card says nothing. */}
                 {seconds !== null && prerequisiteRows.length > 0 && (
                   <div>
                     <WhatToTrainPrerequisites

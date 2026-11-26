@@ -2,12 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
 import { db } from './index';
 
-/**
- * `esiCacheMeta` is a projection of `esiCache` — every row's freshness fields
- * without its (potentially megabytes-large) value — kept in step by a DBCore
- * middleware, so no write or delete path anywhere in the app (or in a test)
- * can leave the two disagreeing.
- */
 beforeEach(async () => {
   await db.esiCache.clear();
   await db.esiCacheMeta.clear();

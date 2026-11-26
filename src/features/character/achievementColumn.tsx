@@ -2,7 +2,6 @@ import type { DataTableColumn } from '@/components/ui';
 import { AchievementCell } from './AchievementLine';
 import type { AchievementLookup } from './useCharacterAchievements';
 
-/** The optional Title / Score column, shared by the Characters and Contacts tables. */
 export function achievementColumn<Row>(
   t: (key: string) => string,
   characterIdOf: (row: Row) => number,

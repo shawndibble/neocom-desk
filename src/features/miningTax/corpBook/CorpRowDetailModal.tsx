@@ -52,29 +52,15 @@ interface Props {
   systemName: string;
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  /** Opens the corp pay dialog; absent when nothing is owed. */
   onPay?: () => void;
-  /** The notice for a day the miner's own list shares with the corporation's bill: the overlap notice, or a Conflict's. */
   notice?: ReactNode;
-  /** Opens the Resolve dialog (resolving in the app) on a problem of this row. Absent: none is offered. */
   onResolve?: (target: ResolveTarget) => void;
-  /** Opens the member's own entry for this day, to fix their records. Absent: no entry lines up. */
   onFixRecords?: () => void;
-  /** Opens this Payee's ledger, which lists every payment and the days it paid. Absent: no link. */
   onOpenLedger?: () => void;
-  /** An open day: edits the member's own entry the estimate is made from. Absent: not offered. */
   onEdit?: () => void;
-  /** An open day: splits the member's own entry between Payees. Absent: not offered. */
   onSplit?: () => void;
 }
 
-/**
- * Row detail for a day the Corp Tax Book decided (#4065): the layout of
- * `RowDetailModal` for an owed row — who it is owed to and how much, the pilot
- * and system, the ore, how it was priced — with the book's status as a few
- * facts, a Conflict's notice first and any dispute added, and none of the
- * Edit / Unassign actions: the book owns these figures, not the member's Payees.
- */
 export function CorpRowDetailModal({
   open,
   onClose,
@@ -110,7 +96,6 @@ export function CorpRowDetailModal({
   const synced = book?.summary.lastSyncedAt;
   const personal = view.personalOreLines;
   const payeeName = book?.payee.name ?? t('miningTax.corpBook.payeeName', { corp: corp.corpName });
-  // The book's side of the day as a few labelled facts, not one run-on sentence.
   const facts: [string, string][] = [];
   if (view.noticeId && (view.state === 'billed' || view.state === 'paid')) {
     facts.push([
@@ -130,13 +115,8 @@ export function CorpRowDetailModal({
   if ((view.state === 'dismissed' || view.state === 'waived') && view.billed > 0) {
     facts.push([t('miningTax.corpBook.detail.factOriginal'), `${formatIsk(view.billed)} ISK`]);
   }
-  // A conflict is the first thing to read and act on, so its notice leads.
   const conflict = view.state === 'conflict';
-  // Ore listed beyond what the book recorded: the book never bills it.
   const excess = conflict && view.conflictCause === 'overListed';
-  // #6206: "I paid this another way" on a day a Late notice asked for while it is still owed, and
-  // what came of it. A day with an overlap says it in its notice instead.
-  // What Resolve opens on for this day: an officer's kept bill, a Conflict, a figure that differs.
   const resolvable = rowTarget(view);
   const unlinked = unlinkedTarget(view);
   const declaring =
@@ -176,7 +156,6 @@ export function CorpRowDetailModal({
                 conflict && 'text-text-dim'
               )}
             >
-              {/* A Conflict is not owed yet, but shows what the book bills if it is left. */}
               {conflict && !excess
                 ? `${formatIsk(view.billed)} ISK`
                 : excess
@@ -250,7 +229,6 @@ export function CorpRowDetailModal({
             })}
           />
 
-          {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
           {!(conflict && facts.length === 0) && (
             <div className="space-y-1.5 rounded-xs border border-line p-2 text-xs">
               <p className={eyebrowClassName}>{t('miningTax.corpBook.detail.bookTitle')}</p>
@@ -261,7 +239,6 @@ export function CorpRowDetailModal({
                   ))}
                 </ValueList>
               )}
-              {/* Why a day the member saw Paid is Billed again, and the transfer to dispute. */}
               {view.unlinkedDonation && (
                 <div className="space-y-1.5">
                   <p className="text-warning">
@@ -278,7 +255,6 @@ export function CorpRowDetailModal({
                   )}
                 </div>
               )}
-              {/* An officer kept the bill on a billed day: their reason and next step, word for word. */}
               {view.flagged?.state === 'rejected' && keptBy(view) === 'dispute' && (
                 <div className="space-y-1">
                   <p className="text-warning">
@@ -374,7 +350,6 @@ export function CorpRowDetailModal({
                 {t('miningTax.settleUpAction')}
               </Button>
             )}
-            {/* An open day is still the member's own entry: the same Edit and Split as any row. */}
             {onEdit && (
               <div className="flex">
                 <Button onClick={onEdit} className={onSplit ? 'rounded-r-none' : undefined}>

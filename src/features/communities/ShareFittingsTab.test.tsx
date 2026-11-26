@@ -33,7 +33,6 @@ import { ShareFittingsTab } from './ShareFittingsTab';
 
 const f = en.communities.fittings;
 
-/** Opens Add Fittings and returns the dialog. */
 async function openAdd(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: f.add }));
   return screen.findByRole('dialog', { name: f.addTitle });
@@ -88,7 +87,6 @@ describe('ShareFittingsTab', () => {
     const user = userEvent.setup();
     render(<ShareFittingsTab characterId={1} communityId="c1" />);
     const dialog = await openAdd(user);
-    // Every unshared Fitting is listed without a search.
     expect(within(dialog).getByText('Alpha Fit')).toBeInTheDocument();
     await user.type(within(dialog).getByRole('searchbox'), 'gamma');
     const row = within(dialog).getByText('Gamma Fit').closest('li')!;
@@ -122,7 +120,6 @@ describe('ShareFittingsTab', () => {
     await user.click(within(row).getByRole('button', { name: f.share }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(f.failed);
     expect(await loadFittingsAll(1, 'c1')).toEqual(new Set(['saved-b']));
-    // The truth is re-read: Beta is still offered, not listed as shared.
     expect(within(dialog).getByText('Beta Fit')).toBeInTheDocument();
   });
 

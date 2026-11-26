@@ -1,10 +1,3 @@
-/**
- * The fix list's "Do this" call: one short thing to do about an order, with
- * the exact price to type when there is one. Read off `adviseOrder`, so it
- * never disagrees with the Order Detail: a verdict (needs a floor) wins.
- * Without one (no cost basis, the common case): station undercut → one tick
- * under; outbid buy → one tick over.
- */
 import { adviseOrder, type OrderAdvice, type OrderAdviceInput } from './orderAdvice';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { Translate } from '@/lib/translate';
@@ -18,16 +11,13 @@ export type OrderDoThis =
   | { kind: 'relist' }
   | { kind: 'leaveItAlone' }
   | { kind: 'nothingYet' }
-  /** A campaign turn-in pays more than this sell order (#6708): opens the turn-in in Order Detail. */
   | { kind: 'turnIn' }
-  /** A fix-now row with no price in hand: the badge's own action text is the honest answer. */
   | { kind: 'badgeAdvice' };
 
 export function orderDoThis(
   row: OrderAdviceInput,
   { verdict, summary }: Pick<OrderAdvice, 'verdict' | 'summary'> = adviseOrder(row)
 ): OrderDoThis {
-  // Reads healthy only because nothing could check it: no call is honest yet.
   if (row.problem === 'healthy' && row.competitionUnchecked) return { kind: 'nothingYet' };
   if (verdict) {
     switch (verdict.kind) {
@@ -70,7 +60,6 @@ export interface RowFixCall {
 
 const fixCalls = new WeakMap<OpenOrderRow, RowFixCall>();
 
-/** A row's advice and call, worked out once per row object: its cells, card and menu all read it. */
 export function rowFixCall(row: OpenOrderRow): RowFixCall {
   let entry = fixCalls.get(row);
   if (!entry) {
@@ -81,14 +70,12 @@ export function rowFixCall(row: OpenOrderRow): RowFixCall {
   return entry;
 }
 
-/** The exact price the call names, for "Copy new price" and the work-through. */
 export function doThisPrice(call: OrderDoThis): number | null {
   return call.kind === 'raisePrice' || call.kind === 'undercutTo' || call.kind === 'bid'
     ? call.price
     : null;
 }
 
-/** The row's call in words, as the fix list's "Do this" cell and the export read it; null when a fix-now row has no badge to speak for it. */
 export function orderDoThisText(t: Translate, row: OpenOrderRow): string | null {
   const {
     call,

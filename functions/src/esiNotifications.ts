@@ -1,9 +1,3 @@
-// `GET /characters/{id}/notifications/` for the Alerts poller (issue #3756,
-// ADR 0020). Sends `esiHeaders` (esiClient.ts) and the stored ETag, then
-// classifies the response so the poller never has to read a status code:
-// 304 costs nothing, 403 is a dead grant, 420/429 stop the whole
-// run (the error budget is shared by every user of the client id).
-
 import { ESI_BASE, esiGet } from './esiClient.js';
 import { isRecord } from './guards.js';
 import type { EsiNotification } from './eveNotificationSelection.js';

@@ -9,7 +9,6 @@ import { ALERTS_POLL_STATS_KEYS, createRunStats } from './runStats.js';
 
 const KEY = randomBytes(32);
 const NOW = 10 * POLL_RUN_MS;
-/** The run of the day that lists every active grant. */
 const FULL_LISTING_NOW = 12 * POLL_RUN_MS;
 
 const grant = (id: number, over: Partial<AlertGrantDoc> = {}): AlertGrantDoc => ({
@@ -24,7 +23,6 @@ const grant = (id: number, over: Partial<AlertGrantDoc> = {}): AlertGrantDoc => 
   ...over,
 });
 
-/** `alertGrants/{id}` in memory, counting the plain document reads the poller pays for. */
 function fakeDb(initial: Record<number, AlertGrantDoc>) {
   const docs = new Map<string, AlertGrantDoc>(
     Object.entries(initial).map(([id, d]) => [id, d] as const)
@@ -59,7 +57,6 @@ function fakeDb(initial: Record<number, AlertGrantDoc>) {
         .filter(([, d]) =>
           filters.every(({ field, op, value }) => {
             const v = (d as unknown as Record<string, unknown>)[field];
-            // Like Firestore, an inequality never matches a document without the field.
             return op === '==' ? v === value : typeof v === 'number' && v <= (value as number);
           })
         )
@@ -129,13 +126,13 @@ describe('firestorePollerStore', () => {
     const stats = createRunStats(ALERTS_POLL_STATS_KEYS);
     const store = firestorePollerStore(f.db, { key: () => KEY, refresh, stats });
     await store.listDue(NOW);
-    await store.refresh(1); // SSO answered a different token: one write
-    await store.refresh(2); // same token: no write
+    await store.refresh(1);
+    await store.refresh(2);
     expect(stats.snapshot()).toMatchObject({
       ssoRefreshCalls: 2,
       tokenRotationWrites: 1,
       firestoreWrites: 1,
-      firestoreReads: 2 + 1, // the listing's two documents, the one transaction read
+      firestoreReads: 2 + 1,
     });
   });
 

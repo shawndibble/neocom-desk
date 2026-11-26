@@ -1,5 +1,3 @@
-// readBook / readBookState over the version marker (issue #5047): what
-// re-opening a book costs, and what an edit makes it re-read.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -42,12 +40,10 @@ import { clearBookCache } from './bookCache';
 import { bookPartsFor, extendBook, readBook } from './bookRead';
 import { readBookState, readRebills } from './bookClient';
 
-/** The whole book, as the export reads it. */
 const WHOLE = { parts: bookPartsFor() };
 
 const CORP = 98000001;
 const BOOK = `corps/${CORP}`;
-/** A stored observed row as the server writes it (every field `readObservedRow` requires). */
 const OBSERVED_ROW = {
   structureId: 1001,
   characterId: 1,
@@ -71,7 +67,6 @@ const COLLECTIONS = [
   'meta',
   'readModels',
 ];
-// The Overview and Miners tab docs (#5259), read with every book under their own stamp.
 const MODELS = {
   minerList: { schema: READ_MODELS_SCHEMA, miners: [] },
   overview: { schema: READ_MODELS_SCHEMA },
@@ -109,7 +104,6 @@ beforeEach(async () => {
   store.docs.set(MODEL_DOCS[1]!, MODELS.overview);
 });
 
-/** A late notice as the server stores it. */
 function notice(id: string) {
   return {
     id,
@@ -211,7 +205,6 @@ describe('readBook over the version marker', () => {
     const read = new Set(store.reads);
     for (const c of ['miners', 'lateNotices', 'extractions', 'feeders'])
       expect(read).toContain(`${BOOK}/${c}`);
-    // The ledger rows are a part of their own (#5717).
     for (const c of [
       'observed',
       'payments',
@@ -308,7 +301,6 @@ describe('readBook over the version marker', () => {
   it('does not save a part read that a wipe overtook', async () => {
     const { forgetObservedCopy } = await import('./observedStore');
     const first = readBook(7, CORP, WHOLE);
-    // The book is open (its stores made) once meta/paid is requested.
     await vi.waitFor(() => expect(store.reads).toContain(`${BOOK}/meta/paid`));
     await forgetObservedCopy(7, CORP);
     await first;
@@ -391,8 +383,6 @@ describe('readBook over the version marker', () => {
 
     const state = await readBookState(7, CORP);
 
-    // The disputes are the sync's own read (an open one holds its Statement); the page's copy
-    // above never read them.
     expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/disputes`]);
     expect(state?.notices.map((n) => n.id)).toEqual(['s1']);
   });
@@ -444,7 +434,6 @@ describe('readBook and the moon owner summaries (#5717)', () => {
     const held = await readBook(7, CORP, { parts: new Set(['core']) });
     store.reads.length = 0;
     const merged = await extendBook(7, CORP, held!, new Set(['core', 'owners']));
-    // The record list came from this tab's copy: no feeders collection read, only the summaries.
     expect(store.reads.filter((p) => p.includes('/feeders'))).toEqual([]);
     expect(feederViewReads()).toEqual([VIEW, `${BOOK}/feederViews/6`]);
     expect(merged.parts).toEqual(new Set(['core', 'owners']));

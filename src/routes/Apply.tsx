@@ -6,15 +6,6 @@ import { ApplyPage } from '@/features/corp/vetting/ApplyPage';
 import { VettingPublicFrame } from '@/features/corp/vetting/VettingPublicFrame';
 import { useConsumedVettingLogin } from '@/features/corp/vetting/useConsumedVettingLogin';
 
-/**
- * A corp's apply link, `/apply/<corporationId>`: outside `RequireCharacter` and `ScopeGate`
- * deliberately, since an applicant has no account (`routeScopes.test.ts` asserts the exemption).
- * Each character signs in with EVE for exactly what the report reads; that sign-in is never kept
- * as a device session. A pilot with no Character here is offered the app once the report is sent.
- *
- * An invite link carries its code as `?invite=<code>`. `beginVettingLogin` stashes the page it
- * was pressed on with its query, so the code is still on the link when EVE's login returns.
- */
 export function Apply() {
   useMarkPublicRouteRendered();
   const { corpId = '' } = useParams();

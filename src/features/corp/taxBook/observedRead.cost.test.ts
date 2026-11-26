@@ -1,7 +1,3 @@
-// Firestore document reads of the officer ledger (`observed`): the Dexie delta against a
-// windowed open-days query, cold and warm (issue #5718). The windowed arm is a modelled
-// `date >= from` query over a fixture, not production code: it prices the alternative. Documents the measurement that
-// kept the delta: a window cannot ride the copy, so it re-reads every open row on every open.
 import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,7 +22,7 @@ vi.mock('firebase/firestore/lite', () => ({
         )
       )
       .map(([path, data]) => ({ id: path.slice(prefix.length), data: () => data }));
-    store.docReads += docs.length; // Firestore bills one read per returned document
+    store.docReads += docs.length;
     return { docs };
   },
 }));
@@ -46,7 +42,6 @@ const dateOf = (i: number) => new Date(T0 - (DAYS - 1 - i) * DAY_MS).toISOString
 
 const open = (version: string, now: number) =>
   readObservedRows({} as never, 7, CORP, version, ok, now);
-/** The windowed alternative: every row since the oldest open day, no copy to reuse. */
 const windowed = () =>
   getDocs(
     query(
@@ -101,7 +96,6 @@ describe('observed read cost, delta vs windowed open days', () => {
       });
     const delta = await reads(() => open('v2', changedAt + 60_000));
     const win = await reads(windowed);
-    // The 5 changed rows plus the newest day's other 5, stamped at the watermark, which the overlap query (>=) re-reads.
     expect(delta).toBe(10);
     expect(win).toBeGreaterThan(delta);
   });

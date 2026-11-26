@@ -41,7 +41,6 @@ import { useCompareSkills } from '../useCompareSkills';
 import { SavedComparisonsMenu } from './SavedComparisonsMenu';
 import { SkillCompareView } from './SkillCompareView';
 
-/** Short-lived view state (ADR 0015): the selection, its saved-comparison link, the baseline and the one display toggle. One group — several of these change together in a single click. */
 const SKILL_COMPARE_PARAMS = {
   ids: idListParam(),
   comparisonId: nullableTextParam(),
@@ -52,15 +51,9 @@ const SKILL_COMPARE_PARAMS = {
 interface SkillCompareDrawerProps {
   open: boolean;
   onClose: () => void;
-  /** Seeds the selection when the drawer opens with none: you are the baseline you compare others against. */
   activeCharacterId: number | null;
 }
 
-/**
- * The skill comparison, opened over Skills › Trained: a right slide-over on
- * desktop, a full-height bottom sheet on a phone. Pick characters, set one as
- * the baseline, and read how each stands against it skill by skill.
- */
 export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCompareDrawerProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -69,8 +62,6 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
   const selectedIds = params.ids;
   const [someRemoved, setSomeRemoved] = useState(false);
 
-  // Opened with nothing picked: start from the character you are looking at.
-  // Once per opening — a pilot who then clears the selection means it.
   const seeded = useRef(false);
   useEffect(() => {
     if (!open) {
@@ -82,16 +73,11 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
       seeded.current = true;
       return;
     }
-    // No active character yet: wait for it rather than spend the one seed.
     if (activeCharacterId === null) return;
     seeded.current = true;
     setParams({ ids: [activeCharacterId] });
   }, [open, selectedIds.length, activeCharacterId, setParams]);
 
-  // A hand-edited or stale `?ids=` can name a character this device has never
-  // heard of — no chip to toggle it off, no name to show in its column. Prune
-  // once the roster is known. Gated on `roster !== undefined`: pruning against
-  // the still-empty first render would evict every id before it has loaded.
   useEffect(() => {
     if (roster === undefined) return;
     const known = new Set(roster.map((c) => c.characterId));
@@ -101,14 +87,11 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
 
   const compare = useCompareSkills(selectedIds, open);
   const { catalog, skillsByCharacter, loadedIds, pendingIds, failedIds } = compare;
-  // A character whose skills could not be read has nothing to measure against
-  // or to show: it is neither a column nor a possible baseline.
   const usableIds = useMemo(
     () => selectedIds.filter((id) => !failedIds.has(id)),
     [selectedIds, failedIds]
   );
   const baselineId = resolveBaseline(usableIds, params.baseline, activeCharacterId);
-  // Until the baseline's skills land every delta would read against nothing.
   const baselinePending = baselineId !== null && pendingIds.has(baselineId);
 
   const nameFor = useMemo(() => {
@@ -116,7 +99,6 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
     return (characterId: number) => byId.get(characterId) ?? `#${characterId}`;
   }, [roster]);
 
-  // The baseline leads, so every other column reads as its distance from the first.
   const columns = useMemo(() => {
     const ordered =
       baselineId !== null && loadedIds.includes(baselineId)
@@ -153,9 +135,6 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
     columns: csvColumns,
   });
 
-  // The selection lives in the URL, which a render or two behind a click: two
-  // quick toggles would each read the same stale list and the second would
-  // undo the first. `latestIds` holds what the last toggle wrote until the URL catches up.
   const latestIds = useRef(selectedIds);
   useEffect(() => {
     latestIds.current = selectedIds;
@@ -209,8 +188,6 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
   );
 
   const failedNames = [...failedIds].map(nameFor).join(', ');
-  // Closing forgets the selection: it would otherwise linger in the Trained
-  // URL, shared with it and reopening the drawer on a reload.
   function handleClose() {
     latestIds.current = [];
     setSomeRemoved(false);

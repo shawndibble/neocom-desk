@@ -1,9 +1,3 @@
-/**
- * Hub prices at a page's price percent (issue #6531): the page's own lookups
- * through `market/prices.ts`, scaled after the read. The lookups' cache is
- * per station and shared by every page, so the percent is applied here, on
- * the page's copy, never in that cache.
- */
 import {
   getHubPrices,
   getHubPricesWithStatus,
@@ -32,7 +26,6 @@ function scaled<T extends Sides>(prices: ReadonlyMap<number, T>, percent: number
   return out;
 }
 
-/** A `typeId -> price` record at `percent` (a snapshot's hub maps, walked Depth Prices). */
 export function hubPricesAtPercent(prices: HubPrices, percent: number): HubPrices {
   if (percent === DEFAULT_PRICE_PERCENT) return prices;
   const out: HubPrices = {};
@@ -42,7 +35,6 @@ export function hubPricesAtPercent(prices: HubPrices, percent: number): HubPrice
   return out;
 }
 
-/** Each type's sell and buy price at `percent`; everything else (volumes) stays as it is. */
 export function scaleHubPrices<T extends Sides>(
   prices: ReadonlyMap<number, T>,
   percent: number
@@ -50,7 +42,6 @@ export function scaleHubPrices<T extends Sides>(
   return percent === DEFAULT_PRICE_PERCENT ? prices : scaled(prices, percent);
 }
 
-/** `getHubPrices` at `percent` of market. */
 export async function getHubPricesAt(
   hub: TradeHub,
   typeIds: readonly number[],
@@ -60,7 +51,6 @@ export async function getHubPricesAt(
   return percent === DEFAULT_PRICE_PERCENT ? prices : scaled(prices, percent);
 }
 
-/** `getHubPricesWithStatus` at `percent` of market. */
 export async function getHubPricesWithStatusAt(
   hub: TradeHub,
   typeIds: readonly number[],

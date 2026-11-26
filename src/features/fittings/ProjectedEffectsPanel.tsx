@@ -1,11 +1,3 @@
-/**
- * Projected effects: saved Fittings whose running command bursts and remote
- * modules land on the open one — a booster's bursts, a logistics wing's
- * reps, a tackler's web — as many ships of each as the pilot says. Each is
- * worked out once, when added, at all skills V on the implants it carries;
- * then every number on the page takes it in (`useStatsConditions`). A
- * question asked of the fit, like the weather: not saved, not in a link.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,7 +25,6 @@ import { useFittingChoices } from './useFittingChoices';
 
 const MAX_SHIPS = 20;
 
-/** What one ship of a Fitting projects, at all skills V. */
 async function projectionOf(id: string, name: string, fitting: Fitting): Promise<ProjectedSource> {
   const allV = buildAllVProfile((await loadSkills()).map((skill) => skill.typeID));
   const pilot = applyImplantBasis(allV, fitting.implantSet, defaultImplantBasis(fitting));
@@ -67,7 +58,6 @@ export function ProjectedEffectsPanel() {
   ].filter((group) => group.options.length > 0);
   const label = t('fittings.projected.add');
 
-  // Always from the store's current list: an add lands after an await.
   const update = (change: (current: ProjectedSource[]) => ProjectedSource[]) =>
     setSources(change(useProjectedSources.getState().sources));
 
@@ -150,7 +140,6 @@ export function ProjectedEffectsPanel() {
         <StatNote>{t('fittings.projected.needsCharacter')}</StatNote>
       ) : (
         groups.length > 0 && (
-          // Keyed on the list, so the trigger reads the placeholder again after each pick.
           <Select key={sources.length} onValueChange={(id) => void add(id)}>
             <SelectTrigger aria-label={label} size="sm" className="w-full sm:w-64">
               <SelectValue placeholder={t('fittings.projected.addPlaceholder')} />

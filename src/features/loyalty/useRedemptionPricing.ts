@@ -1,9 +1,3 @@
-/**
- * The Offer Detail's "How many" walk (issue #5659): for N > 1 it loads the live
- * book of every required item and, on the instant basis, of the output, then
- * prices N redemptions with `priceRedemptions`. N = 1 loads nothing and returns
- * null: the row's own figures are already that answer.
- */
 import { useEffect, useMemo, useState } from 'react';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ReachableBuyOrder } from '@/engine/market/buyReach';
@@ -30,7 +24,6 @@ interface Args {
   playerLp: number | null;
 }
 
-/** Keyed by `bookKey`, so a hub change never reads another hub's book. */
 type Books = ReadonlyMap<string, LiveBook | 'failed'>;
 
 const bookKey = (hub: TradeHub, typeId: number): string => `${hub.stationId}:${typeId}`;

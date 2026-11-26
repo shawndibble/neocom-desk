@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
 import { AllianceLink, CharacterLink, CorporationLink } from '@/features/entities/EntityLink';
 
-/**
- * A name in a report as an entity link (DESIGN.md §6c "Entities"): a character, corporation or
- * alliance opens its Show Info. Anything else the server could not place stays plain text.
- */
 export function VettingEntity({
   id,
   category,

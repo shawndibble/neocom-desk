@@ -1,9 +1,3 @@
-/**
- * Stand-ins for the SRP backends (settings, officer queue, Doctrine Fits), for Storybook and
- * tests: set, the matching client answers from memory, so a page story shows without a network,
- * a sign-in or Firebase. Never set by the app itself. Its own module so a test that mocks a
- * client still leaves the override unset.
- */
 import type {
   SrpApproveItem,
   SrpAuditEntry,
@@ -25,7 +19,6 @@ import type {
 
 export interface SrpBackendOverride {
   verify: () => SrpOfficerVerdict;
-  /** The settings doc, or null before SRP was ever turned on. */
   readSettings: () => SrpSettings | null;
   status: () => SrpStatus;
   turnOn: () => void;
@@ -51,7 +44,6 @@ export interface SrpDoctrineBackendOverride {
   list: () => DoctrineFit[];
   save: (input: SaveDoctrineInput) => { id: string };
   remove: (id: string) => void;
-  /** A member's list for the Fittings library; absent: none. */
   memberList?: () => MemberDoctrineFit[];
 }
 

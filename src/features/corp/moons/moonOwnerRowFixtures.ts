@@ -1,7 +1,6 @@
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { HOUR_MS } from '@/lib/age';
 
-/** Sample moon owner rows for stories; all names invented. */
 export const NAMES: Record<number, string> = {
   1: 'Ashfall Mining Collective',
   2: 'Cinder Reach Holdings',

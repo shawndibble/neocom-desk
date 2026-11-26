@@ -1,19 +1,5 @@
-/**
- * Sample data for the Corp Tax Book mockups (#4056): one corporation's book,
- * seen on 18 Oct 2026 14:00 EVE. Every name is invented.
- *
- * One story throughout: an officer synced the book at 12:00 (2h ago), so the
- * Billable rule (day end + 30 min grace passed AND a sync after that) makes every
- * day through 17 Oct Billable and 18 Oct not yet. The Aug 2026 Late notices
- * went out on 1 Sep (due 15 Sep). The Sep 2026 Late notices are NOT sent yet:
- * the run in the Late notices tab is about to send them, and Oct is still open.
- * Miner figures that appear in more than one place are derived below from
- * their lines and payments, so every view reconciles.
- */
-
 export const CORP = { name: 'Brass Meridian Logistics', ticker: 'BRML' } as const;
 
-/** The book's settings (D3, D10, D11, D19, D20). */
 export const BOOK = {
   hub: 'Jita',
   oreForm: 'Compressed',
@@ -44,9 +30,7 @@ export interface Extraction {
   refinery: string;
   refineryType: 'Athanor' | 'Tatara';
   state: ExtractionState;
-  /** The one time that matters for the state, already worded. */
   when: string;
-  /** Short countdown or age for a dense row. */
   whenShort: string;
   started: string;
   arrival: string;
@@ -56,7 +40,6 @@ export interface Extraction {
   oreSource: string | null;
   estIsk: number | null;
   minedPct: number | null;
-  /** Timeline bar, in days from 1 Oct (start, ready, fracture, expiry). */
   span: { start: number; ready: number; fracture: number; end: number };
 }
 
@@ -165,9 +148,7 @@ export interface DayLine {
   ore: string;
   units: number;
   unitPrice: number;
-  /** The day the unit price is for (D11: the day mined). */
   priceDate: string;
-  /** Which tier of the price chain produced it. */
   priceSource: string;
   rate: number;
   value: number;
@@ -223,7 +204,6 @@ const taxOf = (rows: DayLine[]) => sum(rows.map((r) => r.tax));
 const valueOf = (rows: DayLine[]) => sum(rows.map((r) => r.value));
 const inMonth = (row: DayLine, month: string) => row.date.endsWith(month);
 
-/** Varro Kestane's days (miner detail), newest first. */
 export const VARRO_DAYS: DayLine[] = [
   line(1, '18 Oct', ...EFA5, 'Lysa Kestane', 'Zeolites', 38_400, 10, 'Not Billable yet'),
   line(2, '17 Oct', ...EFA5, 'Varro Kestane', 'Sylvite', 52_100, 10, 'Owed'),
@@ -247,18 +227,10 @@ export interface PaymentLine {
   kind: 'Donation' | 'Recorded by hand';
   credited: string;
   notTax?: number;
-  /** Left over after a payment within tolerance settled its debt, written off and logged. */
   writtenOff?: number;
   by?: string;
 }
 
-/**
- * Varro Kestane's whole position, derived from his lines and payments. The
- * Miners table, Needs-you card, mail preview and Miner page all read this, so
- * they cannot disagree. `notTax` is how much of Lysa's 16 Oct donation is
- * marked "not tax": 1,000,000 once marked, 0 on the page behind the Mark not
- * tax dialog.
- */
 export function varroLedger(notTax: number) {
   const augLines = VARRO_DAYS.filter((r) => r.status === 'On Aug notice' || r.status === 'Paid');
   const handPayment = 1_338_900;
@@ -321,7 +293,6 @@ export const VARRO = varroLedger(1_000_000);
 export const VARRO_BEFORE_NOT_TAX = varroLedger(0);
 export const VARRO_PAYMENTS = VARRO.payments;
 
-/** The two 17 Oct days the Dismiss dialog is for. */
 export const VARRO_DISMISS_IDS = [2, 3];
 export const VARRO_DISMISS_AMOUNT = taxOf(
   VARRO_DAYS.filter((r) => VARRO_DISMISS_IDS.includes(r.id))
@@ -343,7 +314,6 @@ export const VARRO_MAIL = [
   { id: 2, date: '1 Sep 14:00', what: 'Aug 2026 Late notice', status: 'Sent' },
 ];
 
-/** D6/D7: the audit log lines about Varro, newest first. */
 export const VARRO_ACTIVITY = [
   {
     id: 1,
@@ -382,7 +352,6 @@ export const VARRO_ACTIVITY = [
   },
 ];
 
-/** D16: the Sep 2026 Late notice mail for Varro, exactly as it would be sent. */
 export const VARRO_MAIL_STATEMENT = {
   to: 'Varro Kestane',
   subject: `${CORP.ticker} moon tax · Sep 2026 · ${VARRO.mailBalance.toLocaleString('en')} ISK`,
@@ -399,7 +368,6 @@ export const VARRO_MAIL_STATEMENT = {
   chars: 1_460,
 };
 
-/** Tamsin Holloway (Guest, 15%): her Aug 2026 Late notice, issued 1 Sep. */
 export const TAMSIN_AUG: DayLine[] = [
   line(101, '28 Aug', ...EFA7, 'Tamsin Holloway', 'Euxenite', 15_850, 15, 'On Aug notice'),
   line(102, '27 Aug', ...EFA7, 'Tamsin Holloway', 'Cobaltite', 22_400, 15, 'On Aug notice'),
@@ -425,7 +393,6 @@ export const TAMSIN = {
   mailBalance: TAMSIN_OWED + taxOf(TAMSIN_SEP),
 };
 
-/** Who mined the current chunk at Efa V - Moon 3 (moon detail), from the lines. */
 const chunkLines = (rows: DayLine[]) => rows.filter((r) => r.moon === EFA5[0] && inMonth(r, 'Oct'));
 const varroChunk = chunkLines(VARRO_DAYS);
 const tamsinChunk = chunkLines([...TAMSIN_OCT, ...TAMSIN_PENDING]);
@@ -446,16 +413,13 @@ export const MOON_MINERS = [
   { miner: 'Juno Rask', units: 64_800, value: 10_530_000, tax: 1_053_000 },
 ];
 
-/** Past cycles at Efa V - Moon 3, newest first, not the one running now (moon detail). */
 export interface MoonCycle {
   id: number;
   fractured: string;
   days: number;
   estIsk: number;
   minedPct: number;
-  /** Tax recorded in the cycle's days. */
   tax: number;
-  /** Where that tax stands. */
   on: string;
   miners: number;
   state: ExtractionState;
@@ -503,9 +467,7 @@ export interface Miner {
   characters: string[];
   standing: MinerStanding;
   corp: string;
-  /** On issued Late notices, less payments and dismissals. */
   owed: number;
-  /** Billable days not on a sent Late notice yet (Sep not sent, plus Oct so far). */
   unbilled: number;
   overdueDays: number | null;
   credit: number;
@@ -514,7 +476,6 @@ export interface Miner {
   note?: string;
 }
 
-/** Aug Late notices are due 15 Sep, so anything unpaid is 33 days overdue today. */
 const OVERDUE_DAYS = 33;
 const ODILE = { sep: 14_205_800, oct: 8_275_100 };
 const JUNO = { sep: 2_120_000, oct: 1_820_000 };
@@ -605,11 +566,9 @@ export const MINERS: Miner[] = [
   },
 ];
 
-/** The 20 Miners the table does not show (it lists the 6 that need a look first). */
 export const OTHER_MINERS = { count: 20, unbilled: 53_716_400 };
 export const TOTAL_MINERS = MINERS.length + OTHER_MINERS.count;
 
-/** The Miners tab's chips, summed over the table above. */
 export const MINER_TOTALS = {
   owed: sum(MINERS.map((m) => m.owed)),
   overdue: sum(MINERS.filter((m) => m.overdueDays !== null).map((m) => m.owed)),
@@ -670,7 +629,6 @@ const QUEUE_NAMES = [
   'Galen Mott',
 ];
 
-/** A Late notice is the Miner's balance due: carried + this period's lines, less credit. */
 const QUEUE_AMOUNTS = [
   ODILE.sep,
   VARRO.mailBalance,
@@ -715,7 +673,6 @@ export const QUEUE_SENT_TIMES = [
   '14:07',
 ];
 
-/** The send queue part-way through: 7 sent, one failed, one paused on EVE's limit. */
 export const QUEUE_RUNNING: QueueItem[] = QUEUE_NAMES.map((to, index) => {
   const base = { id: index + 1, to, amount: QUEUE_AMOUNTS[index] };
   if (index === 2)
@@ -730,22 +687,18 @@ export const QUEUE_RUNNING: QueueItem[] = QUEUE_NAMES.map((to, index) => {
   return { ...base, status: 'Waiting' };
 });
 
-/** The same queue finished: everything sent but the one failure. */
 export const QUEUE_DONE: QueueItem[] = QUEUE_RUNNING.map((item) =>
   item.status === 'Failed' ? item : { ...item, status: 'Sent', at: QUEUE_SENT_TIMES[item.id - 1] }
 );
 
-/** The Sep run in numbers (Check step). */
 export const SEP_RUN = {
   statements: QUEUE_AMOUNTS.length,
-  /** What the 19 Late notices add up to: carried + new lines, less credit. */
   balances: sum(QUEUE_AMOUNTS),
   belowMinimum: 4,
   credit: ILSE.credit,
 };
 
 const AUG_BILLED = 231_860_400;
-/** D20 tolerance: payments within max(0.5%, 100k) settled these Late notices; the rest was written off. */
 export const AUG_WRITE_OFFS = { toleranceTotal: 128_900, toleranceCount: 3, lateLines: 3 };
 
 export const PERIODS: StatementPeriod[] = [
@@ -766,7 +719,6 @@ export const PERIODS: StatementPeriod[] = [
     status: 'Ready to send',
     miners: 23,
     toSend: SEP_RUN.statements,
-    // New lines only: the Late notices' balances less what was carried from Aug and plus the credit applied.
     billed: SEP_RUN.balances - MINER_TOTALS.owed + SEP_RUN.credit,
     paid: 0,
     outstanding: 0,
@@ -785,7 +737,6 @@ export const PERIODS: StatementPeriod[] = [
   },
 ];
 
-/** Personal Moon Mining Tax tab: a member's rows against the corp's book (D12, D28, D30). */
 export type PersonalState =
   | 'Pending corp record'
   | 'Billed'
@@ -797,16 +748,13 @@ export type PersonalState =
 
 export interface PersonalRow {
   id: number;
-  /** EVE date, as the Tax tab prints it. */
   date: string;
   character: string;
   system: string;
   ore: string;
   units: number;
   payee: string;
-  /** Est. value on the day mined. */
   value: number;
-  /** Tax owed; null where the corp does not (yet) owe it: Pending, Conflict, Unattributed. */
   tax: number | null;
   state: PersonalState;
   note: string;
@@ -909,7 +857,6 @@ export const PERSONAL_ROWS: PersonalRow[] = [
   },
 ];
 
-/** D28: the member's own figures against the book's for one day. */
 export const DIFF = {
   date: '17 Oct',
   where: 'Efa V - Moon 3 · Efa - Brass Anvil',
@@ -934,7 +881,6 @@ export const DIFF = {
   rateNote: 'Book rate 15% is the per-moon rate for Efa V - Moon 3, effective 1 Oct 2026',
 };
 
-/** The guest verify page: Tamsin Holloway's Aug 2026 Late notice, issued 1 Sep (D27). */
 export const VERIFY = {
   miner: 'Tamsin Holloway',
   period: 'Aug 2026',

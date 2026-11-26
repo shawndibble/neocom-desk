@@ -19,7 +19,6 @@ import {
 
 const specs: readonly EsiEndpointSpec[] = Object.values(ESI_REGISTRY);
 
-// Hand-written: the spelling backstop for the Write to EVE section.
 const WRITE_SCOPES = [
   'esi-mail.send_mail.v1',
   'esi-mail.organize_mail.v1',
@@ -33,8 +32,6 @@ const DEFAULT_ON_GROUPS = SCOPE_GROUPS.filter((group) => PERMISSIONS[group].defa
 const OPT_IN_GROUPS = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
 
 describe('CORE_GRANT', () => {
-  // Hand-written, not derived: the spelling backstop, same reasoning as
-  // SCOPES below.
   it('lists exactly the Core Grant scopes', () => {
     expect([...CORE_GRANT].sort()).toEqual(
       [
@@ -56,11 +53,6 @@ describe('CORE_GRANT', () => {
 });
 
 describe('SCOPES (Base Grant)', () => {
-  // Hand-written, not derived: SCOPES is computed from registry.ts, so a
-  // derived expectation would assert nothing. This is the spelling backstop.
-  // Every scope here is a read, and every read is here (#6102): the six write
-  // scopes are the opt-in "Write to EVE" section, asked for when a Character
-  // first tries the feature.
   it('lists exactly the v1 Base Grant scopes', () => {
     expect([...SCOPES].sort()).toEqual(
       [
@@ -87,7 +79,6 @@ describe('SCOPES (Base Grant)', () => {
         'esi-search.search_structures.v1',
         'esi-industry.read_character_mining.v1',
         'esi-fittings.read_fittings.v1',
-        // corp
         'esi-corporations.read_structures.v1',
         'esi-wallet.read_corporation_wallets.v1',
         'esi-corporations.read_divisions.v1',
@@ -104,14 +95,12 @@ describe('SCOPES (Base Grant)', () => {
         'esi-corporations.read_titles.v1',
         'esi-contracts.read_corporation_contracts.v1',
         'esi-markets.read_corporation_orders.v1',
-        // structureMarkets, jumpFatigue, corpProjects, killmails, mercenaryDens
         'esi-markets.structure_markets.v1',
         'esi-characters.read_fatigue.v1',
         'esi-corporations.read_projects.v1',
         'esi-killmails.read_killmails.v1',
         'esi-activities.read_character.v1',
         'esi-structures.read_character.v1',
-        // militaryCampaigns
         'esi.activity.char:read',
       ].sort()
     );
@@ -131,8 +120,6 @@ describe('SCOPES (Base Grant)', () => {
 });
 
 describe('scopesForGroup', () => {
-  // Hand-written for the same reason as the SCOPES list above: the spelling
-  // backstop for the opt-in groups, which no derived expectation can provide.
   it("lists exactly the corp group's scopes", () => {
     expect([...scopesForGroup('corp')].sort()).toEqual(
       [
@@ -190,12 +177,6 @@ describe('scopesForGroup', () => {
     expect(SCOPES).toContain('esi-corporations.read_projects.v1');
   });
 
-  /**
-   * Issue #327's first acceptance criterion: registering the corp assets
-   * endpoint must widen the *corp group*, not Assets. The character assets
-   * scope is the one it would be easiest to confuse it with, and they must end
-   * up in different Permissions, so unticking one in Customize leaves the other.
-   */
   it('keeps the corp assets scope in the corp group, apart from the character one', () => {
     expect(scopesForGroup('corp')).toContain('esi-assets.read_corporation_assets.v1');
     expect(scopesForGroup('assets')).not.toContain('esi-assets.read_corporation_assets.v1');
@@ -203,10 +184,6 @@ describe('scopesForGroup', () => {
     expect(scopesForGroup('corp')).not.toContain('esi-assets.read_assets.v1');
   });
 
-  /**
-   * Acceptance criterion: opt-in Permissions stay out of the Base Grant, and
-   * every default-on Permission is actually part of it.
-   */
   it('keeps opt-in groups out of the Base Grant and default-on groups inside it', () => {
     const base = new Set<string>(SCOPES);
     for (const group of OPT_IN_GROUPS) {
@@ -222,12 +199,6 @@ describe('scopesForGroup', () => {
     }
   });
 
-  /**
-   * Acceptance criterion 1, with teeth. The Core-Grant/Permission split is
-   * decided per *endpoint*, so one endpoint declaring a scope inconsistently
-   * would put it in two places at once with nothing else failing. Overlap is
-   * an error to fix at the declaration, never something to subtract here.
-   */
   it('assigns every scope to the Core Grant or to exactly one Permission — never both, never neither', () => {
     const core = new Set<string>(CORE_GRANT);
     const seen = new Map<string, string>();
@@ -244,11 +215,6 @@ describe('scopesForGroup', () => {
     }
   });
 
-  /**
-   * A scope repeated across endpoints (e.g. `read_mail` on four routes) must
-   * resolve to the same group everywhere it's declared — enforced at the
-   * registry, not subtracted here.
-   */
   it('resolves every scope to the same group on every endpoint that declares it', () => {
     const groupByScope = new Map<string, string | undefined>();
     for (const spec of specs) {
@@ -315,9 +281,6 @@ describe('PERMISSIONS', () => {
     }
   });
 
-  // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
-  // are filtered by `defaultOn` itself, so a derived expectation here would
-  // pass no matter which way a group's flag flipped.
   it('marks only the six Write to EVE groups opt-in and every read group default-on (#6102)', () => {
     const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
     expect([...optIn].sort()).toEqual(
@@ -360,7 +323,6 @@ describe('revokedScopes', () => {
   });
 
   it('returns nothing when scopes are ADDED (a wider grant is not a revocation)', () => {
-    // The case that would silently nuke every cache on an app update.
     const previous = ['esi-skills.read_skills.v1'];
     const next = [
       'esi-skills.read_skills.v1',
@@ -396,8 +358,6 @@ describe('revokedScopes', () => {
   });
 
   it('reports a removed scope the app does not model (renamed or hand-granted)', () => {
-    // Not filtered through the registry's Scope union: a scope we do not model
-    // must still count as revoked, or the purge misses it.
     expect(revokedScopes(['esi-corporations.read_divisions.v1'], [])).toEqual([
       'esi-corporations.read_divisions.v1',
     ]);
@@ -405,8 +365,6 @@ describe('revokedScopes', () => {
 });
 
 describe('isPermissionGranted', () => {
-  // `.every` over an empty list is vacuously true, so a group that derived no
-  // scopes would read as granted for every Character, forever.
   it('never has a Permission with no scopes to hold', () => {
     for (const group of SCOPE_GROUPS)
       expect(scopesForGroup(group).length, group).toBeGreaterThan(0);
@@ -420,8 +378,6 @@ describe('isPermissionGranted', () => {
     expect(isPermissionGranted('mail', [...CORE_GRANT])).toBe(false);
   });
 
-  // A partial grant (a scope added to the group after the Character granted
-  // it) still needs the Grant button to move, so it reads as missing.
   it('is missing when only part of the Permission is held', () => {
     expect(isPermissionGranted('corp', scopesForGroup('corp').slice(1))).toBe(false);
   });

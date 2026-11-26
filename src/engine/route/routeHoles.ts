@@ -1,13 +1,3 @@
-/**
- * Route Safety through the open Thera / Turnur holes (issue #2476): which of
- * EVE-Scout's connections a route may use, and the extra connections and free
- * systems the pathfinder is handed for them.
- *
- * Pure. `jumpRoute.ts` knows nothing about hubs — this is where a hole list
- * becomes plain graph edges. The costing rule (decision on routing through
- * Thera and Turnur): the hole jumps and the hub itself carry no security
- * cost; the entrance and exit systems are charged as any other system.
- */
 import {
   HUB_SYSTEM_IDS,
   shipSizeRank,
@@ -17,18 +7,14 @@ import {
 } from './theraConnections';
 import { HOUR_MS } from '@/lib/age';
 
-/** Which hubs' holes a route may use. */
 export type RouteHoleHubs = TheraHub | 'all';
 
 export interface RouteHoleSettings {
   hubs: RouteHoleHubs;
-  /** The pilot's ship: only holes passing this size or bigger are used. */
   shipSize: WormholeShipSize;
-  /** Holes with less life than this left are skipped. */
   minLifeHours: number;
 }
 
-/** The connections a route may cross: the chosen hubs, the ship's size, enough life left. */
 export function routeHoles<T extends TheraConnection>(
   connections: readonly T[],
   settings: RouteHoleSettings,
@@ -51,11 +37,6 @@ export interface HoleNetwork {
   freeSystems: Set<number>;
 }
 
-/**
- * The pathfinder's view of the holes: one connection from each exit to its
- * hub, and the hubs those holes lead to as free systems. A hub with no usable
- * hole is not freed, so with none at all the gate route is exactly as before.
- */
 export function holeNetwork(holes: readonly HoleEnds[]): HoleNetwork {
   const extraConnections: [number, number][] = [];
   const freeSystems = new Set<number>();
@@ -67,14 +48,8 @@ export function holeNetwork(holes: readonly HoleEnds[]): HoleNetwork {
   return { extraConnections, freeSystems };
 }
 
-/** What the pathfinder sees of a hole: which exit it joins to which hub. */
 export type HoleEnds = Pick<TheraConnection, 'exitSystemId' | 'hub'>;
 
-/**
- * The hole a step between two systems crosses, either way round, or `null`
- * for a step no hole joins. Several holes can join the same exit to the same
- * hub; the longest-lived one is the one worth flying.
- */
 export function holeBetween<T extends TheraConnection>(
   holes: readonly T[],
   from: number,

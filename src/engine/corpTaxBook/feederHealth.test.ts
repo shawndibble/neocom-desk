@@ -73,7 +73,6 @@ describe('advanceFeederHealth', () => {
 
 describe('disconnectedCoverage', () => {
   it('ends coverage on the last fully synced day', () => {
-    // read well 2026-09-10T08:00 → 2026-09-09 closed (06:00 on the 10th) and was read after it.
     expect(
       disconnectedCoverage([{ from: '2026-08-01' }], { lastReadWellAt: '2026-09-10T08:00:00.000Z' })
     ).toEqual([{ from: '2026-08-01', to: '2026-09-09' }]);
@@ -273,13 +272,11 @@ describe('staleOwnerHolds (#6209)', () => {
 
 describe('daysUntilOreLost', () => {
   it('counts down from the first unread day: EVE keeps 30 days of ledger', () => {
-    // Read well on the 10th at noon: the 9th is the last fully read day, the 10th the first unread.
     const health = {
       lastReadWellAt: '2026-10-10T12:00:00.000Z',
       staleSince: '2026-10-11T00:00:00.000Z',
     };
     expect(daysUntilOreLost(health, '2026-10-20T12:00:00.000Z')).toBe(21);
-    // The 10th is still held on 2026-11-09 (30 days on), gone the day after.
     expect(daysUntilOreLost(health, '2026-11-09T01:00:00.000Z')).toBe(1);
     expect(daysUntilOreLost(health, '2026-11-10T01:00:00.000Z')).toBe(0);
     expect(daysUntilOreLost(health, '2026-12-01T01:00:00.000Z')).toBe(0);

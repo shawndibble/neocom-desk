@@ -28,7 +28,6 @@ const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
   ...over,
 });
 
-/** An accepted courier as ESI sends it: still `outstanding`, with an acceptor, read once as the loader does. */
 const accepted = (id: number, over: Partial<Contract> = {}): Contract =>
   withAcceptedCourierInProgress(
     contract(id, { acceptor_id: 555, date_accepted: iso(NOW), ...over })

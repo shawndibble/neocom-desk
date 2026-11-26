@@ -1,8 +1,3 @@
-/**
- * Officer claims inside a Miner (Player slice): an officer-added character is billed with the
- * group but cannot read it until its owner signs in as it (a Self-proven link). Pure: the store
- * reads the facts, this decides who reads, who is claimed and what a sign-in promotes.
- */
 import { earlierGrouping, soloCharacterId } from './corpTaxBookDonationMatch.js';
 
 export interface GroupConflict {
@@ -14,15 +9,10 @@ export interface GroupConflict {
 export interface ClassifyInput {
   characterIds: readonly number[];
   mainCharacterId: number;
-  /** Characters that already read the group (members before this edit, legacy confirmations). */
   retained: ReadonlySet<number>;
-  /** Legacy guests still awaiting the old confirmation; kept pending while members. */
   pending: ReadonlySet<number>;
-  /** Characters with a Self-proven link. */
   proven: ReadonlySet<number>;
-  /** Characters recorded mining for another corporation. */
   outside: ReadonlySet<number>;
-  /** Characters recorded mining for this corporation. */
   minedHere: ReadonlySet<number>;
 }
 
@@ -56,7 +46,6 @@ export function classifyGroup(i: ClassifyInput): {
   };
 }
 
-/** The characters that read a Miner: everyone but officer claims and legacy unconfirmed guests. */
 export function minerReaderIds(m: {
   characterIds: readonly number[];
   officerClaimed?: readonly number[];
@@ -66,10 +55,6 @@ export function minerReaderIds(m: {
   return m.characterIds.filter((id) => !held.has(id));
 }
 
-/**
- * The sign-ins (`uids`) that read a Miner's own records: its reader Characters', or a solo Miner's
- * own Character's. A grouping not read (`undefined`) that is no solo id has none.
- */
 export function minerUidsOf(
   minerId: string,
   miner:
@@ -90,14 +75,11 @@ export interface ClaimMiner {
   characterIds: readonly number[];
   officerClaimed: readonly number[];
   provenCharacterIds: readonly number[];
-  /** When the group was first written; absent on groups made before the Player slice. */
   createdAt?: string;
 }
 
-/** The earliest grouping wins a Character stored in two: the one rule (`minerIdFor` reads it too). */
 const earlier = earlierGrouping;
 
-/** Characters stored in more than one Miner group (a `solo:` id holds none); earlier group first. */
 export function groupConflicts(miners: readonly ClaimMiner[], at: string): GroupConflict[] {
   const by = new Map<number, ClaimMiner[]>();
   for (const m of [...miners].sort(earlier))
@@ -110,16 +92,11 @@ export function groupConflicts(miners: readonly ClaimMiner[], at: string): Group
 
 export interface Promotion {
   minerId: string;
-  /** The characters that now read the group. */
   characterIds: number[];
   officerClaimed: number[];
   provenCharacterIds: number[];
 }
 
-/**
- * Moves each proven officer claim into the proven list. A character stored in two groups is
- * promoted only in the earlier one (the conflict is shown to an officer, never last-writer-wins).
- */
 export function promoteClaims(
   miners: readonly ClaimMiner[],
   proven: ReadonlySet<number>

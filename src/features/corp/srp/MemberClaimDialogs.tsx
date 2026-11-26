@@ -22,13 +22,11 @@ interface RefileDialogProps {
   hullName: string;
   busy: boolean;
   error?: string;
-  /** The corp requires a Fleet or FC and the original claim named none: ask for it here. */
   needsFleet: boolean;
   onSubmit: (note: string, fleetOrFc?: string) => void;
   onClose: () => void;
 }
 
-/** Re-file a Rejected claim once, with a note for the officer. A bottom sheet on a phone. */
 export function RefileDialog({
   claim,
   hullName,
@@ -123,7 +121,6 @@ interface ClaimDetailDialogProps {
   onClose: () => void;
 }
 
-/** A tapped claim: state, exact amount, the full reason, a short timeline and the killmail. */
 export function ClaimDetailDialog({
   claim,
   hullName,

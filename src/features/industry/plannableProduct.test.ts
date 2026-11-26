@@ -3,7 +3,6 @@ import { buildPlannableIndex, plannableProductTypeID } from './plannableProduct'
 import type { BlueprintMap } from '@/sde/types';
 
 const BLUEPRINTS: BlueprintMap = {
-  // Rifter Blueprint -> Rifter
   '638': {
     name: 'Rifter Blueprint',
     time: 1200,
@@ -12,7 +11,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
-  // A reaction formula -> its output
   '46167': {
     name: 'Caesarium Cadmide Reaction Formula',
     time: 10800,
@@ -21,7 +19,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'reaction',
   },
-  // Pathological data: a blueprint with no product at all.
   '99999': {
     name: 'Broken Blueprint',
     time: 60,
@@ -56,8 +53,6 @@ describe('plannableProductTypeID', () => {
   });
 
   it('prefers the blueprint reading when a typeID is somehow both', () => {
-    // A blueprint that produces another blueprint would otherwise resolve to
-    // itself and open a plan for the copy rather than for what it builds.
     const weird = buildPlannableIndex({
       '1': {
         name: 'Blueprint Of Blueprints',

@@ -21,42 +21,27 @@ import type { ObservedMiningEntry } from './types';
 import { utcDay } from '@/engine/localDay';
 import type { RefineryMining } from './moonOwnerRefineries';
 
-/**
- * The accounting corporation's side of its moon owners (feeders): one row per
- * corporation for the Moon owners tab, one detail for its page. Pure; the
- * accrual is the engine's (`accrueValuedDays`) and mirrors what the server writes
- * into the moon owner's own view, so both sides show the same figure.
- */
-
 export type MoonOwnerPayout = FeederPayout & { id: string };
 
-/** What the tab reads of a feeder record (`BookFeeder` fits). */
 export interface MoonOwnerFeeder {
   corporationId: number;
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
   mode: FeederMode;
-  /** The CEO's own corporation, joined without an invite: always settled otherwise. */
   sameOwner?: boolean;
   note?: string;
   joinedAt: number;
   leftAt?: number;
-  /** ISO instant of the last good ledger read. */
   lastReadWellAt?: string;
-  /** When ESI first refused the ledger in the current spell (ms). */
   staleSince?: number;
   requestedRatePct?: number;
   agreedRatePct?: number;
   offeredOwnerRatePct?: number;
-  /** Who a payment goes to: a corporation or a player. Absent: the moon owner itself. */
   payee?: Payee;
   ownerRateHistory?: OwnerRateEntry[];
   modeChanges?: FeederModeChange[];
   coveragePeriods: CoveragePeriod[];
-  /** A pending removal (#4520); `effectiveAt` is set once its notice is out. */
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
-  /** Whether its grant reads refinery names (#4654); absent until a read since then. */
   readsStructureNames?: boolean;
-  /** Whether its grant reads the Extraction started notifications (each chunk's ore); absent until a read says. */
   readsNotifications?: boolean;
   payouts: readonly MoonOwnerPayout[];
 }
@@ -65,26 +50,17 @@ export type MoonOwnerStatus =
   | 'active'
   | 'cant-read'
   | 'removal-pending'
-  /** A removal whose notice mail has not gone out: it never takes effect until it does (#6210). */
   | 'removal-unsent'
   | 'settled-otherwise'
-  /** The moon owner asked for a rate the accounting corporation has not agreed yet (#6209). */
   | 'rate-asked'
   | 'no-rate'
   | 'disconnected'
   | 'left'
   | 'removed';
 
-/**
- * What the Moon owners tab reads of a moon owner's server-built view summary
- * (`corps/{book}/feederViews/{feeder}`, `FeederViewSummary` fits): one doc per moon owner in
- * place of every ledger row it recorded (ADR 0032, issue #5717).
- */
 export interface MoonOwnerSummary {
   schemaVersion: number;
-  /** The accrual rules it was built under; absent before #6209 (`FEEDER_VIEW_RULES`). */
   rulesVersion?: number;
-  /** The record's mode when it was built. */
   mode?: FeederMode;
   status: MoonOwnerFeeder['status'];
   builtAt: number;
@@ -92,45 +68,29 @@ export interface MoonOwnerSummary {
   coverageTo: string | null;
   lastReadWellAt: number | null;
   rateHistory: readonly Pick<OwnerRateEntry, 'kind' | 'pct' | 'effectiveFrom'>[];
-  /** Ore value at 100% over the covered days. */
   minedValueIsk: number;
   accruedIsk: number;
   paidIsk: number;
   balanceKind: BalanceDisplay['kind'];
   balanceIsk: number;
   refineryCount: number;
-  /** The refineries behind `refineryCount`; absent on a summary built before #6097. */
   refineryIds?: readonly number[];
-  /** Covered, billable days the server could not price; the entry path prices them again. */
   unpricedDays: number;
 }
 
 export interface MoonOwnersInput {
-  /** ISO instant the tab is read at. */
   now: string;
   graceHours: number;
   bookCorporationId: number;
   rates: readonly TaxRate[];
-  /**
-   * Observed rows grouped into entries, every refinery the book reads. A moon owner with a
-   * current summary needs none of them (see `summaryFor`).
-   */
   entries: readonly ObservedMiningEntry[];
   feeders: readonly MoonOwnerFeeder[];
-  /** Each moon owner's view summary, by corporation id; absent where it was not read. */
   summaries?: ReadonlyMap<number, MoonOwnerSummary>;
-  /** The refineries with an Extraction, by the moon owner that reads them (`extractionRefineriesOf`). */
   extractionRefineries?: ReadonlyMap<number, ReadonlySet<number>>;
-  /** The day's unit prices, by raw type id. */
   pricesOn: (date: string) => ReadonlyMap<number, number>;
-  /**
-   * What late notices priced each miner's line at (`billedPricesOf`), by day charge key then raw
-   * type id: an ore with no saved price takes it, as the moon owner's page does (#6209).
-   */
   billedPrices?: ReadonlyMap<string, Readonly<Record<number, number>>>;
 }
 
-/** Each late notice line's unit prices by its key; the first notice to list a line wins. */
 export function billedPricesOf(
   notices: readonly {
     lines: readonly { key: string; unitPrices?: Readonly<Record<number, number>> }[];
@@ -143,7 +103,6 @@ export function billedPricesOf(
   return out;
 }
 
-/** An entry's unit prices: the day's, with its line's billed price where the day has none. */
 function entryPrices(input: MoonOwnersInput, e: ObservedMiningEntry): ReadonlyMap<number, number> {
   const day = input.pricesOn(e.date);
   const billed = input.billedPrices?.get(`${e.characterId}:${e.structureId}:${e.date}`);
@@ -155,50 +114,32 @@ function entryPrices(input: MoonOwnersInput, e: ObservedMiningEntry): ReadonlyMa
 }
 
 export interface MoonOwnerRow {
-  /** The moon owner's corporation id, as a path segment. */
   id: string;
   corporationId: number;
   status: MoonOwnerStatus;
-  /** Refineries in its ledger rows or its Extractions. */
   refineryCount: number;
-  /** No ledger row and no Extraction yet: the row says so instead of "0 refineries". */
   nothingSeen?: true;
-  /** Ore value at 100% over their covered days. */
   mined: number;
-  /** First covered day. */
   since?: string;
-  /** Last day read: the day the ledger went stale, or where coverage ended. */
   until?: string;
-  /** The effective (agreed) owner rate today; absent when none is agreed. */
   theirRatePct?: number;
-  /** A rate the moon owner asked for that is not agreed yet (`pendingRateRequest`). */
   askedRatePct?: number;
-  /** What miners pay at their refineries. */
   minerRatePct?: number;
-  /** Whole ISK still owed to them; 0 when nothing is. */
   owed: number;
   balance: BalanceDisplay;
   lastReadWellAt?: string;
   staleSince?: number;
   mode: FeederMode;
-  /** One of the viewer's own corporations: no owner rate, no payouts. */
   sameOwner?: boolean;
-  /** False when its grant predates the structure scope: rows fall back to systems and ids. */
   readsStructureNames?: boolean;
-  /** False when its grant predates the notifications scope: its chunks' ore stays unknown. */
   readsNotifications?: boolean;
 }
 
-/** What the moon owner's grant reads, as far as a sync has said. */
 const grantReads = (f: MoonOwnerFeeder) => ({
   ...(f.readsStructureNames !== undefined ? { readsStructureNames: f.readsStructureNames } : {}),
   ...(f.readsNotifications !== undefined ? { readsNotifications: f.readsNotifications } : {}),
 });
 
-/**
- * Whether a row is on the pay list: whole ISK owed. A settled otherwise moon owner still owed what
- * accrued before the switch is on it too (#6209).
- */
 export const canPayMoonOwner = (row: Pick<MoonOwnerRow, 'owed'>) => row.owed > 0;
 
 export interface MoonOwnerTotals {
@@ -210,7 +151,6 @@ export interface MoonOwnerTotals {
 
 export { deriveModeChanges, deriveOwnerRateHistory };
 
-/** Each moon owner's refineries that have an Extraction, from the book's stored Extractions. */
 export function extractionRefineriesOf(
   extractions: readonly { structureId: number; sourceCorporationId?: number }[]
 ): Map<number, Set<number>> {
@@ -224,7 +164,6 @@ export function extractionRefineriesOf(
   return out;
 }
 
-/** A moon owner's refineries: those in its ledger rows and those with an Extraction. */
 function refineriesSeen(
   input: MoonOwnersInput,
   feederId: number,
@@ -240,7 +179,6 @@ const seen = (count: number): Pick<MoonOwnerRow, 'refineryCount' | 'nothingSeen'
   ...(count === 0 ? { nothingSeen: true as const } : {}),
 });
 
-/** The same from a summary; one from before it kept the ids can only say the larger of the two counts. */
 function refineriesSeenInSummary(
   input: MoonOwnersInput,
   feederId: number,
@@ -255,13 +193,6 @@ const paidOf = (payouts: readonly MoonOwnerPayout[]) =>
 
 const LIFECYCLE: readonly MoonOwnerFeeder['status'][] = ['disconnected', 'left', 'removed'];
 
-/**
- * Whether an officer's client should ask to send the "we can't read your ledger" mail (#6210):
- * the ledger of a moon owner still on the book (or just disconnected) cannot be read. One of
- * the viewer's own corporations is never mailed (as with its other moon owner mail), nor one whose
- * oldest unread mining EVE already dropped (the mail's "reconnect before" would be past). The
- * server hands the mail to one officer per stale spell.
- */
 export function staleLedgerMailDue(
   row: Pick<MoonOwnerRow, 'status' | 'staleSince' | 'sameOwner' | 'lastReadWellAt'>,
   now: string
@@ -275,7 +206,6 @@ export function staleLedgerMailDue(
   );
 }
 
-/** Whether the scheduled sync still reads a moon owner in this status (Sync now, "next read"). */
 export function isStillRead(status: MoonOwnerStatus): boolean {
   return !(LIFECYCLE as readonly string[]).includes(status);
 }
@@ -296,11 +226,9 @@ function statusOf(
   return 'active';
 }
 
-/** The row's rate fields and status: the agreed rate today and a request still waiting on it. */
 function rateFields(f: MoonOwnerFeeder, settledNow: boolean, today: string) {
   const history = deriveOwnerRateHistory(f);
   const rate = effectiveOwnerRate(history, today);
-  // A same-owner corporation never has a rate to agree.
   const asked = f.sameOwner ? undefined : pendingRateRequest(history);
   return {
     status: statusOf(f, settledNow, rate?.pct, asked),
@@ -309,11 +237,6 @@ function rateFields(f: MoonOwnerFeeder, settledNow: boolean, today: string) {
   };
 }
 
-/**
- * What miners pay at a moon owner's refineries today, resolved per entry the way billing does
- * (`buildDayCharges`): Guest when recorded outside the book's corporation, by refinery and moon.
- * When it varies, the rate most of their entries take (the higher on a tie). No ore yet: Guests.
- */
 function minerRateAt(
   input: MoonOwnersInput,
   feederId: number,
@@ -338,30 +261,19 @@ function minerRateAt(
   return top && { pct: top[0] };
 }
 
-/** A rate history as one comparable string: kind, rate and day, in day order. */
 const historyKey = (h: readonly Pick<OwnerRateEntry, 'kind' | 'pct' | 'effectiveFrom'>[]) =>
   h
     .map((e) => `${e.kind}|${e.pct}|${e.effectiveFrom}`)
     .sort()
     .join(';');
 
-/** The accrual rules a view summary must be built under to stand in for the rows (`functions/` writes it). */
 export const FEEDER_VIEW_RULES = 2;
 
-/**
- * The moon owner's summary when it still says what the record says, else undefined and the
- * entries are priced instead. The server rebuilds a view on a ledger read, a payout, a payee
- * change, a leave or removal and a dismissal, but not when an officer sets a rate or mode, and a
- * day it could not price is priced later: any of those leaves a summary behind the record, so
- * the figures here must not come from it. Nothing is read to check: the record is already held.
- */
 export function summaryFor(
   input: MoonOwnersInput,
   f: MoonOwnerFeeder
 ): MoonOwnerSummary | undefined {
   const s = input.summaries?.get(f.corporationId);
-  // A summary built before the #6209 rules (a request alone accruing, settled otherwise dropping
-  // what was owed) carries no `rulesVersion`: its figures cannot stand.
   if (
     !s ||
     s.schemaVersion !== 1 ||
@@ -372,12 +284,9 @@ export function summaryFor(
     return undefined;
   const today = input.now.slice(0, 10);
   const modes = deriveModeChanges(f);
-  // The summary carries only today's mode and the outer coverage bounds: a closed settled window
-  // or an interior coverage period could have moved without a rebuild and cannot be told apart.
   if (modes.length > 1 || modes[0]?.mode === 'normal' || f.coveragePeriods.length > 2)
     return undefined;
   const settledNow = isSettledOn(modes, today);
-  // A mode switch does not rebuild the summary; a settled moon owner may still be owed.
   if (s.mode !== f.mode) return undefined;
   if (s.balanceKind === 'none' && !settledNow) return undefined;
   if (settledNow && s.balanceKind !== 'none' && s.balanceKind !== 'owed') return undefined;
@@ -391,11 +300,6 @@ export function summaryFor(
   return s;
 }
 
-/**
- * What miners pay at a moon owner's refineries, with no entry to ask. Exact when no rate depends
- * on the entry (a Guest, per-refinery or per-moon rate does): then it is the rate every entry
- * resolves to. Otherwise undefined, and the caller reads the entries if it holds any.
- */
 function minerRateWithoutEntries(
   input: MoonOwnersInput,
   feederId: number,
@@ -403,7 +307,6 @@ function minerRateWithoutEntries(
   noRows: boolean
 ): { pct: number } | undefined | 'depends' {
   const base = { date: today, minerId: '', recordKey: '', feederId, moonId: undefined };
-  // The entry path prices a moon owner with no ore yet as Guests.
   if (noRows) return resolveRate(input.rates, { ...base, isGuest: true });
   if (
     input.rates.some(
@@ -418,7 +321,6 @@ function minerRateWithoutEntries(
   return resolveRate(input.rates, { ...base, isGuest: false });
 }
 
-/** A moon owner's row from its summary: the figures the server already worked out from its rows. */
 function workFromSummary(
   input: MoonOwnersInput,
   f: MoonOwnerFeeder,
@@ -436,7 +338,6 @@ function workFromSummary(
     .at(-1);
   const until = f.staleSince !== undefined ? utcDay(f.staleSince) : open ? undefined : lastTo;
   const rated = minerRateWithoutEntries(input, f.corporationId, today, s.refineryCount === 0);
-  // The entries are held only until the page stops reading them; none held is not "no ore yet".
   const own = rated === 'depends' ? entries() : [];
   const minerRate =
     rated === 'depends'
@@ -466,14 +367,11 @@ function workFromSummary(
 interface Worked {
   row: MoonOwnerRow;
   accrued: number;
-  /** The days that accrued, for the payment's reason. */
   accruedDays: { date: string }[];
   covered: ObservedMiningEntry[];
-  /** Each covered entry's value at 100%, by index into `covered`. */
   coveredValues: number[];
 }
 
-/** The book's entries by the moon owner whose refinery recorded them, in their order. */
 function entriesBySource(entries: readonly ObservedMiningEntry[]) {
   const out = new Map<number | undefined, ObservedMiningEntry[]>();
   for (const e of entries) {
@@ -493,7 +391,6 @@ function work(
   const history = deriveOwnerRateHistory(f);
   const modeChanges = deriveModeChanges(f);
   const covered = own.filter((e) => isDayCovered(f.coveragePeriods, e.date));
-  // Each entry priced once: the accrual, `mined` and the detail's lines share it.
   const coveredValues = covered.map(
     (e) => computeAssignmentValue(e.oreLines, entryPrices(input, e), 100).estimatedValue
   );
@@ -553,7 +450,6 @@ function work(
   };
 }
 
-/** A moon owner who left or was removed stays listed only while it is still owed. */
 const listed = (row: MoonOwnerRow) =>
   (row.status !== 'left' && row.status !== 'removed') || row.owed > 0;
 
@@ -566,12 +462,6 @@ const NEEDS_A_LOOK: readonly MoonOwnerStatus[] = [
   'disconnected',
 ];
 
-/**
- * Whether the Moon owners tab must have the ledger rows (#5717): a moon owner whose summary no
- * longer says what its record says (`summaryFor`), or whose miner rate depends on an entry
- * (`minerRateWithoutEntries`), is priced from rows. Anything else renders from the summaries,
- * and the tab never reads `observed`.
- */
 export function moonOwnersNeedRows(input: Omit<MoonOwnersInput, 'entries' | 'pricesOn'>): boolean {
   const full: MoonOwnersInput = { ...input, entries: [], pricesOn: () => new Map() };
   const today = input.now.slice(0, 10);
@@ -588,7 +478,6 @@ export function buildMoonOwners(input: MoonOwnersInput): {
   rows: MoonOwnerRow[];
   totals: MoonOwnerTotals;
 } {
-  // Grouped only when a moon owner has no current summary (or its miner rate depends on entries).
   let bySource: ReturnType<typeof entriesBySource> | undefined;
   const entriesOf = (id: number) => (bySource ??= entriesBySource(input.entries)).get(id) ?? [];
   const rows = input.feeders
@@ -623,10 +512,8 @@ export function buildMoonOwners(input: MoonOwnersInput): {
 export interface MoonOwnerMinedLine {
   characterId: number;
   structureId: number;
-  /** Ore types mined, most first. */
   oreTypeIds: number[];
   quantity: number;
-  /** At 100%. */
   value: number;
 }
 
@@ -635,20 +522,15 @@ export interface MoonOwnerDetail {
   note?: string;
   joinedAt: number;
   offeredOwnerRatePct?: number;
-  /** The rate they asked for, when they asked. */
   requestedRatePct?: number;
-  /** Newest first. */
   history: OwnerRateEntry[];
-  /** Newest first. */
   payouts: MoonOwnerPayout[];
   accrued: number;
   paid: number;
   mined: MoonOwnerMinedLine[];
   hasPayee: boolean;
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
-  /** Who a payment goes to. */
   payee: Payee;
-  /** The days a payment now covers, for its reason; absent when nothing accrued. */
   period?: { from: string; to: string };
 }
 
@@ -713,10 +595,6 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
   };
 }
 
-/**
- * What was mined at a moon owner's refineries, one line per recorded day on the covered days and
- * valued at 100%: the page's "Mined" figures, split by day for a refinery's own page (#6298).
- */
 export function moonOwnerRefineryMining(
   input: MoonOwnersInput,
   id: number

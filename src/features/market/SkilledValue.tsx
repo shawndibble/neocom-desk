@@ -1,12 +1,3 @@
-/**
- * Item Detail's "base → skilled" figure (DESIGN.md §6c): the base dim, then
- * the pilot's value in `success` with a dashed underline — the figure opener,
- * a plain button whose popover says what made it: each skill at the pilot's
- * level, each implant, the hull's own bonus. `extra` joins the same popover
- * (a row's "which skill changes this" lines), so one number is one trigger.
- * A figure the pilot's skills don't change (`neutral`) is the same opener on
- * the plain base number: dashed underline, no bold, no green, no arrow.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -32,18 +23,12 @@ function sourceLine(source: NamedSkilledSource, t: TFunction): string {
 }
 
 export interface SkilledValueProps {
-  /** The base figure, number only (dim, before the arrow); left out where base has its own column. */
   base?: string;
-  /** The pilot's figure as shown (with its unit, unless a column header carries it). */
   skilled: string;
-  /** What a screen reader hears for the whole figure. */
   spoken: string;
-  /** What the popover is about, for its accessible name ("Armor Hitpoints"). */
   label: string;
   sources: readonly NamedSkilledSource[];
-  /** More lines for the same popover (a row's per-skill effects and Add buttons). */
   extra?: ReactNode;
-  /** The pilot's skills leave this figure at its base value: no green, no bold. */
   neutral?: boolean;
   className?: string;
 }
@@ -73,7 +58,6 @@ export function SkilledValue({
           <button
             type="button"
             className={cx(figureOpenerClassName, !neutral && 'font-semibold text-success')}
-            // §6c figure opener: the press never reaches a row beneath.
             onClick={(event) => event.stopPropagation()}
           >
             <span aria-hidden>{skilled}</span>

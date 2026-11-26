@@ -1,8 +1,3 @@
-/**
- * The rows were each scored alone: one recalculation of the ticked set checks
- * them together. Returns what the footer shows of that check: the summary,
- * whether the set overruns, the covers on offer and whether Apply is open.
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   applyImproveCandidate,
@@ -63,7 +58,6 @@ export function useSelectionCheck({ search, fitting, target, iskBudget, chosen }
           target,
         })
       : null;
-  // The ticked rows were each checked alone; together they can overrun, and the pilot is then offered what covers it.
   const overruns = summary?.problems.some((problem) => problem.kind === 'over') ?? false;
   const covers = useCoverSearch({
     fitting,
@@ -85,7 +79,6 @@ export function useSelectionCheck({ search, fitting, target, iskBudget, chosen }
             )
         )
       : null;
-  // The set as one change with its overrun, for the implant alternative; stable so the finder is not re-run each render.
   const setAsFix = useMemo<RejectedOption | null>(() => {
     const candidate = mergeCandidates(chosen.map((pick) => pick.candidate));
     if (!fitting || !checked || !candidate || !summary || !overruns) return null;
@@ -98,10 +91,8 @@ export function useSelectionCheck({ search, fitting, target, iskBudget, chosen }
       lost: [],
       guardrail: 'budget',
     };
-    // `summary` follows `checked` and `chosen`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitting, checked, chosenKey, overruns]);
-  // A pending check holds Apply back; a failed one (each row was valid alone) warns but does not block.
   const canApply =
     chosen.length > 0 &&
     (!checkable || checked === null || (summary !== null && summary.problems.length === 0));

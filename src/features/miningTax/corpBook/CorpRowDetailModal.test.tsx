@@ -254,8 +254,6 @@ describe('CorpRowDetailModal', () => {
     ).toBeInTheDocument();
   });
 
-  // The Bureau report: the book holds the payment but spent it on an older day it still bills.
-
   it('says what a Market adjustment forgave', () => {
     renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });
     expect(
@@ -322,7 +320,6 @@ describe('CorpRowDetailModal: Resolve on a Late notice (#6206, resolving in the 
     expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
   });
 
-  // A plain billed day can still be paid, or said no to: pay / not paying.
   it('offers a plain billed day Resolve even before a Late notice asks for it', async () => {
     const onResolve = vi.fn();
     renderModal({ onResolve, corp: { ...corp, view: { ...view, dispute: undefined } } });

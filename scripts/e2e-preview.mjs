@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-/**
- * Serves `dist/` for the Playwright `built` project (#205) — but refuses to
- * start on a `dist/` that is missing or older than the sources it was built
- * from.
- *
- * `vite preview` on its own would happily serve a stale bundle, and the
- * whole point of that project is to catch a production-only CSS regression:
- * a run against yesterday's `dist/` passes green while proving nothing. The
- * failure has to be loud, which means here, at server start, rather than as
- * a confusing assertion failure three specs later.
- */
 import { spawn } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,19 +6,8 @@ import { join } from 'node:path';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
-/**
- * Everything whose edit should invalidate `dist/`. `src/` covers the
- * stylesheet the built project exists to check; `index.html` and the Vite
- * config shape the bundle itself.
- */
 const SOURCE_INPUTS = ['src', 'public', 'index.html', 'vite.config.ts', 'package.json'];
 
-/**
- * Editing a test never changes the bundle, so it must not mark it stale.
- * This mirrors `tsconfig.src.json`'s `exclude` rather than inventing its
- * own rule — the two answer the same question ("is this a bundle input?"),
- * and a looser rule here reports a stale `dist/` that a rebuild won't fix.
- */
 const testSupportDir = join(repoRoot, 'src', 'test');
 const isExcludedFile = (name) =>
   /\.test\.tsx?$/.test(name) || name === 'test-helpers.ts' || name.endsWith('.stories.tsx');
@@ -40,7 +18,7 @@ function newestMtimeMs(path) {
   try {
     stats = statSync(path);
   } catch {
-    return 0; // Optional input (e.g. no `public/`) — nothing to compare.
+    return 0;
   }
   if (!stats.isDirectory()) return stats.mtimeMs;
   let newest = 0;
@@ -65,8 +43,6 @@ if (distIndexMtime === 0) {
   );
 }
 
-// CI builds `dist/` in one job and downloads it into the shards, so its mtimes
-// carry no information there; that job opts out of the comparison.
 const skipStaleCheck = process.env.E2E_PREVIEW_SKIP_STALE_CHECK === '1';
 const newestSourceMtime = skipStaleCheck
   ? 0
@@ -79,9 +55,6 @@ if (newestSourceMtime > distIndexMtime) {
   );
 }
 
-// The vite binary directly rather than `npm run preview`, so there is no
-// shell or `.cmd` shim between Playwright's process tree and the server it
-// has to be able to kill.
 const vite = join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js');
 const child = spawn(process.execPath, [vite, 'preview', ...process.argv.slice(2)], {
   cwd: repoRoot,

@@ -1,9 +1,3 @@
-/**
- * Sticky headers must not cover the keyboard-focused control (issue #3383,
- * WCAG 2.4.11 Focus Not Obscured). Asserted on rendered bounding boxes: tab
- * backwards through a long list and check each focused control sits below
- * the sticky bar, not that some class is present.
- */
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -19,7 +13,6 @@ const ALL_SKILLS = JSON.parse(
   readFileSync(new URL('../public/data/skills.json', import.meta.url), 'utf8')
 ) as SkillRow[];
 
-/** Every `step`th skill, so the picks span many groups. */
 function pickSkills(count: number): number[] {
   const step = Math.max(1, Math.floor(ALL_SKILLS.length / count));
   return ALL_SKILLS.filter((_, i) => i % step === 0)
@@ -47,14 +40,12 @@ async function putRecord(page: Page, store: string, record: Record<string, unkno
   );
 }
 
-/** Focused element's top and its tag/label, after a frame so any focus scroll has settled. */
 async function focusedBox(page: Page, insideSelector: string) {
   return page.evaluate(async (selector) => {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const el = document.activeElement as HTMLElement | null;
     if (!el || !el.closest(selector)) return null;
     const rect = el.getBoundingClientRect();
-    // The sticky bar: the nearest sticky ancestor of the first search box.
     const search = [...document.querySelectorAll('input')].find((i) =>
       /search/i.test(i.placeholder)
     );
@@ -67,11 +58,6 @@ async function focusedBox(page: Page, insideSelector: string) {
   }, insideSelector);
 }
 
-/**
- * The first assertion after a `goto` waits out the route's cold load (seen failing the
- * Plan editor test at the default 5s on a CI shard, when this ran on the dev server).
- * Same allowance as segmentedSelectedCue.spec.ts.
- */
 const COLD_LOAD = { timeout: 15_000 };
 
 test('Skills > Trained: Shift+Tab through rows never lands under the sticky search bar', async ({
@@ -107,12 +93,10 @@ test('Skills > Trained: Shift+Tab through rows never lands under the sticky sear
   expect(count).toBeGreaterThan(40);
   await rowButtons.last().focus();
 
-  // The board lists every skill in the SDE, hundreds of rows, so walk a long
-  // stretch of them rather than all.
   let checked = 0;
   for (let i = 0; i < Math.min(count + 5, 80); i += 1) {
     const focused = await focusedBox(page, 'main section');
-    if (!focused) break; // left the list (reached the sticky bar's controls)
+    if (!focused) break;
     expect(focused.top, `"${focused.label}" is under the sticky bar`).toBeGreaterThanOrEqual(
       focused.barBottom - 0.5
     );
@@ -171,9 +155,7 @@ test('Plan editor: Shift+Tab / Tab through the entry list never lands under the 
     }
   };
 
-  // Backwards through the entry list and up into the toolbar (Columns, Group by, Add skill)...
   await visit('Shift+Tab', 90);
-  // ...and forwards again.
   await visit('Tab', 40);
   expect(checked).toBeGreaterThan(50);
 });

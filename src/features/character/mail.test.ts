@@ -263,7 +263,6 @@ describe('prefetchMailBodies', () => {
     await prefetchMailBodies(CHAR_ID, headers);
 
     expect(hits).toBe(1);
-    // The others were cached by the first run and are not asked for again either.
     expect(requested.sort()).toEqual([10, 20]);
   });
 
@@ -277,7 +276,6 @@ describe('prefetchMailBodies', () => {
 });
 
 describe('markMailReadOnEsi', () => {
-  // `organize_mail` is off by default (Write to EVE): most cases run with it held.
   beforeEach(async () => {
     await db.tokens.clear();
     await db.tokens.put({
@@ -708,15 +706,15 @@ describe('setMailReadOnEsi and deleteMailOnEsi', () => {
       return [value.labels[0].unread_count, value.total_unread_count];
     };
 
-    await setMailReadOnEsi(CHAR_ID, 8, true); // unread -> read
+    await setMailReadOnEsi(CHAR_ID, 8, true);
     expect(await counts()).toEqual([1, 1]);
-    await setMailReadOnEsi(CHAR_ID, 8, true); // already read: no change
+    await setMailReadOnEsi(CHAR_ID, 8, true);
     expect(await counts()).toEqual([1, 1]);
-    await setMailReadOnEsi(CHAR_ID, 7, false); // read -> unread
+    await setMailReadOnEsi(CHAR_ID, 7, false);
     expect(await counts()).toEqual([2, 2]);
-    await deleteMailOnEsi(CHAR_ID, 7); // deleting an unread mail
+    await deleteMailOnEsi(CHAR_ID, 7);
     expect(await counts()).toEqual([1, 1]);
-    await deleteMailOnEsi(CHAR_ID, 8); // deleting a read mail: no change
+    await deleteMailOnEsi(CHAR_ID, 8);
     expect(await counts()).toEqual([1, 1]);
   });
 

@@ -4,13 +4,12 @@ import { brokerFeeComparison, reprocessingTaxPct } from './stationFees';
 
 describe('reprocessingTaxPct', () => {
   it.each([
-    // [take %, standing, expected %]
     [5, 0, 5],
     [5, 1, 4.25],
     [5, 5, 1.25],
     [5, 6, 0.5],
     [5, 20 / 3, 0],
-    [5, 6.67, 0], // 0.15 * 6.67 passes 1: floored, never negative
+    [5, 6.67, 0],
     [5, 8, 0],
     [5, 10, 0],
     [2.5, 0, 2.5],

@@ -1,20 +1,9 @@
-// SRP officer decisions (ADR 0026): the pure half. Input parsing and the
-// state-transition rules for approve, reject, change amount and mark paid, with no Firestore. The
-// transaction that applies a decision is in srpOfficerStore.ts.
-//
-// State machine (anything else is refused): pending -> approved | rejected, approved -> paid.
-// An amount may also be changed while a claim is pending or approved (never once paid or rejected).
-// An officer never decides their own claim: another officer must.
-// `closedAt` is set when a claim becomes paid or rejected (the retention sweep keys on it).
-// The app never moves ISK: an officer pays in game, then marks the claim paid.
-
 import { fail } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import { int } from './corpTaxBook.js';
 import type { SrpClaimState } from './srpTypes.js';
 
-/** The most claims one batch call touches. */
 export const MAX_SRP_BATCH = 50;
 export const MAX_SRP_AMOUNT = 1e13;
 export const MAX_SRP_REASON = 500;
@@ -24,17 +13,12 @@ const killmailId = (value: unknown) => int(value, 'killmailId', 1, KILLMAIL_ID_M
 const amountField = (value: unknown) => int(value, 'amount', 1, MAX_SRP_AMOUNT);
 const reasonField = (value: unknown) => boundedString(value, 'reason', MAX_SRP_REASON);
 
-/**
- * The amount the officer saw, whole ISK, or null when the claim showed none. Omitted means no
- * check. A claim whose stored amount differs is refused (`amount-changed`).
- */
 function expectedAmountField(value: unknown): number | null {
   return value === null ? null : amountField(value);
 }
 
 export interface ApproveItem {
   killmailId: number;
-  /** An officer-typed or overriding amount, whole ISK. */
   amount?: number;
   reason?: string;
   expectedAmount?: number | null;
@@ -81,7 +65,6 @@ export function parseMarkPaidItem(data: unknown): MarkPaidItem {
   return item;
 }
 
-/** `claims: [{ killmailId, expectedAmount? }]`. */
 export function parseMarkPaidBatch(data: unknown): MarkPaidItem[] {
   const d = record(data);
   return distinct(list(d.claims, 'claims').map(parseMarkPaidItem));
@@ -112,18 +95,14 @@ export function parseChangeAmount(data: unknown): ChangeAmountItem {
   };
 }
 
-// --- Decisions ---------------------------------------------------------------
-
 export interface Officer {
   characterId: number;
   characterName: string;
 }
 
-/** What the result mail needs, plus the new state. */
 export interface SrpClaimOutcome {
   killmailId: number;
   state: SrpClaimState;
-  /** The pilot the claim belongs to. */
   characterId: number | null;
   characterName: string | null;
   amount: number | null;
@@ -131,9 +110,7 @@ export interface SrpClaimOutcome {
 }
 
 export interface Decision {
-  /** Fields to merge into the claim doc. */
   patch: Record<string, unknown>;
-  /** The audit entry's `detail`. */
   detail: Record<string, unknown>;
   outcome: SrpClaimOutcome;
 }
@@ -160,7 +137,6 @@ function outcomeOf(
   };
 }
 
-/** The claim, once it exists, is in one of `from`, and is not the deciding officer's own. */
 function requireState(
   claim: ClaimData,
   from: SrpClaimState | SrpClaimState[],
@@ -181,7 +157,6 @@ function requireState(
   return claim;
 }
 
-/** Refuses a decision on an amount the officer did not see. */
 function requireExpectedAmount(
   claim: Record<string, unknown>,
   expected: number | null | undefined
@@ -191,7 +166,6 @@ function requireExpectedAmount(
   }
 }
 
-/** The fields that record an amount an officer set, keeping what the server worked out. */
 function overrideFields(
   claim: Record<string, unknown>,
   officer: Officer,
@@ -202,7 +176,6 @@ function overrideFields(
   const computed = amountOf(claim);
   return {
     amount,
-    // The first computed figure stays visible through later changes.
     computedAmount: claim.computedAmount ?? computed,
     amountSource: computed === null && claim.computedAmount === undefined ? 'typed' : 'override',
     ...(reason === undefined ? {} : { overrideReason: reason }),
@@ -212,7 +185,6 @@ function overrideFields(
   };
 }
 
-/** Pending -> approved. An amount that differs from the worked-out one needs a reason; none known needs a typed one. */
 export function decideApprove(
   claimData: ClaimData,
   item: ApproveItem,
@@ -255,7 +227,6 @@ export function decideApprove(
   };
 }
 
-/** Pending -> rejected, with the reason the pilot is told. */
 export function decideReject(
   claimData: ClaimData,
   item: RejectItem,
@@ -282,7 +253,6 @@ export function decideReject(
   };
 }
 
-/** A pending or approved claim keeps its state (and has no closedAt); its amount changes, with a reason. */
 export function decideChangeAmount(
   claimData: ClaimData,
   item: ChangeAmountItem,
@@ -312,7 +282,6 @@ export function decideChangeAmount(
   };
 }
 
-/** Approved -> paid: the officer paid in game; the app records it. */
 export function decideMarkPaid(
   claimData: ClaimData,
   item: MarkPaidItem,

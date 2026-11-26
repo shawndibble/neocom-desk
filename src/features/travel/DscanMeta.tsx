@@ -17,12 +17,6 @@ const SHOWN_LINES = 4;
 const cardClassName = 'space-y-1 rounded-xs border border-line p-3';
 const captionClassName = eyebrowClassName;
 
-/**
- * Two read-only cards under the Read-out (issue #3151): what the hulls on the
- * scan are worth at the market hub, and how the scan differs from the last one
- * pasted on this device. `trackHistory` is set only by the live Pilot Lookup:
- * a Shared D-Scan neither reads nor overwrites this device's last scan.
- */
 export function DscanMeta({
   hulls,
   names,
@@ -33,9 +27,7 @@ export function DscanMeta({
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
   trackHistory: boolean;
-  /** The earlier scan from `useLastScan`; only read when `trackHistory` is set. */
   previous: HullCount[] | null | undefined;
-  /** Set only in wormhole space: the Worth card adds the hole sizes. */
   holes: HoleSizeRead | null;
 }) {
   return (
@@ -58,7 +50,6 @@ function WorthCard({
   const { t } = useTranslation();
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-  // Tagged with the scan and hub they were fetched for, so a new scan never reads old prices.
   const [fetched, setFetched] = useState<{
     key: string;
     prices: ReadonlyMap<number, number | null>;
@@ -72,7 +63,6 @@ function WorthCard({
       hulls.map((h) => h.typeId)
     )
       .then((found) => new Map([...found].map(([typeId, agg]) => [typeId, agg.sellMin])))
-      // A failed fetch reads as no price, the same as an unlisted hull.
       .catch(() => new Map<number, number | null>())
       .then((found) => {
         if (!cancelled) setFetched({ key, prices: found });
@@ -132,11 +122,6 @@ function WorthCard({
   );
 }
 
-/**
- * The smallest wormhole each ship needs and the hulls' base mass: a hull too
- * heavy for a hole can never pass it, and the mass is a floor. Neither says
- * the fleet can pass a hole.
- */
 function HoleSizes({ read }: { read: HoleSizeRead }) {
   const { t } = useTranslation();
   return (
@@ -162,7 +147,6 @@ function SinceLastScanCard({
   names,
 }: {
   hulls: readonly HullCount[];
-  /** undefined = still reading Dexie; null = no earlier scan stored. */
   previous: HullCount[] | null | undefined;
   names: ReadonlyMap<number, string>;
 }) {

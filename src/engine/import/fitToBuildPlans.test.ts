@@ -3,13 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { parseEftFit } from './eftFit';
 import { fitToBuildPlans, type FitBlueprintLookup } from './fitToBuildPlans';
 
-/**
- * The pinned fixture from the Build Groups spec (issue #626). A real Buzzard
- * fit, chosen because it exercises every quantity form at once: repeated
- * module lines, a bare single line, and an `xN` cargo suffix — plus three
- * items with no blueprint at all, which is the routine case rather than the
- * edge one.
- */
 const BUZZARD_FIT = `[Buzzard, Loru's Max Hacker]
 Inertial Stabilizers II
 Inertial Stabilizers II
@@ -31,12 +24,6 @@ Small Low Friction Nozzle Joints II
 
 Sisters Core Scanner Probe x16`;
 
-/**
- * Faction ("Sisters ...") and named/meta ("... Enduring ...") modules drop from
- * NPCs and have no blueprint, so the lookup returns null for them exactly as
- * the real catalog does. Everything else resolves, one unit per run unless
- * stated — `unitsPerRun` is what forces the runs/spare arithmetic.
- */
 const BUILDABLE: Record<string, { blueprintTypeID: number; unitsPerRun: number }> = {
   buzzard: { blueprintTypeID: 11194, unitsPerRun: 1 },
   'inertial stabilizers ii': { blueprintTypeID: 1406, unitsPerRun: 1 },
@@ -69,7 +56,6 @@ describe('fitToBuildPlans — Buzzard fixture', () => {
   it('yields the hull plus 12 distinct items (13 rows in all)', () => {
     const result = runFixture();
     expect(result.hull?.productName).toBe('Buzzard');
-    // 12 distinct non-hull entries: 9 buildable items + 3 skipped.
     expect(result.items).toHaveLength(9);
     expect(result.skipped).toHaveLength(3);
     expect(result.items.length + result.skipped.length + 1).toBe(13);
@@ -79,7 +65,6 @@ describe('fitToBuildPlans — Buzzard fixture', () => {
     const result = runFixture();
     const stabs = result.items.find((i) => i.productName === 'Inertial Stabilizers II');
     expect(stabs?.quantity).toBe(2);
-    // One unit per run, so runs tracks quantity and nothing is left over.
     expect(stabs?.runs).toBe(2);
     expect(stabs?.spare).toBe(0);
 
@@ -90,8 +75,6 @@ describe('fitToBuildPlans — Buzzard fixture', () => {
   });
 
   it('reads an xN cargo suffix as that quantity', () => {
-    // Skipped, not built — but the quantity still has to survive, so the
-    // pilot is told how many of it they were not given a plan for.
     const result = runFixture();
     const probes = result.skipped.find((s) => s.name === 'Sisters Core Scanner Probe');
     expect(probes?.quantity).toBe(16);
@@ -131,7 +114,6 @@ describe('fitToBuildPlans — runs and spare', () => {
     const fit = parseEftFit('[Drake, PvE]\n\nScourge Fury Heavy Missile x150');
     const [row] = fitToBuildPlans(fit, ammoLookup).items;
     expect(row.runs).toBe(2);
-    // 2 runs x 100 = 200 made for 150 needed.
     expect(row.spare).toBe(50);
   });
 
@@ -141,8 +123,6 @@ describe('fitToBuildPlans — runs and spare', () => {
   });
 
   it('clamps runs to the ceiling the plan itself computes at', () => {
-    // A stored 2,000,000,000 would *display* as itself while every number on
-    // the page was computed at computeBuildPlan's own clamp — a silent lie.
     const fit = parseEftFit('[Drake, PvE]\n\nScourge Fury Heavy Missile x2000000000');
     const [row] = fitToBuildPlans(fit, ammoLookup).items;
     expect(row.runs).toBe(MAX_JOB_RUNS);
@@ -161,9 +141,6 @@ describe('fitToBuildPlans — charges', () => {
   it('excludes a module-line charge by default', () => {
     const result = fitToBuildPlans(parseEftFit(fitText), bothLookup);
     expect(result.items.map((i) => i.productName)).toEqual(['Heavy Missile Launcher II']);
-    // Withheld deliberately, so it is reported rather than silently absent:
-    // EFT gives a loaded charge its module line's quantity, which is a count
-    // of launchers, not a production batch.
     expect(result.excludedCharges.map((c) => c.name)).toEqual(['Scourge Fury Heavy Missile']);
   });
 
@@ -189,8 +166,6 @@ describe('fitToBuildPlans — merging and degenerate headers', () => {
   });
 
   it('keeps the hull from a bare [Ship] header, with no group name to show for it', () => {
-    // A bare `[Buzzard]` is a readable header, so the hull survives (issue
-    // #630) — but there is no fit name, and an empty one is not a name.
     const result = fitToBuildPlans(parseEftFit('[Buzzard]\nInertial Stabilizers II'), lookup);
     expect(result.headerFailed).toBe(false);
     expect(result.hull?.productName).toBe('Buzzard');
@@ -198,9 +173,6 @@ describe('fitToBuildPlans — merging and degenerate headers', () => {
   });
 
   it('reports an unreadable header as an error and imports no hull', () => {
-    // An unreadable header costs the hull too — surfaced, never silent. The
-    // group name says nothing on its own now that a bare `[Ship]` header
-    // yields a hull with no fit name, so `headerFailed` is the signal.
     const result = fitToBuildPlans(parseEftFit('Inertial Stabilizers II'), lookup);
     expect(result.headerFailed).toBe(true);
     expect(result.hull).toBeNull();

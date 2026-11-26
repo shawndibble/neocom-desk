@@ -39,7 +39,6 @@ describe('PageHubsField', () => {
   it('adds a page from the ones without a hub, starting at the Global hub', async () => {
     render(<PageHubsField />);
     await userEvent.click(screen.getByRole('button', { name: /Add page hub/ }));
-    // Contracts already has one, so it is not offered.
     expect(screen.queryByRole('menuitem', { name: 'Contracts' })).toBeNull();
     await userEvent.click(screen.getByRole('menuitem', { name: 'Ship Fit Costs' }));
     await waitFor(() =>
@@ -48,7 +47,6 @@ describe('PageHubsField', () => {
   });
 
   it('with one page left to add, a plain button names it', async () => {
-    // Every page but Contracts has its own hub.
     await usePageHubs
       .getState()
       .setValue(
@@ -67,11 +65,9 @@ describe('PageHubsField', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove Contracts hub' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({}));
     expect(screen.getAllByText('Contracts uses your Trade Hub again').length).toBeGreaterThan(0);
-    // Focus moves off the removed row; with no row left, to Add.
     await waitFor(() => expect(screen.getByRole('button', { name: /Add page hub/ })).toHaveFocus());
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' }));
-    // Undo closes its own toast.
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
   });
 
@@ -82,7 +78,6 @@ describe('PageHubsField', () => {
       'Rens'
     );
     expect(screen.getByText('Using your Trade Hub for now')).toBeInTheDocument();
-    // Not offered to add: it already has one.
     await userEvent.click(screen.getByRole('button', { name: /Add page hub/ }));
     expect(screen.queryByRole('menuitem', { name: 'Skills' })).toBeNull();
     await userEvent.keyboard('{Escape}');

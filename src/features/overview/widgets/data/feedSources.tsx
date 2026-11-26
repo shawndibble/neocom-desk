@@ -1,15 +1,3 @@
-/**
- * How each feed is read, declared once per `FeedId`.
- *
- * `FEED_SOURCES` is typed over every `FeedId`, so a feed added to `FeedMap`
- * without a source fails the typecheck, and a feed no kind reads fails
- * `kindRegistry.test.ts`. The provider mounts one source per feed the layout's
- * kinds read; nothing else decides how a feed is fetched.
- *
- * Two kinds of source: a `snapshot` (an async load through `useRouteSnapshot`,
- * reloaded when the refresh epoch moves) and a `hook` (a component that reads
- * synced stores or a board hook and reports through `useReportFeed`).
- */
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -109,9 +97,7 @@ export type FeedSource<K extends FeedId = FeedId> =
   | {
       type: 'snapshot';
       load: Load<FeedMap[K]>;
-      /** The persisted snapshot's key; a return visit restores the read on its first frame. */
       cacheKey: string;
-      /** The read covers every Character, so switching the header Character must not reload it. */
       accountWide: boolean;
     }
   | { type: 'hook'; Component: ComponentType };
@@ -124,13 +110,8 @@ function snapshot<K extends FeedId>(
   return { type: 'snapshot', load, cacheKey, accountWide };
 }
 
-/** A stand-in id for a read that does not depend on the header Character. */
 const ACCOUNT_WIDE = 0;
 
-/**
- * Reports a source's state into the feed store and clears it on unmount: the
- * effect pair every source needs, in one place.
- */
 function useReportFeed<K extends FeedId>(
   feed: K,
   data: FeedMap[K] | null,
@@ -144,7 +125,6 @@ function useReportFeed<K extends FeedId>(
   useEffect(() => () => store.clear(feed), [store, feed]);
 }
 
-/** A read made through `useRouteSnapshot`, reloaded whenever the refresh epoch moves. */
 function SnapshotSource<K extends FeedId>({
   feed,
   source,
@@ -160,8 +140,6 @@ function SnapshotSource<K extends FeedId>({
   );
   const { refresh } = snapshotState;
 
-  // Skip the epoch this source mounted at: a widget added after a refresh must
-  // not refetch what its own first load is already fetching.
   const seen = useRef(epoch);
   useEffect(() => {
     if (seen.current === epoch) return;
@@ -185,12 +163,10 @@ function IncursionsSource() {
   return <IncursionsBoardSource refreshKey={epoch} onChange={setData} />;
 }
 
-/** The synced SP Extraction settings and the hub price, which are hooks, not loads. */
 function SpExtrasSource() {
   const enabled = useSpExtractionMonitoringEnabled((state) => state.value);
   const farm = useSpFarmCharacters((state) => state.value);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  // Only a character marked SP Farm is ever flagged ready (#5658).
   const monitoring =
     enabled && activeCharacterId !== null && isSpFarmCharacter(farm, activeCharacterId);
   const thresholdSp = useSpExtractionThresholdSp((state) => state.value);
@@ -210,14 +186,12 @@ function SpExtrasSource() {
   return null;
 }
 
-/** Every Character's typed-in accelerator (local Dexie, synced), a live query not a load. */
 function AcceleratorSource() {
   const accelerators = useCharacterAccelerators();
   useReportFeed('accelerator', accelerators, false, false);
   return null;
 }
 
-/** The synced corp stock targets, a hook not a load; hydrated before it answers. */
 function CorpStockTargetsSource() {
   const value = useCorpStockTargetsStore((state) => state.value);
   const hydrated = useHydratedStore(useCorpStockTargetsStore);
@@ -225,7 +199,6 @@ function CorpStockTargetsSource() {
   return null;
 }
 
-// The table is the contract the tests read; the sources it names are components, hence the lint note.
 // eslint-disable-next-line react-refresh/only-export-components
 export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   wallet: snapshot(loadWalletPanel, 'overview:wallet'),
@@ -237,7 +210,6 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   industry: snapshot(loadIndustryBoard, 'overview:industry'),
   contracts: snapshot(loadContractsBoard, 'overview:contracts'),
   contractsAll: snapshot(loadAllContractsBoard, 'overview:contracts-all', { accountWide: true }),
-  // A new key: a snapshot saved under the old one holds the events-only shape.
   calendar: snapshot(loadCalendarBoard, 'overview:calendar-board'),
   calendarAll: snapshot(loadAllCalendarBoard, 'overview:calendar-board-all', { accountWide: true }),
   mail: snapshot(loadMailBoard, 'overview:mail'),
@@ -279,7 +251,6 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   tradingProfit: snapshot(loadTradingProfitWidget, 'overview:trading-profit', {
     accountWide: true,
   }),
-  // The Corp Board's reads: keyed `corp:` so they never share a row with a character read.
   corpWallet: snapshot(loadCorpWalletFeed, 'corp:wallet'),
   corpJobs: snapshot(loadCorpJobsFeed, 'corp:jobs'),
   corpCustoms: snapshot(loadCorpCustomsFeed, 'corp:customs'),
@@ -319,7 +290,6 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   corpSrp: snapshot(loadCorpSrpFeed, 'corp:srp'),
 };
 
-/** Mounts the one source that reads `feed`. */
 export function FeedSourceMount({ feed }: { feed: FeedId }) {
   const source = FEED_SOURCES[feed] as FeedSource;
   if (source.type === 'hook') return <source.Component />;

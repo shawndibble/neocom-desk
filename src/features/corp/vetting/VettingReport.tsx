@@ -1,11 +1,3 @@
-/**
- * One review's report, a page of its own below `/corp/vetting`: the result line, flags with the
- * rows behind them, the checks that could not run, the ones that found nothing, the declared
- * characters, and a rail with the decision and the report's own record.
- *
- * Opening it is logged where the pilot can see it, so the read happens once per visit, on
- * mount, never on hover or prefetch.
- */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -55,7 +47,6 @@ import { rememberVettingReview } from './vettingReviewCache';
 import { VETTING_TABS, dataPath } from './vettingTabs';
 import { missingChecks, resultLine } from './vettingView';
 
-/** The report's one-line answer. Three states, never "safe"; "nothing found" is neutral. */
 function VettingResultLine({ assessment }: { assessment: VettingAssessment }) {
   const { t } = useTranslation();
   const line = resultLine(assessment);
@@ -81,7 +72,6 @@ function VettingResultLine({ assessment }: { assessment: VettingAssessment }) {
   );
 }
 
-/** Checks that could not run, kept apart from the ones that ran clean. */
 function MissingChecksPanel({
   review,
 }: {
@@ -115,7 +105,6 @@ function MissingChecksPanel({
   );
 }
 
-/** The checks that ran and raised nothing: collapsed by default, so "nothing found" is never a bare claim. */
 function ClearChecksPanel({ assessment, open }: { assessment: VettingAssessment; open: boolean }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(open);
@@ -293,7 +282,6 @@ function AboutReport({ review }: { review: VettingReview }) {
 type Load =
   | { status: 'loading' }
   | { status: 'failed' }
-  /** The review is about the caller: the server will not open it for them. */
   | { status: 'ownReview' }
   | { status: 'ready'; review: VettingReview };
 
@@ -301,14 +289,8 @@ interface VettingReportProps {
   characterId: number;
   corporationId: number;
   reviewId: string;
-  /** The tab the report was opened from, where the crumb leads back. */
   tab: 'open' | 'decided';
-  /**
-   * The corp's settings, from the queue's overview: what a no tells the pilot and whether a mail
-   * is offered. `undefined` while that is still loading, null when it could not be read.
-   */
   settings: VettingSettings | null | undefined;
-  /** A sign-off was recorded: the queue behind this page is stale. */
   onDecided: () => void;
 }
 
@@ -322,8 +304,6 @@ export function VettingReport({
 }: VettingReportProps) {
   const { t } = useTranslation();
   const mailDecision = useVettingDecisionMail(characterId);
-  // A sign-off reloads the queue behind this page: keep the settings last read meanwhile, so the
-  // decision rail (and its mail offer) is not torn down by its own decision.
   const [known, setKnown] = useState(settings);
   if (settings !== undefined && settings !== known) setKnown(settings);
   const key = `${characterId}:${corporationId}:${reviewId}`;
@@ -331,7 +311,6 @@ export function VettingReport({
   const [attempt, setAttempt] = useState(0);
   const started = useRef('');
   const load: Load = loaded !== null && loaded.key === key ? loaded.load : { status: 'loading' };
-  // The request mail was queued and recorded: show "Mail sent" here, and refresh the queue.
   const requestMail = useVettingRequestMail(characterId, corporationId, (overview) => {
     const sentAt = overview.reviews.find((row) => row.id === reviewId)?.requestMail;
     setLoaded((current) =>
@@ -349,8 +328,6 @@ export function VettingReport({
   });
 
   useEffect(() => {
-    // Once per visit (and per Retry): the open is logged, so StrictMode's second effect run must
-    // not log a second one. No cancel flag; a stale answer is dropped by its key instead.
     const run = `${key}:${attempt}`;
     if (started.current === run) return;
     started.current = run;
@@ -371,8 +348,6 @@ export function VettingReport({
       );
   }, [key, attempt, characterId, corporationId, reviewId]);
 
-  // A link from the data page names a flag (`#flag-<check>`): the report draws after its load, so
-  // the browser's own jump finds nothing; scroll once the flags are there.
   const { hash } = useLocation();
   const ready = load.status === 'ready';
   useEffect(() => {

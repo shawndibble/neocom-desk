@@ -10,5 +10,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Every docs/DESIGN.md §6c cue and state, rendered with the real primitives. */
 export const Cues: Story = {};

@@ -134,7 +134,6 @@ describe('Chart', () => {
       const { container } = render(<Chart model={model} size="M" />);
       const summary = container.querySelector('p.sr-only');
       expect(summary?.textContent).toBe(model.summary);
-      // The drawing is the first child and hidden from assistive tech; the text is not.
       expect(container.firstElementChild?.firstElementChild?.getAttribute('aria-hidden')).toBe(
         'true'
       );
@@ -203,7 +202,6 @@ describe('Chart', () => {
     expect(bars[0]!.className).not.toContain('opacity-55');
     for (const figure of ['+200', '-50', '+300']) expect(container.textContent).toContain(figure);
     expect(container.textContent).toContain('3 weeks ago');
-    // The labels replace the max line.
     expect(container.textContent).not.toContain('max 300');
   });
 
@@ -214,7 +212,6 @@ describe('Chart', () => {
     const plot = container.querySelector<HTMLElement>('.touch-pan-y')!;
     plot.getBoundingClientRect = () => ({ left: 0, width: 400 }) as DOMRect;
     expect(queryAllByText('Last week')).toHaveLength(0);
-    // Four columns of 100px: x=250 is the third.
     fireEvent.pointerMove(plot, { clientX: 250, pointerType: 'mouse' });
     expect(getAllByText('Last week').length).toBeGreaterThan(0);
     fireEvent.pointerLeave(plot, { pointerType: 'mouse' });

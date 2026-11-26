@@ -7,7 +7,6 @@ import { activeCourierFilters, type CourierUiFilter } from './courierFilterHelpe
 import { DEFAULT_COURIER_FILTER } from './courierFilterPref';
 
 const DEFAULT: CourierUiFilter = { routeQuery: '', ...DEFAULT_COURIER_FILTER };
-/** No NPC station sits in J-space, so the board offers the other three bands. */
 const OFFERED: readonly SpaceKind[] = ['highsec', 'lowsec', 'nullsec'];
 const names = {
   originRegions: [{ id: 10000002, name: 'The Forge' }],
@@ -65,7 +64,6 @@ describe('activeCourierFilters', () => {
   });
 
   it('measures destination space against the bands on offer', () => {
-    // Every offered band is no restriction, even with Wormhole unticked.
     expect(pills({ destinationSpace: OFFERED })).toEqual([]);
     expect(pills({ destinationSpace: ['nullsec'] })).toEqual([['Destination space', 'Nullsec']]);
     expect(pills({ destinationSpace: [] })).toEqual([['Destination space', 'None']]);

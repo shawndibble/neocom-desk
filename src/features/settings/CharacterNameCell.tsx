@@ -1,7 +1,6 @@
 import { CharacterLink } from '@/features/entities';
 import { characterCell } from '@/features/settings/activityLogCsv';
 
-/** The Character column: a Show Info link, or plain text for a public (character-less) call. */
 export function CharacterNameCell({
   characterId,
   characterNames,

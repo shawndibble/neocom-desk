@@ -12,11 +12,6 @@ interface MissingSkillsChipProps {
   fittingName: string;
 }
 
-/**
- * "Missing N skills · <time>" — time at the Character's current attributes
- * and implants, the same schedule a Skill Plan uses. Tapping lists the
- * skills and adds them to a Skill Plan through Fit Check's plan picker.
- */
 export function MissingSkillsChip({ entries, characterId, fittingName }: MissingSkillsChipProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -29,8 +24,6 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
   });
 
   return (
-    // A popover rather than an inline panel: the chip sits in the Fitting's
-    // one-row header, which an inline list would push apart.
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="warning">{chipLabel}</Button>

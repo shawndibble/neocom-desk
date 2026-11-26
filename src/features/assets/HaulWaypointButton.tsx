@@ -1,9 +1,3 @@
-/**
- * Sets a Haul's stops as autopilot waypoints in a Character's EVE client
- * (issue #4985): one leg's stop, or every stop of a Character's route. The
- * sending, the failure wording and the grant check are Route Safety's own
- * (`features/travel/sendWaypoints.ts`, `travel.waypoints.*`).
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
@@ -25,7 +19,6 @@ export function HaulWaypointButton({
   variant = 'ghost',
 }: {
   characterId: number;
-  /** Stop ids in flying order: the first clears the client's own waypoints. */
   ids: readonly number[];
   label: string;
   doneLabel: string;
@@ -64,7 +57,6 @@ export function HaulWaypointButton({
 
   return (
     <div className="flex flex-col items-start gap-1">
-      {/* `aria-disabled`, not `disabled`: the reason stays reachable in the tooltip. */}
       <Tooltip content={blockedReason}>
         <Button
           size="sm"

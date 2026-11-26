@@ -7,7 +7,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const remote = vi.hoisted(() => ({
   status: undefined as Record<string, unknown> | undefined,
-  /** The book's Needs you count as the background read finds it; an Error makes it fail. */
   count: 0 as number | null | Error,
 }));
 vi.mock('@/sync/firebaseApp', () => ({
@@ -104,7 +103,6 @@ describe('the corp Moons nav dot (#6208)', () => {
     remote.count = 2;
     await act(() => refreshMoonsAttention(1, CORP));
     expect(await screen.findByRole('link', { name: 'Moons, needs attention' })).toBeInTheDocument();
-    // Another officer handled it.
     remote.count = 0;
     await act(() => refreshMoonsAttention(1, CORP));
     expect(await screen.findByRole('link', { name: 'Moons' })).toBeInTheDocument();

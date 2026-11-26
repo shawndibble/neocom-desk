@@ -30,7 +30,6 @@ function blueprint(materials: Record<number, number>): IndustryBlueprint {
   };
 }
 
-/** The engine's own materials calculation, as the plan's rows at a run count. */
 function rowsFor(bp: IndustryBlueprint, me: number) {
   return (runs: number) => effectiveMaterials(bp, runs, me, ctx);
 }
@@ -66,8 +65,6 @@ describe('maxRunsFromStock', () => {
   });
 
   it('follows the rounded need, which is not linear in runs', () => {
-    // ME 10 on a base of 11: 1 run needs max(1, ceil(9.9)) = 10, 10 runs
-    // need ceil(99) = 99, not 10 x 10.
     const rounding = blueprint({ [TRITANIUM]: 11 });
     const rows = rowsFor(rounding, 10);
     expect(rows(1)[0].quantity).toBe(10);

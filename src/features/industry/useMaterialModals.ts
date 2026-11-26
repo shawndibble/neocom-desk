@@ -22,11 +22,6 @@ interface MaterialModalsInput {
   snapshot: MarketSnapshot | null;
 }
 
-/**
- * Which of the Materials table's three dialogs is open, and what each one
- * shows: the recipe behind a built row, "Buy ore instead", and a Blueprint
- * Acquisition row's picker/override.
- */
 export function useMaterialModals({
   plan,
   catalog,
@@ -38,25 +33,14 @@ export function useMaterialModals({
   modifiers,
   snapshot,
 }: MaterialModalsInput) {
-  /**
-   * The recipe behind whichever built row's "Build it" is open — the runs and
-   * ingredient list the flat table no longer nests (`subBuildPlan`). Held as
-   * a typeID rather than the recipe itself so a re-priced or re-toggled plan
-   * refreshes what the modal shows instead of freezing the numbers it opened
-   * with; a typeID that is no longer built simply resolves to `null`, which
-   * is also how the modal closes when its row stops being built underneath it.
-   */
   const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
 
-  /** The bought material whose "Used by" dialog is open, as a typeID. */
   const [usedByTypeId, setUsedByTypeId] = useState<number | null>(null);
 
-  /** "Buy ore instead", offered only while the plan still buys a mineral. */
   const [buyOreOpen, setBuyOreOpen] = useState(false);
   const shortfall = useMemo(() => mineralShortfall(visibleMaterials), [visibleMaterials]);
   const hasShortfall = Object.keys(shortfall.needs).length > 0;
 
-  /** Which Blueprint Acquisition row's picker/override modal (issue #839) is open, if any. */
   const [acquisitionPickerTypeId, setAcquisitionPickerTypeId] = useState<number | null>(null);
   const acquisitionPickerOwnedCopies = useMemo(
     () =>
@@ -67,8 +51,6 @@ export function useMaterialModals({
             .map((b) => ({ me: b.material_efficiency, te: b.time_efficiency, runs: b.runs })),
     [acquisitionPickerTypeId, effectiveOwnedBlueprints]
   );
-  // The Invent section's numbers, priced exactly as automatic selection
-  // priced the blueprint (issue #3990).
   const acquisitionPickerInvention = useMemo(() => {
     if (acquisitionPickerTypeId === null) return null;
     const ctx = inventionPricingContextFor(

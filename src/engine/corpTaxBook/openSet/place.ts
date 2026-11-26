@@ -4,7 +4,6 @@ import type { ObservedMiningEntry } from '../types';
 import type { PlaceOf } from '../charges';
 import type { Placement } from './types';
 
-/** Which Extraction a refinery was working on a date: from fracture through expiry. */
 export function placeOfFactory(
   extractions: readonly SyncExtraction[],
   expiryHours: Readonly<Record<string, number>>
@@ -29,7 +28,6 @@ export function placeOfFactory(
   };
 }
 
-/** The moon the server stamped on any row of that refinery and day; no Extraction id. */
 function rowPlaceOf(rows: readonly ObservedMiningEntry[]): PlaceOf {
   return (structureId, date) => {
     const moonId = rows.find(

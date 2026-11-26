@@ -110,11 +110,6 @@ describe('structuresDeadline', () => {
     });
   });
 
-  /*
-   * CCP caches corp structures for about an hour, so a twelve-minute timer
-   * read from that snapshot may already be over. The Corp page will not tick
-   * one down, and neither may the strip.
-   */
   it('skips a clock shorter than the cache window, and a dry structure with no instant', () => {
     const items = board([
       structure({ structureId: 1, state: 'hull_reinforce', stateTimerEndMs: NOW + 12 * 60_000 }),
@@ -125,11 +120,6 @@ describe('structuresDeadline', () => {
 });
 
 describe('structuresView', () => {
-  /*
-   * A timer 65 minutes out when the structures were read is 50 minutes out a
-   * quarter of an hour later. Judged at load it would stay live and tick below
-   * the cache window; judged now, it is stale and never leads the strip.
-   */
   it('judges the stale window against the current instant, not the load', () => {
     const later = NOW + 15 * 60_000;
     const view = data(

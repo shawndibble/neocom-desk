@@ -1,10 +1,3 @@
-/**
- * The trip rail and its parts: a sticky column beside the
- * Hauling table that holds the Trip Plan's totals, the fill offer and Copy
- * multibuy, and swaps to a selected row's detail with a "‹ Trip" crumb. On a
- * panel too narrow for it, `HaulingTripBar` is the sticky bottom bar instead.
- * Presentational: the panel owns every value and handler.
- */
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, LiveStatus, Panel, ProgressBar, Spinner } from '@/components/ui';
@@ -30,7 +23,6 @@ import { useHubJumps } from './useHubJumps';
 const isk = (value: number) => formatIsk(value, 0);
 const signed = (value: number) => signedIsk(value, 0);
 
-/** Literal keys, so the locale split finds them. */
 const BINDING_KEYS = {
   sales: 'market.hauling.rail.limitedSales',
   space: 'market.hauling.rail.limitedSpace',
@@ -38,19 +30,13 @@ const BINDING_KEYS = {
 } as const satisfies Record<NonNullable<TripPlan['binding']>, string>;
 
 export interface HaulingTripRailProps {
-  /** The selected row's detail; null shows the trip. */
   detail: ReactNode | null;
-  /** Leaves the detail for the trip (the "‹ Trip" crumb); does not clear the table's selection. */
   onBack: () => void;
-  /** The trip view: `HaulingTripSummary` and `HaulingFillList`. */
   trip: ReactNode;
-  /** Always shown under both views: free m³, profit, Copy multibuy and the table menu. */
   footer: ReactNode;
-  /** Names the shown detail (the selected row's type id), so picking another row scrolls back to its top. */
   detailKey?: string | number;
 }
 
-/** Capped at the viewport's height so the crumb and footer stay on screen; the body scrolls inside. */
 export function HaulingTripRail({ detail, onBack, trip, footer, detailKey }: HaulingTripRailProps) {
   const { t } = useTranslation();
   const showingDetail = detail !== null;
@@ -63,8 +49,6 @@ export function HaulingTripRail({ detail, onBack, trip, footer, detailKey }: Hau
     wasShowingDetail.current = showingDetail;
     if (!body) return;
     body.scrollTop = 0;
-    // The crumb unmounts on its own click and focus drops to the page; land it on the trip.
-    // Focus still on a table row (the row deselected there) stays put.
     const active = document.activeElement;
     if (leftDetail && (!active || active === document.body || !active.isConnected)) {
       body.focus({ preventScroll: true });
@@ -100,18 +84,12 @@ export function HaulingTripRail({ detail, onBack, trip, footer, detailKey }: Hau
 
 export interface HaulingTripSummaryProps {
   plan: TripPlan;
-  /** False until the user has chosen a Cargo Space: no meter, no free m³, the cargo prompt instead. */
   cargoSet: boolean;
-  /** "Amarr to Jita"; null with Any hub at an end. */
   laneLabel: string | null;
-  /** The lane's two Trade Hub systems, for the jump count; null with Any hub at an end. */
   fromSystemId: number | null;
   toSystemId: number | null;
-  /** The panel's `HaulingCargoControl`. */
   cargoControl: ReactNode;
-  /** Cargo value (plan spend) once the ticked fill items are added; null with nothing ticked. */
   cargoValueAfterFill: number | null;
-  /** The free m³ to print: the same figure the fill offer and the trip bar show. */
   freeM3: number;
 }
 
@@ -135,7 +113,6 @@ export function HaulingTripSummary({
   freeM3,
 }: HaulingTripSummaryProps) {
   const { t } = useTranslation();
-  // Here, not in the panel: route data loads only once the trip shows.
   const jumps = useHubJumps(fromSystemId, toSystemId);
   const { profit, cost } = plan.totals;
   const holds = cargoSet ? plan.holds : [];
@@ -173,12 +150,10 @@ export function HaulingTripSummary({
 
       <div className="flex flex-col gap-1">
         {cargoControl}
-        {/* What the load is worth: the figure a ganker weighs. */}
         <span className="flex flex-col text-xs text-text-dim tabular-nums">
           <span>
             {t('market.hauling.rail.cargoValue')} <b className="text-text">{isk(cost)}</b>
           </span>
-          {/* Only when the fill changes the figure as shown. */}
           {cargoValueAfterFill !== null && isk(cargoValueAfterFill) !== isk(cost) && (
             <span>
               {t('market.hauling.rail.cargoValueAfter', { value: isk(cargoValueAfterFill) })}
@@ -238,7 +213,6 @@ export function HaulingTripSummary({
 export interface HaulingFillItem {
   typeId: number;
   name: string;
-  /** The Hauling category it comes from ("Fuel Blocks"). */
   categoryName: string;
   quantity: number;
   volumeM3: number;
@@ -248,7 +222,6 @@ export interface HaulingFillItem {
 
 export type HaulingFillStatus = HaulingFillScanState['status'];
 
-/** Literal keys, so the locale split finds them. */
 const STOP_KEYS = {
   full: 'market.hauling.fill.stopped.full',
   'nothing-left': 'market.hauling.fill.stopped.nothingLeft',
@@ -257,47 +230,30 @@ const STOP_KEYS = {
   'batch-cap': 'market.hauling.fill.stopped.batchCap',
   stopped: 'market.hauling.fill.stopped.byYou',
 } as const satisfies Record<HaulingFillStopReason, string>;
-/** With a Max price set, "nothing else" is only true under it. */
 const UNDER_MAX_PRICE_KEYS = {
   'nothing-left': 'market.hauling.fill.stopped.nothingLeftUnderMax',
   'no-gain': 'market.hauling.fill.stopped.noGainUnderMax',
 } as const satisfies Partial<Record<HaulingFillStopReason, string>>;
 
 export interface HaulingFillListProps {
-  /** Free m³ in the plan as it stands. */
   freeM3: number;
   status: HaulingFillStatus;
-  /** The batch running while `loading`, counted from Find. */
   batch: number;
-  /** Free m³ once everything found so far is planned, while `loading`; null before the first batch lands. */
   runningFreeM3: number | null;
-  /** The stage line of the batch running. */
   progressText?: string;
-  /** Why the batches stopped, once `ready`. */
   reason: HaulingFillStopReason | null;
-  /** A Max price is set. */
   underMaxPrice: boolean;
-  /** Free m³ once every offered item is in: "Filled: 120 m³ left." */
   leftM3: number;
-  /** Offers Find more: the hold is not full and something may be left. */
   canFindMore: boolean;
-  /** What the last Add loaded; it replaces the stop reason until the next Find or Find more. */
   added: { count: number; volumeM3: number } | null;
-  /** Best profit per m³ first. */
   items: readonly HaulingFillItem[];
   ticked: ReadonlySet<number>;
   onToggle: (typeId: number, ticked: boolean) => void;
-  /** Starts the batches afresh. */
   onFind: () => void;
-  /** Carries on from where they stopped: Find more, and Try again after a failed batch. */
   onMore: () => void;
-  /** Ends the batches, keeping what was found. */
   onStop: () => void;
-  /** Adds the ticked items to the Trip Plan. */
   onAdd: () => void;
-  /** Totals of the ticked items. */
   tickedTotals: { count: number; volumeM3: number; cost: number; profit: number };
-  /** The hold once the ticked items are added; null without a Cargo Space. */
   holdAfter: { usedM3: number; capacityM3: number; freeM3: number } | null;
 }
 
@@ -326,7 +282,6 @@ function FillRow({
           <span id={nameId} className="line-clamp-2 break-words">
             {item.name}
           </span>
-          {/* m³ first, untruncatable: only the category gives way. */}
           <span className="flex min-w-0 gap-1 text-text-dim">
             <span className="shrink-0">
               {t('market.hauling.rail.m3', { m3: formatTripM3(item.volumeM3) })}
@@ -363,7 +318,6 @@ export function HaulingFillList({
 }: HaulingFillListProps) {
   const { t } = useTranslation();
   const addDetailId = useId();
-  // A finished run's result (stop sentence, Add) and Add's "Added …" line land below the fold in a long rail: bring them in.
   const endRef = useRef<HTMLDivElement>(null);
   const outcomeRef = useRef<HTMLParagraphElement>(null);
   const ran = useRef(false);
@@ -419,12 +373,10 @@ export function HaulingFillList({
           </span>
           <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
         </div>
-        {/* Its own line, the rail's full width: beside Stop it wrapped. */}
         {progressText && <span aria-hidden="true">{progressText}</span>}
       </div>
     );
   } else {
-    // Ready, or a failed batch: what earlier batches found stays on offer either way.
     body = (
       <>
         {status === 'error' && (
@@ -498,7 +450,6 @@ export function HaulingFillList({
   return (
     <section className="flex flex-col gap-2 border border-line bg-panel-2 p-3">
       <h3 className="text-sm font-semibold">{t('market.hauling.fill.title')}</h3>
-      {/* Always mounted, so the stop reason and Add's result are read out when they land. */}
       <LiveStatus>{outcome}</LiveStatus>
       {body}
     </section>
@@ -506,20 +457,12 @@ export function HaulingFillList({
 }
 
 export interface HaulingTripBarProps {
-  /** Null without a Cargo Space. */
   freeM3: number | null;
   profit: number;
-  /** Opens the trip (summary + fill) as a sheet. */
   onOpenTrip: () => void;
-  /** The panel's Copy multibuy button: the bar's one boxed control, `variant="primary"`, `size="sm"`. */
   copyButton: ReactNode;
 }
 
-/**
- * Pinned above the phone tab bar; at md+, where there is none, flush with the bottom (plus the safe area).
- * Publishes `--hauling-trip-bar-clearance`; `index.css` must sum it into
- * `--sticky-clearance` for focused controls to scroll clear (WCAG 2.4.11).
- */
 export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: HaulingTripBarProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -532,7 +475,6 @@ export function HaulingTripBar({ freeM3, profit, onOpenTrip, copyButton }: Hauli
       aria-label={t('market.hauling.rail.title')}
       className="sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-2 rounded-xs border border-line-bright bg-panel p-2 shadow-lg md:bottom-[env(safe-area-inset-bottom)]"
     >
-      {/* The whole summary opens the trip, so its figures stay plain text (nothing tabbable inside a button). */}
       <button
         type="button"
         onClick={onOpenTrip}

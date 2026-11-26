@@ -4,7 +4,6 @@ import { Button } from './Button';
 import { Modal } from './Modal';
 import { DialogFooter } from './DialogFooter';
 
-/** A confirm for one action: body text, a danger or plain action, and its own failure line. */
 export function ConfirmDialog({
   open,
   title,
@@ -24,17 +23,12 @@ export function ConfirmDialog({
   body: string;
   actionLabel: string;
   danger?: boolean;
-  /** Rejects to keep the dialog open and show the failure. */
   onConfirm: () => Promise<void>;
   onClose: () => void;
-  /** Where focus goes on close when the control that opened it is gone (`Modal`'s). */
   returnFocusFallback?: () => HTMLElement | null;
-  /** Default to the Communities wording; pass your own outside Communities. */
   cancelLabel?: string;
   failedLabel?: string;
-  /** `Modal`'s: false when a Back press already led here and the confirm must not own a history entry. */
   closeOnBack?: boolean;
-  /** A field the confirm asks for, below the body. */
   children?: ReactNode;
 }) {
   const { t } = useTranslation();

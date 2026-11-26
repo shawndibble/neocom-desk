@@ -3,7 +3,6 @@ import { useLayoutEffect } from 'react';
 import { render } from '@testing-library/react';
 import { useBelowFold } from './useBelowFold';
 
-/** Records what each commit rendered: whether the below-the-fold sections were in it. */
 function Probe({ ready, commits }: { ready: boolean; commits: boolean[] }) {
   const shown = useBelowFold(ready);
   useLayoutEffect(() => {

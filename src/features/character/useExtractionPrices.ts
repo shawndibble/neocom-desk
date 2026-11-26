@@ -12,17 +12,13 @@ import { usePricePercentFor } from '@/features/market/pagePricePercents';
 
 export interface ExtractionPrices {
   hubName: string;
-  /** False until the hub answers, so "loading" never reads as "no sell orders". */
   loaded: boolean;
-  /** Null when either item has no sell orders at the saved hub. */
   net: number | null;
 }
 
-/** Net ISK per extraction at the saved market hub (sell injector − buy extractor). */
 export function useExtractionPrices(): ExtractionPrices {
   const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-  // The Skills page's price percent, on both the injector and the extractor.
   const percent = usePricePercentFor('skills');
 
   const load = useCallback(

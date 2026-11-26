@@ -63,7 +63,6 @@ const NOOP_COMPARE_PROPS = {
   onOpenCompare: () => {},
 };
 
-/** Build Groups (issue #626), inert — the tests below are about plans. */
 const NOOP_GROUP_PROPS = {
   groups: [],
   expandedGroupIds: new Set<string>(),
@@ -79,10 +78,8 @@ const NOOP_GROUP_PROPS = {
   statsByGroupId: new Map(),
 };
 
-/** The rename field must survive the menu closing: its focus hand-back would otherwise blur (and commit) it. */
 async function expectRenameFieldHeld(name: string) {
   const field = await screen.findByRole('textbox', { name });
-  // Once the menu is gone, its focus hand-back has run (waitFor drains a timer tick after).
   await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   expect(screen.getByRole('textbox', { name })).toBe(field);
   expect(field).toHaveFocus();
@@ -384,10 +381,6 @@ describe('BuildPlanList: build groups (#626)', () => {
   });
 
   it('names the ship from the stored group name, not from whichever member sorts first', () => {
-    // Nothing marks which plan is the hull, and every ordering that could
-    // stand in for one (insertion order, newest updatedAt) names a different
-    // plan the moment a member is edited. So Fit Import puts the ship in the
-    // name and the list never derives it.
     renderGrouped();
     expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
   });
@@ -422,8 +415,6 @@ describe('BuildPlanList: build groups (#626)', () => {
   });
 
   it('lists a plan whose group is gone as an ordinary ungrouped plan', () => {
-    // A group deleted here, or a sync race delivering the plan before the
-    // settings blob — either way the plan must not vanish from the list.
     renderGrouped({ groups: [] });
     expect(screen.getByText('Buzzard')).toBeInTheDocument();
     expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
@@ -437,8 +428,6 @@ describe('BuildPlanList: build groups (#626)', () => {
   });
 
   it('selects every member of a collapsed group at once in compare mode', async () => {
-    // A row checkbox only renders on a visible row, so without this a
-    // collapsed group's plans cannot be compared at all.
     const onToggleCompareSelected = vi.fn();
     renderGrouped({ compareMode: true, onToggleCompareSelected });
     await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
@@ -454,7 +443,6 @@ describe('BuildPlanList: build groups (#626)', () => {
       compareSelectedIds: new Set(['a']),
       onToggleCompareSelected,
     });
-    // Partly selected, so the header ticks the rest rather than clearing.
     await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
     expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
     expect(onToggleCompareSelected).not.toHaveBeenCalledWith('a');
@@ -476,9 +464,6 @@ describe('BuildPlanList: build groups (#626)', () => {
   });
 
   it('renames a group from its context menu, with no separate visible rename button', async () => {
-    // A second always-visible icon here shifted the Est./Verdict/Runs
-    // columns over for every group header — rename lives in the context
-    // menu now, same as a plan row's own name button.
     renderGrouped();
     expect(screen.queryByRole('button', { name: /^Rename group/ })).not.toBeInTheDocument();
 
@@ -490,11 +475,6 @@ describe('BuildPlanList: build groups (#626)', () => {
   });
 });
 
-// What a drop *means* lives in `groupDrop.test.ts` — pure, and every branch of
-// it. Simulating a real dnd-kit drag here would be measuring jsdom's zero-sized
-// rects against a 4px activation distance, which tests the harness rather than
-// the list. So these cover the rendered contract only: the handle is there, and
-// it is deliberately not the accessibility path.
 describe('BuildPlanList: dragging a plan into a group (#627)', () => {
   const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
   const PLANS = [
@@ -528,21 +508,15 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
   });
 
   it('offers no handle at all until there is a group to drag into', () => {
-    // With no groups every drop resolves to the plan's own (absent) group, so
-    // a grab cursor would be advertising a move that cannot happen.
     renderDraggable({ groups: [] });
     expect(screen.queryByTestId('plan-drag-handle')).not.toBeInTheDocument();
   });
 
   it('keeps the handle out of the tab order and hidden from assistive tech', () => {
-    // Keyboard dragging would step a flat 25px per arrow press and announce
-    // raw droppable ids; the per-row menu reaches the same destinations
-    // properly, so the handle is pointer-only on purpose.
     renderDraggable();
     for (const handle of screen.getAllByTestId('plan-drag-handle')) {
       expect(handle).toHaveAttribute('aria-hidden', 'true');
       expect(handle).toHaveAttribute('tabindex', '-1');
-      // Without this a touch-drag scrolls the list instead of dragging (#408).
       expect(handle).toHaveClass('touch-none');
     }
   });
@@ -555,10 +529,6 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
   });
 
   it('opens "Move to group" from the row context menu, reachable via focus + the native menu key', () => {
-    // The row's name button is a real tab stop, so Shift+F10 / the Menu key —
-    // which the browser turns into a `contextmenu` event on whatever has
-    // focus — reaches it without a mouse. Tests fake that translation the
-    // same way `ContextMenu.test.tsx` does: focus, then `fireEvent.contextMenu`.
     renderDraggable();
     const target = screen.getByText('Rokh');
     target.focus();
@@ -569,8 +539,6 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
   });
 
   it('renders no drag overlay while nothing is being dragged', () => {
-    // The overlay repeats the dragged plan's name, so an always-mounted one
-    // would put a second copy of that text in the document.
     renderDraggable();
     expect(screen.getAllByText('Rokh')).toHaveLength(1);
   });
@@ -582,10 +550,6 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
   });
 });
 
-// Covers the visible "More actions" button beside a plan row's name (WCAG
-// 2.1.1 fix for keyboard-unreachable row actions, issue #1498) and that it
-// lists the same items as the right-click menu, including the "Move to
-// group" submenu's destinations.
 describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
   const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
   const PLANS = [
@@ -627,7 +591,6 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
 
-    // Clicking the sub-trigger opens its submenu, same as a real menu.
     await user.click(screen.getByRole('menuitem', { name: 'Move to group' }));
     expect(await screen.findByRole('menuitem', { name: 'Buzzard fit' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
@@ -774,7 +737,6 @@ describe('BuildPlanList: the whole row opens it', () => {
   });
 
   it('keeps the row hover fill off a live drop target so the accent fill shows', () => {
-    // Pure class recipe: the drop state is internal to a dnd-kit drag.
     expect(rowStateClassName(false, true)).not.toContain('hover:bg-panel-2');
     expect(rowStateClassName(true, true)).not.toContain('hover:bg-panel-2');
     expect(rowStateClassName(false, false)).toContain('hover:bg-panel-2');
@@ -787,9 +749,6 @@ describe('BuildPlanList: the whole row opens it', () => {
   });
 });
 
-// Covers the visible "More actions" button beside a group header's name
-// (WCAG 2.1.1, issue #1498) — a smaller, one-item version of the same fix,
-// since a group header's only right-click action is Rename.
 describe('BuildPlanList: "More actions" button for a group header (#1498)', () => {
   const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker — Buzzard", order: 0 }];
   const PLANS = [plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' })];

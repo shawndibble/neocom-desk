@@ -29,7 +29,6 @@ const swap = (slotIndex: number, toTypeId: number): FitSwap => ({
   toTypeId,
 });
 
-/** CPU/PG per fitted type id; the fit's total is the sum. */
 function statsFor(table: Record<number, { cpu: number; pg: number; dps?: number }>) {
   return async (f: Fitting) => {
     const rows = f.modules.map((m) => table[m.typeId]);
@@ -92,7 +91,7 @@ describe('findFitSwaps', () => {
     const table = {
       1: { cpu: 70, pg: 70 },
       2: { cpu: 50, pg: 50 },
-      3: { cpu: 40, pg: 80 }, // fixes CPU but not PG
+      3: { cpu: 40, pg: 80 },
       4: { cpu: 40, pg: 40 },
     };
     const result = await run(table, [swap(0, 3), swap(0, 4)]);

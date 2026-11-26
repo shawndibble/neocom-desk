@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui';
 import { VETTING_KEEP_DAYS, VETTING_OPEN_KEEP_DAYS } from '@/engine/vetting';
 
-/** What one read covers, in the pilot's words. A `note` narrows a line that would otherwise worry. */
 const READS: readonly { id: string }[] = [
   { id: 'history' },
   { id: 'wallet' },
@@ -12,11 +11,6 @@ const READS: readonly { id: string }[] = [
   { id: 'skills' },
 ];
 
-/**
- * What the read covers, what it leaves alone and how long it is kept, stated before the sign-in
- * in three short groups. The list is exactly what `VETTING_SCOPES` lets the server read, plus
- * corporation history, which is public.
- */
 export function VettingConsentTerms({ readers }: { readers: 'recruiters' | 'officers' }) {
   const { t } = useTranslation();
   return (

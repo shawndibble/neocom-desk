@@ -1,42 +1,19 @@
-/**
- * The Hauling Opportunities table's rows: a scan's items at this Character's
- * own fee rates, with the row filters applied and counted. Pure —
- * `haulingData.ts` fetches, `engine/market/haulingMarket` prices, and this
- * only joins the two for the panel.
- */
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { haulingFlags, lotEconomics, type HaulingFlag } from '@/engine/market/haulingMarket';
 import { profitableDepth, type TripCandidate } from '@/engine/market/haulingPlan';
 import type { TradeHub } from '@/market/hubs';
 import type { HaulingScanRow } from './haulingData';
 
-/** The fee rates a sale at `hub` pays: the broker fee follows the standing toward that hub's owner. */
 export type HaulingFeesAt = (hub: TradeHub) => AppraisalNetFees;
 
-/** A scan row priced at this Character's fees. An intersection, not an `interface`: the scan row is a union over the two modes. */
 export type HaulingViewRow = HaulingScanRow & {
-  /** Margin after fees on the suggested load, percent of the ISK spent. */
   marginPct: number;
-  /** Profit per unit on that load. */
   profitPerUnit: number;
-  /** Profit per m³ of hold on that load (ISK/m³): what a full hold of it earns per cubic metre. */
   iskPerM3: number;
-  /**
-   * The sell price the table shows: the Expected Sell Price when listing, or
-   * the average price the destination's buy orders actually pay for the
-   * suggested load when selling into them (their best bid when none is profitable).
-   */
   price: number;
   flags: HaulingFlag[];
-  /**
-   * Units the margin is worked on. Listing: a week of sales, capped at what is
-   * profitable to buy. Selling into buy orders: the depth both books stay
-   * profitable to. The plan sizes from the same figure.
-   */
   suggestedUnits: number;
-  /** The fee rates this row's sale pays, at its own destination hub. */
   fees: AppraisalNetFees;
-  /** What the trip planner sizes. */
   candidate: TripCandidate;
 };
 
@@ -103,10 +80,6 @@ function toViewRow(row: HaulingScanRow, fees: AppraisalNetFees): HaulingViewRow 
   };
 }
 
-/**
- * The row priced again from only the origin levels at or under `maxUnitPrice`,
- * so the plan never buys past Max price. Unchanged when no level is above it.
- */
 function capBuyLadder(row: HaulingViewRow, maxUnitPrice: number | null): HaulingViewRow {
   if (maxUnitPrice === null || row.buyLadder.every((level) => level.price <= maxUnitPrice))
     return row;
@@ -117,27 +90,17 @@ function capBuyLadder(row: HaulingViewRow, maxUnitPrice: number | null): Hauling
 }
 
 export interface HaulingFilters {
-  /** Longest days-to-sell a row may have; null shows any. */
   maxDays: number | null;
-  /** Margin after fees, percent, a row must reach. */
   minMarginPct: number;
-  /** Hide rows whose demand is "rarely sells". */
   steadyOnly: boolean;
-  /** Highest origin unit price (the Buy column's figure) a row may have, ISK; null shows any. */
   maxUnitPrice: number | null;
 }
 
 export interface FilteredHaulingRows {
   shown: HaulingViewRow[];
-  /** Why rows are missing, so the footer can name them instead of dropping them silently. A row failing several counts under the first that applies: too dear, thin, slow, then low margin. */
   hidden: { tooDear: number; thin: number; slow: number; lowMargin: number };
 }
 
-/**
- * Best margin first. The one row filter: the table and the fill both run
- * their rows through it, so a filter applies to both — Max price trims each
- * shown row's origin ladder too, so the plan sized from it stays under it.
- */
 export function filterHaulingRows(
   rows: readonly HaulingViewRow[],
   filters: HaulingFilters
@@ -154,9 +117,7 @@ export function filterHaulingRows(
       hidden.tooDear += 1;
       continue;
     }
-    // The other filters read the row as the plan will buy it.
     const row = capBuyLadder(listed, filters.maxUnitPrice);
-    // Demand and Days to Sell are not read for an instant sale: only the price and margin filters apply.
     if (row.mode === 'list' && filters.steadyOnly && row.demand.demand === 'rarely')
       hidden.thin += 1;
     else if (
@@ -172,7 +133,6 @@ export function filterHaulingRows(
   return { shown, hidden };
 }
 
-/** Days to sell as a column shows it: whole days, at least one, capped so an outlier cannot widen the column. */
 export function formatDaysToSell(days: number): string {
   return days > 99 ? '99+' : String(Math.max(1, Math.round(days)));
 }

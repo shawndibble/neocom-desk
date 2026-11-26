@@ -22,7 +22,6 @@ const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 
 const calendarSnapshot = { entries: [{ calendarEventId: 5, startMs: NOW + 1000 }], nowMs: NOW };
 
-/** Baselines keyed by domain id; every other domain reads as "no baseline yet". */
 function stores(baselines: Record<string, PollerState<unknown>>) {
   const prev = vi.fn(async (domain: PollDomain) => baselines[domain.id] ?? {});
   const domainState = (domain: PollDomain): DomainPollState => ({
@@ -115,7 +114,6 @@ describe('rebuildProjection', () => {
     await rebuildProjection(d);
     const rows = await uploaded(uploadProjection);
     expect(rows.get(CHAR.characterId)).toHaveLength(1);
-    // Baseline present, scope revoked.
     expect(rows.get(CHAR_B.characterId)).toEqual([]);
   });
 
@@ -128,9 +126,6 @@ describe('rebuildProjection', () => {
   });
 
   it('filters rows to the enabled events, even for a domain whose projection emits more than one event from one snapshot', async () => {
-    // colonyDomain's projection always emits both planetaryExtractionDone and
-    // planetaryExtractorExpiring rows from one snapshot regardless of which is
-    // individually toggled, so the channel filter is load-bearing here.
     const expiryTimeMs = NOW + 20 * HOUR_MS;
     const { deps: d, uploadProjection } = deps({
       eventPrefsFor: async () => ({
@@ -232,14 +227,11 @@ describe('server-pushed events upload (issue #5121)', () => {
       events.includes('priceAlertTriggered') ? { priceStationId: 60003760 } : {}
     );
     const { deps: d, uploadProjection } = deps({
-      // communityMemberJoined and communityRequestPledged default browser-off.
       eventPrefsFor: async () => ({}),
       serverInputsFor,
     });
     await rebuildProjection(d);
     expect(uploadProjection.mock.calls[0][2]?.get(CHAR.characterId)).toEqual({
-      // vettingShared and corpTaxBookSyncStopped ride along for every Character: the server
-      // decides who reviews and who edits the book.
       serverEvents: [
         'communityJoinRequest',
         'corpTaxBookSyncStopped',

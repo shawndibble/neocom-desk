@@ -10,7 +10,6 @@ import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { db } from '@/db';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
-// Spied, so a test can wait for a fan-out to finish (every worker returned).
 vi.mock('@/lib/concurrency', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/concurrency')>();
   return { ...actual, mapWithConcurrencyLimit: vi.fn(actual.mapWithConcurrencyLimit) };
@@ -24,7 +23,6 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
-// Default: the baked shard lacks the type, so ESI handlers serve it.
 vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
@@ -91,7 +89,6 @@ describe('useCompareAttributes', () => {
     mockedLoadDictionary.mockResolvedValue({});
     mockedLoadSkills.mockResolvedValue([]);
 
-    // No ESI handler: an ESI read would fail on the unhandled request.
     const { result } = renderHook(() => useCompareAttributes(ITEMS, true));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -166,21 +163,16 @@ describe('useCompareAttributes', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     const callsAfterFirstFetch = calls;
 
-    // Same ids, fresh array reference — must not refetch.
     rerender({ items: [...ITEMS] });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(calls).toBe(callsAfterFirstFetch);
 
-    // A genuinely different id set must refetch. Types already read are
-    // served from the esiCache row, so the new set needs an id not yet seen.
     rerender({ items: [ITEMS[0], { typeId: 589, itemName: 'Another' }] });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(calls).toBeGreaterThan(callsAfterFirstFetch);
   });
 
   it('stops queuing type fetches once a run is cancelled mid-fan-out', async () => {
-    // More items than the fan-out's concurrency, so some are still queued
-    // behind the first wave when the drawer closes.
     const many = Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, index) => ({
       typeId: 1000 + index,
       itemName: `Item ${index}`,
@@ -215,7 +207,6 @@ describe('useCompareAttributes', () => {
 
     rerender({ enabled: false });
     release();
-    // The fan-out has finished: every worker has returned, so none is left to fetch.
     const pool = vi.mocked(mapWithConcurrencyLimit);
     await waitFor(() => expect(pool).toHaveResolvedTimes(pool.mock.calls.length));
 

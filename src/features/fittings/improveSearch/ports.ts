@@ -1,9 +1,3 @@
-/**
- * The production adapter of the Improve search's ports: the page's evaluator
- * (its cached baseline, and the search's own worker pool for variants), the
- * engine's hull and skill checks, the pilot's Trade Hub prices and the hull's
- * community fits.
- */
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { loadFittingPrice } from '../fittingPrice';
@@ -17,11 +11,8 @@ import type { ImproveSearchPorts } from './types';
 export interface ImprovePortsInput {
   variants: VariantEvaluator;
   catalogue: FittingCatalogue;
-  /** The pilot's Trade Hub; an unknown one prices at the default hub. */
   hubId: TradeHub['id'];
-  /** The Fittings page's price percent; 100 prices at the hub as it stands. */
   percent?: number;
-  /** The search's own workers (`searchPoolSize` of them), started on first use; the caller ends them. */
   workers: () => WorkerPool;
 }
 

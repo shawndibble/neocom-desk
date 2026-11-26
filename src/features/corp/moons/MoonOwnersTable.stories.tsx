@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { MoonOwnersTable } from './MoonOwnersTable';
 import { NAMES, NOW, ROWS, TOTALS } from './moonOwnerRowFixtures';
 
-/** @summary The Moon owners tab (List A): header chips and one sortable table, a row per moon owner. */
 const meta = {
   title: 'corp/MoonOwnersTable',
   component: MoonOwnersTable,
@@ -20,10 +19,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary All five statuses, with Pay on every row that is owed. */
 export const Default: Story = {};
 
-/** @summary One moon owner, healthy. */
 export const Single: Story = {
   args: {
     rows: ROWS.slice(0, 1),
@@ -31,10 +28,8 @@ export const Single: Story = {
   },
 };
 
-/** @summary A viewer who may not record payments: no Pay column. */
 export const ReadOnly: Story = { args: { onPay: undefined } };
 
-/** @summary His own corps (one per Athanor) carry a Yours pill and read "no owner rate · no payouts", with no Pay. */
 export const WithYours: Story = {
   args: {
     rows: [
@@ -62,7 +57,6 @@ export const WithYours: Story = {
   },
 };
 
-/** @summary The phone list ("Stacked"): name, state and note, then the amount owed with Pay; a long name and a huge amount fit. */
 export const Phone: Story = {
   globals: { viewport: { value: 'mobile1', isRotated: false } },
   args: {

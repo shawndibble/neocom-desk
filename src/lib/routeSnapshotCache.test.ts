@@ -56,9 +56,6 @@ describe('routeSnapshotCache', () => {
   });
 
   it('forgets the corp views when only the corp-scoped rows are purged', async () => {
-    // A corp change deletes just the `corp:` prefix in Dexie, but a retained
-    // snapshot is a whole rendered board — so the blunt signal is what keeps
-    // the previous corporation's rows off the screen.
     writeRouteSnapshot('corp', CHAR_A, { board: 'old corp' });
     writeRouteSnapshot('corp-members', CHAR_A, { roster: 'old corp' });
     writeRouteSnapshot('corp', CHAR_B, { board: 'untouched' });

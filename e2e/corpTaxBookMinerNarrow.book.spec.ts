@@ -1,8 +1,3 @@
-/**
- * A Miner's page on a phone (390px, `PHONE`): the figures, the account ledger with its running
- * balance and a late notice's panel all fit the width, so the page never scrolls sideways
- * (#1708's failure mode) and the balance after each row stays on screen.
- */
 import type { Locator, Page } from '@playwright/test';
 import { PHONE } from './support/testBase';
 import { expectNoPageOverflow } from './support/overflow';
@@ -19,7 +14,6 @@ test.beforeEach(async ({ book: emulator }) => {
   await emulator.seed(book.seed.docs());
 });
 
-/** Every part of `locator` lies inside the viewport's width. */
 async function expectWithinWidth(page: Page, locator: Locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
@@ -50,7 +44,6 @@ test("the account ledger's running balance stays on screen on a phone", async ({
 test("a late notice's panel fits a phone", async ({ page }) => {
   await openMiner(page, solo(MINER.ada.id), MINER.ada.name);
   const august = shortDay(book.notices.adaAugust.issuedBack);
-  // A phone folds the paid days away.
   await page.getByRole('button', { name: 'Show Earlier days' }).click();
   await page
     .getByRole('button', { name: `Open the late notice of ${august}` })

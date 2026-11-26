@@ -1,8 +1,3 @@
-/**
- * The Improve Goal chips (a goal the fit cannot score is a disabled chip with
- * its reason, under "More goals"), and the one setting a goal brings with it:
- * Mine more's ore, Carry more's hold.
- */
 import { useTranslation } from 'react-i18next';
 import {
   FilterChip,
@@ -33,7 +28,6 @@ interface Props {
   before: ImproveSearch['before'];
   hull: ImproveSearch['hull'];
   settings: ImproveSettings;
-  /** Whether "More goals" is open, the id of what it opens and how to flip it. */
   goalsOpen: boolean;
   goalsId: string;
   onToggleGoals: () => void;

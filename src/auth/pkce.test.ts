@@ -6,7 +6,7 @@ const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
 describe('generateVerifier', () => {
   it('returns base64url string of 32 random bytes (43 chars, no padding)', () => {
     const v = generateVerifier();
-    expect(v).toHaveLength(43); // ceil(32 * 4 / 3) unpadded
+    expect(v).toHaveLength(43);
     expect(v).toMatch(BASE64URL_RE);
   });
 

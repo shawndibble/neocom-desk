@@ -9,12 +9,6 @@ import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib
 import type { CharacterContact } from '@/esi/endpoints';
 import { type EffectiveStanding } from '@/features/character/contactStandings';
 
-/**
- * One contact flag as an icon. `role="img"` plus a tooltip rather than a
- * focusable trigger, the same trade `NotificationsPanel`'s badges make: the
- * meaning must reach a screen reader, but a tab stop on every row of a long
- * contact list is worse to keyboard through than the flag is worth.
- */
 export function FlagBadge({
   icon,
   label,
@@ -33,16 +27,7 @@ export function FlagBadge({
   );
 }
 
-/**
- * A contact's face: a pilot's portrait, a corp's or alliance's logo. A faction
- * has no image on CCP's image server, so it gets a glyph in the same box. Its
- * own column, pinned to the phone card's left edge (`stackEdge`) so it sits
- * beside both lines; decorative, since the name beside it says who it is.
- */
 export function ContactPortrait({ contact }: { contact: ContactIdentity }) {
-  // `max-w-none`: the cell is `w-0` (a tight desktop column, and pinned out of
-  // flow on the phone card), and the base `img { max-width: 100% }` would
-  // otherwise collapse the portrait to nothing.
   const box = 'block size-6 max-w-none shrink-0 rounded-xs border border-line';
   if (contact.contact_type === 'faction') {
     return (
@@ -70,13 +55,6 @@ export function ContactPortrait({ contact }: { contact: ContactIdentity }) {
   );
 }
 
-/**
- * The name, with an "NPC" tag for an agent or NPC corp — the written word, in
- * the micro-heading treatment rather than a box (DESIGN.md §6), carries it.
- * `flags`, when given, ride beside the name on the phone card only: there the
- * Flags column is hidden, and a blocked or watched mark belongs with the name
- * it is about rather than at the end of the meta line.
- */
 export function ContactNameCell({
   contact,
   name,
@@ -100,7 +78,6 @@ export function ContactNameCell({
   );
 }
 
-/** A contact's blocked/watched marks, or null for neither. */
 export function ContactFlags({ contact }: { contact: CharacterContact }) {
   const { t } = useTranslation();
   const blocked = contact.is_blocked === true;
@@ -126,12 +103,6 @@ export function ContactFlags({ contact }: { contact: CharacterContact }) {
   );
 }
 
-/**
- * A value the phone's dense card can do without (`data-dense-omit`,
- * index.css): an empty cell's dash, which reads as "none" in a table column
- * but would print as one more "· —" on the meta line, or a word the card
- * already says another way. The card hides a cell holding nothing else.
- */
 export function DenseOmit({ children }: { children: ReactNode }) {
   return <span data-dense-omit>{children}</span>;
 }
@@ -140,16 +111,6 @@ export function EmptyCell() {
   return <DenseOmit>—</DenseOmit>;
 }
 
-/**
- * One line of the Corp / Alliance cell: the entity's name, a "yours" badge
- * when the contact sits inside the reader's own corp or alliance, and the
- * standing tag of a *separate* entry of theirs that also covers this pilot.
- *
- * The tag is placed against the entity it comes from rather than in the
- * Standing column, because the whole of its meaning is which entity supplied
- * it — in the Standing column it would read as a second opinion about the
- * pilot, which is exactly what it is not.
- */
 export function AffiliationLine({
   name,
   own,

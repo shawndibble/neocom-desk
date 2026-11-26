@@ -65,7 +65,6 @@ describe('SlideOver', () => {
         <p>Panel body</p>
       </SlideOver>
     );
-    // Radix arms its Escape listener as the panel takes focus: wait for that.
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Add' })).toHaveFocus());
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -83,14 +82,12 @@ describe('SlideOver', () => {
       </SlideOver>
     );
     const { rerender } = render(panel(false));
-    // Armed once the panel holds focus; then an Escape with no window up closes it.
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'My sharing' })).toHaveFocus());
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
     onClose.mockClear();
     rerender(panel(true));
     fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'Escape' });
-    // Focus on the page itself while the Modal is up: still the Modal's Escape.
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -185,7 +182,6 @@ describe('SlideOver focus', () => {
         </>
       );
     }
-    // Opened by a URL, with nothing focused: no opener to return to.
     render(<Gone />);
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus());
     await user.keyboard('{Escape}');

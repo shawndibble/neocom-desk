@@ -1,12 +1,3 @@
-/**
- * Chart models for the kinds whose numbers the adapters already hold. Pure:
- * plain figures and a translate function in, a `ChartModel` out (or null when
- * there is nothing honest to draw, so the Chart view falls back to the
- * Number rather than drawing an empty frame).
- *
- * Honesty rules from the design record: bars carry their max and their time
- * range; every model carries a hidden text summary; no series is red.
- */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type {
@@ -22,7 +13,6 @@ import type { Translate } from '@/lib/translate';
 
 const K = 'overview.widgets.chart';
 
-/** A status colour for a row whose length is itself an urgency (time left to act). */
 export function severityColor(severity: DeadlineSeverity): ChartColor {
   return severity === 'warning' || severity === 'critical' ? 'warning' : 'accent';
 }
@@ -33,11 +23,9 @@ export interface HBarInput {
   value: number;
   text: string;
   color?: ChartColor;
-  /** 0..1, for a figure that is already a share of something; otherwise relative to the largest row. */
   share?: number;
 }
 
-/** Horizontal bars with a generic "note: label figure, ..." summary; null with no rows. */
 export function hbarsFromRows(
   t: Translate,
   rows: readonly HBarInput[],
@@ -63,7 +51,6 @@ export function hbarsFromRows(
   };
 }
 
-/** A balance line over the days we actually know; null under two days. */
 export function walletArea(
   t: Translate,
   series: { days: readonly string[]; values: readonly number[] },
@@ -98,11 +85,6 @@ export interface QueueSegment {
   seconds: number;
 }
 
-/**
- * How long each unfinished skill in the queue takes, in queue order: the
- * running skill from now, a later one from its own start (or the previous
- * skill's finish when ESI gave none). A skill with no finish time is left out.
- */
 export function queueSegments(entries: readonly SkillQueueEntry[], now: number): QueueSegment[] {
   const out: QueueSegment[] = [];
   let previousFinish: number | null = null;
@@ -128,11 +110,6 @@ export interface QueueStackInput {
   seconds: number;
 }
 
-/**
- * The whole skill queue as one bar: a part per skill, each as long as it trains,
- * the running one in the accent. The legend names the first two (a long queue
- * would drown the widget); the caption says when the queue ends. Null when empty.
- */
 export function queueStack(
   t: Translate,
   items: readonly QueueStackInput[],

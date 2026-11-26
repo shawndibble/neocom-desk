@@ -1,46 +1,17 @@
-// Verify an EVE SSO access token (JWT) and extract identity claims.
-//
-// Claim values verified against https://login.eveonline.com/.well-known/oauth-authorization-server
-// and https://docs.esi.evetech.net/docs/sso/validating_eve_jwt.html (2026-08-29):
-//   - JWKS:     https://login.eveonline.com/oauth/jwks
-//   - issuer:   "https://login.eveonline.com" (docs also allow bare "login.eveonline.com")
-//   - audience: contains "EVE Online" (plus the app client_id)
-//   - sub:      "CHARACTER:EVE:{characterId}"
-//   - owner:    character owner hash — changes when the character is transferred
-//
-// App binding: "EVE Online" alone is NOT enough — every EVE app's tokens carry
-// it, so a token minted by any third-party EVE app would otherwise be accepted
-// here. The token must additionally name one of THIS deployment's client_ids
-// (EVE_CLIENT_ID), either in the aud array (EVE tokens carry
-// [client_id, "EVE Online"]) or as the azp (authorized party) claim.
-//
-// EVE_CLIENT_ID is a comma-separated list, not a single value: dev
-// (localhost callback) and prod (GitHub Pages callback) are separate EVE
-// application registrations with different client_ids, but both point at
-// this one deployed function — it must accept either.
-//
-// JWKS URL / issuer / audience are injectable via env so tests can point at a
-// locally served key set.
-
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
 export interface EveTokenClaims {
   characterId: number;
   ownerHash: string;
-  /** Character name (informational only). */
   name: string;
-  /** Scopes the token carries (`scp` claim; EVE sends a string for one scope, an array for many). */
   scopes: string[];
-  /** The one of this deployment's client_ids the token is bound to. */
   clientId: string;
 }
 
 export interface VerifyOptions {
-  /** Key resolver, e.g. jose createRemoteJWKSet / createLocalJWKSet. */
   getKey: JWTVerifyGetKey;
   issuer: string | string[];
   audience: string;
-  /** This deployment's EVE client_ids; tokens minted for other apps are rejected. */
   clientIds: readonly string[];
 }
 
@@ -48,7 +19,6 @@ export const DEFAULT_JWKS_URL = 'https://login.eveonline.com/oauth/jwks';
 export const DEFAULT_ISSUERS = ['https://login.eveonline.com', 'login.eveonline.com'];
 export const DEFAULT_AUDIENCE = 'EVE Online';
 
-/** Firebase auth uid for an EVE character. Same character => same uid on every device. */
 export function uidForCharacter(characterId: number): string {
   return `char:${characterId}`;
 }
@@ -58,16 +28,11 @@ function scopesOf(scp: unknown): string[] {
   return Array.isArray(scp) ? scp.filter((s): s is string => typeof s === 'string') : [];
 }
 
-/** Inverse of `uidForCharacter`; undefined for any other uid shape. */
 export function characterIdForUid(uid: string): number | undefined {
   const match = /^char:(\d+)$/.exec(uid);
   return match ? Number(match[1]) : undefined;
 }
 
-/**
- * Verify signature (via JWKS), issuer, audience, and expiry; return identity.
- * Throws on any validation failure.
- */
 export async function verifyEveAccessToken(
   token: string,
   opts: VerifyOptions
@@ -77,8 +42,6 @@ export async function verifyEveAccessToken(
     audience: opts.audience,
   });
 
-  // jwtVerify only proved the generic "EVE Online" audience. Also require the
-  // token to be bound to one of THIS deployment's apps (see header comment).
   const audiences = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : [];
   const clientId =
     audiences.find((aud) => opts.clientIds.includes(aud)) ??
@@ -106,17 +69,6 @@ export async function verifyEveAccessToken(
   };
 }
 
-/**
- * Production verify options. EVE_CLIENT_ID is REQUIRED (fail closed: without
- * it any EVE app's tokens would be accepted) and is comma-separated — dev and
- * prod are separate EVE application registrations sharing this one deployed
- * function. Env overrides exist for tests (EVE_JWKS_URL, EVE_ISSUER,
- * EVE_AUDIENCE).
- *
- * `allowMissingClientId` is only for the Firebase emulator's function-discovery
- * pass, which loads the module without the user's env files; the options it
- * yields have no client ids, so they verify nothing.
- */
 export function verifyOptionsFromEnv(
   options: { allowMissingClientId?: boolean } = {}
 ): VerifyOptions {

@@ -1,8 +1,3 @@
-/**
- * Net worth chart maths (issue #2935): layers, per-Character day series, and
- * the totals the chart and table share. Pure — snapshots and the journal's
- * daily balances come in, display-ready numbers go out.
- */
 import { findMissingDays, utcDay, type NetWorthSnapshotRow } from './snapshot';
 import { parseInstant } from '../esiInstant';
 import { DAY_MS } from '@/lib/age';
@@ -21,11 +16,6 @@ export function layerValues(row: NetWorthSnapshotRow): LayerValues {
   };
 }
 
-/**
- * The layers worth offering: ISK and Assets always, the rest only when some
- * snapshot day holds a non-zero value for them. Reads rows as stored, so a
- * layer an older row lacks appears once any row carries it.
- */
 export function listedLayers(snapshots: readonly NetWorthSnapshotRow[]): LayerId[] {
   const values = snapshots.map(layerValues);
   return LAYER_IDS.filter(
@@ -37,10 +27,6 @@ export function netWorthOf(values: LayerValues, shown: readonly LayerId[]): numb
   return shown.reduce((sum, id) => sum + values[id], 0);
 }
 
-/**
- * Toggle `id` in a hidden list (the persisted shape, so a new Character or
- * layer shows by default). Hiding the last visible one is refused.
- */
 export function toggleHidden<T>(hidden: readonly T[], id: T, all: readonly T[]): readonly T[] {
   if (hidden.includes(id)) return hidden.filter((h) => h !== id);
   const stillVisible = all.filter((a) => a !== id && !hidden.includes(a));
@@ -51,9 +37,7 @@ export type PointKind = 'wallet-only' | 'snapshot' | 'gap';
 
 export interface SeriesPoint {
   day: string;
-  /** Wallet balance that day; `null` only before anything is known. */
   isk: number | null;
-  /** `null` outside a snapshot day; `estimateLayers` fills those days in for drawing. */
   layers: LayerValues | null;
   kind: PointKind;
 }
@@ -61,15 +45,9 @@ export interface SeriesPoint {
 export interface CharacterSeries {
   points: SeriesPoint[];
   firstSnapshotDay: string | null;
-  /** Days between the first and last snapshot with no snapshot. */
   gapDays: string[];
 }
 
-/**
- * One Character's day-by-day series. ISK is the journal's last balance of each
- * day (the backfill) and continues through gaps and pre-snapshot days; the
- * other layers exist only on snapshot days.
- */
 export function buildCharacterSeries(input: {
   walletByDay: ReadonlyMap<string, number>;
   snapshots: readonly NetWorthSnapshotRow[];
@@ -96,14 +74,6 @@ export function buildCharacterSeries(input: {
   return { points, firstSnapshotDay, gapDays: findMissingDays(snapDays) };
 }
 
-/**
- * Layer values for every point, for drawing: a snapshot day keeps its own;
- * any other day is a guess. Between two snapshots the non-wallet layers run in
- * a straight line from one to the next, before the first (a new user) they
- * repeat the first snapshot, after the last they repeat the last. The wallet is
- * always the day's real balance when the journal has one. `null` only when the
- * series has no snapshot at all.
- */
 export function estimateLayers(points: readonly SeriesPoint[]): (LayerValues | null)[] {
   const snapIdx = points.flatMap((p, i) => (p.layers ? [i] : []));
   return points.map((point, i) => {
@@ -138,7 +108,6 @@ export function totalsFor(
   return { total: netWorthOf(perLayer, opts.shown), perLayer };
 }
 
-/** Last balance of each UTC day from journal entries (`date`, `balance`) — the ISK backfill. */
 export function dailyWalletFromJournal(
   entries: readonly { date: string; balance?: number }[]
 ): Map<string, number> {

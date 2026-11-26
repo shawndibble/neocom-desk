@@ -6,9 +6,6 @@ import {
 } from './skillAttributeEffects';
 import type { SkillAttributeModifierMap } from '@/sde/types';
 
-// Sharpshooter (3311, 5%/level) boosts attribute 54 on items requiring
-// Gunnery (3300); Gunnery (3300, -2%/level) boosts attribute 51 on items it
-// gates itself — a skill gating its own bonus. See `SkillAttributeModifier`.
 const INDEX: SkillAttributeModifierMap = {
   '54': [{ ownerSkillTypeID: 3311, gatingSkillTypeID: 3300, perLevelValue: 5 }],
   '51': [{ ownerSkillTypeID: 3300, gatingSkillTypeID: 3300, perLevelValue: -2 }],
@@ -21,9 +18,6 @@ describe('findModifyingSkills', () => {
   });
 
   it('finds nothing when the item does not require the gating skill', () => {
-    // A missile launcher never requires Gunnery, so Sharpshooter's bonus
-    // to attribute 54 never applies to it even if the launcher happened to
-    // carry that attribute for an unrelated reason.
     const result = findModifyingSkills(54, new Set([3319]), INDEX);
     expect(result).toEqual([]);
   });

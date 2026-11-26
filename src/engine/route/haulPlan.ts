@@ -1,59 +1,34 @@
-/**
- * The haul route (issue #4965): the ordered Legs a pilot flies to carry a Move
- * plan's pickups to its destination — out to a pickup, on to the next while the
- * hold has room, back to the destination, and again for what is left.
- *
- * Pure. Distances are jump counts from the same sweeps Route Safety's pathfinder
- * runs (`flownJumpDistancesFrom`), under the caller's options, so a leg's
- * jumps agree with the route the leg's Route Safety link draws.
- *
- * Greedy by volume: a trip fills the hold from the nearest pickup that still
- * has stock, a pickup's stock may split across trips, and a pickup is visited
- * once per trip it feeds. Visits count against `MAX_STOPS` per Character;
- * returns to the destination do not. Whatever the plan cannot cover is
- * reported in `leftOut`, never dropped.
- */
 import { normalizeMaxIsk } from '@/engine/assets/haulPacking';
 import { flownJumpDistancesFrom } from './holeDetour';
 import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
 import { MAX_STOPS } from './tripPlan';
 
-/** A place a Leg starts or ends: a system, plus the station the pilot named there. */
 export interface HaulPlace {
-  /** `null` when the place resolves to no system. */
   systemId: number | null;
   stationId: number | null;
   name: string;
 }
 
-/** One item type in a load: what the pilot sees in the cargo list. */
 export interface HaulStack {
   typeId: number;
   name: string;
   quantity: number;
-  /** m³ of one unit as hauled. */
   unitM3: number;
-  /** ISK one unit is worth; absent when unpriced (counts as 0 against a limit). */
   unitIsk?: number;
 }
 
 export interface HaulPickupInput extends HaulPlace {
   locationId: number;
-  /** Volume to carry from here, in m³. */
   m3: number;
-  /** What `m3` is made of; absent when the caller has no item list. */
   stacks?: readonly HaulStack[];
-  /** Hulls flown out from here, one name per ship; each is a flight to the destination. */
   ships?: readonly string[];
 }
 
 export interface HaulCharacterInput {
   characterId: number;
   name: string;
-  /** Where the Character is now; `null` when unknown. */
   start: HaulPlace | null;
   pickups: readonly HaulPickupInput[];
-  /** Ships this Character flies out from a place the plan cannot route from: noted, never routed. */
   flown: readonly string[];
 }
 
@@ -61,40 +36,24 @@ export interface HaulInput {
   graph: JumpGraph;
   options?: FindJumpRouteOptions;
   characters: readonly HaulCharacterInput[];
-  /** The hauler's hold, in m³. */
   capacityM3: number;
   destination: HaulPlace;
-  /** Pickup visits per Character; defaults to `MAX_STOPS`. */
   maxStops?: number;
-  /**
-   * Most one trip's load may be worth, in ISK; null or absent for no limit.
-   * Applies to pickups that carry `stacks` with `unitIsk`; a pickup without
-   * stacks has no values to count.
-   */
   maxIskPerHaul?: number | null;
 }
 
 export interface HaulLeg {
-  /** Index within the whole plan: stable across a re-render and a link round-trip. */
   id: number;
   characterId: number;
-  /** 1-based trip this leg belongs to, within its Character. */
   trip: number;
-  /** `pickup`: load `m3` at `to`. `delivery`: drop `m3` at the destination. */
   kind: 'pickup' | 'delivery';
-  /** `null` for the first leg of a Character whose location is unknown. */
   from: HaulPlace | null;
   to: HaulPlace;
-  /** `null` when no gate route joins the ends, or an end has no system. */
   jumps: number | null;
   m3: number;
-  /** ISK the leg's load is worth by its stacks' `unitIsk`; absent on a flight and on a haul saved before values. */
   isk?: number;
-  /** The pickup location a `pickup` leg loads at. */
   locationId: number | null;
-  /** The items a `pickup` leg loads; absent on a delivery and on a haul saved before items. */
   stacks?: HaulStack[];
-  /** The ship a flight's two legs take and fly; absent on a cargo leg. */
   ships?: string[];
 }
 
@@ -109,22 +68,18 @@ export interface HaulLeftOut {
   characterId: number;
   name: string;
   locationId: number;
-  /** The pickup's name. */
   place: string;
   m3: number;
-  /** `cap`: past the stop cap. `unplaced`: no system to route to. `noCapacity`: no hold to carry it in. `overLimit`: a unit that cannot ride in one trip. */
   reason: 'cap' | 'unplaced' | 'noCapacity' | 'overLimit';
 }
 
 export interface HaulPlan {
   sections: HaulSection[];
   leftOut: HaulLeftOut[];
-  /** Ships flown rather than hauled, by Character; only Characters with any. */
   flown: { characterId: number; name: string; ships: string[] }[];
   totals: { legs: number; jumps: number; m3: number };
 }
 
-/** Stacks of one type added together, first appearance first. */
 export function mergeStacks(stacks: readonly HaulStack[]): HaulStack[] {
   const byType = new Map<number, HaulStack>();
   for (const s of stacks) {
@@ -202,14 +157,12 @@ export function planHaul(input: HaulInput): HaulPlan {
         ...(ships ? { ships } : {}),
       });
 
-    /** Whether any stack of this Character carries a price, so every leg of a trip shows a value or none does. */
     const valued = c.pickups.some((p) => p.stacks?.some((s) => s.unitIsk !== undefined));
     let start: HaulPlace | null = c.start;
     while (!capped && left.some((l) => l.m3 > EPS)) {
       trips += 1;
       let hold = 0;
       let holdIsk = 0;
-      /** Pickups whose stacks cannot add a unit to what is left of this trip. */
       const full = new Set<unknown>();
       let here: HaulPlace | null = start;
       let loaded = false;
@@ -221,8 +174,6 @@ export function planHaul(input: HaulInput): HaulPlan {
           break;
         }
         const next = nearest(open, here, jumpsBetween);
-        // Under a limit the stacks decide what rides: a take is whole units that
-        // fit the room in both m³ and ISK, and what is left stays for the next trip.
         const limited = maxIsk !== null && (next.stacks?.length ?? 0) > 0;
         let take = Math.min(next.m3, capacityM3 - hold);
         let stacks: HaulStack[] | undefined;
@@ -232,10 +183,9 @@ export function planHaul(input: HaulInput): HaulPlan {
           next.m3 = next.stacks!.reduce((sum, s) => sum + s.quantity * s.unitM3, 0);
           if (stacks.length === 0) {
             if (hold > 0) {
-              full.add(next); // nothing here fits what is left of this trip
+              full.add(next);
               continue;
             }
-            // Not even one unit rides an empty hold: report it, never loop on it.
             leftOut.push(leftOutOf(c, next.pickup, next.m3, 'overLimit'));
             next.m3 = 0;
             continue;
@@ -284,7 +234,6 @@ export function planHaul(input: HaulInput): HaulPlan {
 
     for (const l of left) if (l.m3 > EPS) leftOut.push(leftOutOf(c, l.pickup, l.m3, 'cap'));
 
-    // Each ship is a flight of its own, after the cargo: take it where it sits, fly it out.
     const flights: { pickup: HaulPickupInput; ship: string }[] = [];
     for (const p of c.pickups) {
       for (const ship of p.ships ?? []) {
@@ -321,14 +270,6 @@ export function planHaul(input: HaulInput): HaulPlan {
   };
 }
 
-/**
- * Takes `m3` worth of units off `stacks` (in place, in order) and returns them.
- * Whole units only, so a non-last leg may sit up to a unit under its m³ (or
- * take none of a unit bigger than its room). The `last` take of a pickup gets
- * whatever is left so no unit is lost, which can sit over that leg's m³ by the
- * units earlier legs could not fit. With `iskRoom` (an ISK limit) a take also
- * stops at that much value, and `last` must be false so no unit rides over it.
- */
 function takeStacks(
   stacks: HaulStack[],
   m3: number,
@@ -368,7 +309,6 @@ function leftOutOf(
   };
 }
 
-/** The open pickup fewest jumps from `here`; ties and unknown distances keep input order. */
 function nearest<T extends { pickup: HaulPickupInput }>(
   open: readonly T[],
   here: HaulPlace | null,

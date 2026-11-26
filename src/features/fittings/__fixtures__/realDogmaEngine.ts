@@ -1,8 +1,3 @@
-/**
- * Test-only: the real pinned engine and SDE (ADR 0016) through the real
- * `loadDogmaEngine`, with fetch and Cache Storage stubbed to serve them from
- * node_modules (and the mutaplasmid data from public/data). Callers `vi.unstubAllGlobals()` in their own `afterAll`.
- */
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { vi } from 'vitest';
@@ -10,7 +5,6 @@ import { loadDogmaEngine, type DogmaEngine } from '../dogmaFittingEngine';
 
 const require = createRequire(import.meta.url);
 
-/** Serves the pinned engine and SDE from node_modules to `loadDogmaEngine`'s fetch. */
 async function stubEngineAssets(): Promise<void> {
   const wasmPath = require.resolve('@eveshipfit/dogma-engine/esf_dogma_engine_bg.wasm');
   const sdePath = require.resolve('@eveshipfit/sde/dist/sde.dat');
@@ -43,7 +37,6 @@ async function stubEngineAssets(): Promise<void> {
   });
 }
 
-/** The real engine, ready. */
 export async function loadRealDogmaEngine(): Promise<DogmaEngine> {
   await stubEngineAssets();
   return loadDogmaEngine();

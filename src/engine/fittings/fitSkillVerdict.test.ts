@@ -63,7 +63,6 @@ describe('fitSkillVerdict', () => {
     expect(
       fitSkillVerdict([HULL, GUN], input({ skillLevels: levels, cloneState: 'alpha' }))
     ).toMatchObject({ kind: 'missing', omegaOnly: true });
-    // An Omega can train it: the gap is only a gap.
     expect(fitSkillVerdict([HULL, GUN], input({ skillLevels: levels }))).toMatchObject({
       kind: 'missing',
       omegaOnly: false,

@@ -20,24 +20,13 @@ interface PrereqRowProps {
   attributes: AttributePair | undefined;
   boosted: boolean;
   alphaCapped: boolean;
-  /** When training begins, for this row's finish date. Undefined when there's no wall-clock basis to offer. */
   startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
   onPromote: (rowId: string) => void;
-  /** Runs as a skill name is clicked, before the link navigates — carries this plan's entries to the modal. */
   onStageSkillDetail: (skillTypeID: number) => void;
 }
 
-/**
- * Prereq-inserted step the user didn't add directly: dimmed, and derived
- * rather than stored — but draggable, because dragging one promotes it into a
- * real entry at that position (GLOSSARY.md "Prereq Promotion"). The "+" button
- * beside it does the same promotion in place, so the affordance is reachable
- * without guessing that a dimmed row can be dragged.
- *
- * Memoized (#408) like EntryRow — holds as long as `onPromote` is stable.
- */
 export const PrereqRow = memo(function PrereqRow({
   row,
   name,
@@ -66,9 +55,6 @@ export const PrereqRow = memo(function PrereqRow({
     </button>
   );
 
-  // Icon-only with an aria-label, like the grip —
-  // and deliberately not wrapped in a Tooltip, which would put a Radix
-  // provider on every row of a long queue to restate the label.
   const promoteButton = (
     <button
       type="button"
@@ -103,8 +89,6 @@ export const PrereqRow = memo(function PrereqRow({
       <AttributePairBadge primary={attributes.primary} secondary={attributes.secondary} />
     ) : null;
 
-  // Same fold as EntryRow's: line one is the name and its one action, every
-  // optional value sits on the meta line below it.
   const metaLine =
     attributeBadge || columns.perLevelTime || columns.cumulativeTime ? (
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem]">

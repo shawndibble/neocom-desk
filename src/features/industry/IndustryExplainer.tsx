@@ -12,11 +12,9 @@ import {
 
 const EVE_UNI_MANUFACTURING = 'https://wiki.eveuniversity.org/Manufacturing';
 
-/** Tritanium (a material) and the Rifter (the product): the chain's real item icons. */
 const TRITANIUM = 34;
 const RIFTER = 587;
 
-/** The Alpha-trainable industry skills, read from the SDE once the drawer first opens. */
 function useAlphaIndustrySkills(open: boolean): AlphaIndustrySkill[] | null {
   const [skills, setSkills] = useState<AlphaIndustrySkill[] | null>(null);
   useEffect(() => {
@@ -35,12 +33,6 @@ function useAlphaIndustrySkills(open: boolean): AlphaIndustrySkill[] | null {
   return skills;
 }
 
-/**
- * "New to Industry?": the short manufacturing explainer in a drawer, on every
- * Industry tab. It teaches blueprint + materials → item, the two kinds of
- * blueprint, where a first one comes from, what an Alpha can train (from the
- * SDE's own Alpha caps) and what this page does for the pilot.
- */
 export function IndustryExplainer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const alphaSkills = useAlphaIndustrySkills(open);
@@ -122,11 +114,6 @@ export function IndustryExplainer({ open, onClose }: { open: boolean; onClose: (
   );
 }
 
-/**
- * The header's "New to Industry?" button and the drawer it opens. Its text
- * stays at every width (DESIGN.md §6c Header controls): the words are what a
- * new pilot is looking for, and an icon alone reads as a generic tip.
- */
 export function IndustryExplainerTrigger() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

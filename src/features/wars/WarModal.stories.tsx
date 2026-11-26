@@ -25,12 +25,10 @@ const active = (over: Partial<StoredWar> = {}): WarAgainstMe => ({
   against: { corporationId: 98000001 },
 });
 
-/** @summary The war card a pilot opens from the War banner: who, when, and how it is going. */
 const meta = {
   title: 'wars/WarModal',
   component: WarModal,
   args: { open: true, onClose: () => undefined, wars: [active()] },
-  // The parties' names, so the story never asks ESI for them.
   loaders: [
     () =>
       seedCachedNames({
@@ -48,10 +46,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary One running war on the pilot's corporation. */
 export const Active: Story = {};
 
-/** @summary A war declared but not started, with allies hired and an end already set. */
 export const NotStartedWithAllies: Story = {
   args: {
     wars: [
@@ -71,7 +67,6 @@ export const NotStartedWithAllies: Story = {
   },
 };
 
-/** @summary More than one war: one card each, newest declared first. */
 export const SeveralWars: Story = {
   args: {
     wars: [
@@ -86,7 +81,6 @@ export const SeveralWars: Story = {
   },
 };
 
-/** @summary Wars on two of the account's corporations: the cards grouped under the corporation each is against, the active Character's first. */
 export const SeveralCorporations: Story = {
   args: {
     nameCorporation: true,

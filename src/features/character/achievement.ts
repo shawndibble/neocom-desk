@@ -1,8 +1,3 @@
-/**
- * A Character's achievement score and displayed title (issue #4777), from the
- * public record (`GET /characters/{id}`, compat date 2026-06-09). The title
- * comes as a `characterTitles` UUID; its name is the baked SDE table's.
- */
 import type { CharacterContact, CharacterPublicInfo } from '@/esi/endpoints';
 import { isNpcCharacterId } from '@/esi/entityIds';
 import { loadPublicCharacterInfo } from './publicInfoData';
@@ -12,7 +7,6 @@ export interface CharacterAchievement {
   titleId: string | null;
 }
 
-/** What a line or cell shows. */
 export interface AchievementParts {
   title: string | null;
   score: number | null;
@@ -22,7 +16,6 @@ export function achievementFromPublicInfo(info: CharacterPublicInfo): CharacterA
   return { score: info.achievement_score ?? 0, titleId: info.character_title_id ?? null };
 }
 
-/** Null when neither a named title nor a score > 0. An unnamed or not-yet-loaded title reads as none. */
 export function achievementParts(
   achievement: CharacterAchievement,
   titleNames: Readonly<Record<string, string>> | null
@@ -36,10 +29,6 @@ export function achievementParts(
   return title === null && score === null ? null : { title, score };
 }
 
-/**
- * The public record's score and title, through the cached loader. An NPC agent
- * has neither, so it is never asked about; a record that cannot be read is null.
- */
 export async function loadCharacterAchievement(
   characterId: number
 ): Promise<CharacterAchievement | null> {
@@ -52,7 +41,6 @@ export async function loadCharacterAchievement(
   }
 }
 
-/** Character contacts only: corps, alliances and factions have no score or title (`loadCharacterAchievement` skips NPC agents). */
 export function achievementContactIds(contacts: readonly CharacterContact[]): number[] {
   return contacts
     .filter((contact) => contact.contact_type === 'character')

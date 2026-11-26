@@ -1,8 +1,3 @@
-/**
- * A corporation's SRP as one workbook (#4946): Settings, every SRP Claim (all states), the SRP
- * log and the Doctrine Fits, a sheet each. Pure: the caller reads them and hands the sheets to
- * `downloadWorkbook`.
- */
 import type { CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
 import {
@@ -20,7 +15,6 @@ import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import type { DoctrineFit, HullRule, SrpClaimBasis, SrpSettings } from '../srpTypes';
 
 export interface SrpExportInput {
-  /** Null when SRP was never turned on. */
   settings: SrpSettings | null;
   claims: readonly SrpClaim[];
   audit: readonly SrpAuditEntry[];
@@ -28,10 +22,8 @@ export interface SrpExportInput {
 }
 
 export interface SrpExportNames {
-  /** Any type: a hull, a module, a rig. */
   type: (typeId: number) => string;
   system: (systemId: number) => string;
-  /** A log entry as the officer feed words it. */
   describe: (entry: SrpAuditEntry) => string;
 }
 
@@ -40,11 +32,9 @@ const PREFIX = 'srp.export';
 const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: SheetColumns<T>) =>
   sheetFrom(t, PREFIX, name, rows, columns);
 
-/** `2x Name; 1x Name`, in the order each type first appears. */
 const counted = (typeIds: readonly number[], names: SrpExportNames): string =>
   joined(groupTypeIds(typeIds).map(({ typeId, count }) => `${count}x ${names.type(typeId)}`));
 
-/** A Doctrine diff's side as counted types; blank when the claim has none (not checked, or a clean match). */
 function diffText(typeIds: readonly number[] | undefined, names: SrpExportNames): string | null {
   return typeIds && typeIds.length > 0 ? counted(typeIds, names) : null;
 }

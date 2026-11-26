@@ -107,8 +107,6 @@ describe('summarizePriceHistory', () => {
     expect(summarizePriceHistory(points, 30)?.totalVolume).toBe(157);
   });
 
-  // Rewritten for #5870: the mean now divides by calendar days (4 here, one per point),
-  // so a window with a trade every day gives the same figure as the old traded-days mean.
   it('reports the mean daily order count over a fully traded window', () => {
     const points = [
       point({ date: '2026-01-01', orderCount: 10 }),
@@ -120,7 +118,6 @@ describe('summarizePriceHistory', () => {
   });
 
   it('counts a day nothing traded as zero orders (ESI omits it)', () => {
-    // 10 orders on 3 of 90 days: 0.11 a day, not the 3.3 that dividing by traded days gives.
     const points = [
       point({ date: '2026-01-01', orderCount: 5 }),
       point({ date: '2026-02-01', orderCount: 3 }),
@@ -217,7 +214,6 @@ describe('filterPriceHistoryRange with a moving-average series', () => {
 describe('orderCountWindowDays', () => {
   it('keeps a market that traded every day at its daily figure through the real range filter', () => {
     const today = new Date('2026-03-31T12:00:00Z');
-    // ESI history runs up to yesterday; 400 days back covers every range.
     const points = Array.from({ length: 400 }, (_, i) => {
       const d = new Date(Date.UTC(2026, 2, 30 - i));
       return point({ date: d.toISOString().slice(0, 10), orderCount: 7 });

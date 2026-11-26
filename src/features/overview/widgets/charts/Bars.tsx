@@ -5,13 +5,10 @@ import { CHART_COLOR } from './palette';
 import { signedBarGeometry } from './signedBars';
 import type { BarsChartModel } from './types';
 
-/** What one printed bar label needs, per character, plus a little air either side. */
 const LABEL_CHAR_PX = 6;
 const LABEL_GAP_PX = 8;
-/** Room above and below a plot whose bars carry labels, so the tallest bar's label is not clipped. */
 const LABEL_ROOM = 'my-3.5';
 
-/** How many bars to skip between printed labels so none overlap, from the width the chart really got. */
 function useLabelStride(labels: readonly string[] | undefined) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -29,14 +26,6 @@ function useLabelStride(labels: readonly string[] | undefined) {
   return { ref, stride: Math.max(1, Math.ceil((labels.length * slot) / width)) };
 }
 
-/**
- * Vertical bars with the tallest labelled and picked out, and the time range
- * at both ends. A model with a loss or a reference line draws on a zero axis
- * instead: losses hang below it, the reference is a dashed line labelled at
- * the top beside the max. A model of `gains` is green above that axis and red
- * below it, and may print a figure beside every bar instead of the max. Hover
- * (or a tap) on a bar reads its `tips`.
- */
 export function Bars({ model, height }: { model: BarsChartModel; height: number }) {
   const signed = model.ref !== undefined || model.gains || model.values.some((v) => v < 0);
   const { ref, stride } = useLabelStride(model.barLabels);
@@ -64,7 +53,6 @@ export function Bars({ model, height }: { model: BarsChartModel; height: number 
   );
 }
 
-/** A year-long series must fit a Small tile: hairline gaps once there are many bars. */
 const gapOf = (bars: number) => (bars > 40 ? 'gap-px' : 'gap-0.5');
 
 function PlainPlot({ model, height }: { model: BarsChartModel; height: number }) {
@@ -78,7 +66,6 @@ function PlainPlot({ model, height }: { model: BarsChartModel; height: number })
     >
       {heights.map((h, i) => (
         <i
-          // Bars are positional: a fixed-length series, oldest first.
           key={i}
           className={`block min-w-px flex-1 rounded-t-[1px] ${i === peak ? 'bg-accent' : 'bg-accent/55'}`}
           style={{ height: `${h}%` }}
@@ -109,7 +96,6 @@ function SignedPlot({
       style={{ height }}
     >
       {bars.map((bar, i) => (
-        // Bars are positional: a fixed-length series, oldest first.
         <span key={i} className="relative block min-w-px flex-1">
           <i
             className={`absolute inset-x-0 block ${bar.negative ? 'rounded-b-[1px]' : 'rounded-t-[1px]'} ${

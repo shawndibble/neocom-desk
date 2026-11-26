@@ -14,41 +14,20 @@ import { FieldError } from './FieldError';
 import { FieldNoteContext, mergeDescribedBy } from './fieldNote';
 import { TextInput } from './TextInput';
 
-/** A digit or the decimal mark: what the caret position is counted in, since grouping marks come and go. */
 const isAmountChar = (ch: string) => /\d/.test(ch) || ch === getDecimalMark();
 
-/** How long typing pauses before invalid text shows its error. */
 const ERROR_PAUSE_MS = 600;
 
 interface IskInputProps extends Omit<
   ComponentProps<typeof TextInput>,
   'type' | 'inputMode' | 'value' | 'onChange' | 'defaultValue'
 > {
-  /** The committed amount as a plain digit string; `''` is blank. */
   value: string;
-  /** Receives each newly parsed amount as a plain digit string, or `''` when cleared. */
   onChange: (value: string) => void;
-  /** What a blank field stands for; shown grouped as the placeholder. */
   defaultAmount?: number;
-  /**
-   * Whether the typed text currently parses (blank counts). A form that saves
-   * the committed value uses this to block saving while the field shows text
-   * that value doesn't match.
-   */
   onParseableChange?: (parseable: boolean) => void;
 }
 
-/**
- * An ISK amount the user types: accepts `1b`/`500m`/`10t` shorthand and
- * grouped digits (`parseIskAmount`), which `type="number"` would silently
- * report as empty. The keypad is `decimal`, so a phone can reach the suffix.
- *
- * The typed text stays the user's; only a parse commits. Text that doesn't
- * parse yet ("1.") leaves the committed value alone, and the committed value
- * is always a plain digit string, so URLs and stored values never see
- * shorthand. Blank commits `''` — a caller whose blank means "use the
- * default" reads it as that (`defaultAmount` shows what it will be).
- */
 export function IskInput({
   value,
   onChange,
@@ -63,12 +42,9 @@ export function IskInput({
   const { t } = useTranslation();
   const errorId = useId();
   const noteId = useContext(FieldNoteContext);
-  // A committed value is a plain `1500000.5`, whatever the display mark: it is formatted, not re-read as typed text.
   const toDisplay = (amount: string) =>
     amount !== '' && Number.isFinite(Number(amount)) ? maskIsk(Number(amount)) : amount;
   const [text, setText] = useState(toDisplay(value));
-  // The last value this field itself committed: a `value` that differs came
-  // from outside (Clear, a URL change) and replaces what was typed.
   const committed = useRef(value);
   useEffect(() => {
     if (value !== committed.current) {
@@ -76,7 +52,6 @@ export function IskInput({
       setText(toDisplay(value));
     }
   }, [value]);
-  // Typing re-groups the text, which moves the caret: it is put back after the same count of digits.
   const field = useRef<HTMLInputElement | null>(null);
   const caretDigits = useRef<number | null>(null);
   useLayoutEffect(() => {
@@ -92,14 +67,11 @@ export function IskInput({
     }
     el.setSelectionRange(at, at);
   }, [text]);
-  // The text the error is armed for: set after typing pauses or on blur, so a
-  // half-typed "1." never flashes (and announces) an error on the way to "1.5b".
   const [errorFor, setErrorFor] = useState<string | null>(null);
   const parsed = text.trim() === '' ? null : parseIskAmount(text);
   const parseable = text.trim() === '' || parsed !== null;
   const showError = !parseable && errorFor === text;
   useEffect(() => {
-    // A trailing "." is incomplete until blur.
     if (parseable || text.trim().endsWith('.')) return;
     const timer = setTimeout(() => setErrorFor(text), ERROR_PAUSE_MS);
     return () => clearTimeout(timer);
@@ -120,8 +92,6 @@ export function IskInput({
         value={text}
         onBlur={(event) => {
           if (!parseable) setErrorFor(text);
-          // Shorthand settles to the full grouped figure on the way out, so the zeros can be checked.
-          // Only when the grouped figure says exactly what was committed: maskIsk keeps two decimals.
           else if (parsed !== null && parseIskAmount(maskIsk(parsed)) === parsed)
             setText(maskIsk(parsed));
           onBlur?.(event);

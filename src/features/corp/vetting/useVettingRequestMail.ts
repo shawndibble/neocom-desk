@@ -1,9 +1,3 @@
-/**
- * Mails a member the link to a review request, from the asking officer's Character, by the paced
- * Officer mail queue. Only on an explicit press; never throws (whatever goes wrong comes back as a
- * `MailRun`). Once queued it tells the server, so the queue shows "Mail sent" and the 24 hour
- * resend wait.
- */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VettingOverview, VettingReviewSummary } from '@/engine/vetting';
@@ -53,7 +47,6 @@ export function useVettingRequestMail(
     async (row: Asked): Promise<RequestMailRun> => {
       const none: RequestMailRun = { queued: [], failed: [], missingScope: false };
       try {
-        // The row may be stale (another tab mailed it): judge on the server's copy.
         const overview = await vettingBackend().overview(officerId, corporationId);
         const gate = mailGate(overview, row.id, officerId, Date.now());
         if (!gate.ok) {
@@ -77,7 +70,6 @@ export function useVettingRequestMail(
               await vettingBackend().recordRequestMail(officerId, corporationId, review.id)
             );
           } catch {
-            // Queued, but not recorded: the officer is told, so no one resends blind.
             return { ...run, unrecorded: true };
           }
         }

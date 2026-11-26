@@ -3,7 +3,6 @@ import type { InputCostMove } from '@/engine/market/inputCostMove';
 import { formatVsMedianPct } from '@/features/market/format';
 import { cx } from '@/lib/cx';
 
-/** One muted line; amber only when cost rose and the product did not. */
 export function InputCostMoveLine({ move, inputName }: { move: InputCostMove; inputName: string }) {
   const { t } = useTranslation();
   const warn = move.costPct > 0 && move.productPct !== null && move.productPct <= 0;

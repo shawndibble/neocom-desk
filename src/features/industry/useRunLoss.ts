@@ -16,10 +16,8 @@ export type LossInsuranceMode = 'wallet' | 'isk' | 'none';
 
 export interface LossForm {
   quantity: string;
-  /** `YYYY-MM-DD`, the local day the units were lost. */
   date: string;
   insuranceMode: LossInsuranceMode;
-  /** Typed ISK for `insuranceMode: 'isk'`. */
   isk: string;
   journalEntryId: number | null;
   note: string;
@@ -32,11 +30,8 @@ interface LossDialogState {
   runQuantity: number;
   totalCost: number;
   quantitySold: number;
-  /** Units lost by the run's *other* loss records (excludes the one being edited). */
   otherLost: number;
-  /** Units neither sold nor lost by any other record — the most this loss may claim. */
   unaccounted: number;
-  /** Set when editing an existing loss. */
   lossId: string | null;
   walletAvailable: boolean;
   journal: WalletJournalEntry[];
@@ -44,7 +39,6 @@ interface LossDialogState {
   error: LossError;
 }
 
-/** Wallet-journal insurance payouts are offered for this long after the fact. */
 const JOURNAL_WINDOW_MS = 30 * DAY_MS;
 const INSURANCE_REF_TYPE = 'insurance';
 
@@ -60,19 +54,12 @@ function fromDateInput(value: string): number {
   return new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
 }
 
-/** The insurance ISK a form currently commits, whichever way it was entered. */
 function formInsurance(form: LossForm, journal: readonly WalletJournalEntry[]): number {
   if (form.insuranceMode === 'none') return 0;
   if (form.insuranceMode === 'isk') return Math.max(0, unmaskNumber(form.isk) ?? 0);
   return journal.find((e) => e.id === form.journalEntryId)?.amount ?? 0;
 }
 
-/**
- * Run Loss state (issue #2851): the "Mark as lost" / "Edit loss" dialog and
- * the remove confirmation, shared by `ProductionRunsPanel` and
- * `ProductionLogPanel` alongside `useSaleLinking`. A loss is its own record
- * (several per run), written straight to Dexie and synced like a sale link.
- */
 export function useRunLoss(characterId: number, losses: readonly ProductionLossRecord[]) {
   const [dialog, setDialog] = useState<LossDialogState | null>(null);
   const [removingLossId, setRemovingLossId] = useState<string | null>(null);
@@ -108,7 +95,6 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
       },
     };
     setDialog(base);
-    // A Character without the wallet scope can still type the ISK.
     if (!(await hasWalletScope(characterId))) return;
     const cached = await loadWalletJournal(characterId);
     const taken = new Set(
@@ -120,7 +106,6 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
     const journal = (cached?.data ?? []).filter(
       (e) =>
         e.ref_type === INSURANCE_REF_TYPE &&
-        // Premiums are negative debits; only payouts are a loss's insurance.
         (e.amount ?? 0) > 0 &&
         !taken.has(e.id) &&
         (new Date(e.date).getTime() >= cutoff || e.id === existing?.journalEntryId)
@@ -187,10 +172,7 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
     try {
       await db.productionLosses.put(record);
       scheduleSync(characterId, { collections: ['productionLosses'] });
-    } catch {
-      // A concurrent write of the same payout from another device; the list
-      // refreshes on the next live query.
-    }
+    } catch {}
     setDialog(null);
   }
 
@@ -204,7 +186,6 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
 
   async function removeLoss() {
     if (removingLossId === null) return;
-    // `removeProductionLoss` tombstones and schedules its own sync.
     await removeProductionLoss(characterId, removingLossId);
     setRemovingLossId(null);
   }

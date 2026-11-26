@@ -1,9 +1,3 @@
-/**
- * Settings › Moon mining tax draws its checkbox rows through the shared
- * `Fields` form grid, so label and hint sizes match the sibling tabs
- * (issue #3058). It once used a private row at default label / `text-sm` hint
- * size, which wrapped each hint to 3–4 lines.
- */
 import type { Locator } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';

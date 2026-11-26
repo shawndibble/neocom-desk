@@ -12,17 +12,6 @@ export const TAB_LABEL_KEY: Record<MailTab, string> = {
   alliance: 'mail.tabAlliance',
 };
 
-/**
- * The glyph a row wears instead of the old uppercase text tag.
- *
- * A glyph rather than a per-folder colour on purpose (see
- * `docs/context/decisions/`, "Mail rows go two-line"): Inbox/Sent/Corp/
- * Alliance is a *nominal* set — no order, no severity — and every colour scale
- * in this app is ordinal or semantic (`securityStatusColor`, `STANDING_TONE`,
- * the order-problem severity ladder). Four hues here would encode identity
- * alone, which DESIGN.md §6 calls decoration, and in a palette where cyan is
- * already "interactive" they would read as status and read wrong.
- */
 export const FOLDER_ICON: Record<MailTab, typeof Icon.Corporation> = {
   inbox: Icon.MailInbox,
   sent: Icon.MailSent,
@@ -36,21 +25,15 @@ export function mailAgeLabel(bucket: MailAgeBucket, t: TFunction): string {
     : t(`mail.age.${bucket.kind}`);
 }
 
-/** A list row: one mail, tagged with whose mailbox it sits in. `mail_id` repeats across mailboxes, `key` does not. */
 export interface MailRow {
   key: string;
   ownerId: number;
   ownerName: string;
   header: MailHeader;
   tab: MailTab;
-  /** The mail's Custom Label names (never a System Label), for the tags under its row. */
   labelNames: readonly string[];
 }
 
-/**
- * Whether a mail reads as read: ESI's flag, moved by what the pilot did in
- * this session before the next load. The two sets never overlap.
- */
 export function isMailRead(
   row: Pick<MailRow, 'key' | 'header'>,
   locallyReadKeys: ReadonlySet<string>,

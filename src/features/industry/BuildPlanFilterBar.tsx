@@ -27,15 +27,11 @@ interface BuildPlanFilterBarProps {
   filter: BuildPlanFilterState;
   onChange: (next: BuildPlanFilterState) => void;
   groups: readonly BuildGroup[];
-  /** The blueprint picker: it stays in the row, the funnel sits beside it. */
   search: ReactNode;
-  /** Whether a pilot is active; without one no blueprint can be "owned", so that control is hidden. */
   canFilterOwnership: boolean;
-  /** Plans the filters leave, for the phone sheet's done button. */
   resultCount?: number;
 }
 
-/** The Build Plan list's filters, behind the funnel beside the blueprint picker. */
 export function BuildPlanFilterBar({
   filter,
   onChange,

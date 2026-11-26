@@ -1,9 +1,3 @@
-// Refinery labels (issue #4640, spec #4504): either side's officers label a moon owner's refinery.
-// Written to the record and the view's refinery doc in one transaction, so a failed price read in a
-// rebuild can't hold it back; the rest of the label chain is the client's. Failures carry a `reason`.
-// A refinery's system (issue #4650) is learned by a miner's client from its own ledger and kept the
-// same way, on the record and the view's refinery doc.
-
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
@@ -38,7 +32,6 @@ export const MAX_REFINERY_LABEL = 100;
 
 export interface RefineryLabelFields {
   structureId: number;
-  /** Null clears it: the label chain falls back to the structure name and on. */
   label: string | null;
 }
 
@@ -61,21 +54,18 @@ function parseLabelFields(data: unknown): RefineryLabelFields {
   return { structureId: id, label: text === '' ? null : text };
 }
 
-/** The accounting corporation's officer labels one of a moon owner's refineries. */
 export interface SetRefineryLabelInput extends FeederTargetCall, RefineryLabelFields {}
 
 export function parseSetRefineryLabelInput(data: unknown): SetRefineryLabelInput {
   return { ...parseFeederTarget(data), ...parseLabelFields(data) };
 }
 
-/** The moon owner's own officer labels one of its refineries. */
 export interface SetOwnRefineryLabelInput extends FeederCall, RefineryLabelFields {}
 
 export function parseSetOwnRefineryLabelInput(data: unknown): SetOwnRefineryLabelInput {
   return { ...parseFeederCall(data), ...parseLabelFields(data) };
 }
 
-/** One label per refinery, replaced in a transaction: the last edit wins, whichever side made it. */
 async function writeRefineryLabel(
   deps: BookDeps,
   collector: number,
@@ -84,7 +74,6 @@ async function writeRefineryLabel(
   actor: Actor & { characterId: number },
   side: RefineryLabelDoc['side']
 ): Promise<{ ok: true }> {
-  // Only a refinery that recorded this moon owner's ore: the map never grows past its refineries.
   const known = await bookRef(deps.db, collector)
     .collection(OBSERVED)
     .where('sourceCorporationId', '==', feeder)
@@ -117,10 +106,8 @@ async function writeRefineryLabel(
             side,
           };
     tx.update(ref, field, doc ?? FieldValue.delete());
-    // Absent until the view's first build, which then reads the label off the record.
     if (viewSnap.exists) {
       tx.update(viewRefinery, { label: doc?.label ?? null, labelSetAt: doc?.setAt ?? null });
-      // The client's stamp: it re-reads the view only when `builtAt` moves (#5241).
       if (summarySnap.exists) tx.update(view, { builtAt: deps.now() });
     }
     appendAudit(tx, deps, collector, actor, 'refineryLabelSet', {
@@ -133,7 +120,6 @@ async function writeRefineryLabel(
   return { ok: true };
 }
 
-/** The accounting corporation's officers (Accountant or higher, live role check). */
 export async function setRefineryLabel(
   deps: BookDeps,
   caller: Caller,
@@ -150,7 +136,6 @@ export async function setRefineryLabel(
   );
 }
 
-/** The moon owner's own CEO, Directors and Accountants (live role check). */
 export async function setOwnRefineryLabel(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -169,14 +154,10 @@ export async function setOwnRefineryLabel(
   );
 }
 
-/** The most refineries one learning call may name. */
 export const MAX_LEARNED_SYSTEMS = 50;
 
-/** A miner's client reports the systems its own ledger placed a book's moon owner refineries in. */
 export interface LearnRefinerySystemsInput {
-  /** The book's corporation. */
   corporationId: number;
-  /** System by structure id. */
   systems: Record<string, number>;
 }
 
@@ -199,11 +180,6 @@ export function parseLearnRefinerySystemsInput(data: unknown): LearnRefinerySyst
   return { corporationId, systems };
 }
 
-/**
- * Keeps each system a miner's own ledger placed a moon owner's refinery in. Only a refinery the
- * caller's Character has a row at, from a moon owner, whose rows carry no system; the first one
- * learned stays. Says nothing about which it kept, so the call leaks nothing about the book.
- */
 export async function learnRefinerySystems(
   deps: BookDeps,
   caller: Caller,
@@ -239,7 +215,6 @@ export async function learnRefinerySystems(
       ]);
       if (!recSnap.exists || recSnap.get(field) !== undefined) return;
       tx.update(ref, field, system);
-      // Absent until the view's first build, which then reads it off the record.
       if (viewSnap.exists && typeof viewSnap.get('solarSystemId') !== 'number') {
         tx.update(viewRefinery, { solarSystemId: system });
         if (summarySnap.exists) tx.update(view, { builtAt: deps.now() });

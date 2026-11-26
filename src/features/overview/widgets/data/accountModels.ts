@@ -1,11 +1,3 @@
-/**
- * The Widget Kinds that read the account's money and inbox (Wallet, Mail,
- * Orders, Contracts, Mining tax, Stock, Price watch): one builder each, turning
- * the raw feeds into a `KindView`.
- *
- * Pure: no React, Dexie or fetch. The judgements live in `boardSeverity` and
- * `boardSummary`; this only picks which figure leads and how each row reads.
- */
 import {
   needsAttentionCount,
   notCheckedCount,
@@ -64,10 +56,8 @@ import type { Feeds, ListRow, NumberModel, NumberSecondary } from './types';
 import type { Translate } from '@/lib/translate';
 import { utcDay } from '@/engine/localDay';
 
-/** The Contracts History table, unfiltered: the widget counts hauls and outstanding contracts, which no one status covers. */
 export const CONTRACTS_HREF = '/contracts/history';
 
-/** The journal-derived daily balance, over the widget's range (ESI keeps about 30 days of journal). */
 function walletSeries(feeds: Feeds, now: number, range: number, balance: number | null) {
   const journal = feeds.journal?.data?.result?.data;
   if (!journal || balance === null) return null;
@@ -82,7 +72,6 @@ const wallet: Builder = (feeds, { t, now, range }) => {
   const series = walletSeries(feeds, now, range, balance);
   const journal = feeds.journal?.data?.result?.data;
   return {
-    // A lapsed grant over a saved balance keeps the balance (with a sign-in note).
     ...blank(
       '/wallet',
       statusOf(feed, { needsPermission: data.needsReauth, hasStaleData: balance !== null })
@@ -96,20 +85,16 @@ const wallet: Builder = (feeds, { t, now, range }) => {
             value: formatIskCompact(balance),
             iskAmount: balance,
             unit: t('overview.isk'),
-            // How far it moved is the fact the balance lacks; no journal, no line.
             secondary: series ? balanceChange(t, series.values) : undefined,
             tone: 'clear',
           },
-    // The Table is the journal's newest entries, never the balance again.
     rows: [],
     table: balance !== null && journal ? journalTable(t, journal, now) : undefined,
     summary: balance === null ? UNKNOWN : `${formatIsk(balance, 2)} ${t('overview.isk')}`,
-    // A secondary read: while the journal loads or fails the Number stays ok and the chart is just absent.
     chart: series ? (walletArea(t, series, formatIskCompact) ?? undefined) : undefined,
   };
 };
 
-/** Wallet balance across every Character: the sum, and who holds what. */
 const walletAcross: Builder = (feeds, { t }) => {
   const feed = feeds.walletAll;
   const data = feed?.data ?? null;
@@ -185,11 +170,9 @@ const walletAcross: Builder = (feeds, { t }) => {
   };
 };
 
-/** Wallet flow across every Character: the same breakdown over their journals merged. */
 const walletFlowAcross: Builder = (feeds, ctx) =>
   walletFlow({ ...feeds, journal: feeds.journalAll }, ctx);
 
-/** The newest message's sender and age: a fact the unread count does not carry. */
 function latestMail(t: Translate, now: number, data: MailBoardData): NumberSecondary | undefined {
   const latest = data.recent[0];
   if (!latest || !latest.from) return undefined;
@@ -235,7 +218,6 @@ const mail: Builder = (feeds, { t, now, activeCharacterId }) => {
   };
 };
 
-/** The oldest real read among the entries; null when none landed (a failed read is not a fresh one). */
 function oldestFetch(entries: readonly { fetchedAt: number }[]): Date | null {
   const times = entries.map((entry) => entry.fetchedAt).filter((at) => at > 0);
   return times.length > 0 ? new Date(Math.min(...times)) : null;
@@ -247,20 +229,14 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const to = '/market/orders';
   if (!snapshot) return blank(to, statusOf(feed));
   const everyone = scopeAll || activeCharacterId === null;
-  // A read that landed nothing (no result, no lapsed grant) is unknown, never "no open orders".
   const asked = snapshot.openOrders.entries.filter(
     (entry) => everyone || entry.characterId === activeCharacterId
   );
   if (asked.length > 0 && asked.every((entry) => entry.fetchedAt === 0 && !entry.needsReauth)) {
     return blank(to, { ...statusOf(feed, { hasData: false }), error: true });
   }
-  // `loadOpenOrdersSnapshot` fans out across every Character because it backs
-  // the cross-character Orders page; a widget on one Character narrows the
-  // built rows, which costs nothing since the other Characters' orders were
-  // already fetched for the page's cache.
   const built = openOrderRowsFromSnapshot(snapshot);
   const rows = everyone ? built : built.filter((row) => row.characterId === activeCharacterId);
-  // No entry at all for this Character means the grant was never given.
   const entries = snapshot.openOrders.entries;
   const needsReauth = everyone
     ? entries.length > 0 && entries.every((entry) => entry.needsReauth)
@@ -281,18 +257,13 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
       statusOf(feed, {
         needsPermission: needsReauth,
         isEmpty: rows.length === 0,
-        // Saved orders for this view's Characters are still worth showing.
         hasStaleData: rows.length > 0,
       })
     ),
-    // When ESI last answered for these Characters, never when this view was built.
     fetchedAt: oldestFetch(asked),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),
-      // What is on the market is the fact the undercut count lacks; the slots sit under the table.
-      // Unchecked orders come first: "0 undercut" must not read as all-clear
-      // when the competition behind it was never looked at.
       secondary:
         unchecked > 0
           ? { text: t('overview.widgets.orders.notChecked', { count: unchecked }) }
@@ -359,7 +330,6 @@ const contracts: Builder = (feeds, { t, now }) => {
     },
   ];
   const tone = contractsSeverity(data) ?? 'clear';
-  // Nothing is on a clock, so never say "Nothing due" beside a count of open offers: say when the first lapses.
   const noClockSecondary = (): NumberSecondary => {
     const nextOffer = summary.rows.find((row) => row.state === 'outstanding');
     if (summary.inProgress > 0 && summary.outstanding > 0) {
@@ -376,7 +346,6 @@ const contracts: Builder = (feeds, { t, now }) => {
     }
     return { text: t('overview.board.contractsNothingDue') };
   };
-  // The soonest clock leads; the hauls in flight are the one other fact. With no clock, the count itself leads.
   const number: NumberModel = soonest
     ? {
         value: soonest.overdue
@@ -389,7 +358,6 @@ const contracts: Builder = (feeds, { t, now }) => {
         tone,
       }
     : {
-        // Hauls lead; with none in flight, outstanding contracts are the fact worth a number, not a 0.
         value: count(summary.inProgress === 0 ? summary.outstanding : summary.inProgress),
         unit:
           summary.inProgress === 0 && summary.outstanding > 0
@@ -422,7 +390,6 @@ const contracts: Builder = (feeds, { t, now }) => {
   };
 };
 
-/** The headline is the ISK owed; how long it has been owed is the fact it lacks. */
 function miningTaxSecondary(t: Translate, data: MiningTaxBoardData): NumberSecondary | undefined {
   if (data.unpaidIsk > 0 && data.oldestUnpaidDays !== null) {
     return { text: t('overview.widgets.miningTax.oldest', { days: data.oldestUnpaidDays }) };
@@ -438,10 +405,6 @@ const miningTax: Builder = (feeds, { t, activeCharacterId }) => {
   const data = feed?.data ?? null;
   const to = '/mining/tax';
   if (!data) return blank(to, statusOf(feed));
-  // Account-wide, like Mining yield: the figures are the Characters whose ledger could
-  // be read; one that could not is left out, never asked about (`needsReauth` is set
-  // only when none could). Then the grant asks a Character that failed, the active
-  // one if it is among them, never one that may hold the permission already.
   const missing = data.missingCharacterIds ?? [];
   const index = Math.max(0, activeCharacterId === null ? 0 : missing.indexOf(activeCharacterId));
   const grant =
@@ -475,8 +438,6 @@ const stock: Builder = (feeds, { t }) => {
   if (!data) return blank(to, statusOf(feed));
   const board = data.board;
   if (board === null) return blank(to, statusOf(feed, { isEmpty: true }));
-  // Counts need the cached orders list. Until it is there they are unknown, not zero, and
-  // that is a settled answer (the loader fills the cache first), never a spinner that could stick.
   if (!board.counted) {
     return {
       ...blank(to, statusOf(feed)),
@@ -492,7 +453,6 @@ const stock: Builder = (feeds, { t }) => {
   const cost = board.markets.reduce((sum, market) => sum + market.summary.costToFill, 0);
   return {
     ...blank(to, statusOf(feed)),
-    // The shortfall (out plus low) is the count to act on; "0 out" beside "2 low" hid it.
     number: {
       value: count(shortfall),
       unit: t('overview.widgets.stock.short'),
@@ -503,14 +463,12 @@ const stock: Builder = (feeds, { t }) => {
       tone: shortfall > 0 ? (stockBoardSeverity(board) ?? 'clear') : 'clear',
     },
     rows: [],
-    // Every market, not only those short: the healthy ones are the answer to "am I fine".
     table: stockTable(t, board.markets),
     summary: stockBoardSummary(t, board),
     chart: stockChart(t, board.markets) ?? undefined,
   };
 };
 
-/** The closest target not yet crossed, by how far its price still is: the fact the hit count lacks. */
 function nearestAlert(t: Translate, data: PriceAlertsBoardData): NumberSecondary | undefined {
   let best: { name: string; gap: number } | null = null;
   for (const alert of data.alerts) {
@@ -547,14 +505,11 @@ const priceWatch: Builder = (feeds, { t }) => {
   };
 };
 
-/** The account-money and inbox kinds: the feeds each reads and the builder that draws it. */
 export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
-  // Balance reads both feeds, Flow the journal alone.
   wallet: {
     feeds: ['wallet', 'journal'],
     allFeeds: ['walletAll', 'journalAll'],
     scope: 'account',
-    // Balance on All reads the balances alone; only Flow merges the journals.
     bySettings: ({ show }) => ({
       feeds: ['wallet', 'journal'],
       allFeeds: show === 'flow' ? ['journalAll'] : ['walletAll'],

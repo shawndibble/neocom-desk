@@ -1,7 +1,3 @@
-/**
- * How Improve's rows are told apart and kept from colliding: a row's key, the
- * slots it changes, and what ticking one does to the ticks already made. Pure.
- */
 import { conversionKey, type ImproveOption, type ImproveResult } from './improve';
 
 type Candidate = ImproveOption['candidate'];
@@ -12,7 +8,6 @@ export const moveKey = (candidate: Candidate): string =>
 
 export const optionKey = (option: ImproveOption) => moveKey(option.candidate);
 
-/** Every slot a suggestion changes, its paired downgrade's included: two ticked rows never share one. */
 export function slotsOf(candidate: Candidate): string[] {
   const own = [...(candidate.conversion?.removes.flatMap((r) => r.at) ?? []), ...candidate.at].map(
     (at) => `${at.slot}${at.slotIndex}`
@@ -20,11 +15,9 @@ export function slotsOf(candidate: Candidate): string[] {
   return candidate.pairedWith ? [...own, ...slotsOf(candidate.pairedWith)] : own;
 }
 
-/** One key for a whole set of options, however they are ordered. */
 export const setKey = (options: readonly ImproveOption[]): string =>
   options.map(optionKey).sort().join('|');
 
-/** The single best swap across both lists, or null when there is none. */
 export function bestOption(result: ImproveResult): ImproveOption | null {
   return [...result.noDownside, ...result.tradeOffs].reduce<ImproveOption | null>(
     (top, option) => (top === null || option.score > top.score ? option : top),
@@ -32,10 +25,6 @@ export function bestOption(result: ImproveResult): ImproveOption | null {
   );
 }
 
-/**
- * Ticks after toggling `option`: unticks it when ticked, otherwise ticks it and
- * unticks any pick sharing a slot, remembering the displaced picks' labels.
- */
 export function toggleTick(
   ticked: ReadonlyMap<string, ImproveOption>,
   replaced: ReadonlyMap<string, string>,
@@ -61,7 +50,6 @@ export function toggleTick(
   return { byModule: next, replaced: nextReplaced };
 }
 
-/** The ticked set with `hovered` on top: it displaces a ticked row sharing a slot, as ticking it would. */
 export function withHovered(
   chosen: readonly ImproveOption[],
   hovered: ImproveOption

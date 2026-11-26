@@ -24,12 +24,10 @@ interface CharactersFilterFieldsProps {
   draft: RosterFilter;
   setDraft: (next: RosterFilter) => void;
   corpOptions: readonly string[];
-  /** Whether any Group exists: with none there is nothing to narrow to. */
   hasGroups: boolean;
   groupFilterOptions: readonly CharacterGroup[];
 }
 
-/** The Characters page's `FilterBar` panel: queue, corp, group, starred/alerts chips and sort. */
 export function CharactersFilterFields({
   draft,
   setDraft,
@@ -56,7 +54,6 @@ export function CharactersFilterFields({
           ))}
         </div>
       </FilterField>
-      {/* One corp has nothing to narrow to — unless a link already set one, which must stay visible to be cleared. */}
       {(corpOptions.length > 1 || draft.corp !== null) && (
         <FilterField label={t('characters.filterCorpLabel')}>
           <Select
@@ -84,7 +81,6 @@ export function CharactersFilterFields({
           </Select>
         </FilterField>
       )}
-      {/* No Groups yet has nothing to narrow to — same gate as the corp filter above. */}
       {hasGroups && (
         <FilterField label={t('characters.filterGroupLabel')}>
           <Select

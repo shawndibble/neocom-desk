@@ -29,9 +29,7 @@ function txn(overrides: Partial<FillTransaction> = {}): FillTransaction {
   };
 }
 
-/** Fetched too soon after the fill was noticed to prove the final fill is in it. */
 const STALE_FETCH = OBSERVED + 5 * 60_000;
-/** Fetched long enough after the fill was noticed that ESI's cache must include it. */
 const FRESH_FETCH = OBSERVED + WALLET_TRANSACTIONS_LAG_MS;
 
 describe('resolveFillTime', () => {
@@ -52,8 +50,6 @@ describe('resolveFillTime', () => {
   });
 
   it('settles on what it has once the data is provably newer than the fill (a re-priced order)', () => {
-    // Fills before a price change carry the old price and no longer match;
-    // the final fill is still at the current price.
     const rows = [txn({ quantity: 30 })];
     expect(resolveFillTime(match, rows, OBSERVED, FRESH_FETCH)).toEqual({
       status: 'settled',
@@ -105,9 +101,6 @@ describe('resolveFillTime', () => {
   });
 
   it('can settle early when a twin order (same item, price and station) also sold — known limitation', () => {
-    // Indistinguishable without an order id on the transaction: the twin's
-    // sales count toward this order's quantity. The date is still a real
-    // sale of this item at this price, so it is close, not wild.
     const rows = [txn({ dateMs: OBSERVED - 3 * HOUR_MS, quantity: 100 })];
     expect(resolveFillTime(match, rows, OBSERVED, STALE_FETCH)).toEqual({
       status: 'settled',

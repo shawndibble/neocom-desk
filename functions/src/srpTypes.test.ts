@@ -7,13 +7,9 @@ import * as feederPayouts from './corpTaxBookFeederPayouts.js';
 import * as feederView from './corpTaxBookFeederView.js';
 import * as srp from './srpTypes.js';
 
-// deleteBook keeps every `corps/{id}` subcollection named in SRP_COLLECTIONS and deletes
-// the rest, so an SRP collection missing from the list would be wiped with the book (#4939).
-
 const here = dirname(fileURLToPath(import.meta.url));
 const exported = srp as unknown as Record<string, unknown>;
 
-/** Every `.collection(...)` argument in the non-test SRP sources, as a resolved name. */
 function srpSourceCollections(): string[] {
   const names = new Set<string>();
   for (const file of readdirSync(here)) {

@@ -4,7 +4,6 @@ import type { Figure } from './statFigures';
 import { fmt0, fmt1, fmt2 } from './fixedFormat';
 import type { Translate } from '@/lib/translate';
 
-/** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
 export function resourceFacts(
   s: FittingStats,
   figure: Figure,

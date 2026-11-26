@@ -49,6 +49,10 @@ dev`) — Shawn frequently has another agent working there at the same
   (`src/sync/routedCallable.ts`). Only a scheduled job, a Firestore or HTTP trigger, or a
   new router is a new export, and it goes in the allowlist in
   `functions/src/deployedFunctions.test.ts` with the reason in the PR.
+- **No comments.** `local/no-comments` (scripts/lib/noCommentsRule.mjs) flags every comment
+  except tool directives (`eslint-`, `@ts-`, `@vitest-environment`, `/// <reference`,
+  `prettier-ignore`, coverage ignores). A comment is a reason or a workaround: fix the code, or
+  record the scope decision with `node scripts/new-decision.mjs`. There is no baseline.
 - TDD for all calculation/logic modules (`src/engine`, `src/auth`, industry
   math): failing test first, then code.
 - Pure engines stay pure: no fetch/DOM/Dexie imports in `src/engine`.

@@ -20,7 +20,6 @@ interface PayeeFilterMenuProps {
   onTogglePayee: (payeeId: string) => void;
 }
 
-/** The Payee filter dropdown above the Open list: all, none, or a ticked set. */
 export function PayeeFilterMenu({
   ledgerPayees,
   characters,

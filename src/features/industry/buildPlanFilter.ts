@@ -1,4 +1,3 @@
-/** The Build Plan list's filter: its shape, URL codec and the pure predicate. */
 import type { TFunction } from 'i18next';
 import { summarizeFilterValues, type ActiveFilter } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
@@ -7,7 +6,6 @@ import { boolParam, defineUrlFilter, enumParam, enumSetParam, textParam } from '
 import type { BuildGroup } from './buildGroups';
 import type { PlanIndexStats, PlanVerdictTag } from './BuildPlanList';
 
-/** Which copy of a plan's blueprint the pilot holds. `owned` is any copy; `none` is neither. */
 export const PLAN_OWNERSHIPS = ['any', 'owned', 'bpo', 'bpc', 'none'] as const;
 export type PlanOwnership = (typeof PLAN_OWNERSHIPS)[number];
 
@@ -21,7 +19,6 @@ export const PLAN_VERDICTS = [
 export const PLAN_ACTIVITIES = ['any', 'manufacturing', 'reaction'] as const;
 export type PlanActivityFilter = (typeof PLAN_ACTIVITIES)[number];
 
-/** `GROUP_ANY` / `GROUP_NONE` stand beside real Build Group ids in `group`; ids are UUIDs, so they cannot collide. */
 export const GROUP_ANY = 'any';
 export const GROUP_NONE = 'none';
 
@@ -59,11 +56,6 @@ export function activePlanFilterCount(filter: BuildPlanFilterState): number {
   ].filter(Boolean).length;
 }
 
-/**
- * The filters set away from their default, in the order their controls sit,
- * so a pill reads left to right like the box it opens. `groups` names the
- * picked Build Group; an id it does not hold shows as the bare caption.
- */
 export function activePlanFilters(
   filter: BuildPlanFilterState,
   t: TFunction,
@@ -113,11 +105,9 @@ export function activePlanFilters(
 }
 
 interface FilterContext {
-  /** The active pilot's blueprints. */
   owned: readonly CharacterBlueprint[];
   activityOf: (plan: BuildPlanRecord) => 'manufacturing' | 'reaction' | undefined;
   statsByPlanId: ReadonlyMap<string, PlanIndexStats>;
-  /** Ids of groups that exist; a plan pointing elsewhere counts as ungrouped, as the list shows it. */
   knownGroupIds?: ReadonlySet<string>;
 }
 

@@ -1,16 +1,3 @@
-/**
- * Per-module variations: a fitted module's T1/T2/faction/deadspace/officer
- * siblings, each with the whole-Fitting delta of swapping it in, CPU/PG/
- * calibration budget, active-Character can-fly, and Jita sell price. Rows
- * settle in async, keyed by evaluator/slot so a change mid-computation
- * never shows stale numbers under a new module or Character.
- *
- * Every number comes from the open Fitting's `VariantEvaluator`
- * (`useFittingEvaluation`), which works out its own "before" baseline under
- * the same pilot, implant basis and Damage Profile as the main stats rather
- * than trusting the workspace's `stats`, which lag an edit or Character
- * switch by one recalculation.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
@@ -39,19 +26,15 @@ export interface VariationRow {
   metaGroupName: string;
   delta: SwapChange[] | null;
   fits: boolean | null;
-  /** Set only when the swap is over a CPU/PG/calibration budget; null otherwise (including a hull-rule miss). */
   overage: ResourceBudgetOverage | null;
   canFly: boolean | null;
-  /** Sell price at the Fittings hub; null if the hub has no sell orders for it. */
   price: number | null;
 }
 
 interface UseModuleVariationsParams {
-  /** The open Fitting's evaluator; rows list without numbers while it's null. */
   variants: VariantEvaluator | null;
   slot: FittingSlotKind;
   slotIndex: number;
-  /** The type currently fitted at slot/slotIndex — excluded from its own sibling list. */
   typeId: number;
   catalogue: FittingCatalogue | null;
 }
@@ -70,9 +53,6 @@ export function useModuleVariations({
   typeId,
   catalogue,
 }: UseModuleVariationsParams): { rows: VariationRow[]; loading: boolean } {
-  // Split from `members` below: the index walks every variation-grouped type
-  // in the SDE, so it's worth keeping across a module switch that doesn't
-  // change `catalogue` — only `getVariations` needs to rerun per module.
   const variationIndex: VariationIndex | null = useMemo(() => {
     if (!catalogue) return null;
     return buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
@@ -104,19 +84,9 @@ export function useModuleVariations({
         typeIds,
         variants.profile
       );
-      // One variant at a time: each `compare` runs in the worker, so the main
-      // thread stays free however many siblings there are (26 for a Medium
-      // Armor Repairer II).
       const entries: [number, ComputedEntry][] = [];
       for (const member of members) {
-        // A run gone stale (evaluator/slot changed meanwhile) stops here,
-        // without calculating the rest — the effect that superseded it
-        // already has its own run going.
         if (cancelled) return;
-        // One sibling's `calculate()` throwing (stale SDE variation data, a
-        // slot mismatch) must not blank every other row — the failure just
-        // leaves that row's delta/fits/canFly at null rather than wedging
-        // the whole panel on "loading" forever.
         try {
           const swapped = swapModuleType(variants.fitting, slot, slotIndex, member.typeId);
           const { before, after } = await variants.compare(swapped, controller.signal);
@@ -130,9 +100,7 @@ export function useModuleVariations({
               canFly: check?.canFly ?? true,
             },
           ]);
-        } catch {
-          // Left out — see above (or dropped: the next check ends the run).
-        }
+        } catch {}
       }
       if (cancelled) return;
       setComputed({ variants, slot, slotIndex, byTypeId: new Map(entries) });
@@ -143,9 +111,6 @@ export function useModuleVariations({
     };
   }, [variants, members, slot, slotIndex]);
 
-  // Left null on failure: rows show "no sell orders", the same degrade a hub
-  // with no orders at all produces, rather than a broken loading state.
-  // The Fittings hub, as the rest of the fit's prices.
   const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const percent = usePricePercentFor('fittings');
@@ -157,8 +122,6 @@ export function useModuleVariations({
       typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
     );
   }, [members, hub, percent]);
-  // Same hub: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
-  // Keyed on the hub: another hub's prices never show under this one; null until the hub is read.
   const freshPrices = useKeyedLoad(
     hubHydrated ? `prices:${hub.id}:${percent}` : null,
     loadPrices

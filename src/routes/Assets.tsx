@@ -17,12 +17,8 @@ import { AssetsToolbar } from '@/features/assets/AssetsToolbar';
 import { useAssetsData } from '@/features/assets/useAssetsData';
 import { useAssetsRows } from '@/features/assets/useAssetsRows';
 
-/** Character assets, browsed one level at a time. Read-only, cached for offline. */
 export function Assets() {
   const { t } = useTranslation();
-  // "Where am I" lives in the URL (`/assets/:stationId/*`), not in state, so
-  // the browser/Android back button steps up one level instead of leaving the
-  // page — the single most important thing about drill-down on a phone.
   const [tab, setTab] = usePageTab(ASSETS_TABS);
   const tabsId = useTabsId();
   const { search: query } = useLocation();
@@ -38,8 +34,6 @@ export function Assets() {
     itemActions,
   } = assetsData;
   const { assetsRoute } = assetsRows;
-  // Ships and Move each read the Characters themselves; they report whom they
-  // skipped so the header picker names them (`useReportSkipped`).
   const [tabMissingNames, setTabMissingNames] = useState<readonly string[] | undefined>();
   if (!hydrated) {
     return <Spinner block="page" label={t('common.loading')} />;
@@ -51,14 +45,6 @@ export function Assets() {
       <div
         className={cx(
           'mx-auto flex w-full max-w-page flex-col gap-3',
-          // Fills the remaining viewport height (issue #148) rather than
-          // growing with content: bounds the height against `<main>`'s own
-          // chrome (Layout.tsx's `p-4`, plus the mobile bottom nav's
-          // `calc(5rem+safe-area)` reservation below `md`, mirrored here since
-          // that reservation isn't itself exposed as a token) so the list
-          // Panel below — the only `flex-1` child — has real remaining space
-          // to fill instead of a `flex-1` that's inert with no bounded
-          // ancestor.
           'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
         )}
       >

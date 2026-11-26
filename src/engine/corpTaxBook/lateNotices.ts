@@ -1,14 +1,3 @@
-/**
- * Late notices (#6294, decision 20261120-235011): a Miner gets one when they are behind — their
- * oldest unpaid day is N days old, or the book's day of the month has come round while they owe
- * from before it — and owe at least the book's minimum; at most one every `cooldownDays`, and
- * none once paid up. An officer's tab issues and mails them (automatic sync never does).
- *
- * A notice is only a record of what was asked (`LateNotice`): its lines are the unpaid days no
- * earlier notice listed, priced as they are billed. Money pays the Miner's oldest day whatever
- * code it carries, and a notice is settled once its days are; what earlier notices still ask is
- * `carried`.
- */
 import { bookMiner, newest, type BookView } from './bookView';
 import {
   listedKeys,
@@ -21,25 +10,19 @@ import type { NoticeRules } from './notices';
 import { utcDay, utcDayOf, utcDaysBetween } from '@/engine/localDay';
 
 export interface NoticePlan {
-  /** The notice to issue: the unpaid days no earlier notice listed, priced as they are billed. */
   notice: LateNotice;
-  /** Everything the Miner owes now. */
   owed: number;
-  /** What of `owed` is not on this notice's lines: days earlier notices listed. */
   carried: number;
 }
 
-/** One unpaid day the notice mail lists: what is still owed of it, and where it was mined. */
 export interface OwedDay {
   date: string;
   owed: number;
-  /** An officer's charge on the day, owed as a line of its own: no place. */
   correction?: true;
   structureId?: number;
   moonId?: number;
 }
 
-/** Every day a Miner owes, oldest first, by place. */
 export function owedDays(view: BookView, minerId: string): OwedDay[] {
   const inner = view.internals.byMiner.get(minerId);
   if (!inner) return [];
@@ -57,7 +40,6 @@ export function owedDays(view: BookView, minerId: string): OwedDay[] {
         ...(d.moonId !== undefined ? { moonId: d.moonId } : {}),
       });
   }
-  // An officer's charge is owed like a mined line; a credit correction is in each line's share.
   const charges = new Map<string, number>();
   for (const l of inner.billable.lines)
     if (l.kind === 'correction' && l.tax > 0)
@@ -70,10 +52,6 @@ export function owedDays(view: BookView, minerId: string): OwedDay[] {
   );
 }
 
-/**
- * The notice a Miner would get now, whatever the rules say: undefined when the Miner owes
- * nothing. A `final` notice (closing an account) is stored under `finalNoticeId`.
- */
 export function draftNotice(
   view: BookView,
   minerId: string,
@@ -91,8 +69,6 @@ export function draftNotice(
     return day !== undefined && !day.held && !day.settled && !listed.has(l.key);
   });
 
-  // What the new lines still owe: each charging line's share of its date's remainder (a credit
-  // correction is in the remainder already, so it is no share of its own).
   const onLines = lines.reduce((sum, l) => sum + account.owedOf(l.date, l.tax), 0);
 
   const first = lines[0]?.date ?? owes.oldest;
@@ -104,7 +80,6 @@ export function draftNotice(
       characterIds: row.characterIds,
       kind: opts.kind ?? 'late',
       issuedAt: now,
-      // The Miner's one code, which the mail asks for: the server sets it as this, and refuses any other.
       code: minerPaymentCode(minerId),
       pricing: { hubId: view.input.hubId, oreForm: view.input.oreForm },
       uids: row.characterIds.map((c) => `char:${c}`),
@@ -117,17 +92,11 @@ export function draftNotice(
   };
 }
 
-/** The most recent `day` of a month on or before `today`. */
 function lastAnchorDay(today: string, day: number): string {
   const [y, m, d] = today.split('-').map(Number);
   return utcDay(Date.UTC(y, d >= day ? m - 1 : m - 2, day));
 }
 
-/**
- * Whether a Miner who owes `owed` since `oldest` is due a notice by the rules, after `lastIssued`.
- * The cooldown holds first, so nobody is billed twice inside it; past it, owing `earlyAt` is due
- * before the Miner is behind by the `after` rule.
- */
 export function noticeDue(
   rules: NoticeRules,
   today: string,
@@ -143,10 +112,6 @@ export function noticeDue(
   return oldest < anchor && (lastIssued === undefined || utcDayOf(lastIssued) < anchor);
 }
 
-/**
- * Every notice due now, one per Miner who is behind and owes at least the minimum, with no notice
- * in the cooldown. Empty on a calendar book. A closed guest's mail has stopped (#4184).
- */
 export function planNotices(
   view: BookView,
   rules: NoticeRules,
@@ -167,5 +132,4 @@ export function planNotices(
   return plans;
 }
 
-/** The book's late notices from their `lateNotices` docs, read as the server reads them. */
 export { noticesOfDocs } from '../../../functions/src/corpTaxBookLateNotice';

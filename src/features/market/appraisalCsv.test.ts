@@ -106,7 +106,6 @@ describe('appraisalCsvColumns', () => {
   });
 
   it('exports the refine figures on the Price Basis the pilot picked', () => {
-    // 1 unit too few to refine, buy 5 / sell 6 each; minerals 900 on buy, 1100 on sell.
     const refining = row({
       refineTotal: 900,
       refinePricedAll: true,

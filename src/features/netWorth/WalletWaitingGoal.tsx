@@ -23,11 +23,6 @@ interface WalletWaitingGoalProps {
   characterIds: readonly number[];
 }
 
-/**
- * Under the ISK flow: ISK parked in orders and contracts, and the wallet Goals.
- * The Goals and most of ISK waiting read the stored Net Worth Snapshots; the
- * sell-order health reads live orders.
- */
 export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
   const { t } = useTranslation();
   const data = useNetWorthData(characterIds);

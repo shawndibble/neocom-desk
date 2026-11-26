@@ -54,11 +54,6 @@ installBuildPlanDetailHarness();
 describe('BuildPlanDetail build system', () => {
   const systemInput = () => screen.getByLabelText('Build system');
 
-  /**
-   * Facility and build system sit behind "Override" — the line under the
-   * search box states them, and the fields are one click away. Every test
-   * below reads or edits one of them, so each opens it first.
-   */
   async function openOverride(user: ReturnType<typeof userEvent.setup>) {
     await openSetup(user);
     await user.click(screen.getByRole('button', { name: /Override/ }));
@@ -71,9 +66,6 @@ describe('BuildPlanDetail build system', () => {
   });
 
   it('corrects a stored band that disagrees with the build system', async () => {
-    // A plan saved before the Security select was removed can carry any band,
-    // and it still drives the 1x/1.9x/2.1x rig multiplier. Nothing on screen
-    // could fix it, so the panel reconciles it on load.
     const onDerivedFix = vi.fn();
     render(
       <Harness
@@ -89,7 +81,6 @@ describe('BuildPlanDetail build system', () => {
     const onDerivedFix = vi.fn();
     render(<Harness plan={{ security: 'lowsec', hubId: 'jita' }} onDerivedFix={onDerivedFix} />);
 
-    // No request for this one — a hub's band is a constant on the hub record.
     await waitFor(() => expect(onDerivedFix).toHaveBeenCalledWith({ security: 'highsec' }));
     expect(loadSystemSecurity).not.toHaveBeenCalled();
   });
@@ -109,8 +100,6 @@ describe('BuildPlanDetail build system', () => {
   });
 
   it('states the security band under the field rather than offering it as a choice', async () => {
-    // The band follows the system, so a select beside it could only ever
-    // disagree with it.
     const user = userEvent.setup();
     render(
       <Harness plan={{ security: 'lowsec', buildSystemId: 30002813, buildSystemName: 'Tama' }} />
@@ -132,11 +121,6 @@ describe('BuildPlanDetail build system', () => {
         }}
       />
     );
-    // A synchronous click, not `openSetup`'s userEvent one: this plan's stored
-    // band disagrees with Badivefi's real one, so `useDerivedSecurityBand`
-    // corrects it moments after mount. `userEvent.click` awaits enough of the
-    // event loop for that correction to land first, which would flip the text
-    // this asserts before the assertion even runs.
     fireEvent.click(screen.getByRole('button', { name: 'Edit setup' }));
 
     expect(await screen.findByText(/Azbel · Badivefi · Lowsec/)).toBeInTheDocument();
@@ -168,8 +152,6 @@ describe('BuildPlanDetail build system', () => {
   });
 
   it('forgets the picked location when the facility is changed by hand', async () => {
-    // The stored name is a label, never a number — but a label naming a
-    // Raitaru over a plan that now says NPC station is a label that lies.
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(
@@ -289,7 +271,6 @@ describe('BuildPlanDetail build system', () => {
     await user.tab();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No solar system by that name.');
-    // The plan is untouched, and the near-miss is still there to correct.
     expect(onUpdate).not.toHaveBeenCalled();
     expect(valueOf(systemInput())).toBe('Notasystem');
   });
@@ -331,9 +312,6 @@ describe('BuildPlanDetail build system', () => {
   });
 
   it('builds at the hub when the plan holds only half the id/name pair', async () => {
-    // A half-pair is what a partial sync or a hand-edited record can leave
-    // behind. Charging the fee at one system while labelling it another is
-    // worse than not having a build system at all.
     const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888 }} />);
     await user.click(await screen.findByRole('button', { name: 'Show details' }));
@@ -383,7 +361,6 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
 
     expect(screen.queryByLabelText('ME %')).toBeNull();
     expect(screen.queryByLabelText('TE %')).toBeNull();
-    // Runs is unaffected — only ME/TE are activity-specific.
     expect(runsInput()).toBeInTheDocument();
   });
 
@@ -394,9 +371,6 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'Facility' }));
     const options = await screen.findAllByRole('option');
-    // The selected option's own checkmark indicator rides along in
-    // textContent (e.g. "✓Athanor"), so strip leading non-word characters
-    // rather than comparing raw text.
     expect(options.map((o) => o.textContent?.replace(/^\W+/, '')).sort()).toEqual([
       'Athanor',
       'Tatara',
@@ -506,8 +480,6 @@ describe('BuildPlanDetail remembers the location it sets', () => {
     await user.click(await screen.findByRole('option', { name: 'Azbel' }));
 
     await waitFor(() => expect(useFacilityDefaults.getState().value.facility).toBe('azbel'));
-    // The plan's whole resulting location — its system stays, the picked
-    // place the facility change forgot is forgotten here too.
     const remembered = useFacilityDefaults.getState().value;
     expect(remembered).toMatchObject({
       security: 'highsec',

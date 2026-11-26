@@ -21,7 +21,6 @@ const FILTER_STATES: PopState[] = ['extracting', 'fractured', 'expired', 'cancel
 
 type Moon = Pick<typeof OPEN_MOON, 'moon' | 'refinery' | 'owner' | 'id'> & { system: string };
 
-/** Header and chips of an opened moon: what the book holds for it in one line each. */
 function MoonHead({ moon, chips }: { moon: Moon; chips: ReactNode }) {
   return (
     <>
@@ -50,7 +49,6 @@ export function FullChips() {
   );
 }
 
-/** The state chips every history list shows, with the count of each. */
 function StateChips({
   pops,
   on,
@@ -156,7 +154,6 @@ function popColumns(phone: boolean): DataTableColumn<Pop>[] {
   return cols;
 }
 
-/** One table, a row per Extraction; a row opens that Extraction's own page. */
 export function MoonPageA({
   moon = OPEN_MOON,
   pops = OPEN_MOON.popRows,
@@ -198,7 +195,6 @@ export function MoonPageA({
   );
 }
 
-/** Empty history: the one live pop is there; nothing earlier was kept. */
 export function EmptyHistory({ moon, live }: { moon: Moon & { bookStart: string }; live: Pop }) {
   return (
     <MoonPageA

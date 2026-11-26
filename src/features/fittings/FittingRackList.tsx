@@ -36,11 +36,6 @@ import {
   type EditContext,
 } from './RackListParts';
 
-/**
- * An empty List slot: tap to add there, drop a module on it. With the
- * editor's actions it has the Ring's empty-slot menu too (Add module,
- * Paste, Fill rack), on right-click, touch-and-hold or its ⋮.
- */
 function EmptySlot({
   rack,
   slotIndex,
@@ -61,7 +56,6 @@ function EmptySlot({
       name={button.label}
       items={<EmptySlotMenuItems rack={rack} index={slotIndex} />}
     >
-      {/* The ⋮ sits beside the slot's button, never inside it. */}
       <div className="flex items-center gap-1">
         {slot}
         <RowMoreActions />
@@ -70,10 +64,6 @@ function EmptySlot({
   );
 }
 
-/**
- * A rack's heading, which takes drops too: a module goes in the rack's first
- * free slot, a charge into every module that takes it.
- */
 function RackHeading({ rack, label }: { rack: FittingSlotKind; label: string }) {
   const drop = useFittingDropTarget({ kind: 'rack', rack });
   return (
@@ -93,14 +83,9 @@ interface RackSlotsProps extends EditContext {
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
   unusableModuleKeys?: ReadonlySet<string>;
-  /** Hides the rack's own heading — a rack sheet titles it already. */
   hideLabel?: boolean;
 }
 
-/**
- * One rack's slots, filled and empty: the List view's rack section, and the
- * whole of the phone Ring's rack sheet (scope decision `20260924-205720`).
- */
 export function RackSlots({
   rack,
   stats,
@@ -119,7 +104,6 @@ export function RackSlots({
   const slotCounts = stats?.slotCounts ?? null;
   const bySlot = new Map(fitted.map((entry) => [entry.module.slotIndex, entry]));
   const highestFitted = Math.max(-1, ...fitted.map((entry) => entry.module.slotIndex));
-  // A module past the rack's end (a pasted over-full fit) still shows, so it can be removed.
   const slotCount = Math.max(slotCounts?.[rack] ?? 0, highestFitted + 1);
   if (slotCount === 0) return null;
   const rackLabel = t(`fittings.list.rack.${rack}`);
@@ -141,7 +125,6 @@ export function RackSlots({
               />
             );
           }
-          // Before ship data, a gap below a fitted module is just a gap — no Add yet.
           if (slotCounts === null) return null;
           return (
             <EmptySlot
@@ -163,25 +146,14 @@ export function RackSlots({
 
 interface FittingRackListProps extends EditContext {
   stats: FittingStats | null;
-  /** Index-parallel to `fitting.modules`; null while the open fit's own calculation is pending. */
   moduleResults: FittingModuleResult[] | null;
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
-  /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
-  /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
-  /** The editor's Ring | List switch, in the panel header's leading slot (it carries the panel's heading). */
   titleSwitch?: ReactNode;
 }
 
-/**
- * The editable List view (issue #1533): every slot the hull has, filled or
- * empty — tap an empty one to add there — with each module's state, charge
- * and remove control, and the drones with their launch squares. Empty
- * slots need the ship data (a rack's size is a ship attribute), so until it
- * has loaded only what's fitted shows.
- */
 export function FittingRackList({
   fitting,
   stats,
@@ -269,19 +241,12 @@ export function FittingRackList({
           onSelectTarget={onSelectTarget}
         />
 
-        {/* What a fit carries besides its slots and drones: ammo, paste, filaments, a depot. */}
         <CargoSection fitting={fitting} catalogue={catalogue} edit={edit} />
       </div>
     </Panel>
   );
 }
 
-/**
- * The cargo hold: how full it is, each item with its count — a charge drags
- * onto the modules that take it (or loads from a module's own menu) — and "Add cargo".
- * An Add panel item or charge dropped on it goes in the hold.
- * The List's Cargo section; the Ring shows the same items as tiles.
- */
 function CargoSection({
   fitting,
   catalogue,

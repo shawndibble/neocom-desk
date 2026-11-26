@@ -1,12 +1,3 @@
-// Collector books (issue #4520, spec #4504): the accounting corporation removes a moon owner.
-// A 24-hour pending removal that starts counting when the mail goes out; officers cancel it,
-// the moon owner ends it at once (Leave, or the payee's link). Failures carry stable `reason`
-// codes; no player-facing text lives here.
-//
-// The payee's link answers "unavailable" with one shape for every reason it cannot be used:
-// expired, already over, wrong person, or the payee guard (engine `payeeMayForce`). The reason
-// is never in the response, the logs or the audit trail.
-
 import { DAY_MS } from './timeConstants.js';
 import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -46,40 +37,28 @@ import {
 } from './corpTaxBookStore.js';
 import { signedInCharacter, fail, type Caller } from './actorAuth.js';
 
-/** Slack on the link past the wait, for a mail read late. */
 const LINK_SLACK_MS = DAY_MS;
 
-/**
- * How long the mail's link stays valid, from the start: the wait plus slack. Once the notice is
- * out it runs to `effectiveAt` plus the slack instead (#4617), since the queue may send late.
- */
 const LINK_TTL_MS = REMOVAL_WAIT_MS + LINK_SLACK_MS;
 
-/** No payee on record means the moon owner corporation itself is paid: its CEO acts for it. */
 const payeeOf = (rec: FeederRecord): NonNullable<FeederRecord['payee']> =>
   rec.payee ?? { kind: 'corporation', id: rec.corporationId };
 
 const linkRef = (db: BookDeps['db'], id: string) => db.collection(REMOVAL_LINKS_COLLECTION).doc(id);
 
-/** `corpTaxBookRemovalLinks/{hash}`. */
 export interface RemovalLinkDoc {
   collectorCorporationId: number;
   feederCorporationId: number;
-  /** The removal this link belongs to (`removal.startedAt`). */
   startedAt: number;
   expiresAt: number;
-  /** A copy of the removal's effective time, shown only while the link can be used. */
   effectiveAt?: number;
 }
-
-// --- Input -----------------------------------------------------------------
 
 export type RemovalCall = FeederTargetCall;
 
 export const parseRemovalCall = parseFeederTarget;
 
 export interface RemovalNoticeCall extends RemovalCall {
-  /** When the mail went out (ms); clamped to the removal's start and now. */
   sentAt?: number;
 }
 
@@ -101,12 +80,8 @@ export function parseRemovalLinkCall(data: unknown): RemovalLinkCall {
   return { code: boundedString(record(data).code, 'code', 64) };
 }
 
-// --- Recipients ------------------------------------------------------------
-
 interface Recipients {
-  /** Everyone the one mail goes to: the moon owner side first, then the other officers. */
   all: number[];
-  /** The moon owner's CEO and payee: a copy to one of them starts the clock (#4617). */
   owner: number[];
 }
 
@@ -132,22 +107,13 @@ async function recipientsFor(
   return { all: removalRecipients(input), owner: moonOwnerMailRecipients(input) };
 }
 
-// --- Start, notice, cancel --------------------------------------------------
-
 export interface StartRemovalResult {
   startedAt: number;
-  /** The code for the link in the mail; shown nowhere else and never stored. */
   code: string;
-  /** Character ids the one mail goes to, the moon owner side first. */
   recipients: number[];
-  /**
-   * The moon owner's CEO and payee among them (#4617): only a copy to one of these starts the
-   * 24 hours. Empty when neither could be found; the removal then waits on "I sent the notice".
-   */
   ownerRecipients: number[];
 }
 
-/** Start a removal. The status flips at once; the 24 hours wait for the notice (`recordRemovalSent`). */
 export async function startFeederRemoval(
   deps: BookDeps,
   caller: Caller,
@@ -192,10 +158,6 @@ export async function startFeederRemoval(
   return { startedAt: now, code, recipients: all, ownerRecipients: owner };
 }
 
-/**
- * The notice went out (the queue sent the mail, or the officer sent it from EVE): the 24
- * hours run from here. The first notice wins; later ones change nothing.
- */
 export async function recordRemovalSent(
   deps: BookDeps,
   caller: Caller,
@@ -214,7 +176,6 @@ export async function recordRemovalSent(
     if (next.removal === rec.removal) return rec.removal.effectiveAt ?? null;
     tx.update(ref, { removal: next.removal });
     if (rec.removalLinkId) {
-      // The link lives until the removal takes effect, however late the notice went out.
       tx.update(linkRef(deps.db, rec.removalLinkId), {
         effectiveAt: next.removal.effectiveAt,
         expiresAt: next.removal.effectiveAt + LINK_SLACK_MS,
@@ -234,7 +195,6 @@ export async function recordRemovalSent(
   return { effectiveAt };
 }
 
-/** Any Accountant or higher cancels, the starter included. Returns whom the short second mail goes to. */
 export async function cancelFeederRemoval(
   deps: BookDeps,
   caller: Caller,
@@ -269,21 +229,8 @@ export async function cancelFeederRemoval(
   return { recipients: all };
 }
 
-// --- The stale-ledger mail (#6210) ---------------------------------------------
-
-/**
- * How long a claimed stale-ledger mail waits to be marked sent before another officer's client
- * may claim it: mail goes from the claiming officer's own device, and one that never sends must
- * not lose it for good.
- */
 export const STALE_MAIL_CLAIM_MS = 4 * 60 * 60 * 1000;
 
-/**
- * Whether an officer's client may claim this stale spell's mail now: not yet claimed, or claimed
- * more than `STALE_MAIL_CLAIM_MS` ago and never marked sent. A claim with no time
- * (`staleMailClaimedAt`: made before claims carried one, or by a client that never marks it sent)
- * stays final.
- */
 export function staleMailClaimable(
   held: Pick<
     FeederRecord,
@@ -299,17 +246,7 @@ export function staleMailClaimable(
   );
 }
 
-/**
- * The moon owner's ledger can't be read: the first officer client to see it claims this stale
- * spell's one mail to both sides (the moon owner's CEO and payee, and the book's other
- * officers), so every open tab does not send its own. Nobody named: nothing to send, another
- * officer holds the claim, or it is one of the book's own corporations (never mailed). Mail is
- * client-only (no server holds a mail token), so a claim from a client that marks it sent
- * (`marksSent`) lapses after `STALE_MAIL_CLAIM_MS` unless its queue marks it sent
- * (`markFeederStaleMailSent`).
- */
 export interface StaleMailClaimCall extends RemovalCall {
-  /** The client's queue calls `markFeederStaleMailSent` once a copy went: the claim may lapse. */
   marksSent?: boolean;
 }
 
@@ -337,8 +274,6 @@ export async function claimFeederStaleMail(
     ) {
       return undefined;
     }
-    // Only a client that marks the mail sent gets a claim that can lapse: an older client's
-    // claim stays final, or every officer after it would mail the spell again.
     tx.update(ref, {
       staleMailedFor: held.staleSince,
       staleMailClaimedAt: input.marksSent ? now : FieldValue.delete(),
@@ -356,7 +291,6 @@ export async function claimFeederStaleMail(
 }
 
 export interface StaleMailSentCall extends RemovalCall {
-  /** The stale spell the sent mail was for. */
   staleSince: number;
 }
 
@@ -368,11 +302,6 @@ export function parseStaleMailSentCall(data: unknown): StaleMailSentCall {
   return { ...call, staleSince };
 }
 
-/**
- * The claiming officer's queue sent a copy of the stale-ledger mail: the claim is final, so no
- * other officer's client mails this spell again. A copy of a spell that has since ended changes
- * nothing.
- */
 export async function markFeederStaleMailSent(
   deps: BookDeps,
   caller: Caller,
@@ -389,12 +318,6 @@ export async function markFeederStaleMailSent(
   return {};
 }
 
-// --- The payee's link ---------------------------------------------------------
-
-/**
- * What the link says when it cannot be used, for any reason. One shape with no time in it, so
- * the page cannot tell an expired link (its time behind) from a guarded one (its time ahead).
- */
 export interface RemovalLinkUnavailable {
   available: false;
 }
@@ -411,7 +334,6 @@ export type RemovalLinkState =
 interface Resolved {
   state: RemovalLinkState;
   link?: RemovalLinkDoc;
-  /** The link's id, for checking it is still the removal's own when the removal is ended. */
   linkId?: string;
 }
 
@@ -445,16 +367,10 @@ async function resolveLink(deps: BookDeps, caller: Caller, code: string): Promis
   };
 }
 
-/**
- * The record still holds the removal this link was made for, and its payee may end it. Read
- * again inside the transaction that ends it, so a cancel and restart, or a payee change, that
- * landed since the link was read refuses it.
- */
 function isLinkedRemoval(rec: FeederRecord, link: RemovalLinkDoc, linkId: string): boolean {
   return (
     rec.status === 'pending-removal' &&
     rec.removal?.startedAt === link.startedAt &&
-    // A link written before the record kept its id has none to compare.
     (rec.removalLinkId === undefined || rec.removalLinkId === linkId) &&
     payeeMayForce({
       payeeChangedAt: rec.payeeChangedAt,
@@ -464,7 +380,6 @@ function isLinkedRemoval(rec: FeederRecord, link: RemovalLinkDoc, linkId: string
   );
 }
 
-/** What the "Remove now" page shows for this signed-in Character and link. */
 export async function getRemovalLink(
   deps: BookDeps,
   caller: Caller,
@@ -473,7 +388,6 @@ export async function getRemovalLink(
   return (await resolveLink(deps, caller, input.code)).state;
 }
 
-/** The payee ends the removal now. Unavailable looks the same whatever stopped it. */
 export async function forceRemovalNow(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -502,20 +416,11 @@ export async function forceRemovalNow(
       guard: (rec) => isLinkedRemoval(rec, link, linkId),
     });
   } catch {
-    // Raced with a cancel, a restart or the clock: the same answer as an expired link.
     return { ended: false };
   }
   return { ended: true, effectiveAt: state.effectiveAt };
 }
 
-// --- Taking effect -----------------------------------------------------------
-
-/**
- * The feeder records pending removal, with their data. A collection-group
- * equality query, so the hourly run is one read while nothing is pending.
- * Until its index is deployed (indexes go out by hand) it falls back to
- * reading every pointer and then every record, as before.
- */
 async function pendingRemovals(
   { db, log }: Pick<CorpSyncDeps, 'db' | 'log'>,
   pointerCollection: string
@@ -544,7 +449,6 @@ async function pendingRemovals(
   }
   const found = [];
   for (const pointer of await feedersToRead(db, pointerCollection)) {
-    // One unreadable record must not stop the rest, as before.
     try {
       const rec = (
         await feederRef(db, pointer.collectorCorporationId, pointer.feederCorporationId).get()
@@ -560,11 +464,6 @@ async function pendingRemovals(
   return found;
 }
 
-/**
- * End every removal whose wait is over. Scheduled hourly; one failure never stops the rest.
- * `pointerCollection` only matters on the fallback scan; the indexed query finds
- * every pending feeder under `corps/*`.
- */
 export async function finalizeDueRemovals(
   deps: CorpSyncDeps,
   pointerCollection: string = FEEDER_OF_COLLECTION
@@ -575,7 +474,6 @@ export async function finalizeDueRemovals(
     pointerCollection
   )) {
     try {
-      // Decided on the query's copy; the guard below re-checks inside endFeeder's transaction.
       if (!isRemovalDue({ status: rec.status, removal: rec.removal }, deps.now())) {
         continue;
       }
@@ -588,7 +486,6 @@ export async function finalizeDueRemovals(
         actor: { characterId: null, name: 'Removal taking effect', via: 'scheduled' },
         action: 'feederRemoved',
         allowed: ['pending-removal'],
-        // The same removal, still due: a cancel and restart meanwhile is a new one with its own wait.
         guard: (held) =>
           held.removal?.startedAt === startedAt &&
           isRemovalDue({ status: held.status, removal: held.removal }, deps.now()),

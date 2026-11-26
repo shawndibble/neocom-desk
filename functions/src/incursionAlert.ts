@@ -1,32 +1,11 @@
-// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
-/**
- * The "Incursion within N jumps" alert (issue #3542): fires when an Incursion
- * comes within the pilot's chosen number of jumps of their Current System,
- * counted under Route Safety's route rules.
- *
- * Edge-triggered like `diffStockBelowTarget`, keyed on the constellation: an
- * Incursion staying in range, moving on from mobilizing to established,
- * moving out of range or withdrawing never fires again. Unlike stock, an
- * Incursion with no counterpart in the previous poll does fire — a new spawn
- * already in range is exactly what the alert is for.
- *
- * Each entry carries the frame it was counted in: the origin system and N.
- * When either changes between polls, the poll re-baselines silently, so
- * raising N or moving system never fires a burst for Incursions that were
- * already near. A side effect, recorded as a scope decision: flying towards
- * an Incursion changes the origin, so it does not alert either.
- */
 import type { IncursionState } from './incursionState.js';
 
 export interface IncursionAlertEntry {
   constellationId: number;
   stagingSystemId: number;
   state: IncursionState;
-  /** Jumps from the Current System to the staging system; null when unreachable. */
   jumps: number | null;
-  /** The Current System the jumps were counted from. */
   originSystemId: number;
-  /** The pilot's N at the time of the poll. */
   withinJumps: number;
 }
 

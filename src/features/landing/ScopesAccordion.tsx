@@ -4,7 +4,6 @@ import { Disclosure } from '@/components/ui/Disclosure';
 import { PERMISSIONS } from '@/esi/registry';
 import { LANDING_SCOPE_GROUPS, type ScopeRow } from './scopeGroups';
 
-/** The i18n keys and opt-in flag of one row. */
 function rowMeta(row: ScopeRow): {
   id: string;
   labelKey: string;
@@ -28,12 +27,6 @@ function rowMeta(row: ScopeRow): {
   };
 }
 
-/**
- * What the app asks EVE for, by area, closed by default: each row shows the
- * area's name and how many permissions it holds, so the closed list scans like
- * a table of contents. Rows are the same Permissions the Customize
- * permissions dialog offers, with the same captions.
- */
 export function ScopesAccordion() {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());

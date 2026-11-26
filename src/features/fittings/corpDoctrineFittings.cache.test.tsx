@@ -8,7 +8,6 @@ import {
   useCorpDoctrineFittings,
 } from './corpDoctrineFittings';
 
-// One fit saved with its code: it lists as a row without decoding anything.
 const listCorpDoctrineFits = vi.hoisted(() =>
   vi.fn(async () => [
     { id: 'a', name: 'Fleet Rifter', snapshot: { hullTypeId: 587 }, shareCode: '1.abc' },
@@ -36,11 +35,8 @@ describe('useCorpDoctrineFittings', () => {
     listCorpDoctrineFits.mockClear();
     await seedCharacter(501, 'Pilot', { corporationId: CORP });
     (await mountOnce(501)).unmount();
-    // The Open dialog or Compare picker mounting it again: no second call.
     const again = renderHook(() => useCorpDoctrineFittings(501));
-    // The cached rows stand in for the call.
     await waitFor(() => expect(again.result.current.rows).toHaveLength(1));
-    // Settled at once: the `?source=` cleanup needn't wait on a call that never happens.
     expect(again.result.current.settled).toBe(true);
     expect(listCorpDoctrineFits).toHaveBeenCalledTimes(1);
 

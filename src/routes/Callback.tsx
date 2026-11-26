@@ -14,22 +14,6 @@ const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
   generic: 'callback.errorMessage',
 };
 
-/**
- * EVE SSO redirect target. Exchanges the code exactly once — the login inside
- * `addCharacter` consumes the one-time PKCE stash, so every mount of this URL
- * (StrictMode's second effect, or a remount of the route) shares one run.
- *
- * A failure restarts the sign-in once by itself before it is reported at all
- * (issue #649; the decision log has the why). Two rules that are not obvious
- * from the code: the panel is never skipped for a user who already has
- * Characters, since landing them on `/characters` would read as success and
- * hide that the Character they were adding is missing; and a `?error=` from
- * SSO is terminal, because the commonest one is the user pressing Cancel and
- * retrying it bounces them straight back to EVE.
- *
- * The panel never carries the thrown Error's own text, which may hold an
- * ESI/PKCE internal detail.
- */
 export function Callback() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -62,10 +46,7 @@ export function Callback() {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  // A user-initiated retry is not one of the automatic ones.
                   clearRetryBudget();
-                  // Add Character only when this tab has no record of what the
-                  // failed login was for.
                   void retryLastLogin()
                     .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
                     .catch(() => setErrorKind('generic'));

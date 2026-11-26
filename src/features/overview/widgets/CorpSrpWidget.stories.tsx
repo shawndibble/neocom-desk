@@ -8,11 +8,6 @@ import type { CorpSrpFeed, SrpClaimRow } from './data/corpFeeds';
 import type { BuildContext, KindView } from './data/types';
 import type { Widget as WidgetModel } from './layout';
 
-/**
- * The Corp Board's `corpSrp` widget: the real builder over a sample feed, drawn in
- * the real Widget shell. States: Number, Table, empty, SRP not turned on. The phone stories use
- * the phone viewport; the shell hides the Killmail column there.
- */
 const meta = {
   title: 'overview/CorpSrpWidget',
   parameters: { layout: 'fullscreen' },
@@ -97,35 +92,26 @@ function Srp({ data, view }: { data: CorpSrpFeed; view: WidgetModel['view'] }): 
 
 const PHONE = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
-/** @summary Number: open (Pending) claims, ISK owed (Approved, not yet Paid), Review claims link. */
 export const NumberView: Story = { render: () => <Srp data={feed({})} view="number" /> };
 
-/** @summary Number in the phone shell. */
 export const NumberViewPhone: Story = { ...NumberView, globals: PHONE };
 
-/** @summary Table: pilot, killmail, amount and status per open claim. */
 export const TableView: Story = { render: () => <Srp data={feed({})} view="table" /> };
 
-/** @summary Table in the phone shell: Pilot, Amount, Status. */
 export const TableViewPhone: Story = { ...TableView, globals: PHONE };
 
-/** @summary SRP on, no claim open: empty state with an Open SRP link. */
 export const Empty: Story = {
   render: () => <Srp data={feed({ claims: [] })} view="table" />,
 };
 
-/** @summary Empty in the phone shell. */
 export const EmptyPhone: Story = { ...Empty, globals: PHONE };
 
-/** @summary SRP off, officer is a Director: Set up SRP. */
 export const NotTurnedOn: Story = {
   render: () => <Srp data={feed({ enabled: false, claims: [] })} view="table" />,
 };
 
-/** @summary Not turned on in the phone shell. */
 export const NotTurnedOnPhone: Story = { ...NotTurnedOn, globals: PHONE };
 
-/** @summary SRP off, officer is not a Director: told who can turn it on, no link. */
 export const NotTurnedOnAccountant: Story = {
   render: () => <Srp data={feed({ enabled: false, canSetUp: false, claims: [] })} view="table" />,
 };

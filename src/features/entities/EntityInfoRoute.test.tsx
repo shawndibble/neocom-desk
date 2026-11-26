@@ -109,7 +109,6 @@ describe('EntityInfoRoute', () => {
   });
 
   it('a FactionLink opens a faction request through the URL, and Back clears it', async () => {
-    // No modal mounted: this is the URL-to-store seam alone.
     render(
       <MemoryRouter initialEntries={['/contacts?tab=standings']}>
         <EntityInfoRoute />
@@ -158,7 +157,6 @@ describe('EntityInfoRoute', () => {
     renderAt('/contacts?tab=a');
     fireEvent.click(screen.getByRole('link', { name: 'Pilot One' }));
     await screen.findByRole('dialog');
-    // A page's own URL write keeps the entry's state, as `useUrlParams` does.
     act(
       () =>
         void probe.navigate('/contacts?tab=b&info=character-1', {
@@ -295,8 +293,6 @@ describe('EntityInfoRoute', () => {
   });
 
   it('keeps info, and the modal, through a redirect: the cold tab landing replaces the path', async () => {
-    // A cold `/market?info=…` lands through TabRoute's `<Navigate replace>`
-    // to the default tab; that is the same visit, not a page change.
     renderAt('/market?info=character-1');
     await screen.findByRole('dialog');
     act(() => void probe.navigate('/market/browser?info=character-1', { replace: true }));

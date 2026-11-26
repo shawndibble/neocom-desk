@@ -98,7 +98,6 @@ describe('KillLocationModal', () => {
     expect(await screen.findByText('Battlecruiser on 3 of 3 kills')).toBeInTheDocument();
     expect(screen.getAllByText('Interdictor or HIC on the mail')).toHaveLength(2);
     expect(screen.getAllByText('Smartbombs involved')).toHaveLength(2);
-    // One batched names read for every victim pilot and corporation.
     expect(resolveNames).toHaveBeenCalledTimes(1);
     const rows = screen.getAllByRole('button', { expanded: false });
     expect(rows[0]).toHaveAccessibleName(/Name 101/);

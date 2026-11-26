@@ -1,8 +1,3 @@
-/**
- * What the net worth chart reads (issue #2935): the stored snapshots, which
- * Characters hold every permission a snapshot needs, and each Character's
- * journal-backed daily wallet balance (the ISK backfill).
- */
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -20,10 +15,8 @@ const WALLET_SCOPE = ESI_REGISTRY.getCharacterWallet.scope;
 
 export interface NetWorthData {
   snapshotsByCharacter: ReadonlyMap<number, NetWorthSnapshotRow[]>;
-  /** Characters holding the wallet, assets and orders permissions. */
   covered: ReadonlySet<number>;
   walletDailyByCharacter: ReadonlyMap<number, Map<string, number>>;
-  /** Snapshots and permissions have been read once. */
   ready: boolean;
 }
 
@@ -51,8 +44,6 @@ export function useNetWorthData(characterIds: readonly number[]): NetWorthData {
 
   const covered = coveredIds ?? NO_IDS;
 
-  // The journal is read only for Characters that granted the wallet scope, so a
-  // missing permission never provokes a live 403 and its app-wide re-auth banner.
   const walletIdsKey = [...(walletIds ?? [])].join(',');
   const [walletDaily, setWalletDaily] = useState<ReadonlyMap<number, Map<string, number>>>(
     new Map()
@@ -94,15 +85,6 @@ export function useNetWorthData(characterIds: readonly number[]): NetWorthData {
 
 const NO_MISSING: readonly string[] = [];
 
-/**
- * The names of the `characters` net worth leaves out for want of a
- * snapshot permission (`covered` in `useNetWorthData`), for the page's
- * Character picker (`missingNames`). Empty until the permissions are read.
- *
- * The permission read covers every Character, not just `characters`: a
- * `useLiveQuery` keyed on the ids would hand back the previous ids' result for
- * a render after they change, and the picker would flash everyone as missing.
- */
 export function useNetWorthMissingNames(
   characters: readonly { characterId: number; name: string }[]
 ): readonly string[] {

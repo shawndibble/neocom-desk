@@ -435,7 +435,6 @@ describe('day phases against the Miner row figures', () => {
     expect(sumTax(phases.stillAccruing)).toBeCloseTo(row.pending, 6);
     const lines = view.internals.byMiner.get('solo:1')!.billable.lines;
     expect(lines.filter((l) => l.kind === 'correction')).toHaveLength(1);
-    // The owed days list their tax; the account owes them plus the 25 ISK correction.
     expect(sumTax(phases.owed) + 25).toBeCloseTo(row.owed, 6);
   });
 });

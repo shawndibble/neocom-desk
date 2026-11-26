@@ -1,13 +1,3 @@
-/**
- * Item Detail's description, clamped to two lines so the lore never pushes the
- * stats below the fold, with a More / Less text action (DESIGN.md §6c) that
- * shows the rest in place. The action only appears when the text overflows
- * the clamp, measured live so a resize that lets it fit drops it again. Held
- * to a readable line length (`max-w-[80ch]`) however wide the modal is.
- * `full` shows it all with no toggle: an implant's, combat booster's or
- * accelerator's bonuses are written in its description, so the text is the
- * stats there.
- */
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { textActionClassName } from '@/components/ui';
@@ -20,7 +10,6 @@ export function ItemDescription({ markup, full = false }: { markup: string; full
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
 
-  // Show info swaps the open modal to another item without remounting it.
   const [shownFor, setShownFor] = useState(markup);
   if (shownFor !== markup) {
     setShownFor(markup);

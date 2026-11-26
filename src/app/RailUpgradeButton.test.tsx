@@ -38,9 +38,7 @@ describe('RailUpgradeButton', () => {
 
     await userEvent.click(document.body);
     expect(screen.queryByText('A new version is ready.')).toBeNull();
-    // Dismissing never applied anything.
     expect(forceUpdate).not.toHaveBeenCalled();
-    // The icon itself stays for later.
     expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
   });
 

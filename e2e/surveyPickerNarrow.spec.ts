@@ -1,13 +1,3 @@
-/**
- * The Survey tab's "Your surveys" switcher at 390px: the open list is clamped
- * to the viewport and wraps long ore names, so each row's mined percent, time
- * and 44px remove button stay on screen (#3282).
- *
- * Playwright rather than jsdom: the `max-md:` clamp and the wrapping are CSS a
- * real engine has to evaluate. Firestore reads are mocked (the e2e build
- * carries a placeholder project id and no API key — see
- * `appraisalSharedNarrow.spec.ts`).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -83,7 +73,6 @@ test('the open survey list fits a phone and keeps the remove button on screen', 
     timeout: 15_000,
   });
   await expect(picker).toHaveCount(0);
-  // Leave the first survey only once it is noted in the pilot's survey list.
   await expect
     .poll(() =>
       page.evaluate(async (id) => {
@@ -113,7 +102,6 @@ test('the open survey list fits a phone and keeps the remove button on screen', 
   await picker.click();
   const list = page.getByRole('listbox');
   await expect(list).toBeVisible();
-  // The remove buttons are pointer-only (aria-hidden, Delete key for keyboards), so no role query.
   const removes = list.locator('button[aria-label^="Remove"]');
   await expect(removes).toHaveCount(2);
 
@@ -140,7 +128,6 @@ test('the open survey list fits a phone and keeps the remove button on screen', 
   ).toBe(true);
 
   await removes.first().click();
-  // One survey left: nothing to switch to, so the picker goes away without having switched.
   await expect(picker).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Mining Survey' })).toBeVisible();
 });

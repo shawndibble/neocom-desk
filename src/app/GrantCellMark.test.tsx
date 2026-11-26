@@ -99,7 +99,6 @@ describe('GrantCellMark', () => {
         <GrantCellMark characterId={9} endpoints={['getCharacterStandings']} />
       </MemoryRouter>
     );
-    // The other Permission still asks, so the read has landed when it shows.
     await screen.findByRole('button', { name: 'New: Character details not granted' });
     expect(
       screen.queryByRole('button', { name: 'New: Autopilot waypoints not granted' })

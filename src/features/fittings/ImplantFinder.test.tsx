@@ -11,7 +11,6 @@ import type {
   PilotProfile,
 } from '@/engine/fittings/types';
 
-// Two CPU implant families (slots 6 and 10), a speed implant, and a Crash booster for missiles.
 const EE = [601, 602, 603, 604, 605, 606];
 const WU = [1001, 1002, 1003, 1004, 1005, 1006];
 const NN = 3001;
@@ -40,10 +39,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   ],
 }));
 
-/**
- * Base fit: 418.4 / 400 tf, 300 missile DPS. EE-60x adds x% CPU output;
- * WU-100x trims x% of 225 tf of launchers; Crash adds 10% missile DPS.
- */
 function statsFor(set: FittingImplantSet): FittingStats {
   const ee = set.implants.find((id) => EE.includes(id));
   const wu = set.implants.find((id) => WU.includes(id));
@@ -73,7 +68,6 @@ function statsFor(set: FittingImplantSet): FittingStats {
       ],
     },
     tank: { burstEffective: 0 },
-    // A Drake mines nothing: the Mining goal is not on this fit.
     mining: { perHour: 0 },
     sensor: { strength: 0, type: null },
     navigation: {
@@ -118,11 +112,6 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
   ItemDetailModal: ({ itemName }: { itemName: string }) => <p>Details of {itemName}</p>,
 }));
 
-/**
- * Jita sells grade g at g² M ISK (WU-1001: nobody). Caldari Navy's store has
- * EE-603 for 1,000 LP + 0.5M and EE-605 for 4,000 LP + 2M; the pilot holds
- * 3,200 of its LP, valued at 1,000 ISK.
- */
 const caldariNavy = (lpCost: number, iskCost: number): LpOfferInput => ({
   corporationId: 1000035,
   corpName: 'Caldari Navy',
@@ -195,7 +184,6 @@ describe('ImplantFinder', () => {
     const notOnFit = screen.getByText('Not on this fit').parentElement!;
     expect(within(notOnFit).getByRole('button', { name: /Turrets/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Missiles/ })).toBeInTheDocument();
-    // Mining yield exists as a goal, but a Drake mines nothing.
     expect(within(notOnFit).getByRole('button', { name: /Mining yield/ })).toBeInTheDocument();
   });
 
@@ -204,15 +192,11 @@ describe('ImplantFinder', () => {
     const onChange = renderFinder();
     await user.click(await screen.findByRole('button', { name: /CPU\s*18\.4 tf over/ }));
 
-    // EE-603 from Caldari Navy: 0.5M + 1,000 LP × 1,000 = 1.5M, under Jita's 9M.
     const ee603 = (await screen.findByRole('button', { name: /^Add .*EE-603$/ })).closest('li')!;
     expect(ee603).toHaveTextContent('Caldari Navy LP Store · ≈');
-    // The full offer is one click away.
     await user.click(within(ee603).getByRole('button', { name: 'Breakdown' }));
-    // Only the terms: the store and the total are already in the line above.
     expect(ee603).toHaveTextContent('1,000 LP + ');
     expect(ee603.textContent!.match(/Caldari Navy LP Store ·/g)).toHaveLength(1);
-    // EE-605's offer needs 4,000 LP; the pilot has 3,200: market first, the offer shown as cheaper.
     const ee605 = screen.getByRole('button', { name: /^Add .*EE-605$/ }).closest('li')!;
     expect(ee605).toHaveTextContent('Fits · 1.6 tf spare');
     expect(ee605).toHaveTextContent('Also:');
@@ -220,10 +204,8 @@ describe('ImplantFinder', () => {
     expect(screen.getByRole('button', { name: /^Add .*WU-1001$/ }).closest('li')).toHaveTextContent(
       'Not for sale at any Trade Hub or LP Store'
     );
-    // Every store's LP balance isn't spelled out: each offer says what it's short instead.
     expect(screen.queryByText(/Your LP/)).not.toBeInTheDocument();
 
-    // Cheapest fix: EE-603 by LP (1.5M) + WU-1003 at Jita (9M).
     const fixes = await screen.findByText('Ways to fix it · cheapest first');
     const firstFix = within(fixes.parentElement!).getAllByRole('listitem')[0]!;
     expect(firstFix).toHaveTextContent('EE-603');
@@ -237,7 +219,6 @@ describe('ImplantFinder', () => {
   it('keeps a family already in the set, with its Remove and its lower grades', async () => {
     const user = userEvent.setup();
     const onChange = renderFinder(vi.fn(), { implants: [606], boosters: [] });
-    // EE-606 gives 424 tf: the fit already fits, so CPU is under Fitting, not Fix this fit.
     await user.click(await screen.findByRole('button', { name: /^CPU$/ }));
     const remove = await screen.findByRole('button', { name: /^Remove .*EE-606$/ });
     expect(screen.getByRole('button', { name: /^Replace .*EE-605$/ })).toBeInTheDocument();
@@ -259,7 +240,6 @@ describe('ImplantFinder', () => {
     const onChange = renderFinder(vi.fn(), { implants: [1002], boosters: [] });
     const slot10 = await screen.findByRole('button', { name: /^Slot 10: .*WU-1002$/ });
 
-    // Slot 6 holds CPU and speed implants; slot 10 only the CPU one.
     await user.click(screen.getByRole('button', { name: /^Slot 6: Empty$/ }));
     expect(screen.getByRole('button', { name: /^Max velocity/ })).toBeInTheDocument();
     await user.click(slot10);
@@ -275,7 +255,6 @@ describe('ImplantFinder', () => {
     await user.click(screen.getByRole('button', { name: /^Replace .*WU-1005$/ }));
     expect(onChange).toHaveBeenLastCalledWith({ implants: [1005], boosters: [] });
 
-    // A booster slot: nothing there helps CPU.
     await user.click(screen.getByRole('button', { name: /^Booster 3: Empty$/ }));
     expect(screen.getByText('Nothing in Booster 3 helps CPU on this fit.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'All slots' }));

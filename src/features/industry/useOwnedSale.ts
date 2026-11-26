@@ -6,13 +6,6 @@ import type { pricingSourcesForHub } from './buildPlanPricingInputs';
 import type { MarketSnapshot } from './marketData';
 import type { PlanVerdict } from './planPricing';
 
-/**
- * Both liquidation bases at once, so the Use-or-sell toggle switches between
- * two numbers already in hand rather than re-deriving one per click. Sell-now
- * reads the buy side of the book (what a standing order pays today), sell-order
- * the sell side (what listing your own stack asks) — deliberately independent
- * of the plan's *material* price basis, which is about buying, not selling.
- */
 export function useOwnedSale(
   result: BuildResult | null,
   snapshot: MarketSnapshot | null,

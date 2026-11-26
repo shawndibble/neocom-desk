@@ -32,10 +32,8 @@ import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.page.${key}`;
 
-/** Payout states in the order the Status column sorts them: what needs a look first. */
 const PAYOUT_STATE_RANK: readonly PayoutStatus[] = ['waiting-for-journal', 'recorded', 'matched'];
 
-/** A payment's state word: waiting to be confirmed (#6209) first, then not counted, then its status. */
 const payoutStateKey = (p: MoonOwnerPayout) =>
   p.unconfirmed
     ? 'payouts.state.unconfirmed'
@@ -43,7 +41,6 @@ const payoutStateKey = (p: MoonOwnerPayout) =>
       ? 'payouts.state.not-a-payout'
       : `payouts.state.${p.status}`;
 
-/** Sort rank: a payment to confirm first, then waiting on the journal, recorded, matched, not counted. */
 const payoutRank = (p: MoonOwnerPayout) =>
   p.unconfirmed
     ? -1
@@ -51,7 +48,6 @@ const payoutRank = (p: MoonOwnerPayout) =>
       ? PAYOUT_STATE_RANK.length
       : PAYOUT_STATE_RANK.indexOf(p.status);
 
-/** Their rate beside the miner rate and the margin, with what they asked for. */
 export function RateReadout({
   theirPct,
   minerPct,
@@ -135,11 +131,6 @@ function HistoryLines({
   );
 }
 
-/**
- * One moon owner's page: their rate beside the miner rate and margin, rate
- * history, payments, what was mined at their refineries. Set rate and
- * Settled otherwise are the officer's; the callers add Pay and removal.
- */
 export function MoonOwnerPage({
   detail,
   name,
@@ -165,45 +156,28 @@ export function MoonOwnerPage({
 }: {
   detail: MoonOwnerDetail;
   name: string;
-  /** The accounting corporation's own name: who set an agreed rate. */
   accountingName?: string;
   characterName: (id: number) => string;
-  /** Where a miner's name goes (their Miner page); absent: plain text. */
   minerPath?: (characterId: number) => string;
   refineryName: (id: number) => string;
-  /**
-   * The refineries list on a page that opens them (#6298): the active ids, a link and hint per
-   * refinery, and the Archived section after it. Absent: the plain list from the mined lines.
-   */
   refineries?: {
     ids: readonly number[];
     info: (structureId: number) => RefineryRowInfo;
     archived: ReactNode;
   };
-  /** Label their refineries for both sides; absent for a viewer who may not edit. */
   refineryEdit?: RefineryLabelEdit;
   oreName: (typeId: number) => string;
   backTo: string;
-  /** Who the moon owner is paid as. Either side sets it (#4653). */
   payee?: Payee & { name: string };
-  /** Change on the "Paid to" line; absent for a viewer who may not edit. */
   onChangePayee?: () => void;
-  /** The strip when the moon owner changed it (#4653). */
   payeeNotice?: ReactNode;
-  /** Absent for a viewer who may not edit. */
   onSetRate?: () => void;
   onSettledOtherwise?: () => void;
-  /** Start a removal; absent for a viewer who may not edit. */
   onRemove?: () => void;
-  /** Cancel a pending removal (any Accountant or higher, the starter included). */
   onCancelRemoval?: () => Promise<void>;
-  /** The officer sent the notice from EVE: starts the 24 hours. */
   onNoticeSent?: () => Promise<void>;
-  /** Pay the balance: absent when nothing is owed or the viewer may not record payments. */
   onPay?: () => void;
-  /** Add a payment by hand. */
   onAddPayment?: () => void;
-  /** Mark a payment "not a payout" (or count it again). */
   onMarkPayout?: (payoutId: string, notAPayout: boolean) => void;
 }) {
   const zone = useTimeZone();
@@ -246,7 +220,6 @@ export function MoonOwnerPage({
           )}
         </>
       ),
-      // Needs-a-look first: to confirm, waiting on the journal, recorded, matched, not counted.
       sortValue: payoutRank,
       sortFirst: 'asc',
     },
@@ -260,7 +233,6 @@ export function MoonOwnerPage({
             cellClassName: () => 'dt-action-row',
             render: (p: MoonOwnerPayout) =>
               p.unconfirmed ? (
-                // A donation without the payout reference (#6209): the officer says which it is.
                 <span className="inline-flex gap-2">
                   <Button size="sm" variant="ghost" onClick={() => onMarkPayout(p.id, false)}>
                     {t(k('payouts.countIt'))}

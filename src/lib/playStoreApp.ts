@@ -1,15 +1,7 @@
-/** Application id of the Bubblewrap-built Trusted Web Activity; matches public/.well-known/assetlinks.json. */
 export const PLAY_STORE_PACKAGE = 'com.neocomdesk.app';
 
-/** sessionStorage flag a TWA launch leaves for the rest of the session; `index.html`'s landing-shell boot script reads it too. */
 export const PLAY_STORE_FLAG_KEY = 'playStoreApp';
 
-/**
- * Chrome won't open Android's settings screens from a page, so the shell ships
- * its own BROWSABLE activity that does (scripts/twa/NotificationSettingsActivity.java).
- * A shell without it (version code 2 and older) takes Chrome to the fallback,
- * i.e. back to the page the tap came from.
- */
 export function androidNotificationSettingsUrl(fallbackUrl: string): string {
   return (
     'intent://notification-settings#Intent;scheme=neocomdesk;' +
@@ -23,20 +15,15 @@ interface FlagStore {
   setItem(key: string, value: string): void;
 }
 
-/** A TWA launch sets the referrer to android-app://<package>; see docs/ANDROID-TWA.md. */
 export function detectPlayStoreApp(referrer: string, store: FlagStore): boolean {
   try {
     if (store.getItem(PLAY_STORE_FLAG_KEY) === '1') return true;
-  } catch {
-    // blocked storage: rely on the referrer alone
-  }
+  } catch {}
   const fromApp = referrer.startsWith(`android-app://${PLAY_STORE_PACKAGE}`);
   if (fromApp) {
     try {
       store.setItem(PLAY_STORE_FLAG_KEY, '1');
-    } catch {
-      // best effort
-    }
+    } catch {}
   }
   return fromApp;
 }

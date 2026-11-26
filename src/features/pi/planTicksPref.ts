@@ -2,11 +2,6 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const PI_PLAN_TICKS_KEY = 'piPlanTicks';
 
-/**
- * The Plan tab's ticked rows (quick wins, in-game steps): per device, keyed by
- * the model's stable row ids, which carry the colony. The page prunes ids whose
- * row is gone (`pruneTicks`), so a win that comes back starts unticked.
- */
 export function parsePlanTicks(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   return raw.filter((id): id is string => typeof id === 'string');

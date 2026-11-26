@@ -1,9 +1,3 @@
-/**
- * PI header strip suggests the nearest trade hub for a far-from-Jita home
- * (#2705). Real gate routes from the shipped jump graph: Tanoo (highsec) is 4
- * jumps from Rens against 19 from Jita; FMH-OV (nullsec) is 34 from Hek
- * against 42 from Jita. `PI_SHOTS=<dir>` also writes screenshots.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';

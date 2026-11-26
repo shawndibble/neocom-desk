@@ -9,16 +9,10 @@ interface SkillPlanAddProps {
   characterId: number;
   skillTypeID: number;
   skillName: string;
-  /** For the levels the target plan trains as prerequisites of other entries. */
   engineSkills: ReadonlyMap<number, EngineSkill>;
-  /** Corrected trained levels; also gives this skill's own. */
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
 }
 
-/**
- * The skill Show info's "Add to Skill Plan": first level neither trained nor
- * already in the target plan, with `AddToPlanBar`'s plan picker and Undo.
- */
 export function SkillPlanAdd({
   characterId,
   skillTypeID,
@@ -53,7 +47,6 @@ export function SkillPlanAdd({
     const entry = { skillTypeID, targetLevel };
     const result = await target.addEntries([entry], skillName);
     if (result.added.length === 0) return;
-    // Adds chain (level III, then IV): Undo takes back every one into this plan, not just the last.
     setAdded((prev) => ({
       planId: result.planId,
       planName: result.planName,

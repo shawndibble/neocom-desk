@@ -50,42 +50,20 @@ import { CargoTile, CargoHoldReadout } from './ring/CargoTile';
 interface FittingRingProps {
   fitting: Fitting;
   stats: FittingStats | null;
-  /**
-   * Index-parallel to `fitting.modules`: what the engine made of each, so a
-   * tile names the state a module actually reached (a pasted passive module
-   * asks for "active" and runs online). Null while it is calculating.
-   */
   moduleResults?: FittingModuleResult[] | null;
-  /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
-  /** Names for the tiles' tooltips. */
   typeName?: (typeId: number) => string;
-  /** Clicking a slot — opens its module, or the Add panel for an empty one. Unused by the phone overview. */
   onSlotSelect?: (rack: FittingSlotKind, index: number) => void;
-  /** An Add panel item dropped on a slot of its rack. */
   onDropType?: (rack: FittingSlotKind, index: number, typeId: number) => void;
-  /** A fitted module dragged to another slot of its rack. */
   onMoveModule?: (rack: FittingSlotKind, from: number, to: number) => void;
-  /**
-   * The phone overview (scope decision `20260924-205720`): no readouts,
-   * tiles only explain themselves (a tap shows the tooltip), and the rack
-   * buttons beneath open a rack's slots via `onRackOpen`.
-   */
   compact?: boolean;
   onRackOpen?: (rack: FittingSlotKind) => void;
-  /** The phone overview's Drones button, among the rack buttons. */
   droneButton?: ReactNode;
-  /** The slot the Add panel is filling, marked on the ring as it is in the List. */
   selectedSlot?: { rack: FittingSlotKind; index: number } | null;
-  /** The turrets and launchers the high slots take; null (no pips filled) until known. */
   hardpointsUsed?: HardpointCounts | null;
-  /** The hardpoint each high-slot type takes, named in its tile's tooltip; unnamed without it. */
   hardpointKindOf?: HardpointKindOf;
-  /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
-  /** The editor's Ring | List switch, in the panel header's leading slot (it carries the panel's heading). Ignored when `bare`. */
   titleSwitch?: ReactNode;
-  /** No panel of its own, for a host that already frames it (the Start screen's preview). */
   bare?: boolean;
 }
 
@@ -111,26 +89,6 @@ function RingFrame({
   );
 }
 
-/**
- * The game-style Ring view (scope decisions `20260924-205720` and
- * `20260925-095734`): one band with the hull's render
- * filling the disc inside it, square tiles on the band — highs over the top,
- * mids down the right, lows round the bottom, rigs on the left, each rack
- * filling clockwise, with the positions a hull lacks as faint outlines — and
- * the resource budgets as bands on the rim: CPU solid up the lower right,
- * powergrid dashed up the lower left, calibration and drone bandwidth thin
- * above them. Hovering a band gives its numbers; the same numbers sit in a
- * strip beneath the ring laid out as the rim is. A T3's subsystems join the
- * band upper-left, between the rigs and the highs, its racks closing up and
- * dropping the outlines to make room (`ringSlotAngles`). Cargo sits in a row
- * below; the page puts the drones in a panel of their own.
- *
- * Tiles take drops: an Add panel item on a slot of its rack (replacing what
- * it holds), or a fitted module dragged along its rack. Dropped anywhere else
- * on the ring, an item goes where it should (`ringDropFor`); dropped on the
- * cargo row, it goes in the hold. The phone overview (`compact`) is
- * read-only; its rack buttons are the way in.
- */
 export function FittingRing({
   fitting,
   stats,
@@ -152,11 +110,9 @@ export function FittingRing({
 }: FittingRingProps) {
   const { t } = useTranslation();
   const itemActions = useFittingItemActions();
-  // The tile last focused, the ring's tab stop.
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const layout = stats?.slotCounts ?? null;
   const slots = buildRingSlots(fitting, layout);
-  // Anywhere on the ring that isn't a slot taking the drag: it goes where it should.
   const openSpace = useFittingDropTarget({ kind: 'ring' }, (payload, handlers) => {
     const placed = ringDropFor(payload, fitting.modules, layout);
     return placed?.kind === 'fit'
@@ -212,7 +168,6 @@ export function FittingRing({
       flash: bwFlash,
     },
   };
-  // A hull with no drone bay (a Corax) has no bandwidth gauge or readout.
   const dronesShown = showsDrones(stats, fitting.drones.length);
   const gauges: RingGauge[] = dronesShown
     ? ['calibration', 'droneBandwidth', 'cpu', 'powergrid']
@@ -254,7 +209,6 @@ export function FittingRing({
     FITTING_SLOT_KINDS.map((rack) => [rack, slots.filter((slot) => slot.rack === rack).length])
   ) as SlotLayout;
   const angles = ringSlotAngles(counts);
-  // A T3's band has no room for the positions it lacks.
   const ghosts =
     subsystems.length > 0
       ? []
@@ -262,9 +216,6 @@ export function FittingRing({
           ringGhostIndices(rack, counts[rack]).map((index) => ({ rack, index }))
         );
 
-  // One tab stop for the whole ring, not one per tile: the arrow keys walk
-  // the slots in ring order (highs, mids, lows, rigs, then subsystems),
-  // Home and End jump to either end.
   const bandSlots = [...ringSlots, ...subsystems];
   const order = bandSlots.map((slot) => `${slot.rack}-${slot.index}`);
   const tabStop = focusKey !== null && order.includes(focusKey) ? focusKey : order[0];
@@ -302,7 +253,6 @@ export function FittingRing({
     onDropType,
     onMoveModule,
   };
-  // The phone edits through a sheet per rack; a T3's subsystems get one too.
   const sheetRacks: FittingSlotKind[] =
     subsystems.length > 0 ? [...RING_RACKS, 'subsystem'] : [...RING_RACKS];
 
@@ -312,7 +262,6 @@ export function FittingRing({
 
   return (
     <RingFrame bare={bare} title={t('fittings.ring.title')} leading={titleSwitch} actions={actions}>
-      {/* The block keeps the ring's own width, so cargo and the legend sit under it on a wide panel. */}
       <div className="mx-auto w-full max-w-[48rem] space-y-3">
         <div
           ref={ringRef}
@@ -334,8 +283,6 @@ export function FittingRing({
           <svg
             viewBox={`0 0 ${RING_VIEW} ${RING_VIEW}`}
             className="pointer-events-none absolute inset-0 h-full w-full"
-            // The readouts' meters carry these numbers for assistive tech; the
-            // hover bubbles are a pointer's shortcut to them.
             aria-hidden="true"
           >
             <g>
@@ -386,7 +333,6 @@ export function FittingRing({
                 key={`ghost-${rack}-${index}`}
                 aria-hidden="true"
                 className="absolute border border-line/60 bg-bg/40"
-                // fixed format: CSS angle
                 style={{ ...tilePosition(angle), transform: `rotate(${angle.toFixed(1)}deg)` }}
               />
             );
@@ -423,7 +369,6 @@ export function FittingRing({
           </ul>
         )}
 
-        {/* Laid out as the rim is: calibration and powergrid on the left, bandwidth and CPU on the right. */}
         {!compact && (
           <div
             ref={readoutsRef}
@@ -442,12 +387,10 @@ export function FittingRing({
           </div>
         )}
 
-        {/* The phone editor has no readouts under the ring, so the two budgets that gate a fit sit above the rack buttons. (The Start preview is compact too, but carries its own meters.) */}
         {compact && onRackOpen && (
           <div className="mx-auto grid grid-cols-2 gap-x-4 gap-y-1" style={{ maxWidth: ringWidth }}>
             <Readout gauge="cpu" budget={budgets.cpu} align="start" />
             <Readout gauge="powergrid" budget={budgets.powergrid} align="end" />
-            {/* Calibration can gate a fit too, but only earns a line on the phone when it is the one over. */}
             {calFlash.overBudget && (
               <Readout gauge="calibration" budget={budgets.calibration} align="start" />
             )}
@@ -489,7 +432,6 @@ export function FittingRing({
           </>
         )}
 
-        {/* What the ring has no slot for; the drones get a panel of their own beneath it. */}
         {(cargo.length > 0 || (itemActions !== null && !compact)) && (
           <div
             {...(compact ? {} : cargoTarget.props)}

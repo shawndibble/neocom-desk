@@ -1,10 +1,3 @@
-/**
- * The wording of the two nearby alerts (issues #3542, #4784), as a function of
- * a translator rather than the app's i18next instance, so the Foreground
- * Poller and the service worker (a server push, issue #5122) say exactly the
- * same thing. Everything it reads lives under `notifications.fired`, the one
- * subtree the worker loads (`pushHandler.ts`).
- */
 import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
 import type { SkyhookRaidableNearbyFire } from '@/engine/skyhooks/skyhookAlert';
 import type { NotificationCopy } from '@/engine/notificationWording';
@@ -25,10 +18,6 @@ export interface IncursionNames {
 const fired = (t: Translate, eventId: string, variant: string, vars?: Record<string, unknown>) =>
   t(`notifications.fired.${eventId}.${variant}`, vars);
 
-/**
- * A planet's name already leads with its system ("60M-TG I"), so naming the
- * system again reads twice; an unresolved planet is a generic skyhook, not an id.
- */
 function whereLabel(t: Translate, names: SkyhookNames, systemId: number): string {
   const system = names.system ?? `#${systemId}`;
   if (names.planet === undefined) {

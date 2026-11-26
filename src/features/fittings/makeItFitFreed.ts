@@ -13,7 +13,6 @@ const TOTAL_KEY = {
 export const totalOf = (stats: FittingStats, resource: Resource): number =>
   stats[TOTAL_KEY[resource]] ?? 0;
 
-/** Whole units: a budget readout never needs decimals, and a fraction over still reads as over. */
 const whole = (value: number) => formatNumber(Math.max(1, Math.round(value)));
 
 export interface OverBudget {
@@ -23,7 +22,6 @@ export interface OverBudget {
   over: number;
 }
 
-/** Every budget the Fitting is over, in CPU, powergrid, calibration order. */
 export function overBudgets(before: FittingStats): OverBudget[] {
   return RESOURCES.flatMap((resource) => {
     const over = overageOf(before, resource);
@@ -38,11 +36,6 @@ export const unitOf = (resource: Resource, t: Translate): string =>
 
 export const roundedAmount = (value: number): string => formatNumber(Math.round(value));
 
-/**
- * What a fix does for the budget the pilot clicked "Fix" on: "Frees 38 tf" when it
- * lowers what the Fitting uses (a swap), "Adds 42 tf" when it raises what the ship
- * has (an implant), both when it does both; null when it does neither.
- */
 export function freedLabel(
   before: FittingStats | null,
   after: FittingStats,

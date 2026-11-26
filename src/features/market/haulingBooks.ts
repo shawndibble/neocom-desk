@@ -1,19 +1,9 @@
-/**
- * Reads a Trade Hub station's order books, published every 30 minutes by the
- * `public-data-hauling-books` GitHub Actions job (`hauling-books/<stationId>.json` in R2;
- * `functions/src/haulingBooks.ts`): every type's best buy and sell price levels at the
- * station, folded from EVE Ref's latest market-order snapshot. One cached request per
- * station replaces an ESI order-book request per item in the hauling scan's last pass.
- * `null` means unavailable or stale, and the scan falls back to ESI books for a short list.
- */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { LadderLevel } from '@/engine/market/haulingMarket';
 import { MINUTE_MS, HOUR_MS } from '@/lib/age';
 
-/** The backend republishes every 30 minutes. */
 const STALE_AFTER_MS = 10 * MINUTE_MS;
-/** A snapshot older than this means the job stopped (it is normally under an hour old): ESI is the better source. */
 export const MAX_BOOKS_AGE_MS = 3 * HOUR_MS;
 
 export interface StationBooks {
@@ -22,10 +12,8 @@ export interface StationBooks {
 }
 
 export interface HaulingBooks {
-  /** When EVE Ref published the snapshot the books were built from (ms). */
   asOf: number;
   lastSyncedAt: number;
-  /** By type id; a type with no orders at the station is absent. */
   types: ReadonlyMap<number, StationBooks>;
 }
 
@@ -43,7 +31,6 @@ function parseLevels(raw: unknown): LadderLevel[] | null {
   return levels;
 }
 
-/** The object as `functions/src/haulingBooks.ts` writes it, or `null` when it is not that shape. */
 export function parseHaulingBooks(raw: unknown): HaulingBooks | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { lastSyncedAt, asOf, types } = raw as Record<string, unknown>;
@@ -61,7 +48,6 @@ export function parseHaulingBooks(raw: unknown): HaulingBooks | null {
   return { asOf, lastSyncedAt, types: byType };
 }
 
-/** Jita's object is about 1.2 MB gzipped: more room than the 20 s the small R2 objects get, or a slow link silently drops to the capped ESI path. */
 const READ_TIMEOUT_MS = MINUTE_MS;
 
 async function fetchBooks(stationId: number): Promise<HaulingBooks | null> {

@@ -1,12 +1,3 @@
-/**
- * The **Travel Settings** controls both Settings → Travel and Route Safety's
- * Route rules panel draw (issue #2472) — one set of components on one set of
- * synced stores, so the two places cannot drift apart or hold copies.
- *
- * Each host lays them out its own way and waits for the settings to hydrate
- * before showing them: a click on a default not yet replaced by the stored
- * value would write that default over it.
- */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useMemo, useRef } from 'react';
@@ -36,13 +27,10 @@ import {
 import { SolarSystemPicker } from './SolarSystemPicker';
 import { useSolarSystemList } from './useSolarSystems';
 
-/** A whole number typed into a field, clamped to its range; `null` for an unreadable entry. */
 function clampedInt(raw: string, min: number, max: number): number | null {
-  // A cleared field leaves the setting alone rather than snapping it to `min`.
   return raw.trim() === '' ? null : clampInt(Number(raw), min, max);
 }
 
-/** The note under the penalty: Prefer shorter counts jumps only, so it does not apply. */
 export function SecurityPenaltyNote({ preference }: { preference: RoutePreferenceKind }) {
   const { t } = useTranslation();
   return (
@@ -54,11 +42,6 @@ export function SecurityPenaltyNote({ preference }: { preference: RoutePreferenc
   );
 }
 
-/**
- * The security penalty, off under Prefer shorter. `preference` is the one the
- * host routes with — the saved default in Settings, the page's own on Route
- * Safety — so the input never reads the default behind a page's back.
- */
 export function SecurityPenaltyInput({
   id,
   preference,
@@ -86,7 +69,6 @@ export function SecurityPenaltyInput({
   );
 }
 
-/** EDENCOM, Triglavian and recent pod kills: the avoid rules beyond the pilot's own list. */
 export function AvoidRuleToggles({ podKillsUnavailable }: { podKillsUnavailable: boolean }) {
   const { t } = useTranslation();
   const avoidEdencom = useAvoidEdencom((state) => state.value);
@@ -146,14 +128,6 @@ export function AvoidRuleToggles({ podKillsUnavailable }: { podKillsUnavailable:
   );
 }
 
-/**
- * The pilot's **Avoided Systems**: the switch, an add through the local
- * solar-system search, and one row per system to remove it. Each row shows the
- * system's security the way every other system mention in the app does.
- *
- * The Add button sits inline after the switch, wrapping under it only when the
- * row is too tight. `narrow` is for a side column: the list in one column. `switchLabel` replaces the switch's own wording.
- */
 export function AvoidedSystemsEditor({
   narrow = false,
   switchLabel,
@@ -169,7 +143,6 @@ export function AvoidedSystemsEditor({
   const hydrated = useHydratedStore(useAvoidedSystems, useAvoidedSystemsEnabled);
 
   const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(true);
-  // Retry's note unmounts when the read restarts: focus waits on the section.
   const [sectionRef, , holdRetryFocus] = useRetryFocus(
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     'systems'
@@ -177,7 +150,6 @@ export function AvoidedSystemsEditor({
   const byId = useMemo(() => new Map(systems?.map((s) => [s.id, s]) ?? []), [systems]);
   const exclude = useMemo(() => new Set(avoided), [avoided]);
 
-  // A system the snapshot cannot name still lists, as `#id`, so it can be removed.
   const rows = useMemo(
     () =>
       avoided
@@ -196,7 +168,6 @@ export function AvoidedSystemsEditor({
     <div ref={sectionRef} tabIndex={-1} className="space-y-3 focus:outline-none">
       <LiveStatus>{systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        {/* Off routes straight through the list without the pilot losing it. */}
         <label className={`flex items-center gap-2 text-xs font-semibold ${tappableRowClassName}`}>
           <Checkbox checked={enabled} onChange={() => void setEnabled(!enabled)} />
           {switchLabel ?? t('settings.avoidedSystems.enabled')}
@@ -217,7 +188,6 @@ export function AvoidedSystemsEditor({
         />
       </div>
       {systemsFailed && rows.length > 0 && (
-        // The names come off the system list: without it each row shows `#id`.
         <div className="flex flex-wrap items-center gap-2 text-xs text-warning">
           <span>{t('jumpRange.systemsFailed')}</span>
           <Button
@@ -234,7 +204,6 @@ export function AvoidedSystemsEditor({
       {rows.length === 0 ? (
         <p className="text-xs text-text-dim">{t('settings.avoidedSystems.empty')}</p>
       ) : (
-        // Columns rather than one long strip: the names are short and the list can run long.
         <ul
           aria-label={t('settings.avoidedSystems.title')}
           className={cx(
@@ -260,7 +229,6 @@ export function AvoidedSystemsEditor({
                   }}
                   label={t('settings.avoidedSystems.remove', { name })}
                   onClick={() => {
-                    // The removed row's button unmounts: hand focus to a neighbour, else Add.
                     const near = [rows[index + 1]?.id, rows[index - 1]?.id].map(
                       (key) => () => (key === undefined ? null : removeRefs.current.get(key))
                     );

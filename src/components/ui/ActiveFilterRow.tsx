@@ -12,55 +12,31 @@ import { fitPills } from './fitPills';
 import * as Icon from './icons';
 import { activeFilterText, clearFilters, type ActiveFilter } from './activeFilters';
 
-/** The row's gap, in px: `gap-2`. Read by `fitPills`. */
 const GAP_PX = 8;
 
-// A selected chip's look (an "on" filter), hovered part by part rather than whole.
 const pillFrameClassName = cx(
   'inline-flex overflow-hidden rounded-xs border text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase',
   toggleChipStateClassName(true, { hoverable: false }),
   controlHeightClassName.sm
 );
-/**
- * A filter pill: its text part and its × stretch to the full height. It can
- * shrink (the first pill, kept on a line too narrow for it, truncates).
- */
 const pillClassName = cx(pillFrameClassName, 'min-w-0 shrink items-stretch');
-/** The "+N" pill: one centred part. */
 const morePillClassName = cx(pillFrameClassName, 'shrink-0 items-center');
-/**
- * A pill's text, capped so one long filter ("Contract type: Item Exchange")
- * still fits a phone's line with Clear all, rather than folding the whole
- * line into "+N". The full text stays in the pill's accessible name.
- */
 const pillTextClassName = 'block max-w-[10rem] min-w-0 truncate md:max-w-[18rem]';
 const pillPartClassName = cx(
-  // `uppercase` again: Tailwind's preflight resets a button's text-transform,
-  // and the measured copy (plain spans) must be the same width as the pill.
   'inline-flex items-center uppercase hover:bg-accent/22 active:bg-accent/28',
   focusRingClassName,
-  // Inset, so the ring is not clipped by the pill's own rounded overflow.
   'focus-visible:outline-offset-[-2px]'
 );
 
 interface ActiveFilterRowProps<T> {
   active: readonly ActiveFilter<T>[];
-  /** What Clear all clears, when more than the pills shown (inline filters). Defaults to `active`. */
   clearable?: readonly ActiveFilter<T>[];
   value: T;
   onChange: (next: T) => void;
-  /** Open the filter controls, focusing the one captioned `label`. */
   onOpen: (label: string) => void;
-  /** Called after a remove or Clear all, so focus can go somewhere that still exists. */
   onCleared: () => void;
 }
 
-/**
- * The active filters as one line of pills, never wrapping: what does not fit
- * folds into a "+N" pill that opens the controls, and "Clear all" always ends
- * the line. Widths come from an invisible copy of every pill, so the line can
- * grow back as well as shrink when the panel widens.
- */
 export function ActiveFilterRow<T>({
   active,
   clearable = active,
@@ -110,8 +86,6 @@ export function ActiveFilterRow<T>({
 
   return (
     <div className="relative">
-      {/* Every pill, laid out but never seen, for `fitPills` to measure. The
-          clipping wrapper keeps its full width from widening the page. */}
       <div aria-hidden className="invisible absolute top-0 left-0 h-0 w-0 overflow-hidden">
         <div ref={measureRef} className="flex w-max gap-2">
           {texts.map((text) => (

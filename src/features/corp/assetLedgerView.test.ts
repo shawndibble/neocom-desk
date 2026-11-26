@@ -156,7 +156,6 @@ describe('buildLocationRows', () => {
       { prices: new Map([[34, 10]]) }
     );
     const rows = buildLocationRows(filtered, { ...base, tab: 'all' });
-    // The office has no matching stack, so it lists nothing; it is not flagged empty.
     expect(rows.some((r) => r.groupKey === 'office:500')).toBe(false);
     expect(rows.find((r) => r.groupKey === 'office:600')?.groupEmpty).toBe(true);
     expect(

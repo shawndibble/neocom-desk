@@ -1,9 +1,3 @@
-/**
- * The proposed Compare drawer with a third view, Trade hubs (issue #4696).
- * The drawer chrome repeats today's `CompareDrawer` markup (header, segmented
- * view switch, Expand / Clear all / close) so the picture matches what ships;
- * only the Trade hubs table and its cell are new.
- */
 import { Link } from 'react-router-dom';
 import {
   Button,
@@ -36,12 +30,10 @@ import {
 
 type HubId = ComparedHubId;
 
-/** The pilot's saved Market hub, marked in its column header. */
 const OWN_HUB: HubId = 'jita';
 
 interface HubRow extends SampleCompareItem {
   quotes: Readonly<Record<HubId, HubQuote>>;
-  /** Hub with the row's cheapest sell / highest buy (none if only one hub quotes). */
   bestSellHub: HubId | null;
   bestBuyHub: HubId | null;
 }
@@ -66,17 +58,12 @@ function bestHub(
   return best;
 }
 
-/**
- * Short enough to be the phone card's gutter label too: "Amarr · 12j". The
- * own hub is named in the drawer's subtitle and its header is accent.
- */
 function hubHeader(hub: ComparedHub): string {
   return `${hub.systemName} · ${HUB_JUMPS[hub.id]}j`;
 }
 
 const OWN_HUB_NAME = COMPARED_HUBS.find((hub) => hub.id === OWN_HUB)!.systemName;
 
-/** A best figure carries the word, not just the colour (DESIGN.md "New since last time" rule). */
 function BestTag({ children }: { children: string }) {
   return (
     <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
@@ -85,11 +72,6 @@ function BestTag({ children }: { children: string }) {
   );
 }
 
-/**
- * One hub's quote for one item: best sell as the cell's one link (a figure
- * link, DESIGN.md §6c "Item names": accent, solid underline, into the Market
- * browser at that hub), best buy dim beneath it.
- */
 function TradeHubCell({ row, hub, loading }: { row: HubRow; hub: ComparedHub; loading: boolean }) {
   if (loading) return <span className="text-text-dim">…</span>;
   const quote = row.quotes[hub.id];
@@ -171,18 +153,12 @@ export function TradeHubsTable({
         rows={rows}
         rowKey={(row) => row.typeId}
         label="Compare at trade hubs"
-        // A compare table at every width, as Prices: on a phone it scrolls
-        // sideways with the item column pinned.
         responsive="table"
       />
     </NewComponent>
   );
 }
 
-/**
- * Today's drawer chrome, open on the proposed third view. `fullScreen` is the
- * phone sheet, as today below `md`.
- */
 export function ProposedCompareDrawer({
   items,
   loadingHubs,
@@ -192,7 +168,6 @@ export function ProposedCompareDrawer({
   items: readonly SampleCompareItem[];
   loadingHubs?: readonly HubId[];
   fullScreen?: boolean;
-  /** An annotation for an open question, shown above the table. */
   note?: string;
 }) {
   const count = `Compare (${items.length})`;
@@ -220,7 +195,6 @@ export function ProposedCompareDrawer({
               label="Compare view"
               options={[
                 { value: 'prices', label: 'Prices' },
-                // "Trade hubs" pushes Attributes off a 390px header: the phone says "Hubs".
                 { value: 'hubs', label: fullScreen ? 'Hubs' : 'Trade hubs' },
                 { value: 'attributes', label: 'Attributes' },
               ]}

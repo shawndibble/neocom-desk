@@ -4,23 +4,10 @@ import { describe, it, expect } from 'vitest';
 import en from '@/i18n/locales/en.json';
 import type { PiData } from './types';
 
-/**
- * public/data/pi.json is emitted by scripts/build-sde.mjs, so nothing the
- * compiler sees ever checks it against `PiData`. These assertions pin the
- * declared contract onto the payload actually committed — a regenerate that
- * drops a volume or a planet-type list fails here rather than in the UI.
- */
 const pi = JSON.parse(
   readFileSync(join(__dirname, '..', '..', 'public', 'data', 'pi.json'), 'utf8')
 ) as PiData;
 
-/**
- * The eight values ESI returns for `CharacterPlanet.planet_type` (declared as
- * `PlanetType` in src/esi/endpoints/, field verified against
- * https://esi.evetech.net/meta/openapi.json). A P0's `planetTypes` entries are
- * drawn from this set so a character's colony matches the table directly, with
- * no translation layer.
- */
 const ESI_PLANET_TYPES = [
   'barren',
   'gas',
@@ -51,11 +38,7 @@ describe('public/data/pi.json', () => {
   });
 
   it('names only ESI planet types, and only ones the UI can label', () => {
-    // Same keys the route renders through `pi.planetType.*`, so every value in
-    // the payload has a label and the i18n bundle carries no orphan key.
     expect(Object.keys(en.pi.planetType).sort()).toEqual([...ESI_PLANET_TYPES]);
-    // All eight are reachable: every planet type in New Eden yields at least
-    // one P0, so a missing or misspelled one shows up as a set mismatch.
     const used = [...new Set(pi.raw.flatMap((entry) => entry.planetTypes))].sort();
     expect(used).toEqual([...ESI_PLANET_TYPES]);
   });

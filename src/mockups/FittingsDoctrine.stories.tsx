@@ -11,22 +11,6 @@ import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
 import type { FittingLibrarySource } from '@/features/fittings/useFittingPicker';
 import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
 
-/**
- * #6202: a corp member's Fittings library lists the corp's SRP Doctrine Fits beside their own
- * Saved Fittings, each tagged Doctrine and grouped under its hull. Picking one previews it for the
- * viewer's own skills; Open, Compare and Save a copy work as for a Community's Fitting.
- *
- * "Thorax - brawl" was saved after this change, so it keeps its charges and drones. "Rifter -
- * tackle" was saved before, so it holds only its modules and rigs and its preview carries the
- * re-save note.
- *
- * #6217: with rows from more than one source, a Source select beside the search narrows the list
- * to one of them (`?source=`), on the search's line down to a phone.
- *
- * The real `FittingStartScreen`, with the Doctrine list answered by the backend stand-in. No new
- * components. Sample data.
- */
-
 const mod = (
   slot: FittingModule['slot'],
   slotIndex: number,
@@ -92,7 +76,6 @@ async function doctrineFits(): Promise<MemberDoctrineFit[]> {
     {
       id: 'rifter',
       name: 'Rifter - tackle',
-      // saved before Doctrine Fits kept the whole fit: modules and rigs only
       snapshot: {
         hullTypeId: 587,
         name: 'Rifter - tackle',
@@ -104,7 +87,6 @@ async function doctrineFits(): Promise<MemberDoctrineFit[]> {
 }
 
 const seed = async () => {
-  // the app learns the corporation from the public-info read; the list keys on it
   await db.characters.update(SAMPLE_ACTIVE_CHARACTER.characterId, {
     corporationId: SAMPLE_ACTIVE_CHARACTER.corporationId,
   });
@@ -127,7 +109,6 @@ const workspace: FittingLibrarySource = {
   openSaved: () => {},
 };
 
-/** Sets the Doctrine stand-in before the screen mounts, and clears it after. */
 function WithDoctrines({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -172,31 +153,25 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Focus previews a row, as a hover does. */
 const preview =
   (name: RegExp): Story['play'] =>
   async ({ canvasElement }) => {
     (await within(canvasElement).findByRole('button', { name }, { timeout: 10_000 })).focus();
   };
 
-/** @summary The Start list with the corp's Doctrine Fits (Doctrine tag) beside a Saved Fitting; the whole-fit Thorax previewed. */
 export const DoctrineRows: Story = { play: preview(/^Thorax - brawl/) };
 
-/** @summary A Doctrine Fit saved before the change: previewed with modules and rigs only, plus the re-save note. */
 export const OlderDoctrineFit: Story = { play: preview(/^Rifter - tackle/) };
 
-/** @summary The phone list: no preview pane, so the older fit's row carries the re-save note. */
 export const DoctrineRowsPhone: Story = {
   globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
-/** @summary #6217: the Source filter set to Doctrine, beside the search: the Saved Fitting is hidden. */
 export const SourceDoctrine: Story = {
   parameters: { shell: { path: '/fittings?source=doctrine', seed } },
   play: preview(/^Thorax - brawl/),
 };
 
-/** @summary #6217 on a phone: the Source select stays on the search's line. */
 export const SourceDoctrinePhone: Story = {
   parameters: { shell: { path: '/fittings?source=doctrine', seed } },
   globals: { viewport: { value: 'mobile1', isRotated: false } },

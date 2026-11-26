@@ -9,7 +9,6 @@ import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingHeader } from './FittingHeader';
 
 vi.mock('./fittingStatsText', () => ({ fittingStatsText: () => 'STATS TEXT' }));
-// The Mastery sheet loads SDE data and a plan editor; the header only needs to know it exists.
 vi.mock('./MasteryChip', () => ({
   MasteryChip: ({
     presentation,
@@ -55,7 +54,6 @@ describe('FittingHeader on desktop', () => {
     renderHeader({ onCompare });
     expect(screen.getByRole('button', { name: 'Alpha OK' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Mastery' })).toBeTruthy();
-    // Not loose buttons any more.
     expect(screen.queryByRole('button', { name: 'Compare' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy stats' })).toBeNull();
 
@@ -105,7 +103,6 @@ describe('FittingHeader on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Fitting actions' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Copy stats' }));
     expect(written).toEqual(['STATS TEXT']);
-    // Waited on the count: `findAllByText` settles on the first match, before the second renders.
     await waitFor(() => expect(screen.getAllByText('Stats copied')).toHaveLength(2));
   });
 
@@ -126,7 +123,6 @@ describe('FittingHeader below desktop', () => {
     await user.click(trigger());
     await user.click(await screen.findByRole('menuitem', { name: 'Improve Fit' }));
     expect(onImprove).toHaveBeenCalledOnce();
-    // The button holds focus as Improve's column renders, so the column can give it back on close.
     await waitFor(() => expect(document.activeElement).toBe(trigger()));
   });
 

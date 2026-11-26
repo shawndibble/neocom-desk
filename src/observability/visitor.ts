@@ -1,28 +1,10 @@
 import { SIGNED_IN_SHELL_HINT_KEY } from '@/app/signedInShellHint';
 import { DAY_MS } from '@/lib/age';
 
-/**
- * Whether this browser has opened the app before, for Sentry tags — so a
- * flagged trace (an "N+1 API Call" fan-out on an empty cache, say) can be read
- * as a first visit or a returning one.
- *
- * Device-local and anonymous: a timestamp in localStorage, never a Character
- * or account. Reported only as a coarse age bucket.
- */
 export const FIRST_SEEN_KEY = 'neocom:first-seen';
 
-/**
- * Set in sessionStorage alongside a fresh stamp, so the rest of that first
- * session still reads `new` — the EVE SSO round trip lands back on `/callback`
- * as a second page load, and that is exactly the load a first sign-in fans
- * out from. sessionStorage survives same-tab navigation and ends with the tab.
- */
 export const FIRST_SESSION_KEY = 'neocom:first-session';
 
-/**
- * Prefix for a stamp written on a browser that was already signed in when the
- * stamp shipped: its real first visit is unknown, and must stay so.
- */
 const LEGACY_PREFIX = 'legacy:';
 
 export interface VisitorTags {
@@ -30,13 +12,6 @@ export interface VisitorTags {
   'visitor.age_days': '0' | '1-7' | '8-30' | '30+' | 'unknown';
 }
 
-/**
- * Reads (and on a first visit, writes) the stamp. Never throws: the stores are
- * getters because merely touching web storage throws where it is blocked.
- *
- * An existing user who is signed out when this first runs has no Character
- * hint to go on, and is counted `new`.
- */
 export function visitorTags(
   local: () => Storage,
   session: () => Storage,
@@ -80,7 +55,5 @@ function inFirstSession(session: () => Storage): boolean {
 function markFirstSession(session: () => Storage): void {
   try {
     session().setItem(FIRST_SESSION_KEY, '1');
-  } catch {
-    // Blocked: later loads in this session read `returning`, age `0`.
-  }
+  } catch {}
 }

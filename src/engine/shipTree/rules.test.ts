@@ -56,7 +56,6 @@ describe('classUnlocked', () => {
 
 describe('classNeedsOmega', () => {
   it('is true when any prereq, displayed or not, is above its Alpha cap', () => {
-    // Caldari Frigate caps at IV for Alphas; the hidden Interceptors skill is Omega-only.
     const cap = (id: number) => (id === 1 ? 4 : id === 3 ? 0 : 0);
     expect(classNeedsOmega(INTERCEPTOR, CALDARI, cap)).toBe(true);
     const lenient = (id: number) => (id === 1 ? 5 : id === 3 ? 1 : 0);
@@ -87,7 +86,6 @@ describe('parentEmpires', () => {
         { skillTypeID: 2, level: 3, display: false },
       ],
     });
-    // Only Caldari is displayed — one empire is not a pair.
     expect(parentEmpires(g, GURISTAS, skillName)).toEqual([]);
   });
 

@@ -5,14 +5,12 @@ import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { buildHullCatalog, type HullCatalog } from './hullCatalog';
 
 export interface HullCatalogState {
-  /** Null while the SDE loads. */
   catalog: HullCatalog | null;
   className: (classId: number) => string;
 }
 
 let memo: { types: unknown; categories: unknown; catalog: HullCatalog } | null = null;
 
-/** Built once per loaded SDE (it walks every type); a remount reuses it. */
 function catalogFor(
   types: Awaited<ReturnType<typeof loadTypes>>,
   categories: Awaited<ReturnType<typeof loadGroupCategories>>
@@ -23,10 +21,6 @@ function catalogFor(
   return memo.catalog;
 }
 
-/**
- * Hulls and classes from the shipped SDE, class names from ESI's group names (cached for good,
- * `loadGroupNames`). A class whose name is unknown reads "Class <id>" rather than vanishing.
- */
 export function useHullCatalog(): HullCatalogState {
   const { t } = useTranslation();
   const [catalog, setCatalog] = useState<HullCatalog | null>(null);

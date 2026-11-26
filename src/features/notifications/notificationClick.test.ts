@@ -106,9 +106,6 @@ describe('urlFromNotificationData', () => {
     expect(urlFromNotificationData({ url: '/wallet' })).toBe('/wallet');
   });
 
-  // Against the constant, not a literal: the fallback moved from the dashboard
-  // to the Alerts page once the feed had a page of its own, and a test that
-  // re-typed the path only asserted that someone had edited it twice.
   it('falls back for a notification fired before data carried a url', () => {
     expect(urlFromNotificationData(undefined)).toBe(NOTIFICATION_FALLBACK_ROUTE);
     expect(urlFromNotificationData(null)).toBe(NOTIFICATION_FALLBACK_ROUTE);

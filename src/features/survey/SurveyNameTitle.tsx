@@ -1,10 +1,3 @@
-/**
- * The Survey card's title on the Mining › Survey tab: the pilot's own name for
- * the Survey, or "Mining Survey" while it has none. A Survey in the pilot's
- * recents can be renamed in place (a faint pencil after the title, the whole
- * title the tap target); one that isn't shows the plain title. The name lives
- * in the pilot's recents (`surveyHistory`), never on the Survey.
- */
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';

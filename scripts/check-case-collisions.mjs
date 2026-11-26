@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Fail when two tracked paths, or two same-folder names ignoring extension,
-// differ only in letter case (#3890, #4579).
-// Usage: node scripts/check-case-collisions.mjs
 import { execFileSync } from 'node:child_process';
 import { findCaseCollisions } from './lib/caseCollisions.mjs';
 

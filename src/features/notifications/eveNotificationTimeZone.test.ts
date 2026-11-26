@@ -6,18 +6,12 @@ import { parseEveNotificationPayload, reinforcementExitMs } from '@/engine/eveNo
 import { formatLocalDateTime } from '@/lib/localDate';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 
-/**
- * Issue #4731: a notification's times follow the Time format setting. Every
- * instant here sits at 23:30Z, so a pilot on a zone ahead of UTC sees the next
- * day and the two clocks disagree on the date as well as the hour.
- */
 const originalTz = process.env.TZ;
 afterAll(() => {
   if (originalTz === undefined) delete process.env.TZ;
   else process.env.TZ = originalTz;
 });
 
-// 2026-06-14T23:30:00Z as EVE ticks.
 const TICKS_2330Z = '134259534000000000';
 const CHARACTER = { name: 'Test Pilot' };
 
@@ -90,7 +84,6 @@ describe('EVE Notification times follow the Time format', () => {
     const local = renderEveNotification(t, f, CHARACTER).body;
     const eve = renderEveNotification(t, f, CHARACTER, {}, 'UTC').body;
     expect(eve).not.toBe(local);
-    // The exact UTC rendering of the instant the engine computes, not just its shape.
     const exitMs = reinforcementExitMs(f.timestamp, parseEveNotificationPayload(f.text));
     expect(exitMs).toBeDefined();
     expect(eve).toContain(formatLocalDateTime(new Date(exitMs!), 'UTC'));

@@ -1,18 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * Every NPC Trade Hub's broker-fee standings for one character, resolved
- * once per character (issue #1238) rather than per call site: every page
- * that prices against a configurable Trade Hub (`src/market/hubs.ts`) reads
- * `plan.hubId`/the Market Hub setting and needs the matching
- * `ResolvedStandings`, and there are only 5 hubs — resolving all of them
- * up front means every caller can do a plain map lookup instead of its own
- * fetch effect.
- *
- * Left stale while a new character's fetch is in flight, same as
- * `useIndustryWorkspace`'s own `skills`/`implantBonusPct` state — a brief
- * previous-character reading during the fetch is the same trade that state
- * already makes, not a new one.
- */
 import { useCallback } from 'react';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { resolveLocationStandings } from './locationStandings';
@@ -26,7 +12,6 @@ export type TradeHubStandingsMap = ReadonlyMap<TradeHub['id'], ResolvedStandings
 
 const NO_STANDINGS: TradeHubStandingsMap = new Map();
 
-/** The standings at a hub's station, plus the hub's own Safety Tax so fee sites need no hub lookup. */
 async function resolveHubStandings(
   hub: TradeHub,
   entries: Parameters<typeof resolveLocationStandings>[1]
@@ -35,14 +20,8 @@ async function resolveHubStandings(
   return withHubFeeModifiers(hub, standing);
 }
 
-/**
- * A standing plus the hub's own fee modifiers (Safety Tax, temporary fee discount)
- * so fee sites need no hub lookup. The discount is read at resolve time, which
- * is when the page loads: it lapses on the next load after its end date.
- */
 function withHubFeeModifiers(hub: TradeHub, standing: ResolvedStandings): ResolvedStandings {
   const feeDiscountFactor = hubFeeDiscountFactor(hub, Date.now());
-  // Unchanged when no modifier applies, so a hub without one keeps the shared `ZERO_STANDINGS` reference.
   if (hub.safetyTaxPct <= 0 && feeDiscountFactor === 1) return standing;
   return {
     ...standing,
@@ -59,26 +38,12 @@ async function loadTradeHubStandings(characterId: number): Promise<TradeHubStand
   return new Map(resolved);
 }
 
-/** Starts from the last load for this Character (`useWarmLoad`), so opening a page doesn't re-price on arrival. */
 export function useTradeHubStandings(characterId: number | null): TradeHubStandingsMap {
   return useWarmLoad('tradeHubStandings', characterId, loadTradeHubStandings, NO_STANDINGS);
 }
 
 const NO_STANDINGS_BY_CHARACTER: ReadonlyMap<number, TradeHubStandingsMap> = new Map();
 
-/**
- * Every given Character's `TradeHubStandingsMap`, fanned out and cached — for
- * Build Opportunities (issue #2055), which prices candidates owned by however
- * many Characters the pilot's filter resolves to, each against its own owning
- * Character's real standings rather than one active Character's. A Character
- * absent from the result had no resolved standings yet; callers should read
- * that the same way `tradeHubStanding` reads a missing hub — as zero, via
- * `tradeHubStanding(standingsByCharacter.get(characterId) ?? new Map(), hubId)`.
- *
- * Mirrors `useAccountSkillLevels`'s value-stable-key shape: `key` is the id
- * set's real identity (order-independent), so an upstream caller that rebuilds
- * its id array on every render does not restart this fan-out.
- */
 export function useTradeHubStandingsByCharacter(
   characterIds: readonly number[]
 ): ReadonlyMap<number, TradeHubStandingsMap> {
@@ -100,12 +65,10 @@ export function useTradeHubStandingsByCharacter(
 
 const zeroStandingsCache = new Map<TradeHub['id'], ResolvedStandings>();
 
-/** No standing at a hub, but still the hub's own Safety Tax and fee discount: they are the market's, not the pilot's. */
 export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
   const hub = getTradeHub(hubId);
   if (!hub) return ZERO_STANDINGS;
   const resolved = withHubFeeModifiers(hub, ZERO_STANDINGS);
-  // A stable reference per distinct result: callers key memos on the standing, and this runs per render.
   const cached = zeroStandingsCache.get(hubId);
   if (
     cached &&
@@ -118,7 +81,6 @@ export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
   return resolved;
 }
 
-/** `standings.get(hubId)`, defaulting to zero for a hub not yet resolved. */
 export function tradeHubStanding(
   standings: TradeHubStandingsMap,
   hubId: TradeHub['id']

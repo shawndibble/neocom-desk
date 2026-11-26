@@ -1,5 +1,3 @@
-// Collector books: removing a moon owner against the Firestore emulator (issue #4520).
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -83,10 +81,6 @@ const syncDeps = (): CorpSyncDeps => ({
   },
   log: () => undefined,
 });
-/**
- * Deps whose last ledger read (before the grant goes) runs `during` once: a cancel and a fresh
- * start landing between the removal being read and it being ended.
- */
 const raceDeps = (during: () => Promise<void>): CorpSyncDeps => {
   let ran = false;
   return {
@@ -144,7 +138,6 @@ async function reason(promise: Promise<unknown>): Promise<string> {
   throw new Error('expected the call to fail');
 }
 
-/** The moon owner's side sets its payee here: its Director, live role check. */
 const ownerDeps = (): CorpSyncDeps => ({
   ...syncDeps(),
   verify: deps().verifyToken,
@@ -157,7 +150,6 @@ const setPayee = (payee: { kind: 'character' | 'corporation'; id: number }) =>
     { corporationId: FEEDER, accessToken: tok(FEEDER_DIRECTOR), payee },
     async (id) => (id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character')
   );
-/** A real change of payee: away and back, so the stamp moves even for the same final payee. */
 const changePayeeTo = async (payee: { kind: 'character' | 'corporation'; id: number }) => {
   await setPayee({ kind: 'character', id: STRANGER });
   await setPayee(payee);
@@ -191,7 +183,6 @@ emulatorSuite('removing a moon owner', () => {
     });
     await setPayee({ kind: 'character', id: PAYEE });
     now = T0 + 100 * H;
-    // The officers who have visited lately have access records; only those are mailed.
     await verifyOfficer(deps(), who(CEO), call(CEO));
     await verifyOfficer(deps(), who(OTHER_ACCOUNTANT), call(OTHER_ACCOUNTANT));
   });
@@ -204,12 +195,10 @@ emulatorSuite('removing a moon owner', () => {
     expect(rec?.status).toBe('pending-removal');
     expect(rec?.removal).toMatchObject({ startedAt: now, startedBy: ACCOUNTANT });
     expect(rec?.removal?.effectiveAt).toBeUndefined();
-    // The book's other officers, the moon owner's CEO and its payee; not the starter.
     expect([...result.recipients].sort()).toEqual(
       [CEO, OTHER_ACCOUNTANT, FEEDER_CEO, PAYEE].sort()
     );
     expect(result.recipients).not.toContain(ACCOUNTANT);
-    // The moon owner side comes first; only a copy to it starts the clock (#4617).
     expect([...result.ownerRecipients].sort()).toEqual([FEEDER_CEO, PAYEE].sort());
     expect(result.recipients.slice(0, 2).sort()).toEqual([FEEDER_CEO, PAYEE].sort());
     const links = await db.collection('corpTaxBookRemovalLinks').get();
@@ -230,7 +219,6 @@ emulatorSuite('removing a moon owner', () => {
     now += 3 * H;
     const sent = await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
     expect(sent.effectiveAt).toBe(now + 24 * H);
-    // A second notice changes nothing.
     now += H;
     const again = await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
     expect(again.effectiveAt).toBe(sent.effectiveAt);
@@ -297,14 +285,12 @@ emulatorSuite('removing a moon owner', () => {
       );
       expect([...first.ownerRecipients].sort()).toEqual([FEEDER_CEO, PAYEE].sort());
       expect(await claim(OTHER_ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
-      // A new spell (reconnected, then refused again) mails again.
       await goStale(T0 + 90 * H);
       expect((await claim(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
     });
 
     it('lets another officer claim it when the claimer never sent it', async () => {
       await goStale(T0 + 50 * H);
-      // An older client, which never marks it sent, keeps its claim final.
       expect((await claim(ACCOUNTANT)).recipients.length).toBeGreaterThan(0);
       now += STALE_MAIL_CLAIM_MS;
       expect(await claim(OTHER_ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
@@ -314,7 +300,6 @@ emulatorSuite('removing a moon owner', () => {
       expect(await claimMarking(OTHER_ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
       now += 1;
       expect((await claimMarking(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
-      // This one went out: no third officer mails the spell again.
       await markFeederStaleMailSent(deps(), who(OTHER_ACCOUNTANT), {
         ...target(OTHER_ACCOUNTANT),
         staleSince: T0 + 60 * H,
@@ -390,7 +375,6 @@ emulatorSuite('removing a moon owner', () => {
     });
 
     it('answers a guarded payee exactly as it answers an expired link', async () => {
-      // Payee changed 47h before the start: the guard blocks it.
       now = T0 + 200 * H;
       await changePayeeTo({ kind: 'character', id: PAYEE });
       now += 47 * H;
@@ -400,13 +384,11 @@ emulatorSuite('removing a moon owner', () => {
       const blockedForce = await force(guarded.code);
       expect(blockedForce.ended).toBe(false);
       expect((await record())?.status).toBe('pending-removal');
-      // Expire the same link: the response has the same shape and contents.
       now += 500 * H;
       const expired = await getRemovalLink(deps(), who(PAYEE), { code: guarded.code });
       expect(Object.keys(blocked).sort()).toEqual(Object.keys(expired).sort());
       expect(blocked).toEqual(expired);
       expect({ ...blockedForce }).toEqual(await force(guarded.code));
-      // No time at all: a guarded link's would lie ahead, an expired one's behind (S4).
       expect(blocked).toEqual({ available: false });
       expect(blockedForce).toEqual({ ended: false });
     });
@@ -422,7 +404,6 @@ emulatorSuite('removing a moon owner', () => {
 
     it('never lets a payee the accounting side named end it, however long ago', async () => {
       now = T0 + 200 * H;
-      // Away and back, both from the accounting side, so the payee really changes.
       for (const id of [STRANGER, PAYEE]) {
         await setBookFeederPayee(
           deps(),
@@ -463,7 +444,6 @@ emulatorSuite('removing a moon owner', () => {
       const { code } = await start();
       now += 40 * H;
       const { effectiveAt } = await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
-      // Past the old 48 hours from the start, still before it takes effect.
       now = effectiveAt! - H;
       expect(await getRemovalLink(deps(), who(PAYEE), { code })).toMatchObject({ available: true });
       expect((await force(code)).ended).toBe(true);
@@ -522,7 +502,6 @@ emulatorSuite('removing a moon owner', () => {
     expect((await record())?.payeeChangedAt).toBe(first);
     await setPayee({ kind: 'corporation', id: PAYEE_CORP });
     expect((await record())?.payeeChangedAt).toBe(now);
-    // Who was paid when, for matching a donation to the payee in force on its date (#4617).
     const history = ((await record()) as { payeeHistory?: unknown } | undefined)?.payeeHistory;
     expect(history).toEqual([
       { payee: { kind: 'character', id: PAYEE }, from: first },

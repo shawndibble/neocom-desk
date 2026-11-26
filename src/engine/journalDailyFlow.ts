@@ -4,18 +4,14 @@ import { parseInstant } from './esiInstant';
 import { DAY_MS } from '@/lib/age';
 import { shiftUtcDate } from './localDay';
 
-/** One EVE (UTC) day of the Journal: ISK in and out, both as non-negative sums. */
 export interface JournalDayFlow {
-  /** `YYYY-MM-DD`, the UTC day. */
   day: string;
   in: number;
   out: number;
   net: number;
 }
 
-/** Days drawn when the Journal has no date range. */
 export const FLOW_DEFAULT_DAYS = 30;
-/** Most days drawn: past this the bars shrink below a pixel. */
 export const FLOW_MAX_DAYS = 92;
 
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
@@ -23,15 +19,9 @@ const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
 export interface JournalFlowWindow {
   from: string;
   to: string;
-  /** The filter's range was longer than `FLOW_MAX_DAYS`, so only its last days are drawn. */
   truncated: boolean;
 }
 
-/**
- * The days the chart draws. Axis bounds come from the date filter, not from the
- * rows, so empty edge days still show. A one-day filter keeps the default
- * window (shifted only to include that day) so the bars don't collapse to one.
- */
 export function journalFlowWindow(
   startDate: string | null,
   endDate: string | null,
@@ -53,12 +43,6 @@ export function journalFlowWindow(
   return from < floor ? { from: floor, to, truncated: true } : { from, to, truncated: false };
 }
 
-/**
- * Daily In / Out for the "Where the ISK went" chart (#3914). Same rules as the
- * panel's totals: own-Character transfers are left out and a missing `amount`
- * counts as zero. Every day of `window` gets a row (zeros when empty) so the
- * bars sit on an even time axis; without a window, the first to last line's day.
- */
 export function journalDailyFlow(
   rows: readonly JournalRow[],
   window?: { from: string; to: string }

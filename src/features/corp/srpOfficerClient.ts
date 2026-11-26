@@ -1,11 +1,3 @@
-/**
- * The SRP officer queue's backend as the client sees it (ADR 0026).
- * Reads go straight to Firestore under the rules (`verifySrpOfficer` first, which records the
- * 24-hour officer access); every change is a callable that re-checks the Character's roles live,
- * guards the state change in a transaction and audits it. Only a short-lived access token is
- * sent. Refusals carry a `details.reason`: claim-not-found, illegal-transition, reason-required,
- * amount-required, amount-unchanged, amount-changed (the amount moved since the officer looked), not-an-officer, wrong-corp, role-required.
- */
 import type { CallableAction } from '../../../functions/src/callableManifest';
 import {
   collection,
@@ -37,12 +29,10 @@ import { callSignedIn } from '@/sync/signedInCallable';
 const corpDoc = (characterId: number, corporationId: number, name: string) =>
   collection(getSyncFirestore(characterId), 'corps', String(corporationId), name);
 
-/** Most documents an export or audit read takes; far past what a corporation files inside retention. */
 export const SRP_READ_CAP = 2000;
 
 const isOpen = (c: SrpClaim) => c.state === 'pending' || c.state === 'approved';
 
-/** A refusal that says the remembered officer verdict or the view it came from may be stale. */
 const DOUBTED_REASONS: ReadonlySet<string> = new Set([
   'amount-changed',
   'permission-denied',
@@ -75,7 +65,6 @@ async function officerCall<Out>(
   }
 }
 
-/** A bounded read of `srpClaims` under the rules. */
 async function claimsRead(
   characterId: number,
   corporationId: number,
@@ -94,7 +83,6 @@ const auditEntries = (snap: QuerySnapshot) =>
 const real = {
   openClaims: (characterId: number, corporationId: number) =>
     claimsRead(characterId, corporationId, where('state', 'in', ['pending', 'approved'])),
-  // `closedAt` exists only on closed claims, so ordering by it leaves the open ones out.
   history: (characterId: number, corporationId: number, count = 100) =>
     claimsRead(characterId, corporationId, orderBy('closedAt', 'desc'), limitTo(count)),
   allClaims: (characterId: number, corporationId: number) =>
@@ -169,7 +157,6 @@ const real = {
 
 type SrpOfficerBackend = typeof real;
 
-/** A story's in-memory stand-in, as the same backend: the queries' filtering and ordering live here. */
 const fromStandIn = (s: SrpOfficerBackendOverride): SrpOfficerBackend => ({
   openClaims: async () => s.claims().filter(isOpen),
   history: async (_character, _corp, count = 100) =>
@@ -198,37 +185,26 @@ const backend = (): SrpOfficerBackend => {
 
 const op = delegate(backend);
 
-/** The Pending and Approved claims: what an officer works. A bounded, single-field query. */
 export const readSrpClaims = op('openClaims');
 
-/** The newest closed (Paid or Rejected) claims, newest first; retention bounds the rest. */
 export const readSrpHistory = op('history');
 
-/** The newest entries of the corporation's audit log, newest first; `count` null reads up to `SRP_READ_CAP`. */
 export const readSrpActivity = op('activity');
 
-/** Every claim, any state, up to `SRP_READ_CAP`. Retention bounds the closed ones. */
 export const readAllSrpClaims = op('allClaims');
 
-/** Every audit entry about one claim, oldest first. */
 export const readSrpClaimAudit = op('claimAudit');
 
-/** The lost ship's Jita value against the nearest Doctrine Fit's (no cargo), for the claim detail. */
 export const getSrpClaimValues = op('claimValues');
 
-/** Pending to Approved. A typed or differing `amount` is recorded; a differing one needs a `reason`. */
 export const approveSrpClaim = op('approve');
 
-/** Approve many at once; each claim gets its own result. */
 export const approveSrpClaims = op('approveMany');
 
-/** Pending to Rejected; the reason is required and is what the pilot is told. */
 export const rejectSrpClaim = op('reject');
 
-/** A pending claim's amount, with the reason it was changed; the claim stays pending. */
 export const changeSrpClaimAmount = op('change');
 
-/** Approved to Paid: the officer paid in game; the app moves no ISK. `expectedAmount` guards a stale view. */
 export const markSrpClaimPaid = op('markPaid');
 
 export const markSrpClaimsPaid = op('markPaidMany');

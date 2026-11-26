@@ -1,9 +1,3 @@
-/**
- * The Wallet Balance tab body (issue #2935): the net worth chart, its layer
- * legend, and the table beneath it. One Character shows layers stacked; a
- * wider scope shows one line per Character with a "Balance by character" table
- * whose rows drill into that Character.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { lazy, Suspense, useMemo, type ReactNode, type RefObject } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -49,7 +43,6 @@ import { useWalletRange } from './walletRange';
 import { buildTableRows, type NetWorthTableRow } from './tableRows';
 import { useNetWorthData } from './useNetWorthData';
 
-/** Recharts stays out of the initial bundle: it loads when a chart first renders. */
 const LazyNetWorthChart = lazy(() => guarded(() => import('./NetWorthChart')));
 
 export interface NetWorthCharacter {
@@ -58,33 +51,22 @@ export interface NetWorthCharacter {
 }
 
 export interface NetWorthPanelProps {
-  /** `single` = one Character's layers; `multi` = one line per Character. */
   mode: 'single' | 'multi';
-  /** The Characters in scope (one for `single`). */
   characters: readonly NetWorthCharacter[];
-  /** Live wallet balance per Character, where the page has fetched it. */
   liveWallet: ReadonlyMap<number, { balance: number | null; needsReauth: boolean }>;
-  /** The panel is a drill into one Character from the all-Characters view. */
   drilled?: boolean;
   onDrill: (characterId: number) => void;
   onBack: () => void;
-  /** The panel's title, so a drill swap can hand it focus (issue #3393). */
   headingRef?: RefObject<HTMLHeadingElement | null>;
-  /** The drilled panel's "All characters" button. */
   backRef?: RefObject<HTMLButtonElement | null>;
-  /** Extra title-bar actions (the page refresh). */
   actions?: ReactNode;
-  /** Replaces the title when the page already says what this is. */
   title?: string;
-  /** Stats shown beside Net worth in the stat row (the Wallet page's EverMarks). */
   stats?: ReactNode;
-  /** Banners and warnings shown between the stat row and the chart. */
   notices?: ReactNode;
 }
 
 const NO_SERIES: CharacterSeries = { points: [], firstSnapshotDay: null, gapDays: [] };
 const EMPTY_WALLET: ReadonlyMap<string, number> = new Map();
-/** Richest first; the headers stay sortable. */
 const BALANCE_SORT: DataTableSort = { columnId: 'total', direction: 'desc' };
 
 function useHidden() {
@@ -126,7 +108,6 @@ function LayerPicker({
       })}
       options={options}
       selected={selected}
-      // The last series cannot be switched off (`toggleHidden`): an empty chart says nothing.
       onToggle={onToggle}
       searchPlaceholder={t('wallet.netWorth.seriesSearch')}
       noResultsLabel={t('wallet.netWorth.seriesNoResults')}
@@ -162,7 +143,6 @@ export function NetWorthPanel({
   );
   const shown = useMemo(() => {
     const visible = listed.filter((id) => !hiddenLayers.includes(id));
-    // A layer that goes empty can leave only hidden ones listed; an empty chart says nothing.
     return visible.length > 0 ? visible : listed;
   }, [listed, hiddenLayers]);
   const toggleLayer = (id: LayerId) =>
@@ -197,7 +177,6 @@ export function NetWorthPanel({
   );
 
   const coveredIds = useMemo(() => ids.filter((id) => data.covered.has(id)), [ids, data.covered]);
-  // Hidden ids are device-wide, so a filter can leave none visible; show them all then.
   const unhidden = coveredIds.filter((id) => !hiddenCharacters.includes(id));
   const included = mode === 'multi' && unhidden.length > 0 ? unhidden : coveredIds;
   const totals = useMemo(() => {
@@ -219,7 +198,6 @@ export function NetWorthPanel({
   const single = mode === 'single' ? (characters[0] ?? null) : null;
   const singleSeries = single ? (seriesById.get(single.characterId) ?? NO_SERIES) : NO_SERIES;
   const range = useWalletRange((state) => state.value);
-  // Estimates are drawn from the whole series first, so a range edge never changes them.
   const singleRows = useMemo(
     () => lastDays(stackRows(singleSeries, shown), Number(range), guessStackRow),
     [singleSeries, shown, range]
@@ -256,7 +234,6 @@ export function NetWorthPanel({
           const checked = row.covered && !hiddenCharacters.includes(row.characterId);
           const lastOne = checked && included.length === 1;
           return (
-            // A tap here toggles the line; it must not also drill into the row.
             <label
               className={touchCheckboxLabelClassName}
               onClick={(event) => event.stopPropagation()}
@@ -368,8 +345,6 @@ export function NetWorthPanel({
     <Panel
       title={title ?? t('wallet.netWorth.title')}
       headingRef={headingRef}
-      // A drill shows one Character while the page header's picker keeps the
-      // wider pick it was reached from: the title bar names whose it is.
       meta={
         drilled && single ? (
           <CharacterScopeReadout
@@ -444,7 +419,6 @@ export function NetWorthPanel({
         {tableRows.length === 0 ? (
           <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
         ) : (
-          // Scrolls sideways under the pinned Character column instead of widening the page.
           <div className="overflow-x-auto">
             <DataTable
               {...tableExport.tableProps}

@@ -28,7 +28,6 @@ describe('OverviewDemo board', () => {
 
     await user.click(within(menu).getByRole('menuitem', { name: 'Duplicate' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    // Nothing was duplicated, and Rename opens no dialog.
     expect(demo.getAllByRole('region', { name: 'Wallet' })).toHaveLength(1);
     await user.click(demo.getByRole('button', { name: 'Settings for Wallet' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));

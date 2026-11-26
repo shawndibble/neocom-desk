@@ -9,8 +9,6 @@ beforeEach(async () => {
   await db.esiCache.clear();
 });
 
-// The global afterEach in vitest.setup.dom.ts settles the first test's load
-// before the second test's beforeEach clears the cache, so the row can't leak.
 describe('a cache load that outlives its test', () => {
   it('starts a load and ends without awaiting it', () => {
     void loadWithCacheStatus(CHAR_ID, KEY, async () => {

@@ -85,36 +85,19 @@ import { useTaxSelection } from './useTaxSelection';
 import { useTaxTables } from './useTaxTables';
 import { useTaxUrlFilters } from './useTaxUrlFilters';
 
-/** No ledger loaded yet: one empty list, so the dialogs' memos keep their inputs. */
 const NO_ENTRIES: readonly MoonMiningTaxRow[] = [];
 
-/**
- * Moon Mining ledger (issue #523): one continuously-filterable list, all
- * tracked characters by default. The Tax tab of the Mining page (issue #671)
- * — the route shell (`src/routes/MoonMiningTax.tsx`) gates on the active
- * Character before mounting this, so a hydrated store and a non-null
- * `activeCharacterId` are already guaranteed here.
- */
 interface TaxTabProps {
-  /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
-  /** The id base the tab bar was built with, so the body is its tab panel. */
   tabsId: string;
 }
 
-/** Shared, so the hooks below don't see a new empty list on every render. */
 const NO_LINKS: readonly PayeePaymentLink[] = [];
 
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  // The Ore column only where the table has room for it beside a full Payee
-  // name: the Payee is what a row is read by, the ore is one click away in
-  // the entry itself (and at 1024px it pushed Status off-screen, #2147).
   const showOreColumn = useMediaQuery('(min-width: 87.5rem)');
-  // Est. value is out between the phone card and `lg`: there the other
-  // columns' fixed widths would leave the Payee column no room at all. The
-  // card still shows it, and so does every wider screen (and the export).
   const showValueColumn = useMediaQuery('(min-width: 64rem)') || isPhone;
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadTaxSnapshot,
@@ -124,28 +107,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   useRefreshOnOreFormChange(refresh);
 
   const { characterFilter, payeeFilter, setCharacterFilter, setPayeeFilter } = useTaxUrlFilters();
-  // Unconditional, deliberately. Hiding this behind "the pilot has at least
-  // one tag" reads tidier and reintroduces the shape of the bug it exists to
-  // fix: the check can only re-run when `data`'s identity changes, and a
-  // reload that *fails* after a successful tag leaves `data` on the retained
-  // snapshot — so the action would stay hidden while the error branch has
-  // already taken the banner away, stranding the pilot exactly as before. The
-  // dialog says so itself when there is nothing to show.
   const [oreTagsOpen, setOreTagsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // The dialogs' targets live in a store the dialogs host subscribes to, so
-  // opening or closing one re-renders the host and not the tables (`useTaxDialogs`).
   const { store, actions } = useTaxDialogs();
   const acting = useTaxDialogSelector(store, (state) => state.acting);
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
 
-  // Every tracked character, not just those with a Mining Ledger Entry this
-  // refresh (GLOSSARY.md: the point of the feature is not missing an alt's
-  // obligation) — a character with nothing mined yet still needs to appear
-  // in the Characters filter and in Manage Payees.
   const characters = useMemo(() => data?.characters ?? [], [data]);
-  // The Characters the ledger tracks, which can be fewer than the roster: the
-  // picker's faces and "+N" follow them, matching its "· N".
   const characterIds = useMemo(() => characters.map((c) => c.characterId), [characters]);
   const characterNames = useMemo(
     () => new Map(characters.map((c) => [c.characterId, c.characterName])),
@@ -166,7 +134,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemNames,
     systemSecurity,
   } = useTaxCorpBooks(data, characters, activeCharacterId, refresh);
-  // Offered by Manage Payees as the link for a Payee named for one (#6205).
   const bookCorporations = useMemo(
     () =>
       corpView?.books.map((b) => ({
@@ -180,15 +147,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const corpStateHint = useCorpStateHint();
 
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
-  // The ledger as the tab reads it: a paid day its linked ISK does not reach reads owed.
   const { allDisplayRows, personalRows, characterFiltered } = useTaxRows(
     ledger,
     corpView,
     characters,
     resolvedCharacterFilter
   );
-  // A book's figures are its whole account whatever the selector says, but a book none of the
-  // selected Characters is in is not shown, and counts nowhere.
   const bookCredits = useMemo(
     () => bookCreditsOf(corpView, resolvedCharacterFilter),
     [corpView, resolvedCharacterFilter]
@@ -201,7 +165,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     () => bookDaysOf(corpView, resolvedCharacterFilter),
     [corpView, resolvedCharacterFilter]
   );
-  // Read by the Assign dialog when it opens, long after this has hydrated.
   useHydratedStore(useSurveyPayeeId);
   useEntryDeepLink(Boolean(data), allDisplayRows, loading, actions.openDetail);
 
@@ -216,7 +179,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     canManagePayees,
     payeesInline,
   } = useTaxPayeeManager(Boolean(data), characters, activeCharacterId, allPayees, corpView);
-  // Payees from before a Payee had to be someone in EVE: linked where the name is one, once a session.
   const unlinkedPayees = useAutoLinkPayees(allPayees, refresh);
   const datedPrices = data?.datedPrices ?? EMPTY_DATED_PRICES;
   const { pricesFor, priceSourcesFor, estimatedValueOf, systemName, systemSecurityOf } =
@@ -237,14 +199,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [characterFiltered, resolvedPayeeFilter, payeeAliases]
   );
 
-  // The member's own "Not paying": days they hid are not a warning, and are listed on the quiet line.
   const { hidden: notPayingKeys } = useNotPaying();
   const conflicts = useMemo(
     () => summarizeConflicts(characterFiltered, notPayingKeys),
     [characterFiltered, notPayingKeys]
   );
-  // Donations a book hasn't credited, per corporation, from the Characters in view: its Payee card
-  // warns before a second payment, naming the Accounts the book reads (as the attention item does).
   const quietUncredited = useCallback(
     (b: NonNullable<typeof corpView>['books'][number]) => {
       const group = b.summary.uncredited
@@ -264,8 +223,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         corpView?.books.map((b) => [
           b.loaded.corporationId,
           {
-            // Once the member has sent proof (a declaration waits) or chosen not to pay, the
-            // banner is quiet until the corporation answers.
             amount: sum(
               quietUncredited(b)
                 ? []
@@ -284,7 +241,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       ),
     [corpView, resolvedCharacterFilter, t, quietUncredited]
   );
-  // A donation to one of these is the book's money: never a personal Payee's.
   const bookCorporationIds = useMemo(
     () => new Set(corpView?.books.map((b) => b.loaded.corporationId) ?? []),
     [corpView]
@@ -313,7 +269,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     bookDays,
   });
 
-  // A Corp Tax Book row is the corp's to continue, not the member's.
   const continuationRows = useMemo(
     () => characterFiltered.filter((dr) => !isBookRow(dr)),
     [characterFiltered]
@@ -344,10 +299,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     settleUpRowsFor
   );
 
-  // Every suggestion names a personal Payee: a Corp Tax Book credits itself from its wallet.
   const linkable = linkSuggestions;
 
-  // The Resolve dialog (resolving in the app): every problem's ways out, in one place.
   const openBookDay = useCallback(
     (row: BookRowView) => {
       const target = allDisplayRows.find(
@@ -357,7 +310,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     },
     [allDisplayRows, actions]
   );
-  /** What "Let {corp} bill it" would take off the member's own entries for this Conflict day. */
   const takeoverOf = useCallback(
     (row: BookRowView) =>
       planTakeover(
@@ -367,8 +319,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       ),
     [corpView, everyAssignment]
   );
-  // "The book is right": one click takes the contested ore off the member's entry, and an Undo
-  // puts it back. A day with nothing to take off opens instead, since the fix is not ore.
   const fixConflict = useCallback(
     async (row: BookRowView) => {
       const { steps } = takeoverOf(row);
@@ -389,7 +339,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     },
     [takeoverOf, openBookDay, refresh, t]
   );
-  // One Conflict day with ore to take off: the banner fixes it in one click.
   const quickFix = useMemo(() => {
     const first = conflicts?.first.corp;
     if (conflicts?.days !== 1 || first?.kind !== 'row') return undefined;
@@ -408,7 +357,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     onPay: actions.openCorpPay,
     onOpenDay: fixConflict,
   });
-  // What the member has answered: one quiet line, out of the strip, never gone.
   const quiet = useMemo(() => {
     const rows = corpView?.overlay.rows ?? [];
     const waiting = new Set([
@@ -497,7 +445,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     corpStateLabel,
   });
 
-  // The corporations every tracked Character has left; the Pay amount is the card's own balance.
   const leftCorpBooks = useMemo(
     () =>
       leftCorpBooksOf(
@@ -508,7 +455,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [leftCorp, balances]
   );
 
-  /** What a book's rows owe the member right now (its Billed days). */
   const corpOwedNow = useCallback(
     (corporationId: number) =>
       characterFiltered
@@ -566,9 +512,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               systemNames={systemNames}
             />
 
-            {/* Until a Payee exists there is nothing to assign an entry to, so
-              the balances and ledger would all read as blank. Point at the
-              Payees button (outlined in accent while this shows) instead. */}
             {needsFirstPayee ? (
               <EmptyState
                 title={t('miningTax.firstPayeeTitle')}
@@ -576,8 +519,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               />
             ) : (
               <>
-                {/* A Payee that is a book's corporation is only told once the books are known: until
-                    then no Payee card shows, rather than one the book's card then replaces. */}
                 {!booksKnown ? (
                   <Spinner block="panel" label={t('common.loading')} />
                 ) : (

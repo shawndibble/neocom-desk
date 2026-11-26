@@ -1,4 +1,3 @@
-/** What it costs to move: hauling effort against the Baseline, and every leg. */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
@@ -71,7 +70,6 @@ export function Hauling({
     [plan.flows, pi, haulHours]
   );
   const unknown = plan.haulEffort.unknownLegs + baseline.haulEffort.unknownLegs;
-  // What the note counts: the plan's own legs on screen with no distance.
   const unknownShown = rows.filter((row) => row.jumps === null).length;
   const planEffort = plan.haulEffort.m3JumpsPerHour * haulHours;
   const baselineEffort = baseline.haulEffort.m3JumpsPerHour * haulHours;
@@ -243,7 +241,6 @@ export function Hauling({
           density="compact"
           stackColumns={2}
           rowMoreActions
-          // The product name opens its PI page.
           rowHref={(row) => piProductHref(row.typeId, search)}
           rowContextMenu={(row, tr) => (
             <ItemContextMenu typeId={row.typeId} itemName={row.name} linksKeepBrowserMenu>

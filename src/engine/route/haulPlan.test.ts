@@ -8,7 +8,6 @@ import {
 import type { JumpGraph } from './jumpRoute';
 import { MAX_STOPS } from './tripPlan';
 
-/** A line  HOME ─ P1 ─ P2 ─ P3 ─ DEST,  and an ISLAND no gate reaches. */
 const HOME = 1;
 const P1 = 2;
 const P2 = 3;
@@ -342,7 +341,6 @@ describe('planHaul with a max ISK per haul', () => {
       destination,
       maxIskPerHaul: 100,
     });
-    // Trip 1: 1 x 50 ISK would fit, so take 2 of the 50s, then nothing near fits; nothing more is added.
     const first = plan.sections[0].legs.filter((l) => l.trip === 1 && l.kind === 'pickup');
     expect(first.every((l) => (l.isk ?? 0) <= 100)).toBe(true);
     const units = plan.sections

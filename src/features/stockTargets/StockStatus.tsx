@@ -1,9 +1,3 @@
-/**
- * A Stock Target's status as a tinted word (§6c: a computed verdict, never
- * clickable, the word always shown) and its fill as a thin bar beside the
- * numbers that already say it — so the bar is decoration, hidden from
- * assistive tech, and colour is never the only signal.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MarketNeed } from '@/engine/stockTargets/markets';
@@ -42,16 +36,10 @@ export function StockStatusPill({ status }: { status: StockStatus }) {
   );
 }
 
-/** A market's worst need ("2 out", "3 low", "Stocked"), tinted like the item status it sums. */
 export function StockNeedPill({ need, children }: { need: MarketNeed; children: ReactNode }) {
   return <span className={cx(pillClassName, NEED_CLASS[need])}>{children}</span>;
 }
 
-/**
- * Solid for what is listed, hatched after it for the hangar stock at the
- * market that would cover the rest of the Stock Target, then dotted for what
- * running jobs will deliver.
- */
 export function StockFillBar({
   status,
   fill,
@@ -60,11 +48,8 @@ export function StockFillBar({
   className,
 }: {
   status: StockStatus;
-  /** Listed over Stock Target. */
   fill: number;
-  /** The hangar's share of the Stock Target that listing would cover. */
   hangarFill?: number;
-  /** The running jobs' share of the Stock Target they would cover after the hangar's. */
   jobsFill?: number;
   className?: string;
 }) {

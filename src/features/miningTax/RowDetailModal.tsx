@@ -46,57 +46,33 @@ interface RowDetailModalProps {
   assignment: MiningTaxAssignmentRecord | null;
   status: MiningTaxRowStatus;
   systemName: string;
-  /** Undefined while still resolving, null when unresolvable — `SecurityValue` renders nothing either way. */
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  /** Which price tier produced each `pricesFor` number — feeds the price breakdown. */
   priceSourcesFor?: (
     hubId: string | undefined,
     date: string
   ) => ReadonlyMap<number, TaxPriceSource>;
   payees: readonly PayeeRecord[];
-  /**
-   * Prices at a given Payee's hub on a given date, forwarded to
-   * `AssignDialog`, which resolves its own from whichever Payee is selected.
-   * This modal's own read-only valuation of an entry with *no* Assignment
-   * (and so no Payee to name a hub) calls it with `undefined`/`row.entry.date`
-   * — the default hub, at the day this ore was actually mined.
-   */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
-  /** Hubs whose price source could not be reached — see `AssignDialog.unreachableHubs`. */
   unreachableHubs?: ReadonlySet<string>;
   busy: boolean;
-  /** Why the last row action wrote nothing, shown until the next one — `useLedgerAction`'s message. */
   saveError?: string | null;
-  /** A new Assignment from the Assign form lands here — refresh and close, same as every other action below. */
   onAssigned: () => void;
-  /** Opens `EntryEditDialog` for this entry — the same edit form a combined entry uses, owed or paid. */
   onEdit: () => void;
   onDismiss: () => void;
   onResolve: () => void;
-  /** Deletes the Assignment outright — "Undo" on a Dismissed row, "Unassign" on any other assigned one, so a wrong Payee or a mis-split can always be taken back to Unassigned. */
   onUndo: () => void;
-  /** Opens `JoinAssignDialog` to fold another same-system entry into this one (issue #523) — offered only for Unassigned/Outstanding rows that aren't already part of a joined group. */
   onJoin?: () => void;
-  /** Opens `SplitDialog` to move part of this day's ore to a second Payee — offered for Outstanding/Paid/Needs-review rows that aren't part of a joined group. */
   onSplit?: () => void;
-  /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
-  /** Opens its Payee's ledger: every payment and the days it paid. Absent: no link. */
   onOpenLedger?: () => void;
-  /** The Payee to pre-select for an unassigned entry — see `AssignDialog.suggestion`. */
   suggestion?: PayeeSuggestion;
-  /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
   onSettleUp?: () => void;
-  /** Opens "Link a payment" for this entry's Payee, for ISK already sent. */
   onLinkWalletPayment?: () => void;
-  /** What a Corp Tax Book says about this entry (pending record, unattributed), shown under the status line (#4065). */
   corpNote?: ReactNode;
-  /** Opens with the "unassign this entry?" question showing — the row menu's Unassign. */
   startWithUnassignConfirm?: boolean;
 }
 
-/** Stand-in so the breakdown hook can run for a row with no assignment (its text is never used). */
 function placeholderAssignment(row: MoonMiningTaxRow): MiningTaxAssignmentRecord {
   return {
     id: '',
@@ -112,16 +88,6 @@ function placeholderAssignment(row: MoonMiningTaxRow): MiningTaxAssignmentRecord
   };
 }
 
-/**
- * Row detail (issue #523, reworked by scope decision 20261004 — mockup F4).
- * An unassigned entry opens straight into the Assign form, with the Payee
- * last used in its system pre-selected. An assigned one opens as a summary —
- * who it's owed to, how much, what was mined — with one main action for its
- * status (Settle up when owed, Accept new total when grown) and Edit, which
- * opens the same `EntryEditDialog` a combined entry uses. Everything rarer
- * (split, combine, link a payment, unassign) lives in the chevron attached to
- * the Edit button (a split button), and Unassign asks first: it deletes the Assignment.
- */
 export function RowDetailModal({
   open,
   onClose,
@@ -164,19 +130,13 @@ export function RowDetailModal({
   const payee = payees.find((p) => p.id === assignment?.payeeId);
   const payeeName = payee?.name ?? t('miningTax.unknownPayee');
   const assigned = assignment !== null && status !== 'dismissed';
-  // The Assign form already lists the ore (with split checkboxes) when it is
-  // creating across more than one line — showing it again above would be
-  // pure duplication.
   const showOreCard = !assigned && !(status === 'unassigned' && oreLines.length > 1);
-  // A split side that claimed the client's figure ahead of ESI (issue #6180)
-  // shows how much of it the ledger has caught up with.
   const unreportedByType = new Map(
     (assignment ? unreportedClaims(row.entry.oreLines, row.assignments, assignment.id) : []).map(
       (claim) => [claim.typeId, claim]
     )
   );
 
-  // What a split side's amount column says when ESI hasn't caught up with its claim.
   const unreportedText = (typeId: number) => {
     const claim = unreportedByType.get(typeId);
     return claim
@@ -187,9 +147,6 @@ export function RowDetailModal({
       : undefined;
   };
 
-  // The breakdown card only shows for an assigned row; hooks can't be
-  // conditional, so the one that builds its copy text takes a placeholder
-  // assignment otherwise and the item is simply not offered.
   const breakdownCopy = usePriceBreakdown({
     assignment: assignment ?? placeholderAssignment(row),
     payee,
@@ -273,8 +230,6 @@ export function RowDetailModal({
             {t('miningTax.detail.breakdown.copied')}
           </LiveNote>
         )}
-        {/* Who it's owed to and how much lead, the same way the combined
-            view does; the pilot and the paperwork sit on the line below. */}
         {assigned && assignment && (
           <div className="flex items-baseline justify-between gap-3">
             <PayeeLedgerLink

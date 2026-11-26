@@ -1,4 +1,3 @@
-/** True once launched as an installed PWA (Android/desktop `display-mode`, or iOS's own flag). */
 export function isInstalledApp(): boolean {
   if (typeof window === 'undefined') return false;
   const standaloneMedia =

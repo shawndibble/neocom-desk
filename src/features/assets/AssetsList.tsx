@@ -125,15 +125,12 @@ export function AssetsList({
   const navigate = useNavigate();
   const openInFittings = useOpenInFittings();
   if (activeCharacterId === null) return null;
-  // Breadcrumb: the station, then every node walked through. The last entry is
-  // where we are; the ones before it are links back up.
   const crumbs =
     resolved.station === null
       ? []
       : [
           {
             label: placeNicknames[resolved.station.locationId] ?? stationLabelFor(resolved.station),
-            // The real name, for a nicknamed station (screen readers and hover).
             title:
               placeNicknames[resolved.station.locationId] !== undefined
                 ? stationLabelFor(resolved.station)
@@ -150,16 +147,12 @@ export function AssetsList({
             ),
           })),
         ];
-  // The station's own heading is the one place a Place Nickname is renamed. An
-  // orphan group (a parent that never resolved) is no place, so it has none.
   const stationHeading =
     resolved.station !== null &&
     resolved.trail.length === 0 &&
     !isUnresolvedParent(resolved.station, mergedLocationNames)
       ? { locationId: resolved.station.locationId, name: stationLabelFor(resolved.station) }
       : null;
-  // Unfiltered top level of a fresh, complete read is empty: nothing owned, so
-  // say what this page lists.
   const nothingOwned =
     resolved.station === null &&
     activeFilterCount === 0 &&
@@ -174,8 +167,6 @@ export function AssetsList({
     'min-w-0 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
   const parentHref =
     crumbs.length > 1 ? crumbs[crumbs.length - 2].href : assetHref(null, [], query);
-  // A leaf item carries no aggregate of its own — there is nothing below it to
-  // total — so the header simply drops the counts at that depth.
   const deepest = resolved.trail[resolved.trail.length - 1] ?? resolved.station;
   const currentTotals =
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
@@ -187,8 +178,6 @@ export function AssetsList({
     </span>
   );
 
-  // How the abyssal modules in view are valued: every asset at the root, the
-  // level's contents when drilled in, the matches in a flat list.
   const scope: readonly CharacterAsset[] = (() => {
     if (flatModeActive) return flatMatches.map((match) => match.asset);
     if (pathStationId === null) return mergedAssets;
@@ -203,12 +192,8 @@ export function AssetsList({
         abyssal.estimates
       )
     : null;
-  // Contract-only hulls shown at their ask median: counted beside the total, never in it.
   const askSummary = summarizeAskEstimates(scope, askEstimateByTypeId, itemValueByItemId);
 
-  // Phone station header (#2989): security · ISK · jumps on a second line, so the
-  // top line is the back button and the full-width station name. An absent item
-  // (unknown security, jumps still loading) drops out with its dot.
   const phoneFacts = (() => {
     if (!isPhone || pathStationId === null || !resolved.station) return null;
     const { station } = resolved;
@@ -249,8 +234,6 @@ export function AssetsList({
   return loading && !data ? (
     <Spinner block="page" label={t('common.loading')} />
   ) : assetsNeedsReauth && !assetsResult ? (
-    // A lapsed grant with nothing saved: the full banner. With a saved
-    // copy the items stay and a small note sits above them.
     <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterAssets']} />
   ) : error ? (
     <LoadFailedState title={t('common.loadFailed.assets')} onRetry={refresh} />
@@ -275,7 +258,6 @@ export function AssetsList({
 
       <AssetItemActionsContext.Provider value={assetItemActions}>
         <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
-          {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
           {flatModeActive ? (
             <div className="flex h-9 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3">
               <span className={eyebrowClassName}>
@@ -412,9 +394,6 @@ export function AssetsList({
                     </span>
                   )}
                 </h2>
-                {/* Route only matters to the Jumps away sort, so it shows only
-                        then, left of Sort. flex-wrap: on a narrow phone the two wrap
-                        in DOM order, so focus order matches what's on screen. */}
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                   {stationSortField === 'jumpsAway' && (
                     <Select
@@ -452,8 +431,6 @@ export function AssetsList({
                   </Select>
                 </div>
               </div>
-              {/* Without the grant every row degrades to "-"; the note
-                      says why (issue #1590). */}
               <GrantNote
                 className="shrink-0 border-b border-line px-3"
                 characterId={activeCharacterId}
@@ -482,7 +459,6 @@ export function AssetsList({
             />
           )}
 
-          {/* --- the list --- */}
           {resolved.unresolved.length > 0 ? (
             <EmptyState
               title={t('assets.staleLink.title')}

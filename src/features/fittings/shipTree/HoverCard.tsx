@@ -1,8 +1,3 @@
-/**
- * The in-game hover card: render, name, class and bonuses. Fixed-position
- * against the hovered tile's screen box, outside the scaled world, so it
- * reads at 100% whatever the zoom.
- */
 import { useTranslation } from 'react-i18next';
 import { typeRenderUrl } from '@/lib/eveImages';
 import type { ShipTreeShip } from '@/sde/types';
@@ -22,9 +17,7 @@ export function HoverCard({
   anchor: DOMRect;
   className: string;
   skillName: (skillTypeID: number) => string;
-  /** The pointer reached the card: keep it open. */
   onPointerEnter: () => void;
-  /** The pointer left the card: close it. */
   onPointerLeave: () => void;
 }) {
   const { t } = useTranslation();

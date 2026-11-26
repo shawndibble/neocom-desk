@@ -248,7 +248,6 @@ class MemoryStore implements WorkbenchFitsStore {
   }
 }
 
-/** A fake Workbench: a newest-first list, paged by `pageSize`, plus EFT per id. */
 function fakeApi(
   fits: ReturnType<typeof rawFit>[],
   pageSize = 2,
@@ -362,7 +361,6 @@ describe('runWorkbenchSync', () => {
   it('checkpoints a pass that runs out of time and resumes it next run', async () => {
     const store = new MemoryStore();
     const c = clock();
-    // Each request costs 10ms of budget; 50ms covers page 1 (1 list + 2 EFT) only.
     const first = await runWorkbenchSync({
       store,
       fetchJson: fakeApi(LIST).fetchJson,
@@ -397,7 +395,6 @@ describe('runWorkbenchSync', () => {
   it('does not advance past a page it could not finish', async () => {
     const store = new MemoryStore();
     const c = clock();
-    // Budget runs out mid-way through page 2's EFTs: page 2 is discarded, not half-stored.
     const result = await runWorkbenchSync({
       store,
       fetchJson: fakeApi(LIST).fetchJson,
@@ -545,7 +542,6 @@ describe('runWorkbenchSync', () => {
     expect(await runWorkbenchSync(deps)).toMatchObject({ hullsWritten: 2 });
     expect(store.writes.sort()).toEqual([626, 627]);
 
-    // A pass that re-sees only fits already stored (a lost checkpoint) rewrites nothing.
     store.writes = [];
     store.state = { boundary: null, pass: null };
     const again = await runWorkbenchSync({ ...deps, fetchJson: fakeApi(LIST).fetchJson });

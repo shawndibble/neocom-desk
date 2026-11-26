@@ -1,9 +1,3 @@
-/**
- * The impure half of the Stock tab: every Character's assets and own sell
- * orders, item names and hub prices, read and handed to the pure
- * `engine/stockTargets` functions. Cache-first through the same loaders Build
- * Plan owned-stock detection uses, so opening the tab rarely costs an ESI call.
- */
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { jobsAtMarket, type StockJobInput } from '@/engine/stockTargets/inJobs';
 import { contractStockAtMarket, type ContractStockInput } from '@/engine/stockTargets/onContract';
@@ -40,7 +34,6 @@ import { rootOf } from '@/features/market/marketTree';
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 
-/** NPC stations sit in this id range; anything above is a player structure. */
 const MAX_NPC_STATION_ID = 100_000_000;
 
 type SellOrder = MarketOrder & { characterId: number };
@@ -48,26 +41,19 @@ type SellOrder = MarketOrder & { characterId: number };
 interface Holdings {
   detected: DetectedOwnedStockMap;
   sellOrders: SellOrder[];
-  /** Own contracts and their cached items: stock on offer that has left the assets. */
   contractStock: ContractStockInput[];
-  /** Every Character's active manufacturing and reaction jobs: stock on its way, counted apart from the assets. */
   jobs: StockJobInput[];
-  /** Characters whose assets or orders could not all be read: every count is then a floor. */
   incompleteCharacters: string[];
-  /** The oldest asset read behind the counts, or null when none was read. */
   oldestFetchedAt: Date | null;
   characterIds: number[];
-  /** Every Character an asset or order read named. */
   characterNames: Map<number, string>;
 }
 
-/** `'all'` places every type the pilot holds, for "where are my things" rather than "where is this item". */
 async function readHoldings(typeIds: readonly number[] | 'all'): Promise<Holdings> {
   const [assets, orders] = await Promise.all([
     loadAllCharactersAssets(),
     loadAllCharactersOpenOrders(),
   ]);
-  // Only a Stock List read needs the jobs; "where are my things" and the listed-here read do not.
   const jobsRead =
     typeIds === 'all' || typeIds.length === 0
       ? { jobs: [] as StockJobInput[], oldestFetchedAt: null }
@@ -123,10 +109,6 @@ export interface MarketPlace {
   security: number | null;
 }
 
-/**
- * A market's station or structure, named, with its system. A structure is
- * read as the Characters most likely to be allowed in: those selling there.
- */
 export async function loadMarketPlace(
   locationId: number,
   characterIds: readonly number[]
@@ -152,7 +134,6 @@ export async function loadMarketPlace(
   };
 }
 
-/** Characters selling at a market first, then the rest: who to read a structure as. */
 function readersFor(locationId: number, holdings: Holdings): number[] {
   const sellers = holdings.sellOrders
     .filter((order) => order.location_id === locationId)
@@ -160,7 +141,6 @@ function readersFor(locationId: number, holdings: Holdings): number[] {
   return [...new Set([...sellers, ...holdings.characterIds])];
 }
 
-/** Order-listed and on-contract holders as one Listed attribution: the same Character's shares add. */
 function mergeHolders(
   orders: readonly HolderCount[],
   contracts: readonly HolderCount[]
@@ -223,14 +203,10 @@ export interface StockTargetsData {
   names: Map<number, string>;
   incompleteCharacters: string[];
   oldestFetchedAt: Date | null;
-  /** Each item's top-level Market Group ("Ships", "Ammunition & Charges"), when the catalogue has it. */
   groups: Map<number, string>;
   place: MarketPlace | null;
-  /** Names for the Characters the rows' holder splits point at. */
   characterNames: Map<number, string>;
-  /** Characters with a sell order at the market, most orders first. */
   sellers: number[];
-  /** Active jobs making a listed item that deliver somewhere other than this market. */
   jobsElsewhere: number;
 }
 
@@ -267,13 +243,11 @@ export interface StockMarketRow extends MarketSummary {
 }
 
 export interface StockMarketsData {
-  /** Worst first. */
   markets: StockMarketRow[];
   incompleteCharacters: string[];
   oldestFetchedAt: Date | null;
 }
 
-/** Every market at once, for the Stock tab's landing list. */
 export async function loadStockMarkets(
   lists: readonly StockList[],
   hub: TradeHub
@@ -310,17 +284,9 @@ export interface SellLocation {
   locationId: number;
   name: string;
   kind: MarketPlace['kind'];
-  /** Zero for a structure the pilot only keeps items at. */
   orderCount: number;
 }
 
-/**
- * The New market dialog's suggestions: every station and structure the pilot
- * has sell orders at, most orders first, then the structures they keep items
- * at. A structure is otherwise found only by ESI's name search; an NPC station
- * is always searchable from the snapshot, so stations with items alone are not
- * suggested.
- */
 export async function loadSellLocations(): Promise<SellLocation[]> {
   const holdings = await readHoldings('all');
   const counts = new Map<number, number>();
@@ -348,13 +314,11 @@ export async function loadSellLocations(): Promise<SellLocation[]> {
   return locations.sort((a, b) => b.orderCount - a.orderCount || a.name.localeCompare(b.name));
 }
 
-/** What the pilot sells at a market now, as starting Stock Targets. */
 export async function loadListedAtMarket(locationId: number): Promise<StockTarget[]> {
   const holdings = await readHoldings([]);
   return listedAtMarket(holdings.sellOrders, locationId);
 }
 
-/** Each type's top-level Market Group name, from the bundled market catalogue. */
 async function loadRootGroupNames(typeIds: readonly number[]): Promise<Map<number, string>> {
   const [types, groupList] = await Promise.all([loadMarketTypesById(), loadMarketGroups()]);
   const groupsById = new Map(groupList.map((group) => [group.id, group]));
@@ -368,12 +332,6 @@ async function loadRootGroupNames(typeIds: readonly number[]): Promise<Map<numbe
   return result;
 }
 
-/**
- * The below-target alert's reading: every Stock Target on every market's list
- * against the **cached** assets and orders of every Character. Cache only —
- * this runs inside the foreground poll, where a live read would fan an asset
- * request out per Character on every poll; the caches refresh on their own.
- */
 export async function loadStockAlertEntries(
   lists: readonly StockList[]
 ): Promise<StockAlertEntry[]> {
@@ -386,8 +344,6 @@ export async function loadStockAlertEntries(
     readCachedRows<MarketOrder[]>(characterIds, ORDER_KEYS.open),
     loadTypeNames(typeIds),
   ]);
-  // Listed counts come from the order cache. Every Character that can sell must have one:
-  // a missing cache would read their listings as gone and fire a false Out.
   const orderScope = ESI_REGISTRY.getCharacterOrders.scope;
   const sellers = await characterIdsWithScopes([orderScope]);
   const known = sellers.length > 0 && sellers.every((id) => orders.has(id));
@@ -396,7 +352,6 @@ export async function loadStockAlertEntries(
     new Set(typeIds)
   );
   const sellOrders = [...orders.values()].flatMap((cached) => cached.data);
-  // Cache only, like the orders: a missing contract cache adds nothing and never makes `known` false.
   const contractStock = await readCachedContractStock(characterIds);
   const { jobs } = await readCachedStockJobs(characterIds);
   const now = Date.now();

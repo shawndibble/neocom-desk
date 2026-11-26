@@ -1,15 +1,3 @@
-/**
- * Turn a raw EVE fittings-XML export into the plain, engine-safe
- * `FittingXmlDocument` `engine/import/eveFitXml.ts` consumes. This is the
- * only module that touches `DOMParser` — a `Document`/`Element` never
- * crosses into `src/engine`, only this module's plain output does (mirrors
- * `features/skills/planner/planXmlDocument.ts`).
- *
- * The export always wraps in a `<fittings>` root, even for a single fit —
- * "one `<fitting>` child" is exactly how a single-fit export is told apart
- * from a corp doctrine folder's multi-fit export; there is no separate
- * single-fit format to detect.
- */
 import type {
   FittingXmlDocument,
   FittingXmlEntry,
@@ -26,11 +14,8 @@ export interface FittingXmlDocumentError {
 export type FittingXmlDocumentResult =
   { ok: true; document: FittingXmlDocument } | { ok: false; error: FittingXmlDocumentError };
 
-// A corp doctrine folder's export is still tiny XML even with dozens of
-// fits; this cap only exists to reject a malicious/corrupt file cheaply.
 const MAX_BYTES = 2 * 1024 * 1024;
 
-/** Legitimate exports never carry a DOCTYPE — rejecting it removes XXE/entity-expansion as a concern before DOMParser ever sees the text. */
 function containsDoctype(text: string): boolean {
   return /<!DOCTYPE/i.test(text);
 }
@@ -43,7 +28,6 @@ function readHardware(fittingEl: Element): FittingXmlHardware[] {
     if (!slot || !type) continue;
     const qtyAttr = el.getAttribute('qty');
     const qty = qtyAttr ? Number(qtyAttr) : undefined;
-    // Bad qty (NaN/<=0/non-integer) reads as absent — same stance as planXmlDocument.ts.
     hardware.push({
       slot,
       type,
@@ -63,7 +47,6 @@ function readEntries(root: Element): FittingXmlEntry[] {
   return entries;
 }
 
-/** Parses already-read XML text. Never throws: every failure mode returns `{ ok: false, error }`. */
 export function parseFittingXmlText(text: string): FittingXmlDocumentResult {
   if (containsDoctype(text)) {
     return { ok: false, error: { code: 'unsupportedFormat' } };
@@ -86,7 +69,6 @@ export function parseFittingXmlText(text: string): FittingXmlDocumentResult {
   return { ok: true, document: { entries } };
 }
 
-/** Parses a picked fittings-XML file. Never throws. */
 export async function parseFittingXmlFile(file: File): Promise<FittingXmlDocumentResult> {
   if (file.size > MAX_BYTES) {
     return { ok: false, error: { code: 'tooLarge' } };
@@ -96,9 +78,6 @@ export async function parseFittingXmlFile(file: File): Promise<FittingXmlDocumen
   try {
     text = await file.text();
   } catch {
-    // A File handle can reject on read (removed/renamed/permission-denied
-    // mid-pick) — this is the one step here that touches disk I/O rather
-    // than pure text-in-memory.
     return { ok: false, error: { code: 'readFailed' } };
   }
   return parseFittingXmlText(text);

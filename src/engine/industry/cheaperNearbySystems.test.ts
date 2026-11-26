@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cheaperNearbySystems } from './cheaperNearbySystems';
 
-// 1 - 2 - 3 - 4 - 5 - 6 - 7 (a line), plus 8 off 1.
 const graph = new Map<number, readonly number[]>([
   [1, [2, 8]],
   [2, [1, 3]],

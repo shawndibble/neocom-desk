@@ -1,10 +1,3 @@
-/**
- * Open a new mail in EVE: asks the Character's running EVE client to open its
- * new-mail window addressed to one character, subject and body filled in.
- * Nothing is sent; the pilot reads, edits and presses Send in game. It is a
- * UI call (`esi-ui.open_window.v1`, the Open in EVE Permission), not a mail
- * send, so it needs no mail scope and counts against no mail cap.
- */
 import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
 import { postOpenWindowNewMail } from '@/esi/endpoints';
@@ -12,7 +5,6 @@ import type { EsiEndpointId } from '@/esi/registry';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import type { OpenInEveResult } from './sendOpenInEve';
 
-/** Every endpoint this opens: what a grant check has to cover. */
 export const OPEN_NEW_MAIL_ENDPOINTS: readonly EsiEndpointId[] = ['postOpenWindowNewMail'];
 
 export interface NewMailDraft {

@@ -14,8 +14,6 @@ import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 
 const routes = vi.hoisted(() => ({ jumps: {} as Record<number, number> }));
-// One object for every render, as the real hook's memoised basis is: a fresh one
-// each call re-ran the strip's route effects on every render, endlessly.
 const basis = vi.hoisted(() => ({ rules: {}, network: {}, key: 'k', hydrated: true }));
 vi.mock('@/features/route/jumpBasis', () => ({ useSharedJumpBasis: () => basis }));
 vi.mock('@/features/route/routeExposure', () => ({
@@ -51,13 +49,6 @@ beforeEach(async () => {
   usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: false });
 });
 
-/**
- * Lets the strip's async work finish before a test asserts something is absent:
- * first the settings store's own read of Dexie (a read still in flight would
- * land on top of a `setState` made afterwards and revert it), then the mocked
- * route and location lookups: every one the strip started has answered (and
- * waitFor drains a tick after, for the renders they cause).
- */
 async function settled() {
   await waitFor(() => expect(usePiSettings.getState().hydrated).toBe(true));
   const lookups = [routeExposure, loadCharacterSolarSystemId, loadSystemNameAndSecurity].map(
@@ -76,7 +67,6 @@ function renderStrip(props: Parameters<typeof PiHeaderStrip>[0]) {
   );
 }
 
-/** The facts popover behind the strip's "i" (home, colonies, route, EVE time). */
 async function openFacts() {
   await userEvent.click(await screen.findByRole('button', { name: 'Home, colonies and route' }));
   return screen.findByTestId('pi-strip-facts');
@@ -96,7 +86,6 @@ describe('PiHeaderStrip', () => {
     const strip = await screen.findByTestId('pi-header-strip');
     expect(screen.queryByRole('button', { name: /PI settings/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /, Where do you sell\?$/ })).toHaveLength(1);
-    // Home and the colony count are not at a glance: they wait behind the "i".
     expect(within(strip).queryByText('Colonies')).not.toBeInTheDocument();
     const facts = await openFacts();
     expect(within(facts).getByText('Colonies')).toBeInTheDocument();
@@ -151,7 +140,6 @@ describe('PiHeaderStrip', () => {
       expect(hint).toHaveTextContent('Nearest hub: Hek, 9 jumps');
       await userEvent.click(within(hint).getByRole('button', { name: 'Sell at Hek' }));
       expect(usePiSettings.getState().value).toMatchObject({ hub: 'hek', hubChosen: true });
-      // The nudge is about the colonies, so it gives PI its own hub and leaves Global alone.
       await waitFor(() => expect(usePageHubs.getState().value).toEqual({ pi: 'hek' }));
       expect(useMarketHub.getState().value).toBe('jita');
       await waitFor(() => expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument());

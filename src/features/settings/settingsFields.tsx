@@ -1,29 +1,20 @@
-/**
- * The small parts every Settings form is built from. Shared by the Settings
- * page and the page settings modal (`PageSettingsModal.tsx`), which render the
- * same forms, so the two can never disagree about a control.
- */
 import { useContext, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Field, FilterChip, Panel, SegmentedControl, Spinner } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { FieldNoteContext } from '@/components/ui/fieldNote';
 
-/** The paragraph above a form: one width cap and one size for every Settings panel. */
 export function SettingsHint({ children }: { children: ReactNode }) {
   return <p className="max-w-2xl text-xs text-text-dim">{children}</p>;
 }
 
-/** Where a setting lives: on every device through sync, or on this one only. */
 export type SettingsScope = 'device';
 
-/** The one fixed line a panel opens with to say where its settings live. */
 export function SettingsScopeHint({ scope }: { scope: SettingsScope }) {
   const { t } = useTranslation();
   return <SettingsHint>{t(`settings.scope.${scope}`)}</SettingsHint>;
 }
 
-/** A line after a button press. Success and info are a polite status; an error is an alert. */
 export function ActionResult({
   kind,
   children,
@@ -46,7 +37,6 @@ export function ActionResult({
   );
 }
 
-/** A Settings panel while its stores hydrate: the same `Panel` frame, a centred spinner. */
 export function SettingsPanelLoading({ title }: { title?: string }) {
   return (
     <Panel title={title}>
@@ -55,12 +45,10 @@ export function SettingsPanelLoading({ title }: { title?: string }) {
   );
 }
 
-/** Loading state of a form that renders inside its parent panel. */
 export function SettingsFormLoading() {
   return <Spinner />;
 }
 
-/** One lone-checkbox row of the Settings form grid, hint as the row's note. */
 export function CheckboxField({
   id,
   label,
@@ -74,7 +62,6 @@ export function CheckboxField({
   hint?: ReactNode;
   checked: boolean;
   onChange: () => void;
-  /** Set only where this field's scope differs from its panel's. */
   scope?: SettingsScope;
 }) {
   const { t } = useTranslation();
@@ -100,7 +87,6 @@ export function CheckboxField({
   );
 }
 
-/** The chips' group, described by its `Field`'s note — a group has no `htmlFor` to hang one on. */
 function ChipGroup({ label, children }: { label: string; children: ReactNode }) {
   const noteId = useContext(FieldNoteContext);
   return (
@@ -110,10 +96,6 @@ function ChipGroup({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-/**
- * A labelled row of preset chips; a `Fields` row. Only for a single choice whose labels are
- * too long for a `SegmentedControl` at 390px (the number-format examples); otherwise `SegmentedRow`.
- */
 export function ChipRow<T extends string | number>({
   label,
   hint,
@@ -145,7 +127,6 @@ export function ChipRow<T extends string | number>({
   );
 }
 
-/** A labelled single-choice row of 2–4 presets, exactly one always on (DESIGN §4); a `Fields` row. */
 export function SegmentedRow<T extends string | number>({
   label,
   hint,

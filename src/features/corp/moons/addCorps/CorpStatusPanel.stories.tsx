@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CorpStatusPanel } from './CorpStatusPanel';
 
-/** @summary Needs you (N): the corps that did not connect, each with its one-line reason and fix. */
 const meta = {
   title: 'corp/CorpStatusPanel',
   component: CorpStatusPanel,
@@ -30,10 +29,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary All four kinds: sign-in, own book (words only), role, gone quiet. */
 export const Default: Story = {};
 
-/** @summary A connection that failed on the way through shows its reason, not "log in again". */
 export const Failed: Story = {
   args: {
     items: [
@@ -48,7 +45,6 @@ export const Failed: Story = {
   },
 };
 
-/** @summary Read without refinery names: Grant again for an own corp, words only for another's. */
 export const RefineryNames: Story = {
   args: {
     items: [
@@ -63,7 +59,6 @@ export const RefineryNames: Story = {
   },
 };
 
-/** @summary Read without each chunk's ore (a grant from before the notifications): Grant again, naming the CEO to log in as. */
 export const ChunkOre: Story = {
   args: {
     items: [
@@ -78,5 +73,4 @@ export const ChunkOre: Story = {
   },
 };
 
-/** @summary Nothing needs the player: the panel is gone. */
 export const Empty: Story = { args: { items: [] } };

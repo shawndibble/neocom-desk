@@ -18,7 +18,6 @@ import {
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
-// Wraps the real read so a test can see what it was asked for, or make it throw.
 vi.mock('@/features/character/walletJournalAll', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/character/walletJournalAll')>();
   return { ...actual, loadAllCharactersJournals: vi.fn(actual.loadAllCharactersJournals) };
@@ -55,11 +54,9 @@ describe('Wallet', () => {
     expect(await screen.findByText('Donation')).toBeInTheDocument();
     const pulsed = document.querySelector('[data-row-key="2"]');
     expect(pulsed?.className).toContain('row-pulse');
-    // Only the line the alert was about.
     expect(document.querySelector('[data-row-key="1"]')?.className).not.toContain('row-pulse');
     expect(scrollIntoView.mock.instances).toContain(pulsed);
 
-    // Spent on arrival, so a reload or a tab round-trip does not pulse again.
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false);
     });
@@ -70,8 +67,6 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
-    // Scoped to the table: the same humanized strings also populate the
-    // ref-type filter's <option> list (issue #413).
     const table = await screen.findByRole('table', { name: 'Journal' });
     expect(await within(table).findByText('Bounty prize')).toBeInTheDocument();
     expect(within(table).getByText('Player donation')).toBeInTheDocument();
@@ -140,9 +135,7 @@ describe('Wallet', () => {
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
     await user.click(bountyRow);
     expect(screen.queryByText('Donation')).toBeNull();
-    // Ref type is an inline key filter: the select shows it, with no pill.
     expect(screen.getByRole('combobox', { name: 'Ref type' })).toHaveTextContent('Bounty prize');
-    // The breakdown ignores the ref-type filter, so every type is still listed.
     expect(within(breakdown).getAllByRole('row').length).toBeGreaterThan(2);
 
     await user.click(bountyRow);
@@ -163,9 +156,7 @@ describe('Wallet', () => {
     expect(headers).toEqual(['Ref type', 'Net']);
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
     expect(bountyRow).toHaveTextContent('+1,000');
-    // Single-sided ref types carry no second in/out line.
     expect(breakdown).not.toHaveTextContent(/in S+ · out/);
-    // The In / Out / Net summary is a ledger: full figures, not shorthand.
     expect(screen.getAllByText('+500').length).toBeGreaterThan(0);
   });
 
@@ -274,7 +265,6 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     renderWalletRoute();
 
-    // Initial load succeeds live — no banner at all yet.
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).not.toBeInTheDocument();
 
@@ -359,11 +349,6 @@ describe('Wallet', () => {
     expect(screen.queryByText(/: (log in again|grant Wallet)$/)).not.toBeInTheDocument();
   });
 
-  /**
-   * Narrow, so the journal's filters render in the sheet rather than the row.
-   * jsdom's `matchMedia` stub never matches, which `useIsNarrow` reads as a
-   * pointer viewport.
-   */
   function useNarrowViewport(): () => void {
     return stubViewport(NARROW_QUERY);
   }
@@ -376,7 +361,6 @@ describe('Wallet', () => {
       await user.click(await screen.findByRole('tab', { name: 'Journal' }));
       await screen.findByText('Bounty');
 
-      // The dates are behind the trigger now, with the search box left in the row.
       expect(screen.queryByLabelText(/^From$/)).toBeNull();
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
 
@@ -385,9 +369,6 @@ describe('Wallet', () => {
         .getAllByDisplayValue('')
         .filter((el) => el.getAttribute('type') === 'date');
       expect(dates).toHaveLength(2);
-      // `DateRangeFields`' wrapper becomes a real row here rather than the
-      // `display: contents` it carries inline — which is also the only proof
-      // that `useFilterSurface` resolves to the sheet from inside the modal.
       const wrapper = dates[0]!.closest('div')!;
       expect(wrapper).toBe(dates[1]!.closest('div'));
       expect(wrapper).toHaveClass('flex');
@@ -408,7 +389,6 @@ describe('Wallet', () => {
         scopes: ['esi-wallet.read_character_wallet.v1'],
       });
       server.use(
-        // The same entry id as Pilot One's line 1.
         http.get('https://esi.evetech.net/characters/92/wallet/journal', () =>
           HttpResponse.json(journalPage1, { headers: { 'X-Pages': '1' } })
         ),
@@ -440,7 +420,6 @@ describe('Wallet', () => {
         { characterId: 91, name: 'Pilot One' },
         { characterId: 92, name: 'Pilot Two' },
       ]);
-      // The picker in the page header; the panel's title bar keeps the age of the data.
       const pageHeader = screen.getByRole('heading', { level: 1 }).closest('header');
       expect(
         within(pageHeader!).getByRole('button', { name: /^All characters/ })

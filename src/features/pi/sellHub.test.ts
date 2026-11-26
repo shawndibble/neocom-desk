@@ -22,7 +22,6 @@ describe('migratePiHub', () => {
     expect(usePageHubs.getState().value).toEqual({ pi: 'amarr' });
     expect((await db.settings.get(PI_SETTINGS_KEY))?.value).toMatchObject({ hub: 'amarr' });
 
-    // Back to Global later is never re-seeded.
     await usePageHubs.getState().setValue({});
     await migratePiHub();
     expect(usePageHubs.getState().value).toEqual({});

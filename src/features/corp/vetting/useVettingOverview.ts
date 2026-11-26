@@ -1,9 +1,3 @@
-/**
- * `/corp/vetting`'s data: the corp's settings and its reviews, for the signed-in reviewer. Tagged
- * with the Character and corporation it was read for, so a switch shows loading, never another
- * corp's queue. Changes (a request, a settings save) answer with the new overview, which
- * replaces what is on screen.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { VettingOverview } from '@/engine/vetting';
 import { callableErrorCode } from '@/lib/callableError';
@@ -13,7 +7,6 @@ import { vettingBackend } from './vettingClient';
 
 export type VettingOverviewState =
   | { status: 'loading' }
-  /** The server says this Character is no reviewer (roles changed since the page's gate read them). */
   | { status: 'denied' }
   | { status: 'failed' }
   | { status: 'ready'; overview: VettingOverview };
@@ -23,7 +16,6 @@ export interface VettingOverviewData {
   characterId: number | null;
   corporationId: number | null;
   reload: () => void;
-  /** Puts an overview a change answered with on screen. */
   replace: (overview: VettingOverview) => void;
 }
 

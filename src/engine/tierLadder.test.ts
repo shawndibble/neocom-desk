@@ -25,7 +25,6 @@ describe('tiersReached', () => {
   });
 
   it('stops at the first unmet tier even when a later one is met', () => {
-    // Skill 1 at V meets tiers IV and V, but tier III also needs skill 2.
     expect(tiersReached(LADDER, trained({ 1: 5 }))).toBe(2);
   });
 
@@ -51,7 +50,6 @@ describe('alphaCappedEntries', () => {
     ];
     expect(alphaCappedEntries(entries, caps({ 1: 4, 2: 4 }))).toEqual([
       { skillTypeID: 2, targetLevel: 5 },
-      // No Alpha cap at all: an Alpha clone cannot train it.
       { skillTypeID: 3, targetLevel: 1 },
     ]);
   });

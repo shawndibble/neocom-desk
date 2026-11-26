@@ -1,6 +1,3 @@
-// The scheduler's collection-scope rules (issue #4896), against a stub pass:
-// which requests merge into one pass, what that pass is told to sync, and when
-// a narrowed request is widened back to a full pass.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSyncStatus } from './status';
 import {
@@ -13,7 +10,6 @@ import type { SyncedCollectionName } from './syncedCollections';
 
 vi.mock('@/observability/reportFailure', () => ({ reportFailure: vi.fn() }));
 
-/** What each pass was asked to sync, as sorted names or 'all'. */
 type Seen = (readonly SyncedCollectionName[] | 'all')[];
 
 function describeScope(scope: SyncScope): readonly SyncedCollectionName[] | 'all' {
@@ -38,7 +34,6 @@ function create(
   );
 }
 
-/** Hold the next pass open until `release` is called. */
 function holdPasses(): () => void {
   let release!: () => void;
   gate = new Promise<void>((resolve) => {
@@ -62,13 +57,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** A full pass that completed at `clock`, so a narrowed one may follow. */
 async function fullPass(characterId = 1): Promise<void> {
   await scheduler.triggerSync(characterId);
   seen = [];
 }
 
-/** Let one debounced request fire and its pass (or passes) settle. */
 async function flush(): Promise<void> {
   await vi.advanceTimersByTimeAsync(50);
 }
@@ -135,7 +128,7 @@ describe('collection-scoped scheduling', () => {
     const release = holdPasses();
     const full = scheduler.triggerSync(1);
     await vi.advanceTimersByTimeAsync(0);
-    clock += PARTIAL_PASS_WINDOW_MS; // the full pass took the whole window
+    clock += PARTIAL_PASS_WINDOW_MS;
     release();
     await full;
     seen = [];
@@ -197,14 +190,12 @@ describe('collection-scoped scheduling', () => {
   it('records a pass the driver widened itself as a full pull', async () => {
     let widen = true;
     scheduler = create(async (_id, scope) => (widen && scope !== 'all' ? 'all' : undefined));
-    // No full pass yet, so this one runs full anyway; then a narrowed one the
-    // driver widens (an ownerHash change) — and that counts as full too.
     await scheduler.triggerSync(1);
     clock += PARTIAL_PASS_WINDOW_MS - 1;
     scheduler.scheduleSync(1, { collections: ['payees'], debounceMs: 10 });
     await flush();
     widen = false;
-    clock += 2; // past the first full pass's window, inside the widened one's
+    clock += 2;
     seen = [];
     scheduler.scheduleSync(1, { collections: ['payees'], debounceMs: 10 });
     await flush();

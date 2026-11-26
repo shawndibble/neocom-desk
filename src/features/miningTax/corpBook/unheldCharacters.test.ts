@@ -25,7 +25,6 @@ describe('unheldCharacters (the "counts as yours" warning)', () => {
         corporationId: 1,
         corpName: 'Corp 1',
         characterIds: [90, 91],
-        // Each held character in such a Miner declines it for themselves.
         declines: [
           { characterId: 10, minerId: 'g1' },
           { characterId: 11, minerId: 'g1' },
@@ -38,7 +37,6 @@ describe('unheldCharacters (the "counts as yours" warning)', () => {
   it('says nothing once each listed character is held, or no held character is grouped with one', () => {
     const books = [book(1, [{ id: 'g1', characterIds: [10, 90] }])];
     expect(unheldCharacters(books, new Set([10, 90]))).toEqual([]);
-    // Declined: the pilot's character is billed on its own now.
     expect(
       unheldCharacters([book(1, [{ id: 'g1', characterIds: [90, 91] }])], new Set([10]))
     ).toEqual([]);

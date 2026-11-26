@@ -112,7 +112,6 @@ describe('SurveyCharts pace panel', () => {
     expect(within(table).getByRole('columnheader', { name: 'Veldspar' })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Field mined' })).toBeInTheDocument();
-    // 300 m³ of 1000 is 30% of Veldspar, 60 of 500 is 12% of Scordite: shares 71 / 29.
     expect(within(table).getByRole('cell', { name: '71% (30%)' })).toBeInTheDocument();
     expect(within(table).getByRole('cell', { name: '29% (12%)' })).toBeInTheDocument();
     expect(within(table).getByRole('cell', { name: '24%' })).toBeInTheDocument();
@@ -142,7 +141,6 @@ describe('SurveyCharts across a long gap with no scans', () => {
     render(<SurveyCharts summary={summary} />);
     const volume = screen.getByRole('table', { name: /volume left/i });
     expect(within(volume).getAllByRole('row')).toHaveLength(1 + 4);
-    // 00:30 on day one, then 06:30 the next day (30h later): the table speaks real time.
     expect(within(volume).getByText(/00:30/)).toBeInTheDocument();
     expect(within(volume).getByText(/06:30/)).toBeInTheDocument();
     const rate = screen.getByRole('table', { name: /mining rate/i });

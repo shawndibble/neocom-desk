@@ -1,9 +1,3 @@
-/**
- * Where "Open in Fittings" on an Assets ship goes: the Fittings editor, with
- * the ship as it sits in the hangar — slots, loaded charges, drones,
- * fighters, cargo, and each mutated (abyssal) item's real rolls from ESI —
- * as its Fitting Share Code. Null when it's too large for one.
- */
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';
 import {
   assetShipToFitting,
@@ -16,7 +10,6 @@ import { mutationsForItems } from '@/features/abyssal/dynamicItems';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { fittingEditLocationFor } from './fittingEditLink';
 
-/** Every asset inside a ship, whichever bay the tree grouped it under. */
 function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
   const items: ShipAssetItem[] = [];
   const visit = (node: AssetTreeNode) => {
@@ -30,10 +23,8 @@ function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
   return items;
 }
 
-/** How long Open in Fittings waits on ESI for a ship's rolls. */
 const ROLLS_TIMEOUT_MS = 8000;
 
-/** The ship's rolls by item id. Never fails the open: what won't answer loads base unknown. */
 async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<number, ItemMutation>> {
   try {
     const lookup = await loadMutaplasmidLookup();
@@ -42,7 +33,6 @@ async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<numbe
         ? [{ typeId: item.typeId, itemId: item.itemId }]
         : []
     );
-    // A click waits on this: past the timeout, open with what arrived; the rest load base unknown.
     return refs.length === 0
       ? new Map()
       : await mutationsForItems(refs, lookup, { signal: AbortSignal.timeout(ROLLS_TIMEOUT_MS) });
@@ -58,7 +48,6 @@ export async function assetShipEditLocation(
   return shipItemsEditLocation({ typeId: ship.asset.type_id, name }, shipItems(ship));
 }
 
-/** The same, from a ship's direct contents already in hand (My ships reads a flat asset list, no tree). */
 export async function shipItemsEditLocation(
   ship: { typeId: number; name: string },
   items: readonly ShipAssetItem[]
@@ -66,7 +55,6 @@ export async function shipItemsEditLocation(
   return fittingEditLocationFor(await shipItemsToFitting(ship, items));
 }
 
-/** A ship's direct contents as a Fitting, each mutated item with its real rolls (the Active Fit reads this too). */
 export async function shipItemsToFitting(
   ship: { typeId: number; name: string },
   items: readonly ShipAssetItem[]
@@ -75,7 +63,6 @@ export async function shipItemsToFitting(
   return assetShipToFitting(
     ship,
     items,
-    // A module has a rack; a charge in its slot doesn't (a drone's rack is its bay).
     (typeId) => {
       const rack = rackOf[String(typeId)];
       return rack !== undefined && rack !== 'drone';

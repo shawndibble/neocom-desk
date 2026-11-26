@@ -17,7 +17,6 @@ import {
 import { useScopedState } from '../useScopedState';
 import type { PlanEditorProps } from './types';
 
-/** The entry list's row edits: reorder drops, prereq promotion, remove with Undo, marker removal and priority. */
 export function usePlanRowActions({
   planId,
   planScope,
@@ -40,28 +39,16 @@ export function usePlanRowActions({
   onUpdate: PlanEditorProps['onUpdate'];
 }) {
   const { t } = useTranslation();
-  // A promoted prereq row is a quieter change than it looks (a dimmed row
-  // turns into user data), so it says so. A "that worked" note about the
-  // change that just landed, so it clears on its own timer, not with the plan.
   const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
   const { show: showPromoteConfirm } = useAutoDismiss<string | null>(setPromoteConfirm, null);
-  // A removed entry goes at once, with an Undo toast rather than a confirm
-  // dialog. Scoped to plan.id so a plan switch can't offer an undo for another plan.
   const [removedToast, setRemovedToast] = useScopedState<{
     message: string;
     onUndo: () => void;
   }>([planId]);
-  // Focus after a remove goes to a neighbour row, else this heading (WCAG 2.4.3).
   const entriesHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  // A ref keeps `requestRemoveEntry` stable, so memoized rows don't re-render on every recompute.
   const mergedRowsRef = useRef<readonly MergedRow[]>([]);
   const editableRef = useRef<SkillPlanEditable>({ entries: [] });
-  // Outcome of the last drag on the entry list. A drop that would land a
-  // skill after something requiring it is refused rather than silently
-  // re-normalized back (planDrop.ts), so the refusal has to say why. It
-  // describes one drag against one entry order — once the order moves on it
-  // describes nothing.
   const [dropError, setDropError] = useScopedState<string>(planScope);
 
   useEffect(() => {
@@ -76,18 +63,6 @@ export function usePlanRowActions({
     [t, levelLabel, showPromoteConfirm]
   );
 
-  /**
-   * One drag on the merged list — or the equivalent non-drag move (#408's
-   * row-actions menu resolves its own target id and calls this the same way
-   * EntryList's DndContext does). planDrop decides what it meant — a plain
-   * reorder, a prereq row promoted into a real entry, or a drop the
-   * normalizer would silently undo, which is refused with the entry that
-   * requires the dragged skill named rather than springing back unexplained.
-   *
-   * useCallback'd: crosses into EntryList's memoized rows as the row-actions
-   * menu's `onReorder` prop (#408) — see nameFor's comment for why an
-   * unstable identity there would defeat that memoization.
-   */
   const handleDrop = useCallback(
     (activeId: string, overId: string) => {
       const result = moveRow(editable, {
@@ -98,10 +73,6 @@ export function usePlanRowActions({
         trainedSkills,
       });
       if (!result.ok) {
-        // A skill is never its own prerequisite: when both sides are the same
-        // skill, what refused the drop is one of its own levels being trained
-        // first, and the cross-skill wording ("X is a prerequisite of X")
-        // reads as gibberish for the very gesture per-level rows exist for.
         setDropError(
           result.skillTypeID === result.blockedBy
             ? t('plans.dropBlockedSameSkill', {
@@ -133,7 +104,6 @@ export function usePlanRowActions({
     ]
   );
 
-  /** The "+" on a prereq row: the same promotion, without needing a drag. */
   const handlePromotePrereq = useCallback(
     (rowId: string) => {
       const patch = promotePrereqRow(editable, mergedRows, rowId);
@@ -143,14 +113,12 @@ export function usePlanRowActions({
       const row = mergedRows.find((r) => r.id === rowId);
       if (row?.kind === 'prereq') {
         confirmPromotion(row.step.skillTypeID, row.step.level);
-        // The prereq row becomes an entry row with this id, once the update lands.
         focusAfterCommit(() => planRowHandle(`${row.step.skillTypeID}-${row.step.level}`));
       }
     },
     [editable, mergedRows, onUpdate, confirmPromotion, setDropError, focusAfterCommit]
   );
 
-  /** EntryList's `onRemove`: removes at once and offers Undo, which restores the plan as it was. */
   const requestRemoveEntry = useCallback(
     (skillTypeID: number, targetLevel: number) => {
       const before = editableRef.current;
@@ -172,8 +140,6 @@ export function usePlanRowActions({
           void onUpdate(snapshot);
         },
       });
-      // The save is async, so the row can outlive the click: once it has
-      // landed, move focus off the gone ⋮.
       void Promise.resolve(saved).then(() => focusAfterCommit(...landing));
     },
     [onUpdate, focusAfterCommit, setRemovedToast, levelLabel, t]

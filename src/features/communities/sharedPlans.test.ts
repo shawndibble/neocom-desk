@@ -161,7 +161,6 @@ describe('syncSharedPlans', () => {
     deleteDoc.mockRejectedValueOnce(new Error('offline'));
     await syncSharedPlans(1, 'c1');
     expect(deleteDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/skillPlans/char:1~big' });
-    // The failed delete did not stop the next plan from being refreshed.
     expect(setDoc).toHaveBeenCalledTimes(1);
     expect(setDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/skillPlans/char:1~edited' });
   });

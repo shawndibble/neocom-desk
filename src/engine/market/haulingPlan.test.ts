@@ -29,7 +29,6 @@ function candidate(over: Partial<TripCandidate> & { typeId: number }): TripCandi
 
 const NO_OVERRIDES = new Map();
 
-/** One hold of the given size that takes anything. */
 const anyHold = (capacityM3: number): CargoHold[] => [{ kind: 'general', capacityM3 }];
 
 describe('planTrip', () => {
@@ -52,7 +51,7 @@ describe('planTrip', () => {
           expectedPrice: 150,
           buyLadder: [
             { price: 100, units: 10, orders: 1 },
-            { price: 500, units: 50, orders: 1 }, // costs more than it can sell for
+            { price: 500, units: 50, orders: 1 },
           ],
         }),
       ],
@@ -77,7 +76,6 @@ describe('planTrip', () => {
   });
 
   it('ships nothing of a lot that would lose money, such as one the broker’s minimum fee eats', () => {
-    // 2 ISK left for item 2, a thin margin: two units, and a listing's broker fee is at least 100 ISK.
     const plan = planTrip({
       candidates: [
         candidate({ typeId: 1, demandCapUnits: 10 }),
@@ -115,8 +113,8 @@ describe('planTrip', () => {
   it('gives scarce space to the item that earns more per m³', () => {
     const plan = planTrip({
       candidates: [
-        candidate({ typeId: 1, unitVolumeM3: 10, expectedPrice: 150 }), // ~+50 per 10 m³
-        candidate({ typeId: 2, unitVolumeM3: 1, expectedPrice: 150 }), // ~+50 per 1 m³
+        candidate({ typeId: 1, unitVolumeM3: 10, expectedPrice: 150 }),
+        candidate({ typeId: 2, unitVolumeM3: 1, expectedPrice: 150 }),
       ],
       holds: anyHold(100),
       budgetIsk: null,
@@ -180,8 +178,6 @@ describe('planTrip', () => {
 
 describe('planTrip, a lane chosen per item', () => {
   it("prices a candidate at its own destination's fees when it carries them", () => {
-    // Break-even less the unit margin, at 150 x (1 - fees): with poor standing the
-    // broker fee eats the 136-ISK level, with good standing it stays profitable.
     const ladder = [
       { price: 100, units: 10, orders: 1 },
       { price: 136, units: 10, orders: 1 },
@@ -203,7 +199,6 @@ describe('planTrip, a lane chosen per item', () => {
 });
 
 describe('planTrip, selling into buy orders', () => {
-  // Accounting V: 3.375% tax, no broker fee.
   const instant = (over: Partial<TripCandidate> & { typeId: number }) =>
     candidate({
       buyLadder: [
@@ -228,9 +223,7 @@ describe('planTrip, selling into buy orders', () => {
       overrides: NO_OVERRIDES,
     });
     expect(plan.lines[0]).toMatchObject({ quantity: 10, cost: 1000, limitedBy: 'supply' });
-    // 5 @ 115 and 5 @ 110; the 105 level would earn under the 5% unit margin.
     expect(plan.lines[0]!.profit).toBeCloseTo(1125 - 1125 * 0.03375 - 1000);
-    // The weakest bid used is 110: it nets 106.29 after 3.375% tax, less 5% is 101.23.
     expect(plan.lines[0]!.maxBuyPrice).toBe(101.2);
     expect(plan.binding).toBeNull();
   });
@@ -271,10 +264,8 @@ describe('maxBuyPrice', () => {
   it('is the break-even price less the unit margin, after sales tax and broker fee', () => {
     const c = candidate({ typeId: 1, expectedPrice: 150 });
     const limit = maxBuyPrice(c, FEES)!;
-    // 150 less ~5% in fees leaves ~142; a further 5% margin leaves ~135.
     expect(limit).toBeLessThan(142);
     expect(limit).toBeGreaterThan(130);
-    // Every unit at the limit still clears the margin once fees are paid.
     const atLimit = lotEconomics({
       buyLadder: [{ price: limit, units: 1000, orders: 1 }],
       expectedPrice: 150,
@@ -290,7 +281,6 @@ describe('maxBuyPrice', () => {
       buyLadder: [{ price: 100, units: 10, orders: 1 }],
       destBuyLadder: [{ price: 200, units: 10, orders: 1 }],
     });
-    // 200 nets 193.25 after tax; less the 5% margin leaves about 184.
     expect(maxBuyPrice(c, FEES)).toBeCloseTo(184, 0);
   });
 
@@ -352,7 +342,6 @@ describe('planTrip with specialised holds', () => {
         { kind: 'ammo', capacityM3: 41_000 },
       ]
     );
-    // 100,000 units on the ladder at 0.01 m³ = 1,000 m³: all in the ammo hold.
     expect(result.lines[0]).toMatchObject({ quantity: 100_000, placements: [{ kind: 'ammo' }] });
     expect(result.holds).toEqual([
       { kind: 'general', capacityM3: 300, usedM3: 0 },
@@ -461,7 +450,6 @@ describe('planTrip with specialised holds', () => {
       hoarder
     );
     expect(result.lines[0]).toMatchObject({ quantity: 41_300, limitedBy: 'space' });
-    // The gas hold takes no ammo: it shows empty, not as spare room.
     expect(result.holds.find((h) => h.kind === 'gas')!.usedM3).toBe(0);
   });
 

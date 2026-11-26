@@ -119,7 +119,6 @@ describe('CalendarKindFilterMenu corporation filter', () => {
       />
     );
     await user.click(screen.getByRole('button', { name: /filter event types/i }));
-    // By keyboard: a pointer leaving the submenu trigger closes it under jsdom.
     (await screen.findByRole('menuitem', { name: /corporation events/i })).focus();
     await user.keyboard('{Enter}');
     return { user, onCorpFilter };

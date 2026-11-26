@@ -1,15 +1,8 @@
-/**
- * System cost index history: one small R2 object per solar system, all activities,
- * since EVE Ref's own files (~2 MB, every system) are too big for the app to chart.
- * Mutable keys, no lifecycle rule. Free of relative runtime imports so the backfill
- * script loads it under Node type stripping.
- */
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { WriteOpenPricesResult } from './r2DailySnapshots.js';
 
 export const COST_INDICES_R2_PREFIX = 'cost-indices/';
-/** Days kept per system; the oldest drop first. */
 export const COST_INDICES_MAX_DAYS = 120;
 export const INDUSTRY_SYSTEMS_URL = 'https://esi.evetech.net/industry/systems';
 
@@ -18,38 +11,26 @@ const HEADERS = {
   'Content-Encoding': 'gzip',
   'Cache-Control': 'public, max-age=3600',
 };
-/** Small objects dominated by round-trip latency, as in `r2DailySnapshots.ts`. */
 const CONCURRENCY = 32;
 
-/** activity -> cost index, for one system on one day. */
 export type SystemCostIndices = Record<string, number>;
-/** solar system id -> its activities' cost indices, for one day. */
 export type DayCostIndices = Record<number, SystemCostIndices>;
 
 export interface StoredSystemCostIndices {
   systemId: number;
   lastSyncedAt: number;
-  /** ISO dates ascending, one per column. */
   dates: string[];
-  /** activity -> one value per entry of `dates`, `null` for a day it was absent. */
   activities: Record<string, Array<number | null>>;
 }
 
-/**
- * `isPlainRecord` from guards.ts, inlined: the docblock's "no relative runtime
- * imports" rule is what lets the backfill script load this file under Node type
- * stripping, and a value import of `./guards.js` resolves to nothing on disk.
- */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** One object per system, so a popover reads a few KB, not every system. */
 export function costIndicesR2Key(systemId: number): string {
   return `${COST_INDICES_R2_PREFIX}${systemId}.json`;
 }
 
-/** ESI's system list -> `{ systemId: { activity: index } }`. Malformed entries are skipped, never thrown on. */
 export function parseCostIndices(body: unknown): DayCostIndices {
   const day: DayCostIndices = {};
   if (!Array.isArray(body)) return day;
@@ -75,11 +56,6 @@ function isStored(value: unknown): value is StoredSystemCostIndices {
   return isPlainRecord(value) && Array.isArray(value.dates) && isPlainRecord(value.activities);
 }
 
-/**
- * Folds `days` (date -> the system's indices that day) into the system's stored
- * object. Idempotent: a re-run replaces that date's column. Past the window the
- * oldest columns drop, and an activity left with no value at all goes with them.
- */
 export function mergeSystemCostIndices(
   systemId: number,
   existing: unknown,
@@ -108,14 +84,8 @@ export function mergeSystemCostIndices(
   return { systemId, lastSyncedAt, dates, activities };
 }
 
-/** `lastSyncedAt` changes every run, so no system is ever skipped. */
 export type WriteCostIndicesResult = Omit<WriteOpenPricesResult, 'skipped'>;
 
-/**
- * Merges `days` into every system's R2 object (read, merge, write). A system
- * in none of the days is left alone. A system that fails is counted, not thrown:
- * the merge is idempotent, so the caller retries the whole run.
- */
 export async function writeCostIndicesToR2(
   days: ReadonlyArray<{ date: string; indices: DayCostIndices }>,
   io: { get: R2Get; put: R2Put },

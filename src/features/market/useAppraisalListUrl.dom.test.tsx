@@ -5,7 +5,6 @@ import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { decodeAppraisalList, encodeAppraisalList } from '@/engine/market/appraisalListCode';
 import { useAppraisalListUrl } from './useAppraisalListUrl';
 
-// Spied, so a test can wait for a code to be made or read before asserting what it did not do.
 vi.mock('@/engine/market/appraisalListCode', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/engine/market/appraisalListCode')>();
   return {
@@ -17,7 +16,6 @@ vi.mock('@/engine/market/appraisalListCode', async (importOriginal) => {
 const encode = vi.mocked(encodeAppraisalList);
 const decode = vi.mocked(decodeAppraisalList);
 
-/** Every code started has been made or read, and what followed it has run. */
 async function codesSettled() {
   await waitFor(() => expect(encode).toHaveResolvedTimes(encode.mock.calls.length));
   await waitFor(() => expect(decode).toHaveResolvedTimes(decode.mock.calls.length));
@@ -75,7 +73,6 @@ describe('useAppraisalListUrl', () => {
   it('does not touch the URL when only the box text changes', async () => {
     const { view } = setup('/market/appraisal');
     act(() => view.result.current.setText('Pyerite 9'));
-    // A write would start with an encode, in the effect that act flushed.
     expect(encode).not.toHaveBeenCalled();
     expect(view.result.current.location.search).toBe('');
   });
@@ -133,7 +130,6 @@ describe('useAppraisalListUrl', () => {
   it('writes nothing while another Market tab is showing', async () => {
     const { view } = setup('/market/browser', false);
     act(() => view.result.current.setSubmitted('Tritanium 5'));
-    // A write would start with an encode, in the effect that act flushed.
     expect(encode).not.toHaveBeenCalled();
     expect(view.result.current.location.search).toBe('');
   });

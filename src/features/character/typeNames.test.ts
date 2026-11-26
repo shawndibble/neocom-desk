@@ -140,24 +140,11 @@ describe('loadTypeNames', () => {
   });
 
   it('does not fan out per-id when the batch is rate-limited (429)', async () => {
-    // The opposite of the 404 case: a 429 is not "this batch is unresolvable",
-    // it is ESI telling us to send less. Answering one throttled request with
-    // up to 1000 per-id ones spends the same globally-counted error budget the
-    // throttle is already protecting, so a throttled chunk keeps whatever
-    // names are cached and leaves the rest on their placeholder.
-    //
-    // Two ids on purpose: 200 has no cached row at all, which is what makes
-    // `resolveViaEsi` await the network half rather than returning 100's
-    // lapsed row and refreshing it in an un-awaited background call. A
-    // cached-only ask would let this assertion run before the fan-out it is
-    // trying to rule out had a chance to fire — and 200 is also the id that
-    // discriminates, since it reads `Widget 200` under the old fan-out.
     await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
     let typeRequests = 0;
     server.use(
       http.post(
         `${ESI_BASE_URL}/universe/names`,
-        // retry-after: 0 so esiFetch's one blind retry doesn't idle the test.
         () => new HttpResponse(null, { status: 429, headers: { 'retry-after': '0' } })
       ),
       http.get(`${ESI_BASE_URL}/universe/types/:id`, ({ params }) => {
@@ -181,18 +168,10 @@ describe('loadTypeNames', () => {
   });
 
   it('does not fan out per-id when the batch trips the error limit (420) — issue #655', async () => {
-    // 420 is the status the reported outage actually produced, and the one the
-    // old code amplified: the user's console showed GET /universe/types/21039
-    // twice, both 420, fired *by* this fallback in response to a 420 batch.
-    // An id with no cached name is left on its "Type #id" placeholder rather
-    // than chased with a request that cannot succeed and would deepen the
-    // outage for every other surface in the app.
     let typeRequests = 0;
     server.use(
       http.post(
         `${ESI_BASE_URL}/universe/names`,
-        // 420 takes the other branch of esiFetch's retryWaitMs (the error-limit
-        // reset header rather than Retry-After); 0 keeps the retry instant.
         () => new HttpResponse(null, { status: 420, headers: { 'x-esi-error-limit-reset': '0' } })
       ),
       http.get(`${ESI_BASE_URL}/universe/types/:id`, ({ params }) => {
@@ -216,8 +195,6 @@ describe('loadTypeNames', () => {
   });
 
   it('still falls straight to cache on a genuine network failure, not the per-id fallback', async () => {
-    // A true offline/network error (not an ESI status response) means the
-    // per-id fallback would fail identically — no point firing it.
     await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
     let typeRequests = 0;
     server.use(
@@ -266,14 +243,8 @@ describe('loadTypeNames', () => {
 
     const namesPromise = loadTypeNames(ids);
 
-    // Drain the deferred requests in waves: release whatever has arrived so
-    // far, then wait for the next wave to be
-    // dispatched. A concurrency-limited implementation never has more than
-    // its cap in flight at once; an unbounded one would show up here as a
-    // single wave of `ids.length` requests all arriving before any resolve.
     let released = 0;
     for (let guard = 0; guard < 200 && released < ids.length; guard += 1) {
-      // Wait for the next wave to arrive.
       await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0), { interval: 1 });
       const wave = pending.splice(0, pending.length);
       released += wave.length;
@@ -290,9 +261,6 @@ describe('loadTypeNames', () => {
   });
 
   it('serves an already-cached name without any request', async () => {
-    // Cache-first, not cache-as-fallback: a type name never changes, so a
-    // page that resolved it once must not go back to ESI for it on every
-    // later render.
     let called = false;
     await db.esiCache.put({
       characterId: 0,
@@ -336,9 +304,6 @@ describe('loadTypeNames', () => {
   });
 
   it('returns a lapsed cached name at once and refreshes it behind the caller', async () => {
-    // CCP does rename items (tiericide renamed hundreds), so a `type:` row
-    // gets the same `STALE_AFTER.static` window every other static key has —
-    // it just never makes the caller wait for it.
     let release!: () => void;
     const held = new Promise<void>((resolve) => {
       release = resolve;
@@ -439,7 +404,6 @@ describe('loadTypeNames — cache I/O', () => {
     );
     const get = vi.spyOn(db.esiCache, 'get');
 
-    // 300 has no row, so the caller waits on the network half and its fallback.
     const names = await loadTypeNames([100, 200, 300]);
 
     expect(names.get(100)).toBe('Widget 100');

@@ -16,7 +16,6 @@ import {
 import { ACCOUNT_INACTIVITY_MS } from './purgeStaleAccounts.js';
 
 const DAY = 24 * 3_600_000;
-// A run that lands on the hourly slot (floor(now / 15 min) % 4 === 0), and one that does not.
 const HOURLY_RUN = 4 * 1000 * POLL_RUN_MS;
 const OFF_RUN = HOURLY_RUN + POLL_RUN_MS;
 

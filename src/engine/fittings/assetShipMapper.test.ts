@@ -15,14 +15,12 @@ describe('assetShipToFitting', () => {
       { typeId: 621, name: 'My Caracal' },
       [
         { typeId: HEAVY_LAUNCHER, quantity: 1, flag: 'HiSlot0' },
-        // A loaded charge sits in its module's slot.
         { typeId: SCOURGE, quantity: 40, flag: 'HiSlot0' },
         { typeId: HEAVY_LAUNCHER, quantity: 1, flag: 'HiSlot1' },
         { typeId: DAMAGE_CONTROL, quantity: 1, flag: 'LoSlot0' },
         { typeId: HOBGOBLIN, quantity: 5, flag: 'DroneBay' },
         { typeId: PASTE, quantity: 100, flag: 'Cargo' },
         { typeId: SCOURGE, quantity: 500, flag: 'Cargo' },
-        // A bay the editor has no place for.
         { typeId: 34, quantity: 10, flag: 'FleetHangar' },
       ],
       (typeId) => modules.has(typeId)
@@ -106,7 +104,6 @@ describe('assetShipToFitting — mutated items', () => {
       { slot: 'high', slotIndex: 0, typeId: 47832, state: 'active', mutation: NEUT_MUTATION },
       { slot: 'low', slotIndex: 0, typeId: DAMAGE_CONTROL, state: 'active' },
     ]);
-    // Rolls ESI couldn't supply leave that drone with none (base unknown).
     expect(fitting.drones).toEqual([
       { typeId: 60478, quantity: 1, state: 'online', mutation: DRONE_MUTATION },
       { typeId: 60478, quantity: 1, state: 'online' },

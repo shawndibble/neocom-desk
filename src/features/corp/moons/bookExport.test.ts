@@ -180,7 +180,6 @@ const input: BookExportInput = {
   ],
 };
 
-/** The sheet's cells as plain values, header row first. */
 function table(sheet: XlsxSheet<unknown>): unknown[][] {
   const cols = sheet.columns as CsvColumn<unknown>[];
   return [cols.map((c) => c.header), ...sheet.rows.map((r) => cols.map((c) => c.value(r)))];

@@ -84,8 +84,6 @@ describe('planEntryMerges', () => {
   });
 
   it('fuses a grouped half with a loose one, and the survivor stays in the group', () => {
-    // The Payee edited back onto a member that a previous edit had ejected:
-    // one entry, one Payee, one rate is one obligation however it got there.
     const plans = planEntryMerges([
       make({ id: 'b', oreLines: [{ typeId: 200, quantity: 5 }] }),
       make({ id: 'a', groupId: 'g1' }),
@@ -104,8 +102,6 @@ describe('planEntryMerges', () => {
   });
 
   it('leaves a loose half alone when two rival groups both cover the entry', () => {
-    // Which group the loose half belongs to is not knowable, and guessing
-    // would move ore between two obligations.
     expect(
       planEntryMerges([
         make({ id: 'a', groupId: 'g1' }),

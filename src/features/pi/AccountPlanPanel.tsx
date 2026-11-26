@@ -1,12 +1,3 @@
-/**
- * Find best's whole-account plan: what all of the pilot's planets should do
- * together. Draws `accountView`, computes no figure. A row is a change: a chain
- * across planets, or one planet making a product from bought inputs. The rest
- * stay on their own best pick, in one line.
- *
- * Cues follow DESIGN.md §6c: the product name opens its PI detail; the rows
- * carry no controls of their own.
- */
 import { formatCount } from '@/lib/formatCount';
 import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
@@ -108,9 +99,7 @@ export function AccountPlanPanel({
   pi: PiData;
   haul: boolean;
   buying: boolean;
-  /** The PI hub's region, named in a thin product's flag. */
   regionName: string;
-  /** Each change's price against its 90-day median, by type id. */
   vs90d: ReadonlyMap<number, number | null>;
 }) {
   const { t } = useTranslation();

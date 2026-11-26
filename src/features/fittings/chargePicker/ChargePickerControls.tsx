@@ -14,11 +14,9 @@ import { type ChargePickerSettings, type ChargeView } from '../chargePickerSetti
 interface ControlsProps {
   settings: ChargePickerSettings;
   onChange: (next: ChargePickerSettings) => void;
-  /** The slider's top end, km. */
   maxKm: number;
 }
 
-/** View and Sort, the filter chips, and "Fighting at"'s distance slider (shown only while it's on). */
 export function ChargePickerControls({ settings, onChange, maxKm }: ControlsProps) {
   const { t } = useTranslation();
   const set = (patch: Partial<ChargePickerSettings>) => onChange({ ...settings, ...patch });

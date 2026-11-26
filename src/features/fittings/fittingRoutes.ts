@@ -1,9 +1,3 @@
-/**
- * The Ships section's own paths (scope decision `20260926-135538`). The
- * Fittings Start screen (the library: hulls, Load, My and In-game Fittings)
- * is `/ships/fittings`; an open Fitting is `/ships/fittings/edit?f=<Share
- * Link code>`, so opening one is a history entry Back can return from.
- */
 import { tabPath } from '@/lib/pageTabs';
 import { SHIPS_TABS } from './shipsTabs';
 
@@ -15,12 +9,10 @@ export const SHIP_TREE_PATH = tabPath(SHIPS_TABS, 'tree');
 
 export type FittingEditLocation = { pathname: string; search: string };
 
-/** The editor's location for a Fitting Share Code. */
 export function fittingEditLocation(code: string): FittingEditLocation {
   return { pathname: FITTING_EDIT_PATH, search: `?${new URLSearchParams({ f: code })}` };
 }
 
-/** Compare's href for a query string (`f=…&f=…`, with or without its `?`). */
 export function fittingCompareHref(search: string): string {
   const query = search.replace(/^\?/, '');
   return query === '' ? FITTING_COMPARE_PATH : `${FITTING_COMPARE_PATH}?${query}`;
@@ -30,11 +22,6 @@ function hasShareCode(search: string): boolean {
   return (new URLSearchParams(search).get('f') ?? '') !== '';
 }
 
-/**
- * Where the Fittings tab sends a visitor, or null to stay put. A Fitting Share Code
- * on the library's own path opens the editor; the editor's path with no
- * Fitting is just the library.
- */
 export function fittingsRedirect(pathname: string, search: string): string | null {
   const path = pathname.replace(/\/$/, '');
   const hasCode = hasShareCode(search);

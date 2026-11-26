@@ -1,8 +1,3 @@
-/**
- * First-run Roles: the answer to "What do you do in EVE?" and the Widget Kinds
- * each one brings. Pure data plus the builders that turn an answer (or none)
- * into an Overview Layout.
- */
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import { presetSeed } from './galleryPresets';
 import { getKind, isAddable, kindOpenTo, type WidgetKindDef, type WidgetKindId } from './kinds';
@@ -27,7 +22,6 @@ export const ROLE_IDS = [
 export type RoleId = (typeof ROLE_IDS)[number];
 
 export const ROLES: Record<RoleId, readonly WidgetSeed[]> = {
-  // Wallet flow: the Wallet on its Flow, beside the base set's Wallet on its Balance.
   trader: ['orders', 'priceWatch', 'stock', presetSeed('walletFlow'), 'netWorth'],
   industrialist: ['industry', 'profit', 'stock', 'structures'],
   planetaryIndustry: ['planetary'],
@@ -36,10 +30,8 @@ export const ROLES: Record<RoleId, readonly WidgetSeed[]> = {
   explorerHauler: ['routeSafety', 'hauling', 'incursions', 'location'],
 };
 
-/** Always included, whatever the answer. */
 export const BASE_KINDS: readonly WidgetKindId[] = ['wallet', 'training', 'comingUp', 'mail'];
 
-/** `r1`, `r2`, ...: stable ids for layouts built without a caller's makeId. */
 export function seqId(prefix: string): MakeId {
   let n = 0;
   return () => `${prefix}${++n}`;
@@ -54,7 +46,6 @@ function fromSeeds(
   const seen = new Set<string>();
   for (const seed of seeds) {
     const kind = seedKind(seed);
-    // One widget per kind and Show: the base Wallet and a Role's Wallet flow both stay.
     const key = typeof seed === 'string' ? kind : `${kind}:${seed.show ?? ''}`;
     const def = getKind(kind);
     if (seen.has(key) || !def || !isAddable(kind) || !canDraw(def)) continue;
@@ -66,11 +57,6 @@ function fromSeeds(
   return { version: 1, widgets };
 }
 
-/**
- * Base kinds first, then each chosen role's kinds in order, deduped, coming-soon left out.
- * Corp kinds outside `held` (`null`: not known yet) are left out too, since they could
- * only draw as unreadable; the Gallery still offers them.
- */
 export function buildLayoutFromRoles(
   roles: readonly RoleId[],
   held: CorpCapabilities | null,
@@ -81,16 +67,10 @@ export function buildLayoutFromRoles(
   return fromSeeds(kinds, makeId, (kind) => kindOpenTo(kind, held));
 }
 
-/** "Just the basics". */
 export function basicsLayout(makeId: MakeId = seqId('r')): OverviewLayout {
   return fromSeeds(BASE_KINDS, makeId);
 }
 
-/**
- * The board a pilot gets from Reset: the mockup's order, minus kinds that are
- * not built yet. Each widget opens at its kind's own default size and view
- * (`kinds.ts`), so Reset and a fresh add agree.
- */
 const DEFAULT_BOARD: readonly WidgetKindId[] = [
   'wallet',
   'training',

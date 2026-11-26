@@ -160,7 +160,6 @@ describe('SetWaypointMenuItem', () => {
     act(() => {
       window.dispatchEvent(new Event('offline'));
     });
-    // The menu is now in its blocked branch; the in-flight send is still reported.
     expect(screen.getByText('Setting waypoint…')).toBeInTheDocument();
     await act(async () => fail(new TypeError('Failed to fetch')));
 
@@ -182,7 +181,6 @@ describe('SetWaypointMenuItem', () => {
     await seed(['esi-location.read_location.v1']);
     openMenu();
 
-    // Inert renders a different item (`DisabledMenuItem`), so query afresh each try.
     await waitFor(() =>
       expect(screen.getByRole('menuitem', { name: 'Set waypoint in game' })).toHaveAttribute(
         'aria-disabled',

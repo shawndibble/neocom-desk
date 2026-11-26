@@ -3,8 +3,6 @@ import { assertFails, type RulesTestEnvironment } from '@firebase/rules-unit-tes
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Corp Tax Book sync grant (issue #4068, ADR 0025): function-only. Not even the holding
-// Character may read or write its doc; the encrypted token never reaches a client.
 let env: RulesTestEnvironment;
 const PATH = 'corpTaxBookSyncGrants/98000001';
 

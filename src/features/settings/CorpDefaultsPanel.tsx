@@ -13,12 +13,6 @@ import {
   SettingsPanelLoading,
 } from '@/features/settings/settingsFields';
 
-/**
- * The corp roster's inactivity policy. The rail lists it only for a Character
- * who can actually reach the corp section — a setting for a page you cannot
- * open is noise, and this follows the same hide-rather-than-lock rule the corp
- * nav itself uses.
- */
 export function CorpDefaultsPanel() {
   const { t } = useTranslation();
   const access = useCorpAccess();
@@ -27,7 +21,6 @@ export function CorpDefaultsPanel() {
   const setDarkAfterDays = useDarkThreshold((state) => state.setValue);
   const hydrated = useHydratedStore(useDarkThreshold);
 
-  // Reachable by URL even when the rail hides it, so say why it is empty.
   if (access.state !== 'ready') {
     return (
       <Panel>

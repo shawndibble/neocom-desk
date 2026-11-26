@@ -26,8 +26,6 @@ describe('dedupeEntries', () => {
       { skillTypeID: 3300, targetLevel: 4 },
       { skillTypeID: 3300, targetLevel: 5 },
     ];
-    // The whole point of the per-level rule: the user can drag another skill
-    // between Mass Production IV and V, so collapsing them would take that away.
     expect(dedupeEntries(entries)).toEqual(entries);
   });
 
@@ -89,8 +87,6 @@ describe('upsertEntry', () => {
       ],
       { skillTypeID: 1, targetLevel: 5 }
     );
-    // Level 5 is a row of its own; splitEntriesByLevel is what turns it into
-    // the individual levels 4 and 5 once the character's trained level is known.
     expect(result).toEqual([
       { skillTypeID: 1, targetLevel: 3 },
       { skillTypeID: 2, targetLevel: 1 },
@@ -99,8 +95,6 @@ describe('upsertEntry', () => {
   });
 
   it('adds nothing when an existing row already trains the skill that high', () => {
-    // A row for a level an earlier row already covers would train nothing and
-    // render as a zero-time ghost.
     const result = upsertEntry([{ skillTypeID: 1, targetLevel: 5 }], {
       skillTypeID: 1,
       targetLevel: 2,
@@ -231,7 +225,7 @@ describe('applyReorderSuggestion', () => {
   it('ignores prereq-only steps for skills that are not user entries', () => {
     const entries = [{ skillTypeID: 1, targetLevel: 5 }];
     const suggestedSteps = [
-      { skillTypeID: 99, level: 1 }, // prereq, not a user entry
+      { skillTypeID: 99, level: 1 },
       { skillTypeID: 1, level: 1 },
     ];
     expect(applyReorderSuggestion(entries, suggestedSteps)).toEqual([

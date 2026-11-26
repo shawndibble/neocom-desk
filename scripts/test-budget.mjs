@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-/**
- * Lists the tests over the time budget, for ci.yml's `test-shard` job:
- *   node scripts/test-budget.mjs vitest-timing-1.json   (markdown on stdout)
- *
- * Reads the Vitest JSON report. Budget: a unit test runs under 1s. It only
- * reports and never fails the job: CI runner speed swings by half from run to
- * run, so a hard limit would be a flaky test. A test that stays on the list
- * across runs needs a faster rewrite or a comment saying why it is slow.
- */
 import { readFileSync } from 'node:fs';
 
 const BUDGET_MS = 1000;

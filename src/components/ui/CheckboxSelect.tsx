@@ -13,39 +13,21 @@ import { SelectChevron } from './SelectChevron';
 export interface CheckboxSelectOption<V> {
   value: V;
   label: string;
-  /** A dim second line under the label, for an option whose name needs explaining. */
   description?: string;
-  /** Greyed and unclickable; a checked disabled option still shows its tick. */
   disabled?: boolean;
 }
 
 export interface CheckboxSelectProps<V> {
-  /** The field's name: it leads the trigger's accessible name, and its visible text in an inline filter row (where `FilterField` draws no caption). */
   label: string;
   options: readonly CheckboxSelectOption<V>[];
   selected: ReadonlySet<V>;
   onToggle: (value: V) => void;
-  /** `md` (default) like every other field; pass `sm` only in a row whose other controls are `sm`. */
   size?: ControlSize;
-  /** The summary when nothing is ticked, for a filter where that means "no narrowing" (default "None"). */
   noneLabel?: string;
   className?: string;
-  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
   active?: boolean;
 }
 
-/**
- * A select-shaped trigger over a short, closed set of checkboxes — the filter
- * rows' replacement for a line of `FilterChip`s, which wrapped across several
- * lines once a bar held three or four such groups.
- *
- * A `DropdownMenu`, not `MultiSelect`: a handful of fixed options needs no
- * search box. Toggling keeps the menu open, so picking several is one trip.
- *
- * The trigger summarises the selection in words — "All", "None", the one
- * option's name, or a count — so a narrowed filter reads as narrowed without
- * relying on colour.
- */
 export function CheckboxSelect<V extends string | number>({
   label,
   options,
@@ -58,8 +40,6 @@ export function CheckboxSelect<V extends string | number>({
 }: CheckboxSelectProps<V>) {
   const { t } = useTranslation();
   const inline = useFilterSurface() === 'inline';
-  // Named with the summary too, so a screen reader hears "Source: 2 selected",
-  // not just "Source" — the narrowing must not be visual-only.
   const chosen = options.filter((option) => selected.has(option.value));
   const summary =
     chosen.length === options.length
@@ -88,7 +68,6 @@ export function CheckboxSelect<V extends string | number>({
             key={option.value}
             checked={selected.has(option.value)}
             disabled={option.disabled}
-            // Keep the menu open across toggles (`CalendarKindFilterMenu`'s precedent).
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(option.value)}
           >

@@ -1,17 +1,10 @@
-/**
- * Small pure comparisons the Implant Finder's cards share: what a gain costs
- * per unit, and a stable sort that leaves the unpriced last.
- */
-/** How the finder orders what helps: biggest gain, lowest cost, lowest cost per unit of gain. */
 export type ImplantSort = 'gain' | 'cost' | 'value';
 export const IMPLANT_SORTS: readonly ImplantSort[] = ['gain', 'cost', 'value'];
 
-/** ISK per unit of gain; null without a price or when nothing is gained. */
 export function costPerGain(cost: number | null, gain: number): number | null {
   return cost === null || !(gain > 0) ? null : cost / gain;
 }
 
-/** The smallest number in the list, ignoring nulls; null when there is none. */
 export function smallest(values: readonly (number | null)[]): number | null {
   return values.reduce<number | null>(
     (min, v) => (v === null || (min !== null && min <= v) ? min : v),
@@ -19,7 +12,6 @@ export function smallest(values: readonly (number | null)[]): number | null {
   );
 }
 
-/** Ascending by key, ties keep their order, a null key sorts after every number. */
 export function orderBy<T>(items: readonly T[], key: (item: T) => number | null): T[] {
   return items
     .map((item, index) => ({ item, index, k: key(item) }))

@@ -90,7 +90,6 @@ describe('useCharacterShipTypeId', () => {
 
     await waitFor(() => expect(result.current.status).toBe('needsScope'));
     expect(result.current.typeId).toBeNull();
-    // The effect that would fetch has run, and returned early, by the time the status reads.
     expect(called).not.toHaveBeenCalled();
   });
 

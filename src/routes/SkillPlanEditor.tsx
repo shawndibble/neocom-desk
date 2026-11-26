@@ -17,15 +17,6 @@ import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 
-/**
- * Skill Plan editor: the full editing surface for one plan, beside the plan
- * list on wide screens (#158).
- *
- * The two-column grid itself belongs to `PlanEditor`, not to this route: the
- * sidebar's lower half is the plan's own tools, which need every handler
- * `PlanEditor` already owns. This route's job is the data, and the plan list
- * it hands over to fill the top of that sidebar.
- */
 export function SkillPlanEditor() {
   const { t } = useTranslation();
   const { planId } = useParams<{ planId: string }>();
@@ -48,14 +39,11 @@ export function SkillPlanEditor() {
     totalSp,
     unallocatedSp,
   } = usePlanEditorData(activeCharacterId);
-  // Retry unmounts while the catalog loads again; this wrapper holds focus meanwhile.
   const [retryRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
     loaded && catalogFailed ? 'failed' : 'busy',
     activeCharacterId
   );
   const isDesktop = useIsDesktop();
-  // "Optimize queue" opens a fresh plan with the toast it owes: held in state
-  // so the location can be spent at once, a reload or Back must not raise it again.
   const navigate = useNavigate();
   const location = useLocation();
   const stateMessage = (location.state as Partial<OptimizeQueueToastState> | null)
@@ -64,7 +52,6 @@ export function SkillPlanEditor() {
   useEffect(() => {
     if (stateMessage) navigate(location.pathname, { replace: true, state: null });
   }, [stateMessage, location.pathname, navigate]);
-  // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
     () =>
       catalog
@@ -88,27 +75,13 @@ export function SkillPlanEditor() {
       implants,
     ]
   );
-  // The page header's actions slot, as a live DOM node: PlanEditor portals
-  // Import/Export into it, so they land in the page's one top-right actions
-  // cluster (every other route's pattern) rather than in PlanEditor's own
-  // tree, which this route doesn't otherwise reach into. A callback ref
-  // (not a plain ref) because the portal target has to be in state to
-  // trigger the re-render that lets PlanEditor's portal find it.
   const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
 
-  // Wrapped so `undefined` (still loading) is distinguishable from a plan
-  // genuinely not found: db.skillPlans.get() resolves to undefined either
-  // way, and useLiveQuery never invents an in-between "loading but plan is
-  // missing" value on its own.
   const planQuery = useLiveQuery(async () => {
     if (!planId) return { plan: null };
     return { plan: (await db.skillPlans.get(planId)) ?? null };
   }, [planId]);
 
-  // Above the early returns, because it is a hook: React requires the same
-  // hook order on every render. Stable across renders on purpose — PlanEditor
-  // runs an effect keyed on `onUpdate`, and a fresh closure each render
-  // re-fires it on every keystroke in the tools pane.
   const loadedPlan = planQuery?.plan ?? null;
   const handleUpdate = useCallback(
     async (patch: PlanPatch) => {
@@ -127,25 +100,17 @@ export function SkillPlanEditor() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   const plan = planQuery.plan;
-  // Deleted elsewhere or a stale URL — the list is the only page left to send
-  // the user back to. A plan owned by another Character stays open: switching
-  // Characters on a plan re-costs it against the new Character's skills.
   if (!plan) {
     return <Navigate to="/skills/plans" replace />;
   }
 
   return (
     <div className="mx-auto max-w-page space-y-4">
-      {/* Same title as the other two Skills views: the editor is a third view
-          of the same section, and dropping the <h1> when a plan opens made the
-          page look like it had navigated somewhere else. */}
       <SkillsPageHeader
         actions={<div ref={setHeaderActionsEl} className="flex items-center gap-1.5" />}
       />
       <SkillsSubNav />
 
-      {/* Below `lg` the list is not on screen at all, so this is the only way
-          back to it. */}
       {!isDesktop && (
         <Link to="/skills/plans" className={buttonClassName({ size: 'sm' })}>
           {t('plans.backToList')}
@@ -153,9 +118,6 @@ export function SkillPlanEditor() {
       )}
 
       {!catalog || !loaded ? (
-        // Same two-column shape while the skill catalog loads, so the plan
-        // list stays put in the sidebar instead of vanishing behind a
-        // full-page spinner and snapping back once the catalog arrives.
         <PlanEditorLayout
           sidebar={
             isDesktop ? (

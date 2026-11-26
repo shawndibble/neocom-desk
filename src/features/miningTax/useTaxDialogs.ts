@@ -7,44 +7,27 @@ export interface SettleUpStart {
   payerId?: number;
 }
 
-/**
- * What the link-payment dialog is for: one Payee (its card, a row, Settle up), or, with no
- * `payeeId`, every Payee at once (the "Payments to link" card).
- */
 export interface LinkPaymentTarget {
   payeeId?: string;
 }
 
-/** The Payee ledger open: a personal Payee's, or a Corp Tax Book's. */
 export type LedgerTarget =
-  | { kind: 'personal'; payeeId: string }
-  /** A Corp Tax Book's ledger, on one of the member's Miners there (the active Character's by default). */
-  | { kind: 'book'; corporationId: number; minerId?: string };
+  { kind: 'personal'; payeeId: string } | { kind: 'book'; corporationId: number; minerId?: string };
 
-/** Which Mining Tax dialog is open, and on what. `null` / `false` keeps each one closed. */
 export interface TaxDialogState {
   detailTarget: DisplayRow | null;
-  /** The detail opens with its Unassign confirmation already showing — the row menu's Unassign, which deletes and so asks first. */
   detailConfirmUnassign: boolean;
-  /** The entry whose edit form is open — single or combined, owed or paid (mockup F1). */
   editTarget: DisplayRow | null;
   joinTarget: DisplayRow | null;
   splitTarget: DisplayRow | null;
-  /** Set only by the selection toolbar's Combine: pins the Join dialog to exactly the ticked rows and pre-ticks them. */
   joinCandidateOverride: DisplayRow[] | null;
-  /** The Payee Settle up pays: its Outstanding entries in view. */
   settleUpRows: SettleUpRow[] | null;
-  /** Who pays — `SettleUpDialog`'s `payerId`. */
   settleUpStart: SettleUpStart;
-  /** The link-payment dialog, when open. */
   linkPaymentTarget: LinkPaymentTarget | null;
   corpPayTarget: number | null;
-  /** Opened from one book row: that row's Character pays. */
   corpPayFocus: { rowId: string; characterId: number } | null;
-  /** The Payee ledger open, if any. */
   ledgerTarget: LedgerTarget | null;
   bulkDismissOpen: boolean;
-  /** Whether a dialog's ledger action is writing; mirrored here so `TaxTab` can disable its own controls. */
   acting: boolean;
 }
 
@@ -84,19 +67,15 @@ function createTaxDialogStore() {
   };
 }
 
-/** Runs one row-menu action on a row; `TaxDialogsHost` owns it, since it holds the ledger writes and every dialog the actions open. */
 export type RowMenuRunner = (action: RowMenuAction, dr: DisplayRow) => void;
 
-/** Every opener is stable for the life of the tab, so handing them to the tables never re-renders them. */
 function createActions(patch: (next: Patch) => void) {
   let rowMenuRunner: RowMenuRunner | null = null;
   return {
     openDetail: (dr: DisplayRow | null) =>
       patch({ detailTarget: dr, detailConfirmUnassign: false }),
-    /** The row menu's Unassign: the detail opens with the "unassign this?" question already asked. */
     confirmUnassignFor: (dr: DisplayRow) =>
       patch({ detailTarget: dr, detailConfirmUnassign: true }),
-    /** The host registers how row-menu actions run; returns the cleanup. */
     registerRowMenuRunner: (runner: RowMenuRunner) => {
       rowMenuRunner = runner;
       return () => {
@@ -105,11 +84,9 @@ function createActions(patch: (next: Patch) => void) {
     },
     runRowMenuAction: (action: RowMenuAction, dr: DisplayRow) => rowMenuRunner?.(action, dr),
     openEdit: (dr: DisplayRow | null) => patch({ editTarget: dr }),
-    /** Edit replaces the detail view it was opened from. */
     editFromDetail: (dr: DisplayRow) => patch({ editTarget: dr, detailTarget: null }),
     openJoin: (dr: DisplayRow | null) => patch({ joinTarget: dr }),
     joinFromDetail: (dr: DisplayRow) => patch({ joinTarget: dr, detailTarget: null }),
-    /** The selection toolbar's Combine: `primary` plus exactly the other ticked rows. */
     combineSelected: (primary: DisplayRow, rest: DisplayRow[]) =>
       patch({ joinTarget: primary, joinCandidateOverride: rest }),
     closeJoin: () => patch({ joinTarget: null, joinCandidateOverride: null }),
@@ -118,7 +95,6 @@ function createActions(patch: (next: Patch) => void) {
     openSettleUp: (rows: SettleUpRow[] | null, start: SettleUpStart = {}) =>
       patch({ settleUpRows: rows, settleUpStart: start }),
     openLinkPayment: (target: LinkPaymentTarget | null) => patch({ linkPaymentTarget: target }),
-    /** Link payment replaces the detail view it was opened from. */
     linkPaymentFromDetail: (target: LinkPaymentTarget) =>
       patch({ linkPaymentTarget: target, detailTarget: null }),
     openCorpPay: (corporationId: number | null) =>
@@ -134,12 +110,6 @@ function createActions(patch: (next: Patch) => void) {
 export type TaxDialogActions = ReturnType<typeof createActions>;
 export type TaxDialogStore = ReturnType<typeof createTaxDialogStore>;
 
-/**
- * The Tax tab's ~dozen dialog targets, held outside `TaxTab`'s own state so
- * opening, switching or closing a dialog re-renders only `TaxDialogsHost`
- * (which subscribes via `useTaxDialogState`), never the Open and History
- * tables. `store` and `actions` are created once and never change identity.
- */
 export function useTaxDialogs() {
   const [bundle] = useState(() => {
     const store = createTaxDialogStore();
@@ -148,12 +118,10 @@ export function useTaxDialogs() {
   return bundle;
 }
 
-/** Subscribe to the whole dialog state — the host's view. */
 export function useTaxDialogState(store: TaxDialogStore): TaxDialogState {
   return useSyncExternalStore(store.subscribe, store.getState);
 }
 
-/** Subscribe to one field, so the subscriber re-renders only when that field changes. */
 export function useTaxDialogSelector<T>(
   store: TaxDialogStore,
   select: (state: TaxDialogState) => T

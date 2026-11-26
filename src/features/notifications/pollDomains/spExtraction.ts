@@ -14,14 +14,11 @@ import { SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 
-/* SP extraction (grilling session, 2026-09-09) ------------------------------- */
-
 const isSpExtractionEntrySnapshot = shapeGuard<SpExtractionEntrySnapshot>({
   totalSp: is.number,
   thresholdSp: is.number,
 });
 
-/** Re-read every poll, same reasoning as `currentThresholds` in `shared.ts`: AC4's "without a reload" needs the live value, not a value captured at store-creation time. */
 async function currentSpExtractionEnabled(): Promise<boolean> {
   await useSpExtractionMonitoringEnabled.getState().hydrate();
   return useSpExtractionMonitoringEnabled.getState().value;
@@ -47,18 +44,11 @@ export const spExtractionDomain = defineDomain<
   entriesKey: 'entries',
   isEntry: isSpExtractionEntrySnapshot,
   load: async (characterId) => {
-    // The opt-in gate: skipped entirely (no ESI call at all) unless the
-    // pilot has turned monitoring on, matching `corpContextFor`'s "err
-    // toward not calling the endpoint" precedent above.
     if (!(await currentSpExtractionEnabled())) return null;
-    // Only a marked SP Farm character is ever ready. Unmarked: no ESI call, and
-    // an empty entry list resets the baseline so a later re-mark can fire.
     if (!(await isMarkedSpFarm(characterId))) return [];
     const result = await loadCharacterSkillsWithStatus(characterId);
     if (result.needsReauth || result.cached === null) return null;
     const thresholdSp = await currentSpExtractionThresholdSp();
-    // Exactly one entry — see SpExtractionSnapshot's doc comment for why it's
-    // an array at all.
     return [{ totalSp: result.cached.data.total_sp, thresholdSp }];
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),

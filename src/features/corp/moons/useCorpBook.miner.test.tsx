@@ -1,4 +1,3 @@
-// The Miner page reads one Miner's read-model slice (issue #5258); every other page the whole book.
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookRead } from '../taxBook/bookRead';
@@ -69,7 +68,6 @@ function book(): BookRead {
       extractions: [],
     } as never,
     observed: [
-      // Frozen: before the window, priced by nobody.
       {
         structureId: 1,
         characterId: 5,
@@ -95,7 +93,6 @@ function book(): BookRead {
   };
 }
 
-/** The read the hook asked for: its scope, and nothing else. */
 const asked = (n: number) =>
   Object.fromEntries(
     Object.entries(readBook.mock.calls[n]![2] as Record<string, unknown>).filter(

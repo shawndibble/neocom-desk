@@ -19,7 +19,6 @@ interface SyncStatusDotProps {
   online: boolean;
 }
 
-/** Small glyph reflecting sync state — a distinct shape per state, not hue alone — with an i18n'd tooltip. Purely presentational — see Layout for wiring. */
 export function SyncStatusDot({ status, online }: SyncStatusDotProps) {
   const { t } = useTranslation();
   const displayState = syncDisplayState(status, online);

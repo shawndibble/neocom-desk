@@ -15,7 +15,6 @@ interface MaterialsColumnsInput {
   volumeFor: (typeID: number) => number | null;
   sourcing: MaterialSourcingMap | undefined;
   pricesReady: boolean;
-  /** Wider Price column while a row carries a Depth Price's second line. */
   anyDepth: boolean;
   renderName: (material: MaterialTableRow, inline: boolean) => ReactNode;
   renderHave: (material: MaterialTableRow) => ReactNode;
@@ -23,7 +22,6 @@ interface MaterialsColumnsInput {
   renderTotal: (material: MaterialTableRow) => ReactNode;
 }
 
-/** The desktop table's columns, in order. Built per render: the renderers close over live edit state. */
 export function buildMaterialsColumns({
   t,
   nameFor,
@@ -56,9 +54,7 @@ export function buildMaterialsColumns({
       id: 'owned',
       header: t('industry.errands.haveColumn'),
       align: 'right',
-      // Wide enough that the "Use assets" offer under the field stays on one line.
       headerCellClassName: 'w-32',
-      // A Blueprint Acquisition row owns nothing by typed quantity, so it sinks rather than sorting as zero.
       sortValue: (material) =>
         material.acquisitionTier ? undefined : (sourcing?.[material.typeID]?.ownedQuantity ?? 0),
       render: renderHave,
@@ -69,11 +65,9 @@ export function buildMaterialsColumns({
       align: 'right',
       className: 'tabular-nums',
       headerCellClassName: 'w-20',
-      // A built row is not bought at all, so it sinks rather than sorting as zero.
       sortValue: (material) =>
         material.subBuilds.length > 0 ? undefined : material.remainingQuantity,
       render: (material) =>
-        // Built, or already owned in full: nothing to buy.
         material.subBuilds.length > 0 || material.remainingQuantity === 0 ? (
           <NotApplicable />
         ) : (
@@ -84,9 +78,7 @@ export function buildMaterialsColumns({
       id: 'price',
       header: t('industry.price'),
       align: 'right',
-      // Wider only while a row carries a Depth Price's second line.
       headerCellClassName: anyDepth ? 'w-44' : 'w-28',
-      // The unit price shown; a built row has none and an unpriced one has nothing to rank, so both sink.
       sortValue: (material) =>
         material.subBuilds.length > 0
           ? undefined
@@ -102,8 +94,6 @@ export function buildMaterialsColumns({
       sortValue: (material) =>
         material.subBuilds.length > 0 ? undefined : (rowVolume(material, volumeFor) ?? undefined),
       render: (material) => {
-        // A built row's own volume is never hauled at this typeID — its
-        // inputs carry it in their own rows.
         if (material.subBuilds.length > 0) return <NotApplicable />;
         const volume = rowVolume(material, volumeFor);
         return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;

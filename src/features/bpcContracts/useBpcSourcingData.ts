@@ -42,11 +42,6 @@ import {
   loadBpcContractsSnapshot,
 } from './bpcSourcingSnapshot';
 
-/**
- * Everything the panel reads before it ranks: the snapshot load, the URL
- * filter group, the remembered preferences, and the market / LP / Community
- * source hooks, folded into `sourceData`.
- */
 export function useBpcSourcingData() {
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadBpcContractsSnapshot,
@@ -84,10 +79,6 @@ export function useBpcSourcingData() {
     () => bpcSourcingParams({ hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault }),
     [hideAuctionsDefault, hidePlexDefault]
   );
-  // Source is a remembered default behind its URL key (`bpcSourcesPref.ts`):
-  // a bare visit reopens the pilot's last picks, a link's `sourcing.src` still
-  // wins, and only an edit is stored. Same group, so it writes in the same
-  // navigation as the rest.
   const rememberedSources = useBpcSources((state) => state.value);
   useHydratedStore(useBpcSources);
   const rememberedParams = useMemo(
@@ -120,33 +111,15 @@ export function useBpcSourcingData() {
   const jumps = params['sourcing.jumps'];
   const currentSystem = useCurrentSystem();
   const jumpFilter = useJumpRangeFilter(currentSystem, jumps);
-  // Names each row's system on the phone card (the Location cell).
   const solarSystems = useSolarSystemIndex();
-  /**
-   * The one blueprint the search has been narrowed to, or `null` while the
-   * query is still free text. Distinct from `uiFilter.typeQuery`: typing
-   * "rifter" narrows the table to every blueprint whose name matches, which is
-   * the browse path this page has always had; *choosing* one from the
-   * autocomplete is what unlocks the per-blueprint summary and the
-   * cheapest-by-region comparison, neither of which means anything averaged
-   * across several different blueprints. A "search BPC Sourcing" link
-   * (`bpcSourcingHref`, issue #839) arrives with only this set.
-   */
   const selectedTypeId = params['sourcing.type'];
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
-  /** Contract originals (issue #1241). Absent on a snapshot cached before #1240. */
   const originals = useMemo(() => contractsResult?.data?.originals ?? [], [contractsResult]);
 
-  // The market BPO lookup's region when the Region filter is "All regions":
-  // an Order Book is one region's, so it falls back to the pilot's own market
-  // hub rather than guessing (issue #1241).
   const { hubId: marketHubId, hydrated: marketHubHydrated } = useHubFor('industry');
   const marketHub = getTradeHub(marketHubId) ?? DEFAULT_TRADE_HUB;
   const [marketRefreshTick, setMarketRefreshTick] = useState(0);
-  // Refresh lives in the page header, not in this panel: it re-reads the
-  // contract snapshot and re-checks the market. A ref keeps the callback the
-  // header holds stable while `refresh` changes identity.
   const refreshRef = useRef(refresh);
   useEffect(() => {
     refreshRef.current = refresh;
@@ -156,17 +129,11 @@ export function useBpcSourcingData() {
     setMarketRefreshTick((tick) => tick + 1);
   }, []);
 
-  /** `null` when every kind is checked — the filter's own default, a no-op. */
   const activeSpaceKinds = useMemo(
     () => (spaceFilter.length === SPACE_KINDS.length ? null : new Set(spaceFilter)),
     [spaceFilter]
   );
 
-  /**
-   * Every blueprint in the SDE, for the market lookup only: an NPC-seeded BPO
-   * nobody has contracted is exactly what it must find, and `typeOptions`
-   * only holds listed or owned types.
-   */
   const allBlueprintOptions = useMemo(
     () =>
       [...blueprintNames.entries()]
@@ -191,14 +158,11 @@ export function useBpcSourcingData() {
   const blueprintTypeIds = useMemo(() => [...blueprintNames.keys()], [blueprintNames]);
   const lpOffers = useLpBlueprintOffers({
     characterId: activeCharacterId,
-    // Wait for the pilot's LP Value, or the offers price at the market rate and then reload.
     enabled: sources.has('lp') && lpValueHydrated,
     blueprintTypeIds,
     hub: marketHub,
     lpValue,
   });
-  // An LP row's system is its corporation's nearest station: the station list loads
-  // lazily (outside the install precache) and never blocks the table.
   const lpRowsFound = lpOffers.rows.length > 0;
   const npcLoad = useKeyedLoad('npc-stations', loadNpcStations, !lpRowsFound);
   const npcStations: readonly NpcStationEntry[] | null = npcLoad.data ?? null;
@@ -211,7 +175,6 @@ export function useBpcSourcingData() {
   const bpcRowJumps = useCallback(
     (row: BpcSearchRow): JumpsCellValue => {
       if (row.systemId === null) {
-        // An unplaced LP row waits on the station list and the distances like any placed row.
         if (row.source !== 'lp') return { kind: 'value', count: null };
         if (lpStationsLoading) return { kind: 'loading' };
         return jumpFilter.jumpsStatus === 'ready'

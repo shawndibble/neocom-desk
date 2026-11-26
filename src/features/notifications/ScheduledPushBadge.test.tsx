@@ -24,8 +24,6 @@ describe('NearbyPushBadge', () => {
 
   it('shows nothing while the server does not take the scope at all', async () => {
     await db.settings.put({ key: 'alertsNearby', value: { supported: false, characterIds: [] } });
-    // The mail badge, which does show, beside it: once it is up, the same settings
-    // read has answered for the location badge too.
     await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [] } });
     const { container } = render(<NearbyPushBadge />);
     render(<MailPushBadge />);
@@ -88,8 +86,6 @@ describe('EveNotificationBadge', () => {
       value: { 1: { status: 'active', enabledAt: 1 } },
     });
     const { container } = render(<EveNotificationBadge onlyWhenMissing />);
-    // The badge starts as "grant missing" and clears once the live query reads the grant, so wait
-    // for that instead of sleeping a fixed 20 ms, which lost the race on a loaded runner.
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 });

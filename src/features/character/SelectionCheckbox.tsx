@@ -8,17 +8,11 @@ interface SelectionCheckboxProps {
   state: SelectionState;
   onToggle: () => void;
   label: string;
-  /** Issue #738: the "All Characters" master row disables its browser column when the browser permission is blocked, the same as an individual row. */
   disabled?: boolean;
-  /**
-   * A visible word beside the box (a phone row's "Device"). Inside the label, so a click on it
-   * toggles the box; `captionClassName` decides where it shows. Not part of the accessible name.
-   */
   caption?: string;
   captionClassName?: string;
 }
 
-/** Tri-state checkbox for select mode (issue #90) — indeterminate can only be set imperatively, not via a JSX prop. */
 export function SelectionCheckbox({
   state,
   onToggle,
@@ -33,7 +27,6 @@ export function SelectionCheckbox({
   }, [state]);
 
   return (
-    // The label is the 36px touch target on a coarse pointer (it grows its cell, never overlays a neighbour).
     <label
       className={
         caption === undefined

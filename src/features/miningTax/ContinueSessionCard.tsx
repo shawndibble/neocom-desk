@@ -15,19 +15,11 @@ interface ContinueSessionCardProps {
   busy: boolean;
   autoContinue: boolean;
   onContinue: () => void;
-  /** Opens the entry's own Assign form, for a session that belongs to another Payee. */
   onChooseOther: () => void;
   onKeepSeparate: () => void;
   onAutoContinueChange: (next: boolean) => void;
 }
 
-/**
- * The midnight-UTC offer (mockup F2, scope decision 20261004): a new EVE
- * day's still-unassigned entry that looks like yesterday's owed session
- * carrying on. One tap continues it — same Payee, same tax %, combined with
- * the day before. Always asked first unless the pilot opted into automatic
- * mode here, since one system can hold several Payees' moons.
- */
 export function ContinueSessionCard({
   continuation,
   systemName,

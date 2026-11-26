@@ -35,11 +35,6 @@ describe('remapVerdict', () => {
     });
   });
 
-  // The bug: a plan whose Remaps Available is 0 makes placeRemaps return the
-  // no-remap result by definition (it has nothing to place), and the planner
-  // reported that as a verdict about the *plan* — "no remap improves this
-  // plan in its current order", pointing the user at "Suggest reorder".
-  // Reordering cannot help; only raising Remaps Available can.
   it('reports zero Remaps Available rather than blaming the plan', () => {
     expect(remapVerdict(result(0, [segment(false)]), 0)).toEqual({ kind: 'noRemapsAvailable' });
   });
@@ -74,10 +69,6 @@ describe('markerVerdict', () => {
     });
   });
 
-  // The other half of the bug: "Add remap marker" appends the marker at the
-  // end of the entry list, and optimizeAtMarkers drops the empty segment it
-  // delimits — so an undragged marker yields exactly zero savings and no
-  // remapped segment at all. That is not "remapping here doesn't save time".
   it('reports markers that never split the plan, rather than no gain', () => {
     expect(markerVerdict(result(0, [segment(false)]))).toEqual({ kind: 'markersAtEnd' });
   });
@@ -86,8 +77,6 @@ describe('markerVerdict', () => {
     expect(markerVerdict(result(0, []))).toEqual({ kind: 'markersAtEnd' });
   });
 
-  // A marker that does split the plan but lands somewhere unhelpful is the
-  // pre-existing "try moving them" case, and must stay distinguishable.
   it('reports no gain when a marker splits the plan but the remap does not pay', () => {
     expect(markerVerdict(result(0, [segment(false), segment(true)]))).toEqual({ kind: 'noGain' });
   });

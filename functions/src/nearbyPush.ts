@@ -1,9 +1,3 @@
-// The push payload for a nearby alert (issue #5122, ADR 0028). Pure. Like every
-// server-pushed event (issue #5121, serverEventPoll.ts) it carries the raw fire as
-// JSON (`fire`) and a generic English title/body as the floor: this package has no
-// SDE and no i18n catalog, so the service worker (`pushHandler.ts`) renders the app's
-// own wording with the names it resolves, and falls back to this text when it cannot.
-
 import type { PushMessage } from './eveNotificationPush.js';
 import type { KeyedNearbyFire } from './nearbyAlerts.js';
 

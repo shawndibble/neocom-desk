@@ -54,8 +54,6 @@ async function seedCharacters(withBlueprints: number[], all: number[] = withBlue
   }
 }
 
-// The worker's first render of the page pays the cold module load; pay it once
-// here, under its own timeout, instead of on whichever test runs first.
 beforeAll(async () => {
   store.previewInvite.mockResolvedValue(preview);
   await seedCharacters([]);

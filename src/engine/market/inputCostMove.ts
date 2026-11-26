@@ -1,34 +1,21 @@
-/**
- * How a Build Plan's input cost moved over the last 7 days, on the daily open
- * prices (one side, one hub): the plan's own inputs and product only. Pure.
- * Daily value against daily value — never an order-book price against a
- * history average.
- */
 import type { OpenPricePoint } from './priceHistoryOpen';
 import { shiftUtcDate } from '@/engine/localDay';
 
 export const INPUT_COST_MOVE_DAYS = 7;
-/** The line shows only when build cost moved at least this many percent, up or down. */
 export const INPUT_COST_MOVE_MIN_PCT = 5;
-/** Inputs with a usable series must carry at least this share of the plan's input cost, or the line would speak for a sliver. */
 export const INPUT_COST_MOVE_MIN_COVERAGE = 0.8;
 
 type Side = 'buy' | 'sell';
 
 export interface InputCostMoveInput {
   typeID: number;
-  /** Units still to buy (owned units cost nothing). */
   quantity: number;
-  /** What the plan costs this line, to judge how much of the cost the series cover. */
   lineCost: number;
 }
 
 export interface InputCostMove {
-  /** Percent change of the inputs' summed cost over the window (10 = +10%). */
   costPct: number;
-  /** The input that moved the cost most, in ISK, and its share of the priced cost. */
   topInput: { typeID: number; sharePct: number };
-  /** The product's own change over the same window; null without history. */
   productPct: number | null;
 }
 
@@ -37,7 +24,6 @@ interface Window {
   base: number;
 }
 
-/** Newest priced day on `side` and the last priced day on or before 7 days earlier; null when the series doesn't reach back. */
 function sideWindow(points: readonly OpenPricePoint[] | undefined, side: Side): Window | null {
   const priced = (points ?? [])
     .map((p) => ({ date: p.date, value: p[side] }))

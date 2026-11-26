@@ -41,7 +41,6 @@ function Crumb({ label }: { label: string }) {
   );
 }
 
-/** Today's page chrome: crumb, name, status, a stub for the unchanged Rates and Payments panels. */
 export function OwnerFrame({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto max-w-page space-y-4 px-4 pt-4">
@@ -64,7 +63,6 @@ export function OwnerFrame({ children }: { children: ReactNode }) {
 
 export type MinerLink = 'name' | 'row';
 
-/** Mined at their refineries. A: the miner name is the link. B: the row navigates, trailing caret. */
 export function MinedPanel({ link }: { link: MinerLink }) {
   const cols: DataTableColumn<MinedRow>[] = [
     {
@@ -128,11 +126,9 @@ export function MinedPanel({ link }: { link: MinerLink }) {
   );
 }
 
-/** The one-line facts under a station's name in the list. */
 const stationMeta = (s: Station) =>
   `${s.moon} · ${s.extractions} Extractions · last mined ${s.lastMined}`;
 
-/** The offer hint, as a pill: only when ESI shows the structure gone or no Extraction for long. */
 export function OfferPill({ s }: { s: Station }) {
   if (s.offer === null) return null;
   return (
@@ -192,7 +188,6 @@ function StationRow({
   );
 }
 
-/** Refineries list: names open the station. `control` = where Archive lives (A: detail only, B: also on the row). */
 export function RefineriesPanel({
   stations,
   control,
@@ -211,7 +206,6 @@ export function RefineriesPanel({
   );
 }
 
-/** The Archived section under Refineries: collapsed by default, rows with Restore; empty has one line. */
 export function ArchivedSection({
   stations,
   expanded = true,
@@ -298,7 +292,6 @@ const historyCols: DataTableColumn<HistoryRow>[] = [
   },
 ];
 
-/** The station's own page. `archived` swaps the Archive button for a banner with Restore. */
 export function StationDetail({ s, archived }: { s: Station; archived?: boolean }) {
   const offered = s.offer !== null && !archived;
   return (

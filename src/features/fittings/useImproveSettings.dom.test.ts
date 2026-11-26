@@ -6,15 +6,12 @@ import type { SettingStore } from '@/lib/settingStore';
 import { holdHydration } from '@/test/holdHydration';
 import { IMPROVE_STORES, useImproveSettings } from './useImproveSettings';
 
-// Loose on the value type, so one loop can reset stores of every type.
 type AnyStore = SettingStore<unknown>;
 const stores = Object.entries(IMPROVE_STORES) as [string, AnyStore][];
-// Every store's default, as a page load starts it.
 const defaults = new Map(stores.map(([field, store]) => [field, store.getState().value]));
 
 beforeEach(async () => {
   await db.settings.clear();
-  // A page load: every store starts from its default, unread.
   for (const [field, store] of stores)
     store.setState({ value: defaults.get(field), hydrated: false });
 });
@@ -112,7 +109,6 @@ describe('useImproveSettings', () => {
     for (const [field, store] of stores) {
       const held = holdHydration(store, defaults.get(field));
       const { result, unmount } = renderSettings();
-      // Every other store has settled: only the held one keeps it waiting.
       await waitFor(() =>
         expect(stores.every(([other, s]) => other === field || s.getState().hydrated)).toBe(true)
       );

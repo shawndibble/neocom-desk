@@ -1,15 +1,3 @@
-// Removing a Character from the app (parity plan §5.7 item 3): local Dexie
-// rows for it are deleted (per each synced collection's `onRemoval` rule in
-// sync/syncedCollections.ts). Its remote Editable Data (GLOSSARY.md) is left
-// alone: the `purgeStaleAccounts` Cloud Function deletes it once no device
-// has synced the Character for 90 days. Adding the Character back before then
-// pulls it all again — the pull cursors go with the local rows.
-//
-// Unlike a sold Character (detected via a changed ownerHash, handled by
-// sync/planSync.handleOwnerHashChange), this is the user *choosing* to drop
-// a Character they still hold — there is no signal to detect it from, so it
-// needs its own explicit entry point.
-
 import { dropCharacterHubEntry } from '@/features/market/tradeHubActions';
 import { clearBookCache } from '@/features/corp/taxBook/bookCache';
 import { clearVettingSession } from '@/features/corp/vetting/vettingSession';
@@ -33,18 +21,8 @@ import {
   forgetAlertsGrants,
 } from '@/features/notifications/alertsGrant';
 
-/**
- * How long the last pushes may take, all together, before removal goes ahead
- * without them — a hung push (offline, stalled chunk load) must not block it.
- * One that outlives this is abandoned, not cancelled: it may still write a
- * stale local copy for a Character already gone, never a login.
- */
 export const SYNC_FLUSH_TIMEOUT_MS = 8_000;
 
-/**
- * Best-effort push of each Character's unsynced edits before its local rows
- * and tombstones go; a failure here only means those edits are lost.
- */
 export async function flushSync(characterIds: readonly number[]): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<void>((resolve) => {
@@ -58,13 +36,6 @@ export async function flushSync(characterIds: readonly number[]): Promise<void> 
   }
 }
 
-/**
- * Best-effort deletion of what these Characters shared with their Communities
- * (issue #3600), bounded like {@link flushSync}: it needs each Character's
- * sign-in, so it runs before the local removal, and a hung or failed delete
- * must not keep the Character on the device. Whatever is left is removed by
- * `purgeStaleAccounts` once no device syncs the Character.
- */
 export async function removeSharedBlueprints(characterIds: readonly number[]): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<void>((resolve) => {
@@ -74,7 +45,6 @@ export async function removeSharedBlueprints(characterIds: readonly number[]): P
     const { removeSharedLibraries } = await import('@/features/communities/libraryPush');
     const { unshareAllFittingsEverywhere } = await import('@/features/communities/sharedFittings');
     const { unshareAllPlansEverywhere } = await import('@/features/communities/sharedPlans');
-    // One Character at a time.
     for (const id of characterIds) {
       await removeSharedLibraries(id).catch(() => undefined);
       await unshareAllFittingsEverywhere(id).catch(() => undefined);
@@ -88,33 +58,18 @@ export async function removeSharedBlueprints(characterIds: readonly number[]): P
   }
 }
 
-/**
- * Removing one Character from the Characters page: a last push when sync is
- * set up (gate on `isSyncConfigured()` at the call site), then local removal.
- */
 export async function removeCharacterAfterSync(
   characterId: number,
   syncConfigured: boolean,
   removeShared = false
 ): Promise<void> {
   if (removeShared) await removeSharedBlueprints([characterId]);
-  // Before the local removal: deleting a grant needs this Character's sign-in.
   if (syncConfigured) await deleteAlertGrantsBestEffort([characterId]);
   if (syncConfigured) await flushSync([characterId]);
   await removeCharacter(characterId);
 }
 
-/**
- * @param syncPush Whether to bring this device's Scheduled Push registration in
- *   line with the remaining roster. `logoutAllCharacters` turns it off and
- *   unregisters once itself, rather than once per Character.
- */
 export async function removeCharacter(characterId: number, syncPush = true): Promise<void> {
-  // One transaction for every Dexie-only step: all-or-nothing, so a failure
-  // cannot leave a half-removed Character behind, and live queries wake once
-  // at commit rather than once per table. Nothing non-Dexie may be awaited in
-  // here (IndexedDB would auto-commit early) — the badge, Cache API purge and
-  // push registration all run after it.
   const deletedTables = EDITABLE_COLLECTIONS.filter(
     (collection) => collection.onRemoval === 'delete'
   ).map((collection) => collection.table);
@@ -151,45 +106,28 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await db.mailDrafts.where('characterId').equals(characterId).delete();
       await db.miningLedgerHistory.delete(characterId);
       await db.industryJobHistory.delete(characterId);
-      // Mail queued from this Character can no longer be sent.
       await db.corpMailQueue.where('senderCharacterId').equals(characterId).delete();
       await clearWalletArchive(characterId);
       await clearContractArchive(characterId);
-      // Officer-only rows (ADR 0031) leave with the Character.
       await clearObservedCopies(characterId);
-      // This tab's own copies of those books, which a matching stamp would otherwise still serve.
       clearBookCache();
-      // Officer-only review rows held in memory (ADR 0035) go with it.
       clearVettingSession();
-      // Orphaned feed rows are invisible in the UI (both the bell panel and the
-      // other-character counts skip ids with no Character) but `refreshAppBadge`
-      // counts the whole table — leaving an app-icon count nothing can dismiss.
       await deleteFeedForCharacter(characterId);
       await clearCharacterSyncBookkeeping(characterId);
       await deleteShareSelections(characterId);
       await deleteCommunitySnapshots(characterId);
-      // Its views' stored first frames; the cache purge below also forgets the
-      // in-memory copies and the account-wide ones.
       await db.routeSnapshots.where('characterId').equals(characterId).delete();
     }
   );
-  // Its Trade Hub entry (issue #5593). After the transaction: the synced write loads Firebase lazily.
   await dropCharacterHubEntry(characterId).catch(() => {});
   await forgetAlertsGrants([characterId]);
-  // Its own Firebase app and persisted session go with it (issue #5074).
   if (isSyncConfigured()) await removeCharacterSession(characterId).catch(() => {});
   await refreshAppBadge();
   await purgeCharacterCacheOrSuppress(characterId);
-  // Not part of that purge: the shared rows aren't this Character's own —
-  // they survive as long as the roster does, and only stop being that
-  // roster's own knowledge once nobody in it is left (esi/cachePurge.ts).
   const remaining = await db.characters.count();
   if (remaining === 0) {
     await purgeSharedStructureCache();
   }
-  // This device's own push registration follows its roster: gone with the
-  // last Character, re-uploaded without this one otherwise. The removed
-  // Character's stored Projection is left alone (other devices keep it).
   if (syncPush) {
     if (remaining === 0) {
       scheduleProjectionRebuild.cancel();

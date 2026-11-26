@@ -1,15 +1,3 @@
-// "Add my other corps" (decision "Own corps join a Collector book without an invite link"): a
-// CEO who owns many alt corporations brings each one's moons into the main corporation's Corp
-// Tax Book without invite links. Two router actions' logic:
-//
-//   addOwnFeeder     an editor of the Collector, holding the CEO alt's mining-scope tokens: mint
-//                    an internal self-invite and run the ordinary mining-grant save with it; on
-//                    an own corp already active here (Grant again, #6118) it runs Reconnect
-//   removeOwnFeeder  an editor ends a same-owner moon owner at once (no 24 hour notice mail)
-//
-// The same owner is proven by controlling the CEO alt's refresh token in the same request, not by
-// any account link. Failures carry stable `reason` codes; no player-facing text lives here.
-
 import {
   FEEDER_OF_COLLECTION,
   dateString,
@@ -39,16 +27,12 @@ import { authorizeOfficer, feederRef } from './corpTaxBookStore.js';
 import { fail, type Caller } from './actorAuth.js';
 import type { CorpSyncDeps } from './corpSyncGrant.js';
 
-/** Refusal reasons this pair of actions adds to the existing grant and invite ones. */
 export const OWN_FEEDER_REASONS = ['wrong-corp', 'not-yours'] as const;
 
 export interface AddOwnFeederInput extends BookCall {
-  /** The CEO alt's mining-scope tokens (a separate SSO login). */
   grantAccessToken: string;
   grantRefreshToken: string;
-  /** The corporation the alt is expected to be in; any other is refused `wrong-corp`. */
   feederCorporationId: number;
-  /** First covered day (UTC); clamped server side. Absent: today. */
   coverageFrom?: string;
 }
 
@@ -92,8 +76,6 @@ export async function addOwnFeeder(
     fail('failed-precondition', 'A corporation cannot feed its own book', 'own-book-exists');
   }
   if (await isActiveOwnFeeder(deps, input.corporationId, input.feederCorporationId)) {
-    // Grant again: the new grant replaces the old one through Reconnect, so coverage, mode and
-    // payouts stay as they are and the first pull reads refinery names with the new scopes.
     return saveFeederGrant(
       deps,
       caller,
@@ -105,7 +87,6 @@ export async function addOwnFeeder(
       { expectedFeederCorp: input.feederCorporationId, reconnectOwnOf: input.corporationId }
     );
   }
-  // The code never leaves this function: the invite exists only for the save below.
   const code = newInviteCode();
   const id = hashInviteCode(code);
   const doc: FeederInviteDoc = {
@@ -125,7 +106,6 @@ export async function addOwnFeeder(
       { expectedFeederCorp: input.feederCorporationId }
     );
   } catch (err) {
-    // A refused save unwound everything it wrote; the self-invite is no use to anyone.
     try {
       await inviteRef(deps.db, id).delete();
     } catch (e) {
@@ -135,11 +115,6 @@ export async function addOwnFeeder(
   }
 }
 
-/**
- * Whether the moon owner is one of the caller's own corps that this book already reads. Only
- * routes the call: `reconnectCore` checks the same again inside its transaction. The Moons page
- * offers Grant again on readable rows (`addCorpsStatus.ts`), all of which are `active` here.
- */
 async function isActiveOwnFeeder(
   deps: FeederGrantDeps,
   collector: number,

@@ -1,22 +1,3 @@
-/**
- * The Mining Tax ledger's write actions, in the terms the pilot uses: assign,
- * combine, continue a session (and undo it), unassign, accept a new total,
- * take out of combined, split, dismiss, edit an entry, delete a Payee
- * (moving its entries to another), link a payment to a Payee or unlink it.
- *
- * Every action is one Dexie transaction over the Assignments, the Payees
- * (for deleting one) and the tombstones their deletes leave, so a multi-record change — every day of a
- * Combined Entry, or an undo that both deletes and un-combines — lands whole
- * or not at all. That is what keeps the Combined Entry rule (one obligation,
- * one Payee, one rate) true on write; `coalesce.ts` repairing it on load is
- * only a safety net for data written before this. The sync is scheduled once
- * per character after the commit, never inside the transaction.
- *
- * Every action resolves (never rejects) to one `LedgerActionResult`, so every
- * caller handles a failure the same way — see `useLedgerAction`. The record
- * primitives in `assignments.ts` are this module's to call; the UI imports
- * actions from here (an ESLint rule holds that line).
- */
 import {
   db,
   type MiningTaxAssignmentRecord,
@@ -73,12 +54,6 @@ export type {
   UpdateCombinedInput,
 } from './assignments';
 
-/**
- * Why an action wrote nothing. `already-assigned`: the pilot's view was stale
- * (another tab or device claimed that ore first), so the answer is to reload
- * and show what exists. `save-failed`: anything else — the write, or the
- * pricing it needed first, failed and nothing changed.
- */
 export type LedgerFailureReason = 'already-assigned' | 'save-failed';
 
 export interface LedgerActionFailure {
@@ -97,12 +72,6 @@ function failure(cause: unknown): LedgerActionFailure {
   };
 }
 
-/**
- * Runs `write` as one transaction, then schedules a sync for each character
- * it touched — given up front, or worked out from what `write` returned when
- * only the transaction knows. `write` may only await Dexie — anything else (a price fetch)
- * belongs before this call, or Dexie commits early (PrematureCommitError).
- */
 async function commit<T>(
   characterIds: Iterable<number> | ((value: T) => Iterable<number>),
   write: () => Promise<T>
@@ -122,11 +91,6 @@ async function commit<T>(
 const charactersOf = (records: readonly { characterId: number }[]) =>
   records.map((r) => r.characterId);
 
-/**
- * What is paid, read off the Payees' accounts for a write that may hand a growth collector over.
- * Until the links are known (`linksReady`) every day reads as paid, so no collector hands over a
- * day a link pays elsewhere.
- */
 async function paidReader(): Promise<(a: MiningTaxAssignmentRecord) => boolean> {
   const tracked = (await db.characters.toCollection().primaryKeys()) as number[];
   if (!(await linksReady(tracked))) return () => true;
@@ -134,7 +98,6 @@ async function paidReader(): Promise<(a: MiningTaxAssignmentRecord) => boolean> 
   return (a) => accounts.isPaid(a);
 }
 
-/** Assigns an entry's ore (or a slice of it) to a Payee. */
 export async function assign(
   input: Omit<AssignInput, 'isPaid'> & Partial<Pick<AssignInput, 'isPaid'>>
 ): Promise<LedgerActionResult<MiningTaxAssignmentRecord>> {
@@ -147,7 +110,6 @@ export async function assign(
   return commit([input.characterId], () => createAssignment({ ...input, isPaid }));
 }
 
-/** Combines 2+ entries into one Combined Entry — see `joinAssignments`. */
 export async function combine(
   members: readonly JoinMemberInput[],
   payeeId: string,
@@ -165,23 +127,13 @@ export async function combine(
   );
 }
 
-/** Everything `undoContinue` needs to take a continue back, and nothing stale. */
 export interface ContinueReceipt {
   characterId: number;
-  /** The next day's Assignment the continue created. */
   createdId: string;
-  /** The previous day's Assignment it combined with. */
   previousId: string;
-  /** Whether the previous day was already in a Combined Entry — if so, undo leaves it there. */
   previousWasCombined: boolean;
 }
 
-/**
- * "Continue the <date> session": assigns the next day's unassigned ore to the
- * previous day's Payee and rate, and combines the two (or adds it to the
- * Combined Entry the previous day is already in). The next day is priced at
- * that Payee's hub, through `pricesOn`.
- */
 export async function continueSession(
   continuation: SessionContinuation,
   pricesOn: (date: string) => ReadonlyMap<number, number>
@@ -221,12 +173,6 @@ export async function continueSession(
   };
 }
 
-/**
- * Takes a continue back: unassigns the day it added and, when the previous
- * day stood alone before, un-combines it again. Both records are re-read
- * inside the transaction, so a reload that changed them since (absorbed
- * growth, say) is kept rather than overwritten by the copy from before.
- */
 export function undoContinue(receipt: ContinueReceipt): Promise<LedgerActionResult> {
   return commit([receipt.characterId], async () => {
     const created = await db.miningTaxAssignments.get(receipt.createdId);
@@ -237,19 +183,12 @@ export function undoContinue(receipt: ContinueReceipt): Promise<LedgerActionResu
   });
 }
 
-/** Dismisses entries ("I don't pay tax on this"), one row's or a bulk selection's. */
 export function dismiss(
   inputs: readonly DismissInput[]
 ): Promise<LedgerActionResult<MiningTaxAssignmentRecord[]>> {
   return commit(charactersOf(inputs), () => dismissEntries(inputs));
 }
 
-/**
- * "Dismiss balance" (Settle up): the pilot won't pay what a personal Payee is owed. Each owed day
- * becomes a dismissal of the same ore (no Payee, no tax), written in one transaction with the
- * Assignment it replaces, which is tombstoned like an unassign. A Combined Entry's days come out
- * of the group, since a dismissal belongs to none. A dismissal is undone from its row ("Undo").
- */
 export async function dismissOwed(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
@@ -265,12 +204,10 @@ export async function dismissOwed(
       }))
     );
   });
-  // Sticks like an unassign: a Payee's Default Systems must not assign the day again.
   if (result.ok) await recordDefaultOptOuts(assignments).catch(() => undefined);
   return result;
 }
 
-/** Saves an entry's edit form — one Payee and rate for every day of it. */
 export function editEntry(
   assignments: readonly MiningTaxAssignmentRecord[],
   input: UpdateCombinedInput
@@ -278,30 +215,20 @@ export function editEntry(
   return commit(charactersOf(assignments), () => updateCombinedAssignments(assignments, input));
 }
 
-/** "Take out of combined" for one day, or "Uncombine all" for every day. */
 export function uncombine(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(assignments), () => uncombineAssignments(assignments));
 }
 
-/** Unassigns one Assignment (or undoes a dismissal), or every day of a Combined Entry together. */
 export async function unassign(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
   const result = await commit(charactersOf(assignments), () => deleteAssignments(assignments));
-  // Unassign sticks: a Payee's Default Systems must not assign the entry again. Written after
-  // the commit (the synced setting is not Dexie-only); a failure here only means the default may
-  // try once more, so it never undoes the unassign.
   if (result.ok) await recordDefaultOptOuts(assignments).catch(() => undefined);
   return result;
 }
 
-/**
- * "Accept new total" for one grown day or every grown day of a Combined
- * Entry. Each is priced first — a fetch, so outside the transaction — and
- * only when all of them priced are they written, together.
- */
 export async function acceptNewTotal(members: readonly GroupMember[]): Promise<LedgerActionResult> {
   let resolved: MiningTaxAssignmentRecord[];
   try {
@@ -316,13 +243,10 @@ export async function acceptNewTotal(members: readonly GroupMember[]): Promise<L
   });
 }
 
-/** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
 export async function releaseOre(
   releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[],
-  /** True when a Survey connection takes ore off a Default System's Assignment (`surveyConnections.ts`): the rest stays the default's. */
   takeoverFromDefault = false
 ): Promise<LedgerActionResult> {
-  // Priced before the write: pricing reads market data outside the ledger's transaction.
   let priced: ReleasePrices[];
   try {
     priced = await Promise.all(releases.map((r) => loadReleasePrices(r.assignment, r.after)));
@@ -335,10 +259,6 @@ export async function releaseOre(
   });
 }
 
-/**
- * Puts Assignments back exactly as they were (an Undo of "Let the corporation bill it"): changed
- * ones are overwritten, deleted ones return and are no longer tombstoned.
- */
 export function restoreAssignments(
   records: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
@@ -356,7 +276,6 @@ export function restoreAssignments(
   });
 }
 
-/** Splits part of one assigned day over to a second Payee. */
 export function split(
   original: MiningTaxAssignmentRecord,
   input: SplitInput,
@@ -367,18 +286,9 @@ export function split(
   return commit([original.characterId], () => splitAssignment(original, input, prices));
 }
 
-/**
- * What deleting `payeeId` with a move takes to the new Payee: its owed days,
- * plus every other day of a Combined Entry one of them is in — paid,
- * dismissed and needs-review days included, because a Combined Entry is one
- * obligation under one Payee and moving only its owed days would split it
- * (and coalesce would then dissolve it on load). Standalone paid days, and
- * Combined Entries with nothing owed, stay with the deleted Payee's history.
- */
 export function assignmentsMovedWithPayee(
   assignments: readonly MiningTaxAssignmentRecord[],
   payeeId: string,
-  /** What is paid, off the Payee's account (`PayeeRunningAccounts.statusOf`), never a stored mark. */
   statusOf: (a: MiningTaxAssignmentRecord) => MiningTaxAssignmentStatus
 ): MiningTaxAssignmentRecord[] {
   const own = assignments.filter((a) => a.payeeId === payeeId);
@@ -389,17 +299,6 @@ export function assignmentsMovedWithPayee(
   return own.filter((a) => owed(a) || (a.groupId !== undefined && owedGroups.has(a.groupId)));
 }
 
-/**
- * Deletes a Payee, first moving what `assignmentsMovedWithPayee` picks to
- * `moveToPayeeId` when given — one transaction, so a failure leaves both the
- * Payee and every one of its entries as they were. The entries are re-read
- * inside it, so a day another tab assigned since the dialog opened moves too.
- *
- * Its payment links go with it in the same transaction: to the rest of its merged Payee when
- * another record of the same recipient stays (the links name the group's primary, which may be
- * the record deleted), else to the Payee its entries move to. Deleted with nowhere to move, they
- * stay with its entries, under its own id.
- */
 export async function deletePayee(
   payee: PayeeRecord,
   moveToPayeeId?: string
@@ -413,7 +312,6 @@ export async function deletePayee(
         const accounts = await loadPayeeRunningAccounts();
         let moved: MiningTaxAssignmentRecord[] = [];
         if (moveToPayeeId !== undefined) {
-          // Walks the `characterId` index per character (keys only to find them), not every record.
           const characterIds = await db.miningTaxAssignments.orderBy('characterId').uniqueKeys();
           const own = await db.miningTaxAssignments
             .where('characterId')
@@ -461,11 +359,6 @@ export async function deletePayee(
   return { ok: true, value: undefined };
 }
 
-/**
- * Links a Made Payment to one Payee (a merged Payee's primary record, stored under its Character):
- * it pays that Payee's oldest unpaid days, and what is over is credit. Linking a payment already
- * linked moves it. `replaces` is the recorded payment a transaction now stands in for.
- */
 export async function linkPayment(
   link: PayeePaymentLink,
   characterId: number,
@@ -479,7 +372,6 @@ export async function linkPayment(
   }
 }
 
-/** Unlinks payments, by key: they pay nothing, and are offered again. */
 export async function unlinkPayments(keys: readonly string[]): Promise<LedgerActionResult> {
   try {
     await removePaymentLinks(keys);

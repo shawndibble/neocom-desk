@@ -126,7 +126,6 @@ describe('extractAppliedDpsInputs', () => {
       [
         { attributes: blaster, state: 'online' },
         { attributes: blaster, state: 'overload' },
-        // the engine reports bay drones as active too — the Fitting's own state decides
         { attributes: warrior, state: 'active' },
       ],
       attrs({})
@@ -154,8 +153,6 @@ describe('extractAppliedDpsInputs', () => {
 });
 
 describe('extractAppliedDpsInputs fighters', () => {
-  // A Templar I as the pinned engine reports it: its standard attack's DPS
-  // per fighter, and that attack's damage — all EM.
   const templar = attrs({
     [A.dps]: 38.39,
     [A.fighterAttackEmDamage]: 97.5,

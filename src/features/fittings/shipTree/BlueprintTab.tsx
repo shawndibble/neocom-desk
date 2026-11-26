@@ -1,9 +1,3 @@
-/**
- * Ship Info › Blueprint: the hull's blueprint, where a copy can be had, and
- * a Build Plan for the hull. With the active Character's blueprints read,
- * says whether they already own it. A hull no blueprint makes (special
- * editions, rewards) says so instead.
- */
 import { useCallback, useId } from 'react';
 import { useAsyncLoad, useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +23,6 @@ export function BlueprintTab({
   const needsCharacterId = useId();
   const catalogLoad = useAsyncLoad(shipTreeBlueprintCatalog);
   const catalog = catalogLoad.status === 'failed' ? 'failed' : (catalogLoad.data ?? null);
-  // Ownership is a nicety here; an unreadable list just leaves it unsaid.
   const loadOwned = useCallback(
     () => loadCharacterBlueprints(characterId ?? 0).then((result) => result.cached?.data ?? null),
     [characterId]

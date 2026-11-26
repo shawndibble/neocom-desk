@@ -11,10 +11,6 @@ import { minedDuringExtraction } from './extraction';
 import { toEngineExtraction } from './sync';
 import type { ObservedMiningEntry } from './types';
 
-// Per-pull moon docs (#5256, ADR 0032): the server's mined totals must equal the client
-// engine's `minedDuringExtraction` whatever the rows, expiry and pulls.
-
-/** Small seeded generator: a failing case replays from its seed. */
 function rng(seed: number) {
   let a = seed >>> 0;
   const next = () => {
@@ -160,7 +156,6 @@ describe('moon doc chunk and tax', () => {
       [row({ typeId: 1, quantity: 900, date: dayOf(5) }), row({ typeId: 2, quantity: 100 })],
       rules()
     );
-    // ore 1 caps at its 600, ore 2 gives 100: 700 of 1000.
     expect(doc.minedPct).toBe(70);
   });
 

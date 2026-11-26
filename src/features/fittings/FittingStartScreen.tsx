@@ -72,54 +72,25 @@ import {
 import { useCorpDoctrineFittings } from './corpDoctrineFittings';
 
 interface FittingStartScreenProps {
-  /** The open workspace, or the Compare picker's stand-in that returns a Fitting Share Code. */
   workspace: FittingLibrarySource;
   catalogue: FittingCatalogue | null;
   characterId: number | null;
-  /** Bumped after a Save to EVE, so In-game Fittings refetches. */
   inGameKey: number;
-  /**
-   * `page`: the Start screen with nothing open — New from hull and Import
-   * beside the search. `dialog`: the editor's "Open a fitting" dialog or the
-   * Compare picker.
-   */
   variant?: 'page' | 'dialog';
-  /**
-   * On a desktop, the hovered or focused row previewed beside the list. On by
-   * default for the page; the editor's Open dialog turns it on, the Compare
-   * picker leaves it off.
-   */
   preview?: boolean;
-  /** The page's New from hull button. */
   onStartHull?: (hull: StartHull) => void;
-  /** A dialog's Import, swapping the list for the Load card in place, so no dialog opens over a dialog. */
   importInline?: boolean;
-  /** Each row's ⋮ and right-click menu (Rename, Delete, Compare, Export…). Off in the Compare picker, where a row is only ever picked. */
   rowMenus?: boolean;
-  /** Called once a Fitting has been opened from here. */
   onOpened?: () => void;
-  /** The route's title, for the page; this screen renders the header itself, since the In-game data age and refresh in it come from a hook only this screen holds. */
   pageTitle?: string;
-  /** The page's tab bar (Ships' Fittings / Tree), drawn right under the header. */
   pageTabs?: ReactNode;
-  /** The tab bar's `tabsId` and selected tab, so the content under it is that tab's panel. */
   pageTabsPanel?: { tabsId: string; tabId: string };
 }
 
-/**
- * How long the pointer must rest on a row before the preview takes it: longer
- * than a module's add preview, since each pick works out a whole Fitting and a
- * pointer sweeping the list should pick none of the rows it passes.
- */
 export const LIST_PREVIEW_DELAY_MS = 275;
 
-/**
- * The page's search, in the URL as `?q=` (ADR 0015), so Back from an opened
- * Fitting returns to the list as it was searched.
- */
 const QUERY_KEY = 'q';
 const QUERY_PARAM = textParam();
-/** The page's Source filter (issue #6217), in the URL beside the search as `?source=`. */
 const SOURCE_KEY = 'source';
 const SOURCE_PARAM = enumParam(['all', ...LIBRARY_SOURCES] as const, 'all');
 const SOURCE_LABEL: Record<LibrarySourcePick, string> = {
@@ -130,7 +101,6 @@ const SOURCE_LABEL: Record<LibrarySourcePick, string> = {
   doctrine: 'fittings.start.sourceDoctrine',
 };
 
-/** The content under a page tab bar as its panel; without a bar it is just the content. */
 function MaybeTabPanel({
   panel,
   children,
@@ -146,14 +116,6 @@ function MaybeTabPanel({
   );
 }
 
-/**
- * Every way into a Fitting, as one list (scope decisions `20260925-152418`,
- * `20261001-210222`, `20261106-233825` and `20261113-155526`): one search over
- * the Character's Active Fit, then their saved and In-game Fittings grouped by
- * hull. A click, Enter or Space opens a row. On a desktop page and in the
- * editor's Open dialog the hovered or focused row is previewed beside the
- * list; the last one stays when the pointer leaves.
- */
 export function FittingStartScreen({
   workspace,
   catalogue,
@@ -174,22 +136,16 @@ export function FittingStartScreen({
   const isPhone = useIsPhone();
   const page = variant === 'page';
   const noHover = useMediaQuery(NO_HOVER_QUERY);
-  // A phone has no room for a preview beside the list; a touch tablet no hover to preview with.
   const previewing = preview && !isPhone && !noHover;
-  // Only the page's search is URL state. A dialog's (the editor's Open, the
-  // Compare picker) is a passing pick over another page's URL: written there,
-  // it would outlive the dialog and come back the next time it opened.
   const [urlQuery, setUrlQuery] = useUrlParam(QUERY_KEY, QUERY_PARAM);
   const [dialogQuery, setDialogQuery] = useState('');
   const query = page ? urlQuery : dialogQuery;
   const setQuery = page ? setUrlQuery : setDialogQuery;
-  // The Source filter keeps to the search's rule: the page's in the URL, a dialog's its own.
   const [urlSource, setUrlSource] = useUrlParam(SOURCE_KEY, SOURCE_PARAM);
   const [dialogSource, setDialogSource] = useState<LibrarySourcePick>('all');
   const pickedSource = page ? urlSource : dialogSource;
   const setSource = page ? setUrlSource : setDialogSource;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // The row the pointer is resting on, and its timer to take the preview.
   const hover = useRef<{ rowId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
   const cancelHover = () => {
     clearTimeout(hover.current?.timer);
@@ -197,21 +153,16 @@ export function FittingStartScreen({
   };
   useEffect(() => () => clearTimeout(hover.current?.timer), []);
   const [hullOpen, setHullOpen] = useState(false);
-  // A Fitting Share Code that won't open lands on Import, where its message is.
   const [importOpen, setImportOpen] = useState(page && workspace.shareError !== null);
   const [renaming, setRenaming] = useState<FittingRecord | null>(null);
   const [deleting, setDeleting] = useState<FittingRecord | null>(null);
 
-  // The same when the error arrives once this screen is up (adjusted during
-  // render, not in an effect). Only the page: a dialog never pops Import by itself.
   const [seenShareError, setSeenShareError] = useState(workspace.shareError);
   if (workspace.shareError !== seenShareError) {
     setSeenShareError(workspace.shareError);
     if (page && workspace.shareError !== null) setImportOpen(true);
   }
 
-  // Start the ship data downloading now, so a hull opened from here shows
-  // its slots at once rather than after the first cold download.
   useEffect(() => {
     warmDogmaEngine();
   }, []);
@@ -224,7 +175,6 @@ export function FittingStartScreen({
   const timeZone = useTimeZone();
   const hasCharacter = characterId !== null;
   const { refresh: refreshInGame } = inGame;
-  // Save to EVE landed: pick up the fitting that just arrived.
   useEffect(() => {
     if (inGameKey > 0 && hasCharacter) void refreshInGame();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh() is recreated every render; the key is the trigger
@@ -252,7 +202,6 @@ export function FittingStartScreen({
       t,
     ]
   );
-  // Only the sources with rows are offered; a pick whose source has emptied reads as All sources.
   const sources = useMemo<LibrarySource[]>(
     () => librarySources(active.row ? [...rows, active.row] : rows),
     [rows, active.row]
@@ -262,7 +211,6 @@ export function FittingStartScreen({
     () => groupByHull(filterMyFittings(filterBySource(rows, source), query)),
     [rows, source, query]
   );
-  // Above the hulls, so it is the first pick. It is the ship fitted in game: In-game.
   const activeShown = useMemo(
     () => (active.row ? filterMyFittings(filterBySource([active.row], source), query) : []),
     [active.row, source, query]
@@ -277,11 +225,8 @@ export function FittingStartScreen({
 
   function open(row: LibraryRow) {
     if (row.source === 'saved') workspace.openSaved(row.record);
-    // A Community's Fitting opens like an import: stated for this pilot, nothing saved until they save.
     else if (row.source === 'shared') void workspace.loadFromInput(row.shared.code);
-    // The corp's Doctrine Fit opens the same way; Save a copy makes it the pilot's own.
     else if (row.source === 'doctrine') void workspace.loadFromInput(row.code);
-    // The flown ship opens as an In-game Fitting does (the Compare picker has no other way in).
     else if (row.source === 'active')
       void workspace.openLoaded({
         kind: 'fitting',
@@ -312,15 +257,11 @@ export function FittingStartScreen({
       <p className="text-xs text-warning">{t('common.loadFailedHint')}</p>
     ) : null;
 
-  // Saved Fittings still being read or their hulls decoded, or In-game ones still loading:
-  // "No fittings yet" must not flash before either lands.
   const savedPending =
     hasCharacter && (saved.records === undefined || saved.hulls.size < saved.records.length);
   const loading =
     savedPending ||
     (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
-  // A linked `?source=` whose source has no rows once every source has loaded is
-  // dropped from the URL, so it can't quietly narrow the list when rows arrive later.
   const sourcesSettled =
     !loading && !active.pending && (!hasCharacter || (community.settled && doctrine.settled));
   const urlSourceDead = page && sourcesSettled && urlSource !== 'all' && urlSource !== source;
@@ -343,7 +284,6 @@ export function FittingStartScreen({
       />
     ) : null;
 
-  // A dialog's Import, in place of the list until Back.
   if (importInline && importOpen) {
     return (
       <div className="space-y-3">
@@ -356,7 +296,6 @@ export function FittingStartScreen({
     );
   }
 
-  /** One row of the list: a click opens it, hover or focus previews it, its menu the rest. */
   const renderRow = (row: LibraryRow) => {
     const isSelected = previewing && selected?.id === row.id;
     const item = (
@@ -364,7 +303,6 @@ export function FittingStartScreen({
         <button
           type="button"
           data-row-id={row.id}
-          // A list row, not a toolbar control: a second line (hull, sharer) makes it taller than Compare.
           data-inline-height="exempt"
           aria-current={isSelected || undefined}
           onClick={() => open(row)}
@@ -376,11 +314,9 @@ export function FittingStartScreen({
                 }
               : undefined
           }
-          // Move, not enter: scrolling under a still pointer fires enter on passing rows.
           onPointerMove={
             previewing
               ? (event) => {
-                  // A touch has no hover: its tap opens the row.
                   if (event.pointerType === 'touch' || isSelected) return;
                   if (hover.current?.rowId === row.id) return;
                   cancelHover();
@@ -408,13 +344,11 @@ export function FittingStartScreen({
                   .join(' · ')}
               </span>
             )}
-            {/* The preview pane says it when there is one; without it, the row does. */}
             {row.source === 'doctrine' && row.legacy && !previewing && (
               <span className="block text-xs text-text-dim">
                 {t('fittings.start.doctrineLegacy')}
               </span>
             )}
-            {/* Its heading isn't its hull's, so the row names the hull. */}
             {row.source === 'active' && row.hull !== row.name && (
               <span className="block truncate text-xs text-text-dim">{row.hull}</span>
             )}
@@ -445,7 +379,6 @@ export function FittingStartScreen({
                   : t('fittings.start.sourceInGame')}
             </span>
           )}
-          {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
           {!previewing && !rowMenus && (
             <Icon.Descend
               aria-hidden
@@ -465,9 +398,6 @@ export function FittingStartScreen({
     );
   };
 
-  // Beside a preview the list scrolls in its own box, filling the page or the
-  // dialog (`Modal`'s `page` placement, 90dvh) under the search; elsewhere the
-  // page or the dialog's body scrolls it.
   const listHeight = !previewing
     ? ''
     : page
@@ -476,7 +406,6 @@ export function FittingStartScreen({
   const showNew = page && onStartHull !== undefined;
   const showImport = page || importInline;
   const empty = !hasRows && !active.pending && !loading;
-  // An empty page's New from hull sits in its empty state, beside Fit your ship.
   const showNewInToolbar = showNew && !empty;
   const startHull = (hull: StartHull) => {
     onStartHull?.(hull);
@@ -499,7 +428,6 @@ export function FittingStartScreen({
       {pageTabs}
       <MaybeTabPanel panel={pageTabsPanel}>
         <div className="flex flex-wrap items-center gap-2">
-          {/* The Source filter stays on the search's line, down to a phone. */}
           <div className="flex min-w-64 flex-1 gap-2">
             <div className="min-w-0 flex-1">
               <SearchInput
@@ -507,11 +435,9 @@ export function FittingStartScreen({
                 placeholder={t('fittings.start.searchFittingsPlaceholder')}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                // The page's own box; a dialog's is a passing pick, not a `/` target.
                 pageSearch={page}
               />
             </div>
-            {/* One source has nothing to narrow to. */}
             {sources.length > 1 && (
               <Select
                 value={source}
@@ -534,9 +460,7 @@ export function FittingStartScreen({
               </Select>
             )}
           </div>
-          {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
           {!pageTitle && refreshInGameButton}
-          {/* On a phone they share the row beneath the search, half each. */}
           {(showNewInToolbar || showImport) && (
             <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
               {showNewInToolbar && (
@@ -555,9 +479,6 @@ export function FittingStartScreen({
 
         {inGameStatus}
         <FittingExportNotice notice={rowActions.notice} />
-        {/* A picked Fitting the Compare picker couldn't turn into a Fitting Share Code. The
-          editor's own workspace flags its open Fitting the same way, so the Open
-          dialog never shows it. */}
         {importInline && workspace.tooLargeToShare && (
           <LiveNote className="text-xs text-warning">{t('fittings.load.tooLargeToShare')}</LiveNote>
         )}
@@ -581,9 +502,7 @@ export function FittingStartScreen({
               aria-label={t('fittings.start.listLabel')}
               className={`overflow-y-auto border border-line bg-panel ${listHeight}`}
               onKeyDown={(event) => {
-                // Arrow keys walk the list: focus moves, and a preview follows the focus.
                 if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-                // From a row's ⋮ too, not just the row itself.
                 const focusedId = document.activeElement
                   ?.closest('li')
                   ?.querySelector<HTMLElement>('[data-row-id]')?.dataset.rowId;
@@ -603,10 +522,8 @@ export function FittingStartScreen({
               )}
               {visible.length === 0 &&
                 (source === 'all' ? (
-                  // Search only: the search box is the way out (DESIGN.md, EmptyState).
                   <EmptyState title={t('fittings.start.noMatches')} />
                 ) : (
-                  // The Source pick can be what hides the match: name it, and offer its undo.
                   <EmptyState
                     title={t('fittings.start.noMatchesInSource', {
                       source: t(SOURCE_LABEL[source]),

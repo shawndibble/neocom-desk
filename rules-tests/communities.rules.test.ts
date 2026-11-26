@@ -20,9 +20,6 @@ import {
 import { batchLines } from '../src/engine/communities/delivery';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Communities (issue #3596, ADR 0018): reads are gated by Community
-// membership, writes by the owning Character under the ownerHash guard.
-// A mistake here leaks one player's asset locations to another.
 let env: RulesTestEnvironment;
 
 const C = 'communities/c1';
@@ -453,9 +450,6 @@ describe('shared Fittings', () => {
   });
 });
 
-// Requests (issue #3807, ADR 0021): the whole Community reads them; only the
-// callables write, so even the requester's own client writes are denied.
-// Pledges (issue #3808) are the exception: each Member writes their own.
 describe('Requests', () => {
   const REQ = `${C}/itemRequests/r1`;
   const CLOSED_REQ = `${C}/itemRequests/r-closed`;
@@ -583,7 +577,6 @@ describe('Requests', () => {
     });
 
     it('denies the admin removing a Request or a Pledge from the client: removal is a callable', async () => {
-      // char:1 is the Community's admin; the Request below is char:2's.
       const admin = characterAuth(env, 1, 'hash-1').firestore();
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(
@@ -639,7 +632,6 @@ describe('Requests', () => {
       const STANDING = `${C}/itemRequests/r-standing`;
       const QUOTE = `${STANDING}/pledges/char:2`;
       const standingRequest = (over: Record<string, unknown> = {}) => {
-        // A standing Request has no expiry and no item lines.
         const base: Record<string, unknown> = request({ lines: [], ...over });
         delete base.expiresAt;
         return {
@@ -722,7 +714,6 @@ describe('Requests', () => {
         });
         const links = [{ contractId: 9, status: 'outstanding' }];
         await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, links })));
-        // A different old date is a new quote, and must be about now.
         const other = Date.now() - 5 * DAY;
         await assertFails(
           setDoc(
@@ -742,7 +733,6 @@ describe('Requests', () => {
             )
           )
         );
-        // The old date keeps only its own content: a new total under it is a different quote.
         await assertFails(setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, total: 1, links })));
         await assertFails(
           setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, links: [{ contractId: 9 }] }))
@@ -826,7 +816,6 @@ describe('Requests', () => {
     });
 
     it('still allows a write that changes several lines at once', async () => {
-      // Four plain lines cost more than the rules' budget since `auto`/`through`; the batcher splits at three.
       const SEVERAL = 3;
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(
@@ -852,8 +841,6 @@ describe('Requests', () => {
     });
 
     it('accepts every write the delivery batcher plans, worst cases included (#3809)', async () => {
-      // Pins `batchLines`' cost model to the rules' 1000-expression budget: an
-      // unbatched write of four full lines is denied, a batched one never is.
       const COUNT = 12;
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(
@@ -951,7 +938,6 @@ describe('Requests', () => {
 
     it('bounds the stored contract figure and its finish time, and accepts entries without them (#3809)', async () => {
       const db = characterAuth(env, 2, 'hash-2').firestore();
-      // `auto` is kept unclamped: above a lowered quantity is fine.
       await assertSucceeds(
         setDoc(
           doc(db, PLEDGE),
@@ -1270,7 +1256,6 @@ describe('Board version stamp (issue #5244)', () => {
         { merge: true }
       )
     );
-    // A later stamp-only write keeps the stored reset.
     await assertSucceeds(setDoc(doc(member, STAMP), { stamp: serverTimestamp() }, { merge: true }));
   });
 

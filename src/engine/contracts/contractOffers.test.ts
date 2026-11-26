@@ -73,7 +73,6 @@ describe('bpcRowsFromContractOffers', () => {
 
   describe('isMultiType (issue #1076)', () => {
     it('is false for a contract selling a single distinct type, however many lines/quantity it has', () => {
-      // Two lines of the same typeId (different ME) is still one type.
       const secondLine: PublicContractOfferRow = { ...copy, me: 8, quantity: 2 };
       const rows = bpcRowsFromContractOffers([copy, secondLine]);
       expect(rows.every((row) => row.isMultiType === false)).toBe(true);
@@ -87,9 +86,6 @@ describe('bpcRowsFromContractOffers', () => {
     });
 
     it('counts every for-sale line toward the tally, not only blueprint copies', () => {
-      // A contract selling one blueprint copy plus a plain module is still a
-      // multi-type bundle, even though only the blueprint line survives the
-      // filter — the plain module row is what makes the price indivisible.
       const plainModule: PublicContractOfferRow = { ...base, typeId: 34, quantity: 250 };
       const rows = bpcRowsFromContractOffers([copy, plainModule]);
       expect(rows).toEqual([expect.objectContaining({ typeId: 32858, isMultiType: true })]);

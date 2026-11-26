@@ -1,13 +1,3 @@
-/**
- * Corp/alliance/faction membership for a batch of character ids, via the
- * public POST /characters/affiliation — no scope, no token.
- *
- * Cache-first in the same three tiers as `names.ts`, and for the same reason:
- * a page asks by id, so "which of these do I already have" is answerable
- * without a request. Unlike a name, membership genuinely moves, so these rows
- * lapse on `STALE_AFTER.default` rather than `.static` — a lapsed row is still
- * shown at once and refreshed behind the caller.
- */
 import { postCharactersAffiliation, type CharacterAffiliation } from '@/esi/endpoints';
 import {
   GLOBAL_CACHE_CHARACTER_ID,
@@ -20,10 +10,6 @@ function cacheKey(characterId: number): string {
   return `affiliation:${characterId}`;
 }
 
-/**
- * Affiliations keyed by character id. Ids with neither a live nor a cached
- * answer are absent from the map — callers show the name alone.
- */
 export async function resolveAffiliations(
   characterIds: readonly number[]
 ): Promise<Map<number, CharacterAffiliation>> {
@@ -48,7 +34,6 @@ export async function resolveAffiliations(
     if (now - row.fetchedAt >= STALE_AFTER.default) lapsed.push(id);
   }
 
-  // One request for both tiers when the caller is waiting anyway.
   if (unknown.length > 0) {
     for (const [id, entry] of await fetchAffiliations([...unknown, ...lapsed])) map.set(id, entry);
     return map;
@@ -57,7 +42,6 @@ export async function resolveAffiliations(
   return map;
 }
 
-/** Resolves and caches. Never rejects, so the background call needs no handler of its own. */
 async function fetchAffiliations(
   ids: readonly number[]
 ): Promise<Map<number, CharacterAffiliation>> {
@@ -71,17 +55,10 @@ async function fetchAffiliations(
       entries.map((entry) => [cacheKey(entry.character_id), entry] as const),
       fetchedAt
     );
-  } catch {
-    // Offline or ESI failure. Whatever the caller read from cache stands.
-  }
+  } catch {}
   return resolved;
 }
 
-/**
- * When this character's affiliation row was last read from ESI, or null when
- * there is none. For a view that shows the age of what `resolveAffiliations`
- * handed back: a cache hit is only as new as its row, not as new as the call.
- */
 export async function affiliationFetchedAt(characterId: number): Promise<Date | null> {
   const rows = await readCachedEntries<CharacterAffiliation>(GLOBAL_CACHE_CHARACTER_ID, [
     cacheKey(characterId),

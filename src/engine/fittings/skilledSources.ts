@@ -1,11 +1,3 @@
-/**
- * What made one of Item Detail's skilled values ("base → skilled"): the
- * pilot's skills, their implants, and the hull's own per-level bonus, read
- * off the engine's resolved modifier sources (`affectedAttributes`). Each
- * named once, skills first. A source that didn't apply, the item itself, or
- * the character's own attributes say nothing the pilot can act on and are
- * left out. Pure.
- */
 import type { AffectedSource } from './affectedBy';
 
 export type SkilledSourceKind = 'skill' | 'implant' | 'hull';

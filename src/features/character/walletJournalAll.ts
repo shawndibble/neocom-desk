@@ -1,9 +1,3 @@
-/**
- * The Journal's multi-Character read (issue #3908): the picked Characters'
- * wallet journals and recent fills, fanned out through `fanOutAllCharacters`
- * (scope pre-check, ordering, concurrency). Kept apart from `wallet.ts`, which
- * holds the single-Character loaders.
- */
 import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -24,26 +18,17 @@ export interface CharacterJournal {
   name: string;
   journal: WalletJournalEntry[];
   transactions: WalletTransaction[];
-  /** Pages of the journal were missing. */
   truncated: boolean;
-  /** Pages of the fills were missing: some item names are unresolved. */
   fillsTruncated: boolean;
   fetchedAt: Date;
 }
 
 export interface AllJournalsSnapshot {
-  /** Characters whose journal loaded, in Character order. */
   loaded: CharacterJournal[];
-  /** Tracked Characters with no wallet permission, or whose journal failed to load. */
   skipped: FanOutCharacter[];
   typeNames: Map<number, string>;
 }
 
-/**
- * `characters` is the pick; omitted, every stored Character. `typeNames: false`
- * skips resolving item names (an empty map), for a reader of amounts only;
- * `fills: false` also skips each Character's recent fills (no `transactions`).
- */
 export async function loadAllCharactersJournals(
   characters?: readonly FanOutCharacter[],
   options: { typeNames?: boolean; fills?: boolean } = {}
@@ -54,7 +39,6 @@ export async function loadAllCharactersJournals(
     load: async ({ characterId, name }) => {
       const { cached, needsReauth } = await loadWalletJournalHistory(characterId);
       if (!cached || needsReauth) return null;
-      // The fills only name PLEX lines and items: a failed read costs those, not the journal.
       const fills =
         options.fills === false
           ? null
@@ -76,7 +60,6 @@ export async function loadAllCharactersJournals(
   return { loaded: entries, skipped, typeNames };
 }
 
-/** Ids of the tracked Characters that granted the wallet permission. */
 export async function loadWalletScopedCharacterIds(): Promise<number[]> {
   return characterIdsWithScopes([JOURNAL_SCOPE]);
 }

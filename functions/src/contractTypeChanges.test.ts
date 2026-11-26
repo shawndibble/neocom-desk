@@ -48,7 +48,6 @@ describe('measureContractTypeChanges', () => {
   it('counts a type that appeared or vanished as changed', () => {
     const first = measureContractTypeChanges([row(), row({ typeId: 35 })], null);
     const second = measureContractTypeChanges([row(), row({ typeId: 36 })], first.hashes);
-    // 36 is new, 35 is gone.
     expect(second.stats.changedTypeCount).toBe(2);
   });
 

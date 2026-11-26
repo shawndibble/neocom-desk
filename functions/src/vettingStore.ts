@@ -1,21 +1,3 @@
-// Vetting: the admin-SDK half of the `vettingCall` actions. Parsing is in vettingParse.ts, the
-// rules in vettingDecide.ts, the ESI reads in vettingEsi.ts, the layout in vettingTypes.ts.
-// Clients have no read or write path to any of it (firestore.rules): everything a pilot or an
-// officer sees comes back from one of these functions.
-//
-// Three kinds of caller:
-//   - a pilot with no session: proven by the EVE access token they hand over (start, add) and
-//     then by the review's secret `key`, returned once and stored only as a SHA-256 hash;
-//   - a signed-in member answering a request: their own verified token;
-//   - an officer: Director, CEO or Personnel_Manager, read live from ESI on every call. No
-//     officer record is cached, because no client reads Firestore here.
-//
-// An access token is verified, used for the ESI read and dropped: never written or logged.
-// What the checks read (`inputs`) is held only until the report is submitted, withdrawn or
-// swept, and is not used once `VETTING_DRAFT_HOURS` old even if the daily sweep has not run
-// yet. Every row the read returned is kept apart under `rawRows` until the review is deleted
-// (ADR 0035, vettingRawStore.ts).
-
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { DocumentReference, Firestore, Transaction } from 'firebase-admin/firestore';
 import {
@@ -130,19 +112,13 @@ import { HOUR_MS } from './timeConstants.js';
 
 export interface VettingDeps extends SrpDeps {
   esi: VettingEsi;
-  /** Sends `vettingShared` to reviewers' devices (FCM in production). */
   push: PushSender;
-  /** Where a push that could not be sent is noted; never the caller's problem. */
   logWarn?: (message: string, meta?: Record<string, unknown>) => void;
-  /** Test seam: how long a submit waits for the push. `VETTING_NOTIFY_BUDGET_MS` when absent. */
   notifyBudgetMs?: number;
-  /** Test seam: bytes of rows per stored raw chunk. `VETTING_RAW_CHUNK_BYTES` when absent. */
   rawChunkBytes?: number;
 }
 
-/** The in-game role that may read and sign off reviews, beside Director and the CEO. */
 export const VETTING_REVIEWER_ROLE = 'Personnel_Manager';
-/** The most reviews one overview returns; retention keeps a corp far below it. */
 const OVERVIEW_LIMIT = 500;
 
 const corpRef = (db: Firestore, corporationId: number) =>
@@ -158,11 +134,8 @@ const reviewRef = (db: Firestore, corporationId: number, reviewId: string) =>
 const inputRef = (review: DocumentReference, characterId: number) =>
   review.collection(VETTING_INPUTS).doc(String(characterId));
 
-// --- The pilot's key --------------------------------------------------------
-
 const newReviewId = () => randomBytes(16).toString('base64url');
 const newKey = () => randomBytes(32).toString('base64url');
-/** 9 random bytes are 12 url-safe characters. */
 const newInviteCode = () =>
   randomBytes(9).toString('base64url').slice(0, VETTING_INVITE_CODE_LENGTH);
 const newQuestionId = () => randomBytes(6).toString('base64url');
@@ -175,11 +148,6 @@ function keyMatches(keyHash: unknown, key: string): boolean {
   return held.length === given.length && timingSafeEqual(held, given);
 }
 
-/**
- * One answer for "no such review" and "wrong key", so a key cannot be probed for. A draft past
- * its time gets the same answer: the sweep that deletes it runs once a day, and until then it
- * must be as gone as it will be. `now` is null only for a withdraw, which deletes it anyway.
- */
 function pilotReview(
   snap: { exists: boolean; data(): unknown },
   handle: VettingHandle,
@@ -197,10 +165,6 @@ function pilotReview(
   return review;
 }
 
-/**
- * Inside a transaction, before its other writes: what a member read into a request more than
- * `VETTING_DRAFT_HOURS` ago is deleted rather than used, as the sweep's `clear-inputs` would.
- */
 async function dropExpiredInputs(
   tx: Transaction,
   ref: DocumentReference,
@@ -215,7 +179,6 @@ async function dropExpiredInputs(
   return next;
 }
 
-/** The pilot's review, with a request's expired reads already dropped. */
 async function loadForPilot(
   deps: VettingDeps,
   handle: VettingHandle
@@ -242,8 +205,6 @@ function requireEditable(review: StoredVettingReview): void {
   }
 }
 
-// --- Settings and the corp --------------------------------------------------
-
 async function loadSettings(
   deps: VettingDeps,
   corporationId: number,
@@ -253,7 +214,6 @@ async function loadSettings(
   return readVettingSettings((await (tx ? tx.get(ref) : ref.get())).data());
 }
 
-/** The corp's name and ticker: kept beside its settings, else from public ESI. */
 async function corpName(
   deps: VettingDeps,
   corporationId: number,
@@ -275,29 +235,17 @@ function requireOn(settings: StoredVettingSettings): void {
 
 const CORP_CACHE_MAX = 500;
 const CORP_CACHE_MS = HOUR_MS;
-/**
- * Public ESI names of corporations with no saved settings, null for one ESI does not know.
- * `getVettingCorp` is open to anyone, so without this each call for such a corporation would
- * be an ESI request. In memory, per function instance.
- */
 const corpCache = new Map<number, TimedEntry<{ name: string; ticker: string } | null>>();
 
-/** Test seam: forgets the cached public corp names. */
 export function clearVettingCorpCache(): void {
   corpCache.clear();
 }
 
-/**
- * Public: what the apply page shows before any sign-in. `inviteOk` says only whether the code
- * sent is live; nothing else about a corp's invites leaves through here. An invite-only corp's
- * welcome and minimums are for those it invited: without a live code they read as the defaults.
- */
 export async function getVettingCorp(
   deps: VettingDeps,
   input: { corporationId: number; invite?: string }
 ): Promise<VettingCorpInfo> {
   const { corporationId } = input;
-  // Read on every call: only the ESI name below is cached, never an answer about an invite.
   const settings = await loadSettings(deps, corporationId);
   const inviteOk = vettingInviteOk(settings, input.invite);
   const shown = inviteOk ? settings : VETTING_DEFAULT_SETTINGS;
@@ -317,7 +265,6 @@ export async function getVettingCorp(
   const now = deps.now();
   let found = recallTimed(corpCache, corporationId, now, CORP_CACHE_MS)?.value;
   if (found === undefined) {
-    // A failed lookup throws and is not kept; "no such corporation" is.
     found = await deps.esi.corporation(corporationId);
     rememberTimed(corpCache, corporationId, found, now, CORP_CACHE_MAX);
   }
@@ -325,16 +272,12 @@ export async function getVettingCorp(
   return info(found);
 }
 
-// --- Reading a character ----------------------------------------------------
-
 interface CharacterRead {
   input: VettingCharacterInput;
   character: StoredVettingCharacter;
-  /** Every row the read returned, chunked and named, not yet written. */
   raw: PreparedRaw;
 }
 
-/** Reads the character of a verified token with it. The token goes no further. */
 async function readVerified(
   deps: VettingDeps,
   claims: EveTokenClaims,
@@ -374,14 +317,12 @@ const pilotOf = (character: StoredVettingCharacter): StoredVettingReview['pilot'
   corporationName: character.corporationName,
 });
 
-/** The input document: one JSON string, so 5000 dealings cost no index entries. */
 const inputDoc = (read: CharacterRead) => ({
   characterId: read.character.characterId,
   readAt: read.character.readAt,
   json: JSON.stringify(read.input),
 });
 
-/** Takes one of the character's daily draft slots in this corporation, or fails `rate-limited`. */
 async function takeDraftSlot(
   deps: VettingDeps,
   corporationId: number,
@@ -402,8 +343,6 @@ async function takeDraftSlot(
   }
 }
 
-// --- The pilot --------------------------------------------------------------
-
 function requireInvite(settings: StoredVettingSettings, code: string | undefined): void {
   if (!vettingInviteOk(settings, code)) {
     fail(
@@ -414,17 +353,12 @@ function requireInvite(settings: StoredVettingSettings, code: string | undefined
   }
 }
 
-/**
- * Public: reads the token's character and opens a draft application. A live invite code is
- * recorded on it and counted, whether or not the corp is invite-only.
- */
 export async function startVetting(
   deps: VettingDeps,
   input: VettingStartInput
 ): Promise<{ handle: VettingHandle; status: VettingStatus }> {
   const settings = await loadSettings(deps, input.corporationId);
   requireOn(settings);
-  // Before the token is verified or anything is read: a link without a live invite gets no further.
   requireInvite(settings, input.invite);
   const claims = await verifyAccessToken(deps.verifyToken, input.accessToken);
   await takeDraftSlot(deps, input.corporationId, claims.characterId);
@@ -467,9 +401,6 @@ export async function startVetting(
   };
   const ref = reviewRef(deps.db, input.corporationId, reviewId);
   const settingsDoc = settingsRef(deps.db, input.corporationId);
-  // One transaction: the settings are checked again as they are now (vetting may have been
-  // turned off, or the invite revoked, while the character was read) and the invite's use is
-  // counted with the review it started.
   const made = await deps.db.runTransaction(async (tx) => {
     const current = readVettingSettings((await tx.get(settingsDoc)).data());
     requireOn(current);
@@ -485,7 +416,6 @@ export async function startVetting(
     tx.set(inputRef(ref, read.character.characterId), inputDoc(read));
     return { review: next, settings: current };
   });
-  // After the review exists. A failure leaves a draft the sweep deletes with its rows.
   try {
     await writeRaw(ref, read.raw);
   } catch (err) {
@@ -513,11 +443,6 @@ function requireRoom(review: StoredVettingReview, characterId: number): void {
   }
 }
 
-/**
- * Takes one of the review's `VETTING_MAX_READS` before the ESI read it pays for, in a
- * transaction, so calls made side by side cannot each see room and together pass the cap. A
- * read that then fails has still spent its slot.
- */
 async function reserveRead(
   deps: VettingDeps,
   ref: DocumentReference,
@@ -536,24 +461,19 @@ async function reserveRead(
     tx.update(ref, { reads: review.reads + 1 });
     return review !== loaded;
   });
-  // After the commit, and kept out of the closure, which may run again.
   if (dropped) await tidyRaw(ref, new Map(), deps.logWarn);
 }
 
-/** Reads one more character into a draft or a request being answered; a re-read replaces it. */
 export async function addVettingCharacter(
   deps: VettingDeps,
   input: VettingHandle & { accessToken: string }
 ): Promise<VettingStatus> {
-  // The key, then the token (verified locally), then the limits: all before any ESI call is
-  // spent on the caller.
   const { ref, review: before } = await loadForPilot(deps, input);
   requireEditable(before);
   const claims = await verifyAccessToken(deps.verifyToken, input.accessToken);
   await reserveRead(deps, ref, input, claims.characterId);
   const read = await readVerified(deps, claims, input.accessToken);
   const settings = await loadSettings(deps, input.corporationId);
-  // Own generation first: nothing names these chunks until the transaction below does.
   let done: { status: VettingStatus; replacedRaw: StoredVettingCharacter['raw'] };
   try {
     await writeRaw(ref, read.raw);
@@ -587,7 +507,6 @@ async function addRead(
     const now = deps.now();
     const review = pilotReview(await tx.get(ref), input, now);
     requireEditable(review);
-    // The reads already here went stale while this one was made: the next call drops them.
     if (hasExpiredInputs(review, now)) changed();
     requireRoom(review, read.character.characterId);
     const others = review.characters.filter(
@@ -596,7 +515,6 @@ async function addRead(
     const isReplaced = others.length !== review.characters.length;
     const next: StoredVettingReview = {
       ...review,
-      // A re-read keeps the character's place in the list. `reads` was counted by `reserveRead`.
       characters: isReplaced
         ? review.characters.map((character) =>
             character.characterId === read.character.characterId ? read.character : character
@@ -610,7 +528,6 @@ async function addRead(
       next.pilot = pilotOf(read.character);
     }
     if (review.state === 'requested' && review.characters.length === 0) {
-      // What a member reads into a request is held no longer than a draft would be.
       next.expiresAt = Math.min(requestExpiry(review.createdAt), draftExpiry(now));
     }
     tx.set(ref, next);
@@ -637,7 +554,6 @@ export async function removeVettingCharacter(
     const review = await dropExpiredInputs(tx, ref, loaded, now);
     const next = withoutCharacter(review, input.characterId);
     tx.set(ref, next);
-    // Expired reads are all gone already, this character's among them.
     if (review === loaded) tx.delete(inputRef(ref, input.characterId));
     return {
       status: pilotStatus(input.reviewId, next, settings, now),
@@ -645,7 +561,6 @@ export async function removeVettingCharacter(
       raw: review.characters.find((character) => character.characterId === input.characterId)?.raw,
     };
   });
-  // After the commit: the metadata no longer names these chunks, so they are only tidied.
   if (done.dropped) await tidyRaw(ref, new Map(), deps.logWarn);
   else if (done.raw)
     await tidyRawIds(ref, rawChunkIdsOf(input.characterId, done.raw), deps.logWarn);
@@ -661,10 +576,6 @@ function parseInput(json: unknown): VettingCharacterInput | undefined {
   }
 }
 
-/**
- * Names and places everyone the characters dealt with, runs the checks, and returns the
- * assessment with only the parties its flags name (and their corporations and alliances).
- */
 async function assess(
   deps: VettingDeps,
   characters: VettingCharacterInput[],
@@ -699,7 +610,6 @@ async function assess(
     const party = parties.get(id);
     if (party) kept.set(id, party);
   }
-  // A flagged character is on the report because of where it sits: name that too.
   const homes = new Set<number>();
   for (const party of kept.values()) {
     for (const home of [party.corporationId, party.allianceId]) {
@@ -715,17 +625,12 @@ async function assess(
   return { assessment, parties, kept: [...kept.values()] };
 }
 
-/** What a submit must find unchanged: the reads taken, and which read of each character is held. */
 const readsVersion = (review: StoredVettingReview): string =>
   [
     review.reads,
     ...review.characters.map((character) => `${character.characterId}@${character.readAt}`),
   ].join(',');
 
-/**
- * What an application must bring before it is shared: an answer to each required question and
- * the corp's minimums, both as the settings stand now. Returns the answers to keep.
- */
 function requireApplicationMet(
   settings: StoredVettingSettings,
   given: VettingSubmitInput['answers'],
@@ -737,12 +642,10 @@ function requireApplicationMet(
     fail('failed-precondition', 'Answer every required question first', 'answers-required');
   }
   const unmet = unmetVettingMinimums(settings.minimums, characters, now);
-  // The message is the unmet minimums' ids, comma separated: the client shows which.
   if (unmet.length > 0) fail('failed-precondition', unmet.join(','), 'below-minimum');
   return answers;
 }
 
-/** Sends `vettingShared` to each reviewer `vettingSharedRecipients` picks. Never throws. */
 async function pushShared(
   deps: VettingDeps,
   reviewId: string,
@@ -773,11 +676,6 @@ async function pushShared(
   }
 }
 
-/**
- * Tells the reviewers seen lately that a report was shared, on the devices that chose it. After
- * the submit has committed, and never its problem: a failure is logged and swallowed, and the
- * pilot's answer waits for it no longer than the budget (the report is in the queue either way).
- */
 async function notifyShared(
   deps: VettingDeps,
   reviewId: string,
@@ -792,13 +690,6 @@ async function notifyShared(
   if (late) deps.logWarn?.('vettingShared push timed out', { reviewId });
 }
 
-/**
- * Runs the checks, hands the report to the corp, and deletes what the checks read (`inputs`). Raw
- * rows stay for officers (ADR 0035), except those of characters not on the report. From here
- * the review waits `VETTING_OPEN_KEEP_DAYS` for a decision, and is deleted if none comes. An
- * application must first answer the corp's required questions and meet its minimums; a
- * promotion review is asked neither.
- */
 export async function submitVetting(
   deps: VettingDeps,
   input: VettingSubmitInput
@@ -820,7 +711,6 @@ export async function submitVetting(
   }
 
   if (before.kind === 'promotion' && !byId.has(before.pilot.characterId)) {
-    // The request was about this member: a report of other characters alone does not answer it.
     fail(
       'failed-precondition',
       `Add ${before.pilot.name} before sharing the report`,
@@ -829,7 +719,6 @@ export async function submitVetting(
   }
 
   const settings = await loadSettings(deps, input.corporationId);
-  // Before the checks spend any ESI call on a report that cannot be shared yet.
   const answers =
     before.kind === 'application'
       ? requireApplicationMet(settings, input.answers, characters, deps.now())
@@ -863,7 +752,6 @@ export async function submitVetting(
       assessment,
       signOffsNeeded: signOffsNeeded(settings, review.kind),
       readAt: now,
-      // Shown to the pilot as the day the report goes if nobody decides; a decision resets both.
       deleteAt: openExpiry(now),
       expiresAt: openExpiry(now),
       log: appendVettingLog(review.log, {
@@ -877,7 +765,6 @@ export async function submitVetting(
     for (const doc of stored.docs) tx.delete(doc.ref);
     return next;
   });
-  // Chunks of a read not on the report: nothing names them any more.
   await tidyRaw(ref, keptRaw(shared.characters), deps.logWarn);
   if (settings.notifyReviewers) await notifyShared(deps, input.reviewId, shared);
   return pilotStatus(input.reviewId, shared, settings, deps.now());
@@ -894,17 +781,11 @@ export async function getVettingStatus(
   return pilotStatus(handle.reviewId, review, settings, deps.now());
 }
 
-/**
- * Deletes the review and anything read into it, in any state: the report is the pilot's. The
- * review and its `inputs` go in one transaction, so a character added meanwhile finds it gone. Raw
- * rows go before it and again after, for a read that landed in between.
- */
 export async function withdrawVetting(
   deps: VettingDeps,
   handle: VettingHandle
 ): Promise<Record<string, never>> {
   const ref = reviewRef(deps.db, handle.corporationId, handle.reviewId);
-  // The key first: the rows are not deleted for someone who does not hold it.
   pilotReview(await ref.get(), handle, null);
   await pruneRaw(ref);
   await deps.db.runTransaction(async (tx) => {
@@ -917,7 +798,6 @@ export async function withdrawVetting(
   return {};
 }
 
-/** A member turns an officer's request down. The review stays, so reviewers see the answer. */
 export async function declineVetting(
   deps: VettingDeps,
   handle: VettingHandle
@@ -948,12 +828,6 @@ export async function declineVetting(
   return {};
 }
 
-// --- A member answering a request -------------------------------------------
-
-/**
- * The requests waiting for the caller's character in its current corporation. The member has
- * no key yet, so each one returned is given a fresh key here; an earlier handle stops working.
- */
 export async function listMyVettingRequests(
   deps: VettingDeps,
   caller: Caller,
@@ -986,17 +860,11 @@ export async function listMyVettingRequests(
   return out.sort((a, b) => a.status.id.localeCompare(b.status.id));
 }
 
-// --- Officers ---------------------------------------------------------------
-
 interface Reviewer {
   actor: VettingActor;
   canConfigure: boolean;
 }
 
-/**
- * The caller as a reviewer, from ESI roles read now: a Director or the CEO (who may also
- * configure) or a Personnel_Manager. Nothing is cached, so a demotion takes effect at once.
- */
 async function authorizeReviewer(
   deps: VettingDeps,
   caller: Caller,
@@ -1006,7 +874,6 @@ async function authorizeReviewer(
   const verified = await verifyCallerToken(deps, caller, call.accessToken);
   const { identity, roles } = await requireLiveRoles(deps, verified, {
     corporationId: call.corporationId,
-    // Personnel_Manager is not one of the decided roles, so the role is checked below.
     need: () => true,
     denied: { message: 'No reviewer role in this corporation', reason: 'not-a-reviewer' },
   });
@@ -1050,11 +917,6 @@ async function overview(
   };
 }
 
-/**
- * Notes that this caller held a reviewer role just now, and on which EVE account, so a shared
- * report can find them and leave out its own pilot (`notifyShared`). At most one write a day
- * per reviewer; a failure costs only a push.
- */
 async function recordReviewer(
   deps: VettingDeps,
   corporationId: number,
@@ -1083,7 +945,6 @@ export async function getVettingOverview(
   return out;
 }
 
-/** Any reviewer hands out an apply link: a new invite, live until revoked. */
 export async function createVettingInvite(
   deps: VettingDeps,
   caller: Caller,
@@ -1103,13 +964,11 @@ export async function createVettingInvite(
     if (!out.ok) {
       fail('failed-precondition', 'Too many invites; revoke one first', out.reason);
     }
-    // Merged: a corp that has saved no settings yet keeps none but the invite.
     tx.set(ref, { invites: out.settings.invites }, { merge: true });
   });
   return overview(deps, call.corporationId, reviewer);
 }
 
-/** Any reviewer revokes an invite. A code that is already gone is not an error. */
 export async function revokeVettingInvite(
   deps: VettingDeps,
   caller: Caller,
@@ -1126,7 +985,6 @@ export async function revokeVettingInvite(
   return overview(deps, call.corporationId, reviewer);
 }
 
-/** A review an officer may see: any but a draft, which is not with the corp yet. */
 function officerReview(snap: { exists: boolean; data(): unknown }): StoredVettingReview {
   const review = snap.data() as StoredVettingReview | undefined;
   if (!snap.exists || !review || review.state === 'draft') {
@@ -1135,19 +993,12 @@ function officerReview(snap: { exists: boolean; data(): unknown }): StoredVettin
   return review;
 }
 
-/**
- * Nobody reads the report about themselves, whatever their role: not the pilot, not a character
- * on it, not another character of an account one was read from. Signing it off is refused the
- * same way. (The requester of a promotion review is not its subject: they may read it, and are
- * `barred` from signing.) The queue still lists the row.
- */
 function refuseOwnReview(review: StoredVettingReview, actor: VettingActor): void {
   if (isSubject(review, actor)) {
     fail('permission-denied', 'This review is about you', 'own-review');
   }
 }
 
-/** Opens a report. The pilot sees who opened it, so each open is logged (once an hour). */
 export async function openVettingReview(
   deps: VettingDeps,
   caller: Caller,
@@ -1174,11 +1025,6 @@ export async function openVettingReview(
   });
 }
 
-/**
- * One page of one source's kept rows across the review's characters: one stored chunk per page.
- * Officers only, with the checks and once-an-hour log line of `openVettingReview`, so paging adds
- * none. `next` is an opaque cursor, null on the last page.
- */
 export async function getVettingRawRows(
   deps: VettingDeps,
   caller: Caller,
@@ -1193,7 +1039,6 @@ export async function getVettingRawRows(
   }
   return deps.db.runTransaction(async (tx) => {
     const review = officerReview(await tx.get(ref));
-    // A request is not with the corp yet: the member is still putting it together.
     if (review.state === 'requested' || review.state === 'declined') {
       fail('not-found', 'No such review', 'not-found');
     }
@@ -1201,7 +1046,6 @@ export async function getVettingRawRows(
     const position = rawPagePosition(review.characters, input.source, cursor);
     if (position === null) fail('invalid-argument', 'cursor is not valid', 'bad-cursor');
     const { order, start } = position;
-    // All reads before the log's write.
     let at = start;
     let found: Pick<VettingRawPage, 'rows' | 'parties'> = { rows: [], parties: [] };
     for (; at < order.length; at += 1) {
@@ -1253,7 +1097,6 @@ export async function decideVettingReview(
   return deps.db.runTransaction(async (tx) => {
     const review = officerReview(await tx.get(ref));
     refuseOwnReview(review, actor);
-    // Read with the review: whether this note may reach the pilot is settled as it is written.
     const settings = await loadSettings(deps, call.corporationId, tx);
     const sign = {
       decision: input.decision,
@@ -1270,7 +1113,6 @@ export async function decideVettingReview(
   });
 }
 
-/** Asks a member for a review before a promotion. The member answers from their own session. */
 export async function requestVettingReview(
   deps: VettingDeps,
   caller: Caller,
@@ -1349,10 +1191,6 @@ const MAIL_REFUSAL = {
   'mail-cooldown': ['failed-precondition', 'The member was mailed less than a day ago'],
 } as const;
 
-/**
- * Notes that the asking officer mailed the member the link (the client sends the mail from the
- * officer's own Character; the server cannot). A resend waits `VETTING_MAIL_COOLDOWN_MS`.
- */
 export async function recordVettingRequestMail(
   deps: VettingDeps,
   caller: Caller,

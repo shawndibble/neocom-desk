@@ -10,10 +10,6 @@ import { compareAttributesCsvColumns, flattenCompareGroups } from './compareAttr
 import type { CompareAttributesData } from './useCompareAttributes';
 import type { CompareRow } from './useCompareRows';
 
-/**
- * The matrix's categories, built from the drawer's price rows and dogma.
- * `data` may be absent (still loading) — no categories then.
- */
 export function useCompareAttributeGroups(
   rows: readonly CompareRow[],
   data: CompareAttributesData | null
@@ -38,11 +34,6 @@ export function useCompareAttributeGroups(
   }, [rows, data, t]);
 }
 
-/**
- * One export for the whole matrix — every category's rows, in matrix order,
- * each carrying its category — for the drawer's title-bar menu. The drawer
- * owns the title bar, so it owns this hook and hands it to the matrix.
- */
 export function useCompareAttributesExport(
   rows: readonly CompareRow[],
   data: CompareAttributesData | null

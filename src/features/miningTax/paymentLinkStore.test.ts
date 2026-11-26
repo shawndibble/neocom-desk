@@ -62,7 +62,6 @@ describe('payment links', () => {
     const stored = await loadPaymentLinks();
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ id: 'journal:41', payeeId: 'p2', characterId: 8 });
-    // The copy under the first Character is tombstoned, so the move syncs.
     expect(
       (await readTombstones(tombstoneKey(MINING_TAX_PAYMENT_LINKS, 7))).map((t) => t.id)
     ).toEqual(['journal:41']);
@@ -101,7 +100,6 @@ describe('readLegacyPaidMarks', () => {
     const a = await db.miningTaxAssignments.get('a');
     expect(a?.status).toBe('outstanding');
     expect(a).not.toHaveProperty('payment');
-    // Once per device: a mark that turns up later is not read.
     await db.miningTaxAssignments.put(
       marked('d', {
         payment: { paymentId: 'pay3', paidOn: '2026-10-10', method: 'other', amount: 1 },
@@ -113,7 +111,6 @@ describe('readLegacyPaidMarks', () => {
 
   it('two devices read the same mark into the same link', async () => {
     await db.miningTaxAssignments.put(marked('a'));
-    // Another device read it first; the link arrived by sync.
     await db.miningTaxPaymentLinks.put({
       ...link({ kind: 'legacy', refId: 'pay1', amount: 250_000 }),
       id: 'legacy:pay1',
@@ -169,7 +166,6 @@ describe('the Payees a book owns', () => {
     const accounts = await loadPayeeRunningAccounts();
     expect(accounts.isBookOwned('p1')).toBe(true);
     expect(accounts.of('p1')).toBeUndefined();
-    // Its old day still reads paid (a paid day is never unpaid), but pays nothing personal.
     expect(accounts.isPaid({ payeeId: 'p1', status: 'outstanding', date: '2026-10-01' })).toBe(
       true
     );

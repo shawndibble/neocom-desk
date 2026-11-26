@@ -1,9 +1,3 @@
-/**
- * In-game ship/container names for the Assets pages (issue #5652). Read after
- * the assets load, cached in `esiCache` beside them (so they paint offline and
- * are re-read on the same cadence), and never allowed to break a page: any
- * failure falls back to the last saved names, else none, and rows read as today.
- */
 import { corpCacheKey, loadWithCacheStatus, readCached } from '@/esi/cache';
 import {
   postCharacterAssetNames,
@@ -34,7 +28,6 @@ async function fetchRealNames(
 ): Promise<AssetNameMap> {
   const [types, groupCategories] = await Promise.all([
     loadTypes(),
-    // Without it no type reads as nameable: no names beats a failed batch.
     loadGroupCategories().catch(() => ({}) as Record<string, number>),
   ]);
   const ids = nameableItemIds(assets, (typeId) => {
@@ -50,7 +43,6 @@ async function fetchRealNames(
   return realAssetNames(raw, typeIdByItemId, (typeId) => types[String(typeId)]?.name);
 }
 
-/** A Character's in-game asset names: fresh cache, else ESI, else the saved copy, else none. */
 export async function loadCharacterAssetNames(
   characterId: number,
   assets: readonly NameableAsset[]
@@ -68,7 +60,6 @@ export async function loadCharacterAssetNames(
   }
 }
 
-/** The corporation's in-game asset names, under the Director gate its assets read already passed. */
 export async function loadCorporationAssetNames(
   characterId: number,
   corporationId: number,

@@ -1,13 +1,3 @@
-/**
- * The Corp Tax Book's backend as the client sees it (issue #4062, ADR 0023):
- * reads through Firestore under the officer rules, every write through the
- * callables in functions/src/corpTaxBook*.ts. The refresh token never leaves
- * Dexie; only a short-lived access token is sent, and only where the server
- * asks for one (`verifyOfficer`, and the live-role-check edits).
- *
- * Firestore here is the `lite` build (no listeners), so callers refetch after
- * a change.
- */
 import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import {
@@ -69,7 +59,6 @@ import { callSignedIn } from '@/sync/signedInCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
-/** `verifyCorpOfficerCallable`'s answer. */
 export interface OfficerVerdict {
   corporationId: number;
   isCeo: boolean;
@@ -81,31 +70,24 @@ export interface OfficerVerdict {
   expiresAt: number;
 }
 
-/** The book's settings document, the fields the sync client reads. */
 export interface BookSummary {
   active: boolean;
   startDate: string;
   divisions: number[];
-  /** The corp's own names for those divisions, as a Director's visit last stored them (#6161). */
   divisionNames?: DivisionNames;
   lastSync: LastSync | null;
   structureExpiryHours: Record<string, number>;
 }
 
-/** Everything the sync reads back from the book. */
 export interface BookState {
   book: BookSummary;
   miners: Miner[];
-  /** The book's late notices, from `lateNotices`. */
   notices: LateNotice[];
   payments: SettlePayment[];
   dismissals: Dismissal[];
   extractions: SyncExtraction[];
-  /** Each Miner's stored paid-through day (`meta/paid`): their days up to it stay paid (D22). */
   minerPaidThrough?: Map<string, string>;
-  /** Officer write-offs (#4637): they reduce what a Miner owes. */
   writeOffs?: RecordedWriteOff[];
-  /** Members' disputes: an open one holds its day out of what is due (resolving in the app). */
   disputes?: OreDispute[];
 }
 
@@ -115,9 +97,7 @@ export interface SyncUpload {
   extractions?: SyncExtraction[];
   donations?: JournalDonation[];
   gaps?: SyncGap[];
-  /** #6207: donations noted in divisions the book does not read; replaces the stored list. */
   uncounted?: UncountedDonation[];
-  /** Whether this sync read the book's divisions for donations; the first call only. */
   donationsRead?: boolean;
 }
 
@@ -127,10 +107,6 @@ export interface SyncReceipt {
   donationsAdded: number;
 }
 
-/**
- * A moon owner's status and pending removal, read under the officer rules right before the send
- * queue mails a removal notice (#4621). A lapsed officer record is renewed once.
- */
 export async function readFeederRemovalState(
   characterId: number,
   corporationId: number,
@@ -151,7 +127,6 @@ export async function readFeederRemovalState(
   );
 }
 
-/** Runs an officer-rules read, renewing a lapsed officer record once on a refusal. */
 async function asOfficer<T>(
   characterId: number,
   corporationId: number,
@@ -167,26 +142,14 @@ async function asOfficer<T>(
   }
 }
 
-/** A Collector book's Feeder Extractions and records, for their pops off the Moons page. */
 export interface FeederChunkParts {
   extractions: SyncExtraction[];
   feeders: (Pick<BookFeeder, 'corporationId' | 'refineryLabels' | 'refineryStructures'> & {
-    /** The Feeder's last good read (ms): its pops' Data Age. */
     lastReadWellAt?: number;
   })[];
-  /**
-   * Pop Sharing marks by refinery (#6226), the book's own moons and its Feeders' alike;
-   * absent when the sharing settings could not be read.
-   */
   shareMarks?: PopShareMarks['structures'];
 }
 
-/**
- * Every Miner of the book, for a picker on a page read for one Miner (moving a payment): the
- * groupings, and a Miner of its own for each character the book's rows name. The rows come from
- * this device's copy of the ledger (`observed`, a delta read), so a book already opened on this
- * device costs little; the book's own figures are not built.
- */
 export async function readBookMiners(characterId: number, corporationId: number): Promise<Miner[]> {
   return asOfficer(characterId, corporationId, async () => {
     const book = await openBook(characterId, corporationId);
@@ -200,13 +163,6 @@ export async function readBookMiners(characterId: number, corporationId: number)
   });
 }
 
-/**
- * The Feeder Extractions a book holds and the records that name their refineries (#6116),
- * under the officer rules. Null when the corporation has no book. The Extractions come from the
- * Overview read model (ADR 0032: one doc, already windowed and without cancelled ones); a book
- * whose read model is not built yet reads its live chunks instead. Only Feeder rows are kept:
- * the book's own chunks come from ESI.
- */
 export async function readFeederChunkParts(
   characterId: number,
   corporationId: number
@@ -219,7 +175,6 @@ export async function readFeederChunkParts(
     const [overview, feeders, sharing] = await Promise.all([
       getDoc(doc(book, 'readModels', 'overview')),
       getDocs(collection(book, 'feeders')),
-      // Best effort: the pops still list without their marks.
       readPopSharingCached(characterId, corporationId).catch(() => null),
     ]);
     const windowed = overview.data()?.extractions as SyncExtraction[] | undefined;
@@ -268,7 +223,6 @@ export async function readFeederChunkParts(
   });
 }
 
-/** Checks the Character's corporation and roles with ESI and records officer access for 24 hours (D7). */
 export async function verifyOfficer(
   characterId: number,
   corporationId: number
@@ -281,13 +235,8 @@ export function uploadSync(characterId: number, upload: SyncUpload): Promise<Syn
   return callSignedIn(characterId, 'syncCorpTaxBookCallable', upload);
 }
 
-/**
- * Edits that re-check the Character's roles live (D7). The callable refuses them on the 10-minute
- * cache, so the access token travels with them. The server's own list, so the two cannot drift.
- */
 export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set(LIVE_CHECK_ACTION_NAMES);
 
-/** A close-account that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 function needsLiveToken(action: { action: string } & Record<string, unknown>): boolean {
   return (
     LIVE_CHECK_ACTIONS.has(action.action) ||
@@ -295,17 +244,12 @@ function needsLiveToken(action: { action: string } & Record<string, unknown>): b
   );
 }
 
-/**
- * One edit action through `editCorpTaxBookCallable`, e.g. `{ action: 'writeOff', ... }`.
- * Attaches the access token for the live-check actions and for nothing else.
- */
 export async function editBook<Out = Record<string, unknown>>(
   characterId: number,
   corporationId: number,
   action: { action: string } & Record<string, unknown>,
   options: { freshToken?: boolean } = {}
 ): Promise<Out> {
-  // `freshToken` is for a caller that may outlive the 10-minute role cache (the mail queue).
   const accessToken =
     options.freshToken || needsLiveToken(action)
       ? await getValidAccessToken(characterId)
@@ -317,7 +261,6 @@ export async function editBook<Out = Record<string, unknown>>(
   });
 }
 
-/** The book's settings, or null when the corporation has none. Any signed-in Character may read this document. */
 export async function readBookSummary(
   characterId: number,
   corporationId: number
@@ -333,7 +276,6 @@ function summaryFrom(d: Record<string, unknown>): BookSummary {
   return { active, startDate, divisions, divisionNames, lastSync, structureExpiryHours };
 }
 
-/** Characters an officer unlinked: automatic grouping leaves them alone (D26). Officer-only. */
 export async function readDeclinedAutoGroup(
   characterId: number,
   corporationId: number
@@ -346,11 +288,6 @@ export async function readDeclinedAutoGroup(
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
 }
 
-/**
- * What the Members page flags beside a character: ones two groups claim (`meta/groupConflicts`)
- * and ones that said no to a link (`meta/groupingAnswers`). Best effort: a book that never had
- * either has no document, and a denied read is none. Officer-only.
- */
 export async function readGroupingFlags(
   characterId: number,
   corporationId: number
@@ -371,7 +308,6 @@ export async function readGroupingFlags(
   };
 }
 
-/** The book's settings and the collections the sync needs. Officer-only: verify first. */
 export async function readBookState(
   characterId: number,
   corporationId: number
@@ -401,12 +337,8 @@ export async function readBookState(
   };
 }
 
-// --- The whole book, for /corp/moons (issue #4063) --------------------------
-
-/** Every setting the Settings dialog edits, as the book document stores it. */
 export type { BookSettings };
 
-/** The book's settings document, or null when the corporation has none. */
 export async function readBookSettings(
   characterId: number,
   corporationId: number
@@ -416,25 +348,18 @@ export async function readBookSettings(
   return snap.exists() ? settingsFrom(snap.data()) : null;
 }
 
-/** The settings document as `BookSettings`, validated, every default filled in. */
 export const settingsFrom = (d: Record<string, unknown>): BookSettings => parseBookSettings(d);
 
-/** A guest's answer to a hand-made grouping (D26b), for the officers to see after the fact. */
 export interface GroupingAnswer {
   characterId: number;
   minerId: string;
   answer: 'confirmed' | 'declined';
-  /** ISO instant. */
   at: string;
-  /** Whether the character answered itself or the Miner's verify link declined for it. */
   via: 'character' | 'verify-link';
-  /** ISO instant an officer took it out of Needs you (`dismissGroupingAnswer`). */
   dismissedAt?: string;
-  /** A declined grouping: the Characters that were in that Miner besides the decliner, so the card can name a group that has since dissolved. */
   otherCharacterIds?: number[];
 }
 
-/** Reads `meta/groupingAnswers`, dropping anything malformed. */
 export function groupingAnswersFrom(d: Record<string, unknown> | undefined): GroupingAnswer[] {
   const raw = d?.answers;
   if (typeof raw !== 'object' || raw === null) return [];
@@ -462,7 +387,6 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
   });
 }
 
-/** An officer takes a Character's answer to a grouping out of Needs you. */
 export function dismissGroupingAnswer(
   characterId: number,
   corporationId: number,
@@ -474,15 +398,12 @@ export function dismissGroupingAnswer(
   });
 }
 
-/** A character two groups claim (`meta/groupConflicts`): the earlier group was kept, an officer settles it. */
 export interface GroupConflict {
   characterId: number;
   minerIds: string[];
-  /** ISO instant. */
   at: string;
 }
 
-/** Reads `meta/groupConflicts`, dropping anything malformed. */
 export function groupConflictsFrom(d: Record<string, unknown> | undefined): GroupConflict[] {
   const raw = d?.items;
   if (!Array.isArray(raw)) return [];
@@ -499,13 +420,8 @@ export function groupConflictsFrom(d: Record<string, unknown> | undefined): Grou
   });
 }
 
-/** A payout row with its document id. */
 export type FeederPayoutRow = FeederPayout & { id: string };
 
-/**
- * One feeder's record as the officers read it (`corps/{book}/feeders/{corp}`), with its
- * `payouts`. `lastReadWellAt` is an ISO string, as `FeederReadClock` carries it.
- */
 export interface BookFeeder extends FeederReadClock {
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
   mode: FeederMode;
@@ -517,53 +433,34 @@ export interface BookFeeder extends FeederReadClock {
   grantHolder?: number;
   grantedBy?: number;
   lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
-  /** When ESI first refused the ledger in the current spell (ms). */
   staleSince?: number;
-  /** Why the read that began the current stale spell was refused. */
   staleReason?: string;
-  /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
   payeeChangedAt?: number;
-  /** A pending removal (#4520): who started it and when; `effectiveAt` once its notice is out. */
   removal?: { startedAt: number; startedBy: number; startedByName: string; effectiveAt?: number };
   viewDismissedAt?: number;
   requestedRatePct?: number;
   agreedRatePct?: number;
   offeredOwnerRatePct?: number;
   payee?: { kind: 'corporation' | 'character'; id: number };
-  /** Which side set the payee last, who and when (#4653); absent on an older record. */
   payeeSetBy?: PayeeSetBy & { characterId: number };
   coveragePeriods: { from: string; to?: string }[];
-  /** Absent on records written before the history existed. */
   ownerRateHistory?: OwnerRateEntry[];
-  /** Absent means derive from `mode`. */
   modeChanges?: FeederModeChange[];
-  /** Refinery labels by structure id, set by either side's officers (#4640). */
   refineryLabels?: Record<string, StoredRefineryLabel>;
-  /** Refineries an officer archived, by structure id (#6298); absent when none were. */
   refineryArchive?: Record<string, RefineryArchive>;
-  /** Refinery systems by structure id, learned from miners' own ledgers (#4650). */
   refinerySystems?: Record<string, number>;
-  /** Refinery names and systems the sync read with the moon owner's grant (#4654). */
   refineryStructures?: Record<string, StoredRefineryStructure>;
-  /** The moon owner's grant reads refinery names (#4654); absent on a grant from before. */
   readsStructureNames?: boolean;
-  /**
-   * The moon owner's grant reads the Extraction started notifications, so its chunks' ore is
-   * known; absent until a sync since it existed says.
-   */
   readsNotifications?: boolean;
-  /** The moon owner turned Pop Sharing off for its moons (#6222); absent is sharing allowed. */
   popSharingOptOut?: { by: number; at: number };
   payouts: FeederPayoutRow[];
 }
 
-/** A feeder record as stored: the clock is epoch ms, and the payouts live under it. */
 export type FeederDoc = Omit<BookFeeder, 'lastReadWellAt' | 'payouts'> & {
   lastReadWellAt?: number;
 };
 
-/** A stored feeder record and its payouts as a `BookFeeder`. */
 export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): BookFeeder {
   const { lastReadWellAt, ...rest } = record;
   return {
@@ -575,55 +472,28 @@ export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): B
   };
 }
 
-/**
- * A part of the book a read covers (`bookRead/parts.ts` says which page reads which, and
- * `bookRead/slices.ts` which fields each part fills).
- */
 export type BookPart = 'core' | 'observed' | 'ledger' | 'answers' | 'owners';
 
-/** Everything `/corp/moons` renders from. Officer-only: verify first. */
 export interface BookData {
   settings: BookSettings;
   state: BookState;
   observed: ObservedRow[];
   declarations: BookDeclaration[];
   adjustments: Adjustment[];
-  /** Officers' per-day limits on what a shortfall may forgive (the newest per day decides). */
   toleranceExemptions?: ToleranceExemption[];
-  /** Each Miner's snapshot (`accounts/{minerId}.snapshot`); none before the server keeps them. */
   checkpoints?: RunningAccountCheckpoint[];
-  /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];
-  /** Characters two groups claim, for the officers to settle (`meta/groupConflicts`). */
   groupConflicts?: GroupConflict[];
-  /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
-  /** #6207: donations a sync noted in divisions the book does not read (`meta/uncounted`). */
   uncounted?: UncountedDonation[];
-  /** #6206: Miners' Conflict disputes (`disputes`), answered or not. Read with the ledger. */
   disputes?: OreDispute[];
-  /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
   parts: ReadonlySet<BookPart>;
-  /** A moon page's read (#5716): the moon docs that stand in for earlier cycles' ledger rows. */
   moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
-  /**
-   * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
-   * part. Absent when that part was not read; a moon owner without one is priced from `observed`.
-   */
   feederSummaries?: ReadonlyMap<number, FeederViewSummary>;
-  /**
-   * The Miner a one-Miner read (`readBook` with a `minerId`) covered; absent for the whole book. Then
-   * `state.miners` holds that Miner only, so a dialog listing other Miners reads them itself.
-   */
   scopedMiner?: string;
 }
 
-/**
- * What the group dialog lists on a one-Miner page (#5704): the stored groups and the ledger
- * rows, through the same copies the whole-book read uses, so a warm device reads only the
- * book doc and what changed. Officer-only.
- */
 export async function readGroupingSources(
   characterId: number,
   corporationId: number
@@ -634,11 +504,6 @@ export async function readGroupingSources(
   return { miners, observed };
 }
 
-/**
- * The book's stored observer rows and its moon owners' coverage, for matching donations against
- * the moon owners' mining the book bills (`syncCorpTaxBook`). Through the same copies the
- * whole-book read uses. Officer-only.
- */
 export async function readStoredRows(
   characterId: number,
   corporationId: number
@@ -658,33 +523,26 @@ export async function readStoredRows(
   };
 }
 
-/** A declaration as stored: who recorded it, and who resolved it. */
 export type BookDeclaration = Declaration & {
   recordedBy?: number;
   resolution?: NonNullable<Declaration['resolution']> & { by?: number };
 };
 
-/** A stored declaration with the notice it answers read off its legacy field (`NOTICE_ID_FIELD`). */
 export function bookDeclarationOf(raw: Record<string, unknown>): BookDeclaration {
   const { [NOTICE_ID_FIELD]: legacy, ...rest } = raw;
   return { ...rest, noticeId: (raw.noticeId ?? legacy) as string } as unknown as BookDeclaration;
 }
 
-/** An officer's "rebill from date" (D22), server-written. */
 export interface Rebill {
   id: string;
   minerId: string;
-  /** First UTC day rebilled. */
   fromDate: string;
   reason: string;
   by: number | null;
-  /** ISO instant. */
   at: string;
-  /** It touched a corp member's days, which needs a Director. */
   memberRebill: boolean;
 }
 
-/** Every rebill in the book, for the export. Officer-only. */
 export async function readRebills(characterId: number, corporationId: number): Promise<Rebill[]> {
   const book = await openBook(characterId, corporationId);
   if (!book) return [];
@@ -697,7 +555,6 @@ export async function readRebills(characterId: number, corporationId: number): P
   );
 }
 
-/** One audit-log entry (D7): who did what, when. */
 export interface AuditEntry {
   id: string;
   at: number;
@@ -708,7 +565,6 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
-/** The newest entries of the immutable audit log, newest first. Always limited: the log only grows. */
 export async function readAudit(
   characterId: number,
   corporationId: number,
@@ -720,7 +576,6 @@ export async function readAudit(
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
 }
 
-/** Turns the book on (a Director's act, D10): the start date and the corp default rate. */
 export async function turnOnBook(
   characterId: number,
   corporationId: number,
@@ -736,16 +591,10 @@ export async function turnOnBook(
       startRatePct,
     });
   } finally {
-    // Also on a throw: the server may have written the book before the call failed.
     await clearNotFound(`corps/${corporationId}`);
   }
 }
 
-/**
- * The CEO reclaims the book (ADR 0023): becomes its owner, re-activates it, and
- * every other officer loses access until they re-verify. The role is checked
- * live, so the short-lived access token travels; the refresh token never does.
- */
 export async function reclaimBook(
   characterId: number,
   corporationId: number
@@ -754,26 +603,19 @@ export async function reclaimBook(
   return callSignedIn(characterId, 'reclaimCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/**
- * Deletes the corporation's book for good: whoever turned it on (still a
- * Director), or the CEO. Turning it on again starts from nothing.
- */
 export async function deleteBook(characterId: number, corporationId: number): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
   await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/** The action an older server issued a late notice through: what older audit entries name. */
 export const LEGACY_ISSUE_ACTION = 'issueStatement';
 
-/** The book's late notices (`lateNotices`). */
 export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
   return noticesOfDocs(
     book.written(LATE_NOTICES) ? await book.list<unknown>(LATE_NOTICES).catch(() => []) : []
   );
 }
 
-/** Each Miner's snapshot; none until the server has written one. Best effort. */
 export async function readCheckpoints(book: OpenBook): Promise<RunningAccountCheckpoint[]> {
   const accounts = book.written(RUNNING_ACCOUNTS)
     ? await book.list<{ snapshot?: RunningAccountCheckpoint }>(RUNNING_ACCOUNTS).catch(() => [])
@@ -781,7 +623,6 @@ export async function readCheckpoints(book: OpenBook): Promise<RunningAccountChe
   return accounts.flatMap((a) => a.snapshot ?? []);
 }
 
-/** The verify token for each late notice id; one with no link doc is left out. Editors only (rules). */
 export async function readVerifyTokens(
   characterId: number,
   corporationId: number,
@@ -801,7 +642,6 @@ export async function readVerifyTokens(
   return tokens;
 }
 
-/** Issues a late notice (`issueLateNotice`). */
 export async function issueLateNotice(
   characterId: number,
   corporationId: number,
@@ -810,13 +650,11 @@ export async function issueLateNotice(
   await editBook(characterId, corporationId, { action: 'issueLateNotice', notice });
 }
 
-/** Records a late notice's mail (`recordLateNoticeMail`). */
 export async function recordLateNoticeMail(
   characterId: number,
   corporationId: number,
   mail: { noticeId: string; mailId: number; kind: 'notice' | 'reminder' }
 ): Promise<void> {
-  // Called from the mail queue, which may outlive the 10-minute role cache.
   await editBook(
     characterId,
     corporationId,
@@ -825,5 +663,4 @@ export async function recordLateNoticeMail(
   );
 }
 
-/** Where a late notice's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */
 export { verifyUrl } from '@/engine/corpTaxBook/lateNoticeMail';

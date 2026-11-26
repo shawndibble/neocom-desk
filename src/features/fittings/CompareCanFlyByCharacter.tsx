@@ -1,10 +1,3 @@
-/**
- * "All Characters" popover on a compare column header: whether each Character
- * on the account can fly that Fitting, not just the active one. The rows are
- * worked out only while the popover is open (Radix unmounts closed content)
- * and cached per Fitting + Character, so reopening — or adding a third slot —
- * never redoes a check.
- */
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';

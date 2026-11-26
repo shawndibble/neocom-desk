@@ -8,13 +8,6 @@ import { usePlaceIndex } from './usePlaceIndex';
 
 const SUGGESTIONS = 6;
 
-/**
- * The compose dialog's location field (issue #3811): free text as before, with
- * systems and regions offered as you type. Picking one writes its canonical
- * text ("Badivefi, Khanid" or "Khanid (region)"), which the board reads back
- * to measure jumps. A line under the field says whether what is typed can be
- * measured, so a typed note is never mistaken for a place; it still posts.
- */
 export function LocationPicker({
   value,
   maxLength,
@@ -28,7 +21,6 @@ export function LocationPicker({
   const id = useId();
   const places = usePlaceIndex();
   const index = places.status === 'ready' ? places.index : null;
-  /** Suggestions follow typing; picking one closes them until the next keystroke. */
   const [typing, setTyping] = useState(false);
   const suggestions = useMemo(
     () => (index && typing ? searchPlaces(value, index, SUGGESTIONS) : []),
@@ -42,14 +34,12 @@ export function LocationPicker({
     onChange(text);
   }
 
-  // Enter takes a result only once one is highlighted: the field is free text first.
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (combo.handleNavKey(event)) return;
     if (event.key === 'Enter' && combo.highlight !== null && suggestions[combo.highlight]) {
       event.preventDefault();
       choose(suggestions[combo.highlight].text);
     } else if (event.key === 'Escape' && suggestions.length > 0) {
-      // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
       setTyping(false);

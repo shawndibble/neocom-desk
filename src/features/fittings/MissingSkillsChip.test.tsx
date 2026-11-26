@@ -75,14 +75,12 @@ describe('MissingSkillsChip', () => {
         fittingName="Ishtar"
       />
     );
-    // Drones I–V (256,000 SP at 30 SP/min) dwarfs Sentry Drone Interfacing I.
     const chip = await screen.findByRole('button', { name: /missing 1 skill · 5d 22h/i });
     await user.click(chip);
 
     const prereq = screen.getByText('Drones').closest('li');
     expect(prereq).toHaveTextContent('(prerequisite)');
 
-    // The plan pulls prerequisites in itself; only the fit's own skill is added.
     addEntries.mockClear();
     await user.click(screen.getByRole('button', { name: 'Add all to Skill Plan' }));
     await waitFor(() =>

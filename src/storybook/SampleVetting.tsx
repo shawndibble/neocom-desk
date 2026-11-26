@@ -13,12 +13,6 @@ import {
 const APPLY_SLOT = `apply:${VETTING_FIXTURE_CORPORATION.corporationId}` as const;
 const REQUEST_SLOT = `request:${SAMPLE_ACTIVE_CHARACTER.characterId}` as const;
 
-/**
- * The vetting stand-in, in place before the page's own load effects run (a layout effect) and
- * fresh per story. An applicant's story also finds its application where a return visit would:
- * the handle in `localStorage`. The SRP stand-in rides along because the rail asks it whether
- * SRP is on for the sample corporation.
- */
 export function SampleVetting({
   children,
   options,

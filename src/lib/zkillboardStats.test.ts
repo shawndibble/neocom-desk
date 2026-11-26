@@ -11,7 +11,6 @@ import {
   resetPilotStatsCache,
 } from './zkillboard';
 
-/** zKillboard is asked with no custom headers (no CORS preflight); the only init is the timeout's signal. */
 const NO_HEADERS = { signal: expect.any(AbortSignal) };
 
 describe('parsePilotStats', () => {

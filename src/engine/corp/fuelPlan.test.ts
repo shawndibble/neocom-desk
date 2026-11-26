@@ -65,10 +65,8 @@ describe('fuelPlan', () => {
 
   it('needs the blocks to burn from expiry to the date, rounded up', () => {
     const plan = fuelPlan({ ...base, blocks: 100, fuelExpiresMs: NOW + 3 * DAY_MS });
-    // 33.33…/day for 27 days = 900.
     expect(plan.needed).toBe(900);
     const odd = fuelPlan({ ...base, blocks: 10, fuelExpiresMs: NOW + 3 * DAY_MS });
-    // 3.33…/day for 27 days = 90; 10/3*27 in floating point must not round to 91.
     expect(odd.needed).toBe(90);
     const fraction = fuelPlan({
       ...base,
@@ -113,7 +111,6 @@ describe('fuelPlan', () => {
   });
 
   describe('when EVE read the bay before the expiry', () => {
-    // A refuel between the two reads: 773 blocks before it, 27 days of fuel after.
     const refuelled = {
       ...base,
       blocks: 773,
@@ -135,7 +132,6 @@ describe('fuelPlan', () => {
       expect(plan.perDay).toBe(120);
       expect(plan.rateSource).toBe('remembered');
       expect(plan.ratePending).toBe(false);
-      // 3 more days at 120/day.
       expect(plan.needed).toBe(360);
     });
 

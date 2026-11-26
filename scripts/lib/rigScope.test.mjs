@@ -10,7 +10,6 @@ import {
 const pinnedRows = () =>
   [...RIG_SCOPE_ATTRIBUTES, ALL_SHIPS_ATTRIBUTE].map((a) => ({
     attributeID: a.attributeID,
-    // dogma pads these strings with newlines and runs of spaces
     description: a.description.replace(': ', ':\n').replaceAll(', ', ',    \n'),
   }));
 

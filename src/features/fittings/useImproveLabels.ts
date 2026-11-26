@@ -1,19 +1,12 @@
-/**
- * How Improve words a swap: its short label, the chain of swaps behind a Make
- * Flyable fix, and a conversion's size at a glance.
- */
 import { useTranslation } from 'react-i18next';
 import { conversionSummary, TANK_RACKS, type ImproveOption } from '@/engine/fittings/improve';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 
 export interface ImproveLabels {
-  /** A type's name, as the catalogue gives it. */
   typeName: (typeId: number) => string;
   moveLabel: (candidate: ImproveOption['candidate']) => string;
-  /** The swaps chained behind a Make Flyable fix, each named: what frees the CPU or powergrid it takes. */
   flyableSwaps: (candidate: ImproveOption['candidate']) => string[];
   swapLabel: (option: ImproveOption) => string;
-  /** A conversion's size at a glance: what it removes and adds, and the slots it leaves empty. */
   conversionLine: (candidate: ImproveOption['candidate']) => string | null;
 }
 

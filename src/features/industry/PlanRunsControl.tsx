@@ -11,29 +11,12 @@ import { SourcingInput } from './SourcingInput';
 interface PlanRunsControlProps {
   runs: number;
   onRunsChange: (runs: number) => void;
-  /** The whole plan's time; `null` until the plan resolves. */
   seconds: number | null;
-  /** The profit the verdict reads now. A failed search's note goes stale once it moves. */
   profit: number | null;
-  /**
-   * Searches for the runs at which the verdict breaks even and applies them,
-   * returning the runs found or `null`. Passed only while the verdict reads a
-   * loss on live prices: Break Even is the way out of a loss, not a control
-   * the page always carries.
-   */
   findBreakEven: (() => number | null) | null;
-  /**
-   * The most runs the owned stock covers and the material that caps it
-   * (`limitingName`, null at the maximum job runs); `null` shows nothing.
-   */
   stockRuns?: { runs: number; limitingName: string | null } | null;
 }
 
-/**
- * The verdict's runs row: the runs field, the plan's time, and Break Even
- * while the plan loses money. The time is a fact of the recipe, so it stays
- * when prices are unreachable and the ledger below is an empty state.
- */
 export function PlanRunsControl({
   runs,
   onRunsChange,
@@ -43,7 +26,6 @@ export function PlanRunsControl({
   stockRuns = null,
 }: PlanRunsControlProps) {
   const { t } = useTranslation();
-  // The runs and profit a failed search ran against: the note is stale once either moves.
   const [noBreakEvenAt, setNoBreakEvenAt] = useState<{
     runs: number;
     profit: number | null;
@@ -76,9 +58,6 @@ export function PlanRunsControl({
         label={t('industry.runs')}
         inputMode="numeric"
         widthClassName="w-16"
-        // Blank/garbage reverts to the last committed value rather than
-        // snapping to the minimum — clearing the box to retype "10" as
-        // "100" must not overwrite it with 1 mid-edit.
         parse={(raw) => parseOrKeep(runs, raw, (n) => Math.max(1, Math.round(n)))}
         onCommit={(next) => {
           if (next !== undefined) onRunsChange(next);

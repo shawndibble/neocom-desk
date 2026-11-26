@@ -1,14 +1,3 @@
-/**
- * The All-characters Mail load (issue #2867): every Character's headers, label
- * counts and mailing lists from the same per-Character loaders the single view
- * uses, fanned out under the shared concurrency cap.
- *
- * A Character without the mail grant is skipped (named in the scope readout);
- * so is one with nothing to show (never fetched, offline). Each Character goes
- * live no more often than {@link MAIL_REFRESH_MIN_GAP_MS}: a Refresh inside
- * that window reads Dexie instead, so mashing Refresh with four Characters
- * never means four mail fetches a second.
- */
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadMailOwner, loadMailOwnerCacheOnly, type MailOwnerLoad } from './mail';
@@ -19,7 +8,6 @@ export const MAIL_REFRESH_MIN_GAP_MS = MINUTE_MS;
 
 const lastLiveAt = new Map<number, number>();
 
-/** Test seam: forget when each Character last went live. */
 export function resetMailRefreshThrottle(): void {
   lastLiveAt.clear();
 }
@@ -32,7 +20,6 @@ export interface OwnerMail extends MailOwnerLoad {
 export interface SkippedMailCharacter {
   characterId: number;
   name: string;
-  /** False when the stored grant lacks the mail read scope — the case a Grant note can fix. */
   granted: boolean;
 }
 
@@ -73,7 +60,6 @@ export async function loadMailForCharacters(
     }
     owners.set(characterId, { characterId, name, ...load });
   });
-  // Input order, not completion order: the menu and the tooltip must not reshuffle per load.
   return {
     owners: characters.flatMap((c) => owners.get(c.characterId) ?? []),
     skipped: characters.flatMap((c) => skipped.get(c.characterId) ?? []),

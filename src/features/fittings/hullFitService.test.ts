@@ -42,7 +42,6 @@ describe('getHullFit', () => {
     expect(a).toBe(b);
     expect(checkCandidates).toHaveBeenCalledTimes(1);
     expect(a.get(1)?.fitsHull).toBe(true);
-    // What doesn't go on the hull is still listed, marked as such — the Hull filter needs it.
     expect(a.get(2)?.fitsHull).toBe(false);
   });
 

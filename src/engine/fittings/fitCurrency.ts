@@ -1,25 +1,6 @@
-/**
- * Whether a stored fit still works in today's game (issue #2485): an
- * **Out-of-date fit** (GLOSSARY.md) names an item or hull the app's current
- * game data no longer has, or puts more modules in a rack than the hull now
- * has slots. Read off the EFT loader's own result (`eftLoader.ts`), so a game
- * update is picked up as soon as the app's game data is.
- *
- * Deliberately not a check: CPU, powergrid and calibration (skills and
- * implants change those, so an over-budget fit may still fly), and badly
- * written text (an unparseable line or a missing header is the author's
- * typo, not a game change — Load still reports it). Missing data never makes
- * a fit out of date: with no slot counts for the hull, racks aren't counted.
- *
- * The loader resolves names against a catalogue of what a fit can hold, not
- * the whole game — mutaplasmids, PLEX, skill injectors and other cargo are
- * left out — so an item it can't read is only removed when the game's full
- * list of type names (`isGameItem`) doesn't have it either.
- */
 import type { LoadParts } from './load';
 import { FITTING_SLOT_KINDS, type FittingSlotKind } from './types';
 
-/** A hull's slots in the racks that come from the hull itself. */
 export type HullSlotCounts = Record<'high' | 'medium' | 'low' | 'rig', number>;
 
 export type OutOfDateReason =
@@ -29,12 +10,6 @@ export type OutOfDateReason =
 
 export type FitCurrency = { current: true } | { current: false; reasons: OutOfDateReason[] };
 
-/**
- * A Tech 3 cruiser's high, mid and low slots come from its subsystems, which
- * the bare hull's counts (all zero) don't include — so they can't be counted.
- * Any other hull reading 0/0/0 is skipped the same way: missing data, not a
- * reason to call a fit out of date.
- */
 function subsystemSetsRacks(parts: LoadParts & { hullTypeId: number }, slots: HullSlotCounts) {
   return (
     parts.modules.some((module) => module.slot === 'subsystem') ||
@@ -42,18 +17,12 @@ function subsystemSetsRacks(parts: LoadParts & { hullTypeId: number }, slots: Hu
   );
 }
 
-/** `isGameItem` over a list of the game's type names, matched ignoring case as the EFT loader matches. */
 export function gameItemLookup(names: Iterable<string>): (name: string) => boolean {
   const known = new Set<string>();
   for (const name of names) known.add(name.toLowerCase());
   return (name) => known.has(name.toLowerCase());
 }
 
-/**
- * Classifies one fit from what the EFT loader made of it and its hull's slots
- * (`null`: unknown). `isGameItem` says whether a name the loader couldn't
- * read is still a type in the game.
- */
 export function classifyFitCurrency(
   parts: LoadParts,
   hullSlots: HullSlotCounts | null,
@@ -65,7 +34,6 @@ export function classifyFitCurrency(
 
   for (const warning of parts.unresolved) {
     if (warning.kind === 'unknown-ship') {
-      // An empty name is a missing header — a typo, not a removed hull.
       if (warning.text.trim() !== '') removed.push({ kind: 'unknown-hull', name: warning.text });
     } else if (warning.kind === 'unknown-item') {
       if (!removedNames.has(warning.text) && !isGameItem(warning.text)) {
@@ -96,7 +64,6 @@ export function classifyFitCurrency(
   return reasons.length === 0 ? { current: true } : { current: false, reasons };
 }
 
-/** Current fits first and out-of-date ones apart, each in the order given. No verdict → current. */
 export function partitionByCurrency<T extends { id: string }>(
   fits: readonly T[],
   verdicts: ReadonlyMap<string, FitCurrency>

@@ -1,7 +1,3 @@
-/**
- * The book's Miners for a picker. A page read for one Miner (`scopedMiner`) holds only that Miner,
- * so there the list and its names are read once (`readBookMiners`); elsewhere the view has them.
- */
 import { useEffect, useState } from 'react';
 import { resolveNames } from '@/features/character/names';
 import { readBookMiners } from '../taxBook/bookClient';
@@ -16,7 +12,6 @@ interface PickableMiner {
 export function useBookMiners(): {
   miners: readonly PickableMiner[];
   nameOf: (characterId: number) => string;
-  /** Still reading a scoped page's list. */
   loading: boolean;
 } {
   const { view, names, data, characterId, corporationId } = useBook();
@@ -36,7 +31,6 @@ export function useBookMiners(): {
         );
         if (!cancelled) setRead({ miners, names: resolved });
       } catch {
-        // The page's own Miner is all there is to show; the dialog says nothing matches.
         if (!cancelled) setRead({ miners: [], names: new Map() });
       }
     })();

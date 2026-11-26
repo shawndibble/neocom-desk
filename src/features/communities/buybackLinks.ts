@@ -1,9 +1,3 @@
-/**
- * Which of this Character's contracts are a buyback Quote's (issue #4780), kept
- * on this device so the Contracts page can mark them without reading any
- * Community. The seller's sync and the buyer's panel write what they learn
- * here; nothing here is sent anywhere.
- */
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { db } from '@/db';
@@ -13,19 +7,15 @@ export interface BuybackLinkInfo {
   requestId: string;
   communityId: string;
   communityName: string;
-  /** The Request as the board names it: "All ore + 2 more". */
   requestTitle: string;
-  /** What the quote said, so a contract at another price can be marked. */
   quotedTotal: number;
 }
 
 const keyOf = (characterId: number) => `buybackLinks:${characterId}`;
-/** Contracts remembered per Character: the oldest fall out first. */
 const MAX_LINKS = 200;
 
 type Stored = Record<string, BuybackLinkInfo>;
 
-/** Adds what a sync learned about some contracts, keeping the newest `MAX_LINKS`. */
 export async function rememberBuybackLinks(
   characterId: number,
   found: ReadonlyMap<number, BuybackLinkInfo>
@@ -37,7 +27,6 @@ export async function rememberBuybackLinks(
   for (const [contractId, info] of found) {
     const before = merged[String(contractId)];
     if (before && JSON.stringify(before) === JSON.stringify(info)) continue;
-    // Re-insert so the newest are last: object keys keep insertion order.
     delete merged[String(contractId)];
     merged[String(contractId)] = info;
     changed = true;
@@ -48,18 +37,15 @@ export async function rememberBuybackLinks(
   await db.settings.put({ key: keyOf(characterId), value: merged });
 }
 
-/** The words of the Community cue on a buyback contract: which request and Community it answers. */
 export function buybackCueText(t: Translate, link: BuybackLinkInfo): string {
   return t('contracts.buyback.cue', { title: link.requestTitle, community: link.communityName });
 }
 
-/** This Character's remembered buyback contracts, by contract id; empty until read. */
 export function useBuybackLinks(characterId: number | null): ReadonlyMap<number, BuybackLinkInfo> {
   const stored = useLiveQuery(
     () => (characterId === null ? undefined : db.settings.get(keyOf(characterId))),
     [characterId]
   );
-  // One map per read, not per render: every History row asks.
   return useMemo(() => {
     const value = (stored?.value ?? {}) as Stored;
     return new Map(Object.entries(value).map(([id, info]) => [Number(id), info]));

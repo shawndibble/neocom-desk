@@ -34,7 +34,6 @@ installMarketHarness();
 
 describe('Quickbar unavailable with no active character (issue #7)', () => {
   it('disables the header price alert bell with a tap-reachable explanation (issue #2162)', async () => {
-    // Ambient state from the outer beforeEach: no active character.
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
     await user.type(await screen.findByRole('searchbox'), 'rift');
@@ -45,8 +44,6 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
       'true'
     );
     const bell = await screen.findByRole('button', { name: 'Set price alert' });
-    // `aria-disabled`, not the native attribute: a natively disabled button
-    // takes no tap, which would leave the reason unreachable on touch (#2162).
     expect(bell).toHaveAttribute('aria-disabled', 'true');
 
     fireEvent.touchStart(bell, {
@@ -62,8 +59,6 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
 
 describe('Quickbar (issue #7)', () => {
   beforeEach(async () => {
-    // The route (as in App.tsx) re-hydrates useActiveCharacter from Dexie on every mount, which
-    // would clobber a direct store setState — seed the setting it reads instead.
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
   });
 
@@ -79,8 +74,6 @@ describe('Quickbar (issue #7)', () => {
 
     const quickbar = await screen.findByTestId('quickbar');
     await within(quickbar).findByText('Rifter');
-    // Structure only (jsdom has no layout): the tree wrapper is the flexible,
-    // scrolling part; the Quickbar never shrinks and its list scrolls itself.
     const tree = quickbar.parentElement!.querySelector('.overflow-y-auto');
     expect(tree).toHaveClass('overflow-y-auto', 'lg:flex-1', 'lg:min-h-0');
     expect(quickbar).toHaveClass('shrink-0');
@@ -156,7 +149,6 @@ describe('Quickbar (issue #7)', () => {
     const quickbar = await screen.findByTestId('quickbar');
     await within(quickbar).findByText('Rifter');
 
-    // Move the selection elsewhere, then come back through the Quickbar row.
     await user.clear(screen.getByRole('searchbox'));
     await user.type(screen.getByRole('searchbox'), 'trit');
     await user.click(await screen.findByText('Tritanium'));
@@ -211,9 +203,6 @@ describe('Market Browser order row context menu (issue #6)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    // Default Trade Hub mode already narrows to Jita 4-4, so the sell table
-    // has exactly one row here (order 3, the player-structure sell, is
-    // filtered out by the hub itself, not by the context-menu action below).
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     const [, sellRow] = within(sellTable).getAllByRole('row');
     sellRow.focus();
@@ -229,8 +218,6 @@ describe('Market Browser order row context menu (issue #6)', () => {
     expect(writeText).toHaveBeenCalledWith('1000000');
   });
 
-  // Plain digits, never `formatIsk`'s grouped text (#2294): EVE's own order
-  // price field rejects "12.34 ISK" and "1,000,000" alike.
   it('copies a price with cents as plain digits (#2294)', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);
@@ -294,7 +281,6 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
-    // The dialog opens on a spinner; its body waits on the mocked type lookup.
     expect(await within(dialog).findByText('Structure Hitpoints')).toBeInTheDocument();
   });
 
@@ -310,8 +296,8 @@ describe('Market Browser order row context menu (issue #6)', () => {
           group_id: 25,
           published: true,
           dogma_attributes: [
-            { attribute_id: 182, value: 3327 }, // requiredSkill1 -> Small Projectile Turret
-            { attribute_id: 277, value: 1 }, // requiredSkill1Level
+            { attribute_id: 182, value: 3327 },
+            { attribute_id: 277, value: 1 },
           ],
         })
       ),
@@ -327,14 +313,9 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await screen.findByRole('table', { name: 'Sell Orders' });
 
     await user.click(await screen.findByRole('button', { name: /^Required skills/i }));
-    // No plan yet -> "Create Skill Plan and add", not "Add to Skill Plan" (matches
-    // FitCheck/Mastery's shared Target Plan contract).
     const addButton = await screen.findByRole('button', { name: 'Create Skill Plan and add' });
     await user.click(addButton);
 
-    // The bug: nothing in the row visibly changed after a successful click,
-    // which reads as "I clicked it and nothing happened" even though the
-    // write succeeded. The button now confirms it.
     expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
 
     const plans = await db.skillPlans.where('characterId').equals(1).toArray();
@@ -350,9 +331,6 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
-    // Region mode surfaces both sell orders (Jita 4-4 and the player
-    // structure), which is what makes the station filter's effect visible —
-    // Trade Hub mode alone already hides the player-structure order.
     await user.click(screen.getByRole('button', { name: 'Region' }));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
@@ -366,11 +344,9 @@ describe('Market Browser order row context menu (issue #6)', () => {
     expect(
       await screen.findByText(/Filtered to Jita IV - Moon 4 - Caldari Navy Assembly Plant/)
     ).toBeInTheDocument();
-    // The other sell order sits at a different (player-structure) location, so it drops out of view.
     expect(
       within(await screen.findByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000')
     ).not.toBeInTheDocument();
-    // The buy order shares the filtered-to station, so it stays visible.
     expect(
       within(await screen.findByRole('table', { name: 'Buy Orders' })).getByText('500,000')
     ).toBeInTheDocument();
@@ -384,8 +360,6 @@ describe('Market Browser order row context menu (issue #6)', () => {
 
 describe('Market Browser narrow-screen layout (issue #4)', () => {
   it('shows one column at a time, with a back control that returns to the finder', async () => {
-    // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches,
-    // so this already runs as a narrow viewport.
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
     renderMarketRoute();
@@ -408,7 +382,6 @@ describe('Market Browser narrow-screen layout (issue #4)', () => {
 
     expect(finderPanel).not.toHaveClass('hidden');
     expect(itemPanel).toHaveClass('hidden');
-    // The tree state (search text, matched item) survived being hidden rather than unmounted.
     expect(screen.getByRole('searchbox')).toHaveValue('rift');
     expect(screen.getByText('Rifter')).toBeInTheDocument();
   });
@@ -434,9 +407,6 @@ describe('Market Browser narrow-screen layout (issue #4)', () => {
 
 describe('Market Browser', () => {
   it('points an empty blueprint order book at the BPC search, since copies are contract-only', async () => {
-    // 638 is BLUEPRINTS' own key, so the real blueprint catalogue indexes it —
-    // that catalogue loads lazily on demand, and the hint silently never
-    // rendered until the empty book asked for it.
     vi.mocked(loadMarketTypes).mockResolvedValueOnce([
       ...TYPES,
       { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2, volume: 1 },

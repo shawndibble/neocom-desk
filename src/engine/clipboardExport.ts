@@ -1,10 +1,6 @@
 import { romanLevel } from './projection';
 import type { EngineSkill, PlanStep } from '@/engine/types';
 
-/**
- * Serialize a plan to EVE's in-game "import skill plan from clipboard" format:
- * one line per step, "<Skill Name> <Roman level>".
- */
 export function exportPlanToClipboard(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>

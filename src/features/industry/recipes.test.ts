@@ -16,11 +16,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
-  // Reinforced Carbon Fiber Reaction Formula (issue #460 follow-up): a
-  // reaction-only material with no manufacturing blueprint and no planetary
-  // schematic, the exact shape that showed no make-or-buy marker before
-  // `materialRecipe` learned a third branch for the catalog's reaction
-  // formulas.
   '46156': {
     name: 'Reinforced Carbon Fiber Reaction Formula',
     time: 10800,
@@ -29,10 +24,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'reaction',
   },
-  // A two-hop manufacturing chain (40 <- 41 <- 42), so `buildPlanTypeIds` has
-  // something to exercise its second level of widening against: pricing a
-  // make-or-buy verdict for 41 (an expanded row's own input) needs 42's hub
-  // price too, one level beyond what a single `recipeInputTypeIds` pass reaches.
   '9843': {
     name: 'Isogen Blueprint',
     time: 100,
@@ -49,8 +40,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
-  // A fourth hop (43 <- 42), reachable only if the widening actually walks
-  // the whole tree rather than stopping at a fixed number of levels.
   '9845': {
     name: 'Zydrine Blueprint',
     time: 25,
@@ -166,8 +155,6 @@ describe('materialRecipe', () => {
   });
 
   it('still prefers a copy the character owns over the assumed ME', () => {
-    // The point of the setting: it fills the gap where there is no owned copy
-    // to read, and never overrides a real one — in either direction.
     const recipe = materialRecipe(9840, {
       catalog,
       pi: PI,
@@ -240,15 +227,6 @@ describe('recipeInputTypeIds', () => {
 });
 
 describe('buildPlanTypeIds', () => {
-  // A plain blueprint, not from the fixture catalog: one material (2398) is a
-  // planetary schematic's output, the other (40) is manufactured and itself
-  // heads a four-hop manufacturing chain (40 <- 41 <- 42 <- 43), and the
-  // product (9840) is manufactured by fixture blueprint 9841 — so the walk
-  // below exercises the manufacturing and planetary recipe paths, and
-  // several manufacturing hops, all at once, same as `BuildPlanDetail.tsx`'s
-  // price fetch (shared via this function, issue #453 — the Compare table
-  // widens
-  // its own fetch identically).
   const blueprint = {
     name: 'Widening test blueprint',
     time: 60,
@@ -261,17 +239,6 @@ describe('buildPlanTypeIds', () => {
 
   it('walks the whole recipe tree, not a fixed number of levels', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: PI });
-    // 2398 (material) -> planetary input 2267.
-    // 40 (material) -> manufacturing input 41 -> 42 -> 43, four hops deep —
-    // a `buildHere` choice can now sit at any of them (docs/context/decisions),
-    // and each one needs a hub price for its own recipe's inputs.
-    // 9840 (product) -> manufacturing input 34.
-    // Every manufactured typeID reached (9840, 40, 41, 42) also pulls in its
-    // own blueprint's typeID (9841, 9843, 9844, 9845 respectively — issue
-    // #838's Blueprint Acquisition needs a hub price for the blueprint
-    // itself, not only for what it produces). 43 and 34 are raw, no
-    // blueprint of their own; 2398/2267 are planetary, not in the
-    // manufacturing catalog at all.
     expect(ids.sort((a, b) => a - b)).toEqual([
       34, 40, 41, 42, 43, 2267, 2398, 9840, 9841, 9843, 9844, 9845,
     ]);
@@ -279,10 +246,6 @@ describe('buildPlanTypeIds', () => {
 
   it('skips the planetary widening when pi.json is unavailable', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
-    // No pi means no schematic for 2398, so 2267 never gets added — 2398
-    // itself stays, as a plain material with nothing produced beneath it.
-    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) and its
-    // blueprint typeIDs are unaffected.
     expect(ids.sort((a, b) => a - b)).toEqual([
       34, 40, 41, 42, 43, 2398, 9840, 9841, 9843, 9844, 9845,
     ]);
@@ -359,8 +322,6 @@ describe('acquisitionForLookup', () => {
       pi: PI,
       ownedBlueprints: [],
       blueprintAcquisition: {
-        // A suspiciously cheap offer that must never be consulted for a
-        // reaction node — reaction formulas cannot be copied at all.
         offersFor: () => [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1 }],
         hubPrices: { 46156: 999 },
       },
@@ -406,9 +367,6 @@ describe('acquisitionForLookup', () => {
         sourcing: { 9841: { acquisitionTierOverride: { me: 8, te: 16 } } },
       },
     });
-    // The ME0 BPO is the cheapest tier (unlimited runs, no shortfall to buy),
-    // but the pilot pinned the ME8 BPC instead — that copy's own runs cover
-    // the 5 needed, so the line reports owned/free at the pinned tier.
     const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
     expect(result).toMatchObject({
       me: 8,
@@ -442,7 +400,6 @@ describe('acquisitionForLookup', () => {
     const acquisitionFor = acquisitionForLookup({
       catalog,
       pi: PI,
-      // One BPC, 5 runs — enough to fully cover only one of two branches.
       ownedBlueprints: [
         {
           item_id: 1,
@@ -458,8 +415,6 @@ describe('acquisitionForLookup', () => {
       blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
     });
 
-    // Branch A calls first — 25 parts at 5 a run is 5 runs, which the owned
-    // copy fully covers. `needed` is units, never runs.
     const branchA = acquisitionFor(9840, 25, ctx, { 34: 10 });
     expect(branchA).toMatchObject({
       me: 6,
@@ -468,9 +423,6 @@ describe('acquisitionForLookup', () => {
       line: { unitPrice: 0, owned: true },
     });
 
-    // Branch B needs the same 5 runs of the same blueprint type — the owned
-    // copy is already claimed by Branch A, so Branch B must fall back to the
-    // BPO sell-price cascade instead of also reporting itself as free.
     const branchB = acquisitionFor(9840, 25, ctx, { 34: 10 });
     expect(branchB).toMatchObject({
       me: 0,
@@ -479,7 +431,6 @@ describe('acquisitionForLookup', () => {
       line: { unitPrice: 777, owned: false },
     });
 
-    // Branch B bought the BPO, so a third branch builds with it for free.
     expect(acquisitionFor(9840, 25, ctx, { 34: 10 })?.line).toBeNull();
   });
 
@@ -487,7 +438,6 @@ describe('acquisitionForLookup', () => {
     const acquisitionFor = acquisitionForLookup({
       catalog,
       pi: PI,
-      // 2 runs: covers 10 parts at 5 a run, which a units-as-runs count would miss.
       ownedBlueprints: [
         {
           item_id: 1,
@@ -528,8 +478,6 @@ describe('acquisitionForLookup', () => {
       blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
     };
 
-    // Two independent plan resolutions (e.g. two separate build plans) each
-    // get their own closure and must each see the full owned stock.
     expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,
@@ -548,8 +496,6 @@ describe('acquisitionForLookup', () => {
     const sources = {
       catalog,
       pi: PI,
-      // One BPC, 10 runs — the top-level claim only takes 3, leaving 7 for
-      // whatever nested resolution each pass runs on its own.
       ownedBlueprints: [
         {
           item_id: 1,
@@ -567,8 +513,6 @@ describe('acquisitionForLookup', () => {
 
     const sharedPools: BlueprintTierPools = new Map();
     const forTopLevel = acquisitionForLookup(sources, sharedPools);
-    // The top-level product's own claim — resolved once, shared by both a
-    // real pass and a Group Owned Overlay pass.
     const topLevel = forTopLevel(9840, 3, ctx, { 34: 10 });
     expect(topLevel).toMatchObject({
       me: 6,
@@ -577,15 +521,11 @@ describe('acquisitionForLookup', () => {
       line: { unitPrice: 0, owned: true },
     });
 
-    // Two independent nested-resolution passes, each seeded from the state
-    // right after the top-level claim above (7 runs remaining) — never from
-    // each other.
     const poolsForPassA = cloneBlueprintPools(sharedPools);
     const poolsForPassB = cloneBlueprintPools(sharedPools);
     const forPassA = acquisitionForLookup(sources, poolsForPassA);
     const forPassB = acquisitionForLookup(sources, poolsForPassB);
 
-    // Pass A's own nested node claims all 7 remaining runs.
     expect(forPassA(9840, 7, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,
@@ -593,10 +533,6 @@ describe('acquisitionForLookup', () => {
       line: { unitPrice: 0, owned: true },
     });
 
-    // Pass B's own nested node needs the same 7 runs — if the pools were
-    // shared, Pass A's claim above would have already drained them and Pass
-    // B would wrongly see a shortfall. Isolated pools mean Pass B still sees
-    // its own full 7 remaining.
     expect(forPassB(9840, 7, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,

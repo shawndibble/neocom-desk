@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { SHARES_COLLECTION } from '@/features/share/shareStore';
 import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 
-/** Collection-group single-field indexes the scheduled sweeps query (functions/, #5049). */
 const SWEEP_GROUP_FIELDS: [group: string, field: string][] = [
   ['feeders', 'status'],
   ['itemRequests', 'expiresAt'],
@@ -13,21 +12,6 @@ const SWEEP_GROUP_FIELDS: [group: string, field: string][] = [
   ['vettingReviews', 'expiresAt'],
   ['vettingThrottle', 'windowStart'],
 ];
-
-/**
- * Drift guard over `firestore.indexes.json` — **not** a proof that Firestore
- * honours the exemptions (issue #583's AC1). It cannot be: the Firestore
- * emulator "does not track compound indexes and instead will execute any
- * valid query", so nothing run locally can observe an index being absent.
- *
- * What it does check is that the config still covers what the sync code
- * needs, and that it keeps covering it. The synced collection registry's
- * `REMOTE_COLLECTION_NAMES` is the authoritative list of remotely-owned
- * collections, so a 14th one declared there fails this file until it is
- * exempted too — the case the wildcard
- * design exists to survive, and the one a list hardcoded here would sail
- * straight past.
- */
 
 interface SingleFieldIndex {
   order: string;
@@ -51,27 +35,13 @@ const config = JSON.parse(
   readFileSync(new URL('../../firestore.indexes.json', import.meta.url), 'utf8')
 ) as { indexes: CompositeIndex[]; fieldOverrides: FieldOverride[] };
 
-/** Written and queried by `functions/src/index.ts`, on fields of its own. */
 const DISPATCHER_COLLECTION_GROUPS = ['projections', 'deviceRegistrations'];
 
 const overridesFor = (collectionGroup: string) =>
   config.fieldOverrides.filter((o) => o.collectionGroup === collectionGroup);
 
-/**
- * Fields deliberately re-enabled beyond `ownerHash`, per collection group.
- * The wildcard above exempts *every* field, so a field the backend needs to
- * query has to be named here or the query has no index at all — this is the
- * escape hatch that decision describes, and listing it makes each use
- * deliberate rather than incidental.
- */
 const EXTRA_INDEXED_FIELDS: Partial<Record<string, readonly string[]>> = {
-  // The server-side Notification Feed purge (issue #595) sweeps every
-  // account's subcollection in one collection-group query, so it needs
-  // `firedAt` indexed at COLLECTION_GROUP scope. Nothing filters on it within
-  // a single collection, so that scope is the only one re-enabled.
   notificationFeed: ['firedAt'],
-  // The Community Fittings tab lists and clears a Character's own shares with
-  // `where('ownerUid', '==', uid)` (features/communities/sharedFittings.ts).
   fittings: ['ownerUid'],
 };
 
@@ -86,10 +56,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it.each(REMOTE_COLLECTION_NAMES)('re-enables the ownerHash index on %s', (group) => {
-    // The one field any of these is ever filtered on. Ascending only: the
-    // query is an equality, and `updatedAt` rides a composite index rather
-    // than a single-field one — an exemption applies only to *automatic*
-    // indexing, so a manual composite index still covers its own fields.
     expect(overridesFor(group)).toContainEqual({
       collectionGroup: group,
       fieldPath: 'ownerHash',
@@ -107,10 +73,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('re-enables firedAt on notificationFeed at collection-group scope', () => {
-    // `dailyHousekeeping` (functions/src/index.ts, its feed purge) runs
-    // `collectionGroup('notificationFeed').where('firedAt', '<', cutoff)`.
-    // Without this entry the wildcard exemption leaves that query unindexed
-    // and it fails FAILED_PRECONDITION on every tick.
     expect(overridesFor('notificationFeed')).toContainEqual({
       collectionGroup: 'notificationFeed',
       fieldPath: 'firedAt',
@@ -127,17 +89,11 @@ describe('firestore.indexes.json field overrides', () => {
       'surveyTax',
       'surveyIgnores',
       'surveyInfo',
-      // R2PublishState keeps ~12k type hashes in one map (#3784).
       'systemConditions',
-      // The Community board reads every Pledge in one collection-group query (#3808).
       'pledges',
-      // A guest's pending Miner groupings are found across books (#4210).
       'miners',
-      // The feeder mirror's packed lines would index every nested key (corpTaxBookFeederRollup.ts).
       'feederObserved',
-      // Each caller's last new short link, removed by TTL an hour later (shortStartLink.ts).
       'shortLinkLimits',
-      // Scheduled sweeps query across every parent instead of once per parent (#5049).
       ...SWEEP_GROUP_FIELDS.map(([group]) => group),
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
@@ -146,8 +102,6 @@ describe('firestore.indexes.json field overrides', () => {
   it.each(SWEEP_GROUP_FIELDS)(
     'indexes %s.%s at collection-group scope, keeping the default collection indexes',
     (group, field) => {
-      // functions/src/indexedSweep.ts: the sweeps fall back to the per-parent scan
-      // until this is deployed, so a missing entry costs reads, not a failing job.
       expect(overridesFor(group)).toContainEqual({
         collectionGroup: group,
         fieldPath: field,
@@ -163,7 +117,6 @@ describe('firestore.indexes.json field overrides', () => {
   );
 
   it('indexes pending Miner groupings by character at collection-group scope', () => {
-    // `listPendingGroupings` runs `collectionGroup('miners').where('pendingConfirmation', 'array-contains', id)`.
     expect(overridesFor('miners')).toEqual([
       {
         collectionGroup: 'miners',
@@ -178,8 +131,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('indexes pledges by communityId at collection and collection-group scope', () => {
-    // `loadCommunityPledges` runs `collectionGroup('pledges').where('communityId', '==', id)`;
-    // a collection-group scope index is never automatic.
     expect(overridesFor('pledges')).toEqual([
       {
         collectionGroup: 'pledges',
@@ -194,8 +145,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('indexes one Member’s own Pledges in a Community at collection-group scope', () => {
-    // `loadMyPledges` (the delivery sweep): communityId and ownerHash. It falls back to the
-    // Community's whole Pledge query until this is deployed.
     expect(config.indexes).toContainEqual({
       collectionGroup: 'pledges',
       queryScope: 'COLLECTION_GROUP',
@@ -207,10 +156,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('expires shares by a TTL policy on expiresAt, and indexes none of their fields', () => {
-    // A stored Share Link is only ever read by id (`features/share/shareStore.ts`),
-    // so nothing needs an index; without the wildcard every field of every
-    // shared appraisal item would be auto-indexed for no reader. The TTL policy
-    // is what deletes a week-old share — the rules and the client only hide it.
     expect(overridesFor(SHARES_COLLECTION)).toEqual([
       { collectionGroup: SHARES_COLLECTION, fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: SHARES_COLLECTION, fieldPath: 'expiresAt', ttl: true, indexes: [] },
@@ -218,8 +163,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('expires a Survey Scan with its survey, and indexes only createdAt, for the incremental poll', () => {
-    // Scans sit under `shares/{id}` but a TTL delete of the parent leaves its
-    // subcollection behind, so each scan carries the survey's `expiresAt`.
     expect(overridesFor('surveyScans')).toEqual([
       { collectionGroup: 'surveyScans', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyScans', fieldPath: 'expiresAt', ttl: true, indexes: [] },
@@ -272,9 +215,6 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it.each(DISPATCHER_COLLECTION_GROUPS)('leaves %s automatically indexed', (group) => {
-    // Queried on characterId, fired, fireAt, firedAt and characterIds
-    // (array-contains). An exemption here would break the scheduled
-    // dispatcher, not just a sync pass.
     expect(overridesFor(group)).toEqual([]);
   });
 });
@@ -299,7 +239,6 @@ describe('firestore.indexes.json composite indexes', () => {
           { fieldPath: 'firedAt', order: 'ASCENDING' },
         ],
       },
-      // registerDevice's per-device replace (issue #2240, projectionStore.ts).
       {
         collectionGroup: 'projections',
         queryScope: 'COLLECTION',

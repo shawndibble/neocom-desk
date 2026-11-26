@@ -33,10 +33,6 @@ import { Crumb, OreLine, StateWord } from './moonsParts';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader, UndockableChip } from './sectionParts';
 
-/**
- * A moon's page: this extraction's header, then one scroll of
- * who mined it (a row opens in place to that Miner's ore lines) and earlier cycles.
- */
 export function MoonDetail({ id }: { id: string }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -64,11 +60,9 @@ export function MoonDetail({ id }: { id: string }) {
     row.estimatedValue !== null && row.minedPct !== null
       ? Math.round(row.estimatedValue * (1 - row.minedPct / 100))
       : null;
-  // The tax says what state it is in: still owed or counting, or all paid.
   const minersHint = t(
     billing.paid ? 'corpTaxBook.moons.moon.minersHintPaid' : 'corpTaxBook.moons.moon.minersHint'
   );
-  // Looking at an older cycle: the moon's newest one is a click away.
   const current = detail.otherCycles
     .filter((c) => c.startedAt > row.startedAt)
     .sort((x, y) => y.startedAt.localeCompare(x.startedAt))[0];
@@ -79,7 +73,6 @@ export function MoonDetail({ id }: { id: string }) {
       id: 'miner',
       header: t('corpTaxBook.moons.cols.miner'),
       primary: true,
-      // The name goes to the miner's page; the rest of the row opens their ore (DESIGN.md §6c).
       render: (m) => (
         <Link to={minerPath(m.minerId)} className={entityLinkClassName()}>
           {minerName(m)}
@@ -127,7 +120,6 @@ export function MoonDetail({ id }: { id: string }) {
       id: 'state',
       header: t('corpTaxBook.moons.cols.state'),
       render: (r) => <StateWord state={r.state} />,
-      // What is minable first, the order the Extractions list uses.
       sortValue: (r) => FILTER_STATES.indexOf(r.state),
       sortFirst: 'asc',
     },
@@ -199,13 +191,11 @@ export function MoonDetail({ id }: { id: string }) {
         note={
           <>
             <OreLine row={row} {...(canEdit ? { onLink: () => setLinking(true) } : {})} />
-            {/* A linked Survey opens on its own page (its share link, kept 7 days). */}
             {surveyId !== undefined && (
               <Link to={`/s/${surveyId}`} className={entityLinkClassName('ml-2')}>
                 {t('corpTaxBook.moons.moon.link.view')}
               </Link>
             )}
-            {/* Ore known from a Survey: the link to change it. An unknown one has OreLine's own. */}
             {canEdit && row.oreLines.length > 0 && row.oreSource === 'survey' && (
               <button
                 type="button"
@@ -230,8 +220,6 @@ export function MoonDetail({ id }: { id: string }) {
             label: t('corpTaxBook.moons.moon.minedEst'),
             value: row.minedPct === null ? '—' : `${isk(mined)} · ${row.minedPct}%`,
           },
-          // An expired chunk has no "left": the field is gone, so only what was mined says anything.
-          // A Fully Mined one has none either: the panel below shows its residue instead.
           ...(row.state === 'expired' || row.fullyMined
             ? []
             : [

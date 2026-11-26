@@ -60,7 +60,6 @@ describe('triageGoals', () => {
   });
 
   it('names only the missing input of a P2 whose other input is yieldable', () => {
-    // Coolant is Water (Aqueous Liquids, Temperate has it) + Electrolytes (Ionic Solutions, it does not).
     const coolant = goal(COOLANT, 5);
     const result = triageGoals([coolant], [colony(1, 'temperate')], POLICY, pi);
     expect(result.blockedBy.get(coolant)).toEqual([IONIC_SOLUTIONS]);

@@ -1,23 +1,6 @@
-/**
- * Route Safety's zKillboard column (issue #2329): one route system's player
- * kills from the last hour, grouped by where in the system they happened, with
- * a tag when the attackers brought warp disruption bubbles or smartbombs.
- *
- * States conditions, never verdicts (decision `20260912-172628`): "3 kills at
- * Stargate (Nourvukaiken), last one 32 min ago, smartbombs involved". Nothing
- * here decides what those kills mean for the pilot.
- *
- * Pure, per CLAUDE.md: the caller parses the killmails, resolves location
- * names and supplies the type → group lookup.
- */
 import type { SecurityBand } from '@/engine/securityStatus';
 import { MINUTE_MS } from '@/lib/age';
 
-/*
- * Group ids verified against the SDE (`public/data/types.json`): Sabre, Eris,
- * Heretic and Flycatcher sit in 541; Onyx, Broadsword, Devoter and Phobos in
- * 894; every Smartbomb module (125 types, T1/T2/compact/faction/officer) in 72.
- */
 export const INTERDICTOR_GROUP_ID = 541;
 export const HEAVY_INTERDICTION_CRUISER_GROUP_ID = 894;
 export const SMART_BOMB_GROUP_ID = 72;
@@ -33,11 +16,9 @@ export interface RecentKillAttacker {
   characterId?: number;
   corporationId?: number;
   allianceId?: number;
-  /** The attacker who landed the killing blow. */
   finalBlow?: boolean;
 }
 
-/** The victim of a kill; a field zKillboard left out is `null`. */
 export interface RecentKillVictim {
   characterId: number | null;
   corporationId: number | null;
@@ -45,43 +26,29 @@ export interface RecentKillVictim {
   shipTypeId: number | null;
 }
 
-/** One player kill, as `lib/zkillboard.ts` parses it (NPC kills already dropped). */
 export interface RecentKill {
   killmailId: number;
-  /** Epoch milliseconds. */
   time: number;
-  /** zKillboard's nearest celestial, stargate or station; `null` when absent. */
   locationId: number | null;
   attackers: readonly RecentKillAttacker[];
   victim?: RecentKillVictim;
-  /** zKillboard's total value of the loss; `null` or absent when it gave none. */
   value?: number | null;
 }
 
-/** What a location id resolved to. A location that resolved to nothing is simply absent. */
 export type ResolvedLocation =
   | { kind: 'stargate'; name: string; destinationSystemId: number }
   | { kind: 'station'; name: string };
 
 export interface KillTags {
-  /** An Interdictor or Heavy Interdiction Cruiser was on the mail, in nullsec. */
   bubble: boolean;
-  /** An attacker's weapon was a smartbomb. */
   smartbomb: boolean;
 }
 
 export interface KillTagContext {
   groupOf: (typeId: number) => number | undefined;
-  /** The system's band; `null` when unknown, which never tags a bubble. */
   band: SecurityBand | null;
 }
 
-/**
- * Bubbles can only be launched in nullsec, so a dictor on a highsec or lowsec
- * mail says nothing about a bubble and is not tagged. A killmail cannot show
- * that a bubble was actually up — only that a bubble hull was there — so the
- * tag's copy says exactly that.
- */
 export function classifyKillTags(kill: RecentKill, { groupOf, band }: KillTagContext): KillTags {
   const groupOfAttackerType = (typeId: number | undefined) =>
     typeId === undefined ? undefined : groupOf(typeId);
@@ -97,18 +64,10 @@ export function classifyKillTags(kill: RecentKill, { groupOf, band }: KillTagCon
   return { bubble, smartbomb };
 }
 
-/** A kill with its own tags, for a location's list (issue #5929). */
 export interface RecentKillView extends RecentKill, KillTags {}
 
-/** A pilot's pod dies within this long of their ship, at the same place. */
 export const SHIP_AND_POD_WINDOW_MS = 5 * MINUTE_MS;
 
-/**
- * Kills of one pilot that follow each other closely, as one group: the ship
- * and the pod it left behind. `kills` is newest first (a location's list); a
- * group is oldest first (ship, then pod) and groups stay newest first. A kill
- * with no victim pilot is its own group. Display only: counts stay per kill.
- */
 export function groupVictimKills<T extends RecentKill>(kills: readonly T[]): T[][] {
   const groups: T[][] = [];
   for (const kill of kills) {
@@ -127,18 +86,11 @@ export function groupVictimKills<T extends RecentKill>(kills: readonly T[]): T[]
   return groups;
 }
 
-/** How many of a list's kills had at least one attacker flying a hull of this group. */
 export interface HullKillCount {
   groupId: number;
   kills: number;
 }
 
-/**
- * Hull classes seen among the attackers, counted per kill, never per
- * attacker: the same pilot repeats on every mail, so a sum of attackers would
- * say more than the data shows. An attacker with no ship, or a ship with no
- * known group, is skipped. Most common first; ties by group id.
- */
 export function hullClassKillCounts(
   kills: readonly RecentKill[],
   groupOf: (typeId: number) => number | undefined
@@ -158,10 +110,6 @@ export function hullClassKillCounts(
     .sort((a, b) => b.kills - a.kills || a.groupId - b.groupId);
 }
 
-/**
- * The first `max` attackers, with the final blow always among them (swapped
- * in for the last when it fell past the cap), and how many were left out.
- */
 export function capAttackers<T extends RecentKillAttacker>(
   attackers: readonly T[],
   max: number
@@ -174,34 +122,26 @@ export function capAttackers<T extends RecentKillAttacker>(
 }
 
 export interface RecentKillLocation extends KillTags {
-  /** The location id as a string, or `'other'` for the pooled unnamed group. */
   key: string;
   kind: 'stargate' | 'station' | 'other';
-  /** `null` for the unnamed group: a planet, moon, belt, structure or no location. */
   name: string | null;
-  /** A stargate leading to the previous or next system on the route. */
   onPath: boolean;
   count: number;
   minutesSinceLast: number;
-  /** This location's kills, newest first. */
   kills: RecentKillView[];
   hulls: HullKillCount[];
 }
 
 export interface RecentKillsSummary extends KillTags {
   count: number;
-  /** `null` when nothing died. */
   minutesSinceLast: number | null;
-  /** Busiest first; ties go to the most recent. */
   locations: RecentKillLocation[];
   hulls: HullKillCount[];
 }
 
 export interface RecentKillsContext extends KillTagContext {
   locations: ReadonlyMap<number, ResolvedLocation>;
-  /** The route systems either side of this one. */
   pathNeighbours: ReadonlySet<number>;
-  /** Epoch milliseconds. */
   now: number;
 }
 

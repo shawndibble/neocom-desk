@@ -23,7 +23,6 @@ function row(overrides: Partial<CharacterCsvRow> = {}): CharacterCsvRow {
       piSoonestExpiryMs: Date.parse('2026-09-30T00:00:00Z'),
       piFetchedAt: null,
     },
-    // 11 manufacturing, 11 science, 11 reaction slots.
     jobSlotSkills: {
       massProduction: 5,
       advancedMassProduction: 5,
@@ -182,7 +181,6 @@ describe('charactersCsvColumns', () => {
       'characters.csvSystem': 'Jita',
       'characters.csvPlaceKind': 'characters.csvPlaceDocked',
       'characters.column.ship': 'Rifter',
-      // 52M SP fills 94 extractors at 100 net each.
       'characters.csvSpReadyValue': 9400,
     });
     const inSpace = valuesOf(

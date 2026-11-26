@@ -17,14 +17,9 @@ const leaderMock = vi.hoisted(() => {
       listeners.add(listener);
       return { isLeader: () => leader, leave: () => listeners.delete(listener) };
     },
-    // A new promise, as `navigator.locks.request` returns. Passing the task's
-    // own through would hide an unhandled rejection: it comes from a vitest
-    // spy, and the spy attaches a handler of its own to record the outcome.
     runUnlessRunningElsewhere: (_lock: string, task: () => Promise<void>) =>
       task().then(() => undefined),
-    /** Seats still standing — for the unmount assertion. */
     seats: () => listeners.size,
-    /** Simulate the election: another tab leads (`false`) or this one does. */
     setLeader(next: boolean) {
       leader = next;
       listeners.forEach((listener) => listener());
@@ -195,15 +190,12 @@ describe('ForegroundNotificationPoller', () => {
   });
 
   describe('a poll that fails', () => {
-    /** Rejections nothing handled, as `onunhandledrejection` would have reported them. */
     async function unhandledDuring(run: () => void): Promise<unknown[]> {
       const seen: unknown[] = [];
       const listener = (reason: unknown) => seen.push(reason);
       process.on('unhandledRejection', listener);
       try {
         run();
-        // Node reports an unhandled rejection a turn after it goes unhandled; with
-        // nothing to observe when none comes, a turn is the only thing to wait on.
         // eslint-disable-next-line no-restricted-syntax -- Node's unhandled-rejection turn; nothing else to observe
         await new Promise((resolve) => setTimeout(resolve, 10));
       } finally {

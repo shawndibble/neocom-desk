@@ -1,8 +1,3 @@
-/**
- * The officer queue's two dialogs: Reject (a reason the pilot is sent) and Change
- * amount (a new figure and a reason, with the computed one kept in view). Each ends in its own
- * confirm; a refusal from the server shows inside, never as a bare toast, so the typed reason survives.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IskInput, Modal, TextArea } from '@/components/ui';

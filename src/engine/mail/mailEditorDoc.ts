@@ -1,16 +1,3 @@
-/**
- * The seam between the rich mail editor's document (ProseMirror JSON as
- * Tiptap emits it) and EVE markup. `eveMarkup.ts` stays the single authority
- * for what is sent: every conversion here goes through `parseEveMarkup` and
- * `serializeEveMarkup`, so whatever the editor holds, only the safe subset —
- * entity-escaped text, depth-capped, known link schemes — can come out.
- *
- * Pure and library-free: the JSON types below are the shape only, so
- * `src/engine` keeps its no-DOM, no-editor-import rule.
- *
- * A table has no EVE markup: it is a block of `| a | b |` pipe rows (header,
- * `|---|` separator, body) that the reader also draws as a table.
- */
 import {
   parseEveMarkup,
   markupPlainText,
@@ -37,29 +24,23 @@ export interface EditorDoc {
   content: EditorNode[];
 }
 
-/** Escapes plain text (a legacy draft, a quoted reply) so it reads literally as markup. */
 export function plainTextToMarkup(text: string): string {
   return serializeEveMarkup([{ type: 'text', text }]);
 }
 
-/** A stored draft's body as EVE markup: one saved before the rich editor is plain text, so `< > &` in it stay literal. */
 export function draftMarkupBody(draft: { body: string; format?: 'markup' }): string {
   return draft.format === 'markup' ? draft.body : plainTextToMarkup(draft.body);
 }
 
-/** The markup as it would be sent: parsed and re-serialized, so only the safe subset remains. */
 export function sanitizeMarkup(src: string): string {
   return serializeEveMarkup(parseEveMarkup(src));
 }
 
 const TAG_LIKE = /<\/?[a-zA-Z][^>]*>/g;
 
-/** Whether sanitizing `src` removed any tag: what Source → Preview tells the pilot about. */
 export function droppedMarkup(src: string): boolean {
   return (src.match(TAG_LIKE)?.length ?? 0) > (sanitizeMarkup(src).match(TAG_LIKE)?.length ?? 0);
 }
-
-// --- markup -> doc ---------------------------------------------------------
 
 function runsOf(nodes: readonly MarkupNode[], marks: EditorMark[]): EditorNode[] {
   return nodes.flatMap((node): EditorNode[] => {
@@ -118,8 +99,6 @@ export function markupToDoc(src: string): EditorDoc {
   return { type: 'doc', content };
 }
 
-// --- doc -> markup ---------------------------------------------------------
-
 type Wrapper = Exclude<MarkupNode, { type: 'text' | 'br' }>;
 
 function wrapperKey(n: MarkupNode): string | null {
@@ -139,7 +118,6 @@ function wrapperKey(n: MarkupNode): string | null {
   }
 }
 
-/** Adjacent wrappers of the same kind and value become one, so a styled run split by the editor costs no extra tags. */
 function mergeAdjacent(nodes: MarkupNode[]): MarkupNode[] {
   const out: MarkupNode[] = [];
   for (const node of nodes) {
@@ -167,7 +145,6 @@ function nodesOfRun(run: EditorNode): MarkupNode[] {
   const attr = (type: string, name: string) =>
     run.marks?.find((m) => m.type === type)?.attrs?.[name];
   let nodes: MarkupNode[] = [{ type: 'text', text: run.text }];
-  // Innermost first, so the order outside-in is link > size > colour > b > i > u.
   if (has('underline')) nodes = [{ type: 'u', children: nodes }];
   if (has('italic')) nodes = [{ type: 'i', children: nodes }];
   if (has('bold')) nodes = [{ type: 'b', children: nodes }];
@@ -205,6 +182,5 @@ export function docToMarkup(doc: EditorDoc): string {
     }
     return serializeEveMarkup(mergeAdjacent((block.content ?? []).flatMap(nodesOfRun)));
   });
-  // Nothing typed is nothing sent: an empty paragraph carries no newline.
   return sanitizeMarkup(pieces.length === 1 && pieces[0] === '' ? '' : pieces.join('\n'));
 }

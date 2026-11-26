@@ -1,11 +1,3 @@
-/**
- * The pilot's Damage Profiles (issue #1545): the custom list and which
- * profile is selected, as two synced settings rather than one blob — merging
- * is whole-value last-write-wins per key, so one blob would let "picked
- * Guristas on the laptop" clobber "edited a custom profile on the desktop".
- * The selection is global, not per Fitting: it is the pilot's lens on every
- * fit, and stays out of the `?f=` Fitting Share Code.
- */
 import { useTranslation } from 'react-i18next';
 import {
   CUSTOM_DAMAGE_PROFILE_ID_PREFIX,
@@ -36,7 +28,6 @@ export const useSelectedDamageProfileId = createSyncedSetting<string>({
   parse: parseSelectedDamageProfileId,
 });
 
-/** A profile's display name: a built-in's translated name, a custom one's own. */
 export function useDamageProfileName(): (profile: NamedDamageProfile) => string {
   const { t } = useTranslation();
   return (profile) => {

@@ -79,8 +79,6 @@ describe('shouldDeleteDeviceToken', () => {
   });
 
   it('leaves the token alone on an INVALID_ARGUMENT about the payload', () => {
-    // FCM v1 reports a bad payload with the same code as a bad token; deleting
-    // the registration then would orphan every row that device has.
     expect(
       shouldDeleteDeviceToken('messaging/invalid-argument', 'Message payload is too big')
     ).toBe(false);

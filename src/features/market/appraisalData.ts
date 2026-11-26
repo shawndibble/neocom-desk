@@ -1,42 +1,3 @@
-/**
- * The Appraisal tab's data path: pasted text in, priced rows out.
- *
- * The three steps either side of it are pure and live in `src/engine/market`
- * (`appraisalPaste`, `appraisalMatch`, `appraisal`); this module is the thin
- * layer that reaches the catalogue and the network, which the engine may not.
- *
- * Prices come from `market/prices.ts`'s `getHubPrices`, not `fetchAggregates`
- * directly: it already carries the 15-minute TTL cache and ADR 0002's
- * per-type null fallback when Fuzzwork is unreachable, and a second cache for
- * the same station's prices would only disagree with the first one. Fuzzwork
- * aggregates are per-**station**, which is why an appraisal is quoted at a
- * Trade Hub rather than under the Browser's full Location Mode — a Region
- * appraisal would be one paginated ESI order-book call per pasted item.
- *
- * Refine-then-sell (issue #672) is threaded in here, not the engine: only
- * this layer may reach Dexie (`loadCharacterModifiers`) or the SDE
- * (`loadReprocessing`, 1.4 MB). `characterId` is null with no active
- * Character, in which case neither is fetched at all, and every row's
- * `refine` stays undefined — the page behaves exactly as it did before this
- * issue. Each row's specialisation skill is resolved per type by
- * Character Modifiers' `refiningEfficiency` (issue #1058): the SDE bake's attribute-790
- * join names the matching ore/ice/moon-ore specialisation directly, falling
- * back to Scrapmetal Processing for a module or ship — the same resolver
- * `orderExits.ts` and Mining Yield use, so a mixed paste of ore and modules
- * resolves a different specialisation on each row rather than one shared
- * guess.
- *
- * LP store acquisition (`appraisalLpAcquisition.ts`) is threaded in the same
- * way and for the same reason: only this layer may reach ESI/Dexie for the
- * character's LP corps. It runs alongside the reprocessing fetch, both
- * gated on `characterId` being non-null, and its `requiredItemTypeIds`
- * widen the one `getHubPrices` batch every other price in this function
- * already shares — a turn-in's cost is never a second network round trip.
- *
- * Each row's packaged unit volume (issue #2337) is read from the same market
- * type catalogue the names come from (`loadMarketTypesById`, memoized per
- * session), so volume costs no per-row ESI call.
- */
 import {
   buildAppraisal,
   buildHubComparison,
@@ -75,60 +36,18 @@ import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/re
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
-  /** The paste this was computed from, so a stale result is never read as the current one's. */
   pasteText?: string;
-  /**
-   * The lines (also in `unmatched`) whose second tab field is text, left out of
-   * the total — each with the whole-number columns the pilot could pick instead.
-   */
   textQuantityLines?: AppraisalUnreadableLine[];
-  /** Unmatched lines naming an abyssal type; kept apart so they don't read as typos. */
   abyssal?: AppraisalUnmatched[];
-  /**
-   * The active clone's refining implant bonus, 0 with none fitted, no active
-   * Character, or the whole paste is scrap — the implant's own ESI
-   * description covers ore and ice only, so a scrap-only paste never
-   * actually saw the bonus even though the character has it (issue #1227).
-   */
   implantBonusPct: number;
-  /**
-   * Some refined row is ore or ice — the only material a refining implant
-   * touches — whether or not one was read. Lets the page say it assumed no
-   * implants without saying so over a scrap-only paste (issue #1588).
-   */
   refinesOreOrIce: boolean;
-  /**
-   * The Refining Setup the refine figures were worked out at: the pilot's own,
-   * or the NPC-station default when none was given. Undefined where no refine
-   * was computed (no active Character), so a caller can tell "the default"
-   * from "nothing refined".
-   */
   refining?: RefiningSetup;
-  /** The active Character's own skill level, or null with no active Character. Feeds `appraisalNet`. */
   accountingLevel: number | null;
-  /** Same as `accountingLevel`, for Broker Relations. */
   brokerRelationsLevel: number | null;
-  /**
-   * The price source could not be reached, so every price is unknown rather
-   * than "no orders": the panel shows a placeholder, not 0 ISK totals.
-   */
   pricesUnreachable: boolean;
-  /**
-   * The prices are yesterday's close from the daily open prices, because no
-   * live source answered (docs/context/decisions/*-price-fallback-when-fuzzwork-is-down.md).
-   */
   pricesStale?: boolean;
 }
 
-/**
- * Built once per session from the same `types.json` the Market Browser's tree
- * reads, so opening Appraisal after browsing costs no second fetch.
- *
- * A duplicate name keeps the *first* type id rather than the last. EVE's
- * market catalogue has a handful of same-named types across groups, and which
- * one a paste means is unknowable from the text alone — being stable about it
- * at least makes the number reproducible.
- */
 let cataloguePromise: Promise<AppraisalCatalogue> | null = null;
 
 export function loadAppraisalCatalogue(): Promise<AppraisalCatalogue> {
@@ -142,37 +61,23 @@ export function loadAppraisalCatalogue(): Promise<AppraisalCatalogue> {
       return map as AppraisalCatalogue;
     })
     .catch((error: unknown) => {
-      cataloguePromise = null; // allow retry after failure
+      cataloguePromise = null;
       throw error;
     });
   return cataloguePromise;
 }
 
-/** Test-only: production callers rely on the session-lifetime memo. */
 export function clearAppraisalCatalogue(): void {
   cataloguePromise = null;
 }
 
 export interface AppraiseOptions {
-  /**
-   * Drop the cached prices for these types first, so the refresh button is
-   * not a silent no-op inside the 15-minute TTL. GLOSSARY.md's "Data Age"
-   * makes the manual button one of the two things allowed to bypass a TTL.
-   */
   force?: boolean;
-  /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
   refining?: RefiningSetup;
-  /** The tab column the pilot chose as the quantity of text-quantity lines. */
   quantityColumn?: number | null;
-  /**
-   * Price a text-quantity line as one instead of reporting it. The Appraisal
-   * reports it (its panel can show why); a caller with no such panel, like the
-   * fleet payout, keeps the old reading rather than silently paying nothing.
-   */
   textQuantityAsOne?: boolean;
 }
 
-/** Every abyssal type's name, lower-case: read only when a paste has unmatched lines. */
 async function loadAbyssalTypeNames(): Promise<Set<string>> {
   const [data, types] = await Promise.all([loadMutaplasmids(), loadTypes()]);
   return new Set(
@@ -180,14 +85,6 @@ async function loadAbyssalTypeNames(): Promise<Set<string>> {
   );
 }
 
-/**
- * Parse, resolve and price a paste at `hub`. Throws only if the catalogue
- * itself cannot be loaded — an unreachable price source degrades to null
- * prices per type, which the table renders as a dash rather than as free.
- *
- * `characterId` is null with no active Character — the refine comparison is
- * then never computed, and `reprocessing.json` is never fetched.
- */
 export async function appraisePaste(
   text: string,
   hub: TradeHub,
@@ -216,8 +113,6 @@ export async function appraisePaste(
     ? splitAbyssalUnmatched(matchResult.unmatched, abyssalNames)
     : { abyssal: [], unmatched: matchResult.unmatched };
   const { abyssal } = split;
-  // A line whose quantity couldn't be read is reported with the unmatched ones,
-  // in source order, after the abyssal split so it can never read as abyssal.
   const unmatched = [
     ...split.unmatched,
     ...unreadable.map(({ name, lines }) => ({ name, lines })),
@@ -228,7 +123,6 @@ export async function appraisePaste(
     characterId === null
       ? [null, null, null]
       : await Promise.all([
-          // A lazy download: missing offline, it costs only the refine column.
           loadReprocessing().catch(() => null),
           loadCharacterModifiers(characterId, Date.now()),
           findLpOfferMatches(characterId, typeIds),
@@ -262,7 +156,6 @@ export async function appraisePaste(
 
   let implantApplied = false;
   let refinesOreOrIce = false;
-  /** A refinable type's materials priced on one side of the book; a material nobody trades on that side is left out. */
   const materialPricesOf = (
     reprocessing: ReprocessingType,
     side: (aggregate: ReturnType<typeof prices.get>) => number | null | undefined
@@ -332,33 +225,20 @@ export async function appraisePaste(
   };
 }
 
-/** One Trade Hub's row in the Appraisal tab's Compare Hubs table. */
 export interface HubComparisonRow {
   hub: TradeHub;
   buy: number | null;
   sell: number | null;
-  /** This hub's prices could not be fetched, so the dashes mean "unknown", not "no orders". */
   unreachable: boolean;
-  /** The pasted rows at this hub's cached prices, which live books replace per row (issue #5591). */
   items?: readonly AppraisalItem[];
-  /** Whether the totals are this hub's live books, still cached, or live with a failed row. */
   priceState?: PriceState;
 }
 
-/**
- * Prices the same pasted pile at every Trade Hub side by side, so a pilot can
- * see hub disparity without switching `sync.marketHub` and re-pasting up to 5
- * times. Parses and matches the paste once, then costs exactly one batched
- * `getHubPrices` call per hub (5 total) regardless of paste length — the same
- * shape `hubHaulGaps` already proves cheap for open orders. No refine
- * comparison here: that stays primary-appraisal-only.
- */
 export async function compareHubs(
   text: string,
   pricePercent: number,
   { force = false, quantityColumn = null, textQuantityAsOne = false }: AppraiseOptions = {}
 ): Promise<HubComparisonRow[]> {
-  // The same reading appraisePaste prices, so the compare table matches the total.
   const { entries } = parseAppraisalPasteDetailed(text, { quantityColumn, textQuantityAsOne });
   const catalogue = await loadAppraisalCatalogue();
   const { matched } = matchAppraisalEntries(entries, catalogue);

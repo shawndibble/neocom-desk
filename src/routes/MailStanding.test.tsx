@@ -137,14 +137,11 @@ describe('Mail', () => {
     );
     renderMailRoute();
     await screen.findByText('Mail 0');
-    // The scroller wraps the date sections, each its own <ul>.
     const list = screen.getByText('Mail 0').closest('.overflow-y-auto');
     expect(list).toHaveClass('max-h-[36rem]');
   });
 
   it('groups the list under date headings without breaking row selection (issue #3971)', async () => {
-    // Only Date is faked: real timers keep findBy/waitFor polling. Local noon,
-    // so the 09:00 mail is Today in any runner zone.
     vi.useFakeTimers({ toFake: ['Date'] });
     onTestFinished(() => {
       vi.useRealTimers();
@@ -162,7 +159,6 @@ describe('Mail', () => {
     renderMailRoute();
     const subject = await screen.findByText('Fleet up!');
     const today = screen.getByRole('heading', { name: 'Today' });
-    // Device locale, like every other date in the app.
     const marchLabel = new Date(Date.UTC(2020, 2, 15)).toLocaleDateString(undefined, {
       month: 'long',
       year: 'numeric',
@@ -371,9 +367,6 @@ describe('Mail', () => {
       })
     );
     await addSecondCharacter();
-    // A full page for the second Character too, so its Load more stays on
-    // screen across the switch: its label is how the test sees the stale
-    // request finish (it reads "Loading" until the dropped page settles).
     const secondPage = Array.from({ length: 50 }, (_, i) => ({
       mail_id: 500 - i,
       subject: i === 0 ? 'Second pilot mail' : `Second ${500 - i}`,
@@ -398,7 +391,6 @@ describe('Mail', () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
     await screen.findByText('Second pilot mail');
-    // Same page instance, still waiting on the first Character's older page.
     expect(screen.getByRole('button', { name: 'Loading' })).toHaveAttribute(
       'aria-disabled',
       'true'
@@ -407,7 +399,6 @@ describe('Mail', () => {
     await act(async () => {
       resolveOlderPage?.();
     });
-    // The stale request has settled once the button is back.
     expect(await screen.findByRole('button', { name: /load more/i })).toBeEnabled();
     expect(screen.queryByText('Older mail')).not.toBeInTheDocument();
     expect(screen.getByText('Second pilot mail')).toBeInTheDocument();

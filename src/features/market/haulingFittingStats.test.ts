@@ -9,7 +9,6 @@ vi.mock('@/features/fittings/dogmaFittingEngine', () => ({ computeFittingStats }
 
 describe('computeCargoHolds', () => {
   it('folds the fleet hangar into the general hold', async () => {
-    // A Deep Space Transport: most of what it hauls rides in the fleet hangar.
     computeFittingStats.mockResolvedValue({
       holds: { ...NO_HOLDS, cargo: 4_500, fleetHangar: 50_000 },
     });

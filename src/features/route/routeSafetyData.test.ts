@@ -26,7 +26,6 @@ function publicJson(path: string, body: JsonBodyType) {
   return http.get(`${ESI_BASE_URL}${path}`, ({ request }) => {
     const bad = rejectBadEsiHeaders(request);
     if (bad) return bad;
-    // Public: nothing here may carry a Character's token.
     if (request.headers.get('authorization') !== null) {
       return HttpResponse.json({ error: 'unexpected auth' }, { status: 400 });
     }

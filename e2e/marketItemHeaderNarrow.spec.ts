@@ -1,14 +1,3 @@
-/**
- * Market Browser item panel header at phone width (issue #1945): the shared
- * `Panel` heading was `whitespace-nowrap` with no `min-w-0` when a caller
- * passed `headingRef`, so a long item name pushed the price-alert bell and
- * Show info off the panel's right edge and made the page scroll sideways.
- * Below `md` the name now wraps inside the header; at and above `md` it is
- * unchanged.
- *
- * Asserts containment rather than a character count, and hides the classic
- * scrollbar so the overflow check measures the layout a phone gets.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -16,8 +5,6 @@ import { signInAndGoto } from './support/authSeed';
 const LONG_NAME = 'Mjolnir Auto-Targeting Heavy Missile I Blueprint';
 
 async function openLongItem(page: Page) {
-  // The item view fetches an Order Book and Price History; the header
-  // under test doesn't care what they hold, so both answer empty.
   for (const kind of ['orders', 'history']) {
     await page.route(`https://esi.evetech.net/markets/*/${kind}*`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })

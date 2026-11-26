@@ -1,9 +1,3 @@
-/**
- * State, derived view and actions behind `PlanMap`: ticks, what-ifs, the
- * trace, the URL-backed drawers, the docked/drawer mode and focus return. See
- * PlanMap.tsx's header for who owns what. Returns everything the layout
- * pieces read; `PlanMapState` is its type.
- */
 import { formatList } from '@/lib/listFormat';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,7 +58,6 @@ export function usePlanMapState({
   const location = useLocation();
   const navigate = useNavigate();
 
-  // The product the URL has open; an id the map does not know is ignored.
   const linkedRaw = parsePiProduct(location.search);
   const linked = linkedRaw !== null && graph.byId.has(linkedRaw) ? linkedRaw : null;
   const hasProductParam =
@@ -76,7 +69,6 @@ export function usePlanMapState({
     for (const c of colonies) map.set(c.type, [...(map.get(c.type) ?? []), c.name]);
     return map;
   }, [colonies]);
-  /** With no colony, every type is in play: the pilot unticks what they cannot reach. */
   const noColonies = owned.size === 0;
   const isHave = useCallback(
     (type: PlanetType) => noColonies || owned.has(type),
@@ -94,9 +86,6 @@ export function usePlanMapState({
     return map;
   }, [picks]);
 
-  // --- State ---------------------------------------------------------------
-  // The starting ticks and trace follow the data (colonies, picks) until the
-  // pilot touches them; their own choice, once made, is never overridden.
   const defaultTicked = useMemo<ReadonlySet<PlanetType>>(
     () => new Set(noColonies ? graph.planetTypes : owned),
     [noColonies, graph, owned]
@@ -112,7 +101,6 @@ export function usePlanMapState({
     linked !== null ? { id: linked, explicit: true } : undefined
   );
   const [whatIfTicks, setWhatIfTicks] = useState<ReadonlySet<PlanetType>>(new Set());
-  // The ticked what-if types the pilot still lacks, sorted: the order `whatIfKey` and the planet ids use.
   const whatIfTypes = useMemo(
     () => whatIfTypesOf(whatIfKey([...whatIfTicks].filter((type) => !isHave(type)))),
     [whatIfTicks, isHave]
@@ -120,7 +108,6 @@ export function usePlanMapState({
   const whatIf = useMemo<ReadonlySet<PlanetType>>(() => new Set(whatIfTypes), [whatIfTypes]);
   const [preview, setPreview] = useState<PlanetType | null>(null);
   const [detailKind, setDetailKind] = useState<DetailKind>('product');
-  // A newly linked product is traced, and stays traced once its drawer closes.
   const [seenLinked, setSeenLinked] = useState(linked);
   if (linked !== seenLinked) {
     setSeenLinked(linked);
@@ -138,17 +125,12 @@ export function usePlanMapState({
           : userTraced,
     [linked, userTraced, defaultTraced]
   );
-  /** The "add a planet" drawer; the product drawer is open while the URL names one. */
   const [planetOpen, setPlanetOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  // The colony whose richness drawer the URL has open; an unknown id is dropped.
   const planetRaw = parsePiPlanet(location.search);
   const richnessColony = colonies.find((c) => c.planetId === planetRaw) ?? null;
   const hasPlanetParam = new URLSearchParams(location.search).has(PI_PLANET_PARAM);
-  // The URL keeps only what the view uses, in one navigation (two would each
-  // start from the same stale search and undo each other): an id the map does
-  // not know goes, and with a colony's richness drawer open the product does too.
   const dropProductParam = hasProductParam && (linked === null || richnessColony !== null);
   const dropPlanetParam = hasPlanetParam && richnessColony === null;
   useEffect(() => {
@@ -161,11 +143,8 @@ export function usePlanMapState({
   const dropPlanet = () =>
     navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
 
-  // --- Detail panel mode, by the layout box's own width -----------------------
   const layoutRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setPanelWidth] = useState(0);
-  // No drawer until the width is known: a linked product on a wide screen
-  // would otherwise mount a drawer for one frame before the panel docks.
   const [measured, setMeasured] = useState(false);
   useLayoutEffect(() => {
     const width = layoutRef.current?.getBoundingClientRect().width ?? 0;
@@ -185,13 +164,11 @@ export function usePlanMapState({
   const mode = detailMode({ panelWidth, phone });
   const docked = mode === 'docked';
 
-  // --- Focus comes back to what opened the drawer ------------------------------
   const returnFocus = useRef<HTMLElement | null>(null);
   const remember = useCallback(() => {
     const active = document.activeElement;
     returnFocus.current = active instanceof HTMLElement && active !== document.body ? active : null;
   }, []);
-  // Set until the frame that focuses it: the drawer's own close may run first or second.
   const restoring = useRef<HTMLElement | null>(null);
   const restore = useCallback(() => {
     const el = returnFocus.current;
@@ -207,21 +184,16 @@ export function usePlanMapState({
     setPlanetOpen(false);
     restore();
   }, [restore]);
-  /** Takes `product` off the URL by replacing the entry, never going Back. */
   const dropProduct = useCallback(() => {
     if (parsePiProduct(location.search) === null) return;
     navigate(hrefWithoutPiProduct(location), { replace: true });
   }, [location, navigate]);
-  // A drawer a link on Plan or Colonies opened has no opener left on this
-  // tab: focus goes to that product on the map (a tile, or a phone row), else
-  // the page heading, never the page body.
   const lastLinked = useRef<number | null>(null);
   useEffect(() => {
     if (linked !== null) lastLinked.current = linked;
     else if (richnessColony !== null) lastLinked.current = null;
   }, [linked, richnessColony]);
   const productFocusFallback = useCallback((): HTMLElement | null => {
-    // An opener this page remembered wins, whether its frame has run yet or not.
     if (restoring.current?.isConnected) return restoring.current;
     const active = document.activeElement;
     if (
@@ -243,7 +215,6 @@ export function usePlanMapState({
     restore();
   }, [restore]);
 
-  // --- Derived view ----------------------------------------------------------
   const trace = useMemo(
     () =>
       traced
@@ -255,11 +226,6 @@ export function usePlanMapState({
         : null,
     [graph, traced, owned, ticked, picks]
   );
-  /**
-   * Planet types a traced product needs that the pilot has no colony on. The
-   * chain is drawn as if they were there (lit, tagged NEED) so the trace runs
-   * end to end instead of stopping at a dimmed planet.
-   */
   const needTypes = useMemo<ReadonlySet<PlanetType>>(
     () =>
       new Set(
@@ -269,8 +235,6 @@ export function usePlanMapState({
       ),
     [traced, trace, noColonies]
   );
-  // A planet the trace already needs has nothing to preview: hovering it must not pile pink wires on the trace.
-  // Hovering a type that is already ticked shows the ticked set, as it is.
   const previewed = preview && !needTypes.has(preview) && !whatIf.has(preview) ? preview : null;
   const activeWhatIf = useMemo<ReadonlySet<PlanetType>>(
     () => (previewed ? new Set([previewed]) : whatIf),
@@ -295,9 +259,7 @@ export function usePlanMapState({
   const haulBetween = usePiSettings((state) => state.value.haulBetweenPlanets === true);
   const chainsOn = haulBetween && pi !== null && !pricesFailed;
   const whatIfChainKey = chainsOn && whatIfTypes.length > 0 ? whatIfKey(whatIfTypes) : null;
-  // One new planet per ticked type: every one needs its own free slot.
   const hasFreeSlot = advice.slots.free >= whatIfTypes.length;
-  // Fed by `WhatIfChainsFeed`.
   const [fed, setFed] = useState<{ advice: PlanAdvice; state: WhatIfChainsState } | null>(null);
   const whatIfChains = fed?.advice === advice ? fed.state : NO_WHAT_IF_CHAINS;
   const chainsPending = whatIfChainKey !== null && !whatIfChains.byType.has(whatIfChainKey);
@@ -313,7 +275,6 @@ export function usePlanMapState({
     () => new Map(whatIfCards.map((card) => [card.typeId, card])),
     [whatIfCards]
   );
-  // Lit only while the ticked what-if set is the one shown: hovering a type previews that type alone.
   const newIds = useMemo(() => {
     const ids = unlock?.highlight ?? new Set<number>();
     return previewed === null && chainCards.size > 0
@@ -349,7 +310,6 @@ export function usePlanMapState({
     [advice, graph, pricesFailed, chainOf, chainCards, whatIfChainKey, whatIfTypes]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
-  // The legend explains only the marks the board can draw: none with prices down.
   const marks = useMemo(() => {
     const all = [...figures.values()];
     return {
@@ -366,8 +326,6 @@ export function usePlanMapState({
     [advice, t]
   );
 
-  // A what-if build is a full advice solve: it runs off the click that picked the planet type
-  // (in the worker where there is one), and shows only once it matches the current pick.
   const [whatIfBuilt, setWhatIfBuilt] = useState<{
     types: ReadonlySet<PlanetType>;
     build: typeof adviceWithWhatIf;
@@ -376,14 +334,12 @@ export function usePlanMapState({
   useEffect(() => {
     if (whatIf.size === 0) return;
     let live = true;
-    // The prop may hand back a plain advice; the tick lets the click that picked the type return first.
     Promise.resolve()
       .then(() => adviceWithWhatIf(whatIf))
       .then(
         (advice) => {
           if (live) setWhatIfBuilt({ types: whatIf, build: adviceWithWhatIf, advice });
         },
-        // A failed build leaves no what-if figures, as a model failure does elsewhere on the board.
         () => {
           if (live) setWhatIfBuilt(null);
         }
@@ -401,12 +357,8 @@ export function usePlanMapState({
     [whatIf, whatIfAdvice, owned]
   );
 
-  /** The detail shows the what-if planet: chosen, or nothing else is traced. */
   const showWhatIf = whatIf.size > 0 && (detailKind === 'planet' || traced === null);
 
-  // --- Actions ---------------------------------------------------------------
-  // A product linked while docked stays in the docked panel: narrowing the
-  // window must not pop it open as a drawer, so it is dropped from the URL.
   const [dockedLinked, setDockedLinked] = useState<number | null>(null);
   if (docked && linked !== null && dockedLinked !== linked) setDockedLinked(linked);
   if (linked === null && dockedLinked !== null) setDockedLinked(null);
@@ -419,8 +371,6 @@ export function usePlanMapState({
   const planetShown = !docked && planetOpen;
   const richnessShown = measured && !docked && richnessColony !== null;
   const drawerShown = productShown || planetShown || richnessShown;
-  // Back (or Close) took the product off the URL: focus goes back to the opener,
-  // unless another drawer is taking over.
   const wasProductShown = useRef(productShown);
   useEffect(() => {
     if (wasProductShown.current && !productShown && !docked && !planetOpen && !helpOpen) restore();
@@ -432,14 +382,11 @@ export function usePlanMapState({
     [location.search]
   );
   const openProduct = (typeId: number) => {
-    // Already in a drawer (the add-planet "best recipe" button): keep the
-    // original opener as the place focus returns to.
     if (!docked && !drawerShown) remember();
     setUserTraced({ id: typeId, explicit: true });
     setDetailKind('product');
     const href = piProductHref(typeId, location.search);
     if (planetShown) {
-      // The planet drawer's own Back entry becomes the product's.
       setPlanetOpen(false);
       navigate(href, { replace: true });
       return;
@@ -456,23 +403,17 @@ export function usePlanMapState({
       });
       return;
     }
-    // Before the NEED branch: a ticked what-if unticks even when the trace needs it.
     if (whatIfTicks.has(type)) {
       const next = new Set(whatIfTicks);
       next.delete(type);
       setWhatIfTicks(next);
-      // The last one off closes the panel; with others still ticked it now describes them.
       if (next.size === 0) closePlanet();
       return;
     }
     if (needTypes.has(type)) {
-      // The traced product already shows what this planet is for and where to
-      // find one. A what-if here would swap the panel and pile pink unlock
-      // wires on top of the trace.
       if (!docked && !drawerShown) remember();
       setPlanetOpen(false);
       setDetailKind('product');
-      // The product drawer is the URL's: bring it back if it was closed.
       if (linked === null && traced) {
         navigate(piProductHref(traced.id, location.search), productNavigation(location));
       }
@@ -483,7 +424,6 @@ export function usePlanMapState({
     setWhatIfTicks(new Set([...whatIfTicks, type]));
     setDetailKind('planet');
     if (docked) return;
-    // One drawer at a time: the product's entry goes, the planet's own comes.
     if (linked !== null) {
       navigate(hrefWithoutPiProduct(location), {
         replace: true,
@@ -496,11 +436,6 @@ export function usePlanMapState({
     if (linked !== null) dropProduct();
     else restore();
   };
-  /**
-   * The default first pick is not the pilot's choice: its first click opens it.
-   * While the docked panel shows a colony or the what-if, a click brings the
-   * product back instead of clearing it.
-   */
   const toggleProduct = (typeId: number) => {
     const ownTrace = traced?.explicit === true && traced.id === typeId;
     const panelElsewhere = docked && (richnessColony !== null || showWhatIf);

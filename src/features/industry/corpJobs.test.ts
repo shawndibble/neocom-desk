@@ -112,7 +112,6 @@ describe('visibleCorpJobs', () => {
 });
 
 describe('loadAccountCorpIndustryJobs', () => {
-  // The roles read needs its own scope; without it no corp read is attempted.
   const CORP_SCOPE = 'esi-industry.read_corporation_jobs.v1';
   const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
   const CORP_ID = 98000001;
@@ -168,7 +167,6 @@ describe('loadAccountCorpIndustryJobs', () => {
 
   it('never calls ESI for a character without the corp jobs grant', async () => {
     await seed(1, []);
-    // No handlers: an ESI call would be an unhandled request.
     const snapshot = await loadAccountCorpIndustryJobs(1);
     expect(snapshot.jobs).toEqual([]);
   });

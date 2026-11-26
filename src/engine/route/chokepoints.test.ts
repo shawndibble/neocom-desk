@@ -12,8 +12,6 @@ describe('GANK_CHOKEPOINTS', () => {
   });
 
   it('leaves out Niarja, which every older guide still names', () => {
-    // Moved into Pochven in 2020 and reads -1.0 in the current SDE, so it is
-    // not a highsec chokepoint any more — that traffic is what made Uedama.
     expect(GANK_CHOKEPOINTS.has(30003504)).toBe(false);
   });
 });
@@ -26,8 +24,6 @@ describe('isGankChokepoint', () => {
   });
 
   it('does not rest on security status', () => {
-    // Uedama reads 0.505, which rounds to a 0.5 highsec system. Being a
-    // chokepoint is about traffic, not about the security band.
     expect(isGankChokepoint(UEDAMA)).toBe(true);
   });
 });

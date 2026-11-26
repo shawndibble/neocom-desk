@@ -1,17 +1,3 @@
-/**
- * How wide EVE's chat draws each character, in pixels at font size 12, so the
- * Survey chat message can pad its box to one pixel width. The chat font is
- * proportional (an `i` is 4px, an `m` 10px), so counting characters leaves the
- * box's right edge ragged.
- *
- * Measured by pasting `║` + one character ten or twenty times + `║` into chat
- * and measuring the screenshot, once per character. The lowercase and uppercase
- * alphabets and the digits add up to their measured whole rows. Every box,
- * line, dash, shade and block character measured (`═ ║ ╔ ╗ ╚ ╝ ─ │ ┌ └ ╌ ┄ ┈ ▒ ▓ █ ░`)
- * is 8px, and each digit is 7px. A character not listed counts as a digit
- * (7px). A different chat font size scales every width, so the sizing is exact
- * only at the size this was measured at.
- */
 const WIDTHS: Record<string, number> = {
   ' ': 7,
   '═': 8,

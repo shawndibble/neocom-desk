@@ -23,7 +23,6 @@ import { formatLocalDate } from '@/lib/localDate';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 
-/** A plan's costed total and finish (`null` when there is nothing left to train). */
 export interface PlanRowStats {
   totalSeconds: number;
   finish: Date | null;
@@ -31,22 +30,16 @@ export interface PlanRowStats {
 
 interface PlanListProps {
   plans: readonly SkillPlanRecord[];
-  /** Where a plan's row goes: the row is a real link (DESIGN.md §6c). */
   planHref: (id: string) => string;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void | Promise<void>;
   onRename: (id: string, name: string) => void;
-  /** The account's other characters; "Copy to character" shows only when there are any. */
   otherCharacters?: readonly Pick<CharacterRecord, 'characterId' | 'name'>[];
   onCopyToCharacter?: (id: string, characterId: number) => void;
-  /** Per-plan schedule figures by plan id; rows without an entry show name only. */
   stats?: ReadonlyMap<string, PlanRowStats>;
-  /** The plan open in the editor, marked in the list; omitted on the plain list route. */
   activePlanId?: string;
-  /** A just-created plan whose row opens straight into rename; reported back via `onAutoRenameStarted`. */
   autoRenamePlanId?: string | null;
   onAutoRenameStarted?: () => void;
-  /** The Plans panel's title (its `headingRef`): where focus lands when the last plan is deleted. */
   headingRef?: RefObject<HTMLHeadingElement | null>;
 }
 
@@ -79,8 +72,6 @@ function PlanRow({
   const rowMenu = useOpenAfterMenu();
   const focusAfterCommit = useFocusAfterCommit();
   const moreRef = useRef<HTMLButtonElement>(null);
-  // The new plan's row can mount before or after the flag arrives, so both
-  // orders must land in rename mode — adjusting state during render, not in an effect.
   const [seenAutoRename, setSeenAutoRename] = useState(autoRename);
   if (autoRename !== seenAutoRename) {
     setSeenAutoRename(autoRename);
@@ -97,8 +88,6 @@ function PlanRow({
     else setDraftName(plan.name);
   }
 
-  // Enter and Escape unmount the focused input; hand focus to the row's ⋮.
-  // Blur does not: the pilot is already moving on.
   function endRename(commit: boolean) {
     if (commit) commitRename();
     else {
@@ -122,7 +111,6 @@ function PlanRow({
           onBlur={commitRename}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              // Focus moves to a button mid-keystroke: its keypress must not click it.
               e.preventDefault();
               endRename(true);
             }
@@ -159,8 +147,6 @@ function PlanRow({
           </Link>
         </Tooltip>
       )}
-      {/* One trailing ⋮ holds every action (Delete is the danger item), so the
-          name keeps the row's width and the finish date under it stays on one line. */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <IconButton
@@ -171,9 +157,6 @@ function PlanRow({
             label={t('plans.moreActions', { name: plan.name })}
           />
         </DropdownMenuTrigger>
-        {/* Rename, Copy and Delete open only once the menu has closed: opened
-              earlier, the menu's focus handling blurs the rename input and the
-              dialogs record an item that is about to unmount as their restore target. */}
         <DropdownMenuContent align="end" onCloseAutoFocus={rowMenu.onCloseAutoFocus}>
           <DropdownMenuItem
             onSelect={() => rowMenu.run(() => setRenaming(true), { keepFocus: true })}
@@ -200,7 +183,6 @@ function PlanRow({
   );
 }
 
-/** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (with Undo), rename inline. */
 export function PlanList({
   plans,
   planHref,
@@ -223,16 +205,12 @@ export function PlanList({
     else linkRefs.current.delete(id);
   }
 
-  // The row goes once the delete resolves, so focus is requested then: the
-  // next plan's link, else the previous one's, else the panel title.
   async function deletePlan(target: SkillPlanRecord) {
     const index = plans.findIndex((plan) => plan.id === target.id);
     const near = [plans[index + 1], plans[index - 1]].map(
       (plan) => () => (plan ? linkRefs.current.get(plan.id) : null)
     );
     await onDelete(target.id);
-    // One macrotask on: the menu's own focus restore (to the row being
-    // deleted) runs in a passive effect and must not land after this request.
     await new Promise((resolve) => setTimeout(resolve, 0));
     focusAfterCommit(...near, headingRef);
   }

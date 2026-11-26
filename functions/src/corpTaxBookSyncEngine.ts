@@ -1,11 +1,3 @@
-// The slice of the Corp Tax Book sync engine (src/engine/corpTaxBook/sync.ts,
-// allocation.ts's `matchDonation`, src/engine/eveNotificationPayload.ts) that
-// the scheduled server sync runs (issue #4068, ADR 0025). `functions/` cannot
-// import `src/`, so — like corpTaxBookEngine.ts — this is a mirror kept honest
-// by a parity test in the root suite (src/engine/corpTaxBook/syncMirror.test.ts)
-// that runs both copies on the same inputs. Change the engine first, then this
-// file. Dependency-free apart from its sibling mirror, so that test can import it.
-
 import { utcDay } from './timeConstants.js';
 import {
   moonOnDay,
@@ -16,12 +8,9 @@ import {
 
 import { UNCOUNTED_LIMIT, minerIdFor, type UncountedDonation } from './corpTaxBookDonationMatch.js';
 
-/** One copy each, in the shared donation matching (corpTaxBookDonationMatch.ts). */
 export { UNCOUNTED_LIMIT, minerIdFor, type UncountedDonation };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-// --- Observer ledger ------------------------------------------------------
 
 export interface LedgerRowLike {
   character_id: number;
@@ -31,7 +20,6 @@ export interface LedgerRowLike {
   last_updated: string;
 }
 
-/** Engine `observedRowsFromLedger`. */
 export function observedRowsFromLedger(
   structureId: number,
   rows: readonly LedgerRowLike[],
@@ -54,8 +42,6 @@ export function observedRowsFromLedger(
     }));
 }
 
-// --- Gaps -----------------------------------------------------------------
-
 export const ESI_LEDGER_RETENTION_DAYS = 30;
 export const MAX_GAPS = 20;
 
@@ -74,7 +60,6 @@ export interface GapInput {
   retentionDays?: number;
 }
 
-/** Engine `detectGaps`. */
 export function detectGaps(input: GapInput): SyncGap[] {
   if (input.lastSyncAt === null) return [];
   const retention = input.retentionDays ?? ESI_LEDGER_RETENTION_DAYS;
@@ -90,7 +75,6 @@ export function detectGaps(input: GapInput): SyncGap[] {
   return gaps;
 }
 
-/** Engine `mergeGaps`. */
 export function mergeGaps(prior: readonly SyncGap[], fresh: readonly SyncGap[]): SyncGap[] {
   const byStructure = new Map<number, SyncGap[]>();
   for (const gap of [...prior, ...fresh]) {
@@ -115,8 +99,6 @@ export function mergeGaps(prior: readonly SyncGap[], fresh: readonly SyncGap[]):
     .slice(-MAX_GAPS);
 }
 
-// --- Donations ------------------------------------------------------------
-
 export interface JournalEntryLike {
   id: number;
   date: string;
@@ -135,11 +117,9 @@ export interface JournalDonation {
   at: string;
   reason?: string;
   minerId?: string;
-  /** Set when a known sender's Miner owed nothing, so it stays Unmatched for review (#6207). */
   reviewReason?: 'no-open-balance';
 }
 
-/** Engine `donationsFromJournal`. */
 export function donationsFromJournal(
   entries: readonly JournalEntryLike[],
   division: number,
@@ -168,22 +148,15 @@ export interface MinerLike {
   characterIds: number[];
 }
 
-// --- Donations into divisions the book does not read (#6207) --------------
-
-/** Engine `WALLET_DIVISIONS`. */
 export const WALLET_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 
-/** Engine `otherDivisions`. */
 export function otherDivisions(divisions: readonly number[]): number[] {
   return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
 }
 
-// --- Notification payloads ------------------------------------------------
-
 const EVE_EPOCH_OFFSET_MS = 11_644_473_600_000;
 const TICKS_PER_MS = 10_000;
 
-/** The fields of a moon drill notification the sync reads (engine `EveNotificationPayload`). */
 export interface MoonPayload {
   structureId?: number;
   moonId?: number;
@@ -287,7 +260,6 @@ function ticksToEpochMs(ticks: number | undefined): number | undefined {
   return Math.round(ticks / TICKS_PER_MS - EVE_EPOCH_OFFSET_MS);
 }
 
-/** The moon-related fields of engine `parseEveNotificationPayload`. Never throws. */
 export function parseMoonPayload(text: string): MoonPayload {
   const fields = scalarLines(text);
   return {
@@ -299,9 +271,6 @@ export function parseMoonPayload(text: string): MoonPayload {
   };
 }
 
-// --- Extractions ----------------------------------------------------------
-
-/** The moon drill notification types the sync reads (client: `MOON_NOTIFICATION_TYPES` in sync.ts). */
 export const MOON_NOTIFICATION_TYPES = [
   'MoonminingExtractionStarted',
   'MoonminingExtractionFinished',
@@ -310,7 +279,6 @@ export const MOON_NOTIFICATION_TYPES = [
   'MoonminingExtractionCancelled',
 ] as const;
 
-/** Why a schedule can stop (client: `SCHEDULED_STOP_REASONS` in scheduledSync.ts). */
 export const SCHEDULED_STOP_REASONS = [
   'role-lost',
   'left-corp',
@@ -320,17 +288,14 @@ export const SCHEDULED_STOP_REASONS = [
   'grant-unreadable',
 ] as const;
 
-/** Moon ore is 10 m³ a unit (engine `MOON_ORE_M3_PER_UNIT`). */
 export const MOON_ORE_M3_PER_UNIT = 10;
 
 export interface SyncExtraction extends MirrorExtraction {
   oreLines?: { typeId: number; quantity: number }[];
   surveyId?: string;
-  /** The moon owner whose grant read it (#6097); absent means the book's own corporation. */
   sourceCorporationId?: number;
 }
 
-/** A moon owner's Extraction, as its grant read it (#6097). */
 export type FeederExtraction = SyncExtraction & { sourceCorporationId: number };
 
 export interface EsiExtractionLike {
@@ -347,7 +312,6 @@ export interface MoonNotification {
   payload: MoonPayload;
 }
 
-/** The moon drill notifications in a character's feed, parsed; every other type is left out. */
 export function moonNotificationsOf(
   feed: readonly { type: string; timestamp: string; text?: string }[]
 ): MoonNotification[] {
@@ -367,14 +331,12 @@ const SAME_CHUNK_MS = 10 * 60_000;
 const WINDOW_SLACK_MS = 5 * 60_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** Engine `ORE_AFTER_ARRIVAL`. */
 const ORE_AFTER_ARRIVAL: ReadonlySet<string> = new Set([
   'MoonminingExtractionFinished',
   'MoonminingLaserFired',
   'MoonminingAutomaticFracture',
 ]);
 
-/** Engine `namesChunk`. */
 function namesChunk(n: MoonNotification, arrival: number, decay: number): boolean {
   const at = Date.parse(n.timestamp);
   if (n.type === 'MoonminingExtractionFinished') {
@@ -392,7 +354,6 @@ const unitsOf = (volumes: readonly { typeId: number; volumeM3: number }[]) =>
     quantity: Math.floor(o.volumeM3 / MOON_ORE_M3_PER_UNIT),
   }));
 
-/** Engine `reconcileExtractions`. */
 export function reconcileExtractions(
   esi: readonly EsiExtractionLike[],
   notifications: readonly MoonNotification[],
@@ -466,7 +427,6 @@ export function reconcileExtractions(
       const arrival = Date.parse(out.chunkArrivalTime);
       const start = Date.parse(out.extractionStartTime);
       const decay = Date.parse(out.naturalDecayTime);
-      // Ore the book already holds, or the started notification's once read, is never replaced.
       let oreHeld = (keep?.oreLines?.length ?? 0) > 0;
       for (const n of notifications) {
         if (n.payload.structureId !== out.structureId || n.payload.moonId !== out.moonId) continue;
@@ -498,7 +458,6 @@ export function reconcileExtractions(
     );
 }
 
-/** Engine `placeObservedRows`: the refinery's system and that day's moon, omitted when unknown. */
 export function placeObservedRows(
   rows: readonly ObservedRow[],
   extractions: readonly MirrorExtraction[],
@@ -515,7 +474,6 @@ export function placeObservedRows(
   });
 }
 
-/** Engine `stampExtractionIds`: the pull covering each unstamped row's day, per-structure expiry. */
 export function stampExtractionIds(
   rows: readonly ObservedRow[],
   extractions: readonly MirrorExtraction[],
@@ -528,7 +486,6 @@ export function stampExtractionIds(
   });
 }
 
-/** Engine `restampPlan`: the rows whose stamp the current Extractions no longer give. */
 export function restampPlan(
   rows: readonly ObservedRow[],
   extractions: readonly MirrorExtraction[],
@@ -540,8 +497,6 @@ export function restampPlan(
   });
 }
 
-// --- Payments -------------------------------------------------------------
-
 export interface SettlePayment {
   id: string;
   minerId?: string;
@@ -549,6 +504,5 @@ export interface SettlePayment {
   at: string;
   notTaxAmount?: number;
   source?: 'donation' | 'manual';
-  /** Held for an officer's review (#6207): never re-matched by a sync. */
   reviewReason?: 'no-open-balance';
 }

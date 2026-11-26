@@ -1,5 +1,3 @@
-// The member side over the Corp Tax Book's version marker (issue #5050): what a
-// reload — and so Settle up's 10-minute recheck — costs when nothing changed.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -157,8 +155,6 @@ describe('loadCorpBooks over the version marker', () => {
   });
 
   it('stops reading feeder coverage once the pointer no longer names the book', async () => {
-    // `feederCoverage` is the one part the rules gate on something outside the
-    // book (the pointer), which no stamp tracks: the copy must not outlive it.
     await loadCorpBooks(me);
     store.docs.set(POINTER, { books: {} });
     store.reads.length = 0;
@@ -175,7 +171,6 @@ describe('loadCorpBooks over the version marker', () => {
 
     const [book] = await loadCorpBooks(me);
 
-    // As before this change: the rules decide, never the copy.
     expect(store.reads).toContain(`${BOOK}/feederCoverage`);
     expect(book?.feeders).toHaveLength(1);
   });
@@ -225,7 +220,6 @@ describe('a member book on this device (#5243)', () => {
     ...(updatedAt === undefined ? {} : { updatedAt }),
   });
   const NOW = Date.now();
-  /** A page reload: the tab's memory is gone, Dexie is not. */
   const reload = () => clearBookCache();
   const obsIds = (b?: { observed: { oreLines: { typeId: number }[] }[] }) =>
     (b?.observed ?? []).flatMap((o) => o.oreLines.map((e) => String.fromCharCode(e.typeId))).sort();

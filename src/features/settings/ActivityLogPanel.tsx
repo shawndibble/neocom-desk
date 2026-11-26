@@ -66,8 +66,6 @@ export function ActivityLogPanel() {
         header: t('activityLog.columnTime'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (entry) => entry.timestamp,
-        // Full date, not just time-of-day: a session that crosses midnight
-        // otherwise makes two entries on different days read as minutes apart.
         render: (entry) => formatTimestamp(new Date(entry.timestamp), timeZone),
       },
       {

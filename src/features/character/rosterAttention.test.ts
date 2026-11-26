@@ -124,7 +124,6 @@ describe('loadRosterAttention (cache-only)', () => {
 
   it('is undefined for a character lacking the scope, without reading its cache', async () => {
     await addCharacter(CHAR_A, 'Scopeless', []);
-    // Seeded anyway, to prove the missing scope — not a missing row — is why this reads undefined.
     await writeCached(CHAR_A, 'industryJobs', [job(1, '2026-09-10T00:00:00Z')], 100);
 
     const [entry] = await loadRosterAttention({ now: NOW });

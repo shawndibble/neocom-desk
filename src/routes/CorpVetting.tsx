@@ -1,9 +1,3 @@
-/**
- * `/corp/vetting`: a corp's reviews of applicants, and of members before a promotion, for a
- * pilot with `canVet` (Director or Personnel Manager). The callables re-check the role live;
- * this gate only decides what to draw. A member's own review request is `/vetting`
- * (`routes/VettingRequest.tsx`); a pilot who is no reviewer and opens this path is sent there.
- */
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/ui';

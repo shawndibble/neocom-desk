@@ -12,10 +12,6 @@ import { isBeforeBook, type TaxPayment } from '../payments';
 import { exemptionsOf } from '../toleranceExemptions';
 import type { MinerSettlement, OpenSetInput } from './types';
 
-/**
- * A stored checkpoint an account may start from: a snapshot (`isSnapshot`: an older strict cache
- * is not one, and is recorded again) summed for the characters the Miner has now.
- */
 export function usableCheckpoint(
   stored: RunningAccountCheckpoint | undefined,
   characterIds: readonly number[]
@@ -28,7 +24,6 @@ export function usableCheckpoint(
     : undefined;
 }
 
-/** The Miner ids a book lists, in order: groupings, then the ids days, notices and payments name. */
 export function minerIdsOf(input: OpenSetInput, charges: readonly DayCharge[]): string[] {
   const ids = new Set<string>(input.miners.map((m) => m.id));
   for (const c of charges) ids.add(c.minerId);
@@ -37,10 +32,6 @@ export function minerIdsOf(input: OpenSetInput, charges: readonly DayCharge[]): 
   return [...ids];
 }
 
-/**
- * One Miner's Running account (#6294): its Billable lines through its own billable-through, its
- * payments and write-offs, the days an open dispute holds, from its closed-through checkpoint.
- */
 export function settleMiner(
   input: OpenSetInput,
   minerId: string,
@@ -68,13 +59,11 @@ export function settleMiner(
     dismissals: input.dismissals,
     billableThrough,
   });
-  // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
   const heldDays = new Set(
     disputesToShow(input.disputes ?? [], input.dismissals)
       .filter((d) => isMinersDispute(d, minerId, characterIds) && disputeHold(d, input.now))
       .map((d) => d.date)
   );
-  // What dismissing a dispute credited: a checkpoint's held day reads it off the dispute.
   const disputeWaivers = new Map<string, number>();
   for (const d of input.disputes ?? [])
     if (d.resolution?.kind === 'dismissed' && isMinersDispute(d, minerId, characterIds))
@@ -82,7 +71,6 @@ export function settleMiner(
   const checkpoint = usableCheckpoint(input.checkpoints?.get(minerId), characterIds);
   const storedPaidThrough = input.minerPaidThrough?.get(minerId);
   const account = MinerRunningAccount.build({
-    // Whether each line was priced at a saved close-of-day price: only such days close for good.
     days: billable.lines.map((l) => ({ ...l, savedPrice: savedPrice(l) })),
     payments,
     writeOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId && !w.reversed),

@@ -20,7 +20,6 @@ function kill(
   };
 }
 
-/** `count` kills, one per day starting `startDays` ago. */
 function kills(count: number, startDays = 1, space: KillRecord['space'] = 'nullsec'): KillRecord[] {
   return Array.from({ length: count }, (_, i) => kill((startDays + i) * DAY_MS, space));
 }

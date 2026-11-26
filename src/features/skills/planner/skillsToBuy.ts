@@ -1,28 +1,17 @@
-/**
- * View model for the Skill Plan editor's "Skills to buy" panel: the plan's
- * skills the character hasn't trained, priced at the selected hub. Pure — no
- * fetch/DOM/Dexie.
- */
-
 export interface SkillToBuyRow {
   typeID: number;
   name: string;
-  /** Lowest sell; null means no sell orders, never 0 ISK. */
   price: number | null;
-  /** Hub station first; the hub's region when the station has no sell orders. */
   source: 'hub' | 'region' | null;
 }
 
 export interface SkillsToBuy {
   rows: SkillToBuyRow[];
-  /** Sum of the priced rows. */
   total: number;
   unpricedCount: number;
-  /** `Name 1` per line, for the in-game multibuy window. */
   multibuy: string;
 }
 
-/** Distinct plan skills the character has not trained, in plan order. */
 export function skillsToBuyTypeIds(
   entries: readonly { skillTypeID: number }[],
   trainedSkills: ReadonlyMap<number, unknown>

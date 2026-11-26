@@ -18,13 +18,11 @@ function detailLine(entry: AuditEntry, t: TFunction): string {
   return typeof reason === 'string' && reason ? reason : '';
 }
 
-/** One row of an Activity feed: the time, then what happened; `aside` is a row action at the end. */
 export function ActivityRow({
   at,
   children,
   aside,
 }: {
-  /** An instant (ISO). */
   at: string;
   children: ReactNode;
   aside?: ReactNode;
@@ -41,7 +39,6 @@ export function ActivityRow({
   );
 }
 
-/** One audit entry as a line: when, who, what, and the reason (or a reclaim's revoked count) when it had one. */
 export function AuditLine({
   entry: a,
   subject,
@@ -51,25 +48,20 @@ export function AuditLine({
 }: {
   entry: AuditEntry;
   subject?: AuditSubject;
-  /** What the pilot or officer wrote behind the entry (`useAuditWords`). */
   words?: AuditWordsOf;
-  /** What the entry is about, when the page does not already say it (a Late notice's days and amount). */
   context?: ReactNode;
-  /** Called when a Miner link is followed (the panel showing the feed closes). */
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   const why = detailLine(a, t);
   const who = subject?.(a) ?? null;
   const words = wordsOf?.(a) ?? {};
-  // A queued mail is a late notice or a reminder; `kind` says which.
   const action =
     words.action ??
     ((a.action === 'recordMail' || a.action === 'recordLateNoticeMail') &&
     a.detail.kind === 'reminder'
       ? 'recordReminder'
       : a.action);
-  // The Miner's name opens their page, in the sentence when it names them, else after it.
   const minerLink = who?.path ? (
     <Link to={who.path} className={entityLinkClassName()} onClick={onOpen}>
       {who.name}
@@ -105,7 +97,6 @@ export function AuditLine({
   );
 }
 
-/** One line per entry. */
 export function AuditFeed({
   entries,
   empty,
@@ -117,7 +108,6 @@ export function AuditFeed({
   empty?: string;
   subject?: AuditSubject;
   words?: AuditWordsOf;
-  /** Called when a Miner link is followed. */
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();

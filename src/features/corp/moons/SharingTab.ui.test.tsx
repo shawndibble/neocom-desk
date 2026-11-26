@@ -1,8 +1,3 @@
-/**
- * Moon settings' Sharing tab (#6222, #6240, moved by #6304): its moon rows, a moon's override dialog, the
- * opted-out and 'No officer' marks, the refineries no Extraction places yet, and the
- * `?highlight=<moonId>` row a share icon on the Extractions tab links to.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -34,7 +29,6 @@ vi.mock('./useBook', () => ({
     corporationId: 98000001,
     view: {
       extractions: [
-        // An idle refinery: its only Extraction ran two years ago.
         pull(40000001, 1001, '2024-11-01T00:00:00Z'),
         pull(40000002, 1002, '2026-11-10T00:00:00Z'),
         pull(40000003, 2001, '2026-11-12T00:00:00Z', 555),
@@ -141,7 +135,6 @@ describe('SharingTab', () => {
     expect(within(section).getByText('Refinery 1003')).toBeInTheDocument();
     expect(within(section).getByText('Refinery 2002')).toBeInTheDocument();
     expect(within(section).getByText('Corp 555')).toBeInTheDocument();
-    // A refinery an Extraction placed is a moon row, never listed here.
     expect(within(section).queryByText('Refinery 1001')).not.toBeInTheDocument();
   });
 

@@ -1,29 +1,3 @@
-/**
- * How each polled domain's Notification Events read (issue #1249): one copy
- * table per `pollDomains/` domain, carrying its live (poll) wording, its
- * hedged Scheduled Push wording where it projects any, and the row a fire is
- * about for click routing. Each event's Event Entry (`eventEntries.ts`, issue
- * #1285) names the table it reads and, if it projects, the push renderer; the
- * domain supplies the name lookups the copy needs. This module does no lookups, so every
- * renderer here is a plain function of `(fire, characterName, names)` and
- * testable as a table.
- *
- * Two render paths, on purpose:
- *
- * - **`poll`** renders through i18next (`notifications.fired.*`). The
- *   Foreground Poller has genuinely observed what it reports, so this copy
- *   asserts.
- * - **`push`** renders plain English (`renderSharedWording` or inline
- *   template literals): a Projection row is rendered on-device before upload
- *   and the backend holds no i18n catalog (ADR 0010). Each one checks
- *   `assertProjectionWording` first. Three events hedge ("was due to …")
- *   because an in-game action routinely falsifies the prediction before the
- *   push fires — see `engine/projection.ts`'s `projectionWording`.
- *
- * A name that failed to resolve is absent from `names`; each renderer owns
- * its `#id` fallback, so poll and push degrade identically.
- */
-
 import type { CorpTaxBookSyncStoppedFire } from '@/engine/corpTaxBook/syncStoppedAlert';
 import type { VettingSharedFire } from '@/engine/vettingAlert';
 import i18n from '@/i18n';
@@ -56,10 +30,6 @@ export * from './pollDomains/copy/acceleratorEnded';
 export * from './pollDomains/copy/skyhooksNearby';
 export * from './pollDomains/copy/sharedMoonPop';
 
-/*
- * Server-only events (no poll domain): the backend pushes them, and the wording is
- * the service worker's too (`serverEventCopy.ts`).
- */
 const t = (key: string, vars?: Record<string, unknown>) => i18n.t(key, vars);
 
 export const vettingSharedCopy: DomainCopy<VettingSharedFire, NoNames> = {

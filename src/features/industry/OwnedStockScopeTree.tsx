@@ -23,7 +23,6 @@ interface OwnedStockScopeTreeProps {
   labelFor: (location: OwnedStockLocation) => string;
 }
 
-/** A native checkbox whose partial state is the DOM `indeterminate` flag, which has no attribute. */
 function TriCheckbox({
   state,
   label,
@@ -51,11 +50,6 @@ function TriCheckbox({
   );
 }
 
-/**
- * Stations with a caret and a tri-state checkbox; corp hangars 1-7 and
- * containers nest under their station (issue #2941). Pure drawing: every
- * selection rule lives in `ownedStockScopeTree`.
- */
 export function OwnedStockScopeTree({
   stations,
   scope,
@@ -64,7 +58,6 @@ export function OwnedStockScopeTree({
 }: OwnedStockScopeTreeProps) {
   const { t } = useTranslation();
   const listId = useId();
-  // A station already narrowed opens on its children, so a saved scope shows what it picked.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set(stations.filter((s) => stationState(scope, s) === 'partial').map((s) => s.key))
   );
@@ -134,7 +127,6 @@ export function OwnedStockScopeTree({
     );
   };
 
-  // Grouped only once a corp station exists: a lone "Personal" header would be noise.
   const group = (heading: string | null, list: readonly ScopeTreeStation[]) => {
     if (list.length === 0) return null;
     const key = heading ?? 'all';

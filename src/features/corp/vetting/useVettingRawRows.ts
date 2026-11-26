@@ -6,14 +6,11 @@ import { loadRawPages, rawEntry, rawKey } from './vettingRawStore';
 export interface RawRows {
   rows: readonly VettingRawRow[];
   parties: ReadonlyMap<number, VettingParty>;
-  /** Pages are still arriving. */
   loading: boolean;
-  /** A page failed: `rows` is what loaded before it. */
   failed: boolean;
   retry: () => void;
 }
 
-/** Every kept row of one source: all pages loaded in sequence, appended as they arrive. */
 export function useVettingRawRows(
   characterId: number,
   corporationId: number,
@@ -33,7 +30,6 @@ export function useVettingRawRows(
     return () => {
       entry.listeners.delete(rerender);
     };
-    // `start` only closes over the key's own values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return {

@@ -27,17 +27,14 @@ import { StatNote } from './StatFacts';
 interface FittingPreviewProps {
   row: LibraryRow;
   characterId: number | null;
-  /** Names the weapons, ammo and modules the preview lists. */
   catalogue: FittingCatalogue | null;
   onOpen: () => void;
   onCompare: (code: string) => void;
   onRename: () => void;
   onDelete: () => void;
-  /** Keeps edited notes on a saved fitting. */
   onSaveNotes: (notes: string) => void;
 }
 
-/** One boxed part of the preview, headed like the editor's panels. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border border-line">
@@ -49,7 +46,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** In-game and Active Fit rows hold their Fitting, no code: encoded only when needed. */
 const holdsFitting = (row: LibraryRow) => row.source === 'inGame' || row.source === 'active';
 
 function usePreviewFitting(row: LibraryRow): Fitting | null {
@@ -60,7 +56,6 @@ function usePreviewFitting(row: LibraryRow): Fitting | null {
   return holdsFitting(row) ? held : decoded;
 }
 
-/** The Fitting Share Code compare needs: a saved Fitting has one, an In-game or Active Fit one is encoded once; null when too large. */
 function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null | undefined {
   const encodes = holdsFitting(row);
   const encode = useCallback(
@@ -77,7 +72,6 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
   return encoded;
 }
 
-/** "Shared by <name> in <Community>", for a Community's Fitting. */
 function sharedByText(row: Extract<LibraryRow, { source: 'shared' }>, t: TFunction): string {
   return t('fittings.share.sharedBy', {
     name: row.sharer ?? t('fittings.share.unknownSharer'),
@@ -85,25 +79,13 @@ function sharedByText(row: Extract<LibraryRow, { source: 'shared' }>, t: TFuncti
   });
 }
 
-/** A saved fitting's notes, or an In-game one's description. */
 function rowNotes(row: LibraryRow): string {
   if (row.source === 'saved') return row.record.notes ?? '';
-  // Notes are never shared.
   return row.source === 'inGame' ? row.inGame.description.trim() : '';
 }
 
-/**
- * The selected Fitting on the Start screen (scope decision `20260925-152418`):
- * the Ring (hover a slot for its module) with Skills beneath it, and to its
- * right what the fit asks of the hull with the Offense, Defense and Notes boxes —
- * worked out for this one Fitting only, so a long list costs nothing until a
- * row is picked.
- */
 export function FittingPreview(props: FittingPreviewProps) {
-  // Loaded once for the pane, not per row: a pointer moving down the list
-  // shouldn't reload the pilot from storage at every row it rests on.
   const pilot = usePilotProfile(props.characterId);
-  // Keyed: a row's own state (notes being edited, its encoded code) never carries over.
   return <RowPreview key={props.row.id} {...props} pilot={pilot} />;
 }
 
@@ -127,14 +109,12 @@ function RowPreview({
 
   const stats = compared.values[0];
   const needsConnection = useShipDataNeedsConnection();
-  // No numbers will come: the pilot's skills could not be read, or the calculation failed.
   const statsGaveUp = !stats && (profileFailed || compared.failed[0]);
   const retryStats = profileFailed ? retryProfile : compared.retry;
   const noStatsText = (key: string) => (statsGaveUp ? t('fittings.stats.unavailable') : t(key));
   const unreadable = row.source === 'saved' && row.hull === null;
   const notes = rowNotes(row);
   const typeName = (typeId: number) => catalogueTypeName(catalogue, typeId);
-  // `aria-disabled`, not the native attribute, so the reason stays reachable.
   const compareButton = (
     <Button
       aria-disabled={typeof shareCode !== 'string' || undefined}
@@ -196,7 +176,6 @@ function RowPreview({
         {unreadable ? (
           <p className="text-xs text-warning">{t('fittings.start.preview.unreadable')}</p>
         ) : (
-          // Container query: the pane sits beside the list, far narrower than the viewport.
           <div className="@container min-w-0">
             <div className="grid items-start gap-4 @2xl:grid-cols-[minmax(16rem,min(34rem,45%))_minmax(0,1fr)]">
               <div className="min-w-0 space-y-4">
@@ -259,7 +238,6 @@ function RowPreview({
                     </p>
                   )}
                 </Section>
-                {/* A saved fitting always offers Notes (to write them); an In-game one only when it has a description. */}
                 {(row.source === 'saved' || notes !== '') && (
                   <Section title={t('fittings.start.preview.sectionNotes')}>
                     <NotesPanel

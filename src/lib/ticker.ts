@@ -1,18 +1,5 @@
 import { useSyncExternalStore } from 'react';
 
-/**
- * One shared wall clock per cadence, instead of one `setInterval` per
- * component. Dozens of `DataAgeBadge`s (and every countdown) on a screen used
- * to run dozens of timers that each re-rendered on their own schedule; now
- * each cadence has a single interval that runs only while something is
- * subscribed, pauses while the tab is hidden, and ticks straight away when
- * it becomes visible again so nothing shows an age from before the tab was
- * backgrounded.
- *
- * `Date.now()` is impure, so components read it through `useTicker` rather
- * than in a render body (react-hooks/purity).
- */
-
 interface Ticker {
   intervalMs: number;
   now: number;
@@ -22,13 +9,6 @@ interface Ticker {
   getSnapshot: () => number;
 }
 
-/**
- * How old the shared reading may be when a new subscriber joins before it is
- * refreshed for everyone. Components mounting in one commit subscribe within
- * the same millisecond, so a screenful of badges costs one refresh, not one
- * each — while a countdown mounted mid-interval is never a whole cadence
- * behind.
- */
 const JOIN_FRESHNESS_MS = 1_000;
 
 const tickers = new Map<number, Ticker>();
@@ -81,9 +61,6 @@ function tickerFor(intervalMs: number): Ticker {
         }
       }
       ticker.listeners.add(listener);
-      // A joiner must not start out up to a cadence behind. Publishing (not
-      // just overwriting) keeps every subscriber on the same reading; React
-      // re-reads the snapshot after subscribing, so the joiner gets it too.
       const current = Date.now();
       if (Math.abs(current - ticker.now) >= JOIN_FRESHNESS_MS) publish(ticker, current);
       start(ticker);
@@ -96,10 +73,6 @@ function tickerFor(intervalMs: number): Ticker {
       };
     },
     getSnapshot: () => {
-      // A reader arriving while the clock is idle or paused must not see a
-      // value more than one cadence old (or from the future, if the system
-      // clock moved back). Resyncing leaves the next call's result identical,
-      // which is all `useSyncExternalStore` asks of a snapshot.
       const current = Date.now();
       if (Math.abs(current - ticker.now) >= intervalMs) ticker.now = current;
       return ticker.now;
@@ -109,7 +82,6 @@ function tickerFor(intervalMs: number): Ticker {
   return ticker;
 }
 
-/** `Date.now()`, re-rendering every `intervalMs` off one interval shared by every caller at that cadence. */
 export function useTicker(intervalMs: number): number {
   const ticker = tickerFor(intervalMs);
   return useSyncExternalStore(ticker.subscribe, ticker.getSnapshot);

@@ -1,4 +1,3 @@
-/** Renders `useModuleVariations`' rows; clicking one swaps it in. One `DataTable` — its own stacked layout below `sm` is the mobile card view. */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +12,6 @@ import type { VariationRow } from './useModuleVariations';
 import { fixed1 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
 
-/** A swap's whole-fit changes: the Variations "Changes" cell, and an owned module's row in the mutation dialog. */
 export function ChangesCell({ delta, t }: { delta: SwapChange[] | null; t: Translate }) {
   if (delta === null) return <span className="text-text-dim">{t('common.loading')}</span>;
   if (delta.length === 0)
@@ -81,7 +79,6 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
           <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
-          {/* Row click swaps this variant in, so the name is plain (DESIGN.md §6c); Market is in the row's ⋮ item menu. */}
           <span className={entityLinkClassName('min-w-0 truncate')}>{row.name}</span>
           <span className="shrink-0 text-[0.6875rem] text-text-dim">{row.metaGroupName}</span>
         </span>
@@ -96,7 +93,6 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
     {
       id: 'fits',
       header: t('fittings.variations.fits'),
-      // Still loading (null) sinks to the end rather than sorting as false.
       sortValue: (row) => (row.fits === null ? undefined : row.fits ? 1 : 0),
       render: (row) => (
         <BoolCell
@@ -117,7 +113,6 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
     {
       id: 'canFly',
       header: t('fittings.variations.canFly'),
-      // Still loading (null) sinks to the end rather than sorting as false.
       sortValue: (row) => (row.canFly === null ? undefined : row.canFly ? 1 : 0),
       render: (row) => (
         <BoolCell
@@ -143,8 +138,6 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
     },
   ];
 
-  // The section's title is the `Disclosure` toggle that wraps this panel, a
-  // button a menu can't nest inside — so the table's export button sits on its own row.
   return (
     <div className="space-y-1">
       <div className="flex justify-end">

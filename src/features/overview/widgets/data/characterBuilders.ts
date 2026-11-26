@@ -1,7 +1,3 @@
-/**
- * The Training, SP and Calendar builders: the Character-clock kinds, split
- * out of `models.ts`.
- */
 import { acceleratorSeverity, isAcceleratorLive } from '@/engine/accelerator';
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/character/severity';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
@@ -30,7 +26,6 @@ import type { BoardDeadline } from '../nextDeadline';
 import type { ListRow } from './types';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
-// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 export const training: Builder = (feeds, { t, now, notTrainingAlert, activeCharacterId, show }) => {
@@ -46,7 +41,6 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert, activeChara
   const base = {
     ...blank(
       to,
-      // A lapsed grant over a saved queue keeps the queue (with a sign-in note).
       statusOf(feed, {
         needsPermission: data.queueNeedsReauth,
         hasStaleData: data.queueResult !== null,
@@ -56,7 +50,6 @@ export const training: Builder = (feeds, { t, now, notTrainingAlert, activeChara
     fromCache: data.queueResult?.fromCache ?? false,
   };
 
-  // The typed-in accelerator, unless the widget is set to skills only; an expired one counts as gone.
   const record =
     show === 'skillsOnly' || activeCharacterId === null
       ? undefined
@@ -235,7 +228,6 @@ export const sp: Builder = (feeds, { t }) => {
         : {
             value: formatCompactNumber(total),
             unit: t('overview.widgets.sp.unit'),
-            // Unallocated SP is the pilot's to spend; it leads, the extraction summary is the fallback.
             secondary: {
               text:
                 unallocated !== null && unallocated > 0
@@ -253,7 +245,6 @@ export const sp: Builder = (feeds, { t }) => {
   };
 };
 
-/** Where a Calendar widget row opens: the item itself where the Calendar has a link for it. */
 function boardItemHref(item: CharacterBoardItem): string {
   if (item.kind === 'calendarEvent') return openHref('/calendar', item.sourceId);
   if (item.kind === 'sharedMoonPop') return sharedPopCalendarHref(item.detailId ?? item.sourceId);
@@ -264,11 +255,6 @@ function boardItemHref(item: CharacterBoardItem): string {
 const isCommitted = (item: CharacterBoardItem) =>
   item.response === 'accepted' || item.response === 'tentative';
 
-/**
- * The Calendar widget (kind id `comingUp`): the Calendar page's agenda, the same rows as its
- * Coming Up Rail, less the kinds this widget hides and anything overdue from before today (the rail
- * folds those away). The Events choice narrows calendar events only.
- */
 export const comingUp: Builder = (
   feeds,
   { t, now, zone, calendarEvents, hiddenKinds = [], sharedPopTime = DEFAULT_SHARED_POP_TIME }
@@ -294,8 +280,6 @@ export const comingUp: Builder = (
   const laterToday = items.filter(
     (item) => item !== next && item.deadlineMs > now && item.deadlineMs <= now + DAY_MS
   ).length;
-  // The calendar's share of Next deadline: committed events only, whatever the widget shows,
-  // because every other clock reaches the strip through its own widget.
   const soonest = board.find(
     (item) => item.kind === 'calendarEvent' && item.deadlineMs > now && isCommitted(item)
   );
@@ -303,8 +287,6 @@ export const comingUp: Builder = (
     item.deadlineMs > now
       ? formatCountdown((item.deadlineMs - now) / 1000)
       : t(item.pastLabelKey ?? pastDeadlineLabelKey(item.kind));
-  // The kind, then what tells two of them apart, as the rail's detail line does: the RSVP, the
-  // corporation, the sharer.
   const kindText = (item: CharacterBoardItem) =>
     [
       t(KIND_LABEL[item.kind]),
@@ -315,7 +297,6 @@ export const comingUp: Builder = (
     ]
       .filter(Boolean)
       .join(' · ');
-  // A kind this widget hides never asks for a sign-in, nor keeps the widget up.
   const lapsed = data.reauthKinds.some((kind) => shown.has(kind));
   const readable = data.readableKinds.some((kind) => shown.has(kind));
   return {
@@ -324,7 +305,6 @@ export const comingUp: Builder = (
       statusOf(feed, {
         needsPermission: lapsed,
         isEmpty: items.length === 0,
-        // A source that still read keeps the widget up, with a sign-in note for the lapsed one.
         hasStaleData: readable,
       })
     ),
@@ -337,7 +317,6 @@ export const comingUp: Builder = (
     number: next
       ? {
           value: formatCountdown((next.deadlineMs - now) / 1000),
-          // The others within a day: the one fact the headline clock does not carry.
           unit:
             laterToday > 0 ? t('overview.widgets.comingUp.more', { count: laterToday }) : undefined,
           secondary: { text: next.subject },

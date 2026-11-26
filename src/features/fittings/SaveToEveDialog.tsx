@@ -1,12 +1,3 @@
-/**
- * Save to EVE (issue #1540): names the open Fitting, optionally picks an
- * existing In-game Fitting to replace, and shows what EVE drops on the way
- * out (module state, charge-to-module binding, implants) before saving.
- * Overwriting deletes the old In-game Fitting only after the replacement
- * save has already succeeded (`saveToEve.ts`), so a failed save never costs
- * the pilot their original — a failed *delete* after a successful save
- * leaves both, which this dialog reports rather than hiding.
- */
 import { useEffect, useId, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
@@ -38,14 +29,8 @@ interface SaveToEveDialogProps {
   onClose: () => void;
   characterId: number;
   fitting: Fitting;
-  /** The saved Fitting's notes, sent as the description; empty when it has none. */
   description?: string;
-  /** Called once the save itself succeeds (whether or not the overwrite delete also did) — the caller refreshes its In-game Fittings list. */
   onSaved: () => void;
-  /**
-   * Saves the open Fitting to My Fittings (the normal Save). Offered as an "Also save to My
-   * Fittings" checkbox only when given — omit it for a Fitting that is already saved.
-   */
   onSaveToMyFittings?: () => Promise<boolean>;
 }
 
@@ -68,18 +53,13 @@ export function SaveToEveDialog({
   const [alsoSave, setAlsoSave] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  /** The save failed for want of a connection (the network dropped after the dialog opened). */
   const [offlineFailed, setOfflineFailed] = useState(false);
-  /** The request went out and timed out: the Fitting may or may not have been saved. */
   const [unconfirmed, setUnconfirmed] = useState(false);
-  /** The save was refused for want of the Fittings Permission, which a re-login can grant. */
   const [needsPermission, setNeedsPermission] = useState(false);
-  /** Set when a save succeeded but the overwritten Fitting's delete failed — the pilot now has both. */
   const [overwriteFailure, setOverwriteFailure] = useState<{
     name: string;
     message: string;
   } | null>(null);
-  /** EVE took the save but the follow-up My Fittings save threw. */
   const [myFittingsFailed, setMyFittingsFailed] = useState(false);
 
   useEffect(() => {
@@ -109,7 +89,6 @@ export function SaveToEveDialog({
     target === NEW_TARGET ? null : (existing.find((f) => String(f.fitting_id) === target) ?? null);
 
   const nameMissing = name.trim() === '';
-  // Offline, saving to EVE can't happen; the connection note above says so. Saving to My Fittings alone still can.
   const offlineBlocked = !online && !(onSaveToMyFittings && alsoSave);
 
   async function handleSave() {
@@ -122,7 +101,6 @@ export function SaveToEveDialog({
     setNeedsPermission(false);
     try {
       if (!online) {
-        // EVE can't be reached: save only the My Fittings copy, which is local, if that was asked for.
         if (onSaveToMyFittings && alsoSave) {
           const saved = await onSaveToMyFittings().then(
             (ok) => ok,
@@ -150,7 +128,6 @@ export function SaveToEveDialog({
       onSaved();
       let mineFailed = false;
       if (onSaveToMyFittings && alsoSave) {
-        // False means the workspace had nothing to write (a save already in flight, an unencodable Fitting).
         mineFailed = await onSaveToMyFittings().then(
           (saved) => !saved,
           () => true

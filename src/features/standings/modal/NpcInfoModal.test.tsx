@@ -1,9 +1,3 @@
-/**
- * The NPC info modal as the app mounts it: opened by URL (`?info=`), so a
- * Route Safety link out of it and Back return to the page with it open, and
- * its own Close follows the entity-modal rule. Data loaders are stubbed; this
- * is the router seam.
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';

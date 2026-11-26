@@ -1,21 +1,7 @@
-/**
- * Dated tax rates (D3/D31): corp default → Guest default → per-feeder →
- * per-feeder members → per-refinery → per-moon → per-Miner → per-record, most
- * specific wins. The per-feeder tier prices every refinery of one feeder
- * corporation; the per-feeder members tier (`feeder-member`, #6210) prices only
- * that corporation's own members at its refineries, who are otherwise Guests; the
- * per-refinery tier (`structure`, #4621) prices one refinery by its structure
- * id, which a moon owner's ledger-only row always has and a moon id never. Every rate but a per-record one
- * carries an effective-from date and applies only to days on or after it. A new rate may start up to
- * 30 days back (`earliestRateStart`); the server refuses one on a day an issued late notice
- * listed. A per-record override is an officer's logged correction to one Observed Mining Entry.
- */
-
 import { shiftUtcDate } from '../localDay';
 
 interface DatedRate {
   pct: number;
-  /** First EVE/UTC day the rate applies to. */
   effectiveFrom: string;
 }
 
@@ -34,28 +20,20 @@ export type RateScope = TaxRate['scope'];
 export interface RateContext {
   date: string;
   minerId: string;
-  /** The moon the refinery was drilling; undefined when unknown. */
   moonId: number | undefined;
-  /** The refinery (structure) that recorded the entry; undefined when not given. */
   structureId?: number;
-  /** `observedEntryKey` of the Observed Mining Entry being taxed. */
   recordKey: string;
-  /** The feeder corporation whose refinery recorded the entry; undefined for the book's own. */
   feederId?: number;
-  /** The miner was outside the book's corporation when they mined. */
   isGuest: boolean;
-  /** The corporation the miner was in when they mined (the entry's recorded corporation). */
   minerCorporationId?: number;
 }
 
 export interface ResolvedRate {
   pct: number;
   scope: RateScope;
-  /** Undefined for a per-record override, which is for one day only. */
   effectiveFrom?: string;
 }
 
-/** Most specific first. Every scope a rate can have: `bookDocs.RATE_SCOPES` reads stored rates by it. */
 export const SCOPE_ORDER: readonly RateScope[] = [
   'record',
   'miner',
@@ -92,7 +70,6 @@ function targets(rate: TaxRate, ctx: RateContext): boolean {
   }
 }
 
-/** The rate in effect for one Observed Mining Entry, or undefined when the book had none yet. */
 export function resolveRate(rates: readonly TaxRate[], ctx: RateContext): ResolvedRate | undefined {
   for (const scope of SCOPE_ORDER) {
     let best: TaxRate | undefined;
@@ -115,10 +92,8 @@ export function resolveRate(rates: readonly TaxRate[], ctx: RateContext): Resolv
   return undefined;
 }
 
-/** How far back a new rate may start. Mirrored in `functions/`. */
 export const MAX_RATE_BACKDATE_DAYS = 30;
 
-/** The earliest day a new rate may start: `MAX_RATE_BACKDATE_DAYS` before `today`. */
 export function earliestRateStart(today: string): string {
   return shiftUtcDate(today, -MAX_RATE_BACKDATE_DAYS);
 }

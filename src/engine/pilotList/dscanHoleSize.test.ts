@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildHoleSizes } from './dscanHoleSize';
 
-// Real SDE groups and baked hull masses (public/data/shipMass.json).
 const GILA = 17715;
 const ISHTAR = 12005;
 const RATTLESNAKE = 17918;

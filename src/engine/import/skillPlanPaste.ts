@@ -1,21 +1,9 @@
-/**
- * Parse pasted skill-plan text back into PlanEntry[].
- *
- * Round-trip partner of `clipboardExport.ts` (EVE's in-game "import skill
- * queue from clipboard" format: "<Skill Name> <Roman numeral>"). Also
- * tolerates the arabic-level variant used by EVEMon/EveLens exports
- * ("Skill Name 4") and trailing SP annotations some tools append
- * ("Skill Name IV (1,234,567 SP)").
- */
-
 import type { PlanEntry } from '@/engine/types';
 
 const ROMAN_TO_LEVEL: Record<string, number> = { I: 1, II: 2, III: 3, IV: 4, V: 5 };
 
 export interface SkillPlanParseError {
-  /** 1-indexed source line number (blank lines still count toward the count). */
   line: number;
-  /** Original line text, trimmed. */
   text: string;
   reason: string;
 }
@@ -25,14 +13,10 @@ export interface SkillPlanParseResult {
   errors: SkillPlanParseError[];
 }
 
-/** Minimal catalog shape needed to resolve a skill name to a typeID. */
 export type SkillCatalog = ReadonlyMap<string, { typeID: number }>;
 
 const BULLET_PREFIX = /^[-*•·]\s*/;
 const TRAILING_PAREN = /\s*\([^)]*\)\s*$/;
-// Level token is matched loosely (any digits, or I/II/III/IV/V) so out-of-range
-// values (e.g. "9", "VI") still reach the explicit range check below instead
-// of falling through to the generic "no level found" error.
 const NAME_AND_LEVEL = /^(.*\S)\s+(I{1,3}|IV|V|[0-9]+)$/i;
 
 function parseLevel(token: string): number | null {
@@ -42,12 +26,6 @@ function parseLevel(token: string): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
-/**
- * Parse a paste of "<Skill Name> <level>" lines into plan entries.
- * Never throws: unrecognized lines and unknown skill names become error
- * entries instead. Duplicate lines for the same skill keep the highest
- * level seen (matches PlanEntry's "train up to this level" semantics).
- */
 export function parseSkillPlanPaste(text: string, skillByName: SkillCatalog): SkillPlanParseResult {
   const lines = text.split(/\r\n|\r|\n/);
   const errors: SkillPlanParseError[] = [];

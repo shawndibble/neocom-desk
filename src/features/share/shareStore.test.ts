@@ -12,7 +12,6 @@ import {
 } from './shareStore';
 
 const { getDoc, setDoc, FakeTimestamp } = vi.hoisted(() => {
-  /** Just enough of Firestore's `Timestamp` for the store: built from and read back as millis. */
   class FakeTimestamp {
     constructor(readonly millis: number) {}
     static fromMillis(millis: number) {

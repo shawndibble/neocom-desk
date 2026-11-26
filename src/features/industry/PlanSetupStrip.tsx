@@ -25,7 +25,6 @@ interface PlanSetupStripProps {
   lacksBlueprintRow: boolean;
 }
 
-/** The one-line setup summary at the hero's foot, with the toggle that opens the Setup form. */
 export function PlanSetupStrip({
   open,
   formId,
@@ -47,7 +46,6 @@ export function PlanSetupStrip({
   const { t } = useTranslation();
   return (
     <>
-      {/* While the form is open it is the summary; the strip keeps only its toggle. */}
       {!open && (
         <PlanSetupFacts
           plan={plan}

@@ -1,25 +1,7 @@
-/**
- * The Industry page's Active Jobs panel header at 390px (issue #1683).
- *
- * With jobs present the header carries the title, an "N running · N done"
- * summary with a next-finish line, the job-slot readout and the expand caret.
- * `Panel`'s left-hand group used to hold title and summary on one
- * non-wrapping row, and the title — the one element that said what the block
- * is — yielded first, clipping to "ACTIV…". `Panel`'s `wrapMeta` now drops the
- * summary to a second line below `md`, so the title keeps its full width.
- *
- * jsdom lays nothing out, so only a real browser can show the clip; the
- * assertion is the title's own `scrollWidth <= clientWidth`.
- *
- * Jobs are seeded by overriding the `industry/jobs` route the shared ESI mock
- * answers empty. Registered after `signInAndGoto`, so Playwright (last route
- * wins) consults it first.
- */
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
-/** Rifter Blueprint, manufacturing, one running and one finished. */
 const BLUEPRINT_TYPE_ID = 691;
 
 function job(id: number, status: 'active' | 'ready', endOffsetMs: number) {
@@ -134,11 +116,9 @@ test.describe('Active Jobs phone card (#3684)', () => {
     await expect(rows).toHaveCount(3);
     for (let i = 0; i < 3; i++) {
       const box = (await rows.nth(i).boundingBox())!;
-      // Today's labelled card is ~150px; the dense card is two or three lines.
       expect(box.height).toBeLessThan(110);
     }
 
-    // Sorted soonest-first, so locate rows by content rather than index.
     const logButton = page.getByRole('button', { name: 'Log production' });
     const doneRow = rows.filter({ has: logButton });
     const runningRow = rows.filter({ hasNot: logButton }).first();

@@ -1,10 +1,3 @@
-/**
- * The EFT loader against the real bundled catalogue (`types.json`,
- * `skills.json`, `fittingSlots.json`), not a fixture map: a type no blueprint
- * or skill references used to be absent from `types.json`, so a pasted fit
- * naming an LP booster or a filament read "unknown item", and a Republic
- * Fleet module or a scout drone had no rack either.
- */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { loadEftFitting } from '@/engine/fittings/eftLoader';
@@ -69,7 +62,6 @@ describe('EFT load against the bundled catalogue', () => {
       readData<MutaplasmidData>('mutaplasmids.json'),
     ]);
     const lookup = mutaplasmidLookup(data);
-    // Pyfa layout, reconstructed from Pyfa's source (eft.py, muta.py).
     const text = [
       '[Vexor Navy Issue, Abyssal]',
       'Heavy Gremlin Compact Energy Neutralizer [1]',
@@ -87,7 +79,7 @@ describe('EFT load against the bundled catalogue', () => {
     const [neut, rar] = parts.modules;
     expect(neut).toMatchObject({
       slot: 'high',
-      typeId: 47832, // Heavy Abyssal Energy Neutralizer
+      typeId: 47832,
       mutation: {
         baseTypeId: 16475,
         mutaplasmidTypeId: 47831,
@@ -95,7 +87,6 @@ describe('EFT load against the bundled catalogue', () => {
       },
     });
     expect(mutationStatus(neut!, lookup)).toBe('rolled');
-    // A bare abyssal line: the type is known, its base and rolls are not.
     expect(rar).toMatchObject({ slot: 'high', typeId: 97657 });
     expect(mutationStatus(rar!, lookup)).toBe('baseUnknown');
   });

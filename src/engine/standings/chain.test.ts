@@ -15,12 +15,12 @@ describe('CRIMINAL_FACTION_IDS', () => {
 describe('isCriminalFaction', () => {
   it.each([
     [GURISTAS, true],
-    [500011, true], // Angel Cartel
-    [500012, true], // Blood Raider Covenant
-    [500019, true], // Sansha's Nation
-    [500020, true], // Serpentis
+    [500011, true],
+    [500012, true],
+    [500019, true],
+    [500020, true],
     [CALDARI, false],
-    [500026, false], // Triglavian Collective: UNVERIFIED, not counted
+    [500026, false],
     [null, false],
   ])('%s -> %s', (factionId, expected) => {
     expect(isCriminalFaction(factionId)).toBe(expected);
@@ -44,8 +44,8 @@ describe('standingChain', () => {
       ['corporation', 1000035, -3],
       ['agent', 3009001, 0],
     ]);
-    expect(chain.links[0].effective).toBeCloseTo(6, 10); // Connections V
-    expect(chain.links[1].effective).toBeCloseTo(-3 + 13 * 0.08, 10); // Diplomacy II
+    expect(chain.links[0].effective).toBeCloseTo(6, 10);
+    expect(chain.links[1].effective).toBeCloseTo(-3 + 13 * 0.08, 10);
     expect(chain.links[2].effective).toBe(0);
   });
 

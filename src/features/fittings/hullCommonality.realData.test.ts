@@ -1,9 +1,3 @@
-/**
- * Issue #5581's real-data check: trimmed EVE Workbench fits of the Drake and
- * the Dominix (name and modules only, from `data.neocomdesk.com`), run through
- * the same checks the Popular fits panel uses and the bundled game data.
- * PvE Drakes mostly carry an afterburner; PvE Dominixes mostly a micro jump drive.
- */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { gameItemLookup } from '@/engine/fittings/fitCurrency';
@@ -90,7 +84,6 @@ describe('hull commonality on real Workbench fits', () => {
     const drake = (await load(DRAKE, 'drake'))?.pve;
     expect(drake).toBeTruthy();
     expect(commonPropulsionKind(drake)).toBe('afterburner');
-    // 14 PvE-named fits: 6 afterburner, 5 MWD, 11 either, 13 with a Ballistic Control.
     expect(drake!.fits).toBe(14);
     expect(drake!.propulsion.afterburner).toBeCloseTo(6 / 14);
     expect(drake!.propulsion.mwd).toBeCloseTo(5 / 14);
@@ -104,7 +97,6 @@ describe('hull commonality on real Workbench fits', () => {
     const dominix = (await load(DOMINIX, 'dominix'))?.pve;
     expect(dominix).toBeTruthy();
     expect(commonPropulsionKind(dominix)).toBe('mjd');
-    // 14 PvE-named fits: 10 micro jump drive, 5 afterburner, 3 MWD.
     expect(dominix!.propulsion.mjd).toBeCloseTo(10 / 14);
     expect(dominix!.propulsion.afterburner).toBeCloseTo(5 / 14);
     expect(dominix!.propulsion.mwd).toBeCloseTo(3 / 14);

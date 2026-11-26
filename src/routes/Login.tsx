@@ -30,54 +30,36 @@ import { isPlayStoreApp } from '@/lib/playStoreApp';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 import { setLoginReturnTo, usableLoginReturnTo } from '@/auth/loginReturnTo';
 
-/** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
   const [loginFailed, setLoginFailed] = useState(false);
-  // Read once: a TWA launch referrer only exists on the first load.
   const [inApp] = useState(isPlayStoreApp);
 
-  // One Customize permissions dialog for the whole page, opened from either
-  // "Log in" button's own link right under it.
   const [customizing, setCustomizing] = useState(false);
 
-  // The promo video starts from its poster or from the hero's "Watch" link.
   const [promoPlays, setPromoPlays] = useState(0);
   const playPromo = () => setPromoPlays((n) => n + 1);
 
-  // The hero's login button; the header (a fixed bottom bar on phones) shows
-  // its own once the hero's is out of view. The closing call to action is not
-  // watched, so the header's button stays while it is on screen.
   const heroCtaRef = useRef<HTMLDivElement>(null);
   const ctaRefs = useMemo(() => [heroCtaRef], []);
 
-  // Bookmark/back-button case: a Character already exists, so the marketing
-  // page is not the right thing to show — mirror App.tsx's root gate.
   const characterCount = useCharacterCountOrLoading();
 
-  // Sent here by the auth gate (`RequireCharacter`): stash the page the
-  // visitor asked for so the login lands there, not on the default.
   const from = usableLoginReturnTo((useLocation().state as { from?: unknown } | null)?.from);
   useEffect(() => {
     if (characterCount === 0 && from !== null) setLoginReturnTo(from);
   }, [characterCount, from]);
 
-  // The prerendered hero (`app/landingShell.ts`) stands in through the boot
-  // screen. Let it go once this page knows what it renders: a layout effect,
-  // so the real hero commits in the frame the shell leaves.
   useLayoutEffect(() => {
     if (characterCount !== undefined) releaseLandingShell();
   }, [characterCount]);
 
-  // After the release above: a hash's scroll needs `#root` shown.
   const belowFold = useBelowFold(characterCount === 0 && !inApp);
 
   function onLogin() {
     setPending(true);
     setLoginFailed(false);
-    // The add-a-character branch: nobody is signed in yet, so there is no
-    // grant to union with and the base set is the whole request (#295).
     void beginAddCharacterLogin().catch(() => {
       setPending(false);
       setLoginFailed(true);
@@ -105,12 +87,6 @@ export function Login() {
       <LandingHeader ctaRefs={ctaRefs} pending={pending} onLogin={onLogin} />
 
       <main>
-        {/*
-          The hero is a ship locked in a targeting reticle beside the pitch:
-          copy and the login button on the left (centred over the reticle on a
-          phone), the reticle on the right. Under the button, the three trust
-          points a pilot weighs before handing over an EVE login.
-        */}
         <section className="relative isolate overflow-hidden">
           <LandingBackdrop tone="space" />
           <div className="relative mx-auto grid max-w-page items-center gap-8 px-4 pt-8 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12 lg:px-16 lg:py-20">
@@ -265,14 +241,12 @@ export function Login() {
   );
 }
 
-/** A same-origin footer link: `ExternalLink`'s quiet look without the new-tab icon (our own pages open in the same tab). */
 const FOOTER_LINK = cx(
   'rounded-xs underline-offset-2 hover:text-text hover:underline',
   interactiveClassName,
   focusRingClassName
 );
 
-/** The three trust points under each large login button, as a HUD readout. */
 function TrustLine({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
@@ -294,7 +268,6 @@ function TrustLine({ className }: { className?: string }) {
   );
 }
 
-/** Opens the Customize permissions dialog — always right under a "Log in" button, never a substitute for one. */
 function CustomizeLink({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (

@@ -20,7 +20,6 @@ describe('reauthSlots', () => {
       shared: true,
     });
     expect(speaker('b')).toEqual({ primary: false, endpoints: [], shared: false });
-    // Another Character's banner is its own.
     expect(speaker('c')).toEqual({
       primary: true,
       endpoints: ['getCharacterSkills'],

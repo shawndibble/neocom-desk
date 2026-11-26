@@ -101,7 +101,6 @@ describe('jobsCsvColumns', () => {
     const csv = toCsv([row], columns);
     const dataLine = csv.split('\r\n')[1];
     const fields = dataLine.split(',');
-    // cost is the 7th column (index 6).
     expect(fields[6]).toBe('');
   });
 

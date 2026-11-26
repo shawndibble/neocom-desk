@@ -1,20 +1,9 @@
-/**
- * The Moons nav dot's Needs you count, read in the background (#6208): the Overview's
- * read of the book (`bookPartsFor('overview')`), joined and counted as the Overview counts
- * it (`needsYouOf`). Loaded on demand by the shell's poll, so the shell bundle stays light.
- *
- * The read reuses this device's copy of each part whose version stamp has not moved
- * (bookCache.ts) and reads the ledger rows as a delta (ADR 0031): an unchanged book costs
- * its settings doc and `meta/paid`. Its prices are the ones this session already loaded
- * (`cachedBookPrices`): a recount loads the market only when none held cover the book's ores.
- */
 import { buildBookView } from '@/engine/corpTaxBook/bookView';
 import { loadCurrentMemberIds } from '../currentMembers';
 import { bookPartsFor, readBook } from '../taxBook/bookRead';
 import { bookViewInputOf, cachedBookPrices } from './bookViewOf';
 import { needsYouOf } from './useNeedsYou';
 
-/** The book's Needs you count now; null when the corporation has no active book. */
 export async function loadNeedsYouCount(
   characterId: number,
   corporationId: number

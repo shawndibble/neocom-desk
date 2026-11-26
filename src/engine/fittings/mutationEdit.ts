@@ -1,9 +1,3 @@
-/**
- * Pure edits for a fitted module's mutation (GLOSSARY.md **Mutated module**,
- * **Mutaplasmid**, **Roll**). Ranges are multipliers on the base's own values
- * but rolls are absolute, so every edit takes `baseValue`. A rolled attribute
- * the base lacks (or has as 0) has no range: left out, not a dead slider.
- */
 import {
   normaliseMutation,
   rollQuality,
@@ -13,25 +7,18 @@ import {
 } from './mutaplasmids';
 import type { Fitting, FittingModule, FittingSlotKind, ItemMutation } from './types';
 
-/** The base module's own value of a dogma attribute; undefined when it has none. */
 export type BaseValue = (attributeId: number) => number | undefined;
 
 export function clampRoll(value: number, range: RollRange): number {
   return Math.min(range.max, Math.max(range.min, value));
 }
 
-/**
- * The absolute value at `quality` (0 worst, 1 best, clamped) — the
- * inverse of `rollQuality`, so a control can run worst-to-best whichever
- * way the attribute's good direction points.
- */
 export function rollAtQuality(quality: number, range: RollRange): number {
   const q = Math.min(1, Math.max(0, quality));
   const t = range.highIsGood ? q : 1 - q;
   return range.min + t * (range.max - range.min);
 }
 
-/** The absolute range of each attribute `mutaplasmidTypeId` rolls that the base carries, in its order. */
 function usableRanges(
   mutaplasmidTypeId: number,
   baseValue: BaseValue,
@@ -47,10 +34,6 @@ function usableRanges(
   });
 }
 
-/**
- * A fresh mutaplasmid's rolls: the base's own value per rolled attribute,
- * clamped (a few ranges leave ×1 out), so the item reads as rolled, not rolls unknown.
- */
 export function startingRolls(
   mutaplasmidTypeId: number,
   baseValue: BaseValue,
@@ -63,16 +46,11 @@ export function startingRolls(
   return rolls;
 }
 
-/** One rolled attribute as the Mutation section shows it. */
 export interface RollRow {
   attributeId: number;
-  /** Absolute, `min <= max`. */
   range: RollRange;
-  /** The roll, or the clamped base value where there is none. */
   value: number;
-  /** 0 worst to 1 best (`rollQuality`). */
   quality: number;
-  /** The value is a roll the mutation carries, not the base's stand-in. */
   rolled: boolean;
 }
 
@@ -111,11 +89,6 @@ function updateModuleAt(
   return changed ? { ...fitting, modules } : fitting;
 }
 
-/**
- * A mutation makes the module its resulting abyssal type, rolls cut by
- * `normaliseMutation` (one the base doesn't take changes nothing); `null`
- * reverts it to its base. State and charge stay; the engine lowers what the new type can't reach.
- */
 export function setModuleMutation(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -134,10 +107,6 @@ export function setModuleMutation(
   });
 }
 
-/**
- * Sets one roll, clamped. Missing rolls fill from the base (`startingRolls`),
- * so an unknown-rolls module becomes one consistent set on its first move.
- */
 export function setModuleRoll(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -168,7 +137,6 @@ export function setModuleRoll(
   });
 }
 
-/** Mutaplasmid strains, in the order the game lists them; `other` for a name none matches. */
 export const MUTAPLASMID_STRAINS = [
   'decayed',
   'gravid',
@@ -180,11 +148,6 @@ export const MUTAPLASMID_STRAINS = [
 ] as const;
 export type MutaplasmidStrain = (typeof MUTAPLASMID_STRAINS)[number];
 
-/**
- * A mutaplasmid's strain, read off its English name's first word ("Gravid
- * Heavy Energy Neutralizer Mutaplasmid"; "Glorified Decayed …" is
- * Glorified). The baked data carries no strain field.
- */
 export function mutaplasmidStrain(name: string): MutaplasmidStrain {
   const first = name.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
   return (MUTAPLASMID_STRAINS as readonly string[]).includes(first)
@@ -192,7 +155,6 @@ export function mutaplasmidStrain(name: string): MutaplasmidStrain {
     : 'other';
 }
 
-/** Mutaplasmids grouped by strain (`MUTAPLASMID_STRAINS` order), names alphabetical within each; empty groups left out. */
 export function groupMutaplasmidsByStrain(
   typeIds: readonly number[],
   nameOf: (typeId: number) => string

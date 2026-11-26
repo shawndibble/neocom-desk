@@ -1,9 +1,3 @@
-/**
- * What the Market Browser's order book says about itself: the header Refresh
- * action, the scope words (hub or region, range, station count), the tree's
- * "No orders" cue and each row's context menu. Derived from the browser's
- * location and the loaded book; owns no state of its own.
- */
 import { useCallback, type ReactElement } from 'react';
 import type { TFunction } from 'i18next';
 import type { RegionOrder } from '@/esi/endpoints';
@@ -18,7 +12,6 @@ import { useNoOrdersCue } from '@/features/market/regionMarketTypes';
 
 export interface UseMarketOrderBookViewArgs {
   t: TFunction;
-  /** Only the Browser tab draws the tree, so only it asks for the "No orders" list. */
   onBrowserTab: boolean;
   onAppraisalTab: boolean;
   refreshAppraisal: () => void;
@@ -75,15 +68,10 @@ export function useMarketOrderBookView({
   knownJumps,
 }: UseMarketOrderBookViewArgs) {
   function handleRefresh() {
-    // On Appraisal the button re-prices the pasted list instead, dropping the
-    // Fuzzwork TTL for those types only (`invalidateHubPrices`). Nothing
-    // below applies: there is no selected item and no order book on this tab.
     if (onAppraisalTab) {
       refreshAppraisal();
       return;
     }
-    // A failed catalogue load leaves no item to select, so Refresh retries
-    // the catalogue itself, the one recovery this page has short of F5.
     if (catalogueError) {
       retryCatalogue();
       return;
@@ -111,8 +99,6 @@ export function useMarketOrderBookView({
     [npcStationMap, solarSystemMap, setStationFilter, selectedTypeId, selectedItemName]
   );
 
-  // The tree's "No orders in {Region}" cue (#6200) names the browser's one
-  // region; a region pick with no name yet shows no cue rather than a guess.
   const noOrders = useNoOrdersCue(
     onBrowserTab ? singleRegionId : null,
     effectiveLocation.mode === 'hub'
@@ -121,8 +107,6 @@ export function useMarketOrderBookView({
     globalMarkets
   );
 
-  // The header's hub or region, as the Distance select's "no range" option:
-  // with no range set, that is what the book reads.
   const scopeLabel =
     effectiveLocation.mode === 'hub'
       ? effectiveHub.systemName
@@ -130,8 +114,6 @@ export function useMarketOrderBookView({
         ? t('market.allRegions')
         : (marketRegions?.find((region) => region.id === chosenRegionId)?.name ?? hubRegionName);
 
-  // What the scope bar says the book is reading. Distances are known at every
-  // range, so the hub's own distance shows even with no range set.
   const bookStationCount = new Set([...sortedSell, ...sortedBuy].map((o) => o.location_id)).size;
   const bookScope: OrderBookScope =
     rangeAcross && browserFilterValue.jumps !== 'any'
@@ -145,11 +127,7 @@ export function useMarketOrderBookView({
             jumpsAway: knownJumps?.get(effectiveHub.systemId) ?? null,
           }
         : { kind: 'region', regionName: scopeLabel, stationCount: bookStationCount };
-  // Where the per-item prices beside the book (the hub comparison, the
-  // Variations rows) are read: `orderBookLocation`, which is one region even
-  // under All regions — the hub's — so it is named as that, not "All regions".
   const priceScopeName = allRegions ? hubRegionName : scopeLabel;
-  // What still reads the header's hub or region while the book reaches past it.
   const scopeNote = allRegions
     ? t('market.allRegionsSecondaryNote', { regionName: hubRegionName })
     : rangeAcross

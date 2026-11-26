@@ -72,16 +72,13 @@ describe('reorderRows', () => {
   const entries = [entry(1), entry(2), entry(3)];
 
   it('moves an entry across a marker and recomputes marker positions', () => {
-    // Rows: [e1, M0@1, e2, e3]. Drag e3 onto e1: [e3, e1, M0, e2].
     const result = reorderRows(entries, [1], entryId(entry(3)), entryId(entry(1)));
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([3, 1, 2]);
     expect(result.markers).toEqual([2]);
-    // The lone marker didn't change relative order, so it's still ordinal 0.
     expect(result.markerOrder).toEqual([0]);
   });
 
   it('moves a marker onto an entry row', () => {
-    // Rows: [e1, M0@1, e2, e3]. Drag M0 onto e3: [e1, e2, e3, M0] -> position 3.
     const result = reorderRows(entries, [1], markerRowId(0), entryId(entry(3)));
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([1, 2, 3]);
     expect(result.markers).toEqual([3]);
@@ -96,10 +93,6 @@ describe('reorderRows', () => {
   });
 
   it('reports the old ordinal each marker lands at, so a caller can carry per-marker data along when dragging one marker past another', () => {
-    // Rows: [M0@0, e1, e2, e3, M1@3]. Drag M1 onto M0: [M1, M0, e1, e2, e3].
-    // M1 (old ordinal 1) now renders first; M0 (old ordinal 0) second — the
-    // one case besides an unknown id where a marker's ordinal actually
-    // changes (buildRows/rowsToState assign ordinals by pre-drag position).
     const result = reorderRows(entries, [0, 3], markerRowId(1), markerRowId(0));
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([1, 2, 3]);
     expect(result.markers).toEqual([0, 0]);
@@ -141,8 +134,6 @@ describe('normalizeMarkerAttributes', () => {
 
 describe('markerStepIndices', () => {
   it('maps an entry-list position to the scheduled step prefix length', () => {
-    // Entry 2 requires skill 1 at level 3: entries [e2@1, e3@1] expand to
-    // steps [1-I, 1-II, 1-III, 2-I, 3-I].
     const skills = skillMap(
       skill(1),
       skill(2, 'perception', 'willpower', [{ typeID: 1, level: 3 }]),
@@ -155,13 +146,11 @@ describe('markerStepIndices', () => {
   it('skips already-trained levels like the computed queue does', () => {
     const skills = skillMap(skill(1), skill(3, 'intelligence', 'memory'));
     const trained = new Map([[1, { level: 2, sp: 1415 }]]);
-    // Entry 1 targets III but I/II are trained: only one step before the marker.
     expect(markerStepIndices([entry(1, 3), entry(3)], [1], skills, trained)).toEqual([1]);
   });
 
   it('ignores entries whose skill is missing from the catalog, matching the computed queue', () => {
     const skills = skillMap(skill(1), skill(3, 'intelligence', 'memory'));
-    // Entry 99 is unknown; it contributes no steps.
     expect(markerStepIndices([entry(99), entry(1), entry(3)], [1, 2], skills, new Map())).toEqual([
       0, 1,
     ]);
@@ -172,7 +161,6 @@ describe('segmentsToMarkers', () => {
   it('places one marker per remapped segment at the entry it starts', () => {
     const skills = skillMap(skill(1), skill(2), skill(3));
     const entries = [entry(1), entry(2), entry(3)];
-    // Steps [1, 2, 3], one per entry: segment starts line up with entry boundaries exactly.
     const segments = [seg(0, 0), seg(1, 1), seg(2, 2)];
     expect(segmentsToMarkers(entries, segments, skills, new Map())).toEqual([0, 1, 2]);
   });
@@ -186,7 +174,6 @@ describe('segmentsToMarkers', () => {
 
   it('skips entries whose skill is missing from the catalog when placing the marker', () => {
     const skills = skillMap(skill(1), skill(2));
-    // Entry 99 is unknown and contributes no step; the first real step is entry 1's.
     const entries = [entry(99), entry(1), entry(2)];
     const segments = [seg(0, 0)];
     expect(segmentsToMarkers(entries, segments, skills, new Map())).toEqual([1]);
@@ -195,18 +182,12 @@ describe('segmentsToMarkers', () => {
   it('skips an already-trained entry that contributes no step', () => {
     const skills = skillMap(skill(1), skill(3, 'intelligence', 'memory'));
     const trained = new Map([[1, { level: 3, sp: 1415 }]]);
-    // Entry 1 is fully trained already (targets III, already III): 0 steps.
-    // Entry 3 contributes the plan's only step.
     const entries = [entry(1, 3), entry(3)];
     const segments = [seg(0, 0)];
     expect(segmentsToMarkers(entries, segments, skills, trained)).toEqual([1]);
   });
 
   it('collapses a segment boundary that falls inside one entry (prereq expansion) to before that entry', () => {
-    // Entry 2 requires skill 1 (a different attribute pair) as a prereq, so
-    // it alone expands to two steps: [1-I, 2-I]. A segment boundary between
-    // them cannot be represented as an entry-list position without splitting
-    // the entry, so it snaps to before the whole entry.
     const skills = skillMap(
       skill(1, 'intelligence', 'memory'),
       skill(2, 'perception', 'willpower', [{ typeID: 1, level: 1 }])

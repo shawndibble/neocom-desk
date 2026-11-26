@@ -33,11 +33,6 @@ const PILL_TONE: Record<PillTone, string> = {
   muted: 'text-text-dim',
 };
 
-/**
- * One verdict as a pill. The heading stays in the accessible name so each
- * reads as a separately-labelled statement, while the eye gets the tone and
- * the glyph — never colour alone (docs/DESIGN.md §7).
- */
 export function VerdictPill({
   label,
   tone,
@@ -59,7 +54,6 @@ export function VerdictPill({
   );
 }
 
-/** Names the real limit of an owned BPC the plan's runs exceed, with a one-click fix (issue #1775). */
 export function BpcCoverageWarning({
   coverage,
   blueprintName,
@@ -95,43 +89,19 @@ export function BpcCoverageWarning({
 
 interface PlanVerdictHeroProps {
   result: BuildResult;
-  /**
-   * The hero's figures on the chosen basis (`profitOnBasis`). The big
-   * number, margin, ISK/hour, break-even and the verdict all follow it.
-   */
   figures: ProfitOnBasis;
-  /**
-   * How owned materials are counted; `null` when the plan uses none, so
-   * there is nothing to switch and the line under the figure says so.
-   */
   basis: ProfitBasis | null;
   onBasisChange?: (basis: ProfitBasis) => void;
   pricesReady: boolean;
-  /** The price source could not be reached: the no-price line says so rather than "No price data yet". */
   pricesUnreachable?: boolean;
   pricesLoading: boolean;
   productName: string;
-  /** The product's typeID, for the heading's item context menu; null when the blueprint has no product. */
   productTypeID?: number | null;
-  /**
-   * The product's latest price vs its 90-day median at the plan's hub, in
-   * percent; null or omitted when unknown. At the spike threshold or above,
-   * an amber note under the figure warns the revenue may not last.
-   */
   vs90dPct?: number | null;
-  /** The 7-day input cost move line (`InputCostMoveLine`), beside the vs-90d note; omitted when there is none. */
   costMoveNote?: ReactNode;
-  /** Wraps the product heading in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
-  /**
-   * Visible "More actions" button beside the product heading (WCAG 2.1.1,
-   * issue #1498). `bordered` asks for the ⋮ as a bordered button the height
-   * of a small `Button`, to stand beside one.
-   */
   itemActionsFor?: (typeId: number, bordered?: boolean) => ReactElement;
-  /** The plan's runs field (and its Break Even shortcut), shown beside the product name. */
   runsControl?: ReactNode;
-  /** The owned BPC's real run limit when the plan's runs exceed it and nothing extends it (issue #1775). */
   bpcCoverage?: { coveredRuns: number; neededRuns: number } | null;
   blueprintName?: string;
   onSetRuns?: (runs: number) => void;
@@ -140,39 +110,22 @@ interface PlanVerdictHeroProps {
   onBreakdownOpenChange: (open: boolean) => void;
   onLogProduction: () => void;
   logProductionDisabled?: boolean;
-  /** Account-wide skill gate on this plan's own product (issue #1231). */
   skillGate?: SkillGateVerdict;
   nameForSkill?: (typeID: number) => string;
   nameForCharacter?: (characterId: number) => string;
-  /** The plan's slot schedule line; omitted when the caller has none. */
   slotLine?: ReactNode;
-  /**
-   * Set while the Reaction Location is highsec, where reactions cannot run
-   * (issue #2908). Warns and offers the fix; blocks nothing.
-   */
   locationBlock?: ReactionLocationBlock;
-  /** The one-line setup summary under the verdict, with its Edit setup link. */
   footer?: ReactNode;
-  /** The setup form that slides open under the footer, attached to this card. */
   expansion?: ReactNode;
 }
 
 export interface ReactionLocationBlock {
-  /** The facility and system the reactions are planned at, for the callout. */
   facilityName: string;
   systemName: string;
-  /** One-tap move to the nearest lowsec system; null when none is known. */
   fix: { systemName: string; onApply: () => void } | null;
   onChoose: () => void;
 }
 
-/**
- * The first thing a Build Plan shows: is this worth building? One verdict,
- * one big profit figure, the sentence that says what it is measured against,
- * then margin, ISK/hour and break-even. Status first, detail after: every
- * number here is also in the Costs & revenue ledger, which carries the
- * working (docs/context/decisions/20261024-163816-build-plan-page-reads-verdict-first-on-a.md).
- */
 export function PlanVerdictHero({
   result,
   figures,
@@ -224,8 +177,6 @@ export function PlanVerdictHero({
     </VerdictPill>
   ) : figures.verdict === 'loss' ? (
     <VerdictPill label={t('industry.hero.verdictLabel')} tone="warning">
-      {/* Only when the build itself pays: a plan that loses money even with its
-          own stock counted free is a loss, not a reason to sell the stock. */}
       {basis === 'sellValue' && result.profit !== null && result.profit >= 0
         ? t('industry.hero.verdictSell')
         : t('industry.hero.verdictLoss')}
@@ -237,7 +188,6 @@ export function PlanVerdictHero({
       <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-            {/* A real heading: it is what names the open plan to a screen reader. */}
             {itemMenuFor && productTypeID != null ? (
               itemMenuFor(productTypeID, <h2 className="text-lg font-semibold">{productName}</h2>)
             ) : (
@@ -313,7 +263,6 @@ export function PlanVerdictHero({
                 ) : (
                   <>
                     {t('industry.hero.leadOwned')}{' '}
-                    {/* §6c: accent text, no underline, tooltip naming the press — a value that flips in place. */}
                     <Tooltip content={t('industry.hero.basisFlipHint')}>
                       <button
                         type="button"
@@ -372,11 +321,7 @@ export function PlanVerdictHero({
           </div>
 
           {!pricesLoading && pricesReady && profit !== null && (
-            <dl
-              // Two columns on a phone: three left "BREAK-EVEN ⓘ" no room, and
-              // it must not wrap (the labels share one baseline).
-              className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:flex-1"
-            >
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:flex-1">
               <HeroStat label={t('industry.margin')}>
                 {figures.marginPct === null ? '—' : formatPercent(figures.marginPct)}
               </HeroStat>
@@ -394,7 +339,6 @@ export function PlanVerdictHero({
               <HeroStat
                 label={t('industry.hero.breakEven')}
                 accessory={
-                  // An ⓘ, not a "?": it opens the calculation (§6c).
                   <IconButton
                     size="sm"
                     variant="plain"
@@ -460,15 +404,12 @@ function HeroStat({
   children,
 }: {
   label: string;
-  /** A tooltip or ⓘ beside the label. */
   accessory?: ReactNode;
   note?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="min-w-0">
-      {/* One fixed-height, non-wrapping label row, so a stat whose label
-          carries an ⓘ or "?" lines up with one that carries none. */}
       <dt
         className={cx(
           eyebrowClassName,

@@ -1,14 +1,3 @@
-/**
- * The module browser's whole-catalogue hull check as one shared service
- * (`useHullFit` is its only caller). For a hull and a pilot's skills it
- * answers from memory, else from the saved row (`hullFitCache`), else works
- * it out — in a Web Worker where the browser has one, in slices on the page
- * otherwise (jsdom, old browsers) — and keeps one run per key, so the
- * route's background warm-up and the Add panel share a single computation.
- * It takes a fitting context, so it only runs once the page's own engine is
- * ready: the worker then reads the engine assets from Cache Storage instead
- * of racing the page to download them.
- */
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { skillsKey, unpackCheck } from '@/engine/fittings/hullFitKey';
 import type { PilotProfile } from '@/engine/fittings/types';
@@ -21,13 +10,9 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 
 export type HullFitChecks = ReadonlyMap<number, CandidateCheck>;
 
-/** Bump when what a saved check means changes without the engine pins doing so (`HULL_RULES`, the pre-filter, the packing). */
 const RESULT_VERSION = 2;
-/** Ids per engine call on the page; small enough that one slice stays well under a frame. */
 const BATCH = 50;
-/** How long one slice on the page may run before yielding. */
 const SLICE_MS = 12;
-/** Hulls kept in memory. */
 const MEMORY_HULLS = 8;
 
 const RACK_CODE: Record<CandidateRack, number> = {
@@ -40,7 +25,6 @@ const RACK_CODE: Record<CandidateRack, number> = {
 };
 const fingerprints = new WeakMap<FittingCatalogue, string>();
 
-/** The items and racks the check runs over, as a short text: a data rebuild changes it. */
 function catalogueFingerprint(catalogue: FittingCatalogue): string {
   let known = fingerprints.get(catalogue);
   if (known === undefined) {
@@ -55,7 +39,6 @@ function catalogueFingerprint(catalogue: FittingCatalogue): string {
   return known;
 }
 
-/** Everything a saved answer is valid for. */
 function hullFitKey(catalogue: FittingCatalogue, shipTypeId: number, profile: PilotProfile) {
   return [
     RESULT_VERSION,
@@ -66,7 +49,6 @@ function hullFitKey(catalogue: FittingCatalogue, shipTypeId: number, profile: Pi
   ].join('|');
 }
 
-/** Every fittable market item, by rack. */
 function jobsFor(catalogue: FittingCatalogue): [CandidateRack, number[]][] {
   const byRack = new Map<CandidateRack, number[]>();
   for (const entry of catalogue.marketTypes) {
@@ -102,7 +84,6 @@ function computeInWorker(
   );
 }
 
-/** The page's own path: every item through the memoizing engine call, in slices that yield. */
 function computeOnPage(
   engine: DogmaEngine,
   shipTypeId: number,
@@ -141,23 +122,16 @@ async function compute(
     try {
       return await inWorker;
     } catch (error) {
-      // Asked about another hull meanwhile: the caller has moved on too.
       if (error instanceof Error && error.message === 'superseded') throw error;
     }
   }
   return computeOnPage(engine, shipTypeId, jobs, profile);
 }
 
-/**
- * Which items go on this hull, and which the pilot can fly. Rejects with
- * `superseded` if a newer hull was asked for while the worker was still on
- * this one; the caller has moved on and should ignore it.
- */
 export function getHullFit(context: FittingContext, shipTypeId: number): Promise<HullFitChecks> {
   const key = hullFitKey(context.catalogue, shipTypeId, context.profile);
   const known = memory.get(key);
   if (known) {
-    // Most recently used last, so the oldest goes first.
     memory.delete(key);
     memory.set(key, known);
     return Promise.resolve(known);
@@ -177,7 +151,6 @@ export function getHullFit(context: FittingContext, shipTypeId: number): Promise
   return run;
 }
 
-/** Forgets what is held in memory (the saved rows stay) — for tests. */
 export function clearHullFitMemory(): void {
   memory.clear();
 }

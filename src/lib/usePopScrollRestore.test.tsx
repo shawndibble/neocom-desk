@@ -66,11 +66,9 @@ describe('usePopScrollRestore', () => {
     setPageHeight(2000);
     setScrollY(600);
     click('push');
-    // The page under the new entry is short, so the browser clamps to 0.
     setPageHeight(800);
     setScrollY(0);
     click('back');
-    // Still loading: nothing to scroll to yet.
     act(() => vi.advanceTimersByTime(100));
     expect(scrollTo).not.toHaveBeenCalled();
     setPageHeight(2000);
@@ -86,7 +84,6 @@ describe('usePopScrollRestore', () => {
     click('push');
     setPageHeight(800);
     act(() => screen.getByRole('button', { name: 'back' }).click());
-    // The short page clamps scroll as soon as it commits.
     setScrollY(0);
     setPageHeight(2000);
     act(() => vi.advanceTimersByTime(50));

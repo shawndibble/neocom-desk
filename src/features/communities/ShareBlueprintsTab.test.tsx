@@ -142,7 +142,6 @@ describe('ShareBlueprintsTab', () => {
     expect(within(via).queryByRole('button')).not.toBeInTheDocument();
     const direct = screen.getByText('Gamma Blueprint').closest('li')!;
     expect(within(direct).getByRole('button', { name: b.stop })).toBeInTheDocument();
-    // The location's own row is where it stops.
     const locations = screen.getByRole('region', { name: b.sharedLocations });
     expect(within(locations).getByText('Jita IV - Moon 4')).toBeInTheDocument();
   });

@@ -101,12 +101,10 @@ describe('loadRosterSnapshot (cache-only, default)', () => {
     });
     expect(a?.skills?.data).toEqual({ skills: [], total_sp: 500 });
     expect(a?.queue?.data).toEqual([{ skill_id: 1, queue_position: 0, finished_level: 3 }]);
-    // The queue entry above has no finish_date — paused, so it credits nothing.
     expect(a?.correctedTotalSp).toBe(500);
 
     const b = roster.find((r) => r.characterId === CHAR_B);
     expect(b?.wallet?.data).toBe(2000);
-    // B has no cached skills/queue row: null, not a fabricated empty value.
     expect(b?.skills).toBeNull();
     expect(b?.queue).toBeNull();
     expect(b?.correctedTotalSp).toBeNull();
@@ -144,9 +142,6 @@ describe('loadRosterSnapshot (cache-only, default)', () => {
     await seedCharacter(CHAR_A, 'Pilot A');
     await seedCache(CHAR_A, 'wallet:balance', 999999);
 
-    // Force tier-3 "suppressed": both the targeted and full purge fail, so the
-    // row survives on disk but must never be read again (mirrors
-    // esi/cachePurge.test.ts's own tier-3 test).
     const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
       throw new Error('index damaged');
     });
@@ -155,21 +150,13 @@ describe('loadRosterSnapshot (cache-only, default)', () => {
     where.mockRestore();
     clear.mockRestore();
 
-    // The row is still physically present...
     expect((await db.esiCache.get([CHAR_A, 'wallet:balance']))?.value).toBe(999999);
 
-    // ...but roster must not serve it.
     const [entry] = await loadRosterSnapshot();
     expect(entry.wallet).toBeNull();
   });
 });
 
-// ---------------------------------------------------------------------------
-// issue #40: the roster's cache-only path is the surface that used to skip
-// the stale-skills correction entirely (it never called the per-character
-// loader, so nothing applied it). Both read paths must credit a finished
-// queue entry the same way.
-// ---------------------------------------------------------------------------
 describe('loadRosterSnapshot: correctedTotalSp', () => {
   it('credits a queue entry finished in the past on the cache-only path', async () => {
     await seedCharacter(CHAR_A, 'Pilot A');
@@ -189,7 +176,7 @@ describe('loadRosterSnapshot: correctedTotalSp', () => {
 
     const [entry] = await loadRosterSnapshot();
 
-    expect(entry.correctedTotalSp).toBe(301_255); // 264,000 + (45,255 - 8,000)
+    expect(entry.correctedTotalSp).toBe(301_255);
   });
 
   it('credits a queue entry finished in the past on the live path', async () => {
@@ -242,9 +229,6 @@ describe('loadRosterSnapshot: correctedTotalSp', () => {
   });
 
   it('takes the current time as an injectable parameter, not read internally', async () => {
-    // Keeps this data-layer function clock-free (the same requirement the
-    // corrected-skills loader is built around): the caller decides "now",
-    // not a `Date.now()` buried inside roster.ts.
     await seedCharacter(CHAR_A, 'Pilot A');
     await seedCache(CHAR_A, 'skills', { skills: [], total_sp: 500 });
     await seedCache(CHAR_A, 'skillqueue', [
@@ -298,9 +282,6 @@ describe('loadRosterSnapshot({ live: true })', () => {
   });
 
   it('never exceeds the concurrency cap, counted in requests not characters', async () => {
-    // 25 characters x 3 loaders = 75 requests. Every loader is deferred, so
-    // this measures the real in-flight request count — deferring only one
-    // would pass even if the cap were applied per character.
     const ids = Array.from({ length: 25 }, (_, i) => 1000 + i);
     await Promise.all(ids.map((id) => seedCharacter(id, `Pilot ${id}`)));
 
@@ -330,7 +311,6 @@ describe('loadRosterSnapshot({ live: true })', () => {
     let released = 0;
     const total = ids.length * 3;
     for (let guard = 0; guard < 400 && released < total; guard += 1) {
-      // Wait for the next wave to arrive.
       await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0), { interval: 1 });
       const wave = pending.splice(0, pending.length);
       released += wave.length;
@@ -345,16 +325,6 @@ describe('loadRosterSnapshot({ live: true })', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Cache key parity, end to end: roster.ts imports CACHE_KEYS from
-// wallet.ts's/skills/data.ts's exported `KEYS` maps rather than redeclaring
-// them, but this still runs the REAL (unmocked) per-character loaders against
-// MSW to populate `db.esiCache` under their actual key strings, then asserts
-// cache-only `loadRosterSnapshot()` — which never touches the mocked loaders
-// used elsewhere in this file — reads the same rows back. Regression pin: if
-// this stops passing, roster.ts and the loaders it wraps have gone out of
-// sync on cache keys.
-// ---------------------------------------------------------------------------
 describe('loadRosterSnapshot (cache-only) — cache key parity with the real loaders', () => {
   const server = setupServer();
 

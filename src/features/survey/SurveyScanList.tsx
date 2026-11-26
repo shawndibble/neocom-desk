@@ -1,10 +1,3 @@
-/**
- * Every scan a Survey holds, newest first, with the one visible control that
- * sets a bad paste aside (or takes it back). Owner-only: the board shows it
- * only when the caller offers `onSetIgnored`. The chart's right-click menu is the
- * quick way to the same action; this list is the way that works with a keyboard
- * or a finger, and the only place a removed scan can be restored from.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,7 +24,6 @@ interface OreLine {
   volume: number;
 }
 
-/** One line per ore in a scan: how many rocks and how much m³, biggest first. */
 function oreLines(scan: SurveyScan): OreLine[] {
   const byOre = new Map<string, OreLine>();
   for (const rock of scan.rocks) {

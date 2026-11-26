@@ -6,7 +6,6 @@ const PRODUCT = 587;
 
 describe('productSellNow', () => {
   it('prices the product at the highest buy order, sales tax only, minus total cost', () => {
-    // Accounting 0: 7.5% sales tax. No broker fee: filling a buy order lists nothing.
     const sale = productSellNow({
       productTypeID: PRODUCT,
       productQuantity: 10,
@@ -33,7 +32,6 @@ describe('productSellNow', () => {
       skills: { [SKILL_IDS.accounting]: 5 },
       totalCost: 0,
     });
-    // 7.5% × (1 − 0.11 × 5) = 3.375%
     expect(sale?.salesTax).toBeCloseTo(33_750);
     expect(sale?.profit).toBeCloseTo(966_250);
   });
