@@ -280,7 +280,12 @@ export function useTaxColumns({
           const name = payeeDisplayName(dr);
           const label = dr.assignment?.label
             ? labelWithoutSystem(dr.assignment.label, systemName(dr))
-            : undefined;
+            : dr.corp?.kind === 'row' &&
+                dr.corp.view.state === 'estimate' &&
+                dr.corp.view.structureId === undefined
+              ? // Ore no refinery has yielded the miner yet: said, not silently merged.
+                t('miningTax.corpBook.refineryNotRecorded')
+              : undefined;
           return (
             <HintText content={label ? `${name} · ${label}` : name} desktopOnly onlyWhenTruncated>
               {name}

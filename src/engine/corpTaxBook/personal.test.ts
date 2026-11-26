@@ -2632,9 +2632,61 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
         },
       ],
     });
-    const [row] = ofToday(overlay([live], [withToday(30_000)]));
-    expect(row.unitPrices[SYL]).toBe(100);
-    expect(row.taxOwed).toBeCloseTo((30_000 * 148 + 1_000 * 100) * 0.15, 4);
+    const rows = ofToday(overlay([live], [withToday(30_000)]));
+    const sylvite = rows.find((r) => r.oreLines.some((l) => l.typeId === SYL))!;
+    expect(sylvite.unitPrices[SYL]).toBe(100);
+    expect(rows.reduce((sum, r) => sum + (r.taxOwed ?? 0), 0)).toBeCloseTo(
+      (30_000 * 148 + 1_000 * 100) * 0.15,
+      4
+    );
+  });
+
+  it('puts ore the book has not placed at the refinery that last yielded that ore, else on a row of its own', () => {
+    const syl = (structureId: number, date: string, typeId = SYL) => ({
+      ...observedToday(1),
+      structureId,
+      date,
+      oreLines: [{ typeId, quantity: 1_000 }],
+    });
+    const live = entry({
+      date: TODAY,
+      oreLines: [
+        { typeId: ZEO, quantity: 30_000 },
+        { typeId: SYL, quantity: 2_000 },
+        { typeId: 45492, quantity: 500 },
+      ],
+      freeOreLines: [],
+      allocations: [
+        {
+          id: 'a-today',
+          payeeId: 'bmw',
+          taxPct: 15,
+          oreLines: [
+            { typeId: ZEO, quantity: 30_000 },
+            { typeId: SYL, quantity: 2_000 },
+            { typeId: 45492, quantity: 500 },
+          ],
+          status: 'outstanding',
+        },
+      ],
+    });
+    // The book saw Zeolites at 1000 today; Sylvite came from 1002 the last time, days ago.
+    const b = withToday(null, {
+      observed: [...book().observed, observedToday(10_000), syl(1002, '2026-10-12')],
+      structureNames: { 1000: 'Palomino Prospecting', 1002: 'SSG Qpef' },
+    });
+    const rows = ofToday(overlay([live], [b]));
+    expect(
+      rows.map((r) => [
+        r.structureId,
+        r.refineryLabel,
+        r.oreLines.map((l) => [l.typeId, l.quantity]),
+      ])
+    ).toEqual([
+      [1000, 'Palomino Prospecting', [[ZEO, 30_000]]],
+      [1002, 'SSG Qpef', [[SYL, 2_000]]],
+      [undefined, undefined, [[45492, 500]]],
+    ]);
   });
 
   it('splits the day by the refineries the book saw, the rest to the one it saw most of', () => {

@@ -1302,18 +1302,26 @@ export function overlayCorpBooks(input: {
         left = minusLines(left, lines);
         byStructure.set(o.structureId, sumLines(byStructure.get(o.structureId) ?? [], lines));
       }
+      // Ore the book has not placed yet goes, type by type, to the refinery that yields it: one
+      // that recorded the type today, else the one in the system that last did (a moon's ore tells
+      // its refinery apart). A type no refinery ever yielded the miner is a row of its own.
       if (left.length > 0) {
-        const most = [...seen].sort((a, b) => quantityOf(b.oreLines) - quantityOf(a.oreLines))[0];
-        const last = book.observed
+        const history = book.observed
           .filter(
             (o) =>
               o.characterId === entry.characterId &&
               o.solarSystemId === entry.solarSystemId &&
               o.date < entry.date
           )
-          .sort((a, b) => b.date.localeCompare(a.date))[0];
-        const to = most?.structureId ?? last?.structureId;
-        byStructure.set(to, sumLines(byStructure.get(to) ?? [], left));
+          .sort((a, b) => b.date.localeCompare(a.date));
+        const yields = (o: ObservedMiningEntry, typeId: number) =>
+          o.oreLines.some((l) => l.typeId === typeId);
+        for (const line of left) {
+          const to =
+            seen.find((o) => yields(o, line.typeId))?.structureId ??
+            history.find((o) => yields(o, line.typeId))?.structureId;
+          byStructure.set(to, sumLines(byStructure.get(to) ?? [], [line]));
+        }
       }
       const { prices, sources } = book.pricesOn(entry.date);
       // A refinery with no charge yet takes the member's own rate: one Payee, one rate a day.
