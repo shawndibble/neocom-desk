@@ -1,9 +1,3 @@
-/**
- * Orchestrates the "Import from clipboard" preview: auto-detects EFT fit vs.
- * skill-plan-paste text, resolves names, and (for EFT) prefetches the dogma
- * data fitToSkills needs. Kept out of the dialog component so the parsing
- * logic is unit-testable without rendering anything.
- */
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 import {
   fitToSkills,
@@ -29,27 +23,19 @@ export interface ClipboardImportPreview {
   mode: ClipboardImportMode;
   shipName?: string;
   fitName?: string;
-  /** The `name` attribute of an imported plan-XML file's root `<plan>` element. */
   planName?: string;
   entries: PlanEntry[];
-  /** Unresolved item/skill names, and types whose requirements couldn't be fetched. */
   warnings: string[];
-  /** Line-level parse errors (bad header, unrecognized line format) or per-entry plan-XML errors. */
   errors: ClipboardImportLineIssue[];
-  /** File-level failure (too large, malformed, unsupported) before any entry could be parsed — planXml mode only. */
   documentErrorCode?: PlanXmlDocumentErrorCode;
 }
 
 export interface ClipboardImportDeps {
-  /** Skill names only, for the skill-plan-paste path. */
   skillByName: ReadonlyMap<string, TypeCatalogEntry>;
-  /** Ship/module/charge names, for the EFT-fit path. */
   typeByName: ReadonlyMap<string, TypeCatalogEntry>;
-  /** Each resolved item's dogma_attributes; null when unreadable. */
   loadType: (typeId: number) => Promise<Pick<TypeDetail, 'dogma_attributes'> | null>;
 }
 
-/** EFT fits always start with "[Ship Name, Fit Name]" — same signal parseEftFit's own header check uses. */
 export function detectMode(text: string): ClipboardImportMode {
   return looksLikeEftFit(text) ? 'eftFit' : 'skillPlan';
 }
@@ -61,10 +47,6 @@ async function previewEftFit(
   const fit = parseEftFit(text);
   const errors = fit.errors.map((e) => ({ line: e.line, text: e.text, reason: e.reason }));
 
-  // Resolve every referenced name up front so we know which typeIDs to
-  // prefetch dogma for. fitToSkills does its own (equivalent) resolution
-  // against the same typeByName and is the source of truth for "unknown
-  // item" warnings, avoiding double-reporting.
   const names = fit.shipName
     ? [fit.shipName, ...fit.items.map((i) => i.name)]
     : fit.items.map((i) => i.name);
@@ -91,10 +73,6 @@ async function previewEftFit(
   const requiredSkills: RequiredSkillsLookup = (typeId) => requiredByTypeId.get(typeId) ?? [];
   const { entries, errors: fitErrors } = fitToSkills(fit, typeByName, requiredSkills);
 
-  // Fits repeat items across multiple slots (three turrets loaded with the
-  // same unresolvable faction ammo, say), which would otherwise print the
-  // same "Unknown item" line once per slot. Dedupe by item name, keeping
-  // first-occurrence order, and note the repeat count instead.
   const unknownItemCounts = new Map<string, number>();
   for (const e of fitErrors) {
     unknownItemCounts.set(e.itemName, (unknownItemCounts.get(e.itemName) ?? 0) + 1);
@@ -140,12 +118,6 @@ export async function previewClipboardImport(
   return detectMode(text) === 'eftFit' ? previewEftFit(text, deps) : previewSkillPlan(text, deps);
 }
 
-/**
- * What an Import should do with a preview. A clean parse applies without being
- * looked at; any failed line, dropped item or unreadable file is put in front
- * of the pilot first, since applying would silently lose it; a parse that
- * found nothing at all has nothing to apply or show.
- */
 export type ImportOutcome = 'apply' | 'review' | 'empty';
 
 export function importOutcome(preview: ClipboardImportPreview): ImportOutcome {

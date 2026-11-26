@@ -24,7 +24,6 @@ describe('loadMutaplasmidLookup', () => {
     loadMutaplasmids.mockImplementation(bundled);
     const lookup = await loadMutaplasmidLookup();
 
-    // Gravid Heavy Energy Neutralizer Mutaplasmid, build 3607705.
     expect(lookup.resultingType(16475, 47831)).toBe(47832);
     expect(lookup.isAbyssalType(47832)).toBe(true);
     expect(lookup.attributeId('energyNeutralizerAmount')).toBe(97);
@@ -43,7 +42,6 @@ describe('loadMutaplasmidLookup', () => {
 });
 
 describe('withCheckedMutations', () => {
-  // Heavy Abyssal Energy Neutralizer (47832) from a Heavy Gremlin (16475), Gravid (47831).
   const fitting = (mutation: Fitting['modules'][number]['mutation']): Fitting => ({
     name: 'Neut',
     shipTypeId: 17843,

@@ -29,8 +29,6 @@ describe('buildQueueView', () => {
   });
 
   it('buckets by finish date: this week, this month, then one group per calendar month', () => {
-    // NOW is Wed 2026-10-14: day 3 is Sat the 17th (in-week), 10 is later in October,
-    // 20 is Nov 3, 50 is Dec 3, 80 is Jan 2.
     const v = view([
       entry(0, 1),
       entry(1, 3),
@@ -44,8 +42,6 @@ describe('buildQueueView', () => {
   });
 
   it("ends this week where the next one starts, per the pilot's week-start setting", () => {
-    // Sun the 18th: still this week when weeks start Monday, next week's
-    // first day (so rest of October) when they start Sunday.
     const rows = [entry(0, 1), entry(1, 4)];
     expect(view(rows, 'monday').groups.map((g) => g.id)).toEqual(['week']);
     expect(view(rows, 'sunday').groups.map((g) => g.id)).toEqual(['month']);
@@ -107,8 +103,6 @@ describe('heroProgress', () => {
   });
 
   it("is the share of the whole level's SP when ESI gives the SP span", () => {
-    // Window is half elapsed, but the level began mid-way: 400k of 1M at the
-    // window start, 1M at the end -> 700k now, i.e. 70% of the level.
     const e: SkillQueueEntry = {
       ...entry(0, 1, -1),
       level_start_sp: 0,
@@ -167,7 +161,6 @@ describe('buildQueueView on the EVE clock', () => {
 
   it('files a level under the month its UTC date falls in, not the local one', () => {
     process.env.TZ = 'America/Los_Angeles';
-    // 2026-12-01T03:00Z is Nov 30 in LA (local: November) and Dec 1 in UTC.
     const finish = '2026-12-01T03:00:00Z';
     const now = '2026-10-14T12:00:00Z';
     expect(run(finish, now)).toEqual(['2026-11']);
@@ -176,8 +169,6 @@ describe('buildQueueView on the EVE clock', () => {
 
   it('closes the week at the UTC week boundary on the EVE clock', () => {
     process.env.TZ = 'America/Los_Angeles';
-    // Now Wed 2026-10-14. Monday weeks end at 2026-10-19 00:00 on the chosen clock.
-    // 2026-10-19T03:00Z is still Sun the 18th in LA (this week) but Mon the 19th in UTC.
     const finish = '2026-10-19T03:00:00Z';
     const now = '2026-10-14T12:00:00Z';
     expect(run(finish, now)).toEqual(['week']);
@@ -186,7 +177,6 @@ describe('buildQueueView on the EVE clock', () => {
 
   it('counts a Sunday-start week on UTC days', () => {
     process.env.TZ = 'America/Los_Angeles';
-    // Now Sun 2026-10-18T20:00Z: the week runs to Sat the 24th; Sun the 25th starts the next.
     const now = '2026-10-18T20:00:00Z';
     expect(run('2026-10-24T20:00:00Z', now, 'UTC', 'sunday')).toEqual(['week']);
     expect(run('2026-10-25T01:00:00Z', now, 'UTC', 'sunday')).toEqual(['month']);
@@ -194,7 +184,6 @@ describe('buildQueueView on the EVE clock', () => {
 
   it('reads "this month" on the chosen clock too', () => {
     process.env.TZ = 'America/Los_Angeles';
-    // Now 2026-11-01T03:00Z is Oct 31 in LA but Nov 1 in UTC; a Nov 20 finish is "this month" only on UTC.
     const now = '2026-11-01T03:00:00Z';
     const finish = '2026-11-20T12:00:00Z';
     expect(run(finish, now)).toEqual(['2026-11']);

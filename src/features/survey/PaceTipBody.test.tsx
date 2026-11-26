@@ -16,7 +16,6 @@ describe('PaceTipBody', () => {
       ['Scordite', 500],
       ['Omber', 100],
     ]),
-    // Veldspar 10% of its start, Scordite 40%, Omber idle.
     at(5, [
       ['Veldspar', 900],
       ['Scordite', 300],

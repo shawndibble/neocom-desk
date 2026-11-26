@@ -1,9 +1,4 @@
 import { MINUTE_MS, HOUR_MS } from '@/lib/age';
-/**
- * Sovereignty raid windows (issues #4775, #4798): pure maths over a skyhook's theft
- * window or a sov hub's vulnerability window, plus how long a hub's reagent
- * bay lasts. Epoch ms in, plain values out.
- */
 
 export interface RaidWindow {
   startMs: number;
@@ -12,7 +7,6 @@ export interface RaidWindow {
 
 export type SovereigntyKind = 'skyhook' | 'hub';
 
-/** `overtime`: a hub past its window end, which ESI still counts as vulnerable. */
 export type RaidState = 'upcoming' | 'open' | 'overtime' | 'closed';
 
 export function raidState(
@@ -24,11 +18,6 @@ export function raidState(
   return window.startMs <= nowMs ? 'open' : 'upcoming';
 }
 
-/**
- * "N raidable within the horizon": windows open now or opening within
- * `horizonMs`, and the wait for the soonest live one to open (0 when one is
- * open now), even past the horizon. `untilMs` is null when none is left.
- */
 export function raidHeadline(
   windows: readonly RaidWindow[],
   nowMs: number,
@@ -43,7 +32,6 @@ export function raidHeadline(
   };
 }
 
-/** The systems `allianceId` holds sov in, from the public claims list. */
 export function allianceSpace(
   systems: readonly { systemId: number; allianceId: number | null }[],
   allianceId: number
@@ -53,11 +41,6 @@ export function allianceSpace(
   );
 }
 
-/**
- * Skyhooks whose theft window is open or still ahead, soonest first: open
- * windows closing soonest, then upcoming ones by when they open. A closed or
- * unread window drops out; ties fall back to the key, so the order is stable.
- */
 export function liveRaids<T extends { key: string; window: RaidWindow | null }>(
   skyhooks: readonly T[],
   nowMs: number
@@ -75,20 +58,12 @@ export function liveRaids<T extends { key: string; window: RaidWindow | null }>(
   });
 }
 
-/** The theft link takes ten minutes, so a window with less than this left is closing. */
 export const THEFT_LINK_MS = 10 * MINUTE_MS;
 
-/** An open window with under `THEFT_LINK_MS` left. */
 export function closingSoon(window: RaidWindow, nowMs: number): boolean {
   return raidState(window, nowMs) === 'open' && window.endMs - nowMs < THEFT_LINK_MS;
 }
 
-/**
- * The raidable skyhooks a hunter can act on: live ones within `radius` jumps
- * (a system with no known distance is left out, nothing guessed), open first
- * by fewer jumps, then upcoming by opening and then fewer jumps. A hook with no
- * readable window stays, last. `beyond` counts live hooks the radius cut.
- */
 export function nearRaids<T extends { key: string; systemId: number; window: RaidWindow | null }>(
   skyhooks: readonly T[],
   jumps: ReadonlyMap<number, number>,
@@ -117,10 +92,6 @@ export function nearRaids<T extends { key: string; systemId: number; window: Rai
   return { within, beyond };
 }
 
-/**
- * When a hub's reagent bay empties: `last_updated` plus the amount at the burn
- * rate. Epoch ms; may be in the past. Null when nothing burns.
- */
 export function hubReagentsRunOutMs(bay: {
   amount: number;
   burningPerHour: number;

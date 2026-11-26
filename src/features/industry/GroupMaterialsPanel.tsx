@@ -1,8 +1,3 @@
-/**
- * Materials and the Group Owned Overlay (issue #697) as one table: typing an
- * owned quantity updates that same row's Still To Buy instead of a separate
- * panel scroll-lengths away.
- */
 import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,18 +45,11 @@ interface GroupMaterialsPanelProps {
   pi: PiData | null;
   ownedStockSnapshot: OwnedStockSnapshot;
   rollup: GroupRollupView['rollup'];
-  /** The settled members, whose own tables say which plan needs how much of a material. */
   members: readonly BuildGroupMember[];
   onOpenPlan: (planId: string) => void;
   buyRows: readonly BuyMaterialRow[];
-  /** True when no material is left to buy *and* none is crafted. */
   nothingToBuy: boolean;
   depthByType: ReadonlyMap<number, DepthPrice>;
-  /**
-   * Group Owned Overlay (issue #697): writes the group's own owned-stock
-   * ledger, replacing it wholesale — the same "replace, don't merge"
-   * contract `withGroupOwnedStock` keeps.
-   */
   onOwnedStockChange: (ownedStock: Record<number, number>) => void;
   onOwnedStockScopeChange: (scope: OwnedStockScope | undefined) => void;
 }
@@ -88,9 +76,6 @@ export function GroupMaterialsPanel({
     () => buildItemMenuProps(catalog, (typeId) => navigate(bpcSourcingHref(typeId))),
     [catalog, navigate]
   );
-  // Stable: `DataTable` memoizes its rows on `rowContextMenu`. "Used by" is
-  // offered only for a material two or more plans need: for one plan the row
-  // already says it.
   const rowContextMenu = useMemo(
     () => (material: BuyMaterialRow, tr: ReactElement) =>
       menuProps.itemMenuFor(
@@ -105,14 +90,6 @@ export function GroupMaterialsPanel({
     [menuProps, members, t]
   );
 
-  // Every type any member's whole tree can show, not only each blueprint's
-  // own materials: the buy table lists sub-build leaves
-  // (`rollup.tableMaterials`), and a mineral only a component's recipe
-  // introduces is as ownable here as on that member's own page — the same
-  // Tritanium bug `BuildPlanDetail.tsx` fixed for one plan. Keyed on the
-  // blueprints in play: `plans` gets a fresh identity on every keystroke in
-  // any member, and an asset list runs to tens of thousands of rows per
-  // Character.
   const blueprintSignature = plans.map((p) => `${p.blueprintTypeID}`).join(',');
   const materialTypeIdsKey = useMemo(
     () => groupMaterialTypeIdKey(plans, { catalog, pi }),
@@ -121,16 +98,7 @@ export function GroupMaterialsPanel({
   );
   const materialTypeIds = useMemo(() => typeIdsFromKey(materialTypeIdsKey), [materialTypeIdsKey]);
 
-  // The very detection a single plan's own page runs, over the union of the
-  // group's materials — reused rather than re-derived, so a group and its
-  // members can never hold two opinions about what the hangar contains. Feeds
-  // the Group Owned Overlay's own ledger UI (issue #697), not the rollup
-  // directly — `rollUpBuildGroup` only ever sees the ledger the pilot has
-  // committed to, in `ownedStockMap`.
   const detected = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
-  // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
-  // the group rollup never merges a corp source in, so no corp name or corp
-  // incompleteness is passed.
   const { detection } = useMemo(
     () => ownedStockView({ ...detected, scope: group.ownedStockScope }, t),
     [detected, group.ownedStockScope, t]
@@ -142,7 +110,6 @@ export function GroupMaterialsPanel({
     [group.ownedStock]
   );
 
-  /** One write path for the ledger: every caller mutates a copy of `group.ownedStock`, this commits it. */
   const updateOwnedStock = useCallback(
     (mutate: (next: Record<number, number>) => void) => {
       const next: Record<number, number> = { ...group.ownedStock };
@@ -159,7 +126,6 @@ export function GroupMaterialsPanel({
     [updateOwnedStock]
   );
 
-  // "Use all" / "Use none", written through the Group Owned Overlay adapter.
   const ownedBulk = useOwnedStockBulk({
     write: (changes) => updateOwnedStock((next) => applyToGroupOwnedStock(next, changes)),
     ownedFor: (typeID) => ownedStockMap.get(typeID),
@@ -207,7 +173,6 @@ export function GroupMaterialsPanel({
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
-        // The input is a control: on a phone card it closes the second line, tappable.
         stackEdge: 'end',
         align: 'right',
         sortValue: (material) => ownedStockMap.get(material.typeID) ?? 0,
@@ -309,22 +274,10 @@ export function GroupMaterialsPanel({
               onChange={onOwnedStockScopeChange}
               action={
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    // The buy table's rows: a fully-crafted row is never bought,
-                    // so it has no Have and no offer.
-                    onClick={() => ownedBulk.fillAll(buyRows)}
-                  >
+                  <Button size="sm" onClick={() => ownedBulk.fillAll(buyRows)}>
                     {t('industry.useAllOwned')}
                   </Button>
-                  <Button
-                    size="sm"
-                    // Every merged material: a ledger entry from before its
-                    // material became fully crafted is still read by the rollup
-                    // though the Crafted section shows no input for it, so "Use
-                    // none" must reach it.
-                    onClick={() => ownedBulk.clearAll(rollup.tableMaterials)}
-                  >
+                  <Button size="sm" onClick={() => ownedBulk.clearAll(rollup.tableMaterials)}>
                     {t('industry.useNoneOwned')}
                   </Button>
                 </div>
@@ -332,12 +285,6 @@ export function GroupMaterialsPanel({
             />
           </div>
 
-          {/* An empty buy table two different ways: genuinely nothing left
-              (every material owned, or there are none) reads "Nothing left
-              to buy," but a table empty because everything is crafted has
-              its own panel beside Members explaining that — showing both
-              would call a crafted material "owned," which is exactly the
-              hangar-vs-job confusion the Crafted panel exists to avoid. */}
           {nothingToBuy ? (
             <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
           ) : buyRows.length > 0 ? (
@@ -351,8 +298,6 @@ export function GroupMaterialsPanel({
                 rowKey={(material) => material.typeID}
                 label={t('industry.groupMaterials')}
                 density="compact"
-                // A phone gets the dense two-line card: material and what is still
-                // to buy on line one, the need and the owned input on line two.
                 responsive="stack"
                 stackLayout="dense"
                 mobileSort

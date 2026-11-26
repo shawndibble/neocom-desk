@@ -1,10 +1,5 @@
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
 
-/**
- * One entry in a Tax row's right-click / ⋮ menu. They mirror what the row's
- * detail modal offers (`RowDetailModal`, `GroupSummaryModal`), so the menu is
- * a shortcut to the same actions, not a second set of rules.
- */
 export type RowMenuAction =
   | {
       id:
@@ -25,22 +20,15 @@ export type RowMenuAction =
     }
   | { id: 'takeOut'; member: GroupMember };
 
-/** Corp Tax Book rows are decided by the book: view them, and pay while owed. */
 function corpRowActions(dr: DisplayRow): RowMenuAction[][] {
   const state = dr.corp?.kind === 'row' ? dr.corp.view.state : null;
   const owing =
     (state === 'billed' || state === 'estimate') &&
     (dr.corp?.kind === 'row' ? (dr.corp.view.taxOwed ?? 0) > 0 : false);
   const lead: RowMenuAction[] = owing ? [{ id: 'view' }, { id: 'corpPay' }] : [{ id: 'view' }];
-  // An open day is still the member's own entry until the book bills it: edit it, or split it.
   return state === 'estimate' ? [[...lead, { id: 'edit' }], [{ id: 'split' }]] : [lead];
 }
 
-/**
- * The menu's actions for a row, in groups (a separator between each), View
- * details first. Each rule matches the detail modal's: Settle up for an owed
- * row, Accept new total for a grown one, then Edit, then the rarer moves.
- */
 export function rowMenuActions(dr: DisplayRow): RowMenuAction[][] {
   if (dr.corp?.kind === 'row') return corpRowActions(dr);
   const view: RowMenuAction = { id: 'view' };
@@ -55,7 +43,6 @@ export function rowMenuActions(dr: DisplayRow): RowMenuAction[][] {
     if (anyGrown) lead.push({ id: 'resolve' });
     else if (dr.status === 'outstanding') lead.push({ id: 'settleUp' });
     lead.push({ id: 'edit' });
-    // A payment links to the Payee and pays its oldest days: there is no mark to set here.
     const payments: RowMenuAction[] = dr.assignment?.payeeId ? [{ id: 'linkWallet' }] : [];
     const regroup: RowMenuAction[] = [
       ...[...members]

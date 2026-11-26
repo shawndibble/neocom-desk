@@ -1,11 +1,5 @@
 import { useSyncExternalStore } from 'react';
 
-/**
- * A tiny external store for "cover the page with the boot screen": a swap that
- * is about to reload (Settings → "Update app", a stale-build purge) shows it so
- * the reload reads as a boot. Plain module state so non-React callers can flip
- * it; `BootCoverHost` renders it.
- */
 let shown = false;
 const listeners = new Set<() => void>();
 

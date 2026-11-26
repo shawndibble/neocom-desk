@@ -1,10 +1,3 @@
-/**
- * Open Orders' work-through mode, wired to the network: reads the station's
- * book for the current order, which the order's modal shows with its own Copy
- * and Open in EVE. Next records the order as passed (for "Not changed") and
- * moves on. The queue, progress and "Not changed" rules are `workThrough.ts`'s;
- * this hook only holds what the pilot did and talks to ESI.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { CompetingOrder } from '@/engine/market/undercut';
@@ -23,14 +16,8 @@ import {
   type WorkThroughState,
 } from './workThrough';
 
-/** The click-time price, or `unavailable` when the book could not be read. */
 export type WorkThroughPrice = ClickTimePrice | { kind: 'unavailable' };
 
-/**
- * The order's own station book. A player structure's book comes from the
- * structure itself (the region book never holds structure orders) under the
- * order's owner.
- */
 async function readStationBook(row: OpenOrderRow): Promise<readonly CompetingOrder[] | null> {
   try {
     if (!isNpcStationId(row.locationId)) {
@@ -52,31 +39,22 @@ async function readPrice(
 }
 
 export interface UseWorkThroughOptions {
-  /** Re-formed every render (`workThroughQueue`). */
   queue: readonly OpenOrderRow[];
-  /** Every open order id on every Character — never undercut. */
   ownOrderIds: ReadonlySet<number>;
-  /** The latest orders read, for "Not changed". */
   ordersById: ReadonlyMap<number, { price: number; issued: string }>;
-  /** When each Character's orders were last fetched (ms). */
   fetchedAtByCharacter: ReadonlyMap<number, number>;
 }
 
 export interface WorkThrough {
   running: boolean;
-  /** The order the walk stands on; null when not running or finished. */
   currentId: number | null;
-  /** Orders that would be walked if started now. */
   queueCount: number;
   progress: WorkThroughProgress;
   handled: ReadonlyMap<number, HandledOrder>;
-  /** Handled orders an orders read after the press shows untouched. */
   notChangedIds: ReadonlySet<number>;
-  /** The current order's price as read when it became current; null while loading. */
   preview: WorkThroughPrice | null;
   start: () => void;
   stop: () => void;
-  /** Passes the current order, fixed or not, and moves to the next. */
   next: () => void;
 }
 
@@ -94,8 +72,6 @@ export function useWorkThrough({
   const current = running ? progress.current : null;
   const currentId = current?.orderId ?? null;
 
-  // The current order's price, read once it becomes current: a phone shows
-  // it large before any press, and a below-floor row warns what it loses.
   useEffect(() => {
     if (current === null) return;
     let cancelled = false;
@@ -146,7 +122,6 @@ export function useWorkThrough({
     });
   }, [current, preview, markHandled]);
 
-  // Memoized: every table row reads this through context.
   return useMemo(
     () => ({
       running,
@@ -175,11 +150,6 @@ export function useWorkThrough({
   );
 }
 
-/**
- * Whether the page was opened to start the queue (the Overview Open orders
- * widget's "Work through" link). Latched on mount and spent at once, the way
- * `useHighlightParam` is: a reload never restarts a walk the pilot stopped.
- */
 export function useWorkThroughStartParam(): boolean {
   const [searchParams, setSearchParams] = useSearchParams();
   const [requested] = useState(() => searchParams.get(WORK_THROUGH_PARAM) === '1');

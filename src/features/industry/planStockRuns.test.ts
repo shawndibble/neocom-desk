@@ -17,7 +17,6 @@ const ctx = {
   security: 'highsec',
 } as const;
 
-/** A resolver that answers with the engine's own rows, as the page's would. */
 const resolveQuantitiesAt = ((candidate: BuildPlanRecord) => ({
   result: {
     materials: effectiveMaterials(bp, candidate.runs, 0, { ...ctx, rigFit: [...ctx.rigFit] }).map(

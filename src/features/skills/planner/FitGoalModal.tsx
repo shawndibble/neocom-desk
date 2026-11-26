@@ -1,8 +1,3 @@
-/**
- * Fit goal picker (issue #3564): pick a saved Fitting and see when it
- * becomes flyable under this plan. A Fitting the plan doesn't cover yet
- * asks before adding its missing skills (prerequisites follow on their own).
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -17,7 +12,6 @@ interface FitGoalModalProps {
   open: boolean;
   options: readonly FitGoalOption[];
   onClose: () => void;
-  /** Called with the picked Fitting; the caller adds `toAdd` skills first when present. */
   onPick: (option: FitGoalOption) => void;
 }
 

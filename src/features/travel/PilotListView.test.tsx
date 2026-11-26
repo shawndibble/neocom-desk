@@ -28,7 +28,6 @@ vi.mock('@/features/route/useSolarSystems', () => ({
   useSolarSystemList: () => ({ systems: null, failed: false, retry: () => {} }),
   useSystemName: () => 'Uedama',
 }));
-// The board is FleetBoard's own to test; here only what the live paste hands it.
 vi.mock('./FleetBoard', () => ({
   FleetBoard: ({ wormholeSpace }: { wormholeSpace?: boolean }) => (
     <p>{wormholeSpace ? 'wormhole board' : 'k-space board'}</p>
@@ -279,7 +278,6 @@ describe('PilotListView (Local list)', () => {
     expect(within(here).getByText('Gankerton')).toBeTruthy();
     const elsewhere = screen.getByRole('table', { name: 'Killed elsewhere, last 30 days' });
     expect(within(elsewhere).getByText('Nullbear')).toBeTruthy();
-    // Lowsec-only kills 90 days ago is quiet, not "elsewhere".
     const quiet = screen.getByRole('table', { name: 'No kills in 30 days' });
     expect(within(quiet).getByText('Sleeper')).toBeTruthy();
   });
@@ -294,9 +292,7 @@ describe('PilotListView (Local list)', () => {
         .getAllByRole('columnheader')
         .map((th) => th.className.split(/\s+/).find((c) => /^w-\d+$/.test(c)) ?? null);
     for (const table of tables) {
-      // Fixed layout, so the pinned widths hold whatever the group's content.
       expect(table.className).toContain('table-fixed');
-      // Pilot and Flew on stay flexible; Standing, Highsec, Lowsec, Nullsec and Kills checked are pinned.
       expect(widthsOf(table)).toEqual(widthsOf(tables[0]));
       expect(widthsOf(table).filter((w) => w !== null)).toHaveLength(5);
     }
@@ -315,10 +311,8 @@ describe('PilotListView (Local list)', () => {
     renderList();
     const elsewhere = await screen.findByRole('table', { name: 'Killed elsewhere, last 30 days' });
     const cells = within(within(elsewhere).getAllByRole('row')[1]).getAllByRole('cell');
-    // Pilot, Your standing, Highsec, Lowsec, Nullsec, Flew on kills.
     expect(cells[4].textContent).toBe('22h ago');
     expect(cells[2].textContent).toBe('0—');
-    // The ship name resolves after the table first paints.
     await waitFor(() =>
       expect(within(elsewhere).getAllByRole('row')[1]).toHaveTextContent('Drake')
     );
@@ -327,7 +321,6 @@ describe('PilotListView (Local list)', () => {
   it('shows the contact standing and where it came from', async () => {
     renderList();
     const hostile = await screen.findByRole('table', { name: 'Red and orange contacts' });
-    // The Contacts page's own standing icon, naming whose contact it is.
     expect(within(hostile).getByRole('img', { name: /standing \(-5\).*their corp/ })).toBeTruthy();
     expect(within(hostile).getByText('their corporation')).toBeTruthy();
   });
@@ -496,7 +489,6 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     }),
     row('Bram', { ...lotus, corporationId: 602, corporationName: 'Harbor', kills: ready() }),
     row('Wren', { corporationId: 701, corporationName: 'Ember', kills: ready() }),
-    // Stands in for a name past the 40-name zKillboard cap.
     row('Imre', { corporationId: 701, corporationName: 'Ember', kills: { kind: 'notLookedUp' } }),
     row('Varek', { corporationId: 801, corporationName: 'Quiet Orbit', kills: ready() }),
     row('Corpmate', {
@@ -560,7 +552,6 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     expect(screen.getByRole('table', { name: 'Ember' })).toBeInTheDocument();
     const alone = screen.getByRole('table', { name: 'On their own' });
     expect(within(alone).getByText('Varek')).toBeInTheDocument();
-    // Friendly stays last and folded, as in the Kills view.
     expect(screen.queryByText('Corpmate')).toBeNull();
   });
 

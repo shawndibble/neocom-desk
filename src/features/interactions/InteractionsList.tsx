@@ -1,9 +1,3 @@
-/**
- * The month-grouped list under the Interactions tab's chips: one row per
- * interaction, the whole row a link to the page that holds it (a normal
- * navigation, so Back returns to the modal on this tab). No per-row button: the
- * row is the control (DESIGN.md §6c).
- */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';

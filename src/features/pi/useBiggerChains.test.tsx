@@ -23,7 +23,7 @@ const pi = JSON.parse(
 ) as PiData;
 
 const CONDENSATES = 2344;
-const CAMERA_DRONES = 2345; // Gas raws plus two a Lava planet yields.
+const CAMERA_DRONES = 2345;
 const GAS_RAWS = [2268, 2309, 2310, 2311];
 
 function colony(planetId: number, planetType: PlanetType, raws: number[]): PlannerColony {
@@ -88,16 +88,13 @@ describe('useBiggerChains', () => {
     const { result } = renderHook(() => useBiggerChains(advice, pi));
     expect(result.current.pending).toBe(true);
     await waitFor(() => expect(result.current.pending).toBe(false), { timeout: 5_000 });
-    // Two systems: one pair to count.
     expect(jumpsBetween).toHaveBeenCalledTimes(1);
     const condensates = result.current.estimates.get(CONDENSATES);
     const legs = condensates?.colonies?.legs ?? [];
     expect(legs.length).toBeGreaterThan(0);
-    // Planets 2 and 3 share a system; 1 is four jumps from both.
     for (const leg of legs) {
       expect(leg.jumps).toBe(leg.from === 1 || leg.to === 1 ? 4 : 0);
     }
-    // No free slot: no new-planet layout is priced.
     expect(condensates?.newPlanets).toBeNull();
     expect(result.current.estimates.size).toBe(result.current.candidateCount);
   });
@@ -109,7 +106,6 @@ describe('useBiggerChains', () => {
     const again = renderHook(() => useBiggerChains(advice, pi));
     await waitFor(() => expect(again.result.current.pending).toBe(false));
     expect(again.result.current.estimates.get(CONDENSATES)?.colonies).not.toBeNull();
-    // Nor counts the jumps again.
     expect(jumpsBetween).toHaveBeenCalledTimes(1);
   });
 });
@@ -136,7 +132,6 @@ describe('useWhatIfChains', () => {
       const toNew = leg.from === WHAT_IF_PLANET_ID || leg.to === WHAT_IF_PLANET_ID;
       expect(leg.jumps).toBe(toNew ? null : 4);
     }
-    // A Bigger chain Gas already makes is not one Lava makes possible.
     expect(result.current.byType.get('lava')?.has(CONDENSATES)).toBe(false);
   });
 
@@ -148,7 +143,6 @@ describe('useWhatIfChains', () => {
     expect(chains?.has(CAMERA_DRONES)).toBe(true);
     const planets = [...(chains?.values() ?? [])].flatMap((c) => c.colonies?.planetIds ?? []);
     expect(planets.some((id) => id < 0)).toBe(true);
-    // Not one chain more than a single added planet's slot allows: with one slot, nothing.
     const tight = renderHook(() => useWhatIfChains(twoGas, pi, [['plasma', 'lava']]));
     await waitFor(() => expect(tight.result.current.pending).toBe(false), { timeout: 5_000 });
     const none = [...(tight.result.current.byType.get('lava+plasma')?.values() ?? [])];
@@ -182,7 +176,6 @@ describe('useWhatIfChains', () => {
   it('counts no route and prices nothing while asked for no type', async () => {
     const { result } = renderHook(() => useWhatIfChains(twoGas, pi, []));
     expect(result.current).toEqual({ byType: new Map(), pending: false });
-    // Not pending once mounted: no count was started, now or later.
     expect(jumpsBetween).not.toHaveBeenCalled();
   });
 });

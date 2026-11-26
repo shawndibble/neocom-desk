@@ -50,7 +50,6 @@ describe('useCheaperNearbySystems', () => {
 
   it('does not filter or flag a reaction plan', async () => {
     const { result } = renderHook(() => useCheaperNearbySystems(1, 'reaction', 0.05));
-    // Alpha is highsec, which cannot run a reaction; Beta (lowsec) stays, unflagged.
     await waitFor(() => expect(result.current.map((row) => row.name)).toEqual(['Beta']));
     expect(result.current[0].npcStation).toBe(false);
     expect(npcSystems).not.toHaveBeenCalled();

@@ -21,7 +21,6 @@ describe('preloadedLazy', () => {
         <Component label="shell" />
       </Suspense>
     );
-    // Synchronous: the very first commit is the real component.
     expect(screen.getByText('shell')).toBeInTheDocument();
     expect(screen.queryByText('fallback')).not.toBeInTheDocument();
   });
@@ -42,8 +41,6 @@ describe('preloadedLazy', () => {
   });
 
   it('retries a chunk that failed once the boundary resets, instead of caching the failure', async () => {
-    // Offline until told otherwise — React re-renders once on its own after
-    // an error, so a single rejection would not reach the boundary.
     let online = false;
     const importer = vi.fn<() => Promise<{ default: ComponentType<{ label: string }> }>>(() =>
       online
@@ -62,8 +59,6 @@ describe('preloadedLazy', () => {
     const { rerender } = render(tree('/overview'));
     expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
 
-    // Navigating resets the boundary; a plain `lazy()` would rethrow its
-    // cached rejection here forever.
     online = true;
     rerender(tree('/wallet'));
     expect(await screen.findByText('shell')).toBeInTheDocument();

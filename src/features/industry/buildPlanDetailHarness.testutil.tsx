@@ -22,12 +22,6 @@ import {
   useReactionFacilityDefaults,
 } from './reactionFacilityDefaults';
 
-/** The toast's status region: the sr-only LiveStatus regions are empty here. */
-
-// Shared fixtures and the Harness component for BuildPlanDetail*.test.tsx, one file per
-// concern so CI runs them in parallel. The `vi.mock` calls stay in each test file; their
-// factories and spies live in buildPlanDetailMocks.testutil.ts.
-
 export const costIndexSystem = (name: string) =>
   screen.findByText(
     (_, el) =>
@@ -36,7 +30,6 @@ export const costIndexSystem = (name: string) =>
       el.closest('div')?.textContent?.includes('Cost index') === true
   );
 
-/** The toast's status region: the sr-only LiveStatus regions are empty here. Waits: the toast can land a render after the action. */
 export async function toastStatus() {
   return waitFor(() => {
     const live = screen.getAllByRole('status').filter((el) => el.textContent);
@@ -45,8 +38,6 @@ export async function toastStatus() {
   });
 }
 
-// BuildPlanDetail fetches a market snapshot in an effect on mount; a real
-// fetch would hit ESI/Fuzzwork and never resolve under MSW's default
 export const BLUEPRINT: BlueprintType = {
   name: 'Rifter Blueprint',
   time: 1200,
@@ -56,11 +47,6 @@ export const BLUEPRINT: BlueprintType = {
   activity: 'manufacturing',
 };
 
-/**
- * Gives Tritanium a producer, so the plan has one material the panel can offer
- * to build. Four a run, so the sub-job's run count is visibly not its unit
- * count — the whole point of sizing a sub-build in runs.
- */
 export const TRITANIUM_BLUEPRINT: BlueprintType = {
   name: 'Tritanium Blueprint',
   time: 600,
@@ -70,7 +56,6 @@ export const TRITANIUM_BLUEPRINT: BlueprintType = {
   activity: 'manufacturing',
 };
 
-/** Gives Pyerite a producer too, so an expanded row (Tritanium's own input) can carry its own make-or-buy advice. */
 export const PYERITE_BLUEPRINT: BlueprintType = {
   name: 'Pyerite Blueprint',
   time: 300,
@@ -85,10 +70,6 @@ export const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
   '36': { name: 'Mexallon', groupID: 18, volume: 0.01 },
-  // A blueprint is itself a real, named SDE type — production's `types.json`
-  // (`loadSde.ts`) carries these alongside every other item, so a Blueprint
-  // Acquisition row (issue #838) never actually falls back to `#<typeID>`.
-  // Named here so this fixture doesn't misrepresent that as a real gap.
   '638': { name: 'Rifter Blueprint', groupID: 429, volume: 0.01 },
   '639': { name: 'Tritanium Blueprint', groupID: 429, volume: 0.01 },
   '640': { name: 'Pyerite Blueprint', groupID: 429, volume: 0.01 },
@@ -133,8 +114,6 @@ export const CATALOG: BlueprintCatalog = {
   typesById: TYPES,
 };
 
-// A reaction formula (issue #460): same catalog shape as a manufacturing
-// blueprint, just tagged with the other activity.
 export const REACTION_FORMULA: BlueprintType = {
   name: 'Methanofullerene Reaction Formula',
   time: 10800,
@@ -187,11 +166,8 @@ export interface HarnessProps {
   onDerivedFix?: (patch: PlanPatch) => void;
   corpOwnedStock?: Partial<CorpOwnedStockState>;
   corpOwnedBlueprints?: Partial<CorpOwnedBlueprintsState>;
-  /** Fields layered over the held plan on every render — stands in for a change arriving from elsewhere (another device's sync). */
   externalPlan?: Partial<BuildPlanRecord>;
-  /** Detected owned stock; empty by default. */
   ownedStockSnapshot?: OwnedStockSnapshot;
-  /** Sourcing edits (owned quantity, price) — applied to the held plan as well as reported. */
   onSourcing?: (edits: readonly SourcingPatchEntry[]) => void;
 }
 
@@ -203,11 +179,6 @@ export const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
   incomplete: false,
 };
 
-/**
- * Stands in for Industry.tsx: holds the plan in local state and applies
- * `onUpdate` patches to it, so a committed edit is visible in the next
- * render the way it would be against the real store.
- */
 export function Harness({
   plan: planOverrides,
   catalog = CATALOG,
@@ -269,16 +240,10 @@ export function Harness({
 export const runsInput = () => screen.getByRole('textbox', { name: 'Runs' });
 export const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
-/** Inputs live behind "Edit setup" now — open it before touching any of them. */
 export async function openSetup(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Edit setup' }));
 }
 
-/**
- * A location edit on this page writes the remembered defaults, so every test
- * starts from none — a value left by the last one would seed the next.
- * Call once at module scope.
- */
 export function installBuildPlanDetailHarness(): void {
   beforeEach(async () => {
     await db.settings.clear();

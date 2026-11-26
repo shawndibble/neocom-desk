@@ -76,7 +76,6 @@ describe('corpMoveAssets', () => {
         locationType: 'solar_system',
         locationFlag: 'Unlocked',
       }),
-      // in a container that sits in the office
       input({ itemId: 5, locationId: 50, locationFlag: 'Unlocked' }),
       input({ itemId: 50, typeId: 3293, quantity: 1, isSingleton: true }),
     ]);

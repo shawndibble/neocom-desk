@@ -131,7 +131,6 @@ describe('useAdviceOf with a worker', () => {
     const { useAdviceOf } = await withService(() =>
       ++calls === 1 ? Promise.resolve(advice) : new Promise(() => {})
     );
-    // After `withService`'s module reset, so this is the instance `useAdviceOf` reads.
     const { markReRead } = await import('./snapshotLineage');
     markReRead(reRead.snapshot, a.snapshot);
     const { result, rerender } = renderHook(({ input }) => useAdviceOf(input), {

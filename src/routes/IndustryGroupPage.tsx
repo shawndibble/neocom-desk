@@ -32,12 +32,6 @@ import type { BlueprintPasteNoticeState } from '@/lib/shortcuts';
 
 const NO_PLANS: BuildPlanRecord[] = [];
 
-/**
- * `/industry/groups/:groupId` — a Build Group's rollup as a full-width page.
- * Replaces the old `/industry` list+detail split; the Members panel opens a
- * plan by navigating to `/industry/plans/:id` rather than swapping an
- * in-memory selection.
- */
 export function IndustryGroupPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -59,8 +53,6 @@ export function IndustryGroupPage() {
 
   const itemActions = usePageItemActions({ activeCharacterId });
 
-  // What a blueprint paste just did, read once from the navigation that
-  // brought the pilot here; it fades, and a reload does not bring it back.
   const [pasteNote, setPasteNote] = useState<string | null>(() => {
     const notice = (location.state as Partial<BlueprintPasteNoticeState> | null)
       ?.blueprintPasteNotice;
@@ -96,10 +88,8 @@ export function IndustryGroupPage() {
     });
   }
 
-  // Same account-wide skill gate a member's own page applies to its Auto Build.
   const accountSkills = useAccountSkillLevels([...ownedStockSnapshot.characterNames.keys()]);
 
-  /** @see BuildGroupPanel's `onAutoBuild` doc — same one-shot bulk build/buy control, run once per member. */
   async function handleAutoBuildGroup(options: {
     strategy: BuildStrategy;
     depth: number;
@@ -110,11 +100,6 @@ export function IndustryGroupPage() {
         strategy: options.strategy,
       })
     );
-    // Same BPC Sourcing snapshot each member's own page resolves its
-    // top-level tier against, read fresh at click time rather than off
-    // `pricingInputs.bpcRows`, which may not have landed yet; no offers (not
-    // synced / fetch failed) degrades to owned, forced and BPO tiers,
-    // exactly as on the plan page.
     const bpcRows = (await loadBpcContractRows()) ?? [];
     const picks = await applyGroupAutoBuild(
       plans,
@@ -161,15 +146,11 @@ export function IndustryGroupPage() {
   const group = buildGroupsFor(workspace.buildGroups, activeCharacterId).find(
     (g) => g.id === groupId
   );
-  // Deleted elsewhere, or a stale URL — the index is the only page left to
-  // send the pilot back to (same rule `IndustryPlanPage` follows).
   if (!group) return <Navigate to={industryTabHref('plans')} replace />;
 
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto max-w-page space-y-4">
-        {/* Same chrome the index shows above its own tab strip — see
-            `IndustryPlanPage`'s identical use of it. */}
         <IndustryHeader
           activeCharacterId={activeCharacterId}
           activeTab="plans"

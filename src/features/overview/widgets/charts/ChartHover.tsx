@@ -12,17 +12,6 @@ import { cx } from '@/lib/cx';
 import { ChartTipBody } from './ChartTipBody';
 import type { ChartTip } from './types';
 
-/**
- * The hover layer every Overview chart with per-point readouts shares: one
- * bubble that follows the pointer along the plot, a mark on the point it reads,
- * and a tap (then a drag) for touch. It is pointer-only on purpose: the drawing
- * is aria-hidden, so it takes no focus, and the keyboard and screen reader get
- * the model's summary and the Table view, which hold every figure.
- *
- * It wraps the plot only, so the plot's own sizing classes go on this element
- * (`className`, `style`) and the drawing fills it. A chart with no `tips` gets
- * the same wrapper without any of the behaviour.
- */
 export function ChartHover({
   tips,
   layout,
@@ -32,9 +21,7 @@ export function ChartHover({
   children,
 }: {
   tips: readonly ChartTip[] | undefined;
-  /** `columns`: one slot per bar. `points`: the first and last point sit on the plot's edges. */
   layout: 'columns' | 'points';
-  /** `points` only: where each point sits from the top, 0..1, to draw a dot on it. */
   dotY?: readonly number[];
   className?: string;
   style?: CSSProperties;
@@ -60,7 +47,6 @@ export function ChartHover({
     );
   }
 
-  // A touch reveal has no leave event: a tap elsewhere or a scroll dismisses it.
   useEffect(() => {
     if (!live) return;
     const dismiss = (event: Event) => {

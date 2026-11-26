@@ -4,7 +4,6 @@ import { tabBarTabs } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { SHIPS_TABS, SHIPS_TABS_ID, type ShipsTab } from './shipsTabs';
 
-/** The Ships section's tab bar — Fittings, Tree — under the page header, as Industry's is. */
 export function ShipsTabBar() {
   const { t } = useTranslation();
   const [tab, setTab] = usePageTab(SHIPS_TABS);

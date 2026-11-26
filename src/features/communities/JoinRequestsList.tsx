@@ -4,12 +4,6 @@ import { callableErrorReason } from './callableError';
 import { decideJoinRequest, type JoinRequest } from './communityStore';
 import { NeedsConnection, Button } from '@/components/ui';
 
-/**
- * The Characters waiting to be let in (a Community that approves new
- * Members), on the admin's Members tab: Accept or Decline each. A cap that
- * stops an accept (the Community is full, or the Character is already in 10)
- * is named, and the request stays.
- */
 export function JoinRequestsList({
   requests,
   characterId,
@@ -19,7 +13,6 @@ export function JoinRequestsList({
   requests: readonly JoinRequest[];
   characterId: number;
   communityId: string;
-  /** Refetch the requests and the Member list. */
   onDecided: () => void;
 }) {
   const { t } = useTranslation();

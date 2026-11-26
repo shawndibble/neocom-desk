@@ -12,25 +12,6 @@ import {
 } from './priceHistoryColumns';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
-/*
- * `ResponsiveContainer` measures its parent, and jsdom reports every box as
- * 0×0 — so the plot itself never draws here and there is no SVG to assert
- * against. What these tests cover is everything around it that is plain DOM
- * and carries the same facts: the legend (DESIGN.md §7 — colour is never the
- * only signal) and the sr-only table that is the chart's accessible
- * equivalent. Those are also the parts a reader on a screen reader, or on a
- * phone with no right-hand axis, is actually left with.
- *
- * `vitest.setup.ts` stubs `matchMedia` to never match, so the default here is
- * a desktop viewport and `withPhoneViewport` is what reaches the phone branch
- * at all — without it every phone commitment in this component ships
- * unexercised.
- */
-
-/**
- * Runs `body` with `matchMedia` answering yes, which is how `useIsPhone`'s
- * max-width query reads as a phone. Lasts to the end of the test.
- */
 function withPhoneViewport(body: () => void): void {
   stubViewport(() => true);
   body();
@@ -107,9 +88,6 @@ describe('PriceHistoryChart', () => {
     expect(firstRow).toHaveTextContent('12');
   });
 
-  // A folding phone reports ~1900px unfolded, so anything that hid this table
-  // behind a max-width test made it vanish on the hinge. It is visible at
-  // every width; only its layout changes.
   it('shows the per-day table on a phone', () => {
     withPhoneViewport(() => {
       render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
@@ -214,7 +192,6 @@ describe('PriceHistoryChart', () => {
       expect(
         within(table).getByRole('columnheader', { name: /Domain average/ })
       ).toBeInTheDocument();
-      // Two primary days, plus the header — Domain's extra day is drawn, not tabled.
       expect(within(table).getAllByRole('row')).toHaveLength(3);
       expect(within(table).getByText('No trades')).toBeInTheDocument();
     });
@@ -257,7 +234,6 @@ describe('PriceHistoryChart', () => {
       expect(within(legend).getByText('Jita 4-4 buy at close')).toBeInTheDocument();
       expect(within(legend).getByText('Jita 4-4 sell at close')).toBeInTheDocument();
       expect(within(legend).queryByText('Buy')).not.toBeInTheDocument();
-      // The day table keeps its plain headers; only the chart says "at close".
       const table = screen.getByRole('table');
       expect(within(table).getByRole('columnheader', { name: 'Jita 4-4 buy' })).toBeInTheDocument();
       expect(
@@ -265,7 +241,6 @@ describe('PriceHistoryChart', () => {
       ).toBeInTheDocument();
       expect(within(table).getByRole('columnheader', { name: 'Daily range' })).toBeInTheDocument();
       expect(within(table).queryByRole('columnheader', { name: /at close/ })).toBeNull();
-      // Volume and order count stay the region's (ESI).
       expect(within(legend).getByText('Volume')).toBeInTheDocument();
     });
 
@@ -400,7 +375,6 @@ describe('PriceHistoryChart', () => {
       expect(within(table).getByRole('columnheader', { name: 'Buy' })).toBeInTheDocument();
       expect(within(table).getByRole('columnheader', { name: 'Sell' })).toBeInTheDocument();
       expect(within(table).getByRole('columnheader', { name: /Volume/ })).toBeInTheDocument();
-      // 2026-08-02 had a buy order but no sell order.
       expect(within(table).getByText('No orders')).toBeInTheDocument();
     });
 
@@ -479,7 +453,6 @@ describe('PriceHistoryChart', () => {
       expect(within(legend).getByText('The Forge average')).toBeInTheDocument();
       expect(within(legend).getByText('Domain average')).toBeInTheDocument();
       expect(within(legend).queryByText(/buy|sell/i)).not.toBeInTheDocument();
-      // Average is the chosen line here, not a stand-in, so no note on it.
       expect(within(legend).queryByText(/no order data/)).not.toBeInTheDocument();
       expect(
         within(legend).queryByRole('button', { name: /no order data/ })
@@ -545,7 +518,6 @@ describe('PriceHistoryChart', () => {
         />
       );
       const rows = within(screen.getByRole('table')).getAllByRole('row');
-      // Header, the open-only day, and the two ESI days.
       expect(rows).toHaveLength(4);
       expect(within(rows[1]).getByText('2026-07-30')).toBeInTheDocument();
       expect(within(rows[1]).getAllByText('—').length).toBeGreaterThan(0);
@@ -566,7 +538,6 @@ describe('PriceHistoryChart', () => {
       ).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Columns' }));
       await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Sell' }));
-      // The open menu hides the page from the accessibility tree.
       const after = screen.getByRole('table', { hidden: true });
       expect(
         within(after).queryByRole('columnheader', { name: /Sell/, hidden: true })

@@ -1,13 +1,3 @@
-/**
- * An order book row's expand (`DataTable`'s `expandableRow`): what this one
- * order says that its row can't — how much of it is left, what it is worth,
- * how far it is above the best, what taking the book down to it costs — and
- * the three things a pilot does next with it: fly there, look at only that
- * station, or copy the price.
- *
- * Only facts about the order. The item's own (its required skills) are the
- * same on every row, so they sit once in the item header instead.
- */
 import { fixed2 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
@@ -37,31 +27,17 @@ import { signedMarketIsk } from '@/lib/signedIsk';
 
 export interface OrderRowDetailProps {
   order: RegionOrder;
-  /** This side's best price: the cheapest sell, or the highest buy. */
   best: number | null;
-  /** Units/ISK from the best order down to this one (`bookDepth`). */
   depth: DepthAt | undefined;
   npcStations: ReadonlyMap<number, NpcStationLookup>;
   solarSystems: ReadonlyMap<number, SolarSystemLookup>;
-  /** This table's columns the pilot has hidden via the column picker — shown here instead. */
   hiddenColumns: readonly MarketOrderColumnId[];
   orderColumnsById: Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>;
-  /** Narrows the book to this order's station; `null` while it already is. */
   onFilterToStation: ((locationId: number) => void) | null;
-  /** Injected for tests; `Date.now()` otherwise. */
   now?: number;
 }
 
-function Fact({
-  label,
-  info,
-  children,
-}: {
-  label: string;
-  /** A note on what the figure assumes, as an info icon beside the label. */
-  info?: string;
-  children: ReactNode;
-}) {
+function Fact({ label, info, children }: { label: string; info?: string; children: ReactNode }) {
   const { t } = useTranslation();
   return (
     <div className="min-w-0">
@@ -88,7 +64,6 @@ export function OrderRowDetail({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [copied, setCopied] = useState(false);
-  // Read once when the row opens: ages and days-left don't need to tick.
   const [openedAt] = useState(() => Date.now());
   const now = nowProp ?? openedAt;
   const location = resolveOrderLocation(order, npcStations, solarSystems);

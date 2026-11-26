@@ -1,8 +1,3 @@
-/**
- * Reopening one contract must not re-hit ESI: the location name and the item
- * lines are both game constants once a contract is issued, and both loaders
- * already claim a 24h Dexie window.
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -42,7 +37,6 @@ function contractAt(locationId: number): Contract {
 
 const calls = { station: 0, structure: 0, items: 0 };
 
-// The System row's name lookup — not what these tests count; `openAndClose` waits on its link.
 const server = mswServer(
   http.get(`${ESI_BASE_URL}/universe/systems/30000142`, () =>
     HttpResponse.json({ system_id: 30000142, name: 'Jita', security_status: 0.9 })
@@ -80,13 +74,6 @@ afterEach(() => {
   configureEsi({ getToken: null });
 });
 
-/**
- * Waits for every loader to settle before unmounting: the item lines land
- * first once they are cached, and closing on that alone would leave the
- * location chain still in flight and the request counts short. A resolved
- * location also waits for its System link, or the system lookup would still be
- * running into the next test (against a cleared cache) and count there.
- */
 async function openAndClose(contract: Contract, locationText: string) {
   const view = render(
     <MemoryRouter>
@@ -114,7 +101,6 @@ describe('reopening a contract', () => {
   });
 
   it('does not refetch a player-structure location', async () => {
-    // Station first, structure as the fallback: `contractLocationName.ts`.
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/${STRUCTURE_ID}`, () => {
         calls.station += 1;
@@ -125,16 +111,11 @@ describe('reopening a contract', () => {
     await openAndClose(contractAt(STRUCTURE_ID), 'Some Citadel');
     expect(calls).toEqual({ station: 1, structure: 1, items: 1 });
 
-    // The station probe is the one nothing used to cache: it 404s by design
-    // for a structure id, so every reopen used to re-learn that.
     await openAndClose(contractAt(STRUCTURE_ID), 'Some Citadel');
     expect(calls).toEqual({ station: 1, structure: 1, items: 1 });
   });
 
   it('retries a location that failed for a reason other than the ACL', async () => {
-    // Neither endpoint answers and nothing here says the character is off the
-    // ACL — offline, or ESI having a bad minute. `null` means "don't know", so
-    // the next open must try again.
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/${STRUCTURE_ID}`, () => {
         calls.station += 1;
@@ -155,9 +136,6 @@ describe('reopening a contract', () => {
   });
 
   it('does NOT retry a location this character is off the ACL of', async () => {
-    // The one failure that is an answer rather than an outage: a 403 says this
-    // character cannot see this structure, and asking again on every reopen is
-    // what spends ESI's 100-errors-per-minute budget (see `structures.ts`).
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/${STRUCTURE_ID}`, () => {
         calls.station += 1;

@@ -1,11 +1,3 @@
-/**
- * The relative-age ladder shared by every surface that shows "how long ago".
- * Extracted from `DataAgeBadge` so the Notification Feed's fired-at stamps
- * read identically to a Data Age without duplicating the thresholds — the
- * badge adds a staleness *tone* on top of this, which a fired notification
- * deliberately does not (an old notification is old, not wrong).
- */
-
 import type { Translate } from '@/lib/translate';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../functions/src/timeConstants';
 

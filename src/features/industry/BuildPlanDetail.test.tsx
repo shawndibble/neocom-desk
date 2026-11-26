@@ -48,8 +48,6 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     await user.clear(runsInput());
     await user.type(runsInput(), '25000');
 
-    // Still focused: the DOM shows the raw typed digits, not a clamp and not
-    // the committed prop.
     expect(valueOf(runsInput())).toBe('25000');
   });
 
@@ -257,10 +255,6 @@ describe('BuildPlanDetail facility tax fields', () => {
 describe('BuildPlanDetail shopping list', () => {
   const copyButton = () => screen.getByRole('button', { name: 'Copy shopping list for multibuy' });
 
-  // One throwaway render-and-copy, so no test pays for the first one. The click
-  // re-renders this very large component once the clipboard write resolves, and
-  // under CI load that first re-render outlasted `findBy*`'s 1s default and
-  // landed on whichever test ran first. Paid here under the hook's own budget.
   beforeAll(async () => {
     configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
     const { unmount } = render(<Harness />);
@@ -276,14 +270,10 @@ describe('BuildPlanDetail shopping list', () => {
     const user = userEvent.setup();
     const writeText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
     configureClipboard(writeText);
-    // 100 Tritanium a run x 10 runs = 1000, less the 40 already held.
     render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 40 } } }} />);
 
     await user.click(copyButton());
 
-    // "Rifter Blueprint" is the blueprint's own Blueprint Acquisition row
-    // (issue #838): bought by contract, not market order, so multibuy can't
-    // buy it — excluded from the copied text (issue #1778).
     expect(writeText).toHaveBeenCalledWith('Tritanium\t960');
   });
 
@@ -326,15 +316,10 @@ describe('BuildPlanDetail shopping list', () => {
   it('names the Blueprint Acquisition row left out of the copied text (issue #1778)', async () => {
     const user = userEvent.setup();
     configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
-    // Default fixture's "Rifter Blueprint" Blueprint Acquisition row (issue
-    // #838) is what gets left out here.
     render(<Harness />);
 
     await user.click(copyButton());
 
-    // findAll: Toast renders its message twice (visible span + live region), and
-    // the live region fills in a beat later — `findByText` throws on the
-    // two-match state and never recovers while the toast stays up.
     expect(
       (await screen.findAllByText('1 blueprint left out — buy it by contract')).length
     ).toBeGreaterThan(0);
@@ -365,9 +350,6 @@ describe('BuildPlanDetail sub-builds', () => {
   afterEach(() => configureClipboard(null));
 
   it('offers to build a material a blueprint produces, even with no prices to quote it', async () => {
-    // `loadMarketSnapshot` is mocked to an empty price map, so no make-or-buy
-    // verdict can be reached. The run count and input quantities need no
-    // prices, so the offer must survive that.
     render(<Harness />);
 
     expect(
@@ -391,16 +373,12 @@ describe('BuildPlanDetail sub-builds', () => {
 
     await user.click(buildButton());
 
-    // 1000 Tritanium at 4 a run is 250 runs, each eating 5 Pyerite.
     expect(await screen.findByText('250 runs')).toBeInTheDocument();
     const pyerite = screen.getByText('Pyerite').closest('tr');
     expect(pyerite?.querySelector('[data-label="Need"]')).toHaveTextContent('1,250');
   });
 
   it('offers the build control on an expanded input too, not just an advisory marker', async () => {
-    // Pyerite has its own producer (`PYERITE_ENTRY`): once Tritanium's job
-    // pulls it onto the table, it is exactly as buildable as anything else on
-    // the plan (docs/context/decisions, since the one-level cap was lifted).
     const user = userEvent.setup();
     render(<Harness plan={{ runs: 10 }} />);
 
@@ -418,15 +396,10 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(await screen.findByRole('button', { name: 'Build instead: Pyerite' }));
 
-    // 1250 Pyerite needed at 1 a run is 1250 runs, each eating 2 Mexallon.
     const mexallon = (await screen.findByText('Mexallon')).closest('tr') as HTMLElement;
     expect(mexallon.querySelector('[data-label="Need"]')).toHaveTextContent('2,500');
-    // Mexallon has no producer in this catalog, so the tree bottoms out here
-    // on its own rather than at an artificial depth limit.
     expect(within(mexallon).queryByRole('button', { name: /Build|Buy/ })).not.toBeInTheDocument();
 
-    // Counted over the plan's own materials — only Tritanium is one of those.
-    // Pyerite's job is deeper down, and its cost is inside that same total.
     expect(
       screen.getByText(/Building 1 of this plan's own material\(s\) here/)
     ).toBeInTheDocument();
@@ -439,8 +412,6 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(await screen.findByRole('button', { name: 'Build instead: Pyerite' }));
 
-    // One row per material, whatever depth introduced it — the flat shopping
-    // list this table now is, rather than a branch of the resolved tree.
     await screen.findByText('Mexallon');
     for (const name of ['Tritanium', 'Pyerite', 'Mexallon']) {
       expect(screen.getAllByText(name)).toHaveLength(1);
@@ -456,7 +427,6 @@ describe('BuildPlanDetail sub-builds', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/250 runs x 4 per run makes 1,000/)).toBeInTheDocument();
-    // The job's own ingredient quantity, which the flat row no longer nests.
     expect(within(dialog).getByText('1,250')).toBeInTheDocument();
   });
 
@@ -469,10 +439,6 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    // "Rifter Blueprint" (unbuilt) and "Tritanium Blueprint" (Tritanium is
-    // now built here — its own Blueprint Acquisition row, issue #838) are both
-    // excluded from the multibuy text (issue #1778): a blueprint is bought by
-    // contract, not market order. Pyerite is what the build actually needs.
     expect(writeText).toHaveBeenCalledWith('Pyerite\t1250');
   });
 
@@ -480,14 +446,11 @@ describe('BuildPlanDetail sub-builds', () => {
     const user = userEvent.setup();
     const writeText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
     configureClipboard(writeText);
-    // 1000 needed, 200 in hand: the job covers 800, which is 200 runs.
     render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 200 } } }} />);
 
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    // Both Blueprint Acquisition rows are excluded from the multibuy text
-    // (issue #1778) — only Pyerite, the real material, remains.
     expect(writeText).toHaveBeenCalledWith('Pyerite\t1000');
   });
 
@@ -501,10 +464,6 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(screen.getByRole('button', { name: 'Buy instead: Tritanium' }));
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    // Undone: Tritanium is bought again, not built, so its own "Tritanium
-    // Blueprint" Blueprint Acquisition row is gone too. "Rifter Blueprint"
-    // (the plan's own blueprint) is still excluded from the multibuy text
-    // (issue #1778) — only Tritanium, the real material, remains.
     expect(writeText).toHaveBeenCalledWith('Tritanium\t1000');
   });
 });
@@ -532,7 +491,6 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
   const tritaniumBuildButton = () =>
     screen.getByRole('button', { name: 'Build instead: Tritanium' });
 
-  // Selecting a Build Strategy applies immediately — no separate Apply press.
   async function applyBuildStrategy(
     user: ReturnType<typeof userEvent.setup>,
     strategyLabel: string
@@ -551,19 +509,13 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
   it('overwrites buildHere to match the chosen Build Strategy, applied immediately with no confirmation, reflected right away in the materials table', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
-    // `Harness` always passes `groupSnapshot={null}` — every test in this
-    // file, including this one, already covers a plan with no Build Group
-    // (AC #6): there is nothing special-cased for the grouped case here.
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
     await screen.findByText('Tritanium');
 
     await applyBuildStrategy(user, 'Build');
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // Depth is always "All levels": Tritanium (1) <- Pyerite (2).
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34, 35] });
-    // Pyerite's own consumption (Mexallon) only appears once its job is
-    // actually pulled onto the table by buildHere containing it.
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
   });
 
@@ -597,10 +549,3 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
     ).toBeInTheDocument();
   });
 });
-
-/**
- * The job fee is charged by the system the job runs in, not the system the
- * plan sells in — the two are routinely different, and pricing the fee at the
- * hub overstated it threefold for a hub-selling, nullsec-building pilot. See
- * `docs/context/decisions/20260905-000835-*.md`.
- */

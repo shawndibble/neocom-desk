@@ -45,10 +45,6 @@ vi.mock('@/features/market/useHubJumps', async () =>
 );
 
 installTravelHarness();
-// The App-level tests below (the bare /travel entries and the redirect out to
-// Market, inside the signed-in shell): the shell chunk loads here, under the
-// hook's own budget, not inside a test's findBy. Every other Travel test
-// renders the page on its own (`visit`).
 beforeAll(() => routeChunks.loadLayout(), 30_000);
 
 describe('Travel › Route Safety', () => {
@@ -104,7 +100,6 @@ describe('Travel › Route Safety', () => {
           expect(within(card).queryByText('—')).toBeNull();
         }
       });
-      // One gate chain: all three preferences fly the same route, and say so.
       expect(within(group).getAllByText(/^Same route as/)).toHaveLength(2);
       expect(
         within(group)
@@ -235,7 +230,6 @@ describe('Travel › Route Safety', () => {
     });
     expect(fold).toHaveAttribute('aria-expanded', 'false');
     expect(within(table).queryByText('Niyabainen')).not.toBeInTheDocument();
-    // The ends never fold.
     expect(within(table).getByText('Jita')).toBeInTheDocument();
     expect(within(table).getByText('Sobaseki')).toBeInTheDocument();
 
@@ -263,7 +257,6 @@ describe('Travel › Route Safety', () => {
     expect(uedama.getByText('On your route')).toBeInTheDocument();
     expect(uedama.getByText('Smartbombs involved')).toBeInTheDocument();
 
-    // A rate-limited system says so on its own row; the rest still fill in.
     expect(
       await within(body[1]).findByText('zKillboard is rate-limiting requests. Try again shortly.')
     ).toBeInTheDocument();
@@ -370,7 +363,6 @@ describe('Travel › Route Safety', () => {
 
 describe('Travel › Route Safety › Incursions near you', () => {
   const stopsInLink = () => new URLSearchParams(window.location.search).get('stops');
-  // The fold is remembered per device: each test starts folded.
   beforeEach(() => useIncursionsPanelOpen.setState({ value: false, hydrated: false }));
 
   it('is folded by default but still names the nearest incursion', async () => {
@@ -395,7 +387,6 @@ describe('Travel › Route Safety › Incursions near you', () => {
     await user.click(await screen.findByRole('button', { name: 'Show incursions' }));
     const list = await screen.findByRole('list', { name: 'Active incursions' });
     const rows = within(list).getAllByRole('listitem');
-    // Thera has no stargate route: it sorts last and says so, never "0 jumps".
     expect(within(rows[0]).getByText('Uedama')).toBeInTheDocument();
     expect(within(rows[0]).getByText('Mobilizing')).toBeInTheDocument();
     expect(await within(rows[0]).findByText(/^\d+ jumps?$/)).toBeInTheDocument();
@@ -434,8 +425,6 @@ describe('Travel › Route Safety › Incursions near you', () => {
 });
 
 describe('Travel › Hauling (moved back to Market, #4702)', () => {
-  // The redirect lands on Market, a route this file otherwise never loads; its
-  // lazy chunks cost over a second inside the test.
   beforeAll(() => routeChunks.loadMarket(), 30_000);
 
   it('has only Route Safety and Pilot Lookup tabs', async () => {
@@ -469,14 +458,9 @@ describe('Travel copy', () => {
       else if (node && typeof node === 'object') Object.values(node).forEach(walk);
     };
     const catalog = en as unknown as Record<string, Record<string, unknown>>;
-    // Everything the page shows: its own section, its nav entry, and the
-    // Route Preference labels it borrows from Contract Search. Pilot Lookup
-    // (`travel.pilot`) is checked by its own test: it names zKillboard's
-    // "danger ratio" statistic, which is a figure, not a verdict.
     walk(Object.entries(catalog.travel).filter(([key]) => key !== 'pilot'));
     walk([catalog.nav.travel]);
     walk(catalog.contractSearch.routePreference);
-    // Help › FAQ's answer on what each security band means, and its question.
     const { newToEve } = en.settings.faq.a;
     walk([en.settings.faq.q.securitySpace, newToEve.terms]);
     walk(Object.entries(newToEve).filter(([key]) => key.startsWith('security')));

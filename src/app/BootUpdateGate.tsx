@@ -3,11 +3,6 @@ import { BootScreen } from './BootScreen';
 import { bootUpdateMayHold, type BootUpdateOutcome } from './bootUpdate';
 import { bootUpdateOnce } from './bootUpdateOnce';
 
-/**
- * Holds the app behind the boot screen while a waiting build is applied
- * (`bootUpdate.ts`). Renders the children on any outcome except `'applying'`,
- * where the page is about to reload and the boot screen stays up.
- */
 export function BootUpdateGate({ children }: { children: ReactNode }) {
   const [outcome, setOutcome] = useState<BootUpdateOutcome | null>(() =>
     bootUpdateMayHold() ? null : 'current'

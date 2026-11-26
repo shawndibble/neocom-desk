@@ -1,9 +1,3 @@
-/**
- * Sample data for the "Review a member" mockups: a 187-member roster slice with titles and last
- * seen, one member with a review already waiting, role suggestions, the mail text, and the
- * queue's waiting rows. Kestrel Vane (the sample Character) is the officer asking.
- */
-
 export const CORP_NAME = 'Brass Meridian Logistics';
 export const ROSTER_COUNT = 187;
 export const OFFICER = { characterId: 2119876543, name: 'Kestrel Vane' };
@@ -12,13 +6,9 @@ export const REVIEW_LINK = 'https://neocomdesk.com/vetting';
 export interface RosterMember {
   characterId: number;
   name: string;
-  /** The member's corp title, when the roster read carries titles. */
   title?: string;
-  /** Last seen in words; missing when the officer has no tracking permission. */
   seen?: string;
-  /** Already has a review waiting: who asked and when. */
   waiting?: { by: string; ago: string };
-  /** The officer themselves. */
   you?: boolean;
 }
 
@@ -51,7 +41,6 @@ export const ROSTER: readonly RosterMember[] = [
 
 export const PICKED = ROSTER[0];
 
-/** The corp's own titles (ESI `/corporations/{id}/titles`): the ladder a promotion climbs. */
 export const CORP_TITLES = [
   'Fleet Commander',
   'Industrialist',
@@ -60,7 +49,6 @@ export const CORP_TITLES = [
   'Miner',
 ] as const;
 
-/** EVE's own corporation roles, the common ones (typing finds the rest as free text), for a corp whose titles are not the ladder. */
 export const EVE_ROLES = [
   'Director',
   'Personnel Manager',
@@ -100,7 +88,6 @@ export interface WaitingRow {
   role: string;
   asked: string;
   mail: MailState;
-  /** "6 hours ago", for a `sent` row. */
   mailAgo?: string;
 }
 

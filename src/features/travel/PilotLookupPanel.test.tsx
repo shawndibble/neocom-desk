@@ -26,11 +26,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/app/useGrantedScopes', () => ({
   useEndpointsGranted: () => mocks.granted,
-  // The D-Scan danger read asks which scopes are held, to read the current ship.
   useGrantedScopes: () => undefined,
 }));
 vi.mock('@/stores/activeCharacter', () => ({
-  // The market hub store reads the active character through getState/subscribe too.
   useActiveCharacter: Object.assign(
     (select: (state: { activeCharacterId: number }) => unknown) => select({ activeCharacterId: 1 }),
     {
@@ -63,7 +61,6 @@ vi.mock('./pilotLookup', async (importOriginal) => ({
   loadPilotProfile: mocks.loadPilotProfile,
 }));
 
-// A pasted Local list's zKillboard lookups stay pending: these tests are about the strip and the box.
 vi.mock('./pilotListData', () => ({
   loadPilotList: () => new Promise(() => undefined),
   loadViewerContext: () =>
@@ -164,7 +161,6 @@ describe('PilotLookupPanel', () => {
     );
     expect(mocks.resolvePilotByName).toHaveBeenCalledWith('some pilot');
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
-    // Show Info carries the profile; the page itself stays on the search box.
     expect(probe.search).toBe('');
   });
 
@@ -183,7 +179,6 @@ describe('PilotLookupPanel', () => {
     renderTab('/travel/pilot?pilot=42');
 
     await screen.findByRole('heading', { name: 'Some Pilot' });
-    // "Dangerous" is also the danger meter's high end: the verdict is the one in the Threat band.
     expect(
       await within(await screen.findByRole('region', { name: 'Threat' })).findByText('Dangerous')
     ).toBeTruthy();
@@ -312,7 +307,6 @@ describe('PilotLookupPanel', () => {
 
     expect(await screen.findByText('1,043 kills')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
-    // The meters and the ships they fly come from the stats, so they still show.
     expect(screen.getByRole('meter', { name: 'Kills vs losses' })).toBeTruthy();
     expect(await screen.findByText('Kronos')).toBeTruthy();
   });
@@ -447,7 +441,6 @@ describe('PilotLookupPanel', () => {
       expect(mocks.searchMailRecipients).toHaveBeenCalledWith(1, 'Nim', expect.any(AbortSignal));
       fireEvent.mouseDown(option);
       expect(box.value).toBe('Zakof' + NL + 'Nimjia');
-      // Picking one name of a list does not open that pilot.
       expect(probe.search).toBe('');
     });
   });
@@ -460,11 +453,9 @@ describe('PilotLookupPanel', () => {
       clipboardData: { getData: () => lines.join(String.fromCharCode(10)) },
     });
     const share = await screen.findByRole('button', { name: 'Copy Share Link' });
-    // No "N lines, D-Scan" line of its own: the scan's size is on the page.
     expect(screen.queryByText(/lines, D-Scan/)).toBeNull();
     const lookUp = screen.getByRole('button', { name: 'Look up' });
     const clear = screen.getByRole('button', { name: 'Clear' });
-    // Document order: the box, Look up, Clear, then Share at the far end.
     expect(lookUp.compareDocumentPosition(clear) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(clear.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -496,9 +487,7 @@ describe('PilotLookupPanel', () => {
     expect(screen.getByRole('link', { name: /^zKillboard/ }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
     );
-    // The profile is already on the page; the modal would only repeat it.
     expect(screen.queryByRole('button', { name: 'Public Info' })).toBeNull();
-    // Corp and alliance are real Show Info links (§6c), not modal-opening buttons.
     expect(screen.getByRole('link', { name: 'Some Corp' }).getAttribute('href')).toContain(
       'info=corporation-200'
     );
@@ -508,7 +497,6 @@ describe('PilotLookupPanel', () => {
   });
 
   it('shows how old the profile really is, not when it was looked at', async () => {
-    // Only Date is faked, so the shared age clock and the awaits keep running.
     const now = Date.UTC(2026, 9, 16, 12);
     vi.useFakeTimers({ now, toFake: ['Date'] });
     try {
@@ -568,9 +556,6 @@ describe('PilotLookupPanel', () => {
     expect(screen.queryByText('No kills or losses on zKillboard')).toBeNull();
   });
 
-  // The Threat verdict (decision 20261008-181210) says how threatening a pilot
-  // looks and nothing more: no copy calls a pilot safe, hostile or one to avoid.
-  // The one place "safe" appears is the help text's "never means safe".
   it('never calls a pilot safe, hostile or to be avoided (decision 20261008-181210)', () => {
     const { help, ...rest } = en.travel.pilot.threat;
     const copy = JSON.stringify({ ...en.travel.pilot, threat: rest }).toLowerCase();
@@ -654,7 +639,6 @@ describe('PilotLookupPanel', () => {
     it('reads a hash-only row on expand, once, and opens its fit in Fittings', async () => {
       mocks.loadKillmailFit.mockResolvedValue(FIT);
       renderTab('/travel/pilot?pilot=42');
-      // Scoped to the list: the header's alerts bell is a collapsed button too.
       const list = await screen.findByRole('list', { name: 'Recent kills and losses' });
       const [, lossRow] = within(list).getAllByRole('button', { expanded: false });
       fireEvent.click(lossRow!);
@@ -662,7 +646,6 @@ describe('PilotLookupPanel', () => {
       expect(await screen.findByText('High slots')).toBeTruthy();
       expect(screen.getByText('Small Autocannon')).toBeTruthy();
       expect(mocks.loadKillmailFit).toHaveBeenCalledWith(HASH_ONLY_LOSS);
-      // The row fills in from the killmail it read: the final blow, not "—".
       expect(await screen.findByText('Final Blower')).toBeTruthy();
 
       fireEvent.click(lossRow!);

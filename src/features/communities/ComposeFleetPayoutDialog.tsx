@@ -46,14 +46,12 @@ const DEBOUNCE_MS = 400;
 type Basis = 'buy' | 'sell';
 
 interface Pilot extends RosterRow {
-  /** What ticks, weights and the preview are filed under. */
   key: string;
 }
 
 const pilotKey = (row: RosterRow) =>
   row.characterId === null ? `n${row.pilotName.toLowerCase()}` : `c${row.characterId}`;
 
-/** A whole-number weight as typed, or null when out of range. */
 function parseWeight(text: string | undefined): number | null {
   const trimmed = (text ?? '1').trim();
   if (!/^\d+$/.test(trimmed)) return null;
@@ -63,12 +61,6 @@ function parseWeight(text: string | undefined): number | null {
 
 const clampHoldBack = (pct: number) => Math.min(MAX_HOLD_BACK_PCT, Math.max(0, Math.round(pct)));
 
-/**
- * A new Fleet Payout (issue #4779), one page: a name, the pasted fleet list
- * (resolved through ESI with Member markers, each pilot tickable), the pasted
- * loot priced by the Appraisal engine, the split rule and hold-back, and a
- * live ISK preview per pilot. Names ESI does not know stay as typed.
- */
 export function ComposeFleetPayoutDialog({
   characterId,
   communityId,
@@ -80,7 +72,6 @@ export function ComposeFleetPayoutDialog({
   communityId: string;
   members: { uid: string }[];
   onClose: () => void;
-  /** The Payout exists: refetch the list and open it. */
   onCreated: (payoutId: string) => void;
 }) {
   const { t } = useTranslation();
@@ -106,7 +97,6 @@ export function ComposeFleetPayoutDialog({
   const percent = parsePercent(percentText) ?? NaN;
   const percentValid = isValidPricePercent(percent);
 
-  // Roster: debounced and abortable; stale answers (another list since) are ignored by key.
   const names = useMemo(() => fleetNames(fleetText), [fleetText]);
   const overLimit = names.length > MAX_FLEET_SHARES;
   const namesKey = names.join('\n');
@@ -135,7 +125,6 @@ export function ComposeFleetPayoutDialog({
       clearTimeout(timer);
       controller.abort();
     };
-    // names is derived from namesKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [namesKey, overLimit, members]);
   const resolving = names.length > 0 && !overLimit && roster?.key !== namesKey;
@@ -145,14 +134,13 @@ export function ComposeFleetPayoutDialog({
     const out: Pilot[] = [];
     for (const row of roster.rows) {
       const key = pilotKey(row);
-      if (seen.has(key)) continue; // two spellings of one character
+      if (seen.has(key)) continue;
       seen.add(key);
       out.push({ ...row, key });
     }
     return out;
   }, [names.length, overLimit, roster, namesKey]);
 
-  // Loot: priced once the box has settled, with the Appraisal tab's engine.
   const priceKey = `${lootText}|${hub.id}|${percent}`;
   const wantsPrice = lootText.trim() !== '' && percentValid;
   const [priced, setPriced] = useState<{
@@ -172,7 +160,6 @@ export function ComposeFleetPayoutDialog({
       cancelled = true;
       clearTimeout(timer);
     };
-    // hub and percent are folded into priceKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceKey, wantsPrice]);
   const pricing = wantsPrice && priced?.key !== priceKey;

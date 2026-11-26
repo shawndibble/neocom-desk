@@ -9,7 +9,6 @@ import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import type { ItemUnlockRow } from './skillUnlockLevels';
 
-/** Skill names are links that open the modal through the URL, so every render sits in a router with its `EntityInfoRoute`. */
 function RoutedWithInfo({ children }: { children: ReactNode }) {
   return (
     <MemoryRouter>

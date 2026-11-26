@@ -62,14 +62,11 @@ describe('Mail', () => {
 
     await user.click(fleetSubject);
     expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-normal', 'text-text-dim');
-    // A phone's header holds only Back and the actions; the date sits with From/To.
     expect(await screen.findByText('Date:')).toBeInTheDocument();
 
-    // Mobile layout shows one pane at a time — back to the list to reach the filter row.
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Hide read' }));
     expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
-    // The already-read fixture header ('Market report') is also hidden now.
     expect(screen.queryByText('Market report')).not.toBeInTheDocument();
   });
 
@@ -111,9 +108,6 @@ describe('Mail', () => {
   });
 
   it('retries the write on every reopen within the session, not only on a fresh page load', async () => {
-    // A failed write must get another chance on every reopen, not only once
-    // the whole component remounts. `header.is_read` (still `false` here)
-    // gates the write, not local session state.
     let requestCount = 0;
     server.use(
       http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, () => {
@@ -147,7 +141,6 @@ describe('Mail', () => {
     const user = userEvent.setup();
     renderMailRoute();
 
-    // 'Market report' (mail_id 2) is `is_read: true` in the fixture already.
     await user.click(await screen.findByText('Market report'));
     await screen.findByText('Prices.');
 
@@ -174,7 +167,6 @@ describe('Mail', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/lists`, () =>
         HttpResponse.json([{ mailing_list_id: 500, name: 'Fleet Announcements' }])
       ),
-      // The reading pane's recipients come from the header list, not the body.
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
         HttpResponse.json([
           { ...headers[0], recipients: [{ recipient_id: 500, recipient_type: 'mailing_list' }] },
@@ -190,7 +182,6 @@ describe('Mail', () => {
 
   it('falls back to the generic label for a mailing list with no resolved name', async () => {
     server.use(
-      // No /mail/lists override — the default handler returns `[]`.
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
         HttpResponse.json([
           { ...headers[0], recipients: [{ recipient_id: 999, recipient_type: 'mailing_list' }] },
@@ -265,8 +256,6 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    // Re-queried rather than held: the chip is a different element after a
-    // character switch and again after the remount below.
     const sentChip = () =>
       within(screen.getByRole('group', { name: 'Mail folders' })).getByRole('button', {
         name: 'Sent',
@@ -277,16 +266,12 @@ describe('Mail', () => {
     await user.click(sentChip());
     expect(sentChip()).toHaveAttribute('aria-pressed', 'false');
 
-    // Device-wide, not per character (`mailFolderPref.ts`): switching pilots
-    // does not hand back the folder this one just turned off.
     await act(async () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
     await screen.findByText('Second pilot mail');
     await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
 
-    // And it is on disk, not just in memory: a fresh store hydrating from
-    // Dexie is what a real page reload does.
     expect(await db.settings.get('mailFolders')).toMatchObject({
       value: ['inbox', 'corp', 'alliance'],
     });
@@ -344,7 +329,6 @@ describe('Mail', () => {
       renderMailRoute();
       const second = await screen.findByText('Second pilot mail');
       const first = await screen.findByText('Fleet up!');
-      // 08-03 (Pilot Two) sits above 08-02 (Pilot One).
       expect(second.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(
         within(second.closest('li') as HTMLElement).getByRole('img', { name: 'Mail for Pilot Two' })
@@ -363,7 +347,6 @@ describe('Mail', () => {
       renderMailRoute();
       await screen.findByText('Second pilot mail');
       const group = screen.getByRole('group', { name: 'Mail folders' });
-      // 1 (Pilot One) + 4 (Pilot Two).
       expect(within(group).getByRole('button', { name: 'Inbox 5 unread' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: /^All characters/ }));
@@ -389,7 +372,6 @@ describe('Mail', () => {
       expect(screen.getByText('For Pilot Two')).toBeInTheDocument();
       await waitFor(() => expect(putUrls).toEqual([`/characters/${CHAR_ID_2}/mail/1/`]));
 
-      // Same `mail_id` 1 in Pilot One's mailbox is a different mail, not a selection twin.
       const ownRow = screen.getByText('Fleet up!').closest('li') as HTMLElement;
       expect(ownRow.querySelector('[aria-current="true"]')).toBeNull();
 

@@ -1,13 +1,3 @@
-/**
- * A saved or In-game Fitting's row menu — the Start screen's list, My
- * Fittings and In-game Fittings: Open, Compare with, Duplicate, Copy EFT,
- * Copy permanent link, Save to EVE, Rename, Delete. Right-click (or
- * touch-and-hold) the row, or its ⋮ button.
- *
- * A row names a Fitting without holding one: a saved row has only its Share
- * Link code, an In-game one ESI's own shape, the Active Fit its asset-built Fitting. Each action that needs the
- * Fitting itself works it out when chosen, never while the list renders.
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -38,7 +28,6 @@ import { heldFitting, libraryRowCode, type LibraryRow } from './useLibraryFittin
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 import { LazySaveToEveDialog } from './LazySaveToEveDialog';
 
-/** The row's Fitting and its Fitting Share Code (null when too large for one); null when a saved code no longer decodes. */
 async function rowFitting(
   row: LibraryRow
 ): Promise<{ fitting: Fitting; code: string | null } | null> {
@@ -53,16 +42,12 @@ async function rowFitting(
   return { fitting, code: encoded.ok ? encoded.payload : null };
 }
 
-/** The Communities this Character is in, and which Fittings it already shared (issue #3605). */
 export interface LibrarySharing {
   communities: readonly CommunitySummary[];
-  /** `shareMarker`s of what is already shared. */
   mine: ReadonlySet<string>;
-  /** Called after a share or unshare lands, so the list can refetch. */
   onChanged: () => void;
 }
 
-/** What names a Fitting to the Communities: a saved record's id, or an In-game Fitting's ESI id. */
 function shareKeyOf(row: LibraryRow): SharedFittingKey | null {
   if (row.source === 'saved') return { source: 'saved', key: row.record.id };
   if (row.source === 'inGame') return { source: 'game', key: String(row.inGame.fitting_id) };
@@ -73,16 +58,10 @@ interface LibraryRowActionsOptions {
   characterId: number | null;
   sharing?: LibrarySharing;
   onOpen: (row: LibraryRow) => void;
-  /** Saved rows only. */
   onRename?: (row: Extract<LibraryRow, { source: 'saved' }>) => void;
   onDelete?: (row: Extract<LibraryRow, { source: 'saved' }>) => void;
 }
 
-/**
- * The menu's items for any row, the Save to EVE dialog they open, and the
- * notice a copy leaves — the list renders `dialog` once and `notice` in a
- * status line.
- */
 export function useLibraryRowActions({
   characterId,
   sharing,
@@ -147,7 +126,6 @@ export function useLibraryRowActions({
     });
   }
 
-  /** "Share to Community": one item straight to the only Community, a submenu of them when there are several, nothing when there are none. */
   function shareItems(row: LibraryRow): ReactNode {
     const key = shareKeyOf(row);
     if (!sharing || key === null || characterId === null) return null;
@@ -177,8 +155,6 @@ export function useLibraryRowActions({
 
   function itemsFor(row: LibraryRow): ReactNode {
     const saved = row.source === 'saved' ? row : null;
-    // Someone else's Fitting (a Community's, or the corp's Doctrine Fit): open it, compare it,
-    // keep a copy. It is theirs to rename or delete.
     const shared = row.source === 'shared' || row.source === 'doctrine';
     return (
       <>
@@ -228,7 +204,6 @@ export function useLibraryRowActions({
             </MenuItem>
           </>
         )}
-        {/* An In-game Fitting is in EVE already. */}
         {saved &&
           (characterId === null || canSaveToEve !== true || !online ? (
             <DisabledMenuItem

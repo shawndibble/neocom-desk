@@ -13,10 +13,8 @@ describe('orderExpiry', () => {
   });
 
   it('truncates daysLeft toward zero for a future expiry (part-day never rounds up)', () => {
-    // Issued 4.5 days ago, 90 day duration -> expiresAt is 85.5 days from now.
     const issued = new Date(NOW - 4.5 * DAY_MS).toISOString();
     const result = orderExpiry(issued, 90, NOW);
-    // 85.5 days remaining must truncate to 85, never round up to 86.
     expect(result?.daysLeft).toBe(85);
     expect(result?.expired).toBe(false);
   });
@@ -57,7 +55,6 @@ describe('sellThrough', () => {
       regionUnitsPerDay: 50,
       myShare: 0.5,
     });
-    // rate = 50 * 0.5 = 25 units/day my share of the market clears
     expect(result).toEqual({ kind: 'known', unitsPerDay: 25, daysToClear: 4 });
   });
 
@@ -99,8 +96,6 @@ describe('sellThrough', () => {
 
   it('clamps a negative myShare up into (0, 1]', () => {
     const negative = sellThrough({ volumeRemain: 10, regionUnitsPerDay: 10, myShare: -0.5 });
-    // negative share is not "noSales" (a real answer), clamp behavior: treated as 0 -> noSales
-    // per spec myShare clamped into (0,1]; a share of zero (or below) means noSales.
     expect(negative).toEqual({ kind: 'unknown', reason: 'noSales' });
   });
 

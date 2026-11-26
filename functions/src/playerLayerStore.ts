@@ -1,6 +1,3 @@
-// Firestore side of the Player layer: `players/{playerId}` and `playerCharacters/{characterId}`,
-// server-written only (firestore.rules denies client writes). Logic lives in playerLayer.ts.
-
 import type { Firestore } from 'firebase-admin/firestore';
 import { chunk } from './chunk.js';
 import type { PlayerCharacterDoc, PlayerDoc, PlayerLayerStore, PlayerTx } from './playerLayer.js';
@@ -46,7 +43,6 @@ export function firestorePlayerLayerStore(db: Firestore): PlayerLayerStore {
   };
 }
 
-/** The subset of `characterIds` that has a Self-proven link (a `playerCharacters` doc). */
 export async function provenCharacterIds(
   db: Firestore,
   characterIds: readonly number[]

@@ -1,11 +1,3 @@
-/**
- * One alert per world-scoped occurrence per poll. A raidable skyhook or an
- * Incursion is the world's, not a Character's, so two Characters in range of
- * it each diff the same fire (`occurrenceKey` carries no Character for them).
- * Delivered one after another, the second would raise a second toast whenever
- * the first never wrote a feed row to mark, and the shared row would flip
- * owner. So the poll keeps a single copy, before delivery.
- */
 import { occurrenceKey } from '@/engine/occurrenceKey';
 import { isEventEnabledFor } from '../eventSelection';
 import type { AnyNotificationFire } from '../pollDomains';
@@ -20,10 +12,6 @@ function isSharedWorld(fire: AnyNotificationFire): fire is SharedWorldFire {
   return fire.eventId === 'skyhookRaidableNearby' || fire.eventId === 'incursionNearby';
 }
 
-/**
- * Lower sorts first: a Character who will see it on a live channel, then the
- * nearest, then the lowest id (stable across polls).
- */
 function rank(fire: SharedWorldFire, update: CharacterUpdate, channels: LiveChannels): number[] {
   const visible =
     (channels.browser && isEventEnabledFor(update.eventPrefs, fire.eventId, 'browser')) ||
@@ -36,7 +24,6 @@ function before(a: number[], b: number[]): boolean {
   return false;
 }
 
-/** The updates with all but the best-ranked copy of each world-scoped occurrence removed. */
 export function keepOneSharedFire(
   updates: readonly CharacterUpdate[],
   channels: LiveChannels

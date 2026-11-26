@@ -1,9 +1,3 @@
-/**
- * The Templates control in the Additional information panel's header: pick a
- * saved template to fill the panel, save the current fields as one, or open the
- * list to rename, update and delete them. What the panel does with a pick is
- * the editor's call (`SurveyInfoEditor`); this only lists and reports.
- */
 import { useTranslation } from 'react-i18next';
 import {
   Button,

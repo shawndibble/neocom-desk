@@ -1,16 +1,8 @@
-/**
- * The last Below market view (#3989), boiled down to what the Overview's
- * Below-market contracts widget shows. Item search writes it when the view
- * lands; the widget only reads it, so the Overview never downloads the whole
- * contract snapshot or prices it at the hub — the Hauling widget's rule
- * (#3579).
- */
 import { formatCount } from '@/lib/formatCount';
 import type { TFunction } from 'i18next';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
-/** The lead line as the Item cell names it: "Damage Control II ×40", "Gila Blueprint (copy, 3 runs)". */
 export function belowMarketItemLabel(
   lead: PublicContractOfferRow,
   typeNames: ReadonlyMap<number, string>,
@@ -25,21 +17,15 @@ export function belowMarketItemLabel(
 
 export interface BelowMarketSummaryContract {
   contractId: number;
-  /** `belowMarketItemLabel` of the lead line. */
   item: string;
-  /** Other lines in the contract. */
   more: number;
   profit: number;
-  /** Where the contract sits, for jumps from the widget's Character; null when unplaced. */
   systemId: number | null;
 }
 
 export interface BelowMarketSummary {
-  /** When the contract snapshot behind it was published, ms since the epoch. */
   fetchedAt: number;
-  /** Total below market, not just those kept in `contracts`. */
   count: number;
-  /** Best profit first, at most `MAX_SUMMARY_CONTRACTS`. */
   contracts: BelowMarketSummaryContract[];
 }
 
@@ -76,7 +62,6 @@ export const useBelowMarketSummary = createLocalSetting<BelowMarketSummary | nul
   parse: parseSummary,
 });
 
-/** Saves a summary unless it is the one already stored (the panel recomputes as names and places land). */
 export function rememberBelowMarketSummary(summary: BelowMarketSummary): void {
   const { value, setValue } = useBelowMarketSummary.getState();
   if (value !== null && JSON.stringify(value) === JSON.stringify(summary)) return;

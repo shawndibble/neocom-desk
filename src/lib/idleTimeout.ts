@@ -1,24 +1,10 @@
-/**
- * Stall ("idle") timeout for downloads of unknown duration. A whole-exchange
- * deadline (`fetchWithTimeout`) suits a small API call, but a 3 MB data file on
- * a slow link legitimately takes longer than any fixed deadline. An idle guard
- * aborts only when nothing arrives — no response, no bytes — for `idleMs`, and
- * is re-armed by every chunk, so a slow link that keeps moving is left alone
- * and a hung one rejects into the caller's failure path.
- */
-
-/** How long a download may go without receiving a byte before it is given up on. */
 export const IDLE_TIMEOUT_MS = 20_000;
 
-/** Whole-body deadline for the rare runtime with no streaming `Response.body`. */
 const NO_STREAM_TIMEOUT_MS = 45_000;
 
 export interface IdleGuard {
-  /** Pass to `fetch`; aborts with a `TimeoutError` once the guard has been idle too long. */
   signal: AbortSignal;
-  /** (Re)starts the idle clock; `ms` overrides the window for this arming. */
   arm: (ms?: number) => void;
-  /** Stops the clock. Call when the download is over, however it ended. */
   clear: () => void;
 }
 
@@ -37,11 +23,6 @@ export function createIdleGuard(idleMs: number = IDLE_TIMEOUT_MS): IdleGuard {
   };
 }
 
-/**
- * Reads a response body to the end, re-arming `guard` on every chunk.
- * `onChunk` gets the running byte count. Without a streaming body it falls
- * back to one `arrayBuffer()` read under a plain deadline.
- */
 export async function readBodyWithGuard(
   response: Response,
   guard: IdleGuard,
@@ -71,11 +52,6 @@ export async function readBodyWithGuard(
   return merged;
 }
 
-/**
- * Reads a response body to the end under `guard` and keeps nothing: for a
- * download whose point is the side effect (a service worker or Cache Storage
- * writing it), where holding a copy of a multi-MB file would be waste.
- */
 export async function drainBodyWithGuard(response: Response, guard: IdleGuard): Promise<void> {
   const reader = response.body?.getReader();
   if (!reader) {
@@ -90,11 +66,6 @@ export async function drainBodyWithGuard(response: Response, guard: IdleGuard): 
   }
 }
 
-/**
- * Fetches `url` and reads its body under an idle guard. The body is read only
- * for a 2xx answer (an error page is not worth waiting on; it is cancelled).
- * With `drain`, the body is read and discarded and `bytes` is empty.
- */
 export async function fetchWithIdleTimeout(
   url: string,
   options: { drain?: boolean } = {}
@@ -117,7 +88,6 @@ export async function fetchWithIdleTimeout(
   }
 }
 
-/** `fetchWithIdleTimeout`, parsed as JSON; throws `Failed to load <label>: HTTP <status>` otherwise. */
 export async function fetchJsonWithIdleTimeout<T>(url: string, label: string): Promise<T> {
   const { ok, status, bytes } = await fetchWithIdleTimeout(url);
   if (!ok) throw new Error(`Failed to load ${label}: HTTP ${status}`);

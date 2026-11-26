@@ -1,9 +1,3 @@
-/**
- * "Configure chat message": which rows the Survey's chat message has and how
- * its box is drawn, with the message as it would be copied shown above the
- * choices. The heading and the link row are fixed; everything between is the
- * pilot's call, kept in the browser (`useSurveyChatOptions`).
- */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, SegmentedControl } from '@/components/ui';
@@ -23,13 +17,11 @@ interface SurveyChatDialogProps {
   url: string;
   labels: SurveyMessageLabels;
   now: number;
-  /** The survey's location, for the row that names it; null when none is set. */
   location: string | null;
   onClose: () => void;
 }
 
 type FlagKey = 'location' | 'pace' | 'percentLeft' | 'iskLeft' | 'volumeLeft' | 'elapsed';
-/** The drawn borders; the checkbox beside them is `none`. */
 const LINE_STYLES = ['single', 'double'] as const;
 const FLAGS: readonly FlagKey[] = [
   'location',
@@ -52,7 +44,6 @@ export function SurveyChatDialog({
   const options = useSurveyChatOptions((state) => state.value);
   const setOptions = useSurveyChatOptions((state) => state.setValue);
   const change = (changes: Partial<SurveyChatOptions>) => setOptions({ ...options, ...changes });
-  // The style the checkbox brings back after it was unticked.
   const [lineStyle, setLineStyle] = useState<(typeof LINE_STYLES)[number]>(
     options.border === 'double' ? 'double' : 'single'
   );
@@ -163,7 +154,6 @@ function Toggle({
 }: {
   label: string;
   hint?: string;
-  /** A compact control right after the label, so it reads as that label's; it must fit the row's height. */
   trailing?: ReactNode;
   checked: boolean;
   disabled?: boolean;

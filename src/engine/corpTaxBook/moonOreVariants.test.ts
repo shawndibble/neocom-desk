@@ -88,7 +88,6 @@ describe('splitChunkVariants', () => {
     ];
     const mined = [{ typeId: ZEOLITES, quantity: 10 }];
     expect(splitChunkVariants(chunk, mined, survey)).toEqual([
-      // Mined wins: only plain Zeolites have been mined, so a partial survey cannot skew it.
       { typeId: ZEOLITES, quantity: 1000 },
       { typeId: BITUMENS, quantity: 500 },
       { typeId: BRIMFUL_BITUMENS, quantity: 1500 },
@@ -121,14 +120,12 @@ describe('splitChunkVariants', () => {
       { typeId: BITUMENS, quantity: 375 },
       { typeId: BRIMFUL_BITUMENS, quantity: 625 },
     ]);
-    // So a page that split by the survey before the ledger rows came still reads 80% mined.
     expect(chunkMinedPct(named, mined)).toBe(80);
   });
 });
 
 describe('chunkMinedPct', () => {
   it('counts a variant mined against its base ore’s line', () => {
-    // The notification lists only Bitumens; half of what was mined was Brimful.
     const chunk = [{ typeId: BITUMENS, quantity: 1000 }];
     const mined = [
       { typeId: BITUMENS, quantity: 400 },

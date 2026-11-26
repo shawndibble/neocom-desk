@@ -11,7 +11,6 @@ const PYERITE = 35;
 const ISOGEN = 37;
 const BLUEPRINT = 999;
 
-/** Scoped stock as both tables read it: a quantity per material, 0 when none. */
 function stockOf(entries: Record<number, number>) {
   return (typeID: number): number => entries[typeID] ?? 0;
 }
@@ -42,9 +41,6 @@ describe('ownedStockOffer', () => {
     expect(ownedStockOffer(row, 0, 500)).toBeNull();
   });
 
-  // Blueprint Acquisition (issue #838): a blueprint row's ownership comes from
-  // the Character's real BPO/BPC, never a typed Have, so it has no offer even
-  // when a packaged blueprint sits in a hangar.
   it('offers nothing on a blueprint row', () => {
     expect(
       ownedStockOffer({ typeID: BLUEPRINT, quantity: 1, acquisitionTier: { me: 0, te: 0 } }, 1, 0)
@@ -68,10 +64,6 @@ describe('takeEveryOffer', () => {
     ]);
   });
 
-  // "Use all" is every row's own "Use assets" at once: the rows the per-row
-  // offer would fill, and no others. It used to skip any row with a number
-  // in it, a 0 included — so after "Use none" (which writes 0s) the button
-  // did nothing at all while every row beside it still offered its stock.
   it('fills a zeroed row and refreshes a stale count, the same rows the per-row offer would', () => {
     expect(
       takeEveryOffer(
@@ -106,8 +98,6 @@ describe('takeEveryOffer', () => {
     expect(takeEveryOffer(ROWS, ownedFrom({}), stockOf({}))).toEqual([]);
   });
 
-  // Issue #2538: the per-row offer never showed on a blueprint row, but bulk
-  // used to fill it anyway.
   it('leaves a blueprint row alone, as its own offer does', () => {
     expect(
       takeEveryOffer(
@@ -136,8 +126,6 @@ describe('clearEveryOwned', () => {
     expect(clearEveryOwned(ROWS, ownedFrom({}))).toEqual([]);
   });
 
-  // Deliberately wider than the offer: "Use none" clears whatever the row
-  // holds, so a stray value the offer would never write still has a way out.
   it('clears a blueprint row too', () => {
     const blueprintRow = { typeID: BLUEPRINT, quantity: 1, acquisitionTier: { me: 0, te: 0 } };
     expect(clearEveryOwned([blueprintRow], ownedFrom({ [BLUEPRINT]: 1 }))).toEqual([

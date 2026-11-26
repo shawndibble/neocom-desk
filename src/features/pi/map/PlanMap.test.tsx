@@ -24,7 +24,6 @@ import {
   withWhatIf,
 } from '@/test/planMap';
 
-// The finder reads the SDE and the stargate graph; its own behaviour is not under test here.
 vi.mock('@/features/pi/map/PlanetFinder', () => ({
   PlanetFinder: ({ types }: { types: readonly string[] }) => (
     <div data-testid="finder">finder for {types.join(',')}</div>
@@ -44,7 +43,6 @@ describe('PlanMap: planet toggles', () => {
   it('filters the map to the ticked types, leaving ghost slots, and brings it back', async () => {
     const user = userEvent.setup({ delay: null });
     renderMap();
-    // Autotrophs are a Temperate-only raw.
     expect(product('Autotrophs')).toBeInTheDocument();
     expect(maybeProduct('Felsic Magma')).toBeNull();
     const slots = () => document.querySelectorAll('[data-tier="2"] > ul > li').length;
@@ -52,7 +50,6 @@ describe('PlanMap: planet toggles', () => {
     await user.click(planet('Temperate'));
     expect(planet('Temperate')).toHaveAttribute('aria-pressed', 'false');
     expect(maybeProduct('Autotrophs')).toBeNull();
-    // A hidden product leaves an empty slot: the layout does not jump.
     expect(slots()).toBe(before);
     expect(document.querySelectorAll('[data-tier="2"] > ul > li[aria-hidden="true"]').length).toBe(
       before
@@ -86,7 +83,6 @@ describe('PlanMap: what if I add a planet', () => {
     await user.hover(planet('Lava'));
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
     expect(screen.getByText(/Unlocks \d+ products? on the map/)).toBeInTheDocument();
-    // The mark is in the tile's accessible name, not only a colour.
     expect(
       screen.getByRole('link', { name: /^Felsic Magma\. .*Unlocked by adding a Lava planet/ })
     ).toBeInTheDocument();
@@ -102,7 +98,6 @@ describe('PlanMap: what if I add a planet', () => {
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
     fireEvent.pointerEnter(lava, { pointerType: 'mouse' });
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
-    // A touch leave must not clear a preview a mouse set.
     fireEvent.pointerLeave(lava, { pointerType: 'touch' });
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
     fireEvent.pointerLeave(lava, { pointerType: 'mouse' });
@@ -118,7 +113,6 @@ describe('PlanMap: what if I add a planet', () => {
     expect(active.dataset.mapKey).toMatch(/^p:/);
     expect(active.isConnected).toBe(true);
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
-    // Focus leaving the board ends the preview.
     act(() => (document.activeElement as HTMLElement).blur());
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
   });
@@ -130,8 +124,6 @@ describe('PlanMap: what if I add a planet', () => {
   });
 });
 
-// A product link on Plan or Colonies opens the drawer by URL: the link is gone
-// with its tab, so focus goes to the product on the map, never the page body.
 describe('PlanMap: focus after a drawer another tab opened', () => {
   const COOLANT = 9832;
 
@@ -170,7 +162,6 @@ describe('PlanMap: focus after a drawer another tab opened', () => {
 
 describe('PlanMap: trace', () => {
   it('joins parallel inputs with commas, and an arrow only steps up a tier', () => {
-    // Coolant (P2) from Electrolytes and Water, opened by URL.
     renderMap({}, '/planetary-industry/map?product=9832');
     const dialog = screen.getByRole('dialog', { name: 'How to make Coolant' });
     expect(
@@ -185,7 +176,6 @@ describe('PlanMap: trace', () => {
   });
 
   it('says a P4 is made from its direct inputs side by side, a P1 beside its P3s', () => {
-    // Nano-Factory takes Reactive Metals (P1) next to two P3s.
     renderMap({}, '/planetary-industry/map?product=2869');
     const dialog = screen.getByRole('dialog', { name: 'How to make Nano-Factory' });
     const words = within(dialog).getByText(
@@ -204,9 +194,7 @@ describe('PlanMap: trace', () => {
       expect(screen.getByRole('status')).toHaveTextContent(/Tracing Biofuels\. Needs Temperate/)
     );
     const dialog = screen.getByRole('dialog', { name: 'How to make Biofuels' });
-    // Any planet hosts the factory, so the facility line names no planets.
     expect(within(dialog).getByText('Made in a Basic Industry Facility.')).toBeInTheDocument();
-    // The chain, planets to product, as text a screen reader can read.
     expect(
       within(dialog).getByText(
         (_, el) =>
@@ -215,18 +203,15 @@ describe('PlanMap: trace', () => {
           ) && el?.tagName === 'P'
       )
     ).toBeInTheDocument();
-    // Every other product named in the words is a link to its own detail.
     expect(
       within(dialog).getAllByRole('link', { name: 'Carbon Compounds' }).length
     ).toBeGreaterThan(1);
-    // Its own name is plain text in its own detail; Market is one step away.
     expect(within(dialog).queryByRole('link', { name: 'Biofuels' })).toBeNull();
     expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       expect.stringContaining('/market/browser')
     );
     expect(product('Biofuels')).toHaveAttribute('href', expect.stringContaining('product=2396'));
-    // Moving the trace moves `aria-current`.
     await user.click(product('Proteins'));
     expect(product('Proteins')).toHaveAttribute('aria-current', 'true');
     expect(product('Biofuels')).not.toHaveAttribute('aria-current');
@@ -333,7 +318,6 @@ describe('PlanMap: structure and keyboard', () => {
     expect(planet('Gas')).toHaveFocus();
     await user.keyboard('{ArrowRight}');
     expect(document.activeElement?.getAttribute('data-map-key')).toMatch(/^p:/);
-    // Enter traces.
     await user.keyboard('{Enter}');
     expect(
       screen.getByRole('dialog', { name: /^(How to make|Where to get) / })

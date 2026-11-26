@@ -39,7 +39,6 @@ async function loadSystems() {
       ])
     : null;
 }
-// Jita is 3 jumps out; Efa has no stargate route from here.
 const jumps = new Map([[JITA, 3]]);
 vi.mock('@/features/route/currentSystem', () => ({
   useCurrentSystem: () => ({ systemId: 30000144, loaded: true }),
@@ -93,7 +92,6 @@ beforeAll(async () => {
   renderLibrary().unmount();
 }, 30_000);
 
-/** Picks a view from the Show select. */
 async function pickView(user: ReturnType<typeof userEvent.setup>, label: string) {
   await user.click(await screen.findByRole('combobox', { name: l.filterLabel }));
   await user.click(await screen.findByRole('option', { name: new RegExp(label) }));
@@ -110,7 +108,6 @@ describe('CommunityLibrary', () => {
       .slice(1)
       .map((row) => row.textContent);
     expect(rows).toHaveLength(2);
-    // "Jita IV" already says Jita: no system line under it.
     expect(rows.find((text) => text?.includes('Jita IV'))).toMatch(
       /^Rifter Blueprint.*Ann.*Jita IV3.*0 \/ 0.*BPO/
     );
@@ -132,7 +129,6 @@ describe('CommunityLibrary', () => {
       within(table).getByRole('columnheader', { name: new RegExp(l.columns.blueprint) })
     ).toBeInTheDocument();
 
-    // Shared device-local store: put it back for the next test.
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
   });
@@ -192,7 +188,6 @@ describe('CommunityLibrary', () => {
     renderLibrary();
     const table = await screen.findByRole('table', { name: l.sharedLabel });
     const header = within(table).getByRole('button', { name: new RegExp(l.columns.jumps) });
-    // Twice: descending, where a plain number sort would put the unknown first.
     await user.click(header);
     await user.click(header);
     expect(
@@ -293,7 +288,6 @@ describe('CommunityLibrary', () => {
     renderLibrary();
     const link = await screen.findByRole('link', { name: en.communities.blueprints.browse });
     expect(link).toHaveAttribute('href', '/industry/sourcing?sourcing.src=community%2Cowned');
-    // What BPC Sourcing holds is a tooltip beside it, not a sentence on the page.
     expect(
       screen.getByRole('button', { name: en.communities.blueprints.browseAbout })
     ).toBeInTheDocument();

@@ -19,9 +19,6 @@ import {
 
 const emptyModules = { high: [], mid: [], low: [], rig: [], subsystem: [] };
 
-/** Deflates+base64url's an arbitrary raw body, bypassing `encodeFittingShare`'s
- * own validation — for tests that need to hand-craft a forged decompressed
- * payload rather than encode a real `FittingShareInput`. */
 async function packRawBody(
   body: string,
   version: string = LEGACY_FITTING_SHARE_VERSION
@@ -57,7 +54,7 @@ async function packRawBody(
 
 function minimalInput(): FittingShareInput {
   return {
-    hullTypeId: 24698, // Vexor
+    hullTypeId: 24698,
     modules: emptyModules,
     drones: [],
     fighters: [],
@@ -287,9 +284,6 @@ describe('decodeFittingShare error handling', () => {
   });
 
   it('rejects a forged payload that decompresses past the size cap rather than hanging or crashing', async () => {
-    // A highly repetitive body compresses tiny but decompresses huge — the
-    // classic "decompression bomb" shape. This should come back `invalid`,
-    // never throw and never allocate the full decompressed size.
     const payload = await packRawBody('0'.repeat(2_000_000));
     const decoded = await decodeFittingShare(payload);
     expect(decoded).toEqual({ ok: false, reason: 'invalid' });
@@ -496,8 +490,6 @@ describe('fighters: launched or in the bay', () => {
 });
 
 describe('mutated items (version 3)', () => {
-  // Heavy Abyssal Energy Neutralizer from a Heavy Gremlin Compact, Gravid
-  // mutaplasmid — the live ESI sample's rolls.
   const NEUT_MUTATION = {
     baseTypeId: 16475,
     mutaplasmidTypeId: 47831,
@@ -513,7 +505,6 @@ describe('mutated items (version 3)', () => {
           { slotIndex: 0, typeId: 3186, state: 'active', chargeTypeId: 230 },
           { slotIndex: 1, typeId: 47832, state: 'active', mutation: NEUT_MUTATION },
         ],
-        // Base and mutaplasmid known, rolls not: an empty attribute set.
         low: [
           {
             slotIndex: 0,
@@ -563,7 +554,6 @@ describe('mutated items (version 3)', () => {
   });
 
   it('still decodes a version-2 code saved before version 3 existed', async () => {
-    // Encoded by the pre-v3 encoder (2026-10-16) — a My Fittings record or an old link.
     const saved =
       '2.SynKqzGwMkrPtDKyMku1NrAyLEqxMgTR2eVWhtbWNYblZlamVqY1NWapVkXFNTXBiWWpKapGBkmpaflFqapGBmXGAA';
     expect(await decodeFittingShare(saved)).toEqual({
@@ -598,7 +588,6 @@ describe('mutated items (version 3)', () => {
     expect(quantiseRoll(419.25)).toBe(419.25);
     expect(quantiseRoll(15680)).toBe(15680);
     expect(quantiseRoll(591.3600000476837)).toBe(591.36);
-    // A resonance: 62.3457% shown to two decimals in game.
     expect(quantiseRoll(0.37654321987)).toBe(0.376543);
     expect(quantiseRoll(123456.789)).toBe(123457);
     expect(quantiseRoll(-0.000123456789)).toBe(-0.000123457);
@@ -631,8 +620,6 @@ describe('mutated items (version 3)', () => {
   });
 
   it('stays a short link with 8 mutated modules', async () => {
-    // Eight modules, each with five rolls at full float precision — the
-    // worst case of the wire's per-roll cost.
     const high = Array.from({ length: 8 }, (_, i) => ({
       slotIndex: i,
       typeId: 47832,
@@ -654,8 +641,6 @@ describe('mutated items (version 3)', () => {
       modules: { ...cruiserInput().modules, high },
     });
     if (!encoded.ok) throw new Error('encode failed');
-    // 8 modules x 5 rolls: 418 characters measured on 2026-10-16, against
-    // 142 for the same fit unmutated. Bounded well below any URL limit.
     expect(encoded.payload.length).toBeLessThan(600);
   });
 
@@ -669,7 +654,6 @@ describe('mutated items (version 3)', () => {
       );
       expect(decoded).toEqual({ ok: false, reason: 'invalid' });
     }
-    // `d00` is `d0` written longer: still the same drone.
     const twice = await decodeFittingShare(
       await packRawBody(
         ['1', ';;;;', '1:1:0', '', '', '', '', '', '', 'd0:1:2:,d00:1:2:'].join('|'),

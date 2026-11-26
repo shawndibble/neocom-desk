@@ -32,7 +32,6 @@ interface FakeAuth {
   } | null;
   authStateReady?: () => Promise<void>;
 }
-/** One Auth per Character, like the named apps in `firebaseApp.ts`. */
 const auths = new Map<number, FakeAuth>();
 const fakeAuthFor = (id: number): FakeAuth => {
   let auth = auths.get(id);
@@ -55,7 +54,6 @@ vi.mock('./firebaseCore', () => ({ startedCharacterIds: () => started.ids }));
 
 const mint = vi.fn();
 
-/** Mint returns `token-<id>`; signing in with it makes that Auth `char:<id>`. */
 function mintPerCharacter() {
   vi.mocked(getValidAccessToken).mockImplementation(async (id) => `access-${id}`);
   mint.mockImplementation(async ({ accessToken }: { accessToken: string }) => {
@@ -133,8 +131,6 @@ describe('ensureSignedIn', () => {
   });
 
   it('mints again when the session carries a previous ownerHash', async () => {
-    // Developer claims survive every ID-token refresh, so a session minted
-    // before a transfer would fail every hash-guarded write for good.
     fakeAuthFor(1).currentUser = {
       uid: 'char:1',
       getIdTokenResult: async () => ({ claims: { ownerHash: 'old' } }),
@@ -183,13 +179,11 @@ describe('one session per character', () => {
     await ensureSignedIn(2);
     expect(fakeAuthFor(1).currentUser?.uid).toBe('char:1');
     expect(fakeAuthFor(2).currentUser?.uid).toBe('char:2');
-    // Back to the first: still no second mint for it.
     await ensureSignedIn(1);
     expect(mint).toHaveBeenCalledTimes(2);
   });
 
   it('two tabs syncing different characters never invalidate each other', async () => {
-    // Each tab's own app instance restores its character's persisted session.
     const tabA = fakeAuthFor(1);
     const tabB = fakeAuthFor(2);
     tabA.currentUser = { uid: 'char:1' };

@@ -9,7 +9,6 @@ let listeners: ((status: SyncStatus) => void)[] = [];
 
 vi.mock('@/app/syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/syncStatus')>()),
-  // Sync is configured, so the gate has a first pull to wait for.
   isSyncConfigured: () => true,
 }));
 
@@ -61,7 +60,6 @@ describe('useFirstRunReady', () => {
     });
     const { result } = renderHook(() => useFirstRunReady(true));
     await announce({ state: 'idle', lastSyncedAt: Date.now() });
-    // Give the Dexie check time to have run.
     await act(async () => {
       await db.settings.get('sync.__probe');
     });

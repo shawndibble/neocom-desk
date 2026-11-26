@@ -1,12 +1,3 @@
-/**
- * "Open in EVE" for a row or context menu: opens the target's window in the
- * active Character's EVE client. The menu stays open while it sends and the
- * item reads "Opening in EVE…" and then the outcome — there is no toast to
- * report to once the menu closes, and ESI's commonest refusal (the character
- * isn't logged in to the game) must not fail silently. Same shape as
- * `SetWaypointMenuItem`. No Character, or one without the permission, gets it
- * inert with the reason on tap.
- */
 import { useTranslation } from 'react-i18next';
 import { GrantMissingMenuItem } from '@/app/GrantMissingLink';
 import { DisabledMenuItem, MenuItem } from '@/components/ui';
@@ -18,7 +9,6 @@ export function OpenInEveMenuItem({
   id,
   specific = false,
 }: OpenInEveTarget & {
-  /** The menu carries more than one Open in EVE item: say what this one opens. */
   specific?: boolean;
 }) {
   const { t } = useTranslation();
@@ -36,7 +26,6 @@ export function OpenInEveMenuItem({
     id,
   });
   const label = specific && kind !== 'information' ? t(`openInEve.${kind}`) : t('openInEve.label');
-  // Kept when the connection drops mid-send, so the result is still shown in the blocked branch.
   const content = sending ? (
     t('openInEve.sending')
   ) : outcome ? (

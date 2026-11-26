@@ -2,7 +2,6 @@ import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
 import type { CsvColumn } from '@/lib/csv';
 import type { Translate } from '@/lib/translate';
 
-/** What a row is, in a few words: the table's What column and the export's. */
 export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
   switch (row.kind) {
     case 'charge':
@@ -37,7 +36,6 @@ export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
   }
 }
 
-/** The export's columns: an old history's rows carry no balance, so its file has none either. */
 export function ledgerCsvColumns(t: Translate, history?: boolean): CsvColumn<PayeeLedgerRow>[] {
   const columns: CsvColumn<PayeeLedgerRow>[] = [
     { header: t('miningTax.ledger.column.date'), value: (r) => r.date },

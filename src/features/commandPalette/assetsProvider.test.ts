@@ -169,7 +169,6 @@ describe('loadPaletteAssets', () => {
       { characterId: 2, name: 'Alt', ownerHash: 'b', addedAt: 2 },
     ] as never);
     await writeCached(1, 'assets', [asset(1, 34, 100)], Date.now());
-    // Lapsed on purpose: a stale list is still read, never refreshed.
     await writeCached(2, 'assets', [asset(2, 587, 1)], 0);
   });
 

@@ -1,8 +1,3 @@
-/**
- * Pure logic behind the moon owner page (#4512): what the plain statement says,
- * the rate line, who mined where, and which state the page is in. No fetch, no
- * React: it reads the server-written view (`feederViewClient.ts`).
- */
 import { latestRateChange, rateNotice } from '@/engine/corpTaxBook/ownerRate';
 import { refineryLabeler } from '@/engine/corpTaxBook/refinery';
 import type {
@@ -12,7 +7,6 @@ import type {
   FeederViewSummary,
 } from './feederViewClient';
 
-/** The page's state, in the order its banners and sections take over. */
 export type OwnerPageState = 'ended' | 'settled-otherwise' | 'normal';
 
 export function pageState(s: FeederViewSummary): OwnerPageState {
@@ -20,8 +14,6 @@ export function pageState(s: FeederViewSummary): OwnerPageState {
   return s.mode === 'settled-otherwise' ? 'settled-otherwise' : 'normal';
 }
 
-/** The ledger cannot be read: banner with Reconnect, over an active or disconnected owner. */
-/** Who the moon owner is paid as: its payee, or the moon owner corporation itself when none is set. */
 export function payeeIdOf(s: FeederViewSummary): number {
   return s.payee?.id ?? s.feederCorporationId;
 }
@@ -30,12 +22,10 @@ export function isStale(s: FeederViewSummary): boolean {
   return s.staleSince !== null && pageState(s) !== 'ended';
 }
 
-/** After leaving, once nothing is owed, the section folds to one line. */
 export function isSettledAfterLeaving(s: FeederViewSummary): boolean {
   return pageState(s) === 'ended' && s.balanceKind !== 'owed';
 }
 
-/** Dismissed by the officers: the after-leaving section is gone. */
 export function isDismissed(s: FeederViewSummary): boolean {
   return s.dismissedAt !== null;
 }
@@ -43,22 +33,15 @@ export function isDismissed(s: FeederViewSummary): boolean {
 export type RateNote =
   | { kind: 'none' }
   | { kind: 'plain'; pct: number }
-  /** The accounting corporation set the rate; they never asked, or asked for the same. */
   | { kind: 'set'; pct: number; since: string }
-  /** The accounting corporation set a rate other than the one asked for. */
   | { kind: 'override'; agreedPct: number; since: string | null; askedPct: number }
-  /** Asked for a rate, nothing agreed yet. */
   | { kind: 'asked'; askedPct: number };
 
-/** The rate line: the agreed rate wins; a different request is shown beside it. */
 export function rateNote(s: FeederViewSummary): RateNote {
-  // No effective rate means nothing is owed yet: stale history must not read as a rate set. A
-  // request alone never takes effect (#6209); it waits for an agreement.
   if (s.effectiveRatePct === null)
     return s.requestedRatePct !== null
       ? { kind: 'asked', askedPct: s.requestedRatePct }
       : { kind: 'none' };
-  // The rate-changed event drives the line; records with no event fall back to the plain fields.
   const change = latestRateChange(s.rateHistory);
   if (change) {
     const notice = rateNotice(change);
@@ -79,19 +62,16 @@ export function rateNote(s: FeederViewSummary): RateNote {
     }
     return { kind: 'plain', pct: s.agreedRatePct };
   }
-  // A view built before #6209 took a request alone as the rate; it is still only asked for.
   if (s.requestedRatePct !== null) return { kind: 'asked', askedPct: s.requestedRatePct };
   return s.effectiveRatePct === null
     ? { kind: 'none' }
     : { kind: 'plain', pct: s.effectiveRatePct };
 }
 
-/** What is still owed to the moon owner, in whole ISK, for the Leave dialog. */
 export function owedOnLeaving(s: FeederViewSummary): number {
   return s.balanceKind === 'owed' ? Math.max(0, Math.floor(s.balanceIsk)) : 0;
 }
 
-/** Whether a request for `pct` is a real change worth sending. */
 export function parseRequestedRate(input: string): number | null {
   const text = input.trim().replace(',', '.');
   if (text === '') return null;
@@ -101,25 +81,17 @@ export function parseRequestedRate(input: string): number | null {
 
 export interface MinedRow {
   key: string;
-  /** The UTC day it was mined. */
   date: string;
   characterId: number;
   structureId: number;
-  /** The ore; null on a view built before #5261. */
   typeId: number | null;
   volume: number;
 }
 
-/** The months (`YYYY-MM`) with mining on the page, newest first: the month filter's options. */
 export function minedMonths(days: readonly FeederViewDay[]): string[] {
   return [...new Set(days.map((d) => d.date.slice(0, 7)))].sort().reverse();
 }
 
-/**
- * Mined per day, character, refinery and ore, so the moon owner can check each day against its
- * own ledger (#6210); one month, or every covered day with `month` null. Newest day first, the
- * most mined first within a day. Nothing is capped.
- */
 export function minedDayRows(days: readonly FeederViewDay[], month: string | null): MinedRow[] {
   const byKey = new Map<string, MinedRow>();
   for (const day of days) {
@@ -156,11 +128,6 @@ export function characterIdsOf(days: readonly FeederViewDay[]): number[] {
   return [...new Set(days.flatMap((d) => d.lines.map((l) => l.characterId)))];
 }
 
-/**
- * Each refinery cell on the moon owner's own page, through the label chain (#4640): the label
- * either side set, the structure name the grant read (#4654), the system, then the moon owner's
- * name plus the id.
- */
 export function viewRefineryLabeler(
   refineries: readonly FeederViewRefinery[],
   names: { systemName?: (solarSystemId: number) => string | undefined; ownerName?: string }
@@ -182,7 +149,6 @@ export function viewRefineryLabeler(
   });
 }
 
-/** Newest payment first. */
 export function payoutRows(payouts: readonly FeederViewPayout[]): FeederViewPayout[] {
   return [...payouts].sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount);
 }

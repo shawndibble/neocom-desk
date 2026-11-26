@@ -1,8 +1,3 @@
-// Archiving a moon owner's refinery (issue #6298): an accounting officer takes one off the page's
-// list, or puts it back. The entry lives on the moon owner's record, one per refinery, and only
-// hides: the rows, Extractions and labels are untouched. Additive: a record without the field is
-// a record with nothing archived.
-
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record, utcDayKey } from './communities.js';
@@ -22,9 +17,7 @@ const REASONS: readonly RefineryArchiveDoc['reason'][] = ['gone', 'idle', 'manua
 
 export interface SetRefineryArchiveInput extends FeederTargetCall {
   structureId: number;
-  /** True archives; false restores. */
   archived: boolean;
-  /** What the page offered it for; `manual` when nothing. Ignored on a restore. */
   reason: RefineryArchiveDoc['reason'];
 }
 
@@ -49,11 +42,6 @@ export function parseSetRefineryArchiveInput(data: unknown): SetRefineryArchiveI
   };
 }
 
-/**
- * Whether a call changes the stored entry. A second archive the same UTC day keeps the first
- * officer's entry. One from an earlier day is rewritten: mining after its day shows the refinery
- * as back (the client derives that), so a fresh archive must move `at` past that mining.
- */
 export function archiveNeedsWrite(
   stored: RefineryArchiveDoc | undefined,
   archived: boolean,
@@ -63,7 +51,6 @@ export function archiveNeedsWrite(
   return stored === undefined || utcDayKey(stored.at) < utcDayKey(now);
 }
 
-/** The accounting corporation's officers (Accountant or higher, live role check). */
 export async function setRefineryArchive(
   deps: BookDeps,
   caller: Caller,
@@ -72,8 +59,6 @@ export async function setRefineryArchive(
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
   const book = bookRef(deps.db, input.corporationId);
   const feeder = input.feederCorporationId;
-  // Archiving only a refinery the book knows from this moon owner keeps the map bounded; a restore
-  // must work for any stored entry.
   const [observed, extractions] = await Promise.all([
     book
       .collection(OBSERVED)

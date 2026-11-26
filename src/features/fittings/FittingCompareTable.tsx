@@ -1,8 +1,3 @@
-/**
- * The stat grid for Fitting vs Fitting compare, one column per Fitting. Best
- * value gets an icon and bold weight, never colour alone (DESIGN.md's
- * damage-type rule already establishes that convention).
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
@@ -28,10 +23,7 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
   if (row.key === 'appliedDps' || row.key === 'bestRange') return fixed1(row.values[index]!);
   if (row.key === 'priceSell' || row.key === 'priceBuy') {
     const value = row.values[index]!;
-    // NaN marks a slot whose price fetch failed — the engine row still carries it so the other
-    // slots' prices can show, but there's nothing to format here.
     if (Number.isNaN(value)) return '—';
-    // Whole ISK, same rounding the engine row was built at, so what's shown always matches what `differs` compared.
     return formatIsk(value, 0);
   }
   return fixedFormat(STAT_DIGITS[row.key])(row.values[index]!);
@@ -39,17 +31,11 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
 
 export interface FittingCompareColumn {
   index: number;
-  /** Position in each row's `values`; null when this Fitting's stats couldn't be calculated. */
   statsIndex: number | null;
   header: ReactNode;
-  /** The Fitting's plain name, for the slim row pinned over the stat rows at `md` and up. */
   name?: string;
 }
 
-/**
- * Table classes + column group shared by the Stats and "Modules that differ" tables, so a Fitting's
- * column sits at the same x in both (fixed layout from `sm` up; the phone keeps auto layout).
- */
 export const COMPARE_TABLE_CLASS = 'w-full border-collapse text-xs sm:table-fixed';
 
 export function CompareColGroup({ count }: { count: number }) {
@@ -65,10 +51,8 @@ export function CompareColGroup({ count }: { count: number }) {
 
 export interface FittingCompareTableProps {
   rows: readonly CompareRow[];
-  /** Which columns to render, and what heads them — the phone pager's window, or every column on desktop. */
   columns: readonly FittingCompareColumn[];
   differencesOnly: boolean;
-  /** Pin a slim row of Fitting names under the top edge while the stat rows scroll (not on the phone, whose pager header stays put). */
   pinNames?: boolean;
 }
 
@@ -85,7 +69,6 @@ export function FittingCompareTable({
     return <p className="text-xs text-text-dim">{t('fittings.compare.noDifferences')}</p>;
   }
 
-  // Only worth a second header line once there is a second column to tell apart.
   const pinned = pinNames && columns.length >= 2 && columns.every((column) => column.name);
 
   return (
@@ -103,9 +86,6 @@ export function FittingCompareTable({
           ))}
         </tr>
         {pinned && (
-          // The tall header above scrolls away; this one-line strip stays under the top edge so a
-          // column of bare numbers never loses its Fitting. Its own cells carry the sticky (a
-          // sticky `tr` is unreliable) and an opaque background so rows don't show through.
           <tr data-testid="compare-pinned-names" aria-hidden="true">
             <th className="sticky top-0 z-10 border-b border-line bg-panel p-2 text-left font-normal text-text-dim">
               {t('fittings.compare.statColumn')}

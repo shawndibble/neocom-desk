@@ -78,9 +78,6 @@ describe('whatIfImplants per-attribute sets', () => {
   });
 
   it('never lets an out-of-range or NaN value through to the scheduler', () => {
-    // Implants are documented +0..+5 (engine/types.ts). computeSchedule adds
-    // whatever it is handed straight onto the attribute, so the clamp lives
-    // here rather than only on the input that produced the number.
     expect(
       whatIfImplants(
         custom({
@@ -148,8 +145,6 @@ describe('setWhatIfBonus', () => {
     const next = setWhatIfBonus(preset('+4'), {}, 'perception', 5);
 
     expect(next.kind).toBe('custom');
-    // The other four keep the +4 the preset was showing — editing one value
-    // must not silently zero the rest.
     expect(whatIfImplants(next, {})).toEqual({
       intelligence: 4,
       memory: 4,
@@ -172,9 +167,6 @@ describe('setWhatIfBonus', () => {
   });
 
   it('is frozen against the clone at edit time — a later implant swap does not move it', () => {
-    // Only the 'current' preset tracks the live clone. Once the user has
-    // edited a slot they are describing a hypothetical set, and re-reading
-    // the character's implants underneath it would rewrite their hypothesis.
     const next = setWhatIfBonus(preset('current'), { perception: 4 }, 'memory', 2);
 
     expect(whatIfImplants(next, { perception: 1, charisma: 5 })).toEqual({
@@ -201,8 +193,6 @@ describe('setWhatIfBonus', () => {
   it('clamps at the edit as well as at the resolve', () => {
     expect(whatIfImplants(setWhatIfBonus(preset('none'), {}, 'memory', 12), {}).memory).toBe(5);
     expect(whatIfImplants(setWhatIfBonus(preset('none'), {}, 'memory', -4), {}).memory).toBe(0);
-    // A cleared number field reports '' — Number('') is 0, not NaN, so the
-    // slot empties to +0 rather than sticking on its old value.
     expect(whatIfImplants(setWhatIfBonus(preset('+5'), {}, 'memory', Number('')), {}).memory).toBe(
       0
     );
@@ -235,15 +225,12 @@ describe('normalizeWhatIfSelection', () => {
   });
 
   it('reads a non-numeric stored slot as +0 instead of leaking NaN', () => {
-    // A slot can hold anything once it has been through Firestore and back;
-    // Math.round('abc') is a NaN that escapes both Math.min and Math.max.
     expect(
       normalizeWhatIfSelection({ kind: 'custom', bonuses: { memory: 'abc', perception: 4 } })
     ).toEqual(custom({ intelligence: 0, memory: 0, perception: 4, willpower: 0, charisma: 0 }));
   });
 
   it('falls back to the default rather than trusting a malformed stored value', () => {
-    // Reachable: a doc pulled from Firestore, or a row from an older build.
     expect(normalizeWhatIfSelection({ kind: 'preset', preset: '+9' })).toEqual(
       DEFAULT_WHAT_IF_SELECTION
     );

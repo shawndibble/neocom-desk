@@ -1,21 +1,3 @@
-/**
- * Row model for the Contacts page's Standings tab (issue #2859): the
- * Character's faction / corporation / agent standings, each with what it
- * belongs to, the standing the game applies (with the pilot's skills), the
- * agent levels it opens, and the ones the app applies to broker fees flagged.
- * Pure: names, standings and the reference data come in already loaded. The
- * rules are in `@/engine/standings`.
- *
- * Only Trade Hub owners are flagged: every other NPC station uses its own
- * owner, which is not enumerable up front. Agents are never a fee input.
- * The match is by id alone, as `resolveOwnerStandings` does.
- *
- * Nothing here guesses. An agent the agents data leaves out (storyline,
- * faction warfare, research...) has no known corporation or level, so it has
- * no Belongs to, no Access and no With skills. Skills that could not be read
- * leave With skills and Access empty: access is gated by the standing the
- * skills lift, so a base-standing answer would understate it.
- */
 import type { CharacterStandingEntry } from '@/engine/market/standings';
 import {
   NO_SOCIAL_SKILLS,
@@ -40,16 +22,12 @@ export type NpcStandingKind = 'faction' | 'corp' | 'agent';
 
 export const NPC_STANDING_KINDS: readonly NpcStandingKind[] = ['faction', 'corp', 'agent'];
 
-/** What a row belongs to: a corporation's faction, an agent's corporation with its level and division. */
 export interface NpcBelongsTo {
   name: string;
-  /** Agents only. */
   level?: AgentLevel;
-  /** Agents only; absent for a division no baked agent works in. */
   division?: string;
 }
 
-/** The station a row is about, and how far: a corporation's or faction's nearest, an agent's own. */
 export interface NpcNearestPlace {
   stationId: number;
   systemId: number;
@@ -60,40 +38,29 @@ export interface NpcStandingRow {
   id: number;
   name: string;
   kind: NpcStandingKind;
-  /** The base standing (ESI's, unless `ESI_STANDINGS_ARE_BASE` is flipped). */
   base: number;
-  /** With the pilot's skills; null when skills or the row's chain are unknown. */
   effective: number | null;
   belongsTo: NpcBelongsTo | null;
-  /** The highest agent level the chain's best standing opens; null when the chain or the skills are unknown. */
   accessLevel: AgentLevel | null;
-  /** Agent rows only: whether this agent is open now; null for the rest, for an agent with no known level and when skills are unknown. */
   agentAccess: AgentAccess | null;
-  /** Null when the distances, the stations or the agent's station are unknown, or it owns none. */
   nearest: NpcNearestPlace | null;
   usedForFees: boolean;
 }
 
-/** The NPC corporation data a row reads. */
 export interface NpcCorporationLookup {
-  /** Corporation id to faction id; a corporation without a faction is absent. */
   factions: ReadonlyMap<number, number>;
   corporationName(corporationId: number): string | undefined;
   factionName(factionId: number): string | undefined;
 }
 
-/** Everything a row reads beside the standings and names; each part is null when it could not be read. */
 export interface NpcStandingsReference {
-  /** The pilot's social skills; null when unknown. */
   skills: SocialSkillLevels | null;
   corporations: NpcCorporationLookup | null;
   agents: {
     agentById(agentId: number): NpcAgent | undefined;
     divisionName(divisionId: number): string | undefined;
   } | null;
-  /** The NPC station snapshot, for the nearest station of each row. */
   stations: readonly NpcStationEntry[] | null;
-  /** Jumps from the pilot's Current System to every reachable system; null when unknown. */
   jumps: ReadonlyMap<number, number> | null;
 }
 
@@ -119,12 +86,10 @@ const CHAIN_KIND: Record<NpcStandingKind, ChainKind> = {
 
 const NO_FACTIONS: ReadonlyMap<number, number> = new Map();
 
-/** Owner corporation and faction ids of every Trade Hub. */
 export function feeOwnerIds(): ReadonlySet<number> {
   return new Set(TRADE_HUBS.flatMap((hub) => [hub.ownerCorporationId, hub.ownerFactionId]));
 }
 
-/** Highest base standing first. */
 export function buildNpcStandingRows(
   entries: readonly CharacterStandingEntry[],
   names: ReadonlyMap<number, string>,
@@ -138,9 +103,6 @@ export function buildNpcStandingRows(
       const kind = KIND[entry.from_type];
       const agent = kind === 'agent' ? agents?.agentById(entry.from_id) : undefined;
       const agentLevel = agent ? asAgentLevel(agent.level) : null;
-      // A corporation's or agent's faction link needs the corporation data and an
-      // agent's corporation needs the agents data. Without them the chain is
-      // unknown, never a shorter one that would understate access.
       const target: ChainTarget | null =
         kind === 'faction'
           ? { kind: 'faction', id: entry.from_id }
@@ -178,7 +140,6 @@ export function buildNpcStandingRows(
     .sort((a, b) => b.base - a.base);
 }
 
-/** An agent sits in one station; a corporation or faction owns many, of which the nearest counts. */
 function nearestPlace(
   kind: NpcStandingKind,
   id: number,
@@ -227,7 +188,6 @@ function belongsTo(
 export interface NpcStandingsFilter {
   text: string;
   kinds: ReadonlySet<NpcStandingKind>;
-  /** Keep rows whose chain opens at least this agent level; null keeps all. */
   minAccess: number | null;
   feesOnly: boolean;
 }
@@ -239,10 +199,6 @@ export const EVERY_NPC_STANDING: NpcStandingsFilter = {
   feesOnly: false,
 };
 
-/**
- * Filters set away from their default, for `FilterBar`'s pills. The search
- * text is not one: it sits outside the funnel, in its own box.
- */
 export function activeNpcStandingsFilters(
   { kinds, minAccess, feesOnly }: NpcStandingsFilter,
   t: Translate
@@ -274,7 +230,6 @@ export function activeNpcStandingsFilters(
   return active;
 }
 
-/** Name, what it belongs to (and an agent's division), or numeric id substring, as `filterContacts` matches. */
 export function filterNpcStandingRows(
   rows: readonly NpcStandingRow[],
   { text, kinds, minAccess, feesOnly }: NpcStandingsFilter
@@ -301,20 +256,17 @@ export function countNpcStandingRows(
   return counts;
 }
 
-/** The agent level an agent row opens (0 when you cannot use them), the chain's highest level otherwise; null when unknown. */
 export function npcAccessLevel(row: NpcStandingRow): number | null {
   if (row.kind !== 'agent') return row.accessLevel;
   if (!row.agentAccess) return null;
   return row.agentAccess.open ? (row.belongsTo?.level ?? null) : 0;
 }
 
-/** `npcAccessLevel` as the table sorts it: an open agent with no known level still counts as level 1. */
 export function npcAccessSortValue(row: NpcStandingRow): number | undefined {
   if (row.kind === 'agent' && row.agentAccess?.open) return row.belongsTo?.level ?? 1;
   return npcAccessLevel(row) ?? undefined;
 }
 
-/** What an agent row says about using that agent; null for other kinds and when it cannot be told. */
 export function npcAgentAccessText(t: Translate, row: NpcStandingRow): string | null {
   const access = row.kind === 'agent' ? row.agentAccess : null;
   if (!access) return null;

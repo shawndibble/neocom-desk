@@ -12,12 +12,6 @@ import {
   type SystemLookup,
 } from './ansiblex';
 
-/**
- *   A ─ B ─ C ─ D ─ E        the gate way, four jumps
- *   A ═ D                    an Ansiblex: one jump
- *
- * HI is a highsec system, J a wormhole system: neither can hold an Ansiblex.
- */
 const A = 30000001;
 const B = 30000002;
 const C = 30000003;
@@ -201,7 +195,6 @@ describe('routing over a bridge', () => {
       extraConnections: bridgeConnections([AD]),
     };
     expect(findJumpRoute(GRAPH, A, D, options)).toEqual({ kind: 'route', systems: [A, D] });
-    // One jump into D costs D's full price: the bridge saves the jumps before it, not the landing.
     const bridgeStep = routeCost(GRAPH, [A, D], options);
     expect(bridgeStep).toBe(routeCost(GRAPH, [C, D], { ...options, extraConnections: undefined }));
     expect(bridgeStep).toBeGreaterThan(1);

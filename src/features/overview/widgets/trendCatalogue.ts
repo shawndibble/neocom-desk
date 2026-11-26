@@ -1,12 +1,5 @@
-/**
- * What a Market Trend widget can be pointed at besides the Quickbar, read from
- * the market catalogue: the minerals, the ice products, one raw ore per ore
- * (its grades and compressed forms are separate types that trade alike), and
- * PLEX with the skill injectors. Pure: the dialog hands in the catalogue.
- */
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
-/** Every list the Items dialog can pick from, in dropdown order: the one place the ids are named. */
 export const TREND_SOURCE_IDS = [
   'minerals',
   'ice',
@@ -32,13 +25,10 @@ export interface TrendSource {
 
 const MINERALS_GROUP = 1857;
 const ICE_PRODUCTS_GROUP = 1033;
-/** The Standard Ores branch of the market tree: each child group is one ore. */
 const ORES_GROUP = 54;
 const EMPIRE_ORES_GROUP = 3849;
 const ICE_ORES_GROUP = 1855;
-/** The Moon Ores branch: each child group is a rarity tier of four ores. */
 const MOON_ORES_GROUP = 2395;
-/** PLEX, then the Large and Small Skill Injectors. */
 export const TREND_PLEX_IDS: readonly number[] = [44992, 40520, 45635];
 
 const byName = (a: TrendSourceItem, b: TrendSourceItem) => a.name.localeCompare(b.name);
@@ -59,8 +49,6 @@ export function trendCatalogue(
     return pool.filter((entry) => wanted.has(entry.name)).map(asItem);
   };
 
-  // Standard ores: the type named like its group is the base grade (the group
-  // also holds grades and odd extras). Empire Ores have only X-Grade types.
   const standardPool = groups
     .filter((g) => g.parentId === ORES_GROUP && g.id !== EMPIRE_ORES_GROUP)
     .flatMap((g) => types.filter((entry) => entry.marketGroupId === g.id && entry.name === g.name))
@@ -74,8 +62,6 @@ export function trendCatalogue(
   ]);
   const standardTypes = types.filter((entry) => standardGroupIds.has(entry.marketGroupId));
 
-  // Ice and moon ores: the base grade is a plain, ungraded name that is not a
-  // richer variant of another ("Brimful Zeolites" ends in "Zeolites").
   const baseGrades = (pool: readonly MarketTypeEntry[]): TrendSourceItem[] => {
     const plain = pool.filter(
       (entry) =>
@@ -116,11 +102,6 @@ export interface TrendSearchHit extends TrendSourceItem {
   sourceId: TrendSourceId | 'quickbar';
 }
 
-/**
- * Items whose name contains the query, across every list at once, each named
- * once under the first list that holds it. Names that start with the query
- * come before ones that merely contain it; ties keep list order.
- */
 export function searchTrendItems(
   lists: readonly { id: TrendSearchHit['sourceId']; items: readonly TrendSourceItem[] }[],
   query: string

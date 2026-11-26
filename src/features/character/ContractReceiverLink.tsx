@@ -11,7 +11,6 @@ interface Props {
   standing?: EffectiveStanding | null;
 }
 
-/** Receiver's entity link + standing; a dim "offered" tag when it was only assigned, "—" when none. */
 export function ContractReceiverLink({ receiver, name, standing = null }: Props) {
   const { t } = useTranslation();
   if (receiver === null) return <span className="text-text-dim">—</span>;

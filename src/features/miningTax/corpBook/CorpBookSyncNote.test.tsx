@@ -141,7 +141,6 @@ describe('CorpBookSyncNote', () => {
         'You owe 766,000 ISK. 666,000 ISK of it is 18 Oct, billed after 06:00 UTC on 19 Oct.'
       )
     ).toBeInTheDocument();
-    // Not "safe to pay" beside a day that is not closed yet.
     expect(screen.queryByText(/Safe to pay/)).not.toBeInTheDocument();
   });
 
@@ -228,7 +227,6 @@ describe('CorpBookSyncNote', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // `LeftCorpNotice` says it, with Pay and Stop showing: saying it here too only repeated it.
   it('leaves a leaver to the left-the-corp notice', () => {
     const { container } = render(
       <CorpBookSyncNote book={book({}, { left: true })} owedNow={0} now={NOW} />

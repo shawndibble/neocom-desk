@@ -20,8 +20,6 @@ import { buildVariationIndex } from '../../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from '../types';
 import { baseFittingStats } from '../__fixtures__/fittingStats';
 
-// Groups: 38 shield extender, 77 shield hardener, 60 damage control, 57 shield power relay,
-// 1156 a shield low module, 770 shield flux coil, 46 propulsion, 774 shield rig, 99999 nothing.
 interface Type {
   group: number;
   rack: FittingSlotKind;
@@ -34,7 +32,7 @@ interface Type {
 const TYPES: Record<number, Type> = {
   1: { group: 38, rack: 'medium', meta: 1, ehp: 100, cpu: 10 },
   2: { group: 38, rack: 'medium', meta: 2, ehp: 150, cpu: 12 },
-  3: { group: 38, rack: 'medium', meta: 5, ehp: 400, cpu: 12 }, // officer
+  3: { group: 38, rack: 'medium', meta: 5, ehp: 400, cpu: 12 },
   4: { group: 77, rack: 'medium', meta: 2, ehp: 120, cpu: 15 },
   5: { group: 77, rack: 'medium', meta: 1, ehp: 90, cpu: 12 },
   10: { group: 60, rack: 'low', meta: 2, ehp: 200, cpu: 5 },
@@ -238,7 +236,6 @@ describe('findMakeover', () => {
   });
 
   it('finds a pair that only gains together, which the plain search misses', async () => {
-    // A hardener gains but overruns the CPU; dropping the flux coil frees it but loses alone.
     const types: Record<number, Type> = {
       1: { group: 38, rack: 'medium', meta: 1, ehp: 100, cpu: 10 },
       4: { group: 77, rack: 'medium', meta: 2, ehp: 120, cpu: 70 },
@@ -274,7 +271,6 @@ describe('findMakeover', () => {
       ['low', 0, 11],
       ['low', 1, 11],
     ]);
-    // The cap-unstable module is offered and is the biggest single gain.
     expect(catalogue(TYPES).moves()(f).map(label)).toContain('11>16@l0');
     const { result } = await search(f);
     expect(result?.makeover?.fitting.modules.some((m) => m.typeId === 16)).toBe(false);
@@ -307,7 +303,6 @@ describe('findMakeover', () => {
         return statsOf(g);
       },
       priceOf: () => 1,
-      // Round 1, then three moves of round 2 (the first, cap-unstable, is rejected).
       shouldStop: () => calls >= firstRound + 3,
     });
     expect(result?.stopped).toBe(true);
@@ -329,7 +324,6 @@ describe('findMakeover', () => {
       stats: async (g) => {
         inFlight++;
         peak = Math.max(peak, inFlight);
-        // Later calls finish sooner, so results arrive out of order.
         await new Promise((resolve) => setTimeout(resolve, (7 - (n++ % 7)) * 2));
         inFlight--;
         return statsOf(g);
@@ -344,7 +338,6 @@ describe('findMakeover', () => {
     expect(result?.makeover?.rows.map(label)).toEqual(serial.result?.makeover?.rows.map(label));
     expect(result?.makeover?.fitting.modules).toEqual(serial.result?.makeover?.fitting.modules);
     expect(result?.makeover?.score).toBe(serial.result?.makeover?.score);
-    // Moves calculated ahead of a lazy stop still count.
     expect(result!.calcs).toBeGreaterThanOrEqual(serial.result!.calcs);
     expect(result!.calcs).toBeLessThanOrEqual(maxCalcs);
     expect(Math.max(...progress)).toBeLessThanOrEqual(maxCalcs);
@@ -402,7 +395,6 @@ describe('findMakeover', () => {
   });
 
   it('an open fit over its budget gets no Makeover and no calculation: Make it fit comes first', async () => {
-    // Type 15 uses 40 CPU each: three of them overrun the 100 CPU.
     const over = fit([
       ['low', 0, 15],
       ['low', 1, 15],
@@ -429,7 +421,6 @@ describe('findMakeover', () => {
   });
 
   it('shows no makeover when it beats the best single change by too little', async () => {
-    // A Damage Control gains 1000 EHP; the second change adds only 10 more.
     const types: Record<number, Type> = {
       13: { group: 99999, rack: 'low', meta: 1, ehp: 0 },
       14: { group: 99998, rack: 'low', meta: 1, ehp: 0 },
@@ -474,7 +465,6 @@ describe('rowsBetween', () => {
   });
 
   it('shows the net change in a rack: a module that only moved slot is no row', () => {
-    // An extender became an afterburner and a guidance computer became an extender: net, the computer became the afterburner.
     const f = fit([
       ['medium', 0, 1],
       ['medium', 1, 4],
@@ -522,7 +512,6 @@ describe('makeoverBar', () => {
     }) as unknown as Parameters<typeof makeoverBar>[0]['noDownside'][number];
 
   it('is the best single swap to a Tech I or Tech II module, never a faction or officer step', () => {
-    // 3 is officer: a big gain the Makeover never offers does not hide it.
     const bar = makeoverBar(
       { noDownside: [option(3, 0.5), option(2, 0.1)], tradeOffs: [option(4, 0.2)] },
       index
@@ -595,7 +584,6 @@ describe('hull commonality (#5581)', () => {
       ['low', 0, 40],
       ['medium', 0, 50],
     ]);
-    // Moves from whatever the fit holds now, as the real move list is.
     const moveList =
       (to: number) =>
       (current: Fitting): ImproveCandidate[] => {
@@ -629,8 +617,6 @@ describe('hull commonality (#5581)', () => {
 });
 
 describe('the propulsion a job needs (#5578)', () => {
-  // 1 extender and 2 hardener (mediums), 11 and 10 the lows (a Damage Control gain keeps the Makeover over one row),
-  // 20 an afterburner, 21 an MWD, 22 a Large and 23 a Medium Micro Jump Drive.
   const types: Record<number, Type> = {
     1: { group: 38, rack: 'medium', meta: 2, ehp: 150 },
     2: { group: 77, rack: 'medium', meta: 2, ehp: 120 },
@@ -654,11 +640,9 @@ describe('the propulsion a job needs (#5578)', () => {
     propulsion: { afterburner: 0, mwd: 0, mjd: 0, ...propulsion },
   });
 
-  /** A Makeover of `fitting` under the job, with the propulsion the job needs. */
   async function run(
     fitting: Fitting,
     extra: Partial<MakeoverMoveOptions> = {},
-    // A cruiser: no Large Micro Jump Drive.
     flyable: (slot: FittingSlotKind, typeId: number) => boolean = (_slot, typeId) => typeId !== 22,
     bestSingle = 0
   ) {
@@ -690,7 +674,6 @@ describe('the propulsion a job needs (#5578)', () => {
   });
 
   it('shows a Makeover that meets the need even when a single swap scores higher, propulsion its only change', async () => {
-    // Nothing else gains: two extenders and a Damage Control. No single swap adds propulsion, so the Makeover is where the need is met.
     const settled = fit([
       ['medium', 0, 1],
       ['medium', 1, 1],
@@ -814,7 +797,6 @@ describe('the propulsion a job needs (#5578)', () => {
     it('Explore never turns an MWD into an afterburner', () => {
       const explore = labels(withMwd, { jobSetting: jobSettingOf('explore'), goal: 'overall' });
       expect(explore.filter((l) => l.startsWith('21>20'))).toEqual([]);
-      // PvE may still: the score decides.
       const pve = labels(withMwd, { jobSetting: jobSettingOf('pve'), goal: 'overall' });
       expect(pve).toContain('21>20@m0');
     });

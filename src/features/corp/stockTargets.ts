@@ -1,12 +1,3 @@
-/**
- * Corp stock targets (issue #4671): the minimum quantity of an item type a
- * corporation should hold, set by a Director on the Corp assets page. One
- * synced setting for the whole account, `{corporationId: {typeId: quantity}}`
- * (see `sync.corpStockTargets` in `src/sync/syncedSettings.ts`).
- *
- * The edits are pure so they are testable without a store. `useCorpStockTargets`
- * binds them to one corporation for the page, the dialog and the widget.
- */
 import { useCallback, useMemo } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -14,20 +5,11 @@ import { isPlainRecord } from '@/engine/guards';
 
 export const CORP_STOCK_TARGETS_KEY = 'sync.corpStockTargets';
 
-/** typeId (as a string key) → whole number of units to keep. */
 export type TypeTargets = Record<string, number>;
-/** corporationId (as a string key) → that corporation's targets. */
 export type CorpStockTargets = Record<string, TypeTargets>;
 
 const isTarget = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0;
 
-/**
- * Runs on every value read back, including one another device wrote. Drops a
- * target that is not a whole number above zero and any entry whose type id is
- * not a positive integer. Corporation ids are all kept, even ones this build
- * knows nothing about and ones left with no targets, so a newer build's data
- * survives an edit made here.
- */
 export function parseCorpStockTargets(raw: unknown): CorpStockTargets | null {
   if (!isPlainRecord(raw)) return null;
   const out: CorpStockTargets = {};
@@ -48,7 +30,6 @@ export const useCorpStockTargetsStore = createSyncedSetting<CorpStockTargets>({
   parse: parseCorpStockTargets,
 });
 
-/** One corporation's targets as a map; empty for a corporation with none. */
 export function targetsForCorp(
   all: CorpStockTargets,
   corporationId: number
@@ -60,10 +41,6 @@ export function targetsForCorp(
   return map;
 }
 
-/**
- * Sets one type's target, rounding down. A target below 1 removes it, so
- * "empty" and "0" both mean no target. Other corporations are untouched.
- */
 export function withTarget(
   all: CorpStockTargets,
   corporationId: number,
@@ -90,11 +67,8 @@ export function withoutTarget(
 }
 
 export interface CorpStockTargetsApi {
-  /** False until the stored value has loaded; a write before then would overwrite it. */
   hydrated: boolean;
-  /** typeId → target. */
   targets: ReadonlyMap<number, number>;
-  /** Sets a target (a value below 1 removes it). */
   setTarget: (typeId: number, target: number) => void;
   removeTarget: (typeId: number) => void;
 }
@@ -108,8 +82,6 @@ export function useCorpStockTargets(corporationId: number | null): CorpStockTarg
     () => (corporationId === null ? new Map<number, number>() : targetsForCorp(all, corporationId)),
     [all, corporationId]
   );
-  // Read the store at call time, so two quick edits compose rather than the
-  // second overwriting the first from a stale render.
   const setTarget = useCallback(
     (typeId: number, target: number) => {
       if (corporationId === null || !hydrated) return;

@@ -14,13 +14,6 @@ import { isk } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
 
-/**
- * The Moon owners list on a phone: one row per corporation, "Stacked". The name
- * gets the whole row width, then the state and one muted note, then the amount
- * owed on the left and Pay on the right, so a long name and an eleven-digit amount
- * never fight for the same line. Mined and the rates live on the page the row
- * opens. The row opens that page; Pay does not.
- */
 export function MoonOwnerCards({
   rows,
   name,
@@ -31,11 +24,9 @@ export function MoonOwnerCards({
 }: {
   rows: readonly MoonOwnerRow[];
   name: (corporationId: number) => string;
-  /** Epoch ms the ages are read at. */
   now: number;
   onOpen: (row: MoonOwnerRow) => void;
   onPay?: (row: MoonOwnerRow) => void;
-  /** Pop Sharing marks by moon owner corporation (#6226). */
   shareMarks?: Readonly<Record<string, PopShareMark>>;
 }) {
   const zone = useTimeZone();
@@ -50,7 +41,6 @@ export function MoonOwnerCards({
               'flex cursor-pointer items-center gap-3 px-3 py-3',
               rowInteractiveClassName
             )}
-            // A tap on the share mark reads its tooltip, not the row.
             onClick={(e) => isRowOwnEvent(e) && onOpen(r)}
           >
             <div className="min-w-0 flex-1 space-y-1">
@@ -97,7 +87,6 @@ function OwedLine({
   onPay: ((row: MoonOwnerRow) => void) | undefined;
 }) {
   const { t } = useTranslation();
-  // Settled otherwise still shows what was owed before the switch (#6209).
   if (r.mode === 'settled-otherwise' && r.owed === 0)
     return <p className="pt-1 text-xs text-text-dim">{t(k('settled'))}</p>;
   if (r.theirRatePct === undefined && r.owed === 0)

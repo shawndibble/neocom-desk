@@ -1,9 +1,3 @@
-// The Firestore side of server-pushed events (issue #5121): which devices want
-// an event for a Character, pushing one fire to them, the polled tick's device
-// list and readings, and the community triggers' document reads. index.ts keeps
-// only the `onSchedule`/`onDocumentCreated` wiring; the decisions are in
-// serverEvents.ts, communityPush.ts and serverEventPoll.ts.
-
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import {
@@ -47,12 +41,6 @@ function stringList(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
 }
 
-/**
- * Push one fire to every device that holds its Character and enabled its event
- * for the browser channel, outside the device's quiet time. A dead token
- * deletes the registration, as the other two send paths do. Returns how many
- * devices received it.
- */
 export async function deliverServerEvent(
   db: Firestore,
   sender: PushSender,
@@ -88,11 +76,6 @@ export async function deliverServerEvent(
   return sent;
 }
 
-/**
- * Deletes a device's registration after FCM called its token dead, but only if
- * the doc still holds that token: a re-registration with a fresh token in the
- * meantime must survive.
- */
 export async function deleteDeviceIfToken(
   db: Firestore,
   deviceId: string,
@@ -110,7 +93,6 @@ export async function deleteDeviceIfToken(
   });
 }
 
-/** The polled tick's devices: those with a price alert or ship-lost event on for some Character. */
 export async function listPolledDevices(db: Firestore, stats?: RunStats): Promise<PolledDevice[]> {
   const snap = await db
     .collection(DEVICE_REGISTRATIONS_COLLECTION)
@@ -146,11 +128,6 @@ export async function listPolledDevices(db: Firestore, stats?: RunStats): Promis
   return devices;
 }
 
-/**
- * Replaces the device's readings. `update`, not `set`, so a registration
- * written meanwhile keeps its other fields; a device deleted meanwhile (logged
- * out, dead token) is left deleted.
- */
 export async function saveServerBaselines(
   db: Firestore,
   deviceId: string,
@@ -165,7 +142,6 @@ export async function saveServerBaselines(
     stats?.add('firestoreWrites');
   } catch (err) {
     const code = err instanceof Error && 'code' in err ? (err as { code: unknown }).code : null;
-    // 5 = NOT_FOUND: the device is gone, nothing to keep a reading for.
     if (code !== 5 && code !== 'not-found') throw err;
   }
 }
@@ -173,7 +149,6 @@ export async function saveServerBaselines(
 const communityRef = (db: Firestore, communityId: string) =>
   db.collection(COMMUNITIES_COLLECTION).doc(communityId);
 
-/** A doc created directly under a Community: a join request or a new Member. */
 export async function onCommunityChildCreated(
   db: Firestore,
   sender: PushSender,
@@ -182,7 +157,6 @@ export async function onCommunityChildCreated(
   nowMs: number,
   log: Log
 ): Promise<void> {
-  // The waiting list, not the item Requests (`itemRequests`).
   const isRequest = params.collection === JOIN_REQUESTS_COLLECTION;
   const isMember = params.collection === COMMUNITY_MEMBERS_COLLECTION;
   if (!isRequest && !isMember) return;
@@ -201,7 +175,6 @@ function millis(value: unknown): number | null {
   return typeof stamp?.toMillis === 'function' ? stamp.toMillis() : null;
 }
 
-/** A Pledge doc created on a Request: its requester is told. */
 export async function onPledgeCreated(
   db: Firestore,
   sender: PushSender,

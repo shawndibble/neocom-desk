@@ -8,7 +8,6 @@ import { AbyssalRunPlanner } from './AbyssalRunPlanner';
 import { useAbyssalRunPlan } from './abyssalRunPlan';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
 
-// A full FittingStats is far more than this test is about.
 vi.mock('@/engine/fittings/variationDelta', async (original) => ({
   ...(await original<object>()),
   diffFittingStats: () => ({ changes: [{ key: 'ehp', before: 1000, after: 900 }], count: 1 }),
@@ -93,7 +92,7 @@ describe('AbyssalRunPlanner', () => {
   });
 
   it('names the filament to buy for the picked weather and shows what it does to the fit', async () => {
-    useAbyssalWeather.setState({ weatherTypeId: 47382 }); // Electrical 2
+    useAbyssalWeather.setState({ weatherTypeId: 47382 });
     const compare = vi.fn().mockResolvedValue({ before: stats(1000), after: stats(900) });
     setup(26, compare);
     expect(await screen.findByRole('link', { name: 'Fierce Electrical Filament' })).toBeTruthy();
@@ -102,7 +101,7 @@ describe('AbyssalRunPlanner', () => {
   });
 
   it('names the tier-and-kind filament for a strength the tier never rolls, and the tiers that do', async () => {
-    useAbyssalWeather.setState({ weatherTypeId: 47383 }); // Electrical 3: −70%
+    useAbyssalWeather.setState({ weatherTypeId: 47383 });
     const compare = vi.fn().mockResolvedValue({ before: stats(1000), after: stats(900) });
     setup(26, compare);
     expect(await screen.findByRole('link', { name: 'Fierce Electrical Filament' })).toBeTruthy();

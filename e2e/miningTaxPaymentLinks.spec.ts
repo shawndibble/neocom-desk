@@ -1,10 +1,3 @@
-/**
- * Linking a wallet payment to a personal Payee (decision 20261120-235011, "linking money under one
- * payment model"): a payment links to one Payee and pays its oldest unpaid days. A suggestion
- * identifies the recipient only; any other payment is picked by hand. Paid marks an older client
- * left on Assignments are read into links once, and the figures come out the same. Personal data
- * only (Dexie), so this runs in the main suite.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -57,7 +50,6 @@ test('a payment to the Payee is suggested, and linking it pays the oldest days',
       }),
     ],
   });
-  // The "Payments to link" card offers it, matched by its recipient (the Payee's learned entity).
   await page.getByRole('button', { name: 'Review' }).click();
   const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
   const payment = dialog.getByRole('radio', { name: new RegExp(`${isk(2 * DAY_TAX)} ISK`) });
@@ -76,7 +68,6 @@ test('a payment to someone else is linked by hand', async ({ page }) => {
   await openPersonalTax(page, rookOwed(CHARACTER_ID, DAYS), {
     characterId: CHARACTER_ID,
     mining: personalLedger(DAYS),
-    // Paid to Rook's alt: nothing says it was Rook's, so nothing is picked.
     journal: [
       journalDonation({
         refId: 7202,
@@ -91,14 +82,12 @@ test('a payment to someone else is linked by hand', async ({ page }) => {
   const payment = dialog.getByRole('radio', { name: new RegExp(MINER.fen.name) });
   await expect(payment).not.toBeChecked();
   await payment.check();
-  // Opened from the Payee's card, a payment picked by hand goes to that Payee.
   await dialog.getByRole('button', { name: `Link to ${ROOK.name}` }).click();
   await expect(dialog).toBeHidden();
   await expect(owedCard(page)).toContainText(isk(OWED - DAY_TAX));
 });
 
 test('old paid marks are read into a link and the figures stay the same', async ({ page }) => {
-  // Days 6 and 5 marked paid by an older client, with the lump sum it recorded; day 4 still owed.
   const [six, five, four] = DAYS.map((back) =>
     assignment({ characterId: CHARACTER_ID, payeeId: ROOK_PAYEE_ID, back })
   );
@@ -116,8 +105,6 @@ test('old paid marks are read into a link and the figures stay the same', async 
     },
     { characterId: CHARACTER_ID, mining: personalLedger(DAYS) }
   );
-  // The marks are read into links as the app starts, and it has started already (before the seed):
-  // drop its "already read" flag and start it again.
   await forgetPaidMarksRead(page);
   await page.reload();
   await page.getByRole('tab', { name: 'Tax', selected: true }).waitFor();

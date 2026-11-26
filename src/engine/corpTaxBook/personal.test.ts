@@ -18,11 +18,8 @@ const ZEO = 45490;
 const SYL = 45491;
 
 const NOW = '2026-10-18T14:00:00Z';
-/** Past a 2026-10-17 Conflict's 14 days: the book's share of it is owed. */
 const LATE = '2026-11-05T14:00:00Z';
-/** A day after 2026-10-17 ended: over-listed ore on it is no longer Settling. */
 const SETTLED = '2026-10-19T00:00:00Z';
-// Synced 2h ago: every day through 17 Oct is Billable (day end + 6h grace, then a sync).
 const SYNCED = '2026-10-18T12:00:00Z';
 
 const entry = (over: Partial<PersonalEntry> = {}): PersonalEntry => ({
@@ -71,10 +68,8 @@ const book = (over: Partial<PersonalBook> = {}): PersonalBook => ({
   ...over,
 });
 
-/** The book's tax on the default day: 43,050 Zeolites at 148 ISK and 15%. */
 const DAY = 43_050 * 148 * 0.15;
 
-/** A Late notice asking for `lines` (the default day's charge by default). */
 const noticeOf = (over: Partial<LateNotice> = {}): LateNotice => {
   const lines = over.lines ?? [
     {
@@ -125,7 +120,6 @@ describe('overlayCorpBooks', () => {
     expect(row.rateScope).toBe('corp');
     expect(row.rateEffectiveFrom).toBe('2026-10-01');
     expect(row.taxOwed).toBeCloseTo(43_050 * 148 * 0.15, 4);
-    // The corp took the unassigned ore, so the personal residual row has nothing left.
     expect(out.takenFromFree.get(`${ME}:2026-10-17:${SYSTEM}`)).toEqual([
       { typeId: ZEO, quantity: 41_200 },
     ]);
@@ -231,7 +225,7 @@ describe('overlayCorpBooks', () => {
           ],
         }),
       ],
-      [book()] // the book observed Zeolites only
+      [book()]
     );
     expect(out.labels.get(`${ME}:2026-10-17:${SYSTEM}`)).toMatchObject({
       state: 'unattributed',
@@ -240,19 +234,13 @@ describe('overlayCorpBooks', () => {
   });
 
   it('leaves ore no book observed at all as plain Unassigned, not Unattributed', () => {
-    const out = overlay(
-      [entry({ date: '2026-10-13' })],
-      [book({ observed: [] })] // synced after the day closed, book saw nothing
-    );
+    const out = overlay([entry({ date: '2026-10-13' })], [book({ observed: [] })]);
     expect(out.rows).toEqual([]);
     expect(out.labels.size).toBe(0);
   });
 
   it('leaves ore in a system no book observed Unassigned even when it observed another system that day', () => {
-    const out = overlay(
-      [entry({ solarSystemId: 30000142 })],
-      [book()] // the book's observation is in SYSTEM
-    );
+    const out = overlay([entry({ solarSystemId: 30000142 })], [book()]);
     expect(out.labels.size).toBe(0);
   });
 
@@ -299,7 +287,6 @@ describe('overlayCorpBooks', () => {
       taxOwed: null,
       conflictCause: 'otherPayee',
     });
-    // Closed at 18 Oct 00:00 + 30 min grace on the 17th → 14 days after 2026-10-18T00:30.
     expect(out.rows[0].resolvesAt).toBe('2026-11-01T00:30:00.000Z');
   });
 
@@ -373,8 +360,6 @@ describe('overlayCorpBooks', () => {
           },
         ],
       };
-      // 40,000 to another Payee, 20,000 free: the dismissed book contests 20,000 of the Payee's
-      // ore but bills none of it, so its share stays the Payee's and the next book still names it.
       const out = overlay([day([given('x', 'ashfall', 40_000)], 20_000)], [dismissed, second!]);
       expect(out.rows.filter((r) => r.corporationId === CORP).map((r) => r.state)).toEqual([
         'dismissed',
@@ -399,8 +384,6 @@ describe('overlayCorpBooks', () => {
     });
 
     it("names the Payee on each book's conflict, each capped at the ore it contests", () => {
-      // 30,000 to another Payee, 30,000 free: the first book takes 30,000 free and contests
-      // 10,000; the second contests all 20,000 of its own.
       const out = overlay([day([given('x', 'ashfall', 30_000)], 30_000)], twoBooks());
       const conflicts = out.rows.filter((r) => r.state === 'conflict');
       expect(conflicts.map((r) => [r.corporationId, r.oreLines[0].quantity])).toEqual([
@@ -476,7 +459,6 @@ describe('overlayCorpBooks', () => {
       expect(out.rows[0]).toMatchObject({ state: 'billed' });
       expect(out.rows[0].taxOwed).toBeGreaterThan(0);
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
-      // The ore was the Payee's, not free: nothing comes off the residual row.
       expect(out.takenFromFree.size).toBe(0);
     });
 
@@ -510,7 +492,6 @@ describe('overlayCorpBooks', () => {
         ],
       });
       const out = overlay([two], [book({ ownPayeeIds: ['bmw'] })], SETTLED);
-      // 40,000 + 3,050 fill the book's 43,050; the other 5,950 of 'two' is over-listed.
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['one', 'two']);
       expect(out.rows.find((r) => r.state === 'conflict')?.oreLines).toEqual([
         { typeId: ZEO, quantity: 5_950 },
@@ -559,13 +540,11 @@ describe('overlayCorpBooks', () => {
             oreLines: [{ typeId: ZEO, quantity: 43_050 }],
           },
         ],
-        // The donation that paid the 16th, also sitting in flight.
         inFlight: [{ characterId: ME, amount: 43_050 * 148 * 0.15, at: '2026-10-18T11:00:00Z' }],
       });
       const out = overlay([two, other], [b]);
       const byDate = (d: string) => out.rows.find((r) => r.date === d)!;
       expect(byDate('2026-10-16').state).toBe('paid');
-      // The 17th is not paid by the same ISK a second time.
       expect(byDate('2026-10-17').state).toBe('billed');
     });
 
@@ -684,8 +663,6 @@ describe('overlayCorpBooks', () => {
       ],
       [book(), other]
     );
-    // 43,050 + 20,000 observed against 30,000 mined: the personal ore is split 19,000-ish / 9,500-ish,
-    // and none of it is left over.
     const taken = out.takenFromFree.get(`${ME}:2026-10-17:${SYSTEM}`);
     expect(taken?.reduce((sum, l) => sum + l.quantity, 0)).toBe(30_000);
     expect(out.rows.filter((r) => r.state === 'billed')).toHaveLength(2);
@@ -712,7 +689,6 @@ describe('overlayCorpBooks', () => {
     const open = overlay([entry()], [book({ notices: [noticeOf()] })]);
     expect(open.rows[0]).toMatchObject({ state: 'billed', noticeId: 'n1' });
     expect(open.rows[0].taxOwed).toBeCloseTo(DAY, 4);
-    // A notice whose days are unpaid is the member's overdue one.
     expect(open.books[0].notices).toMatchObject([{ noticeId: 'n1', code: 'MTABCDEF' }]);
     const paid = overlay(
       [entry()],
@@ -897,7 +873,6 @@ describe('overlayCorpBooks', () => {
     const entries = ['2026-10-15', '2026-10-16', '2026-10-17'].map((date) =>
       entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] })
     );
-    // 10,000 × 148 × 15% = 222,000 a day.
     const out = overlay(entries, [
       book({
         observed,
@@ -938,7 +913,6 @@ describe('overlayCorpBooks', () => {
       '2026-10-15': ['paid', 0],
       '2026-10-16': ['billed', 222_000],
     });
-    // Every ISK of it paid the oldest day: none is left as credit.
     expect(out.books[0].credit).toBe(0);
     expect(out.rows.find((r) => r.date === '2026-10-15')?.state).toBe('paid');
   });
@@ -1000,7 +974,6 @@ describe('overlayCorpBooks', () => {
       overlay(entries, [book({ observed, payments: [paid(amount)] })]).books[0];
 
     describe('with an officer correction, as the corp book counts it', () => {
-      // Each day is 10,000 × 148 × 15% = 222,000.
       const adjust = (id: string, date: string, amount: number) => ({
         id,
         minerId: `solo:${ME}`,
@@ -1031,13 +1004,10 @@ describe('overlayCorpBooks', () => {
           source: 'donation' as const,
         });
         const withPayments = (amount: number) => [pay(amount)];
-        // 100,000 of the oldest 222,000 day: part paid.
         const part = rowsOf(withPayments(100_000)).find((r) => r.date === '2026-10-15')!;
         expect(part).toMatchObject({ taxOwed: 122_000, billed: 222_000 });
-        // 221,500 pays it within tolerance: 500 forgiven.
         const closed = rowsOf(withPayments(221_500)).find((r) => r.date === '2026-10-15')!;
         expect(closed).toMatchObject({ state: 'paid', forgivenIsk: 500 });
-        // A reversed correction changes nothing and stays on the day.
         const reversed = adjust('a', '2026-10-15', 300_000);
         const day = rowsOf(
           [],
@@ -1055,7 +1025,6 @@ describe('overlayCorpBooks', () => {
       });
 
       it('owes a charge dated on a day the member did not mine', () => {
-        // As the book counts it: the correction is a day of its own on the account.
         expect(withAdjustments(adjust('a', '2026-10-05', 1_000_000))).toMatchObject({
           credit: 0,
           account: { owes: { amount: 1_444_000, days: 3, oldest: '2026-10-05' } },
@@ -1094,7 +1063,6 @@ describe('overlayCorpBooks', () => {
         key: `${ME}:1000:${date}`,
         oreLines: [{ typeId: ZEO, quantity: 10_000 }],
         estimatedValue: 0,
-        // Priced differently from the day itself: the day's own figure is what is owed.
         tax: 999_999,
       });
       const notice = noticeOf({
@@ -1358,8 +1326,6 @@ describe('inFlightDonations', () => {
     ...over,
   });
 
-  // The one number an officer can search the corporation's own journal on; without it they
-  // are left matching by amount and minute.
   it('carries the wallet journal reference when the donation has one', () => {
     expect(inFlightDonations([made({ refId: 7788991 })], [], CORP, '2026-10-01')).toEqual([
       { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z', refId: 7788991 },
@@ -1408,20 +1374,17 @@ describe('inFlightDonations', () => {
     expect(inFlightDonations([made()], held, CORP, '2026-10-01')).toEqual([]);
   });
 
-  // Audit bug 5: one held 10M swallowed both of two 10M donations, hiding the second.
   it('pairs one held payment with one donation only', () => {
     const held = [{ characterId: ME, amount: 500_000, at: '2026-10-18T13:11:00Z' }];
     const two = [made({ refId: 1 }), made({ refId: 2, date: '2026-10-18T13:14:00Z' })];
     expect(inFlightDonations(two, held, CORP, '2026-10-01').map((d) => d.refId)).toEqual([2]);
   });
 
-  // Audit bug 6: an officer's hand record is dated by them (noon), never the journal's minute.
   it('pairs an officer’s hand record with the member’s donation within two days', () => {
     const held = [
       { characterId: ME, amount: 500_000, at: '2026-10-19T12:00:00Z', source: 'manual' as const },
     ];
     expect(inFlightDonations([made()], held, CORP, '2026-10-01')).toEqual([]);
-    // A donation the book holds is never matched with the same minute rule a day later.
     expect(
       inFlightDonations(
         [made()],
@@ -1433,8 +1396,6 @@ describe('inFlightDonations', () => {
   });
 
   it("matches the wallet's own record first, then an officer's hand record, closest pairs first (M9)", () => {
-    // Two equal donations two hours apart. The book read the first from its wallet; an officer
-    // recorded one by hand at noon, nearer the first. One to one, both are held.
     const two = [
       made({ refId: 1, date: '2026-10-18T10:00:00Z' }),
       made({ refId: 2, date: '2026-10-18T12:00:00Z' }),
@@ -1444,7 +1405,6 @@ describe('inFlightDonations', () => {
       { characterId: ME, amount: 500_000, at: '2026-10-18T10:30:00Z', source: 'manual' as const },
     ];
     expect(inFlightDonations(two, held, CORP, '2026-10-01')).toEqual([]);
-    // Listed hand record first: still the wallet's match is made first.
     expect(inFlightDonations(two, [held[1]!, held[0]!], CORP, '2026-10-01')).toEqual([]);
   });
 
@@ -1482,13 +1442,11 @@ describe('overlayCorpBooks: a moon owner read clock (#4622)', () => {
       [
         book({
           observed: [owned()],
-          // Last good read before the day closed: the day is not Billable yet.
           feeders: [{ corporationId: OWNER, lastReadWellAt: '2026-10-17T20:00:00Z' }],
         }),
       ]
     );
     expect(out.rows).toEqual([]);
-    // The miner's own ore still reads as waiting on the corporation, not plain Unassigned.
     expect(out.labels.get(`${ME}:2026-10-17:${SYSTEM}`)?.state).toBe('pending');
   });
 
@@ -1710,7 +1668,6 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         { typeId: ZEO, quantity: 6_950 },
         { typeId: SYL, quantity: 1_000 },
       ]);
-      // The kept part's worth, at the book's prices, of the whole Assignment's.
       const whole = 50_000 * 148 + 1_000 * 100;
       expect(kept?.valueShare).toBeCloseTo((6_950 * 148 + 1_000 * 100) / whole, 6);
     });
@@ -1736,18 +1693,14 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         conflictCause: 'overListed',
         oreLines: [{ typeId: ZEO, quantity: 6_950 }],
         taxOwed: null,
-        // The book never recorded it, so nothing bills it and it never resolves to the corp.
         billed: 0,
         overlap: { payeeIds: ['bmw'], ore: [{ typeId: ZEO, quantity: 6_950 }], paid: false },
       });
       expect(conflicts[0].resolvesAt).toBeUndefined();
-      // Both rows stand in for the Assignment.
       expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
     });
 
     describe('while the refinery log may still be catching up on the day', () => {
-      // A sync soon after the day closed, read before the settling window ran out: the sync must
-      // not be later than `now`, or the day would look closed by a sync that has not happened.
       const early = (
         entries: PersonalEntry[],
         books: PersonalBook[],
@@ -1785,7 +1738,6 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         expect(settling[0].overlap).toBeUndefined();
         expect(settling[0].conflictCause).toBeUndefined();
         expect(out.rows.some((r) => r.state === 'conflict')).toBe(false);
-        // The Assignment is still stood in for, so its ore is not listed twice.
         expect([...(out.absorbed.get(KEY) ?? [])]).toEqual(['a-bmw']);
       });
 
@@ -1942,7 +1894,6 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
   });
 
   it("disputes each book's quantity against its own share on a two-book day", () => {
-    // 50,000 mined, the books claim 40,000 + 20,000: each share is cut to 33,333 / 16,667.
     const out = overlay(
       [
         entry({
@@ -1984,7 +1935,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     oreLines: [{ typeId: ZEO, quantity: 43_050 }],
   });
   describe("a Miner's credit settles only its own days", () => {
-    // 43,050 × 148 × 15% = 955,710 a day; each payment is enough for one day.
     const DAY = 43_050 * 148 * 0.15;
     const twoMiners = (over: Partial<PersonalBook> = {}) =>
       book({ observed: [observedFor(ME), observedFor(ALT)], ...over });
@@ -2064,8 +2014,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       expect(out.alsoBilled.size).toBe(0);
     });
 
-    // The personal Payee waits on a Conflict: the corporation's row is the day's one bill until the
-    // member resolves it, so it is named as the share the Payee is not billed meanwhile.
     it('names the contested share as held back while the day is a Conflict', () => {
       const out = overlay([toOther(43_050)], [book()]);
       expect(out.conflicted.get(KEY)?.get('a-other')).toBeCloseTo(1, 6);
@@ -2156,7 +2104,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         const counted = { ...old, amount: Math.ceil(tax), at: '2026-10-18T11:00:00Z' };
         const lost = { ...old, amount: Math.ceil(tax) };
         const out = twoDays([counted, lost]);
-        // The pooled money paid both days; without the lost one, the newer day is owed again.
         expect(out.books[0].uncredited).toEqual([{ ...lost, covered: ['2026-10-17'] }]);
         const byDate = new Map(out.rows.map((r) => [r.date, r]));
         expect(byDate.get('2026-10-15')).toMatchObject({ state: 'paid' });
@@ -2166,18 +2113,15 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     });
 
     it('names the days it paid while it counted, so the member can dispute them', () => {
-      // Too little to cover the day: it covered nothing, and says so.
       const small = { ...old, amount: 1 };
       const out = overlay([entry()], [book({ inFlight: [small] })]);
       expect(out.books[0].uncredited).toEqual([{ ...small, covered: [] }]);
     });
 
     it('waits for a sync that read the wallet, not just any sync', () => {
-      // The book synced, but no sync since the donation could read the corp wallet.
       const unread = overlay([entry()], [book({ inFlight: [old], donationsCheckedAt: null })]);
       expect(unread.rows[0]).toMatchObject({ state: 'paid' });
       expect(unread.books[0].uncredited).toEqual([]);
-      // The last sync that did read it was too soon after the donation.
       const early = overlay(
         [entry()],
         [book({ inFlight: [old], donationsCheckedAt: '2026-10-14T11:00:00Z' })]
@@ -2279,7 +2223,6 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       });
       const out = overlay([toOther], [book({ disputes: [rejected] })]);
       expect(out.rows[0].flagged?.state).toBe('rejected');
-      // An open one on another refinery leaves this row free to add its own lines.
       const open = { ...rejected };
       delete open.resolution;
       const still = overlay([toOther], [book({ disputes: [open] })]);
@@ -2397,7 +2340,6 @@ describe('resolving in the app: an open dispute holds its day', () => {
     ...over,
   });
   const DAYS = ['2026-10-15', '2026-10-16', '2026-10-17'];
-  // 10,000 × 148 × 15% = 222,000 a day.
   const days = () =>
     DAYS.map((date) => entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] }));
 
@@ -2424,7 +2366,6 @@ describe('resolving in the app: an open dispute holds its day', () => {
     });
   });
 
-  // The officer's next step must reach the member word for word on the billed day itself.
   it('says a rejected quantity dispute on a billed, unpaid day, with the next step', () => {
     const rejected = disputeOn('2026-10-17', {
       kind: 'quantity',
@@ -2450,7 +2391,6 @@ describe('resolving in the app: an open dispute holds its day', () => {
     expect(out.rows[0].held).toBeUndefined();
   });
 
-  // "Say it again" repeats the claim: the flag carries the ore this record disputed and the rate.
   it("keeps a kept dispute's own claim on the flag: its ore and its rate", () => {
     const rejected = disputeOn('2026-10-17', {
       kind: 'rate',
@@ -2501,10 +2441,6 @@ describe('resolving in the app: an open dispute holds its day', () => {
     expect(out.rows.find((r) => r.date === '2026-10-15')?.held).toBeUndefined();
   });
 
-  // The Bureau report (2026-11-16): one 10,898,549 ISK donation the member meant for 11-06 and
-  // 11-07. The book's credit pays a Miner's oldest open day (11-01) first, and so does the member's
-  // side: there are no marks of their own on a book.
-
   describe('a disputed Conflict day', () => {
     const assigned = () =>
       entry({
@@ -2519,7 +2455,6 @@ describe('resolving in the app: an open dispute holds its day', () => {
           },
         ],
       });
-    // Its own clock runs out on 2026-11-01T00:30; the dispute, raised 25 Oct, holds to 8 Nov.
     const told = disputeOn('2026-10-17', {
       kind: undefined,
       reason: undefined,
@@ -2652,7 +2587,6 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
   });
 
   it('puts ore the book has not placed at the refinery that last yielded that ore, else on a row of its own', () => {
-    /** An ore no refinery has ever yielded this miner. */
     const NEW_ORE = 45492;
     const syl = (structureId: number, date: string, typeId = SYL) => ({
       ...observedToday(1),
@@ -2682,7 +2616,6 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
         },
       ],
     });
-    // The book saw Zeolites at 1000 today; Sylvite came from 1002 the last time, days ago.
     const b = withToday(null, {
       observed: [...book().observed, observedToday(10_000), syl(1002, '2026-10-12')],
       structureNames: { 1000: 'Palomino Prospecting', 1002: 'SSG Qpef' },
@@ -2726,7 +2659,6 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     expect(paid.billed).toBeCloseTo(400_000, 4);
     expect(left.taxOwed).toBeCloseTo(tax - 400_000, 4);
     expect(paid.oreLines[0].quantity + left.oreLines[0].quantity).toBe(30_000);
-    // Both halves are the open day's: the ledger lists them until the book bills it.
     expect([paid.open, left.open]).toEqual([true, true]);
     expect(out.books[0].estimate).toBeCloseTo(tax - 400_000, 4);
     expect(out.books[0].credit).toBeCloseTo(0, 4);
@@ -2741,7 +2673,6 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
 
   it('is billed by the book, not estimated, once the day closes', () => {
     const out = overlay([today(30_000)], [withToday(30_000)], '2026-10-19T14:00:00Z');
-    // An officer has not synced since: the day is still open, so still an estimate.
     expect(ofToday(out).map((r) => r.state)).toEqual(['estimate']);
     const closed = overlay(
       [today(30_000)],
@@ -2756,7 +2687,6 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     const after = { lastSyncedAt: '2026-10-19T00:10:00Z' };
     const matched = overlay([today(30_000)], [withToday(30_000, after)], '2026-10-19T00:12:00Z');
     expect(ofToday(matched).map((r) => [r.state, r.final])).toEqual([['estimate', true]]);
-    // Still mining that day, or the book short of it: not final.
     expect(ofToday(overlay([today(30_000)], [withToday(30_000)]))[0].final).toBeUndefined();
     const short = overlay([today(30_000)], [withToday(20_000, after)], '2026-10-19T00:12:00Z');
     expect(ofToday(short)[0].final).toBeUndefined();

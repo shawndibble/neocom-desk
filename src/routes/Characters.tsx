@@ -98,14 +98,11 @@ const DENSITY_LABEL_KEYS = {
   1.25: 'characters.densitySpacious',
 } as const satisfies Record<FontScale, string>;
 
-/** Character wall: pick the active character, group/sort/densify it, or add another via EVE SSO. */
 export function Characters() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
-  // Corp names only: each card reads its own entry, so a fetch that changes
-  // no corp name does not re-render the page.
   const corporationNameById = usePublicInfo(
     useShallow((state) => {
       const names: Record<number, string> = {};
@@ -174,7 +171,6 @@ export function Characters() {
     handleMoveGroup,
   } = useCharacterGroupActions(groupsValue, setGroupsValue);
   const [removingCharacter, setRemovingCharacter] = useState<RemoveTarget | null>(null);
-  /** The Character whose removal just failed — rolled back whole, so it is still listed. */
   const [removeFailedName, setRemoveFailedName] = useState<string | null>(null);
   useEffect(() => {
     if (removeFailedName === null) return;
@@ -183,21 +179,17 @@ export function Characters() {
   }, [removeFailedName]);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
-  // Always read (a small roster, cached): the table's Docked at and Ship columns and the export,
-  // which carries them in either view.
   const whereabouts = useCharacterWhereabouts(
     useMemo(() => (characters ?? []).map((character) => character.characterId), [characters])
   );
 
   const netWorthById = useLatestNetWorth();
   const acceleratorById = useCharacterAccelerators();
-  // Detection reads each Character's cached attribute sheet, so only pay for it while the column shows.
   const detectedAcceleratorById = useDetectedAccelerators(
     visibleColumns.includes('accelerator')
       ? (characters ?? []).map((character) => character.characterId)
       : NO_CHARACTER_IDS
   );
-  // Roles are a read per Character, so only while a corp column shows.
   const corpColumnsShown =
     visibleColumns.includes('corpRoles') || visibleColumns.includes('corpAccess');
   const corpStandingById = useCharacterCorpStanding(
@@ -246,16 +238,10 @@ export function Characters() {
     alertsGrants,
   });
 
-  // One batched read for the roster (public records): the cards' line, the table's column and
-  // the export, which carries title and score whatever the Columns picker shows.
   const achievements = useCharacterAchievements(
     useMemo(() => (characters ?? []).map((character) => character.characterId), [characters])
   );
 
-  // Not `useMemo`: `handleToggleStar` below closes over `starred`/`setStarred`
-  // and is a fresh function every render anyway, so a memoized wrapper here
-  // would just recompute every render regardless — `buildColumns` itself is
-  // cheap (a handful of object literals, no per-character work).
   const columnsById = buildColumns(
     t,
     spExtractionThreshold,
@@ -286,9 +272,6 @@ export function Characters() {
 
   async function select(characterId: number) {
     await setActiveCharacter(characterId);
-    // Return to wherever the switch started (the rail portrait, the tab bar,
-    // or the More sheet's portrait+name row) — see `returnPathAfterSwitch`.
-    // Picking on Characters itself (no origin) stays put.
     const from = (location.state as { from?: string } | null)?.from;
     const returnTo = returnPathAfterSwitch(from);
     if (returnTo !== null) navigate(returnTo);
@@ -298,12 +281,6 @@ export function Characters() {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)
       : [...visibleColumns, id];
-    // A table with zero *rendered* columns is a blank page with no
-    // explanation — guard against the filtered/available count, not the raw
-    // stored list: `visibleColumns` can carry ids `availableCharacterColumns`
-    // currently excludes (e.g. `spReady` while monitoring is off), so a raw
-    // `next.length` check can stay non-zero while every id left actually
-    // renders nothing.
     if (
       visibleAvailableColumns(
         next,
@@ -392,16 +369,6 @@ export function Characters() {
         title={t('characters.title')}
         actions={
           <>
-            {/*
-              `Tooltip`, not a native `title=`: a touch device has no hover, so
-              the "may take a moment" warning was unreachable on a phone exactly
-              where the wait is longest (#1102). The tap belongs to the refresh,
-              so no `openOnTap` — touch-and-hold reads it. And `aria-disabled`
-              rather than the native attribute while refreshing, per DESIGN.md's
-              `FilterChip` rule: a natively disabled button takes no hover and no
-              focus, which would make the bubble unreadable by either route just
-              as the wait it explains is actually happening.
-            */}
             {characters.length > 0 && (
               <IconButton
                 label={refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
@@ -412,13 +379,6 @@ export function Characters() {
                 className="aria-disabled:cursor-default aria-disabled:opacity-40"
               />
             )}
-            {/*
-              The add-a-character branch, not a re-auth: SSO decides who comes
-              back, so unioning with the *active* Character's grant would ask
-              the newcomer to consent to scopes aimed at somebody else (#295).
-              The arrow reuses the login page's own Customize dialog, so
-              adding several alts with one hand-picked grant stays one click each.
-            */}
             <div className="flex">
               <NeedsConnection tooltip={t('characters.add')}>
                 <Button
@@ -429,7 +389,6 @@ export function Characters() {
                   onClick={() => void beginAddCharacterLogin()}
                 >
                   <Icon.AddCharacter />
-                  {/* Icon-only below `sm`: no room beside the split trigger. */}
                   <span className="hidden sm:inline">{t('characters.addLabel')}</span>
                 </Button>
               </NeedsConnection>
@@ -476,8 +435,6 @@ export function Characters() {
                 className="min-w-40 flex-1"
               />
             }
-            // The column picker only acts on the table; the export holds every
-            // column and the same rows in either view.
             actions={
               <>
                 {viewMode === 'table' && (
@@ -536,9 +493,6 @@ export function Characters() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {/* Shared app-wide text-size control (`useFontScale`), also on Settings' Display
-                  tab — relabeled Compact/Cozy/Comfortable/Spacious here, but changing it here
-                  changes text size everywhere. */}
               <Select
                 value={String(density)}
                 onValueChange={(value) => void setDensity(Number(value) as FontScale)}
@@ -576,9 +530,6 @@ export function Characters() {
           {noMatches ? (
             <EmptyState title={t('characters.noSearchMatches')} />
           ) : viewMode === 'table' ? (
-            // One flat table over the whole roster, not one per group section
-            // (decision 20260927-071415) — the `group` column carries
-            // membership per row, and group management stays in card view.
             <CharactersTableView
               rows={tableRows}
               columns={activeColumnIds.map((id) => columnsById[id])}

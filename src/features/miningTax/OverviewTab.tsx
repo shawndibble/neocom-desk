@@ -1,15 +1,3 @@
-/**
- * Mining Yield Overview tab (issue #671): what a pilot actually mined —
- * ordinary belt/anomaly ore and ice, moon ore included, and harvested gas
- * (issue #880) — across every tracked Character, as ISK/hr and a
- * raw-vs-refined value comparison. Gas reprocesses into nothing, so it
- * contributes a real zero to the refined side rather than a missing one. Sits
- * beside the Tax tab (`TaxTab.tsx`) on the same route; the two read the same
- * ESI mining ledger but group and value it for entirely different questions
- * (see `docs/context/decisions/…-mining-yield-isk-hr-basis-is-calendar-time.md`
- * and the vocabulary note in the issue: this is deliberately not the Tax
- * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   lazy,
@@ -111,17 +99,10 @@ const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldChar
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
-/**
- * From `xl` the header row holds the range, chart metric and Value menu
- * inline beside the picker; from `lg` the range alone (the rest truncated
- * the title at 1024); below `lg` none of them (the range alone, beside the
- * nav rail and the icon-box picker, truncated the title at 768).
- */
 const WIDE_HEADER_QUERY = '(min-width: 80rem)';
 const MID_HEADER_QUERY = '(min-width: 64rem)';
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
-/** A row's mined m³ — units times the type's own unit volume for each ore line. */
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
   return sumVolume(
     row.entry.oreLines,
@@ -140,9 +121,7 @@ function dateRangeLabel(dates: readonly string[]): string {
 }
 
 interface OverviewTabProps {
-  /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
-  /** The id base the tab bar was built with, so the body is its tab panel. */
   tabsId: string;
 }
 
@@ -150,10 +129,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const { t } = useTranslation();
   const showRefining = useMiningShowRefining((state) => state.value);
   const setShowRefining = useMiningShowRefining((state) => state.setValue);
-  // `showRefining` decides what the loader itself fetches (issue #1281), so
-  // unlike basis/buyback-rate — which only rescale already-loaded rows — it
-  // must be part of the load closure. `useRouteSnapshot` only re-runs it on
-  // an epoch bump, so toggling the switch also calls `refresh()` below.
   const { setup: refiningSetup } = useRefiningSetup();
   const { stationRate, taxRate } = refiningSetup;
   const loadSnapshot = useCallback(
@@ -167,7 +142,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     { cacheKey: 'miningYieldOverview' }
   );
   useRefreshOnOreFormChange(refresh);
-  // The load closure carries the pilot's Refining Setup, which only a refresh re-reads.
   const seenSetup = useRef(`${stationRate}/${taxRate}`);
   useEffect(() => {
     const now = `${stationRate}/${taxRate}`;
@@ -207,43 +181,28 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     },
     [setShowRefining, refresh]
   );
-  // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
-  // open past downtime moves its window with the day.
   const nowMs = useNow();
   const today = eveToday(new Date(nowMs));
 
   const characters = data?.characters ?? [];
-  // The Characters the ledger tracks, which can be fewer than the roster: the
-  // picker's faces and "+N" follow them, matching its "· N".
   const characterIds = useMemo(() => (data?.characters ?? []).map((c) => c.characterId), [data]);
   const isWide = useMediaQuery(WIDE_HEADER_QUERY);
   const isMid = useMediaQuery(MID_HEADER_QUERY);
   const headerLayout: 'narrow' | 'mid' | 'wide' = isWide ? 'wide' : isMid ? 'mid' : 'narrow';
   const showCharacterColumn = characters.length > 1;
-  // The reprocessing recipes are a lazy download: when they couldn't load, the
-  // refined side is left out and said to be unavailable rather than shown as zero.
   const refiningUnavailable = showRefining && (data?.refiningUnavailable ?? false);
   const refining = showRefining && !refiningUnavailable;
-  // The recipes are fetched again, and the refined side restored, when the connection returns.
   useEffect(
     () => (refiningUnavailable ? onReconnect(refresh) : undefined),
     [refiningUnavailable, refresh]
   );
   const availableColumnIds = availableOverviewColumns(refining, showCharacterColumn);
-  // `id` is already known available here, so this is just "is it checked" —
-  // `visibleAvailableColumns` (below, `handleToggleColumn`'s own
-  // zero-columns guard) is for narrowing the *raw stored* list, which can
-  // hold ids that aren't available right now; this list already excludes
-  // those.
   const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
 
   function handleToggleColumn(id: OverviewColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)
       : [...visibleColumns, id];
-    // A table with zero *rendered* columns (besides the locked Date one) is
-    // as good as no picker at all — guard against the filtered/available
-    // count, same as Characters' table-view picker.
     if (visibleAvailableColumns(next, refining, showCharacterColumn).length === 0) return;
     void setVisibleColumns(next);
   }
@@ -259,11 +218,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       ),
     [data, resolvedCharacterFilter]
   );
-  // In range, re-valued on the chosen price basis (every basis is
-  // precomputed in the snapshot, so this is a swap, never a refetch), and
-  // scaled by the buyback rate (issue #1280) — done here, once, so every
-  // downstream consumer (stat cards, charts, table, detail modal) sees
-  // already-scaled values without needing to know about the rate itself.
   const visibleRows = useMemo(() => {
     const start = rangeStartDate(range, today);
     return characterRows
@@ -277,8 +231,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
         };
       });
   }, [characterRows, range, today, basis, buybackRate]);
-  // Each row refines under its own Character's modifiers, so the implant
-  // note is per Character too — one for each shown miner lacking the grant.
   const refiningCharacters = useMemo(() => {
     if (!refining) return [];
     const byId = new Map<number, string>();
@@ -327,8 +279,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     for (const row of visibleRows) {
       byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + row.valuation.rawValue);
     }
-    // Every day of the range, mined or not, so the axis spans the whole window
-    // and a gap reads as a gap.
     return rangeDates(range, today).map((date) => ({ date, iskValue: byDate.get(date) ?? 0 }));
   }, [visibleRows, range, today]);
 
@@ -349,8 +299,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     }));
   }, [visibleRows, data]);
 
-  // Only computed for whichever metric the chart-metric select is on, so
-  // switching to m³/Count never costs the other unselected metric's fold.
   const dailyVolume = useMemo(
     () =>
       chartMetric === 'volume'
@@ -387,7 +335,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     character: {
       id: 'character',
       header: t('miningTax.characterColumn'),
-      // Plain: the row opens the detail modal, which links the pilot and system (§6c).
       render: (row) => <span>{row.characterName}</span>,
       sortValue: (row) => row.characterName,
     },
@@ -424,9 +371,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       className: 'whitespace-nowrap',
       render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.rawValue} />,
       sortValue: (row) => row.valuation.rawValue,
-      // Dense phone card's headline figure (`stackLayout="dense"` below) —
-      // this is the column that's on by default, so it's the number a
-      // reader's eye should land on first.
       cardCorner: true,
     },
     total: {
@@ -445,9 +389,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       className: 'whitespace-nowrap',
       render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.refineValue} />,
       sortValue: (row) => row.valuation.refineValue,
-      // Short, dense-meta-line label ("Refined 91.6M"): the full column
-      // header ("Refined value") is right for a desktop table but repeats
-      // the word "value" the phone card has no room for.
       stackAffix: { before: `${t('miningTax.overview.refineValueShort')} ` },
     },
     oreBreakdown: {
@@ -473,7 +414,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
       render: (row) => row.entry.date,
-      // Row opens its detail modal: the accent primary cell is the cue (§6c).
       cellClassName: () => 'text-accent',
       sortValue: (row) => row.entry.date,
       primary: true,
@@ -487,7 +427,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     columns.map((c) => c.id)
   );
 
-  // Every column the table can offer, not just the picker's selection.
   const csvColumns = useMemo(
     () =>
       yieldOverviewCsvColumns(t, {
@@ -507,8 +446,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Same shape as `TaxTab`: this tab owns its snapshot, so it owns the
-          header whose actions drive it. */}
       <PageHeader
         title={t('miningTax.title')}
         meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
@@ -525,11 +462,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
         }
         actions={
           <>
-            {/* The header row never wraps (it has a picker), so what fits
-                decides what is inline (measured at 390/768/1024/1280):
-                everything from `xl`; the range alone, with the other view
-                settings behind the gear, from `lg`; below that the range
-                joins them. */}
             {headerLayout === 'wide' ? (
               <>
                 <RangeControl value={range} onChange={(next) => void setRange(next)} />
@@ -557,7 +489,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               onClick={refresh}
               busy={loading}
             />
-            {/* The gear takes the ⋮'s slot: last before the bell, after Refresh. */}
             {headerLayout !== 'wide' && (
               <SettingsSheet>
                 {headerLayout === 'narrow' && (
@@ -592,7 +523,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             {refiningUnavailable && (
               <p className="text-xs text-warning">{t('miningTax.overview.refiningUnavailable')}</p>
             )}
-            {/* Always mounted, so the note is announced when it appears (DESIGN.md §7). */}
             <LiveStatus>
               {refiningUnavailable ? t('miningTax.overview.refiningUnavailable') : null}
             </LiveStatus>
@@ -643,8 +573,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             ) : (
               <>
                 <p className="text-xs text-text-dim">
-                  {/* Below `lg` the range lives in the settings sheet, so the
-                      summary names it: the page must say what span it shows. */}
                   {headerLayout === 'narrow'
                     ? t('miningTax.overview.rangeSummary', {
                         range: t(`miningTax.overview.range.${range}`),
@@ -717,7 +645,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                   </Panel>
                 </div>
 
-                {/* The charts draw their own two cards. */}
                 <Suspense
                   fallback={
                     <Panel padded>

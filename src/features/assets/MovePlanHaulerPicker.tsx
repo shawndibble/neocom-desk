@@ -17,32 +17,22 @@ import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 
 const CUSTOM = 'custom';
 
-/** Rows shown before "Show more"; the chosen hauler is always among them. */
 const INLINE_ROWS = 4;
 
-/** A phone stacks the carry note and the owned mark under the name; from `sm` up each gets a column. */
 const ROW_COLUMNS =
   'grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[1rem_minmax(0,11rem)_7.5rem_minmax(0,1fr)_auto]';
 
 interface HaulerPickerProps {
   plan: MovePlan;
   override: HaulerOverride | undefined;
-  /** Undefined goes back to the suggested hauler. */
   onPick: (override: HaulerOverride | undefined) => void;
-  /** List owned hulls first; the plan's own ranking is untouched. */
   ownedFirst?: boolean;
   onOwnedFirstChange?: (on: boolean) => void;
-  /** Every hauler is listed, not just the first few. */
   expanded?: boolean;
   onToggleExpanded?: () => void;
-  /** Trips a hauler takes, counting the ships flown. */
   tripsOf?: (option: HaulerOption) => number;
 }
 
-/**
- * Per-plan hauler choice: one row per hauler (trips, what it cannot carry, whether you own one),
- * or one typed m³. Lives only as long as the plan; the saved Cargo Space is never touched.
- */
 export function HaulerPicker({
   plan,
   override,
@@ -61,7 +51,6 @@ export function HaulerPicker({
     override && 'customM3' in override ? maskNumber(override.customM3) : ''
   );
   const { totalM3 } = plan.totals;
-  /** Why the typed size cannot be used; blank and garbage read as not a number. */
   const problem = (raw: string) => {
     const value = unmaskNumber(raw);
     return value === undefined ? 'invalid' : customM3Problem(value, totalM3);
@@ -95,7 +84,6 @@ export function HaulerPicker({
 
   function onType(raw: string) {
     setText(raw);
-    // A bad entry keeps the last good plan on screen; it is never read as unlimited.
     if (problem(raw) === null) onPick({ customM3: unmaskNumber(raw)! });
   }
 

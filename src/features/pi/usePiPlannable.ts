@@ -1,16 +1,3 @@
-/**
- * "Can Planetary Industry make this item?" for one type.
- *
- * `undefined` while `pi.json` is still loading, so a caller can hold the
- * action back rather than flash one in and out. The payload is 15KB and
- * module-cached, so asking from every row of a market tree costs one fetch;
- * rows mounted after it lands never re-render, because the hook seeds its
- * state from the already-resolved set.
- *
- * Failure resolves to `false`, not to a stuck `undefined`: the menu simply
- * offers no PI action, which is the same thing the answer would have been
- * for all but ~70 items in the game.
- */
 import { useEffect, useState } from 'react';
 import { loadPlannableTypeIds, peekPlannableTypeIds } from './products';
 

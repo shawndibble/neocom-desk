@@ -18,7 +18,6 @@ interface PlanSetupFactsProps {
   hub: TradeHub;
   facilityPreset: FacilityPreset;
   buildSystemName: string | null;
-  /** The place the pilot picked, by the name they picked it under; null when none was picked. */
   buildLocationName: string | null;
   includeReactions: boolean;
   reactionBuildSystemName: string | null;
@@ -26,20 +25,9 @@ interface PlanSetupFactsProps {
   reactionsInHighsec: boolean;
   resolvedMe: number;
   resolvedTe: number;
-  /**
-   * True once the plan resolved and its materials table has no blueprint row
-   * (an owned BPO — nothing to buy). Only then does the summary carry ME/TE:
-   * the row's tier picker sets them otherwise, and showing them before the
-   * plan resolves would flash them in and out.
-   */
   lacksBlueprintRow: boolean;
 }
 
-/**
- * Read-only summary of the setup on one line at the foot of the verdict hero:
- * dim label then value, no boxes — nothing here is clickable; the Edit setup
- * link beside it opens the form. Runs live in the hero's own title row.
- */
 export function PlanSetupFacts({
   plan,
   activity,
@@ -73,7 +61,6 @@ export function PlanSetupFacts({
           {fact(t('industry.setupChipTe'), `${resolvedTe}%`)}
         </>
       )}
-      {/* The facility · system · band triple only when no place was picked. */}
       {fact(
         t('industry.buildLocation'),
         buildLocationName ??

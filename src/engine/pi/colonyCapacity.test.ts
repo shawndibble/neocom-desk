@@ -6,8 +6,6 @@ import { colonyExtraction, extractionOptions, fitPlannedPins } from './colonyCap
 import type { PlannerColony, PlannerPolicy, PlanetType } from './goalTypes';
 import { pinsLoad } from './pinBudget';
 
-// The real snapshot, as pinBudget.test.ts reads it: the fits below are claims
-// about the shipped pin costs and Command Center table.
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
@@ -68,7 +66,6 @@ describe('colonyExtraction', () => {
   it('credits a second ECU on the same P0 at the extra-ECU factor, sizing basics off the schematic', () => {
     const one = colonyExtraction(colony({}), [{ p0TypeId: BASE_METALS, ecus: 1 }], pi, POLICY);
     if (one.status !== 'fits') throw new Error(one.status);
-    // 3000 P0 per 1800 s cycle is exactly 6000/h, so one ECU at 6000/h is one basic.
     expect(one.slots).toEqual([
       {
         p0TypeId: BASE_METALS,
@@ -98,7 +95,6 @@ describe('colonyExtraction', () => {
       POLICY
     );
     if (result.status !== 'fits') throw new Error(result.status);
-    // Sorted by P0 so the answer does not depend on the caller's order.
     expect(result.slots.map((s) => s.p1TypeId)).toEqual([REACTIVE_METALS, PRECIOUS_METALS]);
     expect(result.pins).toEqual({ extractorControlUnit: 2, basic: 2, launchpad: 1 });
   });
@@ -130,7 +126,6 @@ describe('colonyExtraction', () => {
       launchpad: 1,
     });
 
-    // Exactly the extraction alone; two factories more no longer fit.
     const bare = colonyExtraction(
       colony({ cc: 4, link: { cpu: 0, powergrid: 0 } }),
       want,
@@ -141,7 +136,6 @@ describe('colonyExtraction', () => {
     const tight = { ...colony({ cc: 4, link: { cpu: 0, powergrid: 0 } }), budget: bare.used };
     expect(colonyExtraction(tight, want, pi, POLICY, { advanced: 2 }).status).toBe('does-not-fit');
 
-    // No extraction at all still fits the factories against the budget.
     expect(colonyExtraction(colony({ cc: 4 }), [], pi, POLICY, { advanced: 2 })).toMatchObject({
       status: 'fits',
       slots: [],
@@ -150,9 +144,6 @@ describe('colonyExtraction', () => {
   });
 
   it('accepts the extraction a colony runs today even where the model would not fit it', () => {
-    // The e2e fixture's Jita I: CC4, two 8-head ECUs on Base Metals at ~12,000/h
-    // each. Refined on the spot that is four basics, and the model puts it at
-    // ~18,200 MW against 17,000 — yet the colony runs those two ECUs today.
     const jita = {
       ...colony({
         cc: 4,
@@ -176,11 +167,9 @@ describe('colonyExtraction', () => {
       status: 'fits',
       runningToday: true,
     });
-    // A subset of today's layout is accepted too; anything beyond it is fitted as usual.
     expect(colonyExtraction(running, [{ p0TypeId: BASE_METALS, ecus: 1 }], pi, POLICY).status).toBe(
       'fits'
     );
-    // Factory pins on top of today's layout are new load, so the model decides.
     expect(colonyExtraction(running, want, pi, POLICY, { advanced: 1 }).status).toBe(
       'does-not-fit'
     );

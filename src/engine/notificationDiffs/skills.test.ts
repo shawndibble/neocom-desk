@@ -162,10 +162,6 @@ describe('diffCharacterNotTraining', () => {
   });
 
   it('does not fire when a just-finished entry is still the queue-position-0 row but the queue has more, active entries behind it', () => {
-    // A completed-but-still-present row at the front is the normal shape on
-    // a completion poll (diffSkillLevelComplete detects completion the same
-    // way) — this must read "training" off the next real entry, not
-    // "not training" off the completed one.
     const prev = snapshot(
       [
         entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 }),
@@ -273,9 +269,6 @@ describe('diffSkillQueueEnding', () => {
   });
 
   it('fires again once a later tail (the queue grew behind it) itself crosses back into the window', () => {
-    // A queue extended with a new, later-finishing entry hands the tail role
-    // to that new entry — a new re-fire identity (its own `finishMs`), so it
-    // is unobserved even though the earlier tail already fired.
     const finishA = T0 + 5 * HOUR_MS;
     const finishB = T0 + 30 * HOUR_MS;
     const entryA = entry({
@@ -296,12 +289,9 @@ describe('diffSkillQueueEnding', () => {
       });
 
     const beforeGrowth = snapshot([entryA], T0);
-    // The queue grows: the new tail (entryB) sits far outside the window.
     const grown = snapshot([entryA, entryB()], T0 + FIVE_MIN);
     expect(diffSkillQueueEnding(7, beforeGrowth, grown)).toEqual([]);
 
-    // Time passes; entryA completes and entryB's remaining time crosses back
-    // into the lead window.
     const laterNowMs = finishB - LEAD + FIVE_MIN;
     const backInside = snapshot([entryA, entryB()], laterNowMs);
     expect(diffSkillQueueEnding(7, grown, backInside)).toEqual([
@@ -338,9 +328,6 @@ describe('diffSkillQueueEnding', () => {
   });
 
   it('ignores a completed-but-unpruned entry at the front when finding the tail', () => {
-    // Same shape `diffSkillLevelComplete`/`headStatus` already handle: a
-    // just-finished row can sit at the front with its finish date in the
-    // past until the character next logs in.
     const finishTail = T0 + 5 * HOUR_MS;
     const completedHead = entry({ skillId: 1, queuePosition: 0, finishMs: T0 - 2000 });
     const prev = snapshot([completedHead], T0);
@@ -370,9 +357,6 @@ describe('diffSkillQueueEnding', () => {
   });
 
   it('fires once for a prev snapshot captured before endingLeadMs existed on the type', () => {
-    // A baseline persisted before issue #1410 shipped has no `endingLeadMs`
-    // on its entries at all — that must read as "no threshold recorded",
-    // i.e. not-previously-observed, so it fires once rather than never.
     const finishMs = T0 + 5 * HOUR_MS;
     const prev = snapshot([entry({ skillId: 1, queuePosition: 0, finishMs })], T0);
     const next = snapshot(
@@ -437,8 +421,6 @@ describe('diffSpExtractionReady', () => {
   });
 
   it('never fires for a character nowhere near the floor, even well above the threshold on total SP alone', () => {
-    // The bug this guards against end-to-end: a naive totalSp >= threshold
-    // check would fire for every fresh character within days.
     const prev = spSnapshot([{ totalSp: 400_000, thresholdSp: 500_000 }]);
     const next = spSnapshot([{ totalSp: 1_000_000, thresholdSp: 500_000 }]);
     expect(diffSpExtractionReady(7, prev, next)).toEqual([]);
@@ -492,7 +474,6 @@ describe('diffOmegaLapsed', () => {
 
   it('fires when the active skill suddenly finishes about twice as far away', () => {
     const prev = snapshot([training(NOW + 8 * HOUR_MS)], NOW);
-    // Halved speed at the poll: the 8h left becomes 16h.
     const next = snapshot([training(NOW + POLL + 16 * HOUR_MS)], NOW + POLL);
     expect(diffOmegaLapsed(1, prev, next)).toEqual([
       {
@@ -513,7 +494,6 @@ describe('diffOmegaLapsed', () => {
 
   it('does not fire for the strongest other slowdown, an accelerator or implants coming off', () => {
     const prev = snapshot([training(NOW + 8 * HOUR_MS)], NOW);
-    // 1.7x on a weak attribute set, plus most of the gap's inflation.
     const next = snapshot([training(NOW + POLL + 13.6 * HOUR_MS)], NOW + POLL);
     expect(diffOmegaLapsed(1, prev, next)).toEqual([]);
   });

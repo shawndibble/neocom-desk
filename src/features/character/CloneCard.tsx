@@ -14,10 +14,8 @@ import { MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/clone/cloneVerdic
 import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import type { AttributeName } from '@/engine/types';
 
-/** 36px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
 export const TOUCH_LINK = 'inline-flex min-h-9 items-center md:min-h-0';
 
-/** An implant name linking to Show Info, with its description in a hover/focus tooltip when it has one. */
 function ImplantLink({
   typeId,
   name,
@@ -39,7 +37,6 @@ function ImplantLink({
 
 export type PriceMap = ReadonlyMap<number, number | null>;
 
-/** One implant: slot, name (Show info), then what it adds and what it is worth. */
 function ImplantRow({
   typeId,
   name,
@@ -50,9 +47,7 @@ function ImplantRow({
   typeId: number;
   name: string;
   detail: ImplantDetail | undefined;
-  /** False when no implant in the list has a known slot: no empty column. */
   showSlot: boolean;
-  /** Nullish until priced or when unpriced: the card's footer counts those. */
   price: number | null | undefined;
 }) {
   const { t } = useTranslation();
@@ -85,18 +80,13 @@ function ImplantRow({
   );
 }
 
-/** The pilot's own name for a clone, edited in place: the heading becomes a field. */
 export interface CloneRename {
-  /** The pencil's accessible name, which names the clone. */
   label: string;
-  /** The pilot's current nickname; empty when there is none. */
   value: string;
-  /** Shown in the empty field: what the clone is called without a name. */
   placeholder: string;
   onSave: (name: string) => void;
 }
 
-/** One clone's facts: where, how far, what it wears and what that is worth. */
 export function CloneCard({
   title,
   place,
@@ -113,24 +103,17 @@ export function CloneCard({
   highlighted = false,
 }: {
   title: string;
-  /** Under a named clone's title; null when the title already is the place. */
   place: ReactNode;
   security: number | undefined;
   jumps: ReactNode;
   implantIds: readonly number[];
   implantNames: ReadonlyMap<number, string>;
   implantDetails: ReadonlyMap<number, ImplantDetail>;
-  /** Undefined until the price read settles. */
   prices: PriceMap | undefined;
-  /** Queue time in this clone; absent when there is no verdict. */
   training?: { row: CloneRow | undefined; best: boolean };
-  /** Absent for the worn clone (no jump_clone_id) and until nicknames hydrate. */
   rename?: CloneRename;
-  /** The clone the Character is wearing now: set apart from the jump clones. */
   current?: boolean;
-  /** The `data-row-key` an Overview row's `?highlight=` finds this card by. */
   rowKey?: string;
-  /** Pulse the card: the clone an Overview row sent the reader to. */
   highlighted?: boolean;
 }) {
   const { t } = useTranslation();
@@ -182,7 +165,6 @@ export function CloneCard({
             )}
           </span>
         )}
-        {/* Place, security and jumps are one phrase: they wrap together, never apart. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2">
           {place !== null && (
             <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
@@ -218,8 +200,6 @@ export function CloneCard({
       {implantIds.length === 0 ? (
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
-        // One row per implant, divided: on a phone each row is a 36px tap target,
-        // and a wrapped run of 36px links read as gaps, not as a list.
         <IskFigureGroup className="space-y-1.5">
           <ul className="divide-y divide-line border-y border-line">
             {bySlot(implantIds, implantDetails).map((id) => (

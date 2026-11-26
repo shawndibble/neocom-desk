@@ -24,7 +24,7 @@ describe('Corp widgets on All my corporations', () => {
 
   it('keeps the other corporations’ rows when one read failed', () => {
     render(<PartlyFailed />);
-    expect(screen.getAllByRole('row')).toHaveLength(4); // the header and three offices
+    expect(screen.getAllByRole('row')).toHaveLength(4);
     expect(screen.getByText(/couldn't load one of your corporations/)).toBeInTheDocument();
   });
 });

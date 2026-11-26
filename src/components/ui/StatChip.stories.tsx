@@ -11,18 +11,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary A label and a value. */
 export const Basic: Story = {};
 
-/** @summary An `InfoTooltip` after the label explains jargon. */
 export const WithTooltip: Story = {
   args: { label: 'EIV', value: '4.1M', tooltip: 'Estimated item value, the base of job fees.' },
 };
 
-/** @summary Larger, semibold value for the one figure that matters most. */
 export const Emphasis: Story = { args: { emphasis: true } };
 
-/** @summary `truncate` caps a free-text value at its row and ends it in an ellipsis. */
 export const Truncated: Story = {
   args: {
     label: 'Longest stay',
@@ -38,7 +34,6 @@ export const Truncated: Story = {
   ),
 };
 
-/** @summary A strip of chips with hairlines between; it wraps at narrow widths. */
 export const Strip: Story = {
   render: () => (
     <StatChips>
@@ -49,7 +44,6 @@ export const Strip: Story = {
   ),
 };
 
-/** @summary `to` makes the value a link to the list it counts: underlined, tone kept. */
 export const Linked: Story = {
   render: () => (
     <StatChips>

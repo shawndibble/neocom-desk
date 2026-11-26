@@ -1,5 +1,3 @@
-// Collector books: feeder invites against the Firestore emulator (issues #4507, #4616).
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -142,7 +140,6 @@ emulatorSuite('feeder invites', () => {
     });
 
     it('needs the edit role, checked live', async () => {
-      // A held officer check, so the token-less call reaches the live-check branch.
       await invite();
       expect(
         await reason(
@@ -231,7 +228,6 @@ emulatorSuite('feeder invites', () => {
           noBackdate: true,
         },
       ]);
-      // A link with no offered rate sets none.
       const plain = await invite();
       await db.collection('corpTaxBookFeederOf').doc(String(FEEDER)).delete();
       await collectorBook().collection('feeders').doc(String(FEEDER)).delete();
@@ -307,7 +303,6 @@ emulatorSuite('feeder invites', () => {
     it('reopens the same record on a fresh link after a leave, keeping payee and mode', async () => {
       const first = await invite();
       await accept(first.code);
-      // The leave belongs to a later ticket; here the record and pointer are put as it leaves.
       const ref = collectorBook().collection('feeders').doc(String(FEEDER));
       await ref.update({
         status: 'left',
@@ -320,7 +315,6 @@ emulatorSuite('feeder invites', () => {
         disconnectedAt: T0 - 5 * DAY,
         lastSyncResult: { at: T0, outcome: 'stale', reason: 'esi-refused' },
         viewDismissedAt: T0 + 3 * DAY,
-        // The last feed's holder must not carry its powers into the new one.
         grantHolder: 4242,
         grantedBy: 4243,
         refineryLabels: {
@@ -344,7 +338,6 @@ emulatorSuite('feeder invites', () => {
         payee: { kind: 'character', id: 99 },
         coveragePeriods: [{ from: '2026-10-18', to: '2026-10-19' }, { from: '2026-10-23' }],
         lastReadWellAt: T0,
-        // Labels carry on across a rejoin (#4640).
         refineryLabels: { '4001': { label: 'Gate Athanor' } },
       });
       for (const gone of [
@@ -359,7 +352,6 @@ emulatorSuite('feeder invites', () => {
       ]) {
         expect(record).not.toHaveProperty(gone);
       }
-      // The old stale spell does not disconnect the new period on the next refused read.
       expect(
         (await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'stale', reason: 'x' }))
           ?.status
@@ -394,7 +386,6 @@ emulatorSuite('feeder invites', () => {
           coveragePeriods: [{ from: '2026-10-18', to: '2026-10-18' }],
         });
       now = T0 + 3 * DAY;
-      // The roles-scope accept stores no grant, so it cannot take a disconnected owner back.
       expect(await reason(accept((await invite()).code))).toBe('already-feeder');
       expect((await feederRecord())?.status).toBe('disconnected');
     });
@@ -607,7 +598,6 @@ emulatorSuite('feeder invites', () => {
       { corporationId: COLLECTOR, accessToken: tok(COLLECTOR_CEO) },
       (corporationId) => dropBookGrants(grantDeps, corporationId)
     );
-    // Each moon owner's grant is revoked and dropped, and its after-leaving pointer written.
     expect(revoked).toEqual(['rt-feeder']);
     expect(
       (await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).get()).exists
@@ -623,7 +613,6 @@ emulatorSuite('feeder invites', () => {
   });
 
   it("a former moon owner's own book starts no earlier than the day its coverage ended", async () => {
-    // A removal finalised late: coverage ended on the 14th, the record was closed on the 18th.
     await db
       .collection('corpTaxBookFeederPrevious')
       .doc(String(FEEDER))

@@ -1,7 +1,3 @@
-/**
- * The Payee ledger on a phone (390px, `PHONE`): opened from the Payee card's Ledger action (its ⋮ menu on a phone), its
- * status, rows and running balance fit the width, and the page never scrolls sideways.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { expectNoPageOverflow } from './support/overflow';
 import { CHARACTER_ID } from './support/fixtureData';

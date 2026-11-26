@@ -17,11 +17,7 @@ export function DataPanel() {
   useEffect(() => () => clearTimeout(clearConfirmTimer.current), []);
 
   async function handleClearCache() {
-    // Blunt on purpose, matching `esi/cachePurge.ts`'s own tier-2 fallback:
-    // every character's rows, global reference data included. `esiCache` is
-    // 100% re-derivable from ESI, so over-clearing costs a refetch, not data.
     await db.esiCache.clear();
-    // Each view's stored last snapshot is built from those rows: it goes too.
     await clearRouteSnapshots();
     setClearedConfirm(true);
     clearConfirmTimer.current = setTimeout(() => setClearedConfirm(false), 2000);

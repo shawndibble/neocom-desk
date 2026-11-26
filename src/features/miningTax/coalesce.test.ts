@@ -9,7 +9,6 @@ vi.mock('@/sync', () => syncMock);
 
 const CHAR_A = 1;
 
-/** A payment linked to the Payee that covers every day stored: they read Paid. */
 async function payTheDays() {
   const owed = (await db.miningTaxAssignments.toArray()).reduce((sum, a) => sum + a.taxOwed, 0);
   await db.miningTaxPaymentLinks.put({
@@ -102,7 +101,6 @@ describe('coalesceAssignments', () => {
     ]);
     expect(stored[0].estimatedValue).toBe(56_969_293);
     expect(stored[0].taxOwed).toBe(2_848_465);
-    // Still a real group: the fused day plus the next one.
     expect(stored[0].groupId).toBe('g1');
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
       collections: ['miningTaxAssignments'],
@@ -147,8 +145,6 @@ describe('coalesceAssignments', () => {
   });
 
   it('fuses two halves left ungrouped once their group dissolved', async () => {
-    // Both ejected (the group falls below two members), then fused: one entry,
-    // one Payee, one rate is one obligation however it got there.
     await db.miningTaxAssignments.bulkPut([
       assignment({ id: 'a1', groupId: 'g1' }),
       assignment({ id: 'a2', groupId: 'g1', oreLines: [{ typeId: TYPE_B, quantity: 7 }] }),
@@ -202,8 +198,6 @@ describe('coalesceAssignments', () => {
   });
 
   it('fuses a half whose Payee was edited back onto the group it was ejected from', async () => {
-    // The whole point of the repair: the pilot moves ore out, changes their
-    // mind, and the day goes back to one line without a Combine step.
     await db.miningTaxAssignments.bulkPut([
       assignment({ id: 'a1', groupId: 'g1' }),
       assignment({ id: 'a2', oreLines: [{ typeId: TYPE_B, quantity: 7 }] }),

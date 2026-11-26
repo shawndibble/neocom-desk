@@ -1,15 +1,3 @@
-/**
- * Calendar event detail, opened from any view (Month/Week/Agenda) instead of
- * an inline panel — keeps the list/grid above from being pushed around by a
- * long description. Mounted only while an event is selected (mounting is the
- * open signal, `ItemDetailModal`'s pattern). `event` seeds the title/date
- * immediately so there's no flash while the full detail fetches.
- *
- * A failed load with nothing cached is a real failure state, not an empty
- * one: the page's Refresh and the app-wide re-login notice both sit behind
- * this modal's backdrop, so recovery (Try again, or Log in again for an auth
- * failure) has to live in the body — `SkillDetailModal`'s pattern.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { useCallback, useState } from 'react';
@@ -56,7 +44,6 @@ const RSVP_OPTIONS: { response: CalendarRsvpResponse; labelKey: string }[] = [
   { response: 'tentative', labelKey: 'calendar.rsvpTentative' },
 ];
 
-/** The active button already turns this tone (DESIGN.md §7's other signal is its own icon + label, not a second, redundant telling). */
 const RSVP_FAILURE_KEY: Record<Exclude<RsvpResult, 'saved'>, string> = {
   offline: 'calendar.rsvpOffline',
   unconfirmed: 'calendar.rsvpUnconfirmed',
@@ -69,7 +56,6 @@ const RSVP_ACTIVE_VARIANT: Record<CalendarRsvpResponse, ButtonVariant> = {
   tentative: 'warning',
 };
 
-/** `detail.text` is markup, but the export formats want plain text — the same strip already used for the on-screen body. */
 function exportEventOf(detail: CalendarEventDetail): CalendarExportEvent {
   return {
     eventId: detail.event_id,
@@ -80,11 +66,6 @@ function exportEventOf(detail: CalendarEventDetail): CalendarExportEvent {
   };
 }
 
-/**
- * `needs-reauth` only when the live call failed on auth *and* nothing is
- * cached — a stale copy still renders as `ready`, and the app-wide notice
- * covers the auth failure there.
- */
 type DetailState =
   | { status: 'loading' }
   | { status: 'failed' }
@@ -95,14 +76,6 @@ export interface EventDetailModalProps {
   characterId: number;
   event: CalendarEventSummary;
   onClose: () => void;
-  /**
-   * Fired after a successful RSVP write, alongside the cache patch inside
-   * `respondToCalendarEvent`. The route's own event list/board (loaded via
-   * `useRouteSnapshot`, not a live query) never sees a Dexie write on its
-   * own, so it needs this to repaint the Coming Up Rail / Calendar Map
-   * without forcing a live ESI refetch — which could reapply ESI's own
-   * still-propagating pre-RSVP response over the optimistic update.
-   */
   onResponded?: (eventId: number, response: CalendarRsvpResponse) => void;
 }
 
@@ -114,12 +87,9 @@ export function EventDetailModal({
 }: EventDetailModalProps) {
   const { t } = useTranslation();
   const zone = useTimeZone();
-  // `retry` (Try again) re-runs the load in place — closing and reopening
-  // was otherwise the only way back to the network.
   const load = useAsyncLoad(
     useCallback(() => loadCalendarEvent(characterId, event.event_id), [characterId, event.event_id])
   );
-  // The answer just saved, laid over the loaded copy until the next load.
   const [savedResponse, setSavedResponse] = useState<{
     eventId: number;
     response: CalendarRsvpResponse;
@@ -162,7 +132,6 @@ export function EventDetailModal({
       {state.status === 'loading' ? (
         <Spinner block="panel" label={t('common.loading')} />
       ) : state.status === 'needs-reauth' ? (
-        // No Try again: retrying can't fix an expired or revoked grant.
         <GrantBanner characterId={characterId} endpoints={['getCharacterCalendarEvent']} />
       ) : state.status === 'failed' ? (
         <EmptyState
@@ -177,7 +146,6 @@ export function EventDetailModal({
         />
       ) : (
         <div className="space-y-3 text-xs">
-          {/* Kind-colour bar, bled to the modal's edges: the same hue the Coming Up Rail and Calendar Map use for `calendarEvent`, so the popup carries the identity a plain dialog otherwise loses. */}
           <div className={`-mx-3 -mt-3 h-1 ${KIND_FILL.calendarEvent}`} />
           {state.detail.fromCache && <CachedNotice fetchedAt={state.detail.fetchedAt} />}
           <p className="flex items-center gap-1.5 text-text-dim">
@@ -196,13 +164,6 @@ export function EventDetailModal({
               <p id="rsvp-response-label" className={eyebrowClassName}>
                 {t('calendar.yourResponse')}
               </p>
-              {/*
-                Only for "no answer yet" — once a response is picked, the
-                button it picked already turns that tone (DESIGN.md §7's
-                other signal is `aria-pressed` plus the button's own icon and
-                label), so a second badge repeating the same word/color here
-                would just double it.
-              */}
               {state.detail.data.response === 'not_responded' &&
                 (() => {
                   const ResponseIcon = RESPONSE_ICON[state.detail.data.response];

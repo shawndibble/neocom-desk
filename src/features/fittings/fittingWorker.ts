@@ -1,11 +1,3 @@
-/**
- * The one Web Worker the Fittings pages share (`hullFit.worker.ts`), and the
- * request/reply bookkeeping around it: the module browser's hull check
- * (`hullFitService`) and the stats evaluations (`evaluationService`) both
- * send their jobs through here. Without a `Worker` (jsdom, old browsers), or
- * once it has failed, `sendToWorker` answers null and the caller works on the
- * page instead.
- */
 import type { EvaluationRequest, WorkerReply, WorkerRequest } from './hullFit.worker';
 
 interface Waiting {
@@ -13,20 +5,16 @@ interface Waiting {
   reject: (reason: Error) => void;
 }
 
-/** Sends one request to a worker, as `sendToWorker` does; null when there is none. */
 export type WorkerSend = (
   build: (id: number) => WorkerRequest,
   signal?: AbortSignal
 ) => Promise<WorkerReply> | null;
 
-/** The message a crashed worker rejects every waiting job with: the cue to work on the page. */
 export const WORKER_FAILED = 'worker failed';
-/** The message a job aborted through its signal rejects with. */
 export const ABORTED = 'aborted';
 
 let nextRequest = 0;
 
-/** One lazily started worker and the request/reply bookkeeping around it. */
 function createChannel() {
   let worker: Worker | null = null;
   let broken = false;
@@ -97,15 +85,12 @@ function createChannel() {
 
   return {
     send,
-    /** Jobs waiting on the worker still in flight: the pool sends to the idlest. */
     get inFlight() {
       return pending.size;
     },
-    /** False once the worker crashed or was closed: the pool leaves it out. */
     get usable() {
       return !broken && !closed;
     },
-    /** Ends the worker; what still waits rejects `aborted`. */
     close() {
       closed = true;
       worker?.terminate();
@@ -117,24 +102,11 @@ function createChannel() {
 
 const shared = createChannel();
 
-/**
- * Sends the request `build` makes for a fresh id. Resolves with the worker's
- * reply; rejects `superseded` if the worker dropped it for a newer request,
- * `aborted` if `signal` fired first (the worker is told to skip it if it has
- * not started), or with the worker's own error. Null when there is no worker.
- */
 export const sendToWorker: WorkerSend = shared.send;
 
-/**
- * Up to `size` workers of their own, for one search whose calculations do not
- * depend on each other (Improve). Each starts on its first job; `send` goes
- * to the one with the fewest jobs waiting. Separate from the shared worker, so
- * a hull check or another page's evaluation never queues behind a search.
- */
 export interface WorkerPool {
   send: WorkerSend;
   size: number;
-  /** Ends every worker. */
   close: () => void;
 }
 
@@ -152,7 +124,6 @@ export function createWorkerPool(size: number): WorkerPool {
   };
 }
 
-/** How many workers a search may use: `min(4, hardwareConcurrency - 1)`, at least 1; 1 with no Worker. */
 export function searchPoolSize(): number {
   if (typeof Worker === 'undefined') return 1;
   const cores = typeof navigator === 'undefined' ? 1 : navigator.hardwareConcurrency || 1;

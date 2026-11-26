@@ -1,8 +1,3 @@
-/**
- * The ticked rows were each checked alone; together they can overrun, and the
- * pilot is then offered the swaps that cover it, searched once the set has
- * sat still for a moment.
- */
 import { useEffect, useState } from 'react';
 import { applyImproveCandidate, type ImproveOption } from '@/engine/fittings/improve';
 import { findCompletions } from '@/engine/fittings/improve';
@@ -10,21 +5,18 @@ import { slotsOf } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import type { ImproveSearch } from './useImprove';
 
-/** How long a set must sit over budget before its covering swaps are searched: ticking several rows in a row searches once. */
 const COMPLETION_DELAY_MS = 400;
 
 export interface CoverSearchInput {
   fitting: Fitting | null | undefined;
   recalc: ImproveSearch['recalc'];
   completion: ImproveSearch['completion'];
-  /** The ticked set's stats, once checked. */
   checked: FittingStats | null | undefined;
   overruns: boolean;
   chosen: ImproveOption[];
   chosenKey: string;
 }
 
-/** The covers found for the set named by `key`; null until the first search lands. */
 export function useCoverSearch({
   fitting,
   recalc,

@@ -1,9 +1,3 @@
-/**
- * The skill levels that make the open, over-budget Fitting fit
- * (`findSkillFixes`), under the same evaluator What to train ranks with. One
- * run per evaluator, shared: Make it fit and What to train both ask, and the
- * second asker reads the first's answer. Stopped once no one waits on it.
- */
 import { useEffect, useState } from 'react';
 import { findSkillFixes, type SkillFix } from '@/engine/fittings/skillFixes';
 import { skillGainCandidates } from '@/engine/fittings/skillGains';
@@ -12,7 +6,6 @@ import { yieldToEventLoop } from './yieldToEventLoop';
 
 interface Run {
   promise: Promise<SkillFix[]>;
-  /** Hooks waiting on it; the last to leave before it settles stops it. */
   subscribers: number;
   cancelled: boolean;
   settled: boolean;
@@ -20,11 +13,6 @@ interface Run {
 
 const runs = new WeakMap<SkillGainEvaluator, Run>();
 
-/**
- * Joins (or starts) the evaluator's run; the returned `leave` stops it once
- * nobody is waiting — every edit makes a new evaluator, and an abandoned
- * search of a superseded Fitting would otherwise run on to the end.
- */
 function joinSkillFixes(evaluator: SkillGainEvaluator): {
   promise: Promise<SkillFix[]>;
   leave: () => void;
@@ -64,7 +52,6 @@ function joinSkillFixes(evaluator: SkillGainEvaluator): {
     leave: () => {
       joined.subscribers--;
       if (joined.subscribers === 0 && !joined.settled) {
-        // A stopped run's answer is partial: the next asker starts afresh.
         joined.cancelled = true;
         if (runs.get(evaluator) === joined) runs.delete(evaluator);
       }
@@ -73,7 +60,6 @@ function joinSkillFixes(evaluator: SkillGainEvaluator): {
 }
 
 export interface SkillFixesState {
-  /** Null while working out, with no evaluator, or when not `enabled`. */
   fixes: SkillFix[] | null;
   failed: boolean;
 }

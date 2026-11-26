@@ -262,7 +262,6 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
 });
 
 describe('deriveMarketOrderEntries', () => {
-  /** The fixture's own type, size and fill-matching details, so a row assertion states only what it is testing. */
   const item = {
     typeId: 34,
     quantity: 10,
@@ -313,8 +312,6 @@ describe('deriveMarketOrderEntries', () => {
   });
 
   it('reads an absent is_buy_order as a sell order, which is how ESI sends one', () => {
-    // ESI omits the field on a sell order rather than sending false, so a
-    // truthiness test here is what keeps every offer out of the buy bucket.
     const sell: MarketOrderHistory = marketOrderHistoryEntry({ order_id: 7, volume_remain: 0 });
     delete sell.is_buy_order;
 
@@ -496,13 +493,6 @@ describe('marketOrderUndercutDomain', () => {
   });
 });
 
-/**
- * Registry wiring for the Scheduled Push Projection engine (issue #355,
- * ADR 0010): each of the six domains with a fixed future timestamp resolves
- * whatever names its row text needs, then delegates row-building to the pure
- * `engine/projection.ts` functions covered exhaustively by their own tests —
- * these only prove the wiring reaches them with the right arguments.
- */
 describe('projection wiring', () => {
   const T0 = 1_700_000_000_000;
 
@@ -566,8 +556,6 @@ describe('projection wiring', () => {
   });
 
   it("projects skillQueueEnding at the Character's current lead time, not the one baked into the baseline (issue #1410, same reasoning as #1248/#1259)", async () => {
-    // A Settings lead-time change rebuilds the Projection from the saved
-    // baseline, whose `endingLeadMs` is whatever was in force at load time.
     useNotificationPreferences.setState({
       value: withCharacterEventThreshold(
         DEFAULT_NOTIFICATION_PREFERENCES,
@@ -679,9 +667,6 @@ describe('projection wiring', () => {
   });
 
   it('carries each extractor install time into the colony snapshot, and omits it when ESI did', async () => {
-    // The only evidence `disprovenExtractorOccurrences` can retract on.
-    // Dropped here — as this mapping did before the retraction needed it —
-    // and the feature silently never fires, with nothing failing to say so.
     vi.mocked(loadCharacterPlanets).mockResolvedValue(
       statusResult([{ planet_id: 40000001, solar_system_id: 1, owner_id: 7 }], false) as never
     );
@@ -795,8 +780,6 @@ describe('projection wiring', () => {
   });
 
   it("projects extractor warnings at the Character's current lead time, not the one baked into the baseline (issue #1248)", async () => {
-    // A Settings lead-time change rebuilds the Projection from the saved
-    // baseline, whose `thresholdMs` is whatever was in force at load time.
     useNotificationPreferences.setState({
       value: withCharacterEventThreshold(
         DEFAULT_NOTIFICATION_PREFERENCES,
@@ -826,8 +809,6 @@ describe('projection wiring', () => {
   });
 
   it("projects structure fuel warnings at the Character's current fuel threshold, not the one baked into the baseline (issue #1259)", async () => {
-    // Same reasoning as the extractor lead time above: a Settings change
-    // rebuilds from the saved baseline, whose `thresholdMs` is stale.
     useNotificationPreferences.setState({
       value: withCharacterEventThreshold(
         DEFAULT_NOTIFICATION_PREFERENCES,
@@ -852,7 +833,6 @@ describe('projection wiring', () => {
         {
           structureId: 111,
           name: 'Keepstar',
-          // Two hours past the default fuel threshold's warning point.
           fuelExpiresMs: T0 + (DEFAULT_STRUCTURE_FUEL_LOW_DAYS * 24 + 2) * HOUR_MS,
           thresholdMs: 24 * HOUR_MS,
         },
@@ -872,7 +852,6 @@ describe('projection wiring', () => {
             type: overrides.type ?? 'StructureUnderAttack',
             senderId: 1000132,
             senderType: 'corporation',
-            // 36,000,000,000 ticks (100ns units) = 3,600,000 ms = 1 hour.
             text: overrides.text ?? 'structureID: 111\ntimeLeft: 36000000000\n',
             timestamp: new Date(T0).toISOString(),
           },
@@ -927,7 +906,6 @@ describe('projection wiring', () => {
     });
 
     it('skips loadStructureName for entries whose reinforcement exit falls outside the projection horizon (Sentry N+1, /skills)', async () => {
-      // 76 hours in 100ns ticks — past the 72-hour horizon.
       const outsideTicks = 76 * 3_600 * 10_000_000;
       const snapshot = {
         entries: [
@@ -949,16 +927,6 @@ describe('projection wiring', () => {
   });
 });
 
-/**
- * Three separate bug fixes from the #174/#175 reviews, now testable because
- * each domain's loader sits on its registry entry rather than inside
- * `liveDependencies()`'s object literal. This only covers the loader half —
- * that a truncated page set returns `null`. That a `null` load then actually
- * skips the poll (no snapshot saved, nothing fired) is a property of
- * `runForegroundPoll` itself, proven once per domain by the
- * "leaves the ... baseline untouched ... when the load is truncated" cases
- * in `foregroundPoller.test.ts`.
- */
 describe('truncation guards', () => {
   beforeEach(() => {
     vi.mocked(loadContracts).mockReset();
@@ -1054,13 +1022,6 @@ describe('mailDomain.toSnapshot', () => {
   });
 });
 
-/**
- * `walletDomain.load` bakes the Character's current wallet-balance-changed
- * threshold onto every entry it returns, the same async-preference-read
- * pattern `structureFuelDomain`'s own test below documents — the threshold
- * is device-local state, only readable in `load`'s async context, so
- * `toSnapshot` stays a pure passthrough for this domain.
- */
 describe('walletDomain journal cause', () => {
   it('carries the context ESI names, so a contract line can be linked to its contract', async () => {
     vi.mocked(loadWalletJournalWithStatus).mockResolvedValue(
@@ -1177,12 +1138,6 @@ function roles(list: readonly string[]): CharacterCorporationRoles {
   return { roles: [...list] };
 }
 
-/**
- * The four corp domains (issue #299) share the same shape of gate: a
- * corporation id, then a role-derived capability, both resolved before the
- * domain's own ESI endpoint is ever called (AC5). This covers that gate
- * itself, not the diff logic — that is `notificationDiffs.test.ts`'s job.
- */
 describe('corp domains', () => {
   beforeEach(async () => {
     vi.mocked(loadCorporationId).mockReset();
@@ -1267,7 +1222,6 @@ describe('corp domains', () => {
       const entries = await structureFuelDomain.load(1);
       expect(entries).toHaveLength(1);
       expect(entries![0]).toMatchObject({ structureId: 77, thresholdMs: 7 * 86_400_000 });
-      // Bay empty at read time: the fuel runs out when it was read.
       expect(entries![0]).toHaveProperty('fuelExpiresMs', expect.any(Number));
     });
 
@@ -1498,12 +1452,6 @@ describe('priceAlertDomain', () => {
   });
 });
 
-/**
- * Copy wiring (issue #1249): each domain owns its events' copy and the name
- * lookups it needs. The copy itself is tabled in `domainCopy.test.ts`; these
- * prove the registry routes a fire to the right domain and feeds its lookups
- * through.
- */
 describe('copy wiring', () => {
   beforeEach(() => {
     vi.mocked(loadUniverseType).mockReset();
@@ -1521,15 +1469,12 @@ describe('copy wiring', () => {
   });
 
   it('refuses an event no domain fires rather than rendering nothing', () => {
-    // Every fire the poller renders came from a domain's own diff, so an
-    // unowned id is a programmer error, not a stale feed row.
     expect(() => domainForEvent('somethingNewer' as NotificationEventId)).toThrow(
       'no domain fires somethingNewer'
     );
   });
 
   it('routes a subject for exactly the events whose URL table can use one', () => {
-    // A fire of every event, carrying every subject field a diff could set.
     const routed = NOTIFICATION_EVENT_IDS.filter(
       (eventId) =>
         notificationSubjectId({

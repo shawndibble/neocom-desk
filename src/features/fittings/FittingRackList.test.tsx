@@ -13,7 +13,6 @@ import { MakeItFitContext } from './makeItFitContext';
 
 type RackListProps = Parameters<typeof EditableRackList>[0];
 
-/** The read-only props these tests care about; the editing ones get inert defaults. */
 function FittingRackList(
   props: Pick<RackListProps, 'fitting' | 'stats' | 'unusableModuleKeys'> &
     Partial<Pick<RackListProps, 'moduleResults' | 'edit'>>
@@ -107,7 +106,6 @@ describe('FittingRackList', () => {
     );
     rerender(<FittingRackList fitting={fitting} stats={null} />);
     rerender(<FittingRackList fitting={fitting} stats={statsWith(115)} />);
-    // Still the first flash element (same key), never a re-mounted second one.
     expect(container.querySelectorAll('.flash-danger')).toHaveLength(1);
   });
 
@@ -139,7 +137,6 @@ describe('FittingRackList', () => {
   });
 
   it('shows the state a passive module actually reaches, and offers nothing above it', () => {
-    // A pasted fit asks for "active" everywhere; the engine runs a passive low online.
     const pasted: Fitting = {
       ...fitting,
       modules: fitting.modules.map((module) => ({ ...module, state: 'active' })),
@@ -156,7 +153,6 @@ describe('FittingRackList', () => {
     );
     const passive = screen.getByLabelText('State of #11') as HTMLSelectElement;
     expect(passive.value).toBe('online');
-    // A thumb gets 36px below md (DESIGN.md §3); a pointer keeps the sm height.
     expect(passive.parentElement).toHaveClass('[&>select]:min-h-9', 'md:[&>select]:min-h-7');
     expect([...passive.options].map((option) => option.value)).toEqual(['offline', 'online']);
   });
@@ -193,7 +189,6 @@ describe('FittingRackList', () => {
 
     fireEvent.change(quantity, { target: { value: '400' } });
     expect(edits.at(-1)?.cargo).toEqual([{ typeId: 209, quantity: 400 }]);
-    // Emptying the box on the way to a new number keeps the row.
     fireEvent.change(quantity, { target: { value: '0' } });
     expect(edits).toHaveLength(1);
 
@@ -237,7 +232,6 @@ describe('FittingRackList', () => {
       />
     );
     expect(screen.getByText('Drones')).toBeTruthy();
-    // The two modules' removes, and the drones'.
     expect(screen.getAllByRole('button', { name: /^Remove/ })).toHaveLength(3);
   });
 });
@@ -270,7 +264,6 @@ describe('DroneSection', () => {
       screen.getByRole('button', { name: `${count} in space` }).getAttribute('aria-pressed')
     );
     expect(pressed).toEqual(['true', 'true', 'false', 'false', 'false']);
-    // The bay count is every drone carried, the two launched included.
     expect(screen.getByLabelText('In bay')).toHaveValue(5);
     expect(screen.queryByText('Drones')).toBeNull();
   });
@@ -302,7 +295,6 @@ describe('DroneSection', () => {
   });
 
   it('disables a square past what bandwidth and the pilot allow, not the bay', () => {
-    // 10 Mbit/s each: two out of 25 Mbit/s leave room for none more.
     const limited = {
       ...stats,
       maxActiveDrones: 5,
@@ -403,7 +395,6 @@ describe('FittingRackList with the editor’s item actions', () => {
         </FakeItemActions>
       </MemoryRouter>
     );
-    // The Damage Control takes no charge: no "No charge in cargo fits this".
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #11' }), {
       button: 0,
       pointerType: 'mouse',
@@ -412,7 +403,6 @@ describe('FittingRackList with the editor’s item actions', () => {
     expect(screen.queryByRole('menuitem', { name: 'No charge in cargo fits this' })).toBeNull();
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
 
-    // The autocannon does, with none in the hold: the entry is there, disabled.
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
       button: 0,
       pointerType: 'mouse',
@@ -425,7 +415,6 @@ describe('FittingRackList with the editor’s item actions', () => {
   it('gives each module row a More actions button with the same menu, Move down included', async () => {
     const actions = fakeItemActions({ names });
     renderList(actions);
-    // 36px for a thumb below md, the dense row size for a pointer.
     expect(screen.getByRole('button', { name: 'More actions for #10' })).toHaveClass(
       'size-9',
       'md:size-7'
@@ -460,7 +449,6 @@ describe('FittingRackList with the editor’s item actions', () => {
       pointerType: 'mouse',
     });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Variations' }));
-    // Once the menu has closed and handed focus back (§6c, `useOpenAfterMenu`).
     await waitFor(() => expect(actions.openVariations).toHaveBeenCalledWith('high', 0));
   });
 
@@ -492,7 +480,6 @@ describe('FittingRackList with the editor’s item actions', () => {
     );
     renderList(actions);
     const empties = screen.getAllByRole('button', { name: /More actions for Empty/ });
-    // High slots 1 and 2 are empty; low has none.
     expect(empties).toHaveLength(2);
     fireEvent.pointerDown(empties[0], { button: 0, pointerType: 'mouse' });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Paste Autocannon' }));

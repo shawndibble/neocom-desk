@@ -64,9 +64,6 @@ describe('groupIdenticalFires', () => {
   });
 
   it('carries every fire in the group, so a caller can act on all of them at once', () => {
-    // The Notification Feed needs this: its row collapses several stored
-    // entries, and dismissing that row has to dismiss every entry behind it,
-    // not just the one the row happens to render.
     const groups = groupIdenticalFires([
       rendered({ eventId: 'marketOrderFilled', orderId: 1 }, 'Market order filled', 'Filled.'),
       rendered({ eventId: 'newMail' }, 'New mail', 'You have new mail.'),

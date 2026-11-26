@@ -12,7 +12,6 @@ const CORP = 98000001;
 const MINER = 'solo:1';
 
 const ORE = 45490;
-/** 1,000 ISK a unit at 10%: a day of 100,000 units owes 10,000,000. */
 const day = (date: string, quantity: number) => ({
   characterId: 1,
   recordedCorporationId: CORP,

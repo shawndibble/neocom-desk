@@ -12,8 +12,6 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { resolveProjectionNames, typeNameOrAbsent, universeTypeName } from './shared';
 
-/* Industry jobs -------------------------------------------------------------- */
-
 const isIndustryJobEntrySnapshot = shapeGuard<IndustryJobEntrySnapshot>({
   jobId: is.number,
   endMs: is.number,

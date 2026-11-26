@@ -9,7 +9,6 @@ export type { OverlapPreview } from './TakeoverConfirm';
 interface Props {
   corpName: string;
   payeeNames: readonly string[];
-  /** Every allocation involved is paid on its Payee's account: only "I paid it another way" is offered. */
   paid: boolean;
   previews: readonly OverlapPreview[];
   typeNames: ReadonlyMap<number, string>;
@@ -17,19 +16,9 @@ interface Props {
   error?: string | null;
   onTakeOver: () => void;
   onPaidAnotherWay: () => void;
-  /**
-   * Asked for on a Late notice (#6206): "I paid this another way" goes to the corporation, so this
-   * replaces the device-only button.
-   */
   paidAnotherWay?: ReactNode;
 }
 
-/**
- * The one notice on a day line when the miner's own list and the corporation's bill
- * cover the same ore (issue #4517). "Let the corporation bill it" first shows what
- * changes on the miner's list, then removes only the overlapping ore; "I paid it
- * another way" says the miner settled it elsewhere. Nothing is mailed or pushed.
- */
 export function OverlapNotice({
   corpName,
   payeeNames,

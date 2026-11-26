@@ -19,17 +19,9 @@ import { loadMySharedPlans, sharePlan, syncSharedPlans, unsharePlan } from './sh
 
 interface Loaded {
   plans: SkillPlanRecord[];
-  /** Plan ids this Character has in the Community. */
   shared: Set<string>;
 }
 
-/**
- * The Skill plans tab's My sharing: what this Character shares, one row per
- * plan with Stop sharing, and Add Skill plans for the rest. Unlike Blueprints and
- * Fittings there is no "share all": each plan is shared by hand, so the page
- * never offers more than the plans the Member picks. A shared plan follows its
- * owner's later edits (`syncSharedPlans`, run when the tab opens).
- */
 export function ShareSkillPlansTab({
   characterId,
   communityId,
@@ -45,7 +37,6 @@ export function ShareSkillPlansTab({
   const focusAfterCommit = useFocusAfterCommit();
 
   const fetchAll = useCallback(async (): Promise<Loaded> => {
-    // Refresh the copies of plans edited since they were shared before listing.
     await syncSharedPlans(characterId, communityId);
     const [plans, shared] = await Promise.all([
       db.skillPlans.where('characterId').equals(characterId).toArray(),
@@ -101,7 +92,6 @@ export function ShareSkillPlansTab({
     return { ...current, shared };
   }
 
-  // With no plans of its own the pilot needs somewhere to make one.
   const makePlan = (
     <Link to="/skills/plans" className={buttonClassName({ size: 'sm' })}>
       {t('communities.plans.makePlan')}
@@ -152,7 +142,6 @@ export function ShareSkillPlansTab({
                       else stopButtons.current.delete(plan.id);
                     }}
                     onClick={() => {
-                      // Stopping removes the row: focus the next Stop sharing, else the search.
                       const near = [shownRows[index + 1], shownRows[index - 1]].map(
                         (other) => () =>
                           other ? (stopButtons.current.get(other.id) ?? null) : null
@@ -169,7 +158,6 @@ export function ShareSkillPlansTab({
           )}
         </>
       )}
-      {/* While Add is open the notice shows in it: the page behind is inert. */}
       {notice !== null && !adding && <InlineError>{notice}</InlineError>}
       <AddSharedItemsDialog
         open={adding}

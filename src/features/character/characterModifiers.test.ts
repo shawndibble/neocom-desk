@@ -30,7 +30,6 @@ function corrected(trained: number, effective: number): CorrectedSkills {
 beforeEach(() => {
   mockedLoadCorrectedSkills.mockReset();
   mockedLoadCharacterImplants.mockReset();
-  // An alpha-capped clone: trained V, usable IV.
   mockedLoadCorrectedSkills.mockResolvedValue(corrected(5, 4));
   mockedLoadCharacterImplants.mockResolvedValue({
     data: [BX_804, RX_802],

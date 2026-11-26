@@ -17,10 +17,6 @@ vi.mock('@/engine/industry/autoMakeOrBuy', async (importOriginal) => {
   return { ...actual, autoBuildHere: vi.fn(actual.autoBuildHere) };
 });
 
-// Each member's blueprints also load Blueprint Acquisition offers (ESI market,
-// LP stores) and an invention market (SDE invention data, hub prices).
-// Unmocked, those ran for real: seconds per test, past the 10 s budget under
-// CI load. No test here reads either, so both resolve to nothing.
 vi.mock('./blueprintPurchaseOffers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./blueprintPurchaseOffers')>();
   return {
@@ -53,10 +49,6 @@ function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRe
   };
 }
 
-// A three-level chain, each level with its own blueprint in the catalog:
-// 600 <- 601 <- 602 <- 603 (raw, unbuildable). blueprintTypeID 100 produces
-// 600, 101 produces 601, 102 produces 602 — a plan built directly off any of
-// these three sees a different amount of its own tree below it.
 const p600Blueprint = {
   name: 'P600',
   time: 100,
@@ -94,7 +86,6 @@ function entry(
   };
 }
 
-/** Every member's shared chain, so `recipeFor(601)`/`recipeFor(602)` resolve regardless of which plan asks. */
 const CHAIN_CATALOG_ENTRIES: BlueprintCatalogEntry[] = [
   entry({ blueprintTypeID: 100, blueprint: p600Blueprint, productTypeID: 600 }),
   entry({ blueprintTypeID: 101, blueprint: p601Blueprint, productTypeID: 601 }),
@@ -124,7 +115,6 @@ function sourcesFor(catalog: BlueprintCatalog) {
   return { catalog, pi: null, ownedBlueprints: [], assumedMe: 0 };
 }
 
-/** A corp-owned BPO of blueprint 101 (makes 601) at ME 10. */
 const CORP_BPO_101: CharacterBlueprint = {
   item_id: 9,
   type_id: 101,
@@ -150,15 +140,9 @@ describe('groupAutoBuildMaxDepth', () => {
 
   it("takes the deepest member's own tree, not the shallowest", () => {
     const catalog = catalogWith(CHAIN_CATALOG_ENTRIES);
-    // 'shallow' builds 601 directly: its own materials (602) have a recipe
-    // (depth 1), but 602's own materials (603) don't, so its tree stops
-    // there. 'deep' builds 600, one level higher: its own materials (601)
-    // have a recipe (depth 1), and 601's own materials (602) also have one
-    // (depth 2) before bottoming out at 603 the same way. Its tree is
-    // strictly taller even though both share the same 602/603 floor.
     const plans = [
-      plan({ id: 'shallow', blueprintTypeID: 101 }), // 601 -> 602
-      plan({ id: 'deep', blueprintTypeID: 100 }), // 600 -> 601 -> 602
+      plan({ id: 'shallow', blueprintTypeID: 101 }),
+      plan({ id: 'deep', blueprintTypeID: 100 }),
     ];
     expect(groupAutoBuildMaxDepth(plans, sourcesFor(catalog), NO_CHARACTER_MODIFIERS)).toBe(2);
   });
@@ -174,8 +158,8 @@ describe('applyGroupAutoBuild', () => {
   it("walks each member's own tree independently and returns one buildHere set per plan", async () => {
     const catalog = catalogWith(CHAIN_CATALOG_ENTRIES);
     const plans = [
-      plan({ id: 'a', blueprintTypeID: 100, hubId: 'jita' }), // needs 601
-      plan({ id: 'b', blueprintTypeID: 101, hubId: 'jita' }), // needs 602
+      plan({ id: 'a', blueprintTypeID: 100, hubId: 'jita' }),
+      plan({ id: 'b', blueprintTypeID: 101, hubId: 'jita' }),
     ];
 
     const picks = await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
@@ -183,8 +167,6 @@ describe('applyGroupAutoBuild', () => {
       depth: 1,
     });
 
-    // Plan a's product needs 601; plan b's product needs 602 — each member's
-    // own materials, never a shared tree.
     expect(picks.get('a')).toEqual(new Set([601]));
     expect(picks.get('b')).toEqual(new Set([602]));
   });
@@ -235,8 +217,6 @@ describe('applyGroupAutoBuild', () => {
   });
 
   describe('per-member owned blueprints and Reaction Location', () => {
-    // 601 bought costs 95; built it takes 100 x 602 at ME 0 (100 ISK) but
-    // 90 at the corp copy's ME 10 (90 ISK) — only the ME decides the verdict.
     const catalog = catalogWith(CHAIN_CATALOG_ENTRIES);
     const prices: MarketSnapshot = {
       ...SNAPSHOT,
@@ -341,7 +321,6 @@ describe('applyGroupAutoBuild', () => {
   });
 
   describe("each member's resolved ME (top-level Blueprint Acquisition)", () => {
-    /** A personal BPO of the plan's own top-level blueprint (100) at ME 10. */
     const OWN_BPO_100: CharacterBlueprint = { ...CORP_BPO_101, item_id: 7, type_id: 100 };
     const catalog = catalogWith(CHAIN_CATALOG_ENTRIES);
 

@@ -25,13 +25,6 @@ import { cx } from '@/lib/cx';
 import { SegmentedRow, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
-/**
- * Planetary Industry's settings: Settings → Industry, and the PI page's
- * settings modal. The sell market, what may be bought at the hub and the haul
- * cadence are read by every PI tab. The sell market is picked in the PI header
- * strip, so the modal leaves it out (`showSellAt` is for Settings, which has no
- * strip); both edit the same record (`piSettings.ts`).
- */
 export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean }) {
   const { t } = useTranslation();
   const expiringHours = useExpiringWindowHours((state) => state.value);

@@ -6,11 +6,6 @@ import { FlyDot } from './FlyDot';
 import { flyLabel } from './flyLabel';
 import { MasteryBadge } from './IsisTile';
 
-/**
- * A hull's can-fly line and mastery line for the active Character, as the
- * Ship Tree reads them: Ship Info's header and the New fitting hull pane.
- * Two siblings, so the host lays them out (stacked or in a row).
- */
 export function HullFlyStatus({ status }: { status: ShipTreeHullStatus | undefined }) {
   const { t } = useTranslation();
   const mastery = status?.mastery ?? 0;

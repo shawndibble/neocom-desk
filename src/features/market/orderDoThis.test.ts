@@ -26,7 +26,6 @@ describe('orderDoThis', () => {
   });
 
   it('undercuts a station rival by one legal tick when no floor says otherwise', () => {
-    // The common case: no cost basis linked, so no verdict to weigh it.
     expect(orderDoThis(stationUndercut())).toEqual({ kind: 'undercutTo', price: 449.9 });
   });
 
@@ -55,7 +54,6 @@ describe('orderDoThis', () => {
   it('turns in a sell order a campaign turn-in pays more for', () => {
     const row = openOrderRow({ problem: 'turnInPays', problems: ['turnInPays'], turnInEach: 600 });
     expect(orderDoThis(row)).toEqual({ kind: 'turnIn' });
-    // A floor's "leave it alone" is for a healthy order only: the turn-in still speaks.
     expect(orderDoThis({ ...row, floor: { relist: 300 } as OpenOrderRow['floor'] })).toEqual({
       kind: 'turnIn',
     });
@@ -74,7 +72,6 @@ describe('orderDoThis', () => {
   it('has nothing to do yet for an order nobody could check', () => {
     const row = openOrderRow({ competitionUnchecked: true });
     expect(orderDoThis(row)).toEqual({ kind: 'nothingYet' });
-    // Even with a floor, whose verdict would otherwise say "leave it alone".
     const withFloor = openOrderRow({
       competitionUnchecked: true,
       floor: { relist: 400, fill: 390 },

@@ -1,8 +1,3 @@
-/**
- * An Assets row's item menu, plus "What to do with this ore" on ore rows only
- * (issue #2836). The dialog's open state lives here, outside the menu, because
- * the menu unmounts its items the moment one is chosen.
- */
 import { useEffect, useState, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MenuItem } from '@/components/ui';
@@ -12,7 +7,6 @@ import { OreDecisionDialog } from './OreDecisionDialog';
 
 let oreTypeIds: Promise<ReadonlySet<number>> | null = null;
 
-/** Ore, moon ore and ice, raw and Compressed: the types the Ore Form setting maps between. */
 function loadOreTypeIds(): Promise<ReadonlySet<number>> {
   oreTypeIds ??= loadCompressedOreTypeIds().then(
     (byRaw) => new Set(Object.entries(byRaw).flat().map(Number))

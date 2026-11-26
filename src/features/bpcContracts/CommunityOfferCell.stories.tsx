@@ -25,10 +25,6 @@ const asCommunity = (row: ReturnType<typeof offer>) => {
 
 const title = <span className="text-accent">Rifter Blueprint</span>;
 
-/**
- * @summary The Item cell of a Community Offer row in BPC Sourcing: a Shared BPO is "ask <name> to
- * copy…" (a button), a copy is "from <name>", a reaction formula keeps the plain text.
- */
 const meta = {
   title: 'bpcContracts/CommunityOfferCell',
   component: CommunityOfferCell,
@@ -74,7 +70,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Four rows: ask to copy (button), a copy, a reaction formula (plain), a stale library. */
 export const Rows: Story = {
   args: { row: asCommunity(offer(-1, 'x')), title, canAsk: true, onAsk: () => undefined },
 };

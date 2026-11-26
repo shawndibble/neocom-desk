@@ -69,7 +69,6 @@ interface PlanMaterialsPanelProps {
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
 }
 
-/** The Materials panel: its header actions, the owned-stock controls, the table, its dialogs and the sub-build summary. */
 export function PlanMaterialsPanel({
   plan,
   catalog,
@@ -135,7 +134,6 @@ export function PlanMaterialsPanel({
         <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
       ) : (
         <>
-          {/* Reactions are exempt from every time implant — nothing to assume. */}
           {activity !== 'reaction' && (
             <ImplantsAssumedNote hint={t('industry.assumesNoImplantsHint')} />
           )}
@@ -219,26 +217,8 @@ export function PlanMaterialsPanel({
             update={update}
             onSearchBpcSourcing={onSearchBpcSourcing}
           />
-          {/*
-          What building the chosen material(s) actually costs — already
-          folded into the Results panel's totals below, at whatever depth
-          they were built to (docs/context/decisions, since superseded:
-          the two panels used to disagree the moment a build was
-          toggled). The "buying instead" comparison only appears when
-          every built material genuinely has a hub price to compare
-          against; silently pricing an unsold item as free was the bug
-          this replaces.
-        */}
           {anySubBuilds && (
             <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
-              {/*
-                Counted over the plan's own materials, not over every
-                built row in the flat table: `subBuildTotal` and the
-                "buying them instead" comparison beside it are both
-                top-level sums, and a count of a different set in the same
-                sentence reads as a count of those. What the deeper jobs
-                cost is inside the total already.
-              */}
               {t('industry.subBuildSummary', {
                 count: builtTopLevel.length,
                 total: formatIsk(subBuildTotal),

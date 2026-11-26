@@ -10,7 +10,6 @@ export type SrpFixtureRole = 'director' | 'accountant' | 'ceo-not-owner';
 
 const NOW = Date.UTC(2026, 9, 20, 12);
 
-/** A corp's saved SRP settings: percents, a class price, a percent class and a few hulls. */
 export function sampleSrpSettings(owner = SAMPLE_ACTIVE_CHARACTER.characterId): SrpSettings {
   return {
     corporationId: SAMPLE_ACTIVE_CHARACTER.corporationId,
@@ -38,7 +37,6 @@ export function sampleSrpSettings(owner = SAMPLE_ACTIVE_CHARACTER.characterId): 
   };
 }
 
-/** Real SDE type ids: a Hurricane armour brawl and a second Hurricane fit, and a Cerberus. */
 export function sampleDoctrineFits(): DoctrineFit[] {
   const by = SAMPLE_ACTIVE_CHARACTER.characterId;
   return [
@@ -81,7 +79,6 @@ export function sampleDoctrineFits(): DoctrineFit[] {
   ];
 }
 
-/** An in-memory Doctrine Fit store for page stories; `start: 'empty'` has none. */
 export function createDoctrineFixture(start: 'sample' | 'empty'): SrpDoctrineBackendOverride {
   let fits = start === 'sample' ? sampleDoctrineFits() : [];
   return {
@@ -104,7 +101,6 @@ export function createDoctrineFixture(start: 'sample' | 'empty'): SrpDoctrineBac
   };
 }
 
-/** An in-memory SRP backend for page stories: `never-on` starts with no settings doc. */
 export function createSrpFixture(
   role: SrpFixtureRole,
   start: 'never-on' | 'configured'

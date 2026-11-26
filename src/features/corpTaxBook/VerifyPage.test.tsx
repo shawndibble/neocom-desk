@@ -274,10 +274,8 @@ describe('VerifyPage', () => {
     const list = await screen.findByRole('list', { name: 'Still owed' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
     expect(within(list).getByText('of 2,000,000 ISK')).toBeInTheDocument();
-    // A day's ore stays folded until it is opened; the Statement's lines are not listed whole.
     expect(screen.queryByText(/Zeolites ×/)).not.toBeInTheDocument();
     expect(screen.queryByText('What you mined')).not.toBeInTheDocument();
-    // Only the day whose ore the notice lists opens; Aug 27 was mined since and is a plain line.
     expect(within(list).getAllByRole('button')).toHaveLength(1);
     await userEvent.click(within(list).getByRole('button', { name: /Aug 13, 2026/ }));
     expect(await screen.findByText(/Zeolites × 70,200/)).toBeInTheDocument();
@@ -307,7 +305,6 @@ describe('VerifyPage', () => {
     expect(screen.queryByRole('list', { name: 'Ledger' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show ledger' }));
     const rows = within(screen.getByRole('list', { name: 'Ledger' })).getAllByRole('listitem');
-    // The day still owed (mined since the last notice) is the newest row.
     expect(rows[0]).toHaveTextContent('2,000,000 ISK');
     expect(rows[1]).toHaveTextContent('+1,000,000 ISK');
     expect(rows[2]).toHaveTextContent('500,000 ISK');
@@ -439,7 +436,6 @@ describe('VerifyPage', () => {
       renderPage();
       await userEvent.click(await screen.findByRole('button', { name: 'Confirm Quiet Alt' }));
       expect(api.confirm).toHaveBeenCalledWith(61, 98000001);
-      // LiveNote renders the text twice (visible + live region)
       expect(await screen.findAllByText(/Quiet Alt is now part of this account/)).not.toHaveLength(
         0
       );
@@ -450,7 +446,6 @@ describe('VerifyPage', () => {
       renderPage();
       await userEvent.click(await screen.findByRole('button', { name: 'Not mine, remove it' }));
       expect(api.decline).toHaveBeenCalledWith('tok', 61);
-      // LiveNote renders the text twice (visible + live region)
       expect(await screen.findAllByText(/Quiet Alt was removed/)).not.toHaveLength(0);
     });
 

@@ -1,10 +1,3 @@
-// Short-lived Storybook for agent CLIs (`ui:catalog`, `ui:shot`).
-//
-// Per worktree: a free port, this worktree's code only. A server already
-// started by another run of these scripts in the same worktree is reused (its
-// port is in `.cache/storybook-server.json`); one we start ourselves is killed,
-// process group and all, when `fn` returns, throws, or we get SIGINT/SIGTERM.
-
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -57,9 +50,7 @@ const start = async () => {
   const stop = () => {
     try {
       process.kill(-child.pid, 'SIGKILL');
-    } catch {
-      // already gone
-    }
+    } catch {}
     rmSync(stateFile, { force: true });
   };
   let exited = false;
@@ -78,7 +69,6 @@ const start = async () => {
   return { port, stop };
 };
 
-/** Runs `fn(baseUrl)` against this worktree's Storybook, starting one if needed. */
 export const withStorybook = async (fn) => {
   const existing = readState();
   let port = existing?.port;

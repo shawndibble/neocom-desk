@@ -1,13 +1,3 @@
-/**
- * "Affected by" in a fitted module's dialog: each of the module's attributes
- * that something changed, from its base to its value, with every modifier
- * the engine applied — which skill, hull bonus, module, charge, projected
- * effect or fleet boost, how it changes it, and any stacking penalty. Worked
- * out on demand, under exactly what the stats are (`explainModule`). Only what
- * moves a number is listed: an attribute that reads the same before and after
- * (a launcher's 0 HP damage — the charge carries it) and a source that isn't
- * running are left out.
- */
 import { useCallback } from 'react';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +13,6 @@ function AffectedSourceLine({
   typeName,
 }: {
   source: AffectedSource;
-  /** The attribute's unit: an assigned or added value is in it. */
   unitId: number | undefined;
   typeName: (typeId: number) => string;
 }) {
@@ -61,14 +50,12 @@ export function FittingAffectedByPanel({
   moduleIndex,
   typeName,
 }: {
-  /** `workspace.explainModule`; null while the engine or the pilot isn't ready. */
   explain: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
   moduleIndex: number;
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
   const dictionary = useAttributeDictionary();
-  // Null `explain`: nothing to ask yet, so it reads as loading.
   const load = useCallback(
     () => (explain === null ? Promise.resolve(null) : explain(moduleIndex)),
     [explain, moduleIndex]
@@ -80,7 +67,6 @@ export function FittingAffectedByPanel({
   if (failed) return <p className="text-xs text-danger">{t('fittings.affectedBy.failed')}</p>;
   if (rows === null || dictionary === null)
     return <p className="text-xs text-text-dim">{t('fittings.affectedBy.loading')}</p>;
-  // Published attributes only: one the dictionary can't name isn't one the game shows.
   const shownRows = rows.flatMap((row) => {
     const entry = dictionary[row.attributeId];
     if (entry === undefined) return [];

@@ -25,8 +25,6 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: sde.loadSkills,
 }));
 vi.mock('@/features/fittings/fittingPrice', () => ({ loadFittingPrice: async () => null }));
-// No engine in tests: every calculation fails, which the stats sections show
-// as their own error rather than needing a full `FittingStats` here.
 const computeFittingStats = vi.fn(async (): Promise<FittingStats> => {
   throw new Error('no dogma engine in tests');
 });
@@ -98,7 +96,6 @@ describe('FittingShared', () => {
       await screen.findByText('Shown with all skills at V. Log in to see it with your skills.')
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
-    // The ring's slot tile is named by item, not `#id`.
     expect(
       await screen.findByRole('button', { name: /125mm Gatling AutoCannon I/ })
     ).toBeInTheDocument();
@@ -106,7 +103,6 @@ describe('FittingShared', () => {
     expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Choose permissions/ })).toBeInTheDocument();
-    // The login sits in the header; Copy Fitting rides in the notice strip below it.
     const header = screen.getByRole('link', { name: /Neocom Desk/ }).closest('header')!;
     expect(within(header).getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(within(header).queryByRole('button', { name: 'Copy Fitting' })).not.toBeInTheDocument();
@@ -115,7 +111,6 @@ describe('FittingShared', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
     expect(clipboardText).toContain('[Rifter, Rifter]');
     expect(clipboardText).toContain('125mm Gatling AutoCannon I');
-    // The button label swap alone is silent; the status region says it.
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/copied/i));
   });
 

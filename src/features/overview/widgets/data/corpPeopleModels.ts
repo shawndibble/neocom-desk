@@ -1,7 +1,3 @@
-/**
- * Corp people and mining builders: Members, Inactive members and Moon mining
- * ledger. Same contract as `models.ts`: pure, derived at render time.
- */
 import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { label, memberStanding, type MemberActivity } from '@/engine/corp/members';
 import { DAY_MS } from '@/lib/age';
@@ -19,29 +15,18 @@ const I = 'overview.widgets.corpInactive';
 const G = 'overview.widgets.corpMining';
 
 const MEMBERS_PATH = '/corp/members';
-/** The roster's own dark-only filter (`CorpMembers` reads `?dark=1`), so the link lands on the same set. */
 const INACTIVE_PATH = `${MEMBERS_PATH}?dark=1`;
 const MOONS_PATH = '/corp/moons';
-/** A member's row flashes on the roster (`CorpRoster` reads `?highlight=<characterId>`). */
 const rosterPath = (query: string, characterId: number) =>
   `${MEMBERS_PATH}${query}highlight=${characterId}`;
-/**
- * The ledger names characters, the Miners tab names Miners (a main with its alts, or `solo:<id>`),
- * so a row cannot name its own Miner: it opens the tab.
- */
 const MINERS_PATH = `${MOONS_PATH}/miners`;
 
-/** ESI keeps about this many days of an observer ledger. */
 const LEDGER_DAYS = 30;
 const CHART_MONTHS = 12;
 const TOP_MINERS = 8;
 
-/** A name ESI could not resolve prints the way the roster prints it. */
 const nameOf = (names: ReadonlyMap<number, string>, id: number) => label(names.get(id) ?? null, id);
 
-// --- Members -----------------------------------------------------------------------
-
-/** Members by the UTC month they joined, oldest first, for the last `CHART_MONTHS` months. */
 function joinsByMonth(members: readonly MemberActivity[], now: number): number[] {
   const at = new Date(now);
   const base = at.getUTCFullYear() * 12 + at.getUTCMonth();
@@ -149,8 +134,6 @@ export const corpMembers: Builder = (feeds, { t, now }) => {
   };
 };
 
-// --- Inactive members --------------------------------------------------------------
-
 export const corpInactive: Builder = (feeds, { t }) => {
   const feed = feeds.corpMembers;
   const data = feed?.data ?? null;
@@ -159,7 +142,6 @@ export const corpInactive: Builder = (feeds, { t }) => {
   if (!data.readable) return corpUnreadable(to, feed, data.needsReauth, t);
 
   const { names, darkAfterDays, loadedAt } = data;
-  // The roster's own rule: later of logon/logoff, or the join date for a member who never played.
   const inactive = data.members
     .map((member) => ({ member, standing: memberStanding(member, loadedAt, darkAfterDays) }))
     .filter((entry) => entry.standing.isDark)
@@ -201,8 +183,6 @@ export const corpInactive: Builder = (feeds, { t }) => {
     summary: t(`${I}.summary`, { count: inactive.length, days: darkAfterDays }),
   };
 };
-
-// --- Moon mining ledger ------------------------------------------------------------
 
 interface MinerTotal {
   id: number;
@@ -268,7 +248,6 @@ export const corpMining: Builder = (feeds, { t, now, range }) => {
     (min, row) => (min === null || row.date < min ? row.date : min),
     null
   );
-  // ESI's ledger is about a month deep: a longer range must say how much it really covers.
   const covered =
     range > LEDGER_DAYS
       ? Math.min(

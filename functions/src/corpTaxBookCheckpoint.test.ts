@@ -10,7 +10,6 @@ import {
 } from './corpTaxBookCheckpoint.js';
 
 describe('checkpointProblems: a checkpoint must add up before it is stored', () => {
-  // Day 2 owes 50 of its 60 (10 paid), 10 of it an officer's charge; day 5 owes all 25.
   const ok = {
     through: '2026-09-30',
     owed: [
@@ -29,9 +28,7 @@ describe('checkpointProblems: a checkpoint must add up before it is stored', () 
       checkpointProblems({ ...ok, owed: [], credit: 30, balance: -30, paidThrough: '2026-09-30' })
     ).toEqual([]);
     expect(checkpointProblems({ ...ok, owed: [], balance: 0, paidThrough: null })).toEqual([]);
-    // To the ISK: a fraction of rounding is no mismatch.
     expect(checkpointProblems({ ...ok, balance: 75.4 })).toEqual([]);
-    // What the day tolerance wrote off is part of the day too.
     expect(
       checkpointProblems({ ...ok, owed: [{ ...a, writtenOff: 5, remaining: 45 }, b], balance: 70 })
     ).toEqual([]);
@@ -99,7 +96,6 @@ describe('checkpointFits: a checkpoint stands only for the characters it summed'
     expect(checkpointFits({ characterIds: [2, 1] }, [1, 2])).toBe(true);
     expect(checkpointFits({ characterIds: [1] }, [1, 2])).toBe(false);
     expect(checkpointFits({ characterIds: [1, 2] }, [1])).toBe(false);
-    // One recorded before characters were stored is read as absent.
     expect(checkpointFits({}, [1])).toBe(false);
   });
 });
@@ -119,7 +115,6 @@ describe('lockDateFor', () => {
 });
 
 describe('isLocked: history before the lock date is read-only', () => {
-  // On 15 Dec the lock date is 1 Oct.
   const today = '2026-12-15';
   it('locks a day or an instant before the lock date, and nothing from it on', () => {
     expect(isLocked('2026-09-30', today)).toBe(true);

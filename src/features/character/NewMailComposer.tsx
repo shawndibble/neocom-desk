@@ -1,14 +1,3 @@
-/**
- * New Mail compose (docs/context/decisions/
- * 20261016-124635-mail-compose-format-bar-and-eve-markup.md). One component,
- * two placements: a full-pane takeover on a phone (`fullPane`) and inline in
- * the reading pane on a wide screen. Close (X) keeps the draft; Discard
- * clears it after a confirmation; Send clears it on success.
- *
- * The body is a controlled string behind the `bodyEditor` seam
- * (`MailBodyEditor.tsx`), so a rich editor replaces the plain text area
- * without touching send or draft code.
- */
 import { useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -45,7 +34,6 @@ import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
-/** Writes the slot, or clears it when there is nothing worth keeping. Returns whether a draft is now stored. */
 async function persistNewMail(characterId: number, fields: NewMailFields): Promise<boolean> {
   if (isNewMailEmpty(fields)) {
     await clearNewMailDraft(characterId);
@@ -55,14 +43,11 @@ async function persistNewMail(characterId: number, fields: NewMailFields): Promi
   return true;
 }
 
-/** How the composer ended: draft kept, nothing worth keeping, or an explicit Discard. */
 export type NewMailCloseReason = 'kept' | 'empty' | 'discarded';
 
 interface NewMailComposerProps {
   characterId: number;
-  /** Phone placement: covers the whole viewport instead of sitting in the reading pane. */
   fullPane: boolean;
-  /** Swap point for the body editor; defaults to the rich (WYSIWYG + Source) one. */
   bodyEditor?: ComponentType<MailBodyEditorProps>;
   onClose: (reason: NewMailCloseReason) => void;
   onSent: () => void;
@@ -89,8 +74,6 @@ export function NewMailComposer({
   const finishedRef = useRef(false);
   const sendingRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
-  // The latest values, for the flushes that run outside a render (unmount,
-  // backgrounding), where the closure would be stale.
   const latestRef = useRef({ characterId, recipients, subject, body, ready: false });
   useEffect(() => {
     latestRef.current = { characterId, recipients, subject, body, ready };
@@ -103,8 +86,6 @@ export function NewMailComposer({
   const errorId = `${fieldId}-error`;
   const viewport = useVisualViewportBox(fullPane);
 
-  // The page behind a full-pane composer is not reachable by keyboard or
-  // screen reader: every other child of <body> goes inert while it is open.
   useEffect(() => {
     if (!fullPane) return;
     const section = sectionRef.current;
@@ -117,7 +98,6 @@ export function NewMailComposer({
     return () => marked.forEach((el) => el.removeAttribute('inert'));
   }, [fullPane]);
 
-  // Reopens the draft as left; anything typed before it resolves wins.
   useEffect(() => {
     let cancelled = false;
     void loadNewMailDraft(characterId).then((draft) => {
@@ -140,8 +120,6 @@ export function NewMailComposer({
     };
   }, [characterId]);
 
-  // Writes what is on screen right now, from the refs; never after the
-  // composer has finished (sent, discarded or closed).
   function flushLatest() {
     const l = latestRef.current;
     if (finishedRef.current || !l.ready) return Promise.resolve();
@@ -163,8 +141,6 @@ export function NewMailComposer({
     return () => clearTimeout(id);
   }, [ready, characterId, recipients, subject, body]);
 
-  // The 500 ms debounce is lost if the composer goes away without Close
-  // (bottom nav, route change, Back) or the page is backgrounded.
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === 'hidden') void flushLatest();
@@ -186,7 +162,6 @@ export function NewMailComposer({
 
   async function handleClose() {
     const empty = isNewMailEmpty(fields);
-    // Flush now: the debounce may not have fired, and the draft must survive the close.
     await flushLatest();
     finishedRef.current = true;
     onClose(empty ? 'empty' : 'kept');
@@ -200,13 +175,11 @@ export function NewMailComposer({
   }
 
   async function handleSend() {
-    // Synchronous: a double tap lands before `sending` re-renders the button disabled.
     if (sendingRef.current) return;
     if (recipients.length === 0) {
       setError(t('mail.sendNoRecipients'));
       return;
     }
-    // Read before the request: a drop mid-send must not retroactively make it "never sent".
     const wasOffline = !isOnline();
     sendingRef.current = true;
     setSending(true);
@@ -217,7 +190,6 @@ export function NewMailComposer({
           characterId,
           recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
           subject,
-          // Whatever the editor produced, only the safe subset is ever sent.
           sanitizeMarkup(body)
         );
       } catch (err) {
@@ -238,7 +210,6 @@ export function NewMailComposer({
         return;
       }
       finishedRef.current = true;
-      // The mail is sent; a draft that fails to clear is stale, not a failed send.
       await clearNewMailDraft(characterId).catch(() => undefined);
       onSent();
     } finally {
@@ -249,7 +220,6 @@ export function NewMailComposer({
 
   function onSectionKeyDown(e: KeyboardEvent<HTMLElement>) {
     if (e.key !== 'Escape' || !fullPane || confirmingDiscard || sendingRef.current) return;
-    // Escape inside a sheet or dialog (format bar, discard) closes that, not the composer.
     if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('dialog'))) return;
     e.preventDefault();
     void handleClose();
@@ -273,7 +243,6 @@ export function NewMailComposer({
       aria-modal={fullPane ? true : undefined}
       aria-label={t('mail.newMailHeading')}
       onKeyDown={onSectionKeyDown}
-      // `dvh` does not shrink for the iOS keyboard, so a known visual viewport sizes the pane.
       style={
         fullPane && viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined
       }

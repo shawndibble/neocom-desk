@@ -1,17 +1,9 @@
-/**
- * The characters a corporation counts as the pilot's that the pilot does not hold in Neocom Desk
- * (decision 20261120-235011, "a warning when the corporation counts a character the pilot has not
- * added"): an officer grouped them with a held character, so the book bills them together, but
- * the Mining Tax page reads only held characters' lines. One entry per corporation. Pure.
- */
 import type { Miner } from '@/engine/corpTaxBook/charges';
 
 export interface UnheldCharacters {
   corporationId: number;
   corpName: string;
-  /** The characters not held, in the order the Miners list them. */
   characterIds: number[];
-  /** "Not yours?": each held character in such a Miner declines its link to it. */
   declines: { characterId: number; minerId: string }[];
 }
 

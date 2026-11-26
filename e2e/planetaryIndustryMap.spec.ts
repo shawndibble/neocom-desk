@@ -1,10 +1,3 @@
-/**
- * The PI Map at laptop, wide and phone widths: the page never scrolls
- * sideways, and a click on a product opens the detail panel the way the width
- * says (a drawer over the map below ~1500px of map panel, docked beside it
- * above, a bottom sheet on a phone). Playwright rather than jsdom because only
- * a real layout engine can tell the widths apart.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { mockPlannerColonies, mockPiHubPrices, mockPiSkills } from './support/piColonies';
@@ -24,12 +17,10 @@ test.describe('PI Map', () => {
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openMap(page);
-    // Well past the 5s default: the tab awaits the SDE bake, every colony's detail and a hub read.
     const board = page.getByRole('group', { name: /^Planet map/ });
     await expect(board).toBeVisible({ timeout: 20_000 });
     await expectNoPageOverflow(page);
 
-    // A product tile is a real link to its PI detail (`?product=`).
     const product = board.getByRole('link', { name: /^Coolant\. Refined/ });
     await product.click();
     const drawer = page.getByRole('dialog', { name: /^(How to make|Where to get) / });
@@ -76,7 +67,6 @@ test.describe('PI Map', () => {
 
     await page.getByRole('button', { name: 'Close' }).click();
     await expect(sheet).toBeHidden();
-    // "Show full map" scrolls inside its own container, never the page.
     await page.getByRole('button', { name: 'Show full map' }).click();
     await expectNoPageOverflow(page);
   });

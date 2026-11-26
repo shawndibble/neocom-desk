@@ -1,15 +1,3 @@
-/**
- * "Optimize at remap points" (GLOSSARY.md): the user places Remap Markers in
- * the plan; this computes the best attribute spread for each marker-delimited
- * segment. Unlike placeRemaps, the boundaries are user-chosen, not searched:
- * segment 0 (before the first marker) trains on the CURRENT attributes at no
- * remap cost, and every marker starts a segment trained on its own
- * bestAttributes spread.
- *
- * Markers are step indices ("remap before step i"). Out-of-range markers are
- * clamped to [0, steps.length]; duplicates and the empty segments they leave
- * (e.g. a marker at steps.length) are dropped.
- */
 import {
   aggregateSpByPair,
   bestAttributesForPairs,
@@ -21,27 +9,11 @@ import { spBetween, timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type { Attributes, CloneState, EngineSkill, Implants, PlanStep } from '@/engine/types';
 
 export interface OptimizeAtMarkersOptions {
-  /** Step indices where the user will remap ("remap before step i"). */
   markers: readonly number[];
   currentAttributes: Attributes;
   implants?: Implants;
-  /**
-   * Live Boosters and when the plan starts training. Omit for Booster-blind
-   * costing — matches `placeRemaps`' own `booster` option.
-   */
   booster?: BoosterContext;
-  /**
-   * Manual attribute override per marker, aligned index-for-index to
-   * `markers` (not to the deduped/sorted cut points) — the same convention
-   * `normalizeMarkerAttributes` uses. `null`/absent falls back to the
-   * optimizer's own best spread for that marker's segment. When two markers
-   * collapse onto the same cut, the first one's override wins.
-   */
   manualAttributes?: readonly (Attributes | null)[];
-  /**
-   * Omit for Omega. Only the costing changes: halving every rate leaves the
-   * best spread for a segment the same, so the allocation search ignores it.
-   */
   cloneState?: CloneState;
 }
 
@@ -69,9 +41,6 @@ export function optimizeAtMarkers(
 
   let elapsedSeconds = 0;
 
-  // Cost `steps[start, end)` on fixed `attrs`, Booster-aware (against
-  // `liveBoosters`, offset by how far into the plan this segment starts)
-  // when a booster context was given, blind otherwise.
   const segmentSeconds = (start: number, end: number, attrs: Attributes): number => {
     if (boosted) {
       const startDate = new Date(booster!.startDate.getTime() + elapsedSeconds * 1000);
@@ -94,16 +63,12 @@ export function optimizeAtMarkers(
     }, 0);
   };
 
-  // Baseline: whole plan on current attributes (Booster-aware). Computed
-  // before `elapsedSeconds` starts accumulating, so it always starts at 0.
   const currentSeconds = segmentSeconds(0, steps.length, currentAttributes);
 
   const cuts = [...new Set(markers.map((m) => Math.min(steps.length, Math.max(0, m))))].sort(
     (a, b) => a - b
   );
 
-  // First manual override at each cut's step index, in the caller's marker
-  // order — mirrors `normalizeMarkerAttributes`'s "first write wins".
   const manualByStep = new Map<number, Attributes | null>();
   markers.forEach((m, i) => {
     const clamped = Math.min(steps.length, Math.max(0, m));
@@ -112,7 +77,6 @@ export function optimizeAtMarkers(
 
   const segments: RemapSegment[] = [];
 
-  // Leading current-attributes segment: everything before the first marker.
   const firstCut = cuts[0] ?? steps.length;
   if (firstCut > 0) {
     const seconds = segmentSeconds(0, firstCut, currentAttributes);
@@ -126,11 +90,9 @@ export function optimizeAtMarkers(
     elapsedSeconds += seconds;
   }
 
-  // One remapped segment per marker: a manual override when set, otherwise
-  // its own best spread.
   cuts.forEach((start, i) => {
-    const end = cuts[i + 1] ?? steps.length; // exclusive
-    if (start >= end) return; // empty (marker at/beyond the plan end)
+    const end = cuts[i + 1] ?? steps.length;
+    if (start >= end) return;
     const override = manualByStep.get(start) ?? null;
     const attributes =
       override ??

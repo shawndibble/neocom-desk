@@ -14,19 +14,12 @@ export type FeederViewLoad =
   | {
       state: 'ready';
       access: FeederViewAccess;
-      /** `null` when the server has not built the view yet. */
       view: FeederView | null;
       names: (characterId: number) => string;
-      /** A resolved name, or undefined: the refinery label chain skips what is unknown. */
       nameOf: (id: number) => string | undefined;
-      /** An ore's name, or undefined while unresolved. */
       typeName: (typeId: number) => string | undefined;
     };
 
-/**
- * The moon owner's view for a corporation: access, then the view, then the miners' names.
- * `collectorCorporationId` opens an accounting corporation it left (#4621).
- */
 export function useFeederView(
   characterId: number,
   corporationId: number,
@@ -42,8 +35,6 @@ export function useFeederView(
           collectorCorporationId === undefined
             ? await loadFeederView(characterId, corporationId)
             : await loadFeederView(characterId, corporationId, collectorCorporationId);
-        // Universe names resolves characters, corporations and systems alike: the miners, the
-        // payee, the moon owner itself and its refineries' systems for the label chain.
         const ids = view
           ? [
               ...characterIdsOf(view.days),

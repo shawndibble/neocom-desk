@@ -31,7 +31,6 @@ function defaultProps(overrides: Partial<VariationsTableProps> = {}): Variations
   };
 }
 
-/** ItemContextMenu (wired to every row) calls useNavigate/useLocation unconditionally, so any non-empty render needs a Router ancestor. */
 function renderTable(overrides: Partial<VariationsTableProps> = {}) {
   const actions = fakeItemActions();
   const result = render(
@@ -69,7 +68,7 @@ describe('VariationsTable', () => {
         [589, summary(300, 290)],
       ]),
     });
-    const rowEls = screen.getAllByRole('row').slice(1); // drop header row
+    const rowEls = screen.getAllByRole('row').slice(1);
     expect(within(rowEls[0]).getByText('Rifter')).toBeInTheDocument();
     expect(within(rowEls[0]).getByText('T1')).toBeInTheDocument();
     expect(within(rowEls[1]).getByText('Republic Fleet Rifter')).toBeInTheDocument();
@@ -84,7 +83,6 @@ describe('VariationsTable', () => {
   it('shows the sell-side empty state when only a buy order exists, and vice versa', () => {
     renderTable({ rows: [ROWS[0]], prices: new Map([[588, summary(null, 90)]]) });
     expect(screen.getByText('No sell orders')).toBeInTheDocument();
-    // Shorthand on screen (#947); the exact figure is the accessible name.
     expect(screen.getByText('90.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
@@ -162,7 +160,6 @@ describe('VariationsTable', () => {
     });
     await user.click(screen.getByRole('button', { name: /Buy/ }));
     const rowEls = screen.getAllByRole('row').slice(1);
-    // Buy is a price, not a cheapest-first ask: high to low on the first click.
     expect(within(rowEls[0]).getByText("Vherokior's Slasher")).toBeInTheDocument();
   });
 
@@ -174,7 +171,6 @@ describe('VariationsTable', () => {
       row.focus();
       fireEvent.contextMenu(row);
 
-      // Quickbar, price alert and stock target fold into one submenu.
       expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();

@@ -16,7 +16,6 @@ describe('focusPageSearch', () => {
     expect(focusPageSearch()).toBe(true);
     const primary = document.getElementById('primary') as HTMLInputElement;
     expect(document.activeElement).toBe(primary);
-    // Selected, so typing replaces the old query the way a browser's own find box does.
     expect(primary.selectionStart).toBe(0);
     expect(primary.selectionEnd).toBe(4);
   });

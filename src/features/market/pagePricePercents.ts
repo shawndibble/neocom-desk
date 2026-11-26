@@ -1,24 +1,3 @@
-/**
- * Page price percents (issue #6531): a percentage of market each page area
- * prices at, beside its Trade Hub (`pageHubs.ts`). 100 is the hub's price as
- * it stands; a buyback paying 90% of Jita, or a pilot who budgets at 105%,
- * sets their own. The percent belongs to the page whichever hub it uses
- * (Global or its own), so it lives in its own map, never in `sync.pageHubs`.
- *
- * `sync.pagePricePercents` is one synced map `area -> percent`, account-wide;
- * a page with no entry is at 100, so an empty map prices exactly as before.
- * Two areas keep the percent they already had, so there is never a second one
- * to stack with it:
- * - Appraisal: `sync.marketPricePercent` (its Price % field, `pricePercent.ts`).
- * - PI: its corp buyback rate (`piSettings.buybackPct`, device-local). An entry
- *   here wins; a percent written here is also written there (100 as no
- *   buyback), which older builds still read.
- *
- * The side a page prices on (buy or sell) is the page's; the popover only uses
- * it to name the field (`HubMenu`). The percent scales whatever price the page
- * reads, applied where the page reads it: the price lookups are cached per
- * station and shared by every page, so they are never scaled centrally.
- */
 import type { TFunction } from 'i18next';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -30,7 +9,6 @@ export type PagePricePercentMap = Readonly<Record<string, number>>;
 
 export const PAGE_PRICE_PERCENTS_SETTING_KEY = 'sync.pagePricePercents';
 
-/** Keeps every valid entry, an unknown area's too (a newer build's), as `parsePageHubs` does. */
 export function parsePagePricePercents(raw: unknown): PagePricePercentMap | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const out: Record<string, number> = {};
@@ -46,12 +24,6 @@ export const usePagePricePercents = createSyncedSetting<PagePricePercentMap>({
   parse: parsePagePricePercents,
 });
 
-/**
- * The pages with no percent in the popover: raw order books and history
- * (Market, Overview), order-book depth (Corp SRP), Appraisal (its Price % field
- * sits on the page) and Assets (no hub picker of its own, and its haul value
- * doubles as collateral).
- */
 const NO_PERCENT_FIELD: ReadonlySet<PageHubArea> = new Set([
   'market',
   'overview',
@@ -60,12 +32,10 @@ const NO_PERCENT_FIELD: ReadonlySet<PageHubArea> = new Set([
   'assets',
 ]);
 
-/** Whether `area`'s hub popover offers a Buy/Sell percent. */
 export function hasPercentField(area: PageHubArea): boolean {
   return !NO_PERCENT_FIELD.has(area);
 }
 
-/** The percent from already-read stores: the pure rule behind the hook and the loader. */
 export function percentFrom(
   area: PageHubArea,
   map: PagePricePercentMap,
@@ -79,14 +49,12 @@ export function percentFrom(
   return DEFAULT_PRICE_PERCENT;
 }
 
-/** The stores a page's percent is read from, for a caller that waits on them (`useHydratedStore`). */
 export const PRICE_PERCENT_STORES = [
   usePagePricePercents,
   useMarketPricePercent,
   usePiSettings,
 ] as const;
 
-/** `area`'s percent, live; it reads its stores itself. 100 until they are read, as an empty map is. */
 export function usePricePercentFor(area: PageHubArea): number {
   useHydratedStore(...PRICE_PERCENT_STORES);
   const map = usePagePricePercents((state) => state.value);
@@ -95,7 +63,6 @@ export function usePricePercentFor(area: PageHubArea): number {
   return percentFrom(area, map, appraisal, buyback);
 }
 
-/** `area`'s percent once its stores are read, for a loader outside React. */
 export async function loadPricePercentFor(area: PageHubArea): Promise<number> {
   await Promise.all([
     usePagePricePercents.getState().hydrate(),
@@ -110,7 +77,6 @@ export async function loadPricePercentFor(area: PageHubArea): Promise<number> {
   );
 }
 
-/** Writes `area`'s percent; an invalid value is ignored. */
 export async function setPricePercentFor(area: PageHubArea, percent: number): Promise<void> {
   if (!isValidPricePercent(percent)) return;
   if (area === 'appraisal') return useMarketPricePercent.getState().setValue(percent);
@@ -118,7 +84,6 @@ export async function setPricePercentFor(area: PageHubArea, percent: number): Pr
   await store.hydrate();
   await store.setValue({ ...usePagePricePercents.getState().value, [area]: percent });
   if (area !== 'pi') return;
-  // Older builds read the buyback: 100 is selling on the market; they accept 1–100 only.
   const settings = usePiSettings.getState();
   await settings.hydrate();
   const buybackPct =
@@ -126,14 +91,12 @@ export async function setPricePercentFor(area: PageHubArea, percent: number): Pr
   await settings.setValue({ ...usePiSettings.getState().value, buybackPct });
 }
 
-/** "Amarr", or "Amarr · 90%" when the page's percent is not 100. */
 export function withPercent(t: TFunction, hubText: string, percent: number): string {
   return percent === DEFAULT_PRICE_PERCENT
     ? hubText
     : t('pageHubs.withPercent', { hub: hubText, percent });
 }
 
-/** `price` at `percent` of market. */
 export function atPercent(price: number, percent: number): number {
   return percent === DEFAULT_PRICE_PERCENT ? price : (price * percent) / 100;
 }

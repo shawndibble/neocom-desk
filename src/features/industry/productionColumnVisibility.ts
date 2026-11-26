@@ -1,10 +1,3 @@
-/**
- * Optional columns and device-local visible-columns preferences for the three
- * production-run tables: the Records tab's By item and All production runs, and
- * a Build Plan's own runs. Each table's identity column (product, logged date)
- * and its row-actions column are not in a catalog: a table that can lose the
- * column naming its rows, or its only way to act on them, has lost them.
- */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
 export const PRODUCTION_LOG_ITEM_COLUMN_IDS = [
@@ -55,7 +48,6 @@ export const useVisiblePlanRunColumns = createColumnVisibilitySetting({
   allowEmpty: true,
 });
 
-/** The columns to draw: every one outside the catalog, and the catalog's ticked ones. */
 export function shownProductionColumns<Id extends string, C extends { id: string }>(
   columns: readonly C[],
   catalog: readonly Id[],

@@ -76,23 +76,16 @@ async function choose(name: string) {
   await user.click(await screen.findByRole('menuitem', { name }));
 }
 
-/**
- * The notice's live region (`LiveStatus`) mounts empty and fills a tick later, so
- * `findByRole('status')` can return it still empty: wait for the text itself.
- */
 async function expectStatus(text: string) {
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(text));
 }
 
-// Settled, so the hub menu's first open (`useMarketHub.hydrate`) never reads Dexie for the
-// active Character: that read lands after a test has picked one and resets it to null.
 beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
 
 afterEach(() => {
   configureClipboard(null);
-  // Reset, not clear: drops a queued mockRejectedValueOnce and restores each factory default.
   vi.mocked(createShareLink).mockReset();
   vi.mocked(existingShareLink).mockReset();
 });
@@ -107,7 +100,6 @@ describe('FittingExportMenu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Copy in-game link' })).toBeNull();
   });
 
-  // The Fittings library's row menu still copies one.
   it('builds a permanent link that decodes back to the Fitting', async () => {
     const url = new URL((await exportFitting('permanentLink', FITTING)) ?? '');
     expect(url.pathname.endsWith('/ships/fittings')).toBe(true);
@@ -116,7 +108,6 @@ describe('FittingExportMenu', () => {
   });
 
   it('keeps the whole implant set in the link, leaving the clone’s implants off the multibuy list', async () => {
-    // A set seeded from a clone holding 8 and 9, with implant 11 and booster 10 added.
     const seeded: Fitting = { ...FITTING, implantSet: { implants: [8, 9, 11], boosters: [10] } };
     const clone = [8, 9];
 

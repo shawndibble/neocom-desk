@@ -1,9 +1,3 @@
-/**
- * How to get a scan out of the game, as one numbered list with the in-game
- * windows shown where their steps begin. The badges on the pictures carry the
- * same numbers as the steps, so a pilot can find the spot on screen. Shown
- * under the empty state, where the page is waiting for the first paste.
- */
 import { useTranslation } from 'react-i18next';
 
 interface HowToPicture {
@@ -11,20 +5,17 @@ interface HowToPicture {
   width: number;
   height: number;
   alt: string;
-  /** Names which client this picture is from, when there are two. */
   caption?: string;
 }
 
 interface HowToStep {
   key: string;
-  /** The in-game pictures that cover this step and the ones after it, until the next. */
   pictures?: readonly HowToPicture[];
 }
 
 const STEPS: readonly HowToStep[] = [
   {
     key: 'openMenu',
-    // EVE has two Mining Surveyor overlays; each picture carries its own badges.
     pictures: [
       {
         src: '/images/survey/scan-menu.webp',
@@ -54,7 +45,6 @@ const STEPS: readonly HowToStep[] = [
   { key: 'paste' },
 ];
 
-/** `heading` off when a toggle above already says "How to copy a scan". */
 export function SurveyHowTo({ heading = true }: { heading?: boolean }) {
   const { t } = useTranslation();
   return (

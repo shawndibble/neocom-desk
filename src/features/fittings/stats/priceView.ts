@@ -1,12 +1,6 @@
 import type { Appraisal } from '@/engine/market/appraisal';
 import { unpricedSellRows } from '../fittingPrice';
 
-/**
- * What the Price section reads off an appraisal. The price loader names each
- * row by its bare typeId; the section and its breakdown read (and the
- * multibuy pastes) the item's real name. A fit with nothing sell-priced totals
- * 0 — that's "unknown", not a free ship, so the section shows a dash.
- */
 export function priceView(price: Appraisal | null, typeName: (typeId: number) => string) {
   const named =
     price === null
@@ -19,7 +13,6 @@ export function priceView(price: Appraisal | null, typeName: (typeId: number) =>
   };
 }
 
-/** A `priceView` with an appraisal in hand. */
 export type PriceView = ReturnType<typeof priceView> & {
   named: NonNullable<ReturnType<typeof priceView>['named']>;
 };

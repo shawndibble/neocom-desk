@@ -80,8 +80,6 @@ describe('recipientOf', () => {
     expect(recipientOf(made(), [other])).toBeUndefined();
   });
 
-  // Audit bug 2: an alt's payment is a merged Payee's even when its primary record is another
-  // Character's.
   it("reads every record of a merged Payee, so an alt's payment is its own", () => {
     const merged = payeeOf([
       record({ id: 'p1', characterId: MAIN }),
@@ -122,15 +120,12 @@ describe('suggestLink', () => {
     expect(suggestLink(anon, ctx([p, twin]))).toBeNull();
   });
 
-  // Audit bug 4: a donation the corporation's book holds (or has in flight) was offered to a
-  // personal Payee by amount, counted twice and re-pointed the Payee at the corporation.
   it('never offers a donation to a corporation whose book counts it', () => {
     const p = payeeOf([record({ entityId: 5 })], 1_000_000);
     const toCorp = made({ counterpartyId: CORP, counterpartyName: 'Brass Meridian' });
     expect(suggestLink(toCorp, ctx([p], { bookCorporations: new Set([CORP]) }))).toBeNull();
   });
 
-  // Audit bug 1: a suggestion aimed at a Corp Tax Book's Payee wrote Assignments for the book.
   it('never suggests a payment for a Corp Tax Book Payee: only personal Payees are linkable', () => {
     const corpPayee = payeeOf([
       record({ id: 'corp-book:98000001', name: 'Brass Meridian', entityId: CORP }),
@@ -185,12 +180,10 @@ describe('autoMatchRecorded', () => {
     ]);
   });
 
-  // Audit bug 3: the recipient was never checked.
   it('never links a transaction to someone else', () => {
     expect(autoMatchRecorded([made({ counterpartyId: 77 })], [recorded()], ctx([p]))).toEqual([]);
   });
 
-  // Audit bug 3: two recorded payments of one amount could both claim one transaction.
   it('is one to one or nothing', () => {
     const two = [recorded({ refId: 'r1' }), recorded({ refId: 'r2' })];
     expect(autoMatchRecorded([made()], two, ctx([p]))).toEqual([]);

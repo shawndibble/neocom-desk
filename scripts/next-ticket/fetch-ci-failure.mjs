@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Fetch and lightly filter a failed CI run's log so the diagnosis
-// sub-agent (next-ticket.md step 8) gets one call instead of the
-// `gh run view --log-failed` (+ `gh run download` for e2e) sequence.
-//
-// Usage: node scripts/next-ticket/fetch-ci-failure.mjs <run-id>
-//
-// Prints the filtered failed-step log to stdout (plain text, not JSON —
-// this is read by an agent, not parsed by another script).
 
 import { gh } from './lib.mjs';
 
@@ -26,9 +18,6 @@ try {
     .filter((j) => j.conclusion === 'failure')
     .map((j) => j.name);
   if (failedJobNames.some((n) => /e2e/i.test(n))) {
-    // A glob, not `-n playwright-report`: the e2e job is a sharded
-    // matrix and each shard uploads its own report, so there is no single
-    // artifact of that name any more. `-p` grabs whichever shards failed.
     console.error(
       `e2e job failed (${failedJobNames.join(', ')}) — consider: gh run download ${runId} -p 'playwright-report-shard-*'`
     );

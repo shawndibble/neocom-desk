@@ -94,7 +94,6 @@ describe('InlinePercent', () => {
     setup();
     const field = openField();
     fireEvent.change(field, { target: { value: '54' } });
-    // fireEvent returns false when the event was default-prevented.
     expect(fireEvent.keyDown(field, { key: 'Enter' })).toBe(false);
   });
 });

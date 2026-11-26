@@ -10,10 +10,6 @@ import {
   typeNameOf,
 } from './improveMakeoverFixture';
 
-/**
- * @summary The Improve Makeover group: rows by the fitted module that leaves, a three-state
- * group tick, and the whole-fit before → after figures.
- */
 const meta = {
   title: 'fittings/ImproveMakeover',
   component: ImproveMakeover,
@@ -40,10 +36,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Every row ticked: the group is whole and no row shows a gain of its own. */
 export const AllTicked: Story = {};
 
-/** @summary One row unticked: the group shows a dash and each row shows "On its own". */
 export const PartlyTicked: Story = {
   args: { ticked: new Set(MAKEOVER_KEYS.slice(0, 1).concat(MAKEOVER_KEYS.slice(2))) },
 };
@@ -68,5 +62,4 @@ function InteractiveMakeover(args: ComponentProps<typeof ImproveMakeover>) {
   );
 }
 
-/** @summary Interactive: tick the group or a row. */
 export const Interactive: Story = { render: (args) => <InteractiveMakeover {...args} /> };

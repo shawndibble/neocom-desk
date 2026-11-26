@@ -1,27 +1,3 @@
-/**
- * The Calendar page's seven ESI reads, its gated corp reads (every readable corporation's deadlines, the active Character's skyhooks) and its one Skill Plan projection, and the one snapshot they collapse into.
- *
- * Fetch + cache only — the ESI-shape-to-board-source conversion lives next
- * door in `calendarBoardSources.ts`, and the ranking lives in
- * `engine/character/board.ts`. Same three-layer split as the corp board's
- * `boardData` / `boardSources` / `board`. The one exception is contract
- * subject wording (`contractTypeLabel`/`contractRouteName` below): that needs
- * i18next and the location-name cache, neither of which the pure sources file
- * may import, so this layer resolves both and hands the sources file plain
- * strings through a callback, the same shape `typeName` already uses for SDE
- * names. `i18n.t` is the shared singleton, safe here only because
- * `src/main.tsx` initialises it before any caller of this loader — including
- * `routeWarm.ts`'s hover-triggered warm — can run.
- *
- * **Each source fails on its own.** Every loader here returns a `StatusResult`
- * rather than throwing on an auth failure, so a Character missing
- * `esi-industry.read_character_jobs.v1` gets a board with no jobs on it and
- * five other clocks intact. A source that could not be read is left
- * `undefined`, which the engine reads as "not readable" — distinct from `[]`,
- * "read fine, nothing due". Collapsing those two would put a confident "no
- * industry jobs" in front of someone who was never allowed to ask.
- */
-
 import i18n from 'i18next';
 import type { CalendarEventSummary, Contract } from '@/esi/endpoints';
 import type {
@@ -70,88 +46,34 @@ export interface CalendarBoardData {
   industryJobs?: BoardClockSource[];
   planetExtractions?: BoardClockSource[];
   mercenaryDens?: BoardClockSource[];
-  /** Moon drills of every readable corporation. Left `undefined` when no corporation can be read for them. */
   moonChunks?: BoardClockSource[];
   structureFuel?: BoardClockSource[];
   structureTimers?: BoardClockSource[];
   corpJobs?: BoardClockSource[];
-  /** The corporations behind the corp events: the corporation filter's choices. Empty when none is readable. */
   corporations: BoardCorporation[];
-  /** Other corporations' Shared Pops, less any moon already read as a `moonChunk`. `undefined` when the read failed. */
   sharedMoonPops?: BoardClockSource[];
-  /** Every live Shared Pop with its names, for the detail and the `?pop=` deep link. */
   sharedPops: SharedPopEntry[];
-  /** Refineries the pilot already reads as corp moon chunks: their Shared Pops, and the Calendar events that match them, stay as they are. */
   readableRefineries: number[];
-  /** The corporations sharing pops: the sharing-corporation filter's choices. */
   sharingCorporations: BoardCorporation[];
-  /** Corp skyhook raid windows. Left `undefined` unless the Character holds the corp role and scope to read them. */
   skyhookRaids?: BoardClockSource[];
-  /** The skyhooks behind `skyhookRaids`, for the detail modal (system, stock, window). */
   skyhookRaidDetails: SkyhookRaid[];
   contractExpiries?: BoardClockSource[];
   orderExpiries?: BoardClockSource[];
-  /** The pilot's typed-in accelerator running out; empty when none is running. */
   accelerator?: BoardClockSource[];
-  /**
-   * Kinds whose source was read at all — empty or not.
-   *
-   * Without this the filter menu cannot tell "read fine, nothing due" from
-   * "could not read", and falls through to a confident `0` next to a source
-   * that failed for any reason other than 401/403: a network drop, a 500, or
-   * a colony whose detail has never been cached. That zero is a lie about the
-   * pilot's data, and the scope decision forbids it in as many words.
-   */
   readableKinds: CharacterBoardItemKind[];
-  /**
-   * Kinds whose read came back 401/403. The filter menu names these as "log in
-   * again" rather than as a zero, which is the whole reason the page no longer
-   * gates wholesale on one scope.
-   */
   reauthKinds: CharacterBoardItemKind[];
-  /**
-   * The oldest `fetchedAt` across the sources that were actually read.
-   *
-   * The Data Age badge is a promise about the whole view, so a fresh calendar
-   * must not vouch for an hour-old jobs list. Sources that were not read at
-   * all are excluded rather than counted as infinitely old.
-   */
   oldestFetchedAt: Date | null;
-  /** Any read served from cache — the view's offline marker. */
   fromCache: boolean;
-  /** The raw events, which the detail modal and the CSV export still need. */
   events: CalendarEventSummary[];
-  /**
-   * The instant this snapshot was assembled, and the `nowMs` every surface on
-   * the page ranks against.
-   *
-   * Read here rather than at render for two reasons. It keeps the route pure —
-   * a `Date.now()` inside a `useMemo` is a lint error and, more to the point, a
-   * bug waiting for a re-render. And it guarantees the map, the ticker and the
-   * rail share one instant: a dot and the row it stands for must not land on
-   * different days, or show countdowns a minute apart, because they each asked
-   * the clock separately.
-   */
   loadedAtMs: number;
 }
 
-/** A source with no ESI cache row of its own: nothing to date, nothing to re-authorise. */
 const NO_CACHE: StatusResult<unknown[]> = { cached: null, needsReauth: false };
 
-/** `undefined` when the source could not be read, so the engine can tell that from empty. */
 function readRows<T>(result: StatusResult<T[]>): readonly T[] | undefined {
   return result.cached?.data;
 }
 
-/**
- * Every untitled, still-open courier's start/end location name, resolved once
- * for the whole board rather than once per row — `ContractIdentity` resolves
- * the same way per rendered row (issue #1706), but this loader composes every
- * row in one pass, so it batches instead. Filtered to `isActiveContractStatus`
- * up front so a character's finished/cancelled courier history — which
- * `toContractExpirySources` drops anyway — never spends a Dexie/ESI round trip
- * on a name nothing will render.
- */
 async function loadCourierRouteNames(
   characterId: number,
   contracts: readonly Contract[]
@@ -215,23 +137,9 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   const orders = readRows(ordersResult);
   const dens = readRows(densResult);
 
-  /**
-   * Colony detail from Dexie only, never a fetch.
-   *
-   * `loadAllColonyDetails` is one live call per planet on the `char-industry`
-   * bucket — the same bucket the jobs read above already used. Spending that
-   * on a page whose planet rows are one line each is the trade `pi/data.ts`
-   * documents against. The cost is that a colony the pilot has never opened on
-   * the PI page contributes nothing here; the planets list still counts as
-   * readable, because the scope plainly worked.
-   */
   const colonies: ColonyPins[] = [];
   if (planets && planets.length > 0) {
     const planetIds = planets.map((planet) => planet.planet_id);
-    // `readCachedPlanetNames`, not `loadPlanetName`: the latter is a
-    // `loadWithCache`, so a cache miss is one live `/universe/planets/{id}`
-    // per colony — exactly the fan-out the paragraph above refuses to spend on
-    // this page. An unnamed planet falls back to its id below.
     const [details, planetNames] = await Promise.all([
       readCachedColonyDetails(characterId, planetIds),
       readCachedPlanetNames(planetIds),
@@ -240,16 +148,12 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
       const detail = details.get(planet.planet_id);
       if (!detail) continue;
       colonies.push({
-        // A planet ESI has not named for us falls back to its id, which is at
-        // least something the pilot can search the client for.
         planetName: planetNames.get(planet.planet_id) ?? `#${planet.planet_id}`,
         pins: detail.data.pins,
       });
     }
   }
 
-  // One name resolution for every id the board will show, rather than one per
-  // source: `loadTypeNames` is a single SDE read either way.
   const typeIds = new Set<number>();
   for (const entry of queue ?? []) typeIds.add(entry.skill_id);
   for (const job of jobs ?? []) typeIds.add(job.product_type_id ?? job.blueprint_type_id);
@@ -271,29 +175,16 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     return start && end ? i18n.t('contracts.courierRoute', { start, end }) : undefined;
   };
 
-  /**
-   * One row per kind, and every derived answer read off it.
-   *
-   * The five lists this replaced — the destructure, the `readRows` calls, the
-   * `noteReauth` calls, the `cached` array and the return object — each
-   * repeated the same six kinds in the same order, so adding a seventh clock
-   * meant editing six places and the compiler could only catch one of them.
-   * `satisfies` pins the set against the engine's own list instead.
-   */
   const sources = [
     { kind: 'calendarEvent', result: eventsResult, rows: events },
     { kind: 'skillTraining', result: queueResult, rows: queue },
     { kind: 'industryJob', result: jobsResult, rows: jobs },
     { kind: 'planetExtraction', result: planetsResult, rows: planets },
     { kind: 'mercenaryDen', result: densResult, rows: dens },
-    // The pilot's own answer, from Dexie.
     { kind: 'accelerator', result: NO_CACHE, rows: acceleratorSources },
-    // Corp reads carry their own fetch times (`corpRead.fetched`), folded in below. A
-    // corporation whose grant lapsed is left out, never a re-auth notice for another Character.
     { kind: 'structureTimer', result: NO_CACHE, rows: corpRead.structureTimers },
     { kind: 'structureFuel', result: NO_CACHE, rows: corpRead.structureFuel },
     { kind: 'moonChunk', result: NO_CACHE, rows: corpRead.moonChunks },
-    // Not an ESI read: a callable, held for minutes (`calendarSharedPopsRead.ts`).
     { kind: 'sharedMoonPop', result: NO_CACHE, rows: sharedMoonPops },
     { kind: 'corpJob', result: NO_CACHE, rows: corpRead.corpJobs },
     { kind: 'skyhookRaid', result: skyhookRead.result, rows: skyhookRead.sources },
@@ -344,10 +235,6 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   };
 }
 
-/**
- * Every Character's board folded into one. No scope pre-check: each source of a board already
- * answers "not granted" for itself, so a Character missing one scope still gives its other clocks.
- */
 export async function loadAllCalendarBoard(): Promise<CalendarBoardData> {
   const { entries } = await fanOutAllCharacters<CharacterCalendarBoard>({
     load: async ({ characterId, name }) => ({

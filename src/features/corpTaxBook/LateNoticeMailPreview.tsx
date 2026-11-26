@@ -19,11 +19,9 @@ export interface MailPreviewContent {
   to: string;
   subject: string;
   body: string;
-  /** The mail was cut down to day or refinery lines to fit 10,000 characters. */
   summarised?: boolean;
 }
 
-/** The mail as the miner will read it: recipient, subject and the EVE-markup body. */
 export function LateNoticeMailPreview({ to, subject, body, summarised }: MailPreviewContent) {
   const { t } = useTranslation();
   return (
@@ -42,19 +40,12 @@ export function LateNoticeMailPreview({ to, subject, body, summarised }: MailPre
   );
 }
 
-/** The officer's own subject and body for one Miner's mail, in place of the standard one. */
 export interface MailEdit {
   subject: string;
   body: string;
-  /** The standard mail's body the edit was made from: when that changes, the edit is stale. */
   basis: string;
 }
 
-/**
- * The mail with Edit: what the officer writes is what the queue sends to this one Miner. The
- * preview's verify link (`previewVerifyUrl`) is swapped for the real one when the mail is queued.
- * Nothing changes until Save; Use the standard mail drops the edit.
- */
 export function EditableMailPreview({
   mail,
   edited,
@@ -64,15 +55,9 @@ export function EditableMailPreview({
   onReset,
   disabled,
 }: {
-  /** The mail as it will go: the edit when there is one, else the standard mail. */
   mail: MailPreviewContent;
   edited: boolean;
-  /** The standard mail changed since the edit was saved (a payment, a new day). */
   stale?: boolean;
-  /**
-   * The standard mail a new draft starts from: the edit's own basis, else today's standard body.
-   * Kept as the draft opened, so figures that change while the officer types are still flagged.
-   */
   basis: string;
   onSave: (edit: MailEdit) => void;
   onReset: () => void;
@@ -173,7 +158,6 @@ export function EditableMailPreview({
   );
 }
 
-/** "Preview mail", opened from the late notice run's Check step (D16). */
 export function LateNoticeMailPreviewDialog({
   open,
   onClose,
@@ -184,9 +168,7 @@ export function LateNoticeMailPreviewDialog({
   open: boolean;
   onClose: () => void;
   mail: MailPreviewContent | null;
-  /** The dialog's body: the run's `EditableMailPreview` for `mail`. */
   children: ReactNode;
-  /** With several Miners in the run: which one this is and how to step between them. */
   nav?: { position: number; count: number; onPrevious: () => void; onNext: () => void };
 }) {
   const { t } = useTranslation();

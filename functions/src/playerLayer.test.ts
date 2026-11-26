@@ -31,7 +31,6 @@ function memoryStore() {
   return { store, links, players };
 }
 
-// token string "t<id>:<hash>" verifies to that character; "bad" rejects.
 function setup(logged: unknown[] = []) {
   const mem = memoryStore();
   const deps: PlayerLayerDeps = {
@@ -120,7 +119,6 @@ describe('claimPlayerCharacters', () => {
     const res = await claimPlayerCharacters(deps, caller(1, 'new'), [tok(1, 'new')]);
     expect(res).toEqual({ playerId: '', characterIds: [], dropped: [1] });
     expect(links.has(1)).toBe(false);
-    // The id is fixed at creation: the Player keeps key '1' without member 1.
     expect(players.get('1')).toMatchObject({ characterIds: [2, 3], uids: ['char:2', 'char:3'] });
     expect(links.get(2)?.playerId).toBe('1');
     expect(links.get(3)?.playerId).toBe('1');
@@ -146,12 +144,10 @@ describe('claimPlayerCharacters', () => {
   it('refuses unproven merges: a character of a bigger Player stays put', async () => {
     const { deps, players, links } = setup();
     await claimPlayerCharacters(deps, caller(10), [tok(10), tok(11), tok(12)]);
-    // 10 re-claimed alone with a new free character 4: 10's Player has unproven 11, 12.
     const res = await claimPlayerCharacters(deps, caller(10), [tok(10), tok(4)]);
     expect(res.playerId).toBe('10');
     expect(res.characterIds).toEqual([10, 11, 12]);
     expect(players.get('10')?.characterIds).toEqual([10, 11, 12]);
-    // free 4 is not folded into a Player it could not prove
     expect(links.get(4)?.playerId).toBe('4');
     expect(players.get('4')?.characterIds).toEqual([4]);
   });

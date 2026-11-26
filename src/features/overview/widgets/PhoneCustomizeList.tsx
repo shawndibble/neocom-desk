@@ -1,10 +1,3 @@
-/**
- * Customize on a phone: the layout as a plain list to reorder and remove, every
- * target 36px. A phone's grid is two-across tiles, which drag and a per-tile
- * size control cannot work in, so sizes, views and ranges are left to a larger
- * screen (the note says so). Add widget, Reset, Cancel and Done are the edit
- * bar's, above this list.
- */
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';

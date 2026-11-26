@@ -1,12 +1,3 @@
-/**
- * The Skyhook raids widget (issue #4798) on the Overview: added from the
- * Gallery, one row per raidable skyhook in the alliance's own space (another
- * alliance's never shows), no horizontal scroll at any width, and a row that
- * opens its facts in a modal with the jump count linking to Route Safety.
- *
- * The fixture pilot is already in Test Alliance (99000001) and `mockEsi.ts`
- * names it, so only the public sov reads and the planets are served here.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { ALLIANCE_ID } from './support/fixtureData';
@@ -97,7 +88,6 @@ test.describe('Skyhook raids widget', () => {
     await signInAndGoto(page, './overview', undefined, [
       overviewLayoutSetting([{ kind: 'training', size: 'S' }]),
     ]);
-    // The first load on a cold dev server is slow.
     await expect(page.getByRole('region', { name: 'Training', exact: true })).toBeVisible({
       timeout: 20_000,
     });
@@ -115,7 +105,6 @@ test.describe('Skyhook raids widget', () => {
     await expect(widget.getByRole('button', { name: 'X-7OMU IV' })).toBeVisible();
     await expect(widget.getByRole('button', { name: 'Efa II' })).toBeVisible();
     await expect(widget).toContainText('2skyhooks raidable in our space');
-    // Another alliance's skyhook is raidable too, but not ours to defend.
     await expect(widget.getByText('4-HWWF VII')).toHaveCount(0);
 
     for (const width of [390, 768, 1024, 1280, 1440, 1920]) {

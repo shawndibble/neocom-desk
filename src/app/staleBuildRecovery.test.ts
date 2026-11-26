@@ -1,8 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { StaleBuildEnv } from './staleBuildRecovery';
 
-// Recovery state is module-level (a reloading page never clears it), so every
-// test gets a fresh copy of the module.
 let mod: typeof import('./staleBuildRecovery');
 beforeEach(async () => {
   vi.resetModules();
@@ -128,7 +126,6 @@ describe('canRecoverFromStaleBuild', () => {
   it('says yes when online and not purged inside the window', () => {
     const env = makeEnv();
     expect(mod.canRecoverFromStaleBuild(env)).toBe(true);
-    // A check, not a claim: nothing is written until a recovery starts.
     expect(env.writeLast).not.toHaveBeenCalled();
   });
 

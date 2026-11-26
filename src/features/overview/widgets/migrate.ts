@@ -1,15 +1,3 @@
-/**
- * Turns the old board's two settings (hidden cards, card order) into an
- * Overview Layout for a pilot who had them before the widget grid shipped.
- *
- * The two retired settings are read here and nowhere else: nothing writes them
- * any more. A non-empty list is also how the page knows the pilot is returning.
- *
- * Both keys stay on the synced-settings allow-list and `parseHiddenCards` keeps
- * keys this build has no meaning for: the value merges last-write-wins as a
- * whole, so a build that dropped a key it did not recognise would corrupt
- * another device's copy.
- */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { isAddable, type WidgetKindId, type WidgetShow } from './kinds';
 import {
@@ -24,27 +12,23 @@ import {
 export const OVERVIEW_HIDDEN_CARDS_KEY = 'sync.overviewHiddenCards';
 export const OVERVIEW_CARD_ORDER_KEY = 'sync.overviewCardOrder';
 
-/** Any list of strings, deduped — including keys this build has no meaning for. */
 export function parseHiddenCards(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   return [...new Set(raw.filter((key): key is string => typeof key === 'string'))];
 }
 
-/** The old board's hidden-cards list (read side only). */
 export const useOverviewHiddenCards = createSyncedSetting<string[]>({
   key: OVERVIEW_HIDDEN_CARDS_KEY,
   defaultValue: [],
   parse: parseHiddenCards,
 });
 
-/** The old board's card order, as the pilot dragged it (read side only). */
 export const useOverviewCardOrder = createSyncedSetting<string[]>({
   key: OVERVIEW_CARD_ORDER_KEY,
   defaultValue: [],
   parse: parseHiddenCards,
 });
 
-/** Old card key -> Widget Kind, in the old board's built-in order. */
 const CARD_TO_KIND: readonly [string, WidgetKindId][] = [
   ['orders', 'orders'],
   ['mining', 'miningTax'],
@@ -61,10 +45,8 @@ const CARD_TO_KIND: readonly [string, WidgetKindId][] = [
   ['stock', 'stock'],
 ];
 
-/** The migration also accepts the Widget Kind's own name for the mining card. */
 const ALIASES: Record<string, string> = { miningTax: 'mining' };
 
-/** Cards that started switched off; their "on" is a `show:<key>` marker. */
 const DEFAULT_OFF = new Set(['incursions']);
 
 const BUILTIN_ORDER = CARD_TO_KIND.map(([key]) => key);
@@ -99,12 +81,10 @@ export function migrateFromCards(
   return { version: 1, widgets };
 }
 
-/** Whether the old settings show this pilot used the board before the grid. */
 export function isReturningPilot(hidden: readonly string[], order: readonly string[]): boolean {
   return hidden.length > 0 || order.length > 0;
 }
 
-/** Retired kinds that became another kind on one of its Shows. */
 const SHOW_FOLDS: Readonly<Record<string, { kind: WidgetKindId; show: WidgetShow }>> = {
   corpServices: { kind: 'structures', show: 'problems' },
   walletFlow: { kind: 'wallet', show: 'flow' },
@@ -112,24 +92,6 @@ const SHOW_FOLDS: Readonly<Record<string, { kind: WidgetKindId; show: WidgetShow
   corpIncome: { kind: 'corpWallet', show: 'sources' },
 };
 
-/**
- * A saved widget of a retired or reshaped kind, as this build reads it; any
- * other widget comes back as the very object passed. `parseLayout` runs it on
- * every read, so a layout another device wrote before the change still loads,
- * and the new form is only written on the pilot's next edit. Size, view,
- * scope, range, title and the rest stay as saved; `parseLayout` repairs
- * whatever the new kind does not offer.
- *
- * - Offline services folded into Structures' Problems only: the same feed, and
- *   the structures with an offline service are among the problems it lists.
- *   Structures' own `structuresShow: 'problems'` (briefly stored before the
- *   Show setting was shared) reads as `show: 'problems'`.
- * - Wallet flow became the Wallet's Flow; Cash flow and Income by source the
- *   Corp wallet's Flow and Sources (decision `20261024-192832`).
- * - Trading profit became Profit on Trading; a Profit widget saved before the
- *   Source setting existed is put on Builds, which is all it ever showed
- *   (decision `20261024-191335`).
- */
 export function migrateRetiredKind(raw: Record<string, unknown>): Record<string, unknown> {
   const folded = typeof raw.kind === 'string' ? SHOW_FOLDS[raw.kind] : undefined;
   if (folded) return { ...raw, kind: folded.kind, show: folded.show };

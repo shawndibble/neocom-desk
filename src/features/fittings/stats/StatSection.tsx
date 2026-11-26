@@ -21,15 +21,11 @@ export function StatSection({
   children,
 }: {
   title: string;
-  /** The headline figure, on the row itself. */
   meta: ReactNode;
-  /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
   warning?: string;
-  /** Which section: a previewed change inside it puts a dot on the row, so a shut section doesn't hide it. */
   id: Section;
   expanded: boolean;
   onToggle: () => void;
-  /** `h4` under a column group label; `h3` in a side panel, under its title. */
   level: 'h3' | 'h4';
   children: ReactNode;
 }) {
@@ -37,7 +33,6 @@ export function StatSection({
   const previewed = useSectionPreviewed(id);
   return (
     <section className="border-b border-line last:border-b-0">
-      {/* Every section's row looks alike, open or shut: its small-caps title, the headline figure beside. Hover fills it `panel-2`, so it rests unfilled. */}
       <div className={cx('flex items-center gap-2 pr-3', rowInteractiveClassName)}>
         <Heading className="min-w-0 flex-1">
           <button
@@ -59,7 +54,6 @@ export function StatSection({
             )}
           </button>
         </Heading>
-        {/* Status text, never boxed: a box would read as a control (DESIGN.md §6). */}
         {warning && <span className={`shrink-0 text-warning ${STAT_EYEBROW_TYPE}`}>{warning}</span>}
         {meta && <span className="shrink-0 text-sm font-semibold tabular-nums">{meta}</span>}
       </div>
@@ -68,12 +62,6 @@ export function StatSection({
   );
 }
 
-/**
- * A side-panel section that is always open: the same small-caps title row as
- * `StatSection`, without the caret, so nothing in the panel hides behind a
- * click. The headline figure and a previewed-change dot read as on a
- * collapsible section.
- */
 export function PanelSection({
   title,
   meta,
@@ -109,7 +97,6 @@ export function PanelSection({
   );
 }
 
-/** The "Your Characters" section: the headline beside its title, the gaps below. */
 export function YourCharactersSection({
   fitting,
   characters,

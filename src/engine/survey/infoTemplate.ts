@@ -1,14 +1,6 @@
-/**
- * The pilot's Survey info templates: a name and any of the fields on a Survey's
- * Additional information panel (location, moon tax, notes), saved to fill the
- * next field in one pick. A template holds only the fields the pilot chose to
- * save, and applying one leaves the others as they are. Pure.
- */
-
 import { clamp } from '../math';
 
 export interface InfoLocation {
-  /** Null for a place typed by hand, which has no waypoint. */
   id: number | null;
   name: string;
 }
@@ -18,14 +10,12 @@ export interface InfoTax {
   pct: number;
 }
 
-/** What the panel shows right now; a blank field is null or empty. */
 export interface InfoFields {
   location: InfoLocation | null;
   tax: InfoTax | null;
   notes: string;
 }
 
-/** The fields a template holds; a field it does not hold is absent. */
 export interface InfoTemplate {
   id: string;
   name: string;
@@ -43,9 +33,7 @@ export interface InfoInclude {
 }
 
 export const TEMPLATE_MAX = 30;
-/** A name is a short label. */
 export const TEMPLATE_NAME_MAX = 40;
-/** The same cap a Survey's stored notes have. */
 const NOTES_MAX = 1000;
 
 function cleanName(raw: unknown): string {
@@ -68,7 +56,6 @@ function parseTax(raw: unknown): InfoTax | undefined {
   return { name, pct };
 }
 
-/** A stored or synced list, which another device or build may have written. */
 export function parseInfoTemplates(raw: unknown): InfoTemplate[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
@@ -92,12 +79,10 @@ export function parseInfoTemplates(raw: unknown): InfoTemplate[] {
   return out.slice(0, TEMPLATE_MAX);
 }
 
-/** `moon` is whether the Survey shows a moon ore: without one the tax row is not on the panel. */
 interface Context {
   moon: boolean;
 }
 
-/** The fields a template holds, as the set to refresh it with; the tax only counts when the panel shows it. */
 export function heldInclude(template: InfoTemplate, ctx: Context): InfoInclude {
   return {
     location: template.location !== undefined,
@@ -106,7 +91,6 @@ export function heldInclude(template: InfoTemplate, ctx: Context): InfoInclude {
   };
 }
 
-/** The fields to save: those the pilot included that are actually set. */
 export function templateFields(current: InfoFields, include: InfoInclude): InfoTemplateFields {
   const fields: InfoTemplateFields = {};
   if (include.location && current.location) fields.location = current.location;
@@ -116,7 +100,6 @@ export function templateFields(current: InfoFields, include: InfoInclude): InfoT
   return fields;
 }
 
-/** The panel's fields after picking `template`: what it holds is set, the rest stays. */
 export function applyTemplate(
   template: InfoTemplate,
   current: InfoFields,
@@ -129,7 +112,6 @@ export function applyTemplate(
   };
 }
 
-/** Whether a field the template holds no longer matches the panel. */
 export function isEdited(template: InfoTemplate, current: InfoFields, ctx: Context): boolean {
   const { location, tax, notes } = template;
   if (
@@ -148,7 +130,6 @@ export function isEdited(template: InfoTemplate, current: InfoFields, ctx: Conte
   return notes !== undefined && current.notes.trim() !== notes;
 }
 
-/** What a template holds, for the one line under its name. */
 export function templateSummary(template: InfoTemplate): {
   location: string | null;
   tax: InfoTax | null;
@@ -161,7 +142,6 @@ export function templateSummary(template: InfoTemplate): {
   };
 }
 
-/** The template a save under `name` would replace, if any (names match in any case). */
 export function findTemplateByName(
   list: readonly InfoTemplate[],
   name: string
@@ -171,7 +151,6 @@ export function findTemplateByName(
 }
 
 interface SaveInput {
-  /** Set to update that template; otherwise a template of the same name is replaced, or a new one added. */
   id?: string;
   name: string;
   fields: InfoTemplateFields;
@@ -204,7 +183,6 @@ export function deleteTemplate(list: readonly InfoTemplate[], id: string): InfoT
   return list.filter((t) => t.id !== id);
 }
 
-/** Puts a deleted template back at its old place (the end when the list is shorter now). */
 export function insertTemplate(
   list: readonly InfoTemplate[],
   template: InfoTemplate,

@@ -15,9 +15,7 @@ describe('activeShipItems', () => {
       [
         asset(1, SHIP, 'HiSlot0'),
         asset(2, SHIP, 'DroneBay'),
-        // The ship itself, in a station hangar.
         asset(SHIP, 60003760, 'Hangar', 'station'),
-        // Another ship's module.
         asset(3, 1_000_000_002, 'HiSlot0'),
       ],
       SHIP

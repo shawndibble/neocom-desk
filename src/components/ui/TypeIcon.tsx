@@ -11,26 +11,6 @@ interface TypeIconProps {
   className?: string;
 }
 
-/**
- * A type's icon, e.g. for the Market list or an item detail header. Always
- * decorative — every call site sits next to text that already names the
- * item, same as `CharacterAvatar`'s default (unlike a portrait, a type icon
- * is never a row's sole identifier, so there's no accessible-name case to
- * carry here).
- *
- * Blueprints and reaction formulas have no `icon` render on the EVE image
- * server (it 400s) — only a `bp` one, under the same type ID — and SKINs
- * have no render at all in any variation. Rather than let every one of
- * those show the browser's identical broken-image glyph, this falls back
- * `icon` -> `bp` -> a generic placeholder glyph.
- *
- * A type whose `bp` render has loaded once is remembered for the session
- * (`typeIdsWithBpRender`), so every later mount — each row of a blueprint
- * list, each re-render after scrolling — requests `bp` directly instead of
- * paying a 400 and a retry first. Only a successful `bp` load is
- * remembered, never a failure: an `icon` error from a network blip must not
- * pin an ordinary item to the wrong render.
- */
 const typeIdsWithBpRender = new Set<number>();
 
 function initialStage(typeId: number): 0 | 1 {
@@ -39,9 +19,6 @@ function initialStage(typeId: number): 0 | 1 {
 
 export function TypeIcon({ typeId, size, width, height, className }: TypeIconProps) {
   const [stage, setStage] = useState<0 | 1 | 2>(() => initialStage(typeId));
-  // Resets the fallback stage when `typeId` changes without an effect — the
-  // "adjust state during render" pattern React docs recommend for this
-  // exact case (https://react.dev/learn/you-might-not-need-an-effect).
   const [renderedTypeId, setRenderedTypeId] = useState(typeId);
   if (typeId !== renderedTypeId) {
     setRenderedTypeId(typeId);

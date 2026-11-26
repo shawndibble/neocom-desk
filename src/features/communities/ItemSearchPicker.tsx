@@ -8,13 +8,6 @@ import { namedLike, needleOf } from './shareLists';
 const SEARCH_RESULTS = 8;
 const MIN_SEARCH_CHARS = 2;
 
-/**
- * The compose form's "add an item" search (a request's lines, a buyback's
- * single items): a combobox over the appraisal catalogue. Results list under
- * the field, not over it, so the dialog's scroll area never clips them; Enter
- * takes the highlighted result, or the first. The caller learns the pick through
- * `onPick`, and the field empties for the next one.
- */
 export function ItemSearchPicker({
   catalogue,
   inputRef,
@@ -51,7 +44,6 @@ export function ItemSearchPicker({
       event.preventDefault();
       choose(results[combo.highlight ?? 0]);
     } else if (event.key === 'Escape' && open) {
-      // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
       setSearch('');

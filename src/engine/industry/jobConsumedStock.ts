@@ -1,21 +1,10 @@
-/**
- * Materials an active job already consumed that the last assets read still
- * shows as held (issue #6386). Pure: the caller supplies jobs, the assets
- * snapshot times and blueprints; no fetch/DOM/Dexie here.
- *
- * Under-subtracting is the safe failure — the offer then stays what it was
- * before — so a job whose inputs cannot be placed subtracts nothing.
- */
-
 import { effectiveMaterials } from '@/engine/industry/materials';
 import type { FacilityContext, IndustryBlueprint } from '@/engine/industry/types';
 import type { DetectedOwnedStockMap } from './ownedStock';
 
-/** ESI activity ids whose inputs come out of the installer's stock. */
 const MANUFACTURING = 1;
 const REACTION = 11;
 
-/** A job as this module needs it — structural, so the engine imports nothing from `esi`. */
 export interface StockJob {
   jobId: number;
   characterId: number;
@@ -24,11 +13,9 @@ export interface StockJob {
   runs: number;
   startMs: number;
   facilityId: number;
-  /** Material efficiency of the job's blueprint, resolved by the caller; ignored for a reaction, which has none. */
   me: number;
 }
 
-/** Units of one material a job consumed, at the facility it was installed in. */
 export interface JobConsumption {
   jobId: number;
   characterId: number;
@@ -38,7 +25,6 @@ export interface JobConsumption {
   quantity: number;
 }
 
-/** Units actually taken out of detected stock for one job and material. */
 export interface StockReduction {
   jobId: number;
   blueprintName: string;
@@ -46,11 +32,6 @@ export interface StockReduction {
   quantity: number;
 }
 
-/**
- * What the jobs installed after each Character's assets read consumed. A job
- * started at or before that read is already out of the assets, so it is never
- * counted; a Character with no known read time contributes nothing.
- */
 export function consumedByJobs(
   jobs: readonly StockJob[],
   snapshotMsByCharacter: ReadonlyMap<number, number>,
@@ -83,11 +64,6 @@ export function consumedByJobs(
   return out;
 }
 
-/**
- * Takes each consumption out of the installing Character's own placement at
- * the job's facility, floored at zero. Never another location, another
- * Character or a corporation. Returns `stock` itself when nothing applies.
- */
 export function subtractJobConsumption(
   stock: DetectedOwnedStockMap,
   consumption: readonly JobConsumption[]

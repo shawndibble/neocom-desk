@@ -180,7 +180,6 @@ describe('narrowing the merged Roles audit and SRP reads to one corporation', ()
     } as unknown as Feeds;
     const narrowed = narrowFeedsToCorporation(feeds, A).corpRoleAuditAll!.data!;
     expect(narrowed.audit!.holders.map((h) => h.characterId)).toEqual([1]);
-    // Character 7 lost every role, yet their change is still this corporation's.
     expect(narrowed.audit!.changes!.map((c) => c.characterId).sort()).toEqual([1, 7]);
   });
 

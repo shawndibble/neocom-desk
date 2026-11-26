@@ -149,7 +149,6 @@ describe('bundleShareOfValue', () => {
 
 describe('contractSavingFor', () => {
   it('is what the hub sell of every unit would cost, less the ask, as a percent of it', () => {
-    // 3 units at 1,000 = 3,000 at the hub; asking 2,400 saves 20%.
     expect(contractSavingFor(row({ price: 2_400, quantity: 3 }), 1_000)).toBeCloseTo(20);
   });
 

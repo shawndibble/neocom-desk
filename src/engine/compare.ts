@@ -1,5 +1,3 @@
-/** Shared sort comparators. Pure. */
-
 export const byName = (a: { name: string }, b: { name: string }): number =>
   a.name.localeCompare(b.name);
 

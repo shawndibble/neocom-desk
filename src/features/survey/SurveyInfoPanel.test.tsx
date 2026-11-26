@@ -5,7 +5,6 @@ import { SurveyInfoEditor, SurveyInfoReadout } from './SurveyInfoPanel';
 
 const { setSurveyInfo } = vi.hoisted(() => ({ setSurveyInfo: vi.fn() }));
 vi.mock('./surveyStore', () => ({ setSurveyInfo, MAX_SURVEY_NOTES: 1000 }));
-// Each has its own test; here only where they sit in the panel matters.
 vi.mock('./MoonTaxRow', () => ({
   MoonTaxRow: () => <div data-testid="tax-edit" />,
   MoonTaxReadout: () => <div data-testid="tax-readout" />,

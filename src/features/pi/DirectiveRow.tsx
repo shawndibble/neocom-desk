@@ -1,35 +1,3 @@
-/**
- * The Advisor's scan pattern: one instruction per row, always the same shape.
- *
- * ## Why a shared primitive rather than prose per card
- *
- * The tab used to state every instruction as a sentence — "Remove 4x idle
- * Basic Industry Facility — they draw 48,000/hr of Microorganisms against the
- * 21,201/hr this colony extracts. Frees 800 tf and 3,200 MW." Every clause was
- * true and load-bearing, and the card was still unreadable: six planets of
- * that is a page of prose a pilot has to *read* to find the two things they
- * should actually go and do.
- *
- * So an instruction is now three fixed slots — a VERB, what it applies to, and
- * the number it is worth, right-aligned and tabular. The eye runs down the
- * verb column to find the work and down the number column to rank it, without
- * parsing a sentence. The reasoning is not deleted: it moves to the colony's
- * detail view.
- *
- * ## The verbs are a closed set, and the colour is the meaning
- *
- * `remove` is amber because something is running that nothing feeds — it is a
- * fault, and it is the one a pilot should act on first. `add` and `swap` are
- * accent: an opportunity the plan placed here. `rebuild` is quiet and
- * outlined, because it is worth more but only by tearing the colony down, and
- * it must never compete with the two above for attention.
- *
- * `asIs` is the fourth, and it exists because "keep selling this raw" means
- * *change nothing*. Rendered as a verb tag like the others it read as an
- * instruction to rebuild a colony that was already right — see the
- * `stopTierSellRaw` / `stopTierSwitchRaw` split in `en.json`, which the old
- * card kept apart in words and this layout has to keep apart in colour.
- */
 import { Pill, type PillTone } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
@@ -38,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 
-/** What an instruction does. The set is closed; the colour carries the meaning. */
 export type DirectiveVerb =
   'add' | 'remove' | 'swap' | 'rebuild' | 'asIs' | 'build' | 'start' | 'stop';
 
@@ -47,32 +14,20 @@ const VERB_TONE: Record<Exclude<DirectiveVerb, 'asIs'>, PillTone> = {
   build: 'accent',
   swap: 'accent',
   remove: 'warning',
-  // The Goal Planner's change list: begin extracting on a colony that runs
-  // none, or stop one P0 of what it runs.
   start: 'accent',
   stop: 'warning',
-  // Outlined: a course of action the pilot could take, and a real one.
   rebuild: 'neutral',
 };
 
-// Flat and borderless, because `asIs` is not an action at all. It shared
-// `rebuild`'s outline once, which left the two rows differing only in their
-// wording — the exact collapse this verb exists to prevent.
 const AS_IS_CLASS =
   'inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-transparent bg-panel-2 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
-/** How the right-hand number reads: ISK earned, budget freed, or a quiet projection. */
 export type DirectiveTone = 'gain' | 'freed' | 'quiet' | 'muted';
 
 const TONE_CLASS: Record<DirectiveTone, string> = {
   gain: 'text-isk-pos',
   freed: 'text-warning',
   quiet: 'text-text-dim',
-  /**
-   * For a row that asks for nothing: the figure is a comparison, not a prize.
-   * Italic, not `text-dim` alone — `quiet` already owns that color, and
-   * `text-faint` (the tier below it) is below AA (issue #1491).
-   */
   muted: 'text-text-dim italic',
 };
 
@@ -89,22 +44,13 @@ export function VerbTag({ verb, label }: { verb: DirectiveVerb; label?: string }
 
 export interface DirectiveRowProps {
   verb: DirectiveVerb;
-  /** What the instruction applies to. Keep it to one line where it can be. */
   children: ReactNode;
-  /** The number this is worth, already formatted. Omit when there isn't one. */
   value?: ReactNode;
-  /** A unit shown small after the value, e.g. "/hr". */
   unit?: string;
   valueTone?: DirectiveTone;
-  /** Input chips, rendered beneath and spanning both columns. */
   chips?: ReactNode;
 }
 
-/**
- * One instruction. Two columns — the sentence fragment and its number — with
- * the chips spanning underneath, so the number column stays a straight edge
- * however long the left side runs.
- */
 export function DirectiveRow({
   verb,
   children,
@@ -132,15 +78,8 @@ export function DirectiveRow({
   );
 }
 
-/** Where an input comes from — a link, a customs boundary, or a shopping trip. */
 export type InputSource = 'local' | 'routed' | 'bought';
 
-/**
- * One glyph per source, from the shared set — never hand-rolled paths.
- * `icons.tsx` is what pins the weight and the rem-based sizing (DESIGN.md §5),
- * and three inline SVGs at three different stroke widths is exactly the drift
- * that rule exists to stop.
- */
 const SOURCE_ICON: Record<InputSource, typeof Icon.Done> = {
   local: Icon.Done,
   routed: Icon.Route,
@@ -153,13 +92,6 @@ const SOURCE_ICON_CLASS: Record<InputSource, string> = {
   bought: 'text-warning',
 };
 
-/**
- * One input, as a chip rather than a clause.
- *
- * The icon carries the source — made here, routed in, or bought — which is the
- * distinction a pilot asked to see, and it survives being scanned at a glance
- * in a way "already made here, just link it" at the end of a sentence does not.
- */
 export function InputChip({ source, children }: { source: InputSource; children: ReactNode }) {
   const Glyph = SOURCE_ICON[source];
   return (
@@ -174,14 +106,6 @@ export function InputChip({ source, children }: { source: InputSource; children:
   );
 }
 
-/**
- * A colony's load on one axis, as a percentage.
- *
- * The card's budget bar: the same reading with
- * the raw figures dropped, because "8,017 / 25,415 tf" is four numbers to
- * compare across six cards and "32%" is one. The exact figures are in the
- * detail modal, where a pilot checking the arithmetic will be.
- */
 export function LoadMeter({
   label,
   used,
@@ -210,18 +134,10 @@ export function LoadMeter({
   );
 }
 
-/** A card or modal section's micro-heading. */
 export function SectionLabel({ children }: { children: ReactNode }) {
   return <span className={eyebrowClassName}>{children}</span>;
 }
 
-/**
- * "Est." — the badge every projected figure carries.
- *
- * Kept as a badge rather than a sentence for the same reason the instructions
- * were: the caveat has to survive a glance. The sentence it replaces is still
- * available, in the tooltip and in the detail modal.
- */
 export function EstimateBadge() {
   const { t } = useTranslation();
   return (
@@ -231,10 +147,6 @@ export function EstimateBadge() {
   );
 }
 
-/**
- * "P2" — a planetary commodity's tier, as a quiet chip beside the verb and
- * estimate tags. Text, never colour alone: the tier is the label.
- */
 export function TierChip({ tier }: { tier: number }) {
   const { t } = useTranslation();
   return (

@@ -1,10 +1,3 @@
-/**
- * The info modal's blocks, each loaded on its own (`useKeyedLoad`): a block
- * that is slow, failed or has nothing to say never holds up the others. The
- * ones about the pilot's own standing wait for the Character and their data;
- * without a Character (not signed in) they stay idle and the modal shows the
- * entity's facts alone.
- */
 import { useCallback } from 'react';
 import { useKeyedLoad, type AsyncLoad } from '@/lib/useAsyncLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -27,23 +20,16 @@ import type { LoyaltyModel, StationsModel, WhereRow } from './npcInfoModel';
 
 const targetKey = ({ kind, id }: NpcInfoTarget) => `${kind}-${id}`;
 
-/** The active Character's id, or null when none is signed in. */
 function useCharacterId(): number | null {
   return useActiveCharacter((state) => state.activeCharacterId);
 }
 
-/**
- * The chain of standings. Every hook below takes the same `target` object
- * across renders (`NpcInfoView` memoizes it), so it is the loader's identity.
- * `ready` with `null` data means there is nothing honest to show.
- */
 export function useChainData(target: NpcInfoTarget): AsyncLoad<ChainData | null> {
   const characterId = useCharacterId();
   const loader = useCallback(() => loadChainData(characterId!, target), [characterId, target]);
   return useKeyedLoad(characterId === null ? null : `${characterId}-${targetKey(target)}`, loader);
 }
 
-/** Broker fee and reprocessing tax; idle for an agent, and until the chain is read. */
 export function useStationsModel(
   owner: OwnerTarget | null,
   chain: ChainData | null | undefined
@@ -59,7 +45,6 @@ export function useWhereRows(target: NpcInfoTarget): AsyncLoad<WhereRow[]> {
   return useKeyedLoad(`${characterId}-${targetKey(target)}`, loader);
 }
 
-/** Agents (of a corporation) or corporations (of a faction) the pilot holds a standing with. */
 export function useKnownRows(
   owner: OwnerTarget | null,
   chain: ChainData | null | undefined
@@ -92,7 +77,6 @@ export function useFactionFacts(factionId: number): AsyncLoad<FactionFacts | nul
   return useKeyedLoad(String(factionId), loader);
 }
 
-/** The faction an NPC corporation belongs to, for its header. */
 export function useCorporationFaction(corporationId: number): AsyncLoad<CorporationFaction | null> {
   const loader = useCallback(() => loadCorporationFaction(corporationId), [corporationId]);
   return useKeyedLoad(String(corporationId), loader);

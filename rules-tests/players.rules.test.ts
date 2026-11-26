@@ -16,7 +16,6 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Player layer: server-written only. A member reads its Player; a Character reads only its own proof doc.
 let env: RulesTestEnvironment;
 
 beforeAll(async () => {

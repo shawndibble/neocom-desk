@@ -35,7 +35,6 @@ describe('RefiningSetupFields', () => {
   it('asks for the reprocessing yield the EVE client shows, and shows the base it works out', () => {
     multiplier.value = 1.08 * 1.15 * 1.1;
     setup(0.51);
-    // 51% base x 1.366 reads as the client's 69.7%.
     expect(screen.getByRole('button', { name: /Edit Reprocessing yield/ })).toHaveTextContent(
       '69.68%'
     );

@@ -1,4 +1,3 @@
-/** Skill-plan optimizer: remap placement + attribute-grouped reorder. */
 export {
   aggregateSpByPair,
   bestAttributes,

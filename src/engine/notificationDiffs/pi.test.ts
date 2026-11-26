@@ -90,7 +90,6 @@ describe('diffPlanetaryExtractionDone', () => {
   });
 });
 
-/** A colony whose extractor pin ids are given explicitly, so a restart on the same pin is expressible. */
 function colonyWithPins(
   planetId: number,
   extractors: readonly ColonyExtractorSnapshot[]
@@ -122,11 +121,6 @@ describe('diffPlanetaryExtractorExpiring', () => {
   });
 
   it('never fires for a program that has already expired, even across a closed-app gap', () => {
-    // The regression this event exists to avoid (issue #310, AC2): the naive
-    // `expiry - now <= 24h` predicate stays true forever after expiry, so a
-    // user who closed the app at T-30h and reopened at T+5h would be told a
-    // program that died five hours ago is "expiring soon". Expired is
-    // `planetaryExtractionDone`'s to report, never this event's.
     const expiryMs = T0 + 30 * HOUR_MS;
     const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
     const next = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs + 5 * HOUR_MS);
@@ -194,12 +188,6 @@ describe('diffPlanetaryExtractorExpiring', () => {
   });
 
   it('takes effect on the very next poll when the Character raises their configured lead time', () => {
-    // On `diffStructureFuelLow`'s precedent: "is it inside now" is judged
-    // against `extractor.thresholdMs` (this poll's setting), "was it already
-    // inside" against `prevExtractor.thresholdMs` (the setting live when
-    // `prev` was captured) — not the same value reused for both. A raised
-    // lead time must not retroactively read the earlier poll as
-    // already-reported under the new, wider window.
     const expiryMs = T0 + 20 * HOUR_MS;
     const prev = planetarySnapshot([colonyEntry(1, [expiryMs], 6 * HOUR_MS)], T0);
     const next = planetarySnapshot([colonyEntry(1, [expiryMs], 24 * HOUR_MS)], T0 + FIVE_MIN);
@@ -233,10 +221,6 @@ describe('diffPlanetaryExtractorExpiring', () => {
   });
 
   it('fires for a program restarted on a pin whose previous program was already inside the lead time', () => {
-    // Identity is (pinId, expiryTimeMs): `expiry_time` is fixed for a
-    // program's life, so a changed expiry on the same pin is a new program,
-    // and the dead one's position inside the window must not swallow the new
-    // one's first crossing.
     const prev = planetarySnapshot(
       [
         colonyWithPins(1, [
@@ -294,7 +278,6 @@ describe('disprovenExtractorOccurrences', () => {
   const OLD_EXPIRY = T0 + 10 * HOUR_MS;
   const NEW_EXPIRY = T0 + 58 * HOUR_MS;
 
-  /** The reported case: replaced ten minutes before the old program ran out. */
   function restartedEarly(planetId = 1, pinId = 1) {
     return {
       prev: planetarySnapshot(
@@ -327,10 +310,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('finds every occurrence that was already false when it fired', () => {
-    // `restartedEarly` replaces the program 10 minutes before its expiry, so
-    // the lead-time warning — fired 24h out — was honest at the time about a
-    // program that was still live. Only the stop itself never happened, and
-    // only the stop is retracted.
     const { prev, next } = restartedEarly();
     expect(disprovenExtractorOccurrences(7, prev, next)).toEqual([
       { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: OLD_EXPIRY },
@@ -338,8 +317,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('retracts a lead-time warning only when the replacement predates the warning itself', () => {
-    // Replaced 30 hours out, so the warning (fired at expiry - 24h) would
-    // have fired about a program that was already gone.
     const prev = planetarySnapshot(
       [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 24 * HOUR_MS }])],
       OLD_EXPIRY - 40 * HOUR_MS
@@ -364,9 +341,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('keeps a lead-time warning that was true when it fired, retracting only the stop', () => {
-    // Replaced 18 hours out: the warning (fired at expiry - 24h) was honest —
-    // the program was live and really did have under 24 hours left — and
-    // dismissing it would erase the very nudge the pilot acted on.
     const prev = planetarySnapshot(
       [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 24 * HOUR_MS }])],
       OLD_EXPIRY - 40 * HOUR_MS
@@ -390,8 +364,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('retracts nothing on the boundary, where the replacement lands exactly when the alert fired', () => {
-    // Proof, not a tie-break: an `install_time` equal to the fire instant
-    // does not establish that the alert was about a program already replaced.
     const prev = planetarySnapshot(
       [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 24 * HOUR_MS }])],
       OLD_EXPIRY - 40 * HOUR_MS
@@ -415,7 +387,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('finds nothing when the program was left to expire and only then restarted', () => {
-    // The extraction really did stop: the feed row is history, not a mistake.
     const prev = planetarySnapshot(
       [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 24 * HOUR_MS }])],
       T0
@@ -458,9 +429,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('claims nothing when ESI omitted the replacement program install time', () => {
-    // `install_time` is spec-optional (`engine/pi/colonyPins.ts`). Without it
-    // there is no evidence the old program was cut short, and a retraction on
-    // a guess would erase a true "extraction done" from the feed.
     const prev = planetarySnapshot(
       [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 24 * HOUR_MS }])],
       T0
@@ -485,10 +453,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('retracts the colony-level stop only when every pin that set the soonest expiry was cut short', () => {
-    // `planetaryExtractionDone` keys on `Math.min(...expiries)` and
-    // `colonyStatus` reads a colony as idle the moment *any* program expires,
-    // so a second pin sharing that expiry and left alone means the colony did
-    // go idle — only the restarted pin's own warning is retractable.
     const prev = planetarySnapshot(
       [
         colonyWithPins(1, [
@@ -559,8 +523,6 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('produces occurrence keys the poller and the push backend already agree on', () => {
-    // The retraction has to address the very rows a Scheduled Push wrote, so
-    // the fires must key identically to the ones `projection.ts` projected.
     const prev = planetarySnapshot(
       [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 24 * HOUR_MS }])],
       OLD_EXPIRY - 40 * HOUR_MS

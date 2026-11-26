@@ -1,4 +1,3 @@
-/** The opened LP store's nearest station (issue #5385); its jump count opens the route there (#5386). */
 import { useTranslation } from 'react-i18next';
 import { JumpsLink } from '@/features/route/JumpsLink';
 import { useNearestStation } from './useNearestStation';

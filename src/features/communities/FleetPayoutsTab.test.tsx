@@ -157,7 +157,6 @@ describe('FleetPayoutsTab', () => {
       await within(dialog).findByText('Loot value: 1,000,000 ISK', undefined, { timeout: 3000 })
     ).toBeInTheDocument();
     expect(within(dialog).getByText("1 line wasn't read and is left out.")).toBeInTheDocument();
-    // 10% held back, 900,000 split two ways.
     expect(within(dialog).getAllByText('450,000 ISK')).toHaveLength(2);
 
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Include Zed' }));

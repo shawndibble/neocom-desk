@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import { queuePledgeDeletes } from './communitiesStore.js';
 
-// A Firestore stand-in just deep enough for `communities/{c}/itemRequests` and
-// `{request}/pledges/{uid}`: refs are plain path strings.
 function fakeDb(requestIds: string[]) {
   const ref = (path: string) => ({
     path,

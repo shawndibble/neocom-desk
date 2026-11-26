@@ -70,7 +70,6 @@ function instantRow(over: Partial<InstantHaulingScanRow> & { typeId: number }): 
 describe('toViewRows', () => {
   it('reports the margin after fees on the suggested load, and its flags', () => {
     const [row] = toViewRows([scanRow({ typeId: 1 })], FEES_AT);
-    // 70 units: cost 7,000, revenue 10,500, tax 3.375% + broker 1.8% of revenue.
     const revenue = 70 * 150;
     const profit = revenue - revenue * 0.03375 - revenue * 0.018 - 7000;
     expect(row!.marginPct).toBeCloseTo((profit / 7000) * 100);
@@ -156,7 +155,6 @@ describe('filterHaulingRows', () => {
 
   it('hides a row whose origin buy price is above the max price per item, and counts it', () => {
     const dear = scanRow({ typeId: 7, buyLadder: [{ price: 5_000, units: 100, orders: 1 }] });
-    // Thin and dear: counted once, as too dear.
     const thinDear = scanRow({ typeId: 8, buyLadder: [{ price: 5_000, units: 100, orders: 1 }] });
     thinDear.demand = { ...thinDear.demand, demand: 'rarely' };
     const all = toViewRows([scanRow({ typeId: 1 }), dear, thinDear], FEES_AT);
@@ -183,7 +181,6 @@ describe('filterHaulingRows', () => {
       { price: 1_500, demandCapUnits: 500 }
     );
     const [uncapped] = toViewRows([laddered], FEES_AT);
-    // Without a cap the profitable depth runs into the 300 level.
     expect(uncapped!.suggestedUnits).toBeGreaterThan(10);
     const {
       shown: [row],
@@ -227,7 +224,7 @@ describe('suggested units', () => {
           typeId: 1,
           buyLadder: [
             { price: 100, units: 10, orders: 1 },
-            { price: 900, units: 500, orders: 1 }, // dearer than the 150 it would sell for
+            { price: 900, units: 500, orders: 1 },
           ],
         }),
       ],
@@ -250,8 +247,6 @@ describe('ISK/m³', () => {
 describe('selling into buy orders', () => {
   it('works the load to the profitable depth of both books, after sales tax only', () => {
     const [row] = toViewRows([instantRow({ typeId: 1 })], FEES_AT);
-    // The walkInstant worked example, stopped before the 5%-margin line:
-    // 10 units, 1,000 ISK in, 1,125 ISK out.
     const profit = 1125 - 1125 * 0.03375 - 1000;
     expect(row!.suggestedUnits).toBe(10);
     expect(row!.marginPct).toBeCloseTo((profit / 1000) * 100);

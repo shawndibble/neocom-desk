@@ -253,7 +253,6 @@ describe('ImprovePanel', () => {
     expect(screen.getByText(/Max velocity 300 to 250 m\/s, worse/)).toBeInTheDocument();
     const apply = screen.getByRole('button', { name: 'Apply' });
     expect(apply).toHaveAttribute('aria-disabled', 'true');
-    // Opaque in the drawer's surface token, so rows scrolling under it don't show through.
     expect(apply.closest('.sticky')).toHaveClass('bg-panel');
     const boxes = screen.getAllByRole('checkbox');
     await userEvent.click(boxes[0]);
@@ -371,7 +370,6 @@ describe('ImprovePanel', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Apply 3 changes' })).toBeEnabled()
     );
-    // The added cover has its own tick, so it can be taken back out.
     await userEvent.click(screen.getByRole('checkbox', { name: /Added to cover the set/ }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toHaveAttribute(
@@ -430,7 +428,6 @@ describe('ImprovePanel', () => {
   const applied = (dps: number) => ({ weapons: [missile(dps)], droneControlRange: 20000 });
   const frigate: TargetProfile = { signatureRadius: 40, velocity: 400 };
 
-  /** The first row's stat rows, as the visible text of each (the screen-reader copy left out). */
   const statRows = () =>
     [...screen.getByRole('checkbox').closest('li')!.querySelectorAll('[role="listitem"]')].map(
       (item) =>
@@ -453,7 +450,6 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       target: frigate,
     });
-    // The goal's figure is the first stat row, in the same list (columns, tone) as the others.
     const rows = statRows();
     expect(rows[0]).toMatch(/^Applied DPS/);
     expect(rows.slice(1).join('|')).toMatch(/Sustained DPS\s*90.7 → 128/);
@@ -475,7 +471,6 @@ describe('ImprovePanel', () => {
     });
     const rows = statRows();
     expect(rows[0]).toMatch(/^Capacitor/);
-    // Just the level: the Capacitor label already says what it is.
     expect(rows[0]).toMatch(/70%/);
     expect(rows[0]).not.toMatch(/stable at/i);
     expect(rows.join('|')).not.toMatch(/DPS|EHP/);
@@ -799,9 +794,7 @@ describe('ImprovePanel', () => {
     );
     renderPanel(noGain, vi.fn(), vi.fn(), settings(), { goal: 'mining' });
     const lines = screen.getAllByText('Mines 10 → 12.5 m³/s');
-    // Two rows plus the best-found header.
     expect(lines).toHaveLength(3);
-    // The ore name lives in the Ore picker only: rows don't repeat it.
     expect(screen.getAllByText(/Veldspar/)).toHaveLength(1);
     cleanup();
     renderPanel(search(done({ rejected: [broke] }, own), own), vi.fn(), vi.fn(), settings(), {
@@ -1050,7 +1043,6 @@ describe('ImprovePanel', () => {
       const summary = await screen.findByTestId('improve-selection');
       expect(summary).toHaveTextContent('2 changes');
       expect(summary).toHaveTextContent('EHP 1,000 → 1,700');
-      // DPS did not move, so it is not listed.
       expect(summary).not.toHaveTextContent('DPS');
       expect(s.recalc).toHaveBeenLastCalledWith(expect.anything());
       await userEvent.click(screen.getByRole('button', { name: 'Apply 2 changes' }));
@@ -1184,7 +1176,6 @@ describe('ImprovePanel', () => {
       const a = option(11, { ehp: 1100 });
       const b = option(21, { cpuUsed: 5 });
       const onPreview = vi.fn();
-      // The hovered fold (both rows) also moves CPU; the ticked fold moves EHP alone.
       const s = withRecalc(done({ noDownside: [a, b] }), (fit) => {
         void fit;
         return { ...before, ehp: before.ehp + 500 };

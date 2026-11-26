@@ -1,22 +1,3 @@
-/**
- * "Ways to fly this leg" (issue #2477): beside a leg's rows, each way to fly
- * it as a small box — its name and jumps, then dim facts (lowest security,
- * lowsec and nullsec counts, Gank Chokepoints passed). A way not in use is
- * itself the button that pins it to the leg.
- * Through a hole, each hole jump follows: where it joins, the size it fits
- * and the life it has left. The way in use has an accent edge and an In use
- * badge.
- *
- * On a phone the panel folds under the leg header to one line — "Gates only
- * · 33 jumps", with Compare at its right end — and opens in place.
- *
- * Via Ansiblex (issue #2478) is one more way, with a line per bridge it
- * crosses. With Use jump bridges on and no gate known yet, its box offers
- * Find with a character or paste a list instead.
- *
- * Facts only, never verdicts (decision `20260912-172628`): no way is called
- * better, safer or riskier than another.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
@@ -104,7 +85,6 @@ function WayBox({
         way.inUse && 'border-l-2 border-l-accent bg-panel-2'
       )}
     >
-      {/* The whole box is the control: a button under the text, so its fill never hides it. */}
       {canUse && (
         <button
           type="button"
@@ -183,29 +163,16 @@ function WayBox({
 
 export interface LegWaysProps {
   leg: RouteSafetyLeg;
-  /** The leg's place in the trip, from 1. */
   number: number;
-  /** Whether the trip has legs of its own: a single route's panel names its ends instead. */
   multiStop: boolean;
   nameOf: (systemId: number) => string;
   now: number;
-  /**
-   * Where the hole list stands: off, the panel says how to compare ways
-   * through a hole; loading, a pin waiting on it is not reported yet.
-   */
   holes: RouteHolesState['kind'];
-  /**
-   * Where the Ansiblex list stands: `off` while Use jump bridges is off,
-   * `none` when it is on and no gate is known — Via Ansiblex then offers
-   * the ways to find some.
-   */
   bridges: 'off' | 'none' | 'known';
-  /** Opens the Ansiblex list, at a character search or the paste box. */
   onSetUpBridges: (mode: 'search' | 'paste') => void;
   onUse: (pin: string | null) => void;
 }
 
-/** Via Ansiblex while no gate is known: the two ways to find some. */
 function BridgeSetupBox({ onSetUpBridges }: Pick<LegWaysProps, 'onSetUpBridges'>) {
   const { t } = useTranslation();
   return (
@@ -272,7 +239,6 @@ function LegWaysPanel({
   );
 }
 
-/** The phone's folded line: the first way not in use (else the one in use) and its jumps. */
 function PhoneLine({
   leg,
   number,
@@ -310,7 +276,6 @@ function PhoneLine({
           ? t('travel.ways.phoneJumps', { count: way.summary.jumps })
           : t('travel.ways.noRoute', { to: nameOf(leg.to) })}
       </span>
-      {/* The button is the whole line; this only looks like the page's other text actions. */}
       <span className={textActionClassName('ml-auto min-h-0')}>
         {open ? t('travel.ways.hide') : t('travel.ways.compare')}
       </span>
@@ -318,20 +283,12 @@ function PhoneLine({
   );
 }
 
-/**
- * One leg's body: the pin note when a pin could not be flown, the ways panel
- * beside the rows when the leg itself is at least `@5xl` wide (above them,
- * two or three across, when it is narrower), and folded to a line under the
- * leg header on a phone.
- */
 export function LegBody({ children, ...props }: LegWaysProps & { children: ReactNode }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
   const { leg, holes, bridges, nameOf } = props;
-  // One way is no comparison; the Ansiblex setup box still offers something to do.
   const showWays = leg.ways.length > 1 || bridges === 'none';
-  // A pin waiting on the hole list: said once the list is off or unreachable, not while it loads.
   const noteKey =
     leg.pinNote === 'no-list' ? (holes === 'loading' ? null : `no-list-${holes}`) : leg.pinNote;
   const note =
@@ -344,7 +301,6 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
   return (
     <div className="space-y-2">
       {note && <LiveNote className="text-sm text-text-dim">{note}</LiveNote>}
-      {/* Beside the rows only when this panel, not the screen, has room: the rules column and the nav rail both eat into it. */}
       <div className="@container">
         <div
           className={cx(

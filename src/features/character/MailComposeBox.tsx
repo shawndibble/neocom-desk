@@ -1,10 +1,3 @@
-/**
- * The Reply/Forward compose box (mail-reply-and-forward decision,
- * docs/context/decisions/): inline, in the same reading-pane `Panel` Mail.tsx
- * already renders the open mail in — no modal, no new route. Mounted only
- * while a pilot has Reply or Forward open; `Mail.tsx` unmounts it on Cancel,
- * on send, or when the selected mail changes.
- */
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
@@ -41,13 +34,11 @@ import {
 } from '@/engine/mail/mailCompose';
 import type { MailHeader } from '@/esi/endpoints';
 
-/** One chip in the recipient row — a name is always resolved before it is added, so the row never shows a bare id. */
 interface RecipientChip extends MailDraftRecipient {
   name: string;
   removable: boolean;
 }
 
-/** Saves the draft in progress without hammering Dexie on every keystroke. */
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
 function chipKey(r: { recipient_id: number; recipient_type: string }): string {
@@ -58,14 +49,10 @@ interface MailComposeBoxProps {
   characterId: number;
   kind: ComposeKind;
   header: MailHeader;
-  /** The reading pane's own already-stripped body text — quoted verbatim, never re-fetched or re-stripped here. */
   bodyText: string;
-  /** The mail's raw body, so a Forward keeps its formatting; Reply quotes `bodyText` plain. */
   bodyMarkup?: string;
-  /** Swap point for tests; defaults to the rich editor. */
   bodyEditor?: ComponentType<MailBodyEditorProps>;
   senderName: string;
-  /** Already formatted in the pilot's chosen timezone, same string the reading pane shows. */
   formattedTimestamp: string;
   resolveRecipientName: (recipient: { recipient_id: number; recipient_type: string }) => string;
   onClose: () => void;
@@ -91,8 +78,6 @@ export function MailComposeBox({
   const [recipients, setRecipients] = useState<RecipientChip[]>([]);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  // A Reply's quoted history is folded out of the editor: the pilot types above it, and it is
-  // appended to `body` unchanged, so it is still sent and saved with the draft.
   const quoteMarkup = useMemo(
     () =>
       kind === 'reply'
@@ -105,7 +90,6 @@ export function MailComposeBox({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /** Forward's contacts, offered before anything is typed. */
   const [contacts, setContacts] = useState<ComposeRecipient[]>([]);
   const errorId = `mail-compose-error-${header.mail_id}`;
   const fieldId = useId();
@@ -115,53 +99,34 @@ export function MailComposeBox({
   const bodyId = `${fieldId}-body`;
   const bodyCountId = `${fieldId}-body-count`;
 
-  // First-field focus (issue #1485): Forward's recipient picker is the real
-  // first field (it sits above Subject) and focuses itself (`autoFocus`);
-  // Reply lands on Subject. Runs once per mount, which a kind/mail switch
-  // already is — Mail.tsx keys this component by `${mail_id}:${kind}`.
   const subjectRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (kind !== 'forward') subjectRef.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see comment above
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
   }, []);
 
-  // Flips true the moment a pilot makes their own edit (subject, body, a
-  // chip). Guards the hydration effect below: `loadDraft` is async, and
-  // nothing else stops a slow resolution from landing after typing has
-  // already started and silently overwriting it.
   const touchedRef = useRef(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
-  // Cancel discards: a half-written draft would otherwise come back on the next Reply.
   function discard() {
     void clearDraft(characterId, header.mail_id).catch(() => undefined);
     onClose();
   }
 
-  // Hydrates from a saved draft, or builds this decision's reply/forward
-  // defaults (`engine/mail.ts`) otherwise. Mail.tsx keys this component by
-  // `${mail_id}:${kind}`, so either changing fully remounts it — `ready`
-  // starting `false` is already the reset this effect needs.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const draft = await loadDraft(characterId, header.mail_id);
-      // A pilot who started typing before this resolved keeps what they
-      // typed — their edit is authoritative over a draft/default that would
-      // otherwise clobber it. `ready` still flips below, so autosave picks
-      // up their in-progress edit rather than staying gated forever.
       if (cancelled || touchedRef.current) {
         if (!cancelled) setReady(true);
         return;
       }
-      // A draft with nothing in it (everything cleared out) is no draft: build the defaults.
       const isBlank =
         draft !== undefined &&
         draft.recipients.length === 0 &&
         draft.subject.trim() === '' &&
         draft.body.trim() === '';
       if (draft && draft.kind === kind && !isBlank) {
-        // A saved draft is typed work: Cancel asks before throwing it away.
         touchedRef.current = true;
         setRecipients(
           draft.recipients.map((r) => ({
@@ -182,13 +147,11 @@ export function MailComposeBox({
           }))
         );
         setSubject(prefixSubject('reply', header.subject ?? ''));
-        // The quote sits under a dashed rule: formatting stripped, `< > &` escaped to stay literal.
         setQuoteFolded(true);
         setBody(quoteMarkup);
       } else {
         setRecipients([]);
         setSubject(prefixSubject('forward', header.subject ?? ''));
-        // The original travels with its formatting, editable, under a header.
         setBody(
           forwardMailBody(
             senderName,
@@ -206,9 +169,6 @@ export function MailComposeBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only on a genuinely new mail/kind, not on every resolver identity change.
   }, [characterId, header.mail_id, kind]);
 
-  // Debounced autosave (decision: Dexie, device-only, cleared on send or Cancel).
-  // Gated on `ready` so the hydration above never overwrites a real draft
-  // with the still-empty initial state on the first render.
   useEffect(() => {
     if (!ready) return;
     const id = setTimeout(() => {
@@ -224,9 +184,6 @@ export function MailComposeBox({
     return () => clearTimeout(id);
   }, [ready, characterId, header.mail_id, kind, recipients, subject, body]);
 
-  // Forward's contacts quick-picks (decision: search-plus-contacts) — loaded
-  // once, character-type contacts only (this app's mail recipients are
-  // people, not corp/alliance broadcast targets).
   useEffect(() => {
     if (kind !== 'forward') return;
     let cancelled = false;
@@ -263,9 +220,6 @@ export function MailComposeBox({
 
   function removeRecipient(target: RecipientChip) {
     touchedRef.current = true;
-    // Clears a stale send-failure message too — otherwise removing the last
-    // recipient re-wires an unrelated old error onto the recipients field via
-    // `noRecipientsError`, which reads `recipients.length` alone.
     setError(null);
     setRecipients((prev) => prev.filter((r) => chipKey(r) !== chipKey(target)));
   }
@@ -275,7 +229,6 @@ export function MailComposeBox({
       setError(t('mail.sendNoRecipients'));
       return;
     }
-    // Read before the request: a drop mid-send must not retroactively make it "never sent".
     const wasOffline = !isOnline();
     setSending(true);
     setError(null);
@@ -285,12 +238,9 @@ export function MailComposeBox({
           characterId,
           recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
           subject,
-          // Whatever the editor produced, only the safe subset is ever sent.
           sanitizeMarkup(body)
         );
       } catch (err) {
-        // Only the send itself is classified: a failure below is not "offline".
-        // Known not to have left: offline when pressed, no token, or still queued for a permit.
         const neverSent =
           isOfflineFailure(err) &&
           (wasOffline ||
@@ -300,15 +250,13 @@ export function MailComposeBox({
           neverSent
             ? t('mail.sendOffline')
             : isOfflineFailure(err)
-              ? // It may have left and been delivered: do not invite a duplicate.
-                t('mail.sendUnconfirmed')
+              ? t('mail.sendUnconfirmed')
               : t('mail.sendErrorPrefix', {
                   message: err instanceof Error ? err.message : String(err),
                 })
         );
         return;
       }
-      // The mail is sent; a draft that fails to clear is stale, not a failed send.
       await clearDraft(characterId, header.mail_id).catch(() => undefined);
       onSent();
     } finally {
@@ -319,7 +267,6 @@ export function MailComposeBox({
   const headingKey = kind === 'reply' ? 'mail.composeReplyHeading' : 'mail.composeForwardHeading';
   const bodyLength = composeBodyLength(body);
   const bodyOver = bodyLength > MAX_BODY_LENGTH;
-  // A long quote can push a short reply over the limit: unfold it so the pilot can trim it.
   if (quoteFolded && bodyOver) setQuoteFolded(false);
   const noRecipientsError = error !== null && recipients.length === 0;
   const labelClass = stackedLabelClassName;

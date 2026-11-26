@@ -1,21 +1,3 @@
-/**
- * `TurnInDetail` (issue #6705): the one single-item popover every surface
- * opens on a campaign turn-in — the Appraisal's Turn in figure, the Market
- * item's "Turn in ~60K", Open Orders, Assets, Hauling and the Overview widget.
- * Callers supply only the trigger: their own figure (`TurnInFigureButton`) or
- * the dim glyph after one (`TurnInGlyph`).
- *
- * It holds the Turn-in Reward each and its ISK + LP split, the Item Trader and
- * system, how full the Campaign Objective is, the Character's Participate
- * line, the LP block and "+ faction tokens", an optional line from the
- * surface, and Set destination to the trader's system.
- *
- * `TurnInDetailBody` is the content alone, for a surface that already has a
- * detail view (Open Orders' `OrderDetailModal`); `TurnInDetailView` is that
- * content with every read already made, for stories.
- *
- * Never a predicted close date, a token count or "multiples of N" advice.
- */
 import {
   type ComponentProps,
   type MouseEvent,
@@ -58,7 +40,6 @@ import {
 import { useTurnInCharacter, useTurnInParticipate } from './useTurnInParticipate';
 import type { TurnInOfferDetail } from './useTurnIns';
 
-/** A press inside the portalled popover never reaches a row beneath its trigger (§6c). */
 const stop = (event: SyntheticEvent) => event.stopPropagation();
 const stopRowEvents = {
   onClick: stop,
@@ -68,27 +49,16 @@ const stopRowEvents = {
   onKeyDown: stop,
 };
 
-/* ------------------------------------------------------------------ */
-/* Set destination                                                     */
-/* ------------------------------------------------------------------ */
-
 export interface TurnInDestinationViewProps {
   systemName: string;
   block: DestinationBlock;
-  /** "Autopilot waypoints", named by a dismissed button's tooltip. */
   permissionLabel: string;
   sending: boolean;
   outcome: Outcome | null;
   onSend: () => void;
-  /** The waypoint `GrantCellMark`, drawn after the button when `block` is `mark`. */
   mark?: ReactNode;
 }
 
-/**
- * Set destination as drawn. Blocked, it stays visible and `aria-disabled`:
- * with the mark after it and no words when Autopilot waypoints is missing, or
- * a tooltip saying why (no Character, offline, the Permission dismissed).
- */
 export function TurnInDestinationView({
   systemName,
   block,
@@ -110,7 +80,6 @@ export function TurnInDestinationView({
   const button = (
     <Button
       size="sm"
-      // Stays focusable so its tooltip can say why (DESIGN §6c Disabled).
       aria-disabled={block.kind !== 'ready' || undefined}
       loading={sending}
       aria-label={t('campaigns.turnIn.setDestinationTo', { system: systemName })}
@@ -131,7 +100,6 @@ export function TurnInDestinationView({
   );
 }
 
-/** Set destination to a trader's system for `characterId`'s client, wired up. */
 export function TurnInDestination({
   systemId,
   systemName,
@@ -175,11 +143,6 @@ export function TurnInDestination({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Participate                                                         */
-/* ------------------------------------------------------------------ */
-
-/** The Participate line: participating, not participating, or the caveat with an optional mark. */
 export function TurnInParticipateLine({
   line,
   characterName,
@@ -187,7 +150,6 @@ export function TurnInParticipateLine({
 }: {
   line: ParticipateLine;
   characterName: string;
-  /** The Military Campaigns `GrantCellMark`, by the caveat when `line.mark`. */
   mark?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -203,7 +165,6 @@ export function TurnInParticipateLine({
     return <p className="text-xs text-warning">{t('campaigns.turnIn.notParticipating')}</p>;
   }
   return (
-    // Plain inline text, so the mark follows the last word instead of wrapping onto a line of its own.
     <p className="text-xs text-text-dim">
       {t('campaigns.turnIn.paysOnlyIf')}
       {line.mark && <span className="ml-1 inline-flex align-middle">{mark}</span>}
@@ -211,24 +172,16 @@ export function TurnInParticipateLine({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* The detail                                                          */
-/* ------------------------------------------------------------------ */
-
 export interface TurnInDetailViewProps {
-  /** The item turned in. */
   name: string;
   offer: TurnInOfferDetail;
   participate: ParticipateLine;
   characterName: string;
   participateMark?: ReactNode;
-  /** Set destination (`TurnInDestination`); left out when the trader's system is unknown. */
   destination?: ReactNode;
-  /** One line from the surface: "You hold 340 · ~19.1M turned in", a buy order's margin. */
   surfaceLine?: ReactNode;
 }
 
-/** The detail's content with every read already made. */
 export function TurnInDetailView({
   name,
   offer,
@@ -280,13 +233,11 @@ export function TurnInDetailView({
 export interface TurnInDetailBodyProps {
   name: string;
   offer: TurnInOfferDetail;
-  /** Whose Participate and waypoints: the row's Character; the active one when omitted, `null` for none. */
   characterId?: number | null;
   characterName?: string;
   surfaceLine?: ReactNode;
 }
 
-/** The detail's content, wired up: for a popover (`TurnInDetail`) or an existing detail view. */
 export function TurnInDetailBody({
   name,
   offer,
@@ -319,7 +270,6 @@ export function TurnInDetailBody({
   );
 }
 
-/** The popover shell around a caller's trigger, for the wired body or a story's view. */
 export function TurnInPopover({
   name,
   trigger,
@@ -338,7 +288,6 @@ export function TurnInPopover({
       <PopoverContent
         align="start"
         side="bottom"
-        // Clear of the phone shell's bottom tabs.
         collisionPadding={{ top: 8, right: 8, bottom: 80, left: 8 }}
         aria-label={t('campaigns.turnIn.dialogLabel', { name })}
         className="max-w-[calc(100vw-1rem)] p-0"
@@ -350,7 +299,6 @@ export function TurnInPopover({
   );
 }
 
-/** One item's turn-in popover, opened from the caller's own trigger. */
 export function TurnInDetail({
   trigger,
   defaultOpen,
@@ -363,16 +311,10 @@ export function TurnInDetail({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Triggers                                                            */
-/* ------------------------------------------------------------------ */
-
 type TriggerProps = Omit<ComponentProps<'button'>, 'children'> & {
-  /** The item, named in the accessible name ("Turn-in reward for …"). */
   name: string;
 };
 
-/** Runs the caller's click after stopping it at the trigger: the press never reaches the row. */
 function stopThen(onClick: TriggerProps['onClick']) {
   return (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -380,11 +322,6 @@ function stopThen(onClick: TriggerProps['onClick']) {
   };
 }
 
-/**
- * The trigger as a small dim glyph after a figure the surface already shows
- * (Assets' value, Hauling's Sell at, a buy order's price): §6c's
- * glyph-after-a-figure cue.
- */
 export function TurnInGlyph({ name, className, onClick, ...props }: TriggerProps) {
   const { t } = useTranslation();
   return (
@@ -394,9 +331,6 @@ export function TurnInGlyph({ name, className, onClick, ...props }: TriggerProps
       {...props}
       onClick={stopThen(onClick)}
       className={cx(
-        // A 24px target around the 14px glyph, pulled back so the row keeps its height; on touch
-        // 36px tall (DESIGN.md §3), only vertically, so it never covers the figure beside it
-        // (as `PermissionCellMark`).
         gripHitAreaClassName,
         '-my-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-xs align-middle text-text-dim hover:text-accent',
         focusRingClassName,
@@ -408,10 +342,6 @@ export function TurnInGlyph({ name, className, onClick, ...props }: TriggerProps
   );
 }
 
-/**
- * The trigger as the turn-in figure itself, dashed underlined (the Refine
- * figure's cue): the Appraisal's Turn in column, the Market item's "Turn in ~60K".
- */
 export function TurnInFigureButton({
   name,
   className,
@@ -425,7 +355,6 @@ export function TurnInFigureButton({
       type="button"
       {...props}
       onClick={stopThen(onClick)}
-      // On touch 36px tall around the short figure (DESIGN.md §3), never wider than it.
       className={cx(figureOpenerClassName, gripHitAreaClassName, 'tabular-nums', className)}
     >
       <span className="sr-only">{t('campaigns.turnIn.openDetail', { name })} </span>

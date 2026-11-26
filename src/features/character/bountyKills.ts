@@ -1,9 +1,3 @@
-/**
- * ESI's `reason` on a bounty-prize journal line is not prose: it is the NPC
- * kills the payout covers, as comma-separated `typeID: count` pairs (e.g.
- * `"17039: 2,2072: 1"`). Parsed here so the journal can name the rats instead
- * of printing the ids.
- */
 export interface BountyKill {
   typeId: number;
   count: number;
@@ -11,12 +5,10 @@ export interface BountyKill {
 
 const PAIR = /^(\d+):\s*(\d+)$/;
 
-/** A journal line's bounty kills, or null when it isn't a bounty line with a kill list. */
 export function bountyKillsOf(entry: { ref_type: string; reason?: string }): BountyKill[] | null {
   return entry.ref_type.startsWith('bounty_prize') ? parseBountyKills(entry.reason) : null;
 }
 
-/** The kills in a bounty `reason`, most killed first — or null when it isn't a kill list. */
 export function parseBountyKills(reason: string | undefined): BountyKill[] | null {
   if (!reason) return null;
   const counts = new Map<number, number>();
@@ -34,11 +26,6 @@ export function parseBountyKills(reason: string | undefined): BountyKill[] | nul
     .sort((a, b) => b.count - a.count || a.typeId - b.typeId);
 }
 
-/**
- * EVE carries no faction on an NPC type; its item Group's name does ("Deadspace
- * Blood Raiders Battleship", "Asteroid Guristas Frigate"). First match wins,
- * in this order; the display names are CCP's own proper nouns.
- */
 const PIRATE_FACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bAngel\b/, 'Angel Cartel'],
   [/\bBlood Raider/, 'Blood Raiders'],
@@ -54,19 +41,16 @@ const PIRATE_FACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bEDENCOM\b/, 'EDENCOM'],
 ];
 
-/** The pirate faction an NPC's item Group name names, or null (sentry guns, structures). */
 export function pirateFactionOf(groupName: string): string | null {
   for (const [pattern, faction] of PIRATE_FACTIONS) if (pattern.test(groupName)) return faction;
   return null;
 }
 
 export interface FactionKills {
-  /** Null collects kills with no faction, or whose faction couldn't be resolved. */
   faction: string | null;
   count: number;
 }
 
-/** Kills summed per faction, largest first; the null bucket always last, and only when non-empty. */
 export function killsByFaction(
   kills: readonly BountyKill[],
   factions: ReadonlyMap<number, string | null>

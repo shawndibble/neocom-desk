@@ -9,21 +9,12 @@ import { LiveStatus } from '@/components/ui/LiveStatus';
 
 const STATUS_MS = 5000;
 
-/**
- * Tapping an alert (feed row or push notification) for an alt lands with
- * `?character=<id>`. Makes that Character active, drops the param, and says so
- * — the pages read the active Character, so without this an alt's alert showed
- * the active pilot's data. Already-active, unknown or removed Characters just
- * lose the param: no switch, no status line.
- */
 export function AlertCharacterSwitch() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [switchedTo, setSwitchedTo] = useState<string | null>(null);
-  // The strip runs after an async lookup; it must remove the param from the URL
-  // as it is *then* (the page may have spent its own `?highlight=` meanwhile).
   const locationRef = useRef(location);
   useEffect(() => {
     locationRef.current = location;
@@ -65,8 +56,6 @@ export function AlertCharacterSwitch() {
     return () => clearTimeout(timer);
   }, [switchedTo]);
 
-  // The region stays mounted (empty) so the text is announced when it fills;
-  // the visible note carries no role, or it would be read twice.
   const message = switchedTo === null ? null : t('alerts.switchedTo', { name: switchedTo });
   return (
     <>

@@ -416,15 +416,6 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
 });
 
 describe('toggleEventChannelPref / toggleEveTypeChannelPref', () => {
-  /**
-   * These wrap `with*Toggled` + `updateNotificationPrefs` into one call so a
-   * caller states `channel` once instead of passing it to both — the two used
-   * to be independent arguments a caller could accidentally mismatch (issue:
-   * nothing checked that a `with*Toggled` call's channel and the trailing
-   * `updateNotificationPrefs` channel argument agreed). The tests below pin
-   * the sync-vs-local rule `updateNotificationPrefs` documents: a browser
-   * write never reaches the synced setting, a feed write always does.
-   */
   it('toggleEventChannelPref: a browser toggle updates the store but never touches the synced setting', async () => {
     await toggleEventChannelPref(1, DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
     expect(
@@ -565,7 +556,6 @@ describe('hydrateNotificationPreferences', () => {
         'feed'
       )
     ).toBe(false);
-    // The browser flag came from the local row and must survive the merge untouched.
     expect(
       isEventEnabledFor(
         characterEventPrefs(useNotificationPreferences.getState().value, 1),
@@ -575,17 +565,6 @@ describe('hydrateNotificationPreferences', () => {
     ).toBe(true);
   });
 
-  /**
-   * Regression test for a bug caught in review: `withSyncedFeedPrefsApplied`
-   * rebuilds a fresh object graph for every Character present in the synced
-   * blob even when nothing changed, so a naive reference check
-   * (`merged !== current`) is true on nearly every call. Both
-   * NotificationsPanel and the Alerts page re-run this (via
-   * `refreshAppBadge`) from a `useEffect` keyed on the store's value — a
-   * reference check there would call `setValue` every time, looping without
-   * end. This asserts the store's value reference is stable across repeated
-   * calls when the synced blob hasn't actually changed.
-   */
   it('does not re-apply (or re-persist) an unchanged synced value on repeated calls', async () => {
     await db.settings.put({
       key: SYNCED_NOTIFICATION_FEED_PREFS_KEY,
@@ -711,7 +690,6 @@ describe('setMutedForCharacters (Stop these alerts in the alerts panel)', () => 
     for (const id of [1, 2, 3]) {
       expect(onFor(id, EVENT_A, 'browser')).toBe(false);
       expect(onFor(id, EVENT_A, 'feed')).toBe(false);
-      // Only that event: a sibling is untouched.
       expect(onFor(id, EVENT_B, 'feed')).toBe(true);
     }
   });

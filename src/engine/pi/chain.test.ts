@@ -16,26 +16,13 @@ import {
   type SourcingFloor,
 } from './chain';
 
-// The real SDE snapshot, not a fixture: the ticket's numbers are claims about
-// the shipped recipe graph, so pinning them against a hand-made stub would pin
-// nothing. Read from disk (vitest runs at the project root) rather than
-// imported, so the engine itself keeps no data dependency.
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-/** Broadcast Node — the P4 the ticket's worked example uses. */
 const BROADCAST_NODE = 2867;
-/** The ticket's example run rate: 10 Broadcast Nodes a day. */
 const TEN_PER_DAY = 10 / 24;
 
-/**
- * Fixture prices, flat per tier. Deliberately NOT the ticket's live Jita
- * snapshot: those margins came from nine distinct per-type prices that the
- * ticket does not list, so no uniform-per-tier fixture reproduces them. The
- * tax *bases* below are price-free and do reproduce the ticket exactly; these
- * prices only have to preserve the two inversions the ticket pins.
- */
 const FIXTURE_UNIT_PRICE: Record<PiTier, number> = {
   0: 5,
   1: 760,
@@ -77,8 +64,6 @@ function costed(opts: {
 }
 
 describe('pi.json shape assumptions', () => {
-  // Guards #303's PiData reshape: every membership question this engine asks
-  // goes through isP0, so a raw[] shape change fails here, loudly and once.
   it('keeps raw and schematics disjoint and complete', () => {
     for (const { typeID } of pi.raw) {
       expect(isP0(typeID, pi)).toBe(true);
@@ -97,15 +82,14 @@ describe('pi.json shape assumptions', () => {
 describe('piTier', () => {
   it('derives the tier from the graph rather than a hardcoded table', () => {
     expect(piTier(BROADCAST_NODE, pi)).toBe(4);
-    expect(piTier(17392, pi)).toBe(3); // Data Chips
-    expect(piTier(2327, pi)).toBe(2); // Microfiber Shielding
-    expect(piTier(3779, pi)).toBe(1); // Biomass
-    expect(piTier(2286, pi)).toBe(0); // Planktic Colonies
+    expect(piTier(17392, pi)).toBe(3);
+    expect(piTier(2327, pi)).toBe(2);
+    expect(piTier(3779, pi)).toBe(1);
+    expect(piTier(2286, pi)).toBe(0);
   });
 });
 
 describe('expandChain', () => {
-  // Acceptance criterion 1.
   it('reproduces the Broadcast Node chain at 10/day', () => {
     expect(nodeFor(BROADCAST_NODE).unitsPerHour).toBeCloseTo(0.4167, 4);
 
@@ -119,12 +103,10 @@ describe('expandChain', () => {
       expect(nodeFor(p2).unitsPerHour).toBeCloseTo(8.3333, 4);
     }
 
-    // The P1s each single P2 consumes.
     for (const p1 of [3779, 3683, 2401, 2389, 2396, 2399]) {
       expect(nodeFor(p1).tier).toBe(1);
       expect(nodeFor(p1).unitsPerHour).toBeCloseTo(66.6667, 4);
     }
-    // ...and the three feeding two P2s each, which are therefore doubled.
     for (const p1 of [2397, 9828, 2392]) {
       expect(nodeFor(p1).unitsPerHour).toBeCloseTo(133.3333, 4);
     }
@@ -139,23 +121,22 @@ describe('expandChain', () => {
   });
 
   it('derives factory throughput from each schematic, giving 40/5/3/1 per hour', () => {
-    expect(nodeFor(3779).outputPerHour).toBeCloseTo(40, 6); // P1
-    expect(nodeFor(2327).outputPerHour).toBeCloseTo(5, 6); // P2
-    expect(nodeFor(17392).outputPerHour).toBeCloseTo(3, 6); // P3
-    expect(nodeFor(BROADCAST_NODE).outputPerHour).toBeCloseTo(1, 6); // P4
-    expect(nodeFor(3779).cyclesPerHour).toBeCloseTo(2, 6); // 1800s cycle
-    expect(nodeFor(17392).cyclesPerHour).toBeCloseTo(1, 6); // 3600s cycle
+    expect(nodeFor(3779).outputPerHour).toBeCloseTo(40, 6);
+    expect(nodeFor(2327).outputPerHour).toBeCloseTo(5, 6);
+    expect(nodeFor(17392).outputPerHour).toBeCloseTo(3, 6);
+    expect(nodeFor(BROADCAST_NODE).outputPerHour).toBeCloseTo(1, 6);
+    expect(nodeFor(3779).cyclesPerHour).toBeCloseTo(2, 6);
+    expect(nodeFor(17392).cyclesPerHour).toBeCloseTo(1, 6);
   });
 
   it('counts factory pins as ceil(need / output)', () => {
-    expect(nodeFor(BROADCAST_NODE).factoryPins).toBe(1); // 0.42 of 1/hr
-    expect(nodeFor(17392).factoryPins).toBe(1); // 2.5 of 3/hr
-    expect(nodeFor(2327).factoryPins).toBe(2); // 8.33 of 5/hr
-    expect(nodeFor(3779).factoryPins).toBe(2); // 66.67 of 40/hr
-    expect(nodeFor(2397).factoryPins).toBe(4); // 133.33 of 40/hr
+    expect(nodeFor(BROADCAST_NODE).factoryPins).toBe(1);
+    expect(nodeFor(17392).factoryPins).toBe(1);
+    expect(nodeFor(2327).factoryPins).toBe(2);
+    expect(nodeFor(3779).factoryPins).toBe(2);
+    expect(nodeFor(2397).factoryPins).toBe(4);
   });
 
-  // Acceptance criterion 5.
   it('terminates at P0 and never gives it a factory count', () => {
     const p0s = chain.nodes.filter((n) => n.tier === 0);
     expect(p0s.length).toBe(9);
@@ -183,13 +164,6 @@ describe('customs taxable values', () => {
 });
 
 describe('chainCost tax base', () => {
-  /**
-   * These five bases are pure functions of the chain and the taxable-value
-   * constants — no price enters them — and each one reproduces a column of the
-   * ticket's own margin tables exactly. They are simultaneously the check that
-   * CUSTOMS_TAXABLE_VALUE is right: the bases are linear in those five numbers,
-   * so all five matching pins the constant.
-   */
   it.each([
     ['P3' as const, 'single-planet' as const, 1_740_000],
     ['P2' as const, 'single-planet' as const, 1_632_000],
@@ -203,18 +177,15 @@ describe('chainCost tax base', () => {
   });
 
   it('charges nothing between two tiers made on the same planet', () => {
-    // The whole point: single-planet pays one import and one export, while
-    // planet-per-tier pays an export and an import at every hop.
     const single = costed({ sourcingFloor: 'P1', layout: 'single-planet', taxRate: 0.15 });
     const perTier = costed({ sourcingFloor: 'P1', layout: 'planet-per-tier', taxRate: 0.15 });
     expect(single.planetCount).toBe(1);
-    expect(perTier.planetCount).toBe(3); // P2, P3, P4
+    expect(perTier.planetCount).toBe(3);
     expect(perTier.taxBase).toBeGreaterThan(single.taxBase);
   });
 });
 
 describe('chainCost', () => {
-  // Acceptance criterion 2: layout inverts the sign.
   it('makes the P1 floor profitable on one planet and unprofitable per tier', () => {
     const single = costed({ sourcingFloor: 'P1', layout: 'single-planet', taxRate: 0.15 });
     const perTier = costed({ sourcingFloor: 'P1', layout: 'planet-per-tier', taxRate: 0.15 });
@@ -225,7 +196,6 @@ describe('chainCost', () => {
     expect(perTier.margin).toBeCloseTo(-234_200, 3);
   });
 
-  // Acceptance criterion 3: the rate inverts which floor wins.
   const floors: SourcingFloor[] = ['P0', 'P1', 'P2', 'P3'];
   function bestFloor(taxRate: number): SourcingFloor {
     return floors.reduce((best, floor) =>
@@ -244,7 +214,6 @@ describe('chainCost', () => {
     expect(bestFloor(taxRate)).toBe('P1');
   });
 
-  // Acceptance criterion 4: no residual tax constant.
   it('removes every tax term at a zero rate, making layout irrelevant', () => {
     for (const sourcingFloor of floors) {
       const single = costed({ sourcingFloor, layout: 'single-planet', taxRate: 0 });
@@ -269,7 +238,6 @@ describe('chainCost', () => {
 
   it('buys only at the floor tier and never below it', () => {
     const p1 = costed({ sourcingFloor: 'P1' });
-    // 1920 P1 per Broadcast Node at 760 ISK, and no P0 bought at all.
     expect(p1.sourcedCost).toBeCloseTo(1_459_200, 3);
     expect(p1.sourced.some((line) => line.tier === 0)).toBe(false);
     expect(p1.sourced.every((line) => line.tier === 1)).toBe(true);
@@ -301,7 +269,6 @@ describe('chainCost sales tax', () => {
 });
 
 describe('chainCost with no observed extraction rate', () => {
-  // Acceptance criterion 6.
   const withoutRate = (sourcingFloor: SourcingFloor): ChainCostResult =>
     chainCost(chain, {
       prices,
@@ -329,7 +296,6 @@ describe('chainCost with no observed extraction rate', () => {
     expect(result.sourcingFloor).toBe('P0');
     expect(result).not.toHaveProperty('margin');
     expect(result).not.toHaveProperty('totalCost');
-    // It still says what an assumption would have to cover.
     expect(result.p0PerHour).toHaveLength(9);
     expect(result.p0PerHour.find((line) => line.typeId === 2286)?.unitsPerHour).toBeCloseTo(
       10_000,
@@ -351,17 +317,15 @@ describe('chainCost with no observed extraction rate', () => {
     const result = costed({ sourcingFloor: 'P0', extractionRate: 3_000 });
     expect(result.extraction).not.toBeNull();
     expect(result.extraction?.ratePerHour).toBe(3_000);
-    // 10,000/hr needs 4 extractors at 3,000/hr; the doubled P0s need 7.
     expect(result.extraction?.byType.find((l) => l.typeId === 2286)?.extractors).toBe(4);
     expect(result.extraction?.byType.find((l) => l.typeId === 2305)?.extractors).toBe(7);
     expect(result.extraction?.totalExtractors).toBe(6 * 4 + 3 * 7);
   });
 
   it('never derives a rate from anything the engine can see', () => {
-    // A rate is the only way to answer the P0 floor; nothing else substitutes.
     const a = costed({ sourcingFloor: 'P0', extractionRate: 3_000 });
     const b = costed({ sourcingFloor: 'P0', extractionRate: 9_000 });
-    expect(a.margin).toBeCloseTo(b.margin, 6); // the rate sizes, it does not price
+    expect(a.margin).toBeCloseTo(b.margin, 6);
     expect(a.extraction?.totalExtractors).toBeGreaterThan(b.extraction?.totalExtractors ?? 0);
   });
 });

@@ -1,31 +1,3 @@
-/**
- * The Calendar page's event-type filter: an icon in the page toolbar that
- * opens a multi-select list of the eight clocks.
- *
- * **In `PageHeader` `actions`, not in a `FilterBar` row.** The mobile-filter
- * decision puts a page's filters behind a funnel *beside its search box* below
- * `md`, and lists Calendar as unconverted. This page has no search box and no
- * filter row at all — its two panes spend the whole width — so a `FilterBar`
- * would put a lone funnel in an otherwise empty strip above them. The header's
- * action cluster is where this page's controls already live (export, refresh),
- * and Market's own selects set the precedent for a page toolbar carrying
- * controls rather than a filter row.
- *
- * **A `DropdownMenu` at every width.** Six checkbox rows are a menu, not a
- * form, and every toggle is already reversible in one tap. The filter sheet
- * would wrap that one list in a modal with a caption and a footer (Clear all,
- * "Show N results") it does not need: the menu commits each tick as made and
- * its result shows in the panes beside it. `MoonMiningTax` does the same thing
- * with the same primitive.
- *
- * The trigger states how many types are hidden **as a number**, not as an
- * accent tint — "this list is filtered" may not be carried by colour alone.
- *
- * Each row carries its kind's swatch, which makes this menu double as the
- * legend for the colour the rest of the page paints (`components/ui/kindTone.ts`).
- * That is deliberate: the hues are picked *here*, so the place they are picked
- * is the place to learn them.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import type { ReactNode } from 'react';
@@ -61,23 +33,13 @@ export interface CalendarKindFilterMenuProps {
   hidden: readonly CharacterBoardItemKind[];
   onToggle: (kind: CharacterBoardItemKind) => void;
   onShowAll: () => void;
-  /** Hides every kind that has a row, so one kind can then be ticked on. */
   onHideAll: (kinds: readonly CharacterBoardItemKind[]) => void;
-  /** How many of each kind the board holds. A kind that read fine with none due is absent. */
   counts: Map<CharacterBoardItemKind, number>;
-  /**
-   * Kinds whose source was read at all. A kind that is readable and absent
-   * from `counts` genuinely has nothing due; one that is not readable has no
-   * answer to give, and must not borrow a zero from the first case.
-   */
   readableKinds: readonly CharacterBoardItemKind[];
-  /** Kinds whose read came back 401/403 — named as such rather than shown as a zero. */
   reauthKinds: readonly CharacterBoardItemKind[];
-  /** The corporations with corp events. Empty hides the corporation filter. */
   corporations?: readonly BoardCorporation[];
   corpFilter?: CorpEventFilter;
   onCorpFilter?: (filter: CorpEventFilter) => void;
-  /** The corporations sharing pops. Fewer than two hides that filter: the kind row already hides them all. */
   sharingCorporations?: readonly BoardCorporation[];
   sharingCorpFilter?: CorpEventFilter;
   onSharingCorpFilter?: (filter: CorpEventFilter) => void;
@@ -85,11 +47,6 @@ export interface CalendarKindFilterMenuProps {
 
 const NO_CORPORATIONS: readonly BoardCorporation[] = [];
 
-/**
- * A by-corporation filter as a submenu of radio rows: All, each corporation, then an optional
- * None. The Corporation events filter and the Shared moon pops by filter share it. Every row
- * keeps the menu open, like the kind rows.
- */
 function CorporationFilterSub({
   trigger,
   value,
@@ -102,7 +59,6 @@ function CorporationFilterSub({
   value: CorpEventFilter;
   corporations: readonly BoardCorporation[];
   allLabel: string;
-  /** The "none" row's label; without it there is no such row. */
   noneLabel?: string;
   onChange: (filter: CorpEventFilter) => void;
 }) {
@@ -140,7 +96,6 @@ function CorporationFilterSub({
   );
 }
 
-/** A kind's glyph in its hue: the legend for the icons and colours the Calendar draws. */
 export function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
   const Glyph = KIND_ICON[kind];
   return <Glyph aria-hidden="true" className={`size-4 shrink-0 ${KIND_TEXT[kind]}`} />;
@@ -166,31 +121,14 @@ export function CalendarKindFilterMenu({
   const readable = new Set(readableKinds);
   const needsReauth = new Set(reauthKinds);
 
-  /**
-   * Three answers, in order of how much they explain: a scope to grant, a read
-   * that did not land, or a real count. "Not granted" and "none due" must never
-   * look alike — a confident 0 next to an endpoint the Character was never
-   * allowed to ask about is a lie about their data.
-   */
   function countLabel(kind: CharacterBoardItemKind) {
     if (needsReauth.has(kind)) return t('calendar.filter.notGranted');
     if (!readable.has(kind)) return t('calendar.filter.unavailable');
     return counts.get(kind) ?? 0;
   }
 
-  /**
-   * A kind with nothing coming up is not worth a row. Three cases stay: one
-   * the pilot hid (the row is how they turn it back on — their choice is
-   * remembered, so it must stay reachable), one that could not be read or
-   * needs a scope (the row says why, and absence would hide that). The opt-in kinds (moon chunks,
-   * skyhook raids, mercenary dens) are the exception: unreadable usually means
-   * the Permission is off, and an "Unavailable" row would blame the network for
-   * a choice the pilot never made.
-   */
   function hasRow(kind: CharacterBoardItemKind) {
     if (!kindHasFilterRow(kind, { hidden: hiddenSet, readable, reauth: needsReauth })) return false;
-    // Here, unlike the Overview widget's menu, the counts are on hand: a readable kind with
-    // nothing due is not worth a row.
     if (!readable.has(kind) || hiddenSet.has(kind) || needsReauth.has(kind)) return true;
     return (counts.get(kind) ?? 0) > 0;
   }
@@ -216,26 +154,13 @@ export function CalendarKindFilterMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
         <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('calendar.filter.title')}</p>
-        {CHARACTER_BOARD_ITEM_KINDS.filter(
-          // A corp source the Character was never allowed to ask about
-          // gets no row, rather than an "Unavailable" hinting at corp access
-          // they lack. Kinds with nothing due also drop out: see `hasRow`.
-          hasRow
-        ).map((kind) => (
+        {CHARACTER_BOARD_ITEM_KINDS.filter(hasRow).map((kind) => (
           <DropdownMenuCheckboxItem
             key={kind}
             checked={!hiddenSet.has(kind)}
-            // Without this the menu closes on the first toggle, which makes a
-            // multi-select take one round trip per kind.
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(kind)}
           >
-            {/*
-              The glyph in its hue makes this menu the legend for the icons and
-              colours the rail, the map and the ticker draw — the one place a
-              pilot learns that a mint planet means Planets. Decorative only:
-              the label beside it already says the same thing (DESIGN.md §5, §7).
-            */}
             <KindGlyph kind={kind} />
             <span className="flex-1">{t(KIND_LABEL[kind])}</span>
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
@@ -244,19 +169,16 @@ export function CalendarKindFilterMenu({
           </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />
-        {/* Only with a corp event source: a pilot who reads no corporation sees no hint of one. */}
         {corporations.length > 0 && (
           <CorporationFilterSub
             trigger={t('calendar.corpFilter.title')}
             value={corpFilter}
-            // One corporation alone would repeat All.
             corporations={corporations.length > 1 ? corporations : NO_CORPORATIONS}
             allLabel={t('calendar.corpFilter.all')}
             noneLabel={t('calendar.corpFilter.none')}
             onChange={(filter) => onCorpFilter?.(filter)}
           />
         )}
-        {/* One sharing corporation alone would repeat All, and the kind row hides them all. */}
         {sharingCorporations.length > 1 && (
           <CorporationFilterSub
             trigger={
@@ -271,9 +193,6 @@ export function CalendarKindFilterMenu({
             onChange={(filter) => onSharingCorpFilter?.(filter)}
           />
         )}
-        {/* Real menu items, not raw buttons: Radix roving focus only visits registered
-            items, so a plain button here is unreachable by keyboard (WCAG 2.1.1).
-            `preventDefault` keeps the menu open, like the rows above. */}
         <div className="mt-1 flex border-t border-line">
           <DropdownMenuItem
             aria-disabled={hidden.length === 0 || undefined}

@@ -1,9 +1,3 @@
-/**
- * The quiet "on N% of PvE Drake fits" hints under Improve rows (issue #5581):
- * what the hull's community fits say about a row's target GROUP. Shown, never
- * scored; never about a specific variant. A group with no clean name (the
- * propulsion group is afterburners and MWDs both) gets no hint.
- */
 import type { TFunction } from 'i18next';
 import {
   HINT_SHARE,
@@ -15,22 +9,17 @@ import type { ImproveJob } from '@/engine/fittings/improve';
 import type { FittingModule } from '@/engine/fittings/types';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
-/** What the hint lines need, built once when a search finishes. */
 export interface CommunityHints {
   job: ImproveJob;
   hullName: string;
-  /** Groups on at least half of the job's fits that have a name to show, with their share. */
   groups: ReadonlyMap<number, { share: number; label: string }>;
   groupOf: (typeId: number) => number | undefined;
-  /** Groups the shown Makeover takes off the fit that most of the job's fits keep. */
   removed: readonly number[];
 }
 
 const SIZE_WORD = /^(small|medium|large|x-large|capital)\b/i;
 
-/** A group's name for a hint: the market group of one of its listed types, one level up when that is a size tier. */
 function groupLabel(catalogue: FittingCatalogue, group: number): string | null {
-  // Afterburners and MWDs share a group: no honest single name.
   if (group === PROPULSION_GROUP) return null;
   const members = new Set(catalogue.typeIdsByGroup.get(group) ?? []);
   const entry = catalogue.marketTypes.find((type) => members.has(type.typeId));
@@ -66,7 +55,6 @@ export function communityHintsOf(
 
 const percentOf = (share: number) => Math.round(share * 100);
 
-/** "Ballistic Control Systems on 98% of PvE Drake fits"; null when the target's group is not that common. */
 export function hintLine(
   t: TFunction,
   hints: CommunityHints | undefined,
@@ -83,7 +71,6 @@ export function hintLine(
   });
 }
 
-/** One quiet caution per group the Makeover removes that most fits keep. */
 export function cautionLines(t: TFunction, hints: CommunityHints | undefined): string[] {
   if (!hints) return [];
   return hints.removed.flatMap((group) => {

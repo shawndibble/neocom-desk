@@ -3,11 +3,6 @@ import { StatChip } from '@/components/ui';
 import { InlinePercent } from './InlinePercent';
 import { useRefiningSetup } from './useRefiningSetup';
 
-/**
- * The pilot's Facility Yield and Reprocessing Tax, edited where the refined
- * number they move is shown. Two chips, each a number that swaps to a field
- * on click, with a tooltip on where to find it in the client.
- */
 export function RefiningSetupChips() {
   const { t } = useTranslation();
   const { setup, setYieldRate, setTaxRate } = useRefiningSetup();

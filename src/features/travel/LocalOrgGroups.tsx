@@ -1,8 +1,3 @@
-/**
- * The Local list's Organization view (issue #5668): `groupByOrganization`'s
- * headings over the Kills view's own rows, passed in as `renderRows`. On a
- * phone each organization folds, the largest open, so the headings read as the roll call.
- */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, IconButton, isRowOwnEvent } from '@/components/ui';
@@ -25,7 +20,6 @@ type Threat = ThreatLevel | 'pending' | null;
 export type RenderPilotRows = (
   label: string,
   rows: PilotListRow[],
-  /** Off where the heading names it, or nothing is known. */
   showAffiliation: boolean
 ) => ReactNode;
 
@@ -36,15 +30,12 @@ export function LocalOrgGroups({
   threatOf,
   renderRows,
 }: {
-  /** Found pilots: the non-friendly ones, or the Friendly section's. */
   rows: PilotListRow[];
   threatOf: (row: PilotListRow) => Threat;
   renderRows: RenderPilotRows;
 }) {
   const { t } = useTranslation();
   const { sections, alone, unplaced } = useMemo(() => groupByOrganization(rows), [rows]);
-  // Keyed by organization, not position: the largest stays open by default even
-  // when names arriving re-sort equal-sized groups.
   const [folds, setFolds] = useState<ReadonlyMap<string, boolean>>(new Map());
   return (
     <>
@@ -97,7 +88,6 @@ function OrgSectionView({
   renderRows,
 }: {
   section: OrgSection<PilotListRow>;
-  /** Phone only: desktop never folds. */
   open: boolean;
   onToggle: () => void;
   threatOf: (row: PilotListRow) => Threat;
@@ -107,7 +97,6 @@ function OrgSectionView({
   const isPhone = useIsPhone();
   const name = section.name ?? t('travel.pilot.list.org.unnamed', { id: section.id });
   const shown = !isPhone || open;
-  // An alliance heading shows only an alliance contact: one corporation's contact is not the alliance's.
   const standing =
     standingVia(section.rows, 'alliance') ??
     (section.kind === 'corporation' ? standingVia(section.rows, 'corporation') : null);
@@ -115,7 +104,6 @@ function OrgSectionView({
     <section className="space-y-2">
       <h3
         className={cx(SECTION_TITLE, isPhone && 'cursor-pointer')}
-        // A phone folds the section from anywhere on its heading, bar the links in it.
         onClick={isPhone ? (event) => isRowOwnEvent(event) && onToggle() : undefined}
       >
         {isPhone && (
@@ -188,7 +176,6 @@ function CorporationView({
   );
 }
 
-/** The standing every pilot of the group shares through that organization's contact, if any. */
 function standingVia(
   rows: readonly PilotListRow[],
   via: ContactStanding['via']

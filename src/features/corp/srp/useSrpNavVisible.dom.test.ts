@@ -9,7 +9,6 @@ vi.mock('@/stores/activeCharacter', () => ({
     select({ hydrated: true, activeCharacterId: 7 }),
 }));
 
-// Spied, so a test can wait for every mount's probe to have answered.
 vi.mock('./srpNavProbe', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./srpNavProbe')>();
   return { ...actual, probeSrp: vi.fn(actual.probeSrp) };
@@ -42,7 +41,6 @@ describe('useSrpNavVisible', () => {
     await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(1));
     renderHook(() => useSrpNavVisible());
     renderHook(() => useSrpNavVisible());
-    // Every mount asked, and every answer is in: still the one call.
     await vi.waitFor(() => expect(probeSrp).toHaveResolvedTimes(3));
     expect(status).toHaveBeenCalledTimes(1);
   });

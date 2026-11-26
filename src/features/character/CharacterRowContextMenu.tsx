@@ -1,12 +1,3 @@
-/**
- * Right-click menu on a Characters-table row: jump straight to this
- * character's Overview, Skill training, Industry, PI, or Alerts, without
- * first clicking through to Overview and navigating from there. Every
- * destination reads the single active-character store (none of these routes
- * take a `:characterId` param — see `Overview.tsx`, `Skills.tsx`,
- * `Industry.tsx`), so getting there for a character other than the active
- * one means switching first, same as `Characters.tsx`'s own `select()`.
- */
 import type { ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -15,14 +6,10 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export interface CharacterRowContextMenuProps {
   characterId: number;
-  /** The character's name, for the row's "More actions" button label. */
   name: string;
-  /** Marked SP Farm; undefined hides the action (SP extraction monitoring is off). */
   spFarm?: boolean;
   onToggleSpFarm?: () => void;
-  /** Opens the remove-confirm dialog: the menu's one danger item (decision 20261005-202754). */
   onRemove: () => void;
-  /** The `<tr>` `DataTable`'s `rowContextMenu` hands back — the menu's trigger. */
   children: ReactElement;
 }
 
@@ -67,10 +54,7 @@ export function CharacterRowContextMenu({
             </MenuItem>
           )}
           <MenuSeparator />
-          <MenuItem
-            className="text-danger" // After the menu has closed and returned focus, so the dialog's own focus is not undone.
-            onSelect={() => setTimeout(onRemove, 0)}
-          >
+          <MenuItem className="text-danger" onSelect={() => setTimeout(onRemove, 0)}>
             {t('characters.removeMenuLabel', { name })}
           </MenuItem>
         </>

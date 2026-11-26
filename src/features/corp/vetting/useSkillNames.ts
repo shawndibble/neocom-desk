@@ -11,7 +11,6 @@ function load(): Promise<SkillNames> {
     (skills) =>
       new Map(skills.map((skill) => [skill.typeID, { name: skill.name, group: skill.groupName }])),
     () => {
-      // The catalog could not load: skills show as ids; try again on the next visit.
       loading = null;
       return NONE;
     }
@@ -19,7 +18,6 @@ function load(): Promise<SkillNames> {
   return loading;
 }
 
-/** Skill name and group by type id, from the static skill data; empty until it loads. */
 export function useSkillNames(): SkillNames {
   const [names, setNames] = useState<SkillNames>(NONE);
   useEffect(() => {

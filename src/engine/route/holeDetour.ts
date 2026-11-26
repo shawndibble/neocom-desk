@@ -1,12 +1,3 @@
-/**
- * A Thera / Turnur route with more jumps than the gates is never flown
- * (decision `20261012-224645`). Hubs are free to a biased search, so it can
- * price a long hole route below a short gate one; such a route is traded for
- * the one without holes. Route Safety and every jump count apply this same
- * rule, so a count always matches the route Route Safety draws.
- *
- * Pure.
- */
 import {
   findJumpRoute,
   jumpDistancesFrom,
@@ -19,12 +10,10 @@ import { HUB_SYSTEM_IDS } from './theraConnections';
 
 const HUB_IDS: ReadonlySet<number> = new Set(Object.values(HUB_SYSTEM_IDS));
 
-/** The same search with every hole and bridge taken away: the preference and Avoided Systems stay. */
 export function gatesOnlyOptions(options: FindJumpRouteOptions): FindJumpRouteOptions {
   return { ...options, extraConnections: undefined, freeSystems: undefined };
 }
 
-/** The same search without the holes: the bridges, preference and Avoided Systems stay. */
 export function noHoleOptions(options: FindJumpRouteOptions): FindJumpRouteOptions {
   return {
     ...options,
@@ -35,7 +24,6 @@ export function noHoleOptions(options: FindJumpRouteOptions): FindJumpRouteOptio
   };
 }
 
-/** A route that steps into or out of a hub by something other than a gate: a hole jump. */
 export function crossesHole(graph: JumpGraph, systems: readonly number[]): boolean {
   return systems.some(
     (id, index) =>
@@ -45,12 +33,10 @@ export function crossesHole(graph: JumpGraph, systems: readonly number[]): boole
   );
 }
 
-/** More jumps than the gate route. With no gate route at all, nothing is longer. */
 export function longerThanGates(systems: readonly number[], gates: JumpRouteResult): boolean {
   return gates.kind === 'route' && systems.length > gates.systems.length;
 }
 
-/** `findJumpRoute`, with a hole route longer than the gates traded for the route without holes. */
 export function findFlownRoute(
   graph: JumpGraph,
   from: number,
@@ -65,10 +51,6 @@ export function findFlownRoute(
     : route;
 }
 
-/**
- * `jumpDistancesFrom`, each system counted as `findFlownRoute` flies it. With
- * no hole open it is the one sweep; with holes, up to three.
- */
 export function flownJumpDistancesFrom(
   graph: JumpGraph,
   originSystemId: number,

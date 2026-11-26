@@ -19,7 +19,6 @@ describe('FlyDot', () => {
     expect(locked.dataset.shape).toBe('ring');
     expect(canFly.dataset.shape).toBe('dot');
     expect(elite.dataset.shape).toBe('star');
-    // Shape, not just fill: only the star is an svg, only the ring is hollow.
     expect(elite.tagName.toLowerCase()).toBe('svg');
     expect(locked.tagName.toLowerCase()).toBe('span');
     expect(canFly.tagName.toLowerCase()).toBe('span');

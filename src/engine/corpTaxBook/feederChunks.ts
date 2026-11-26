@@ -1,12 +1,3 @@
-/**
- * Collector books' Feeder Extractions as moon-chunk board sources, per Feeder corporation
- * (#6116), so the Calendar, Due soon and the Moon extractions widget show pops a pilot's
- * Characters cannot read from ESI themselves. A book's own chunks (no `sourceCorporationId`)
- * are left out: its officers read those from ESI already. A corporation in `skip` is one some
- * Character reads straight from ESI, which is fresher, so the book's copy is dropped and no pop
- * shows twice. Only live chunks count (not cancelled, not yet decayed), so a Feeder whose pops
- * are all past adds nothing.
- */
 import type { BoardExtractionSource } from '../corp/board';
 import {
   officerLabelsOf,
@@ -17,7 +8,6 @@ import {
 } from './refinery';
 import { extractionId, type SyncExtraction } from './sync';
 
-/** One book's Extractions and the Feeder records that name its refineries. */
 export interface FeederChunkBook {
   extractions: readonly SyncExtraction[];
   feeders: readonly {
@@ -28,13 +18,10 @@ export interface FeederChunkBook {
 
 export interface FeederChunksInput {
   books: readonly FeederChunkBook[];
-  /** Corporations some Character reads from ESI. */
   skip: ReadonlySet<number>;
-  /** Epoch ms: a chunk that has decayed by now is past. */
   now: number;
 }
 
-/** A book's refinery names: its own officers' labels, then the names its Feeder grants read. */
 function bookLabeler(book: FeederChunkBook): (structureId: number) => string {
   const labels = officerLabelsOf(book.feeders);
   const names = structureNamesOf(book.feeders);
@@ -42,7 +29,6 @@ function bookLabeler(book: FeederChunkBook): (structureId: number) => string {
   return refineryLabeler({
     officerLabels: (id) => labels.get(id),
     structureName: (id) => names.get(id),
-    // ESI's own extraction rows read the same way when the refinery has no name.
     fallback: (id) => `Moon ${moons.get(id) ?? id}`,
   });
 }

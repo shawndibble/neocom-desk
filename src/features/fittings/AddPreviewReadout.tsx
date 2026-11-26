@@ -3,7 +3,6 @@ import { StatChange } from '@/components/ui';
 import type { AddPreview } from './useModuleAddPreview';
 import { fixed1 } from '@/lib/fixedFormat';
 
-/** Most changed stats listed; the rest collapse into "and N more". */
 const MAX_LISTED = 6;
 
 interface AddPreviewReadoutProps {
@@ -11,12 +10,6 @@ interface AddPreviewReadoutProps {
   name: string;
 }
 
-/**
- * What adding the hovered or focused module would change on the whole
- * Fitting: each changed stat before → after (at the stats panel's
- * rounding), then whether it fits and the pilot can fly it. Sticks to the
- * bottom of the browser so showing it never moves the rows under the pointer.
- */
 export function AddPreviewReadout({ preview, name }: AddPreviewReadoutProps) {
   const { t } = useTranslation();
   const { delta, fits, overage, canFly } = preview;

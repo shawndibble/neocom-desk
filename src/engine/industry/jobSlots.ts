@@ -1,33 +1,11 @@
-/**
- * How many industry jobs a character can run at once, per job-slot pool
- * (support.eveonline.com "Invention"; EVE Ref skill pages 3387/24625,
- * 3406/24624, 45748/45749).
- *
- * Every category shares the same shape: one free slot, plus one more per
- * level of a basic skill and its "Advanced" counterpart (5 + 5, so 11 at
- * both maxed) — manufacturing (Mass Production / Advanced Mass Production),
- * science (Laboratory Operation / Advanced Laboratory Operation), and
- * reaction (Mass Reactions / Advanced Mass Reactions).
- *
- * "Science" is the EVE-standard umbrella for the four activities that draw
- * from the *same* laboratory slots — time efficiency research, material
- * efficiency research, copying, and invention — not a fourth, separate pool.
- *
- * Pure: no fetch/DOM/Dexie. Callers adapt ESI's `CharacterSkill[]` (skill
- * ids) and `IndustryJob[]` (activity ids, ISO dates) to this module's named
- * shapes at the boundary (ARCHITECTURE.md).
- */
-
 export type JobSlotCategory = 'manufacturing' | 'science' | 'reaction';
 
-/** Display order every job-slot readout in the app follows. */
 export const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = [
   'manufacturing',
   'science',
   'reaction',
 ];
 
-/** Active levels of the six skills that grant extra job slots. */
 export interface JobSlotSkills {
   massProduction: number;
   advancedMassProduction: number;
@@ -37,7 +15,6 @@ export interface JobSlotSkills {
   advancedMassReactions: number;
 }
 
-/** Every character can run this many jobs per category with no relevant skill trained at all. */
 const BASE_SLOTS = 1;
 
 export function maxJobSlots(skills: JobSlotSkills): Record<JobSlotCategory, number> {
@@ -48,19 +25,14 @@ export function maxJobSlots(skills: JobSlotSkills): Record<JobSlotCategory, numb
   };
 }
 
-/**
- * The slot pool an EVE industry activity id draws from, or null for an id
- * this app doesn't otherwise recognise (`features/industry/jobs.ts`'s
- * `ACTIVITY_NAMES` lists the same six: 1, 3, 4, 5, 8, 11).
- */
 export function jobSlotCategory(activityId: number): JobSlotCategory | null {
   switch (activityId) {
     case 1:
       return 'manufacturing';
-    case 3: // time efficiency research
-    case 4: // material efficiency research
-    case 5: // copying
-    case 8: // invention — classed as a science job (support.eveonline.com "Invention")
+    case 3:
+    case 4:
+    case 5:
+    case 8:
       return 'science';
     case 11:
       return 'reaction';
@@ -71,11 +43,9 @@ export function jobSlotCategory(activityId: number): JobSlotCategory | null {
 
 export interface JobSlotJob {
   activityId: number;
-  /** Epoch ms the job finishes. */
   endMs: number;
 }
 
-/** How many of a job list are still running (not yet at `endMs`), per category. */
 export function runningJobCountsByCategory(
   jobs: readonly JobSlotJob[],
   nowMs: number
@@ -89,20 +59,11 @@ export function runningJobCountsByCategory(
   return counts;
 }
 
-/** One character's job-slot inputs, adapted to this module's shapes. Either field undefined: not loaded/known for this character yet. */
 export interface JobSlotCharacterInput {
   skills: JobSlotSkills | undefined;
   jobs: readonly JobSlotJob[] | undefined;
 }
 
-/**
- * Open/max slot counts per category, summed across every character passed
- * in. A character missing skills or jobs data for a category simply doesn't
- * contribute to that category's sum — never guessed as zero — so one
- * not-yet-loaded alt in a multi-character selection doesn't blank out
- * everyone else's known capacity. A category comes back undefined only when
- * *no* character in the set has both pieces known for it.
- */
 export function aggregateJobSlotSummary(
   characters: readonly JobSlotCharacterInput[],
   nowMs: number
@@ -131,22 +92,12 @@ export function aggregateJobSlotSummary(
   return totals;
 }
 
-/** When one more job in a category could start, and so finish, for one character. */
 export interface JobFinishProjection {
-  /** Free slots in the category right now (never negative). */
   open: number;
-  /** Epoch ms the job would start: `nowMs` with a slot free, else the moment the earliest-ending running job frees one. */
   startMs: number;
   finishMs: number;
 }
 
-/**
- * When each of the character's `category` slots is next free, earliest first:
- * `nowMs` for an open slot, else the end of the running job holding it. Over
- * capacity, the jobs ending last hold the slots (the earlier ones free a slot
- * only for another queued-over job), so the first free moment is the
- * `running - max`-th earliest end.
- */
 export function slotFreeTimes(
   character: { skills: JobSlotSkills; jobs: readonly JobSlotJob[] },
   category: JobSlotCategory,
@@ -161,12 +112,6 @@ export function slotFreeTimes(
   return [...new Array<number>(open).fill(nowMs), ...runningEnds].slice(-max);
 }
 
-/**
- * When a job of `seconds` in `category` would finish if the character
- * installed it as soon as a slot allows. With a slot open that is now; with
- * every slot full it waits for the running job that ends soonest (the
- * `running - max`-th earliest end, when several are over capacity).
- */
 export function projectJobFinish(
   character: { skills: JobSlotSkills; jobs: readonly JobSlotJob[] },
   category: JobSlotCategory,

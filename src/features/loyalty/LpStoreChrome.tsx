@@ -8,14 +8,8 @@ import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { usePriceBasis } from './priceBasis';
 
-/**
- * The header's gear for the two settings this page's numbers lean on: LP
- * Value and the Trade hub. The hub is the LP Store page hub (`useHubFor('lpStore')`),
- * the one the filter row's select applies to as well, so the two never disagree.
- */
 export function LpStoreActions() {
   const { t } = useTranslation();
-  // The percent is named for the side of the book revenue is priced on.
   const priceBasis = usePriceBasis((s) => s.value);
   return (
     <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
@@ -31,11 +25,6 @@ export function LpStoreActions() {
   );
 }
 
-/**
- * LP Store is a Wallet tab, but its own route outranks Wallet's, so the page
- * draws Wallet's tab bar itself. Every other tab is a path under `/wallet`;
- * `transactions` is no tab Wallet shows (it redirects to Market).
- */
 export function WalletTabBar({ tabsId }: { tabsId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();

@@ -30,7 +30,6 @@ import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 import { colonyCountUnknown } from './colonyFillModel';
 
-/** The recipe filter and the picks/all switch ride in the URL, scoped to Find best (ADR 0015). */
 const FIND_BEST_PARAMS = {
   'fb.filter': enumParam<RecipeFilter>(['any', 'p1', 'p2'], 'any'),
   'fb.mode': enumParam<FindBestMode>(['picks', 'all'], 'picks'),
@@ -41,13 +40,6 @@ interface Props {
   characterId: number;
 }
 
-/**
- * "Find the best thing to build": ranked one-planet recipes for the pilot's
- * planet types and what-if planets, a planet finder per recipe, and every
- * product by tier. Reads the same recommendation model as every Plan view
- * (`usePlanAdvice`), shapes it (`buildFindBestView`) and draws it
- * (`FindBestSections`, `ShowMeHow`, `AllProductsPanel`).
- */
 export function FindBestPlan({ snapshot, characterId }: Props) {
   const { t } = useTranslation();
   const preference = usePlanPreference((state) => state.value);
@@ -63,7 +55,6 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   const setFilter = (next: RecipeFilter) => setFindBestParams({ 'fb.filter': next });
   const setMode = (next: FindBestMode) => setFindBestParams({ 'fb.mode': next });
   const [openId, setOpenId] = useState<number | null>(null);
-  // The finder's Highsec only box is remembered across cards; null follows the origin.
   const [highsecPick, setHighsecPick] = useState<boolean | null>(null);
 
   const colonyTypes = useMemo(
@@ -77,7 +68,6 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   );
 
   const advice = state.status === 'ready' ? state.advice : null;
-  // All products and the unfiltered picks show chain estimates; a P1/P2 filter hides them.
   const chainOf = useChainEstimates(
     mode === 'all' || filter === 'any' ? (advice?.chainBasis ?? null) : null,
     snapshot.pi

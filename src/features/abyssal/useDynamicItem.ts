@@ -1,7 +1,3 @@
-/**
- * A Mutated module's dynamic item (`dynamicItems.ts`): base, mutaplasmid and
- * full attribute set.
- */
 import { useEffect, useMemo, useState } from 'react';
 import type { DynamicItemRecord } from '@/db';
 import type { ItemMutation } from '@/engine/fittings/types';
@@ -14,7 +10,6 @@ export type DynamicItemState =
   | { status: 'ready'; record: DynamicItemRecord }
   | { status: 'failed' };
 
-/** `none` without an item id; `failed` when neither the cache nor ESI has the item. */
 export function useDynamicItem(typeId: number, itemId: number | undefined): DynamicItemState {
   const key = itemId === undefined ? null : `${typeId}:${itemId}`;
   const [answer, setAnswer] = useState<{ key: string; state: DynamicItemState } | null>(null);
@@ -43,12 +38,6 @@ export function useDynamicItem(typeId: number, itemId: number | undefined): Dyna
   return answer?.key === key ? answer.state : { status: 'loading' };
 }
 
-/**
- * The Mutated module's mutation (base, mutaplasmid, its rolls) once the item
- * has loaded and this build's mutaplasmid data agrees with it; null
- * otherwise. What "This module's rolls" shows, so Item Detail can leave those
- * attributes out of its groups.
- */
 export function useDynamicItemMutation(
   typeId: number,
   dynamic: DynamicItemState

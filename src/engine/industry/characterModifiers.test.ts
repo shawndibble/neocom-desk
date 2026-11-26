@@ -13,14 +13,12 @@ import {
 } from './characterModifiers';
 import { SKILL_IDS } from './types';
 
-// Real ESI type IDs (issues #1227, #1229).
 const BX_801 = 27170;
 const BX_802 = 27167;
 const BX_804 = 27171;
 const RX_801 = 27175;
 const RX_802 = 27169;
 const RX_804 = 27174;
-// Real SDE skill type ids (issue #1058).
 const SIMPLE_ORE_PROCESSING = 60377;
 const ICE_PROCESSING = 18025;
 const MECHANICAL_ENGINEERING = 11452;
@@ -252,7 +250,6 @@ describe('referenceSkillsMultiplier', () => {
   const ORES = [SIMPLE_ORE_PROCESSING, ICE_PROCESSING, 12185];
 
   it("is the client's multiplier for a pilot whose ore skills are all at one level", () => {
-    // Reprocessing V x Efficiency V x ore skills IV: the x1.366 the EVE client shows.
     const skills = {
       [SKILL_IDS.reprocessing]: 5,
       [SKILL_IDS.reprocessingEfficiency]: 5,
@@ -269,7 +266,6 @@ describe('referenceSkillsMultiplier', () => {
       [SKILL_IDS.reprocessingEfficiency]: 5,
       [SIMPLE_ORE_PROCESSING]: 5,
       [ICE_PROCESSING]: 3,
-      // 12185 untrained.
     };
     expect(referenceSkillsMultiplier(mods(skills), ORES)).toBeCloseTo(1.15 * 1.1 * 1.08, 10);
   });

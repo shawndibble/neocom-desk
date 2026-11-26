@@ -41,8 +41,6 @@ vi.mock('./orderCostBasis', () => ({
   loadOrderCostBases: vi.fn(),
   loadWalletOrderCostBases: vi.fn(async () => ({ bases: new Map(), gaps: new Map() })),
 }));
-// The snapshot's own station-price tier. Order Detail's fetches go through
-// its fake loaders instead (`loaders` below).
 vi.mock('./orderCompetition', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./orderCompetition')>()),
   loadStationBestPrices: vi.fn(),
@@ -111,9 +109,7 @@ function costBasis(unitCost: number): ProductionRunBasis {
   };
 }
 
-/** Sell order below floor: unit cost of 600 with any skill level always relists well above 500. */
 const BELOW_FLOOR_ORDER = order({ order_id: 101, type_id: 34, price: 500 });
-/** Healthy-looking sell order with no cost basis linked at all. */
 const NO_COST_BASIS_ORDER = order({
   order_id: 103,
   type_id: 35,
@@ -121,7 +117,6 @@ const NO_COST_BASIS_ORDER = order({
   volume_remain: 20,
   volume_total: 20,
 });
-/** Sell order expiring within the week — no cost basis needed for this problem to fire. */
 const EXPIRING_ORDER = order({
   order_id: 201,
   type_id: 36,
@@ -140,7 +135,6 @@ function snapshot(
 }
 
 const actions = fakeItemActions();
-/** Order Detail's fetches, fresh per test: region books and price history never resolve unless a test says so. */
 let loaders: FakeOrderDetailLoaders;
 
 function renderPanel(initialEntry = '/market/orders') {
@@ -158,7 +152,6 @@ function renderPanel(initialEntry = '/market/orders') {
   );
 }
 
-/** Renders the current URL's search string alongside the panel, for asserting `?highlight=` is spent on arrival (issue #1423). */
 function CurrentSearch() {
   const location = useLocation();
   return <p data-testid="location-search">{location.search}</p>;
@@ -189,8 +182,6 @@ beforeEach(() => {
   mockedNpcStations.mockResolvedValue([
     { id: STATION_A, name: 'Jita IV - Moon 4', systemId: 30000142 },
   ]);
-  // The real loader returns an entry (null prices = no orders) for every type
-  // of each station it reached; an absent entry means the station's fetch failed.
   mockedStationPrices.mockImplementation(
     async (requests) =>
       new Map(
@@ -212,14 +203,10 @@ beforeEach(() => {
       [3446, 5],
     ])
   );
-  // Deep checks (and price history, for the "sells out in" chip) are
-  // on-demand only — the fake never resolves either, so a test that doesn't
-  // care about them never has to wait on them.
   loaders = fakeOrderDetailLoaders();
   useVisibleOpenOrderColumns.setState({ value: [], hydrated: true });
 });
 
-/** The sr-only `LiveStatus` count. */
 async function findMatchCount(text: string) {
   await waitFor(() =>
     expect(screen.getAllByRole('status').some((el) => el.textContent === text)).toBe(true)
@@ -241,7 +228,6 @@ function entry(
   };
 }
 
-/** The table on screen, by the segment it shows. */
 const NEEDS_YOU_TABLE = { name: 'Orders that need you' } as const;
 
 describe('OpenOrdersPanel', () => {
@@ -314,7 +300,6 @@ describe('OpenOrdersPanel', () => {
     expect(row).toHaveTextContent('Jita IV');
     expect(row).toHaveTextContent('Below floor');
     expect(within(row).getByRole('button', { name: /^Put the price up: / })).toBeInTheDocument();
-    // Sentence and copy button live in the detail.
     expect(row).not.toHaveTextContent('Selling at this price loses');
   });
 
@@ -327,7 +312,6 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
 
     expect(await screen.findByRole('heading', { name: '2 orders need you' })).toBeInTheDocument();
-    // 500 x 10 + 300 x 5.
     const line = screen.getByText(/ISK tied up in them/).closest('p');
     expect(line).toHaveTextContent('6.5K');
     expect(line).toHaveTextContent(/ISK tied up in them · 0 to watch · 1 fine/);
@@ -429,14 +413,12 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
 
     const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
-    // Each row names its owner.
     expect(within(table).getByRole('row', { name: /Mexallon/ })).toHaveTextContent('Bravo');
     const trigger = within(screen.getByRole('banner')).getByRole('button', {
       name: 'All characters · 2',
     });
 
     await user.click(trigger);
-    // The active Character (from `useActiveCharacter`) is Alpha (id 1).
     await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -455,14 +437,12 @@ describe('OpenOrdersPanel', () => {
     const user = userEvent.setup();
     const first = renderPanel();
 
-    // First visit: the Settings default seeds the page.
     expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'This character' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'All characters · 2' }));
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
     first.unmount();
 
-    // A fresh visit (no query string) reopens the last pick, not the default.
     renderPanel();
     expect(await screen.findByRole('button', { name: 'All characters · 2' })).toBeInTheDocument();
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
@@ -511,7 +491,6 @@ describe('OpenOrdersPanel', () => {
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
     expect(spy.mock.calls[0][0]).toMatch(/^neocom-orders-open-\d{4}-\d{2}-\d{2}\.csv$/);
     const csv = spy.mock.calls[0][1] as string;
-    // The fix-list facts ride along: station, character, problem and the call.
     expect(csv).toMatch(/"Tritanium","Sell","[^"]+","[^"]+",500,/);
     expect(csv).toContain('"Do this"');
     expect(csv).toContain(`"${TYPE_NAMES.get(EXPIRING_ORDER.type_id)}","Sell",`);
@@ -548,10 +527,6 @@ describe('OpenOrdersPanel', () => {
     expect(screen.queryByText('No orders match your filters.')).not.toBeInTheDocument();
   });
 
-  // issue #1423: a marketOrderUndercut (or marketOrderFilled) notification
-  // deep-links here with `?highlight=<orderId>`, per decision
-  // `20260908-123516` — the row must land on screen and pulsed even when it
-  // is a healthy order the default segment leaves out.
   describe('?highlight= deep link (issue #1423)', () => {
     it('opens All and pulses the highlighted row, until the pilot picks a segment', async () => {
       const user = userEvent.setup();
@@ -582,7 +557,6 @@ describe('OpenOrdersPanel', () => {
 
       renderPanel('/market/orders?highlight=999999');
 
-      // Needs you, same as with no highlight at all.
       expect(await screen.findByRole('table', NEEDS_YOU_TABLE)).toBeInTheDocument();
     });
 
@@ -668,8 +642,6 @@ describe('OpenOrdersPanel', () => {
         within(screen.getByRole('table', NEEDS_YOU_TABLE)).getAllByRole('row')[1].textContent;
       await screen.findByRole('table', NEEDS_YOU_TABLE);
       expect(firstItem()).toContain('Tritanium');
-      // A price column starts high to low (the same Tritanium first), so a second
-      // click, low to high, is the one that moves a row.
       for (let click = 0; click < 2; click += 1) {
         await user.click(
           within(screen.getByRole('table', NEEDS_YOU_TABLE)).getByRole('button', {
@@ -688,8 +660,6 @@ describe('OpenOrdersPanel', () => {
     it('shows "—" for a floor nobody linked, and the floor rounded up to a legal price, in danger colour when the price is under it (issue #1421)', async () => {
       useVisibleOpenOrderColumns.setState({ value: ['floor'], hydrated: true });
       mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER, EXPIRING_ORDER])]));
-      // unitCost 1000 (vs. BELOW_FLOOR_ORDER's 500 price) lands the exact
-      // break-even ("relist") at a fractional, non-legal price.
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(1000)]]));
 
       renderPanel();
@@ -761,10 +731,6 @@ describe('OpenOrdersPanel', () => {
   });
 
   it('fetches price history on opening a row\'s details and feeds it into the "sells out in" chip', async () => {
-    // This is the wiring `loadPriceHistory` exists for (issue #5): if
-    // `openDetails` stopped calling it, this test — not just the modal's own
-    // prop-level tests — is what would catch a promised feature silently
-    // regressing back to dead scaffolding.
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
@@ -785,9 +751,6 @@ describe('OpenOrdersPanel', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
     expect(loaders.priceHistory).toHaveBeenCalledWith(REGION, 34);
-    // 300 units / 30 days = 10/day; BELOW_FLOOR_ORDER's volumeRemain is 10 ->
-    // 1 day, with no deep book fetched yet so myShare defaults to 1.
-    // The folded "The numbers" section's trailing read carries it.
     await waitFor(() =>
       expect(within(dialog).getByRole('button', { name: /The numbers/ })).toHaveTextContent(
         'Sells out in 1 day'
@@ -799,9 +762,6 @@ describe('OpenOrdersPanel', () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-    // The region book comes back with no orders at all — my own order can't
-    // be found in it, so `system` cannot be resolved (must read as "not
-    // checked"), while `region` was genuinely checked and found clean.
     loaders.regionCompetition.mockResolvedValue({
       competitors: [],
       fetchedAt: Date.now(),
@@ -814,7 +774,6 @@ describe('OpenOrdersPanel', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
     await waitFor(() => expect(within(dialog).queryByText('Checking…')).not.toBeInTheDocument());
-    // "Who is cheaper" starts folded (issue #1428).
     fireEvent.click(within(dialog).getByRole('button', { name: /Who is cheaper/ }));
 
     const systemRow = within(dialog).getByText('System').closest('div');
@@ -824,9 +783,6 @@ describe('OpenOrdersPanel', () => {
   });
 
   it('still renders rows when the NPC-station lookup itself fails to load (e.g. first offline visit)', async () => {
-    // stations.json is deliberately outside the install precache, so it can
-    // fail on a first offline visit — that must not take the whole loader
-    // down with it (it used to, via an unguarded `Promise.all`).
     mockedNpcStations.mockRejectedValue(new Error('offline'));
     mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
@@ -845,7 +801,6 @@ describe('OpenOrdersPanel', () => {
     const line = (await screen.findByText("Bravo hasn't shared their orders")).closest('p');
     const table = screen.getByRole('table', NEEDS_YOU_TABLE);
     expect(table.compareDocumentPosition(line!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // The cached notice keeps its own line above the list, age included (DESIGN.md).
     const cached = screen.getByText(/Showing cached data/);
     expect(cached.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -869,7 +824,6 @@ describe('OpenOrdersPanel', () => {
     expect(picker).toHaveClass('h-9');
     expect(picker).not.toHaveClass('md:h-7');
     expect(screen.queryByText("Charlie hasn't shared their orders")).not.toBeInTheDocument();
-    // The faces are the two Characters with orders, the active one first (no "+N" from the roster).
     const faces = Array.from(picker.querySelectorAll('img')).map(
       (img) => /characters\/(\d+)\//.exec(img.getAttribute('src') ?? '')?.[1]
     );
@@ -878,11 +832,6 @@ describe('OpenOrdersPanel', () => {
   });
 
   describe('funnel filter controls', () => {
-    /**
-     * The controls live behind the funnel at every width on this page (the
-     * chip-per-problem set is two full rows inline), so every filter test
-     * has to open the box first.
-     */
     async function openFunnel(user: ReturnType<typeof userEvent.setup>) {
       await user.click(await screen.findByRole('button', { name: /^Filters/ }));
     }
@@ -898,9 +847,7 @@ describe('OpenOrdersPanel', () => {
     it('narrows the list with a problem chip', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      // Needs you: belowFloor + expiringOrStale; the healthy order is Fine.
       expect(await screen.findByRole('button', { name: 'Needs you (2)' })).toBeInTheDocument();
-      // A segment hiding the rest is not a failed match: nothing announced.
       expect(screen.queryByText(/orders match/)).not.toBeInTheDocument();
 
       await openFunnel(user);
@@ -919,12 +866,6 @@ describe('OpenOrdersPanel', () => {
       expect(screen.getByRole('combobox', { name: 'Expires within' })).toBeInTheDocument();
     });
 
-    /*
-     * The Overview board's count tiles link here already narrowed to what they
-     * counted (`openOrdersHref`), so a tile reading "21 undercut" and a page
-     * listing thirty cannot both be on screen. `openOrdersFilter.test.ts`
-     * covers the parsing; these cover that the page actually opens on it.
-     */
     it('opens narrowed to the problem the link names', async () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       await findMatchCount('1 of 3 orders match');
@@ -999,20 +940,9 @@ describe('OpenOrdersPanel', () => {
         ])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-      // The active Character (from `useActiveCharacter`) is Alpha (id 1); this
-      // link names Beta (id 2) instead — the Overview board's own per-alt
-      // Orders tile (`overview/cards.tsx`) links exactly this way on purpose,
-      // to open narrowed to one alt's orders regardless of which Character
-      // happens to be active. `CharacterFilterControl` can no longer express
-      // "just Beta" (only "current" or "all"), so its label falls back to
-      // "All characters" rather than lying that it's "This character"
-      // (Alpha) — but the table must keep filtering to Beta's own orders
-      // regardless, exactly as the tile that built this link intended.
       renderPanel('/market/orders?orders.characters=2');
 
       expect(await screen.findByRole('button', { name: 'All characters · 2' })).toBeInTheDocument();
-      // Beta's own item (Mexallon, type 36) shows; Alpha's (Tritanium, type
-      // 34) does not — the table stayed narrowed to Beta despite the label.
       expect(await screen.findByText('Mexallon')).toBeInTheDocument();
       expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     });
@@ -1021,7 +951,6 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       await findMatchCount('1 of 3 orders match');
 
-      // The funnel's count is what tells the reader why they see one order of three.
       expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
     });
 
@@ -1048,8 +977,6 @@ describe('OpenOrdersPanel', () => {
       await screen.findByRole('table', NEEDS_YOU_TABLE);
       await openFunnel(user);
 
-      // Nothing in this fixture is undercut at the station tier. The `0`
-      // itself is the cue — no opacity fade below AA (issue #1491).
       const chip = screen.getByRole('button', { name: /^Undercut at my station/ });
       expect(chip).toHaveTextContent('0');
       expect(chip.className).not.toContain('opacity-50');
@@ -1060,7 +987,6 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture();
       await screen.findByRole('table', NEEDS_YOU_TABLE);
 
-      // The expiring and the healthy order have no cost basis.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'No cost basis' }));
       await findMatchCount('2 of 3 orders match');
@@ -1072,8 +998,6 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture();
       await screen.findByRole('table', NEEDS_YOU_TABLE);
 
-      // The below-floor order expires in 60 days; only the expiring order (5
-      // days left) is inside a 7-day window.
       await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'Expires within' }));
       await user.click(screen.getByRole('option', { name: '7 days' }));
@@ -1085,7 +1009,6 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture();
       await screen.findByRole('table', NEEDS_YOU_TABLE);
 
-      // Every order ties up well under 10M ISK.
       await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'ISK tied up over' }));
       await user.click(screen.getByRole('option', { name: '10M ISK' }));
@@ -1104,7 +1027,6 @@ describe('OpenOrdersPanel — Corporation source', () => {
     orders: orders.map((o, i) => ({ ...o, issued_by: issuers[i % issuers.length]![0] })),
     typeNames: TYPE_NAMES,
     stationNames: new Map([[STATION_A, 'Jita IV - Moon 4']]),
-    // A rival sells below 500: the order is undercut at the station.
     stationPrices: new Map([
       [stationPriceKey(STATION_A, 34), { sellMin: 400, buyMax: 100, sellVolume: 5, buyVolume: 5 }],
     ]),
@@ -1155,7 +1077,6 @@ describe('OpenOrdersPanel — Corporation source', () => {
     expect(headers(table)).toEqual(characterHeaders);
     expect(screen.getByRole('button', { name: /^Watch/ })).toBeInTheDocument();
     expect(screen.getByRole('searchbox')).toBeInTheDocument();
-    // Undercut advice rests on market prices alone, so it reads the same.
     expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent(/undercut/i);
   });
 
@@ -1182,7 +1103,6 @@ describe('OpenOrdersPanel — Corporation source', () => {
     const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
     expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent('Efa Astrahus');
     expect(within(table).getByRole('row', { name: /Mexallon/ })).toHaveTextContent('Bea Astrahus');
-    // Never the Character read.
     expect(mockedLoadAll).not.toHaveBeenCalled();
   });
 
@@ -1195,7 +1115,6 @@ describe('OpenOrdersPanel — Corporation source', () => {
       { characterId: 2, name: 'Bravo' },
     ] as never);
     renderCorp({ onLeaveCorporation });
-    // Issuer 7 is no Character on the device: its rows show whatever the pick.
     await screen.findByRole('table', NEEDS_YOU_TABLE);
 
     await user.click(
@@ -1211,7 +1130,6 @@ describe('OpenOrdersPanel — Corporation source', () => {
 
 describe('OpenOrdersPanel — phone', () => {
   beforeEach(() => {
-    // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
     stubViewport(() => true);
   });
 
@@ -1225,10 +1143,8 @@ describe('OpenOrdersPanel — phone', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(row).toHaveTextContent('Below floor');
     expect(row).toHaveTextContent(/Put the price up: /);
-    // Station and remaining live in the detail.
     expect(row).not.toHaveTextContent('Jita');
     expect(row).not.toHaveTextContent('10 / 10');
-    // No column picker: the cards ignore it.
     expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument();
   });
 
@@ -1245,9 +1161,6 @@ describe('OpenOrdersPanel — phone', () => {
   });
 
   it('shows the price to type as plain text inside the card, never a nested copy button', async () => {
-    // A cheap station rival beating my price, plus a cost basis: the call is
-    // "Undercut to …", a copy button on desktop. Nested inside this card's own
-    // `<button>` that would be invalid HTML and a focus/tap trap.
     mockedLoadAll.mockResolvedValue(snapshot([entry([{ ...BELOW_FLOOR_ORDER, price: 1000 }])]));
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(100)]]));
     mockedStationPrices.mockResolvedValue(

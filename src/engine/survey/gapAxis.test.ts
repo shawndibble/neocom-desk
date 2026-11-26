@@ -11,7 +11,6 @@ const scan = (at: number, volume: number): SurveyScan => ({
   rocks: [{ ore: 'Bitumens', volume }],
 });
 
-/** Two idle days, then a burst of scans ten minutes apart. */
 const withGaps = () =>
   summarizeSurvey([
     scan(T0, 900),
@@ -73,7 +72,6 @@ describe('compressGaps', () => {
     expect(b.realTo - b.realFrom).toBe(23 * HOUR_MS);
     const times = summary.points.map((p) => p.at);
     expect([...times].sort((x, y) => x - y)).toEqual(times);
-    // The burst keeps its real spacing.
     expect(times[5] - times[4]).toBe(10 * MINUTE_MS);
     expect(summary.firstAt).toBe(times[0]);
     expect(summary.lastAt).toBe(times[5]);

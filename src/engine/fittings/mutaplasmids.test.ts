@@ -12,9 +12,6 @@ import {
   withoutMutation,
 } from './mutaplasmids';
 
-// Real ids and ranges from public/data/mutaplasmids.json (build 3607705):
-// Gravid / Decayed Heavy Energy Neutralizer Mutaplasmid -> Heavy Abyssal
-// Energy Neutralizer, from (among others) the Heavy Gremlin Compact.
 const GRAVID_HEAVY_NEUT = 47831;
 const DECAYED_HEAVY_NEUT = 47829;
 const HEAVY_ABYSSAL_NEUT = 47832;
@@ -103,7 +100,6 @@ describe('mutaplasmidLookup', () => {
   });
 
   it('turns a multiplier range into absolute values on the base’s own value', () => {
-    // Heavy Gremlin: 500 GJ activation cost.
     expect(lookup.rollRange(GRAVID_HEAVY_NEUT, 6, 500)).toEqual({
       min: 400,
       max: 650,
@@ -173,7 +169,6 @@ describe('normaliseMutation', () => {
 });
 
 describe('mutationFromDynamicItem', () => {
-  // The live ESI sample in the research notes: contract item 1054645434634.
   const dynamic = {
     created_by: 2123627600,
     source_type_id: HEAVY_GREMLIN_NEUT,
@@ -299,7 +294,6 @@ describe('normaliseFittingMutations', () => {
             attributes: { 6: 419.25, 50: 0 },
           },
         },
-        // A mutation forged onto a plain module.
         {
           slot: 'low' as const,
           slotIndex: 0,

@@ -46,11 +46,6 @@ describe('buildPriceAlertRows', () => {
     ]);
   });
 
-  /*
-   * The poller priced the *old* target. Judging a new target against that
-   * reading would say "crossed" or "not" about a question nobody has checked
-   * yet, so the price is withheld until the next poll.
-   */
   it('withholds a price polled against a target the pilot has since changed', () => {
     const rows = buildPriceAlertRows(
       [item(1, 200, 'above')],

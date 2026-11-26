@@ -1,12 +1,3 @@
-/**
- * Corp contracts builder: outstanding courier and item-exchange contracts, the
- * ones expiring soon and the courier collateral at stake. Same contract as
- * `models.ts`: pure, derived at render time.
- *
- * The clocks come from the character contracts engine's rules
- * (`engine/contracts/corpContracts.ts`). ESI caches the list for 300 s, so no
- * countdown is drawn finer than that.
- */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { summarizeCorpContracts, type CorpContractRow } from '@/engine/contracts/corpContracts';
 import { CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
@@ -26,9 +17,7 @@ import type { TableCell, TableRowModel } from './types';
 import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.corpContracts';
-/** The Contracts page's Corp view, where a member with no corp role reads the same list. */
 const TO = '/contracts/history?scope=corp';
-/** The corp contracts read's cache window: a clock under it would tick past what ESI knows. */
 const CACHE_WINDOW_MS = 300_000;
 
 function toneOf(row: CorpContractRow): DeadlineSeverity {

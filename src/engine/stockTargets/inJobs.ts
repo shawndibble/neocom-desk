@@ -1,41 +1,22 @@
-/**
- * The units a pilot's running manufacturing and reaction jobs will deliver to
- * a market's station or structure: the **In jobs** count beside Listed and In
- * hangar on a Stock List row (issue #6429).
- *
- * A job counts only while it is in the active jobs list. Once it delivers it
- * leaves that list and the assets own the units, so a unit is counted in
- * exactly one place. Output location is matched exactly against the market's
- * location id: ESI names a station or structure there for a hangar delivery,
- * and anything else (a container, a corporation facility, a missing field)
- * cannot be placed at the market, so the job is reported as delivering
- * elsewhere rather than guessed at.
- */
-
 const MANUFACTURING_ACTIVITY = 1;
 const REACTION_ACTIVITY = 11;
 
 export interface StockJobInput {
   activityId: number;
   productTypeId?: number;
-  /** Runs of the job (a BPC job's own runs, not the copy's licensed runs). */
   runs: number;
-  /** Units one run yields, from the blueprint; undefined when the blueprint is unknown. */
   unitsPerRun?: number;
   outputLocationId?: number;
-  /** ISO end date. */
   endDate: string;
 }
 
 export interface JobStock {
   units: number;
-  /** The soonest end date among the jobs counted, ISO. */
   earliestEnd: string;
 }
 
 export interface JobsAtMarket {
   byType: Map<number, JobStock>;
-  /** Jobs making a listed item that deliver somewhere other than the market. */
   elsewhere: number;
 }
 

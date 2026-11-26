@@ -8,26 +8,16 @@ import { blueprintKindKey, stockCoverage, unitMargin } from './opportunityMetric
 import { romanLevel } from '@/engine/projection';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 
-/*
- * Export columns for the two opportunity rankings, in each table's order.
- * Time is raw seconds and margin a raw percent (`62.5` for the table's
- * `62.5%`); unpriced figures are blank, never "Unknown".
- */
-
-/** The table's whole percent ("+35%" exports `35`); blank while unread or too thin to say. */
 function vs90dCsv(value: number | null | undefined): number | null {
   return value === null || value === undefined ? null : Math.round(value);
 }
 
-/** What the skill-gate columns resolve a row's verdict and names through. */
 export interface SkillGateExport {
-  /** The row's account-wide verdict; undefined while unread (exports blank, never "no"). */
   verdictFor: (productTypeID: number | null) => SkillGateVerdict | undefined;
   nameForSkill: (typeID: number) => string;
   nameForCharacter: (characterId: number) => string;
 }
 
-/** The one skill-gate resolver both opportunity panels hand their export: verdicts by product, names from the catalog. */
 export function skillGateExport(
   verdicts: ReadonlyMap<number, SkillGateVerdict>,
   catalog: BlueprintCatalog | null,
@@ -41,7 +31,6 @@ export function skillGateExport(
   };
 }
 
-/** The three skill-gate columns every opportunity table carries: gated, what is missing, and who is closest. */
 function skillGateColumns<R>(
   t: CsvTranslate,
   productTypeIdOf: (row: R) => number | null,
@@ -76,7 +65,6 @@ function skillGateColumns<R>(
   ];
 }
 
-/** Build Opportunities (owned blueprints). The character and runs, chips in the table, get their own columns. */
 export function opportunitiesCsvColumns(
   t: CsvTranslate,
   gate?: SkillGateExport
@@ -89,7 +77,6 @@ export function opportunitiesCsvColumns(
       value: (row) => t(blueprintKindKey(row.candidate)),
     },
     {
-      // A BPO's -1 is "unlimited", not a count.
       header: t('industry.runs'),
       value: (row) => (row.candidate.blueprint.runs === -1 ? null : row.candidate.blueprint.runs),
     },
@@ -110,9 +97,7 @@ export function opportunitiesCsvColumns(
       header: t('industry.opportunitiesOrderDepthLabel'),
       value: (row) => t(`industry.opportunitiesOrderDepth.${row.orderDepth}`),
     },
-    // The loss tooltip's figures, for every row (the tooltip only opens on a loss).
     { header: t('industry.csvProfit'), value: (row) => row.result.profit },
-    // A floor while a material is unpriced, so blank like Profit and Revenue.
     {
       header: t('industry.csvTotalCost'),
       value: (row) => (row.result.unpriceable ? null : row.result.totalCost),
@@ -124,7 +109,6 @@ export function opportunitiesCsvColumns(
   ];
 }
 
-/** "What's profitable" (the market-wide scan). */
 export function marketWideOpportunitiesCsvColumns(
   t: CsvTranslate,
   gate?: SkillGateExport

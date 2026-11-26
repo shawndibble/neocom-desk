@@ -47,7 +47,6 @@ describe('useSyncRequestDeliveries', () => {
     await vi.advanceTimersByTimeAsync(DELIVERY_BOOT_DELAY_MS - 1000);
     rerender({ ids: [1, 3] });
     await vi.advanceTimersByTimeAsync(2000);
-    // The old timer is gone: nothing ran yet.
     expect(mocks.sync).not.toHaveBeenCalled();
     await bootSweep();
     expect(mocks.sync.mock.calls.map((c) => c[0])).toEqual([3, 1]);

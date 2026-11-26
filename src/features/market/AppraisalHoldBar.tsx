@@ -1,8 +1,3 @@
-/**
- * Packaged volume of the Appraisal against the Hauling Cargo Space. Rendered
- * only once a Cargo Space is set; a line with no known volume is said so, not
- * guessed.
- */
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/components/ui';
 import { popoverValueClassName } from '@/components/ui/controlStyles';
@@ -33,7 +28,6 @@ export function AppraisalHoldBar({
             {t('market.appraisal.holdTitle')}
           </span>
           {' · '}
-          {/* The ship name is the picker's trigger: accent text with a dashed underline marks the editable value. */}
           <HaulingCargoPopover
             characterId={characterId}
             cargo={cargo}

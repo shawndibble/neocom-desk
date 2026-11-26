@@ -1,16 +1,8 @@
-/**
- * The stat field table every Fitting-diff view shares: which numeric stats
- * exist, their accessor, and the rounding each displays at — so a stat that
- * reads identically on screen never counts as "changed" in any of them.
- * Neutral home for `variationDelta.ts` (2-way before/after) and
- * `fittingCompare.ts` (N-way compare) to both import from.
- */
 import { isMobileDrone } from './appliedDps';
 import type { SupportKind, SupportRow } from './support';
 import { resistPct } from './stats';
 import type { FittingStats } from './types';
 
-/** Every numeric stat a Fitting-diff view can report changed. */
 export type FittingStatKey =
   | 'cpuUsed'
   | 'cpuTotal'
@@ -99,58 +91,33 @@ export type FittingStatKey =
   | 'painterRange'
   | ImproveExploreKey;
 
-/** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below. */
 export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey;
 
-/**
- * The damage figure an Improve row leads with, which no Fitting-diff view
- * lists: DPS applied to a Target Profile (sustained, reload included). Not in
- * `NUMERIC_FIELDS`, so no diff ever reports it.
- */
 export type ImproveDamageKey = 'appliedDps';
 
-/** Explore better's figures: the best analyzer's hacking figures and the arrays' scan bonuses. */
 export type ImproveExploreKey =
   'virusCoherence' | 'hackingCycle' | 'scanStrength' | 'scanTimeCut' | 'deviationCut';
 
-/** Which way a change is an improvement; `neutral` stats only move with the hull, so no change is good or bad. */
 export type StatDirection = 'higher' | 'lower' | 'neutral';
 
-/** Displayed value and rounding for one stat — matches `FittingStatsSections`' own `toFixed` calls. */
 export interface NumericField {
   key: FittingStatKey;
   direction: StatDirection;
   digits: number;
   value: (stats: FittingStats) => number;
-  /**
-   * Only Fitting Compare shows it; a Variations swap's diff lists what it
-   * always has. Overheated DPS because Variations is worked out without heat
-   * (it would only repeat total DPS); the tank, cap-delta and hold rows
-   * because they restate a field the diff already shows (the repairs, the
-   * capacitor) or are no module swap's question (a hauler's hold comes
-   * through `skillGains`' hold role).
-   */
   compareOnly?: boolean;
-  /**
-   * A figure only a fit doing the job has (tackle, EWAR, hacking), zero meaning
-   * none: Compare drops the row while every Fitting is at zero, and a
-   * lower-is-better one counts no change to or from zero as better or worse.
-   */
   hideWhenNone?: boolean;
 }
 
-/** The strongest (or longest-reaching) module of `kinds`: what a single swap moves; 0 with none. */
 const supportMax = (
   s: FittingStats,
   kinds: readonly SupportKind[],
   pick: (row: SupportRow) => number
 ) => Math.max(0, ...s.support.rows.filter((row) => kinds.includes(row.kind)).map(pick));
 
-/** Reach of the longest `kinds` module, optimal plus falloff, km. */
 const supportReach = (s: FittingStats, kinds: readonly SupportKind[]) =>
   supportMax(s, kinds, (row) => row.optimal + row.falloff) / 1000;
 
-/** The best figure among mobile combat drones (a sentry's speed is 0); 0 with none. */
 const fastestDroneFigure = (
   s: FittingStats,
   pick: (drone: { speed: number; tracking: number }) => number
@@ -162,7 +129,6 @@ const fastestDroneFigure = (
     )
   );
 
-/** A missile figure over every missile weapon, `worst` of them: a loss on any launcher shows. */
 const missileFigure = (
   s: FittingStats,
   pick: (missile: { explosionVelocity: number; explosionRadius: number }) => number,
@@ -184,7 +150,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'totalDps', direction: 'higher', digits: 1, value: (s) => s.offense.dps },
   { key: 'totalVolley', direction: 'higher', digits: 0, value: (s) => s.offense.volley },
   { key: 'sustainedDps', direction: 'higher', digits: 1, value: (s) => s.offense.sustainedDps },
-  // Nothing to overheat reads as its plain DPS, so every column has a figure.
   {
     key: 'overheatedDps',
     direction: 'higher',
@@ -380,7 +345,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => supportMax(s, ['web'], (row) => row.optimal) / 1000,
     hideWhenNone: true,
   },
-  // One figure per EWAR kind: a jam strength and a damp % are not one scale.
   {
     key: 'ecmStrength',
     direction: 'higher',
@@ -443,7 +407,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.mining.wastePct,
     hideWhenNone: true,
   },
-  // Per site, so an Integrated → Data Analyzer swap names the relic sites it can no longer open.
   {
     key: 'dataStrength',
     direction: 'higher',
@@ -472,7 +435,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.explore.hacking.coherence,
     hideWhenNone: true,
   },
-  // A shorter analyzer cycle is a faster hack.
   {
     key: 'hackingCycle',
     direction: 'lower',
@@ -529,7 +491,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.explore.cloakRecalibrationSeconds,
     hideWhenNone: true,
   },
-  // A yes/no (`FLAG_STATS`); display only, so it joins no gain metric.
   {
     key: 'warpsCloaked',
     direction: 'higher',
@@ -593,7 +554,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.moduleFigures.shipScanRange / 1000,
     hideWhenNone: true,
   },
-  // The fastest mobile combat drone; a sentry's speed is 0, so it never counts.
   {
     key: 'droneSpeed',
     direction: 'higher',
@@ -608,7 +568,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => fastestDroneFigure(s, (drone) => drone.tracking),
     hideWhenNone: true,
   },
-  // Worst launcher, so one that gets worse reads as a loss.
   {
     key: 'missileExplosionVelocity',
     direction: 'higher',
@@ -623,7 +582,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => missileFigure(s, (missile) => missile.explosionRadius, Math.max),
     hideWhenNone: true,
   },
-  // Reach per EWAR kind, longest module: never one mean across kinds.
   {
     key: 'ecmRange',
     direction: 'higher',
@@ -654,7 +612,6 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   },
 ];
 
-/** Same rounding every diff view compares/displays at, keyed by `StatChangeKey` including `capacitor`. */
 export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
   capacitor: 0,
@@ -666,18 +623,12 @@ export function round(value: number, digits: number): number {
   return Math.round(value * factor) / factor;
 }
 
-/**
- * Better direction per stat. The capacitor is compared on the metric
- * `diffFittingStats` stores, where stable (a positive %) beats unstable
- * (a negated depletion time), then a higher %, then a longer depletion.
- */
 export const STAT_DIRECTION: Readonly<Record<StatChangeKey, StatDirection>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.direction])),
   capacitor: 'higher',
   appliedDps: 'higher',
 } as Readonly<Record<StatChangeKey, StatDirection>>;
 
-/** Role stats (`skillGains`) where less is better: a reload, a fuel bill. Absent: higher. */
 const LOWER_ROLE_KEYS: ReadonlySet<string> = new Set(['burstReload', 'coreFuel']);
 
 export function statDirection(key: string): StatDirection {
@@ -685,17 +636,14 @@ export function statDirection(key: string): StatDirection {
   return LOWER_ROLE_KEYS.has(key) ? 'lower' : 'higher';
 }
 
-/** Stats that are a yes/no, 1 or 0, shown as words rather than a number. */
 export const FLAG_STATS: ReadonlySet<string> = new Set(['warpsCloaked']);
 
-/** Stats where zero means the fit has none of the thing (`hideWhenNone`). */
 export const NONE_AT_ZERO: ReadonlySet<string> = new Set(
   NUMERIC_FIELDS.filter((field) => field.hideWhenNone).map((field) => field.key)
 );
 
 export type ChangeVerdict = 'better' | 'worse' | 'neutral';
 
-/** Whether a before → after change is an improvement, by the stat's own direction. */
 export function changeVerdict(change: {
   key: string;
   before: number;
@@ -703,14 +651,12 @@ export function changeVerdict(change: {
 }): ChangeVerdict {
   const direction = statDirection(change.key);
   if (direction === 'neutral' || change.before === change.after) return 'neutral';
-  // A first analyzer's cycle, or a miner's residue, is not a slower hack or more waste than none.
   if (
     direction === 'lower' &&
     NONE_AT_ZERO.has(change.key) &&
     (change.before === 0 || change.after === 0)
   )
     return 'neutral';
-  // Unstable capacitor is stored as a negated depletion time: longer (more negative) is better.
   const unstable = change.key === 'capacitor' && change.before < 0 && change.after < 0;
   const rose = unstable ? change.after < change.before : change.after > change.before;
   return rose === (direction === 'higher') ? 'better' : 'worse';

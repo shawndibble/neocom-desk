@@ -14,27 +14,9 @@ import {
   type OpenOrdersFilter,
 } from './openOrdersFilter';
 
-/**
- * The whole filter lives in the URL (ADR 0015), one `orders.*` key per
- * field — a deep link (an Overview Orders widget's row, `openOrdersHref`)
- * narrows it on arrival, and every chip, select, segment and search
- * keystroke from here on writes straight back to it, so a reload or a
- * shared link always reopens exactly what was on screen.
- *
- * `orders.locations` is the one exception: a bare `/market/orders` visit
- * (no query string at all — every app relaunch) falls back to the
- * device-local pick remembered in `openOrdersLocationFilterPref.ts`
- * (decision `20260922-221531` / ADR 0015), via `useRememberedUrlParams`
- * rather than the plain `useUrlFilter` every other field still reads
- * through. The URL always wins when it states the field; the stored value
- * is never mirrored back into it.
- */
 export function useOpenOrdersFilterState(activeCharacterId: number | null) {
   const rememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.value);
   useHydratedStore(useOpenOrdersLocationFilterPref);
-  // `orders.characters` remembers the This character / All characters pick the
-  // same way the other pages do, then the synced Settings default. `'current'`
-  // is `[activeCharacterId]` here, so it keeps following the active Character.
   const { pick: rememberedCharacterPick, remember: rememberCharacterPick } =
     useCharacterFilterPick('orders');
   const rememberedCharacterIds = useMemo<readonly number[]>(
@@ -71,8 +53,6 @@ export function useOpenOrdersFilterState(activeCharacterId: number | null) {
     () => filterFromParamValues<OpenOrdersFilter>(params, OPEN_ORDERS_FIELD_TO_PARAM),
     [params]
   );
-  // Rows derive from a deferred copy so a keystroke paints the box first
-  // (`useUrlFilter`'s rule); the bar, chips and setter keep the immediate one.
   const rowsFilter = useDeferredValue(filter);
   function setFilter(next: OpenOrdersFilter) {
     setParams(paramsPatchFromFilter(next, OPEN_ORDERS_FIELD_TO_PARAM));

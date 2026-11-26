@@ -85,8 +85,6 @@ describe('RemoveNowPage', () => {
     expect(api.force).toHaveBeenCalledWith(6, 'c');
   });
 
-  // The server answers a guarded payee exactly as it answers an expired link; the page must
-  // not add a difference of its own.
   it('renders an expired, a guarded and an unknown link identically', async () => {
     api.link.mockResolvedValue({ available: false, effectiveAt: AT });
     const first = render(<RemoveNowPage code="expired" />);
@@ -100,7 +98,6 @@ describe('RemoveNowPage', () => {
     expect(second.container.innerHTML).toBe(expiredHtml);
     second.unmount();
 
-    // An unknown or garbled code has no removal to date: it reads the same, with no time.
     api.link.mockResolvedValue({ available: false, effectiveAt: null });
     const third = render(<RemoveNowPage code="garbled" />);
     await screen.findByText(/This can't be done right now/);

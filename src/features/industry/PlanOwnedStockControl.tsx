@@ -7,27 +7,17 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
 interface PlanOwnedStockControlProps {
-  /** Absent means every placement counts. */
   scope: OwnedStockScope | undefined;
   includeCorpAssets: boolean;
-  /** False when the Character can't read their corporation's assets; the chip says why. */
   corpAvailable: boolean;
-  /** The plan's full, unfiltered detected stock, for the location picker. */
   detectedStock: DetectedOwnedStockMap;
   detection: OwnedStockDetection;
   onScopeChange: (scope: OwnedStockScope | undefined) => void;
   onIncludeCorpAssetsChange: (include: boolean) => void;
-  /** Use all / Use none: fill every Have from what was found, or clear them. */
   onFillAll: () => void;
   onClearAll: () => void;
 }
 
-/**
- * Which owned stock the Materials table counts, behind one Owned trigger:
- * read once per plan, not on every visit, so it is a summary at rest and the
- * scope, corp assets and bulk fill in a popover. §6c: a trigger that opens a
- * popover is field chrome with a trailing caret.
- */
 export function PlanOwnedStockControl({
   scope,
   includeCorpAssets,

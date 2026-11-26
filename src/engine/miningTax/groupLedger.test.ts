@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { groupMiningLedger } from './groupLedger';
 import type { MiningLedgerRow } from './types';
 
-const MOON_ORE_A = 45490; // Zeolites
-const MOON_ORE_B = 45491; // Sylvite
-const VELDSPAR = 1230; // ordinary asteroid ore — not in the allowlist
+const MOON_ORE_A = 45490;
+const MOON_ORE_B = 45491;
+const VELDSPAR = 1230;
 
 const ALLOWLIST = new Set([MOON_ORE_A, MOON_ORE_B]);
 
@@ -74,9 +74,6 @@ describe('groupMiningLedger', () => {
   });
 
   it('never reinterprets the date string through a Date object (stays exactly what ESI sent)', () => {
-    // A local-timezone round trip would shift a date near midnight UTC.
-    // Asserting the row's date is used byte-for-byte as the entry's key
-    // guards against `new Date(row.date).toLocaleDateString()` creeping in.
     const rows: MiningLedgerRow[] = [
       { date: '2026-01-01', quantity: 1, solar_system_id: 1, type_id: MOON_ORE_A },
     ];

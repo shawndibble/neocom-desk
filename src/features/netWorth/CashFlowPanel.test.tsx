@@ -11,7 +11,6 @@ import { useWalletRange } from './walletRange';
 vi.mock('@/features/character/walletJournalAll', () => ({
   loadAllCharactersJournals: vi.fn(),
 }));
-// Recharts draws nothing useful in jsdom; the maths are tested in the engine.
 vi.mock('@/features/character/IskFlowChartBars', () => ({
   default: () => <div data-testid="bars" />,
 }));
@@ -98,7 +97,6 @@ describe('CashFlowPanel', () => {
       typeNames: new Map(),
     });
     renderPanel();
-    // Once the load has answered, what it draws is drawn.
     await waitFor(() => expect(loadAllCharactersJournals).toHaveResolved());
     expect(screen.queryByRole('heading', { name: 'ISK flow' })).not.toBeInTheDocument();
   });

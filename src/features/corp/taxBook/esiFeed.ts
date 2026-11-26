@@ -1,9 +1,3 @@
-/**
- * The ESI reads an officer's visit feeds into the Corp Tax Book (D9). Each goes
- * through the existing corp loaders, so the cache, the corp-scoped keys and the
- * 403-is-a-role-gate rule apply unchanged; this module only adds the observer
- * ledger and the moon notifications, and shapes everything for the sync.
- */
 import { conditionalPagedFetch } from '@/esi/cache';
 import {
   getCorporationMiningObserver,
@@ -30,21 +24,12 @@ import { loadCorporationWalletJournal } from '../wallet';
 
 export interface ObserverFeed {
   rows: ObservedRow[];
-  /** Every refinery that keeps a ledger, whether or not it had rows. */
   structureIds: number[];
-  /** The oldest day ESI returned per refinery — proof of how far back it reaches. */
   oldestEsiDate: Record<number, string | undefined>;
-  /** A page was missing, so the rows may not be the whole ledger. */
   truncated: boolean;
-  /** The solar system of each refinery whose structure this Character could resolve (#4181). */
   systemIds: Record<number, number>;
 }
 
-/**
- * Why a feed could not be read: sign in again, ESI did not answer, or the
- * corporation has no refinery this Character can read (an empty list, or the
- * role gate's 403 on it) — an answer, not an outage.
- */
 export type FeedFailure = 'needs-reauth' | 'unavailable' | 'no-refineries';
 
 export async function loadObserverFeed(
@@ -77,7 +62,6 @@ export async function loadObserverFeed(
     truncated: list.cached.truncated,
     systemIds: {},
   };
-  // One refinery at a time: each is its own paginated read in the corp-industry rate group.
   for (const observer of observers) {
     const { fetchLive, conditional } = conditionalPagedFetch((o) =>
       getCorporationMiningObserver(characterId, corporationId, observer.observer_id, o)
@@ -90,7 +74,6 @@ export async function loadObserverFeed(
       { conditional }
     );
     if (ledger.needsReauth) return 'needs-reauth';
-    // A refinery that did not answer is a missing read, not an empty ledger: abandon the visit.
     if (!ledger.cached) return 'unavailable';
     const rows = observedRowsFromLedger(
       observer.observer_id,
@@ -109,17 +92,11 @@ export async function loadObserverFeed(
   return feed;
 }
 
-/** The corporation's current moon extractions (Station_Manager). Null when ESI did not answer. */
 export async function loadEsiExtractions(characterId: number, corporationId: number) {
   const result = await loadCorporationMiningExtractions(characterId, corporationId);
   return result.cached?.data ?? null;
 }
 
-/**
- * Donations into the given wallet divisions. A division that does not answer is skipped, not
- * fatal — unless `whole`, when it makes the read null: a caller that replaces a stored list
- * (#6207) must not mistake an unread division for one with nothing in it.
- */
 export async function loadDonations(
   characterId: number,
   corporationId: number,
@@ -136,7 +113,6 @@ export async function loadDonations(
   return found;
 }
 
-/** Donations the corporation's wallet sent, for attaching to a moon owner's recorded payouts. */
 export async function loadOutgoingDonations(
   characterId: number,
   corporationId: number,
@@ -154,7 +130,6 @@ export async function loadOutgoingDonations(
 
 const MOON_TYPES: ReadonlySet<string> = new Set(MOON_NOTIFICATION_TYPES);
 
-/** This Character's moon drill notifications. Empty when the notifications scope is not granted. */
 export async function loadMoonNotifications(characterId: number): Promise<MoonNotification[]> {
   const result = await loadCharacterNotifications(characterId);
   return (result.cached?.data ?? [])

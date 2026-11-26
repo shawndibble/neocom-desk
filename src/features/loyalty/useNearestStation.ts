@@ -9,14 +9,11 @@ import {
 import { nearestNpcStation, type NearestNpcStation } from './nearestNpcStation';
 
 export interface NearestStationState {
-  /** The station list (outside the install precache) is still loading. */
   loading: boolean;
   station: NearestNpcStation | null;
-  /** Where the distances stand: `no-origin` is a Current System that is not set. */
   jumpsStatus: JumpDistanceStatus;
 }
 
-/** Nearest station of an NPC corporation from the Current System (issue #5384). */
 export function useNearestStation(corporationId: number | null): NearestStationState {
   const current = useCurrentSystem();
   const { jumps, jumpsStatus } = useJumpRangeFilter(current, 'any');

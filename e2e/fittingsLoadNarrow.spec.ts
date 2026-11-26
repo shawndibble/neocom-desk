@@ -1,11 +1,3 @@
-/**
- * Fittings section tracer (issue #1532): pasting an EFT fit Loads it and
- * renders the List view, at a phone width where every tappable control still
- * meets the 36px touch-target floor (DESIGN.md, `min-h-9`). The stats
- * sections wait on the dogma engine's own WASM+SDE download — genuinely slow
- * on a cold CI runner — so this spec asserts on the List view and the Load
- * control only, not on any stat figure.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
@@ -25,7 +17,6 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
-    // The Start screen's Import opens the Load card in a dialog.
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     const loadButton = page.getByRole('button', { name: 'Load', exact: true });
@@ -39,7 +30,6 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await expect(page.getByText('High slots', { exact: true })).toBeVisible();
     await expect(page.getByText('Mid slots', { exact: true })).toBeVisible();
 
-    // No sideways scroll at 390px — the usual narrow-width regression.
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
@@ -54,21 +44,17 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
-    // The Start screen's Import opens the Load card in a dialog.
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
 
-    // Below desktop the Ring, the List and the stats are one row of tabs.
     const ringToggle = page.getByRole('tab', { name: 'Ring', exact: true });
     const toggleBox = await ringToggle.boundingBox();
     expect(toggleBox!.height).toBeGreaterThanOrEqual(36);
     await ringToggle.click();
 
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
-    // At 390px the ring is an overview — its tiles are too small to be the
-    // tap target (scope decision 20260924-205720) — so the rack buttons are.
     await expect(page.getByLabel(/^High slots 1[:,]/)).toBeVisible();
     const rackButton = page.getByRole('button', { name: /^High slots\s*\d+ \/ \d+/ });
     const rackBox = await rackButton.boundingBox();
@@ -78,15 +64,9 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await expect(sheet).toBeVisible();
     await expect(sheet.getByText('125mm Gatling AutoCannon I')).toBeVisible();
     await page.keyboard.press('Escape');
-    // Closing a sheet pops its history entry (Back); reloading while that
-    // navigation is in flight aborts it (net::ERR_ABORTED).
     await expect(sheet).toBeHidden();
     await page.waitForLoadState('load');
 
-    // The Back pop is a same-document navigation `load` can't see, so on a
-    // slow runner it can still be in flight; retry the reload until it lands.
-    // Each attempt gets its own short budget: a reload that hangs behind the
-    // in-flight pop would otherwise eat the whole test timeout in one attempt.
     await expect(async () => {
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 6000 });
     }).toPass({ timeout: 20_000 });
@@ -137,7 +117,6 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     const h1 = page.getByRole('heading', { level: 1 });
     await expect(h1).toContainText('Rifter - long PvE');
     const h1Box = (await h1.boundingBox())!;
-    // Readable beside Save and ⋮ (Rename is in that menu), and no more than two 28px lines.
     expect(h1Box.width).toBeGreaterThan(80);
     expect(h1Box.height).toBeLessThanOrEqual(60);
     const h1Size = await h1.evaluate((el) => el.scrollWidth <= el.clientWidth);

@@ -9,7 +9,6 @@ import { loadStationName, loadStationSummary, loadStationSystemId } from './stat
 
 const JITA_ID = 60003760;
 const JITA_NAME = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
-/** Stands in for a snapshot built before #655 added `typeId`: the field is absent. */
 const AMARR_ID = 60008494;
 const AMARR_NAME = 'Amarr VIII (Oris) - Emperor Family Academy';
 
@@ -23,9 +22,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadNpcStations: () => loadNpcStations(),
 }));
 
-// `onUnhandledRequest: 'error'` is the real assertion in this file: a test
-// that resolves a name with no handler registered proves no ESI request was
-// made at all, which is stronger than counting calls on a spy.
 const server = mswServer();
 
 beforeEach(async () => {
@@ -41,9 +37,6 @@ describe('loadStationName', () => {
   });
 
   it('resolves a whole page of station ids off one snapshot read', async () => {
-    // The point of item E: `Promise.all(stationIds.map(loadStationName))` at
-    // Assets/Clones/owned-stock detection stops being a network fan-out, so
-    // there is nothing left there to cap.
     const ids = Array.from({ length: 12 }, () => [JITA_ID, AMARR_ID]).flat();
 
     const names = await Promise.all(ids.map((id) => loadStationName(id)));
@@ -53,8 +46,6 @@ describe('loadStationName', () => {
   });
 
   it('falls back to ESI for a station the snapshot predates', async () => {
-    // A station CCP added since the last `npm run sde:build`. Rare, but the
-    // fallback is what stops a stale snapshot from losing a name outright.
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/60099999`, () =>
         HttpResponse.json({
@@ -117,8 +108,6 @@ describe('loadStationSummary', () => {
   });
 
   it('falls back to ESI when the snapshot predates the typeId field', async () => {
-    // A deployed snapshot built before #655 carries `{ id, name, systemId }`
-    // only, and a summary missing its typeId is not a summary.
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/${AMARR_ID}`, () =>
         HttpResponse.json({

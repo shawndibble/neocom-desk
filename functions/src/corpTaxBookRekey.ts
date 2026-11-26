@@ -15,12 +15,6 @@ import {
 } from './corpTaxBook.js';
 import { soloMinerId } from './corpTaxBookDonationMatch.js';
 
-/**
- * Grouping Characters into one Miner (#6450): everything the absorbed Miners were billed, paid
- * or disputed moves onto the surviving id, so the Miners table lists one row and one balance.
- * Pure: the store reads the records, this plans the writes, the store applies them.
- */
-
 export interface RekeyRecord {
   collection: string;
   id: string;
@@ -38,7 +32,6 @@ export type RekeyWrite =
     }
   | { kind: 'delete'; collection: string; id: string };
 
-/** Collections whose records carry `minerId`. */
 export const MINER_KEYED = [
   LATE_NOTICES,
   PAYMENTS,
@@ -48,14 +41,8 @@ export const MINER_KEYED = [
   REBILLS,
   TOLERANCE_EXEMPTIONS,
 ];
-/**
- * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerPaid/{minerId}`): figures
- * an officer's tab records again on its next load. A checkpoint is dropped by the caller with every
- * Miner whose characters change, not here.
- */
 export const MINER_CACHES = [RUNNING_ACCOUNTS, MINER_PAID];
 
-/** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(
   target: string,
   characterIds: readonly number[],
@@ -68,16 +55,13 @@ export function absorbedMinerIds(
 
 export function planRekey(input: {
   target: string;
-  /** The grouped Miner's readers: a record keeps being readable by each of its Characters. */
   targetUids: readonly string[];
   records: readonly RekeyRecord[];
-  /** Dispute doc ids already filed under the target, so a move never overwrites one. */
   existingDisputeIds: ReadonlySet<string>;
 }): RekeyWrite[] {
   const { target, targetUids, existingDisputeIds } = input;
   const writes: RekeyWrite[] = [];
   const claimed = new Set(existingDisputeIds);
-  // `uids` are the sign-ins the rules let read the record; a record without any keeps none.
   const readers = (data: Record<string, unknown>) =>
     'uids' in data ? { uids: [...targetUids] } : {};
   for (const { collection, id, data } of input.records) {
@@ -112,12 +96,10 @@ export function planRekey(input: {
   return writes;
 }
 
-/** For the backfill: each confirmed grouped Character's `solo:` id, mapped to the group it belongs to now. */
 export function soloTargets(
   miners: readonly {
     id: string;
     characterIds: readonly number[];
-    /** A guest's Character not yet confirmed keeps its own Miner (D26b). */
     pendingConfirmation?: readonly number[];
   }[]
 ): Map<string, string> {
@@ -129,7 +111,6 @@ export function soloTargets(
   return out;
 }
 
-/** What the records of a Miner id are read through: a transaction in the store, a plain query in the backfill. */
 export interface RekeyIo {
   read(
     collection: string,
@@ -140,7 +121,6 @@ export interface RekeyIo {
   exists(collection: string, id: string): Promise<boolean>;
 }
 
-/** Every record the absorbed Miners hold, and the dispute ids the target already has. */
 export async function loadRekeyRecords(
   io: RekeyIo,
   target: string,
@@ -153,7 +133,6 @@ export async function loadRekeyRecords(
   };
   for (const collection of [...MINER_KEYED, DISPUTES]) await read(collection, 'minerId');
   await read(DISMISSALS, 'targetId', ['scope', 'miner']);
-  // Caches are keyed by the Miner id itself.
   for (const id of absorbed)
     for (const collection of MINER_CACHES)
       if (await io.exists(collection, id)) records.push({ collection, id, data: {} });

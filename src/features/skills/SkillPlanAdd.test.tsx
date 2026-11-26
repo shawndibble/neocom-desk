@@ -19,7 +19,6 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
 
 const CHAR_ID = 91;
 
-// Gunnery (3300) is a prerequisite of Small Hybrid Turret (3301) at level 4.
 const ENGINE_SKILLS: ReadonlyMap<number, EngineSkill> = new Map([
   [
     3300,

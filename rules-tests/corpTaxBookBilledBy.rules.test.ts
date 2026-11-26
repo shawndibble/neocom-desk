@@ -7,8 +7,6 @@ import {
 import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Collector books (issue #4517): the sync writes a pointer per Character listing the
-// books that bill them. Only that Character reads it; nobody writes it from a client.
 let env: RulesTestEnvironment;
 const MINER = 5;
 const OFFICER = 1;

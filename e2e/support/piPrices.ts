@@ -4,19 +4,12 @@ import type { Page } from '@playwright/test';
 import { piTier } from '../../src/engine/pi/chain';
 import type { PiData } from '../../src/sde/types';
 
-/** The graph the app itself bakes, so the engine's own `piTier` can read it. */
 export const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
-/** Flat per tier, so a made tier is worth making. */
 const UNIT_PRICE = [5, 760, 14_000, 100_000, 1_900_000];
 
-/**
- * The region volume object PI plans cap sales against: every product trades far
- * more than a pilot makes, so no plan is capped. Unmocked, the read 404s and the
- * console-error check fails.
- */
 async function mockHubVolume(page: Page): Promise<void> {
   const perDay = Object.fromEntries(Object.keys(pi.schematics).map((id) => [id, 1_000_000]));
   await page.route('https://data.neocomdesk.com/lp-store-volume/*.json', (route) =>
@@ -28,10 +21,6 @@ async function mockHubVolume(page: Page): Promise<void> {
   );
 }
 
-/**
- * Quotes every type asked about, at its tier's price, both sides of the book.
- * A later `page.route` wins over an earlier one — see `support/testBase.ts`.
- */
 export async function mockHubPrices(page: Page): Promise<void> {
   await mockHubVolume(page);
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
@@ -52,7 +41,6 @@ export async function mockHubPrices(page: Page): Promise<void> {
   });
 }
 
-/** Every type asked about at one flat quote, whatever it is. */
 export async function mockFlatHubPrices(
   page: Page,
   quote: { buy: number; sell: number }

@@ -1,7 +1,3 @@
-/**
- * PI with the hub price read failing: ISK is blanked, nothing else.
- * `PI_SHOTS=<dir>` also writes screenshots.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -34,7 +30,6 @@ for (const [label, viewport] of VIEWPORTS) {
     await openPricesDown(page, 'map');
     await expect(page.locator('p', { hasText: NOTICE })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('group', { name: /^Planet map|^Planets$/ }).first()).toBeVisible();
-    // The notice itself names ISK; nothing else may.
     await expect(
       page.getByText(/\bISK\b/).filter({ hasNotText: 'stay hidden until they do' })
     ).toHaveCount(0);

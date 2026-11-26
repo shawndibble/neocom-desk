@@ -20,8 +20,6 @@ describe('ItemPriceAlertBell', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  // Issue #2162: a `title=` explanation is unreachable on a touch device,
-  // which has no hover — the reason must be reachable by a tap instead.
   it('reveals the disabled reason on a tap instead of opening the popover', () => {
     render(
       <ItemPriceAlertBell

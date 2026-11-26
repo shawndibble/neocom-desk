@@ -15,27 +15,17 @@ import { useCombobox } from '@/lib/useCombobox';
 import { listShipTypes, searchShips, type ShipType } from './ownShip';
 
 export interface OwnShipPickerProps {
-  /** The hull picked by hand, remembered on this device. */
   typeId: number | null;
-  /** The hull the active character is flying, when ESI says. */
   autoTypeId: number | null;
   onChange: (typeId: number | null) => void;
 }
 
-/**
- * "Your ship" for the D-Scan danger read, as a line of text: the ship's name
- * with a faint pencil (DESIGN.md §6c), which opens into a field where you type
- * a hull name and pick it from the SDE. A manual pick wins over the
- * character's current ship; Clear drops it.
- */
 export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
-  // Escape and a pick hand focus back to the name; a blur must not steal it.
   const refocusButton = useRef(false);
   const [ships, setShips] = useState<ShipType[]>([]);
-  // null = showing the name; a string = the field is open with that text.
   const [query, setQuery] = useState<string | null>(null);
 
   useEffect(() => {
@@ -165,8 +155,6 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
             </span>
           )}
           {typeId !== null && (
-            // Both mean "drop the manual pick"; with a character ship to fall back
-            // to, the label says where it lands.
             <button type="button" className={textActionClassName()} onClick={() => onChange(null)}>
               {autoTypeId !== null
                 ? t('travel.pilot.dscan.ownShip.useCurrent')

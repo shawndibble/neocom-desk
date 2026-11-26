@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Is there a newer game build to bake? For the nightly refresh
-// (.github/workflows/sde-refresh.yml). Prints `update`, `build` and `reason`
-// as key=value lines, for $GITHUB_OUTPUT; exits 1 when Fuzzwork has lagged a
-// newer CCP build for days, so the run fails and files an issue.
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';

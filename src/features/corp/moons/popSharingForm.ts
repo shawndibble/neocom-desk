@@ -1,8 +1,3 @@
-/**
- * The Sharing tab's editor state (issue #6222): the settings as form fields, and the patch
- * an edit sends. A default edit sends only what changed; a moon edit sends each setting the
- * moon now overrides and null for one that follows the Sharing default again.
- */
 import {
   POP_SHARING_KEYS,
   type PopAudience,
@@ -17,7 +12,6 @@ export interface SettingsDraft {
   audiences: PopAudience[];
   popTime: PopTime;
   showOre: boolean;
-  /** The start link's rate as typed; empty is the book's own rate. */
   rate: string;
   notes: string;
 }
@@ -32,7 +26,6 @@ export function draftOf(s: PopSharingSettings): SettingsDraft {
   };
 }
 
-/** The settings a draft holds, or null when its rate is not a number 0-100. */
 export function settingsOfDraft(d: SettingsDraft): PopSharingSettings | null {
   const typed = d.rate.trim();
   const ratePct = typed === '' ? null : Number(typed);
@@ -48,7 +41,6 @@ export function settingsOfDraft(d: SettingsDraft): PopSharingSettings | null {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The Sharing default settings that changed. */
 export function defaultsPatch(
   current: PopSharingSettings,
   next: PopSharingSettings
@@ -58,10 +50,6 @@ export function defaultsPatch(
   return out as Partial<PopSharingSettings>;
 }
 
-/**
- * One moon's change: `overriding` names the settings the moon sets for itself, taken from
- * `next`; any other it overrode now follows the default (`clear`).
- */
 export function moonPatch(
   current: PopSharingOverride,
   next: PopSharingSettings,
@@ -77,7 +65,6 @@ export function moonPatch(
   return { set: set as Partial<PopSharingSettings>, clear };
 }
 
-/** Whether a patch changes anything. */
 export const isEmptyPatch = (p: Partial<PopSharingSettings> | PopSharingOverridePatch): boolean =>
   'clear' in p && 'set' in p
     ? p.clear.length === 0 && Object.keys(p.set).length === 0

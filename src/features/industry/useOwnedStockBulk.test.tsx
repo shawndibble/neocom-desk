@@ -28,8 +28,6 @@ function Harness({
 }
 
 describe('useOwnedStockBulk', () => {
-  // A store whose write is built from the ledger it last rendered (the Group
-  // Owned Overlay's) would otherwise lose an edit made while the toast was up.
   it('writes Undo through the latest render, not the one that clicked', async () => {
     const user = userEvent.setup();
     const clickTimeWrite = vi.fn();

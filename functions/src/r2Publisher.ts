@@ -1,20 +1,3 @@
-/**
- * Publishes the offers snapshot to Cloudflare R2 (ADR 0019, issue #3745): the
- * bundle shards (every row, a few dozen content-addressed gzip objects; one
- * already in R2 is not uploaded again, though with ~30% of types changing per
- * publish nearly every shard changes), then `index.json` last, naming per
- * type the shard that holds it. The upload itself is injected (`R2Put`) so this
- * stays testable; `createR2Put` is the SigV4 implementation.
- *
- * Config: `R2_ENDPOINT` (https://<account>.r2.cloudflarestorage.com) and
- * `R2_BUCKET` in functions/.env; the access key pair
- * comes from the `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` secrets (GitHub repository secrets for the runner jobs).
- *
- * An R2 lifecycle rule deletes objects after a few days, which would also
- * delete a long-unchanged shard that `index.json` still names. So every
- * `REFRESH_AFTER_MS` the writer re-uploads every shard; the rule's age must
- * stay comfortably above that.
- */
 import { runPool } from './asyncPool.js';
 import type { R2Put } from './r2Client.js';
 import {
@@ -34,25 +17,18 @@ export { createR2Get, createR2Put } from './r2Client.js';
 export type { R2Config, R2Get, R2Put } from './r2Client.js';
 
 export const REFRESH_AFTER_MS = 2 * 24 * 60 * 60_000;
-/** A few dozen ~80 KB shards; 8 in flight is plenty. */
 const UPLOAD_CONCURRENCY = 8;
 
-/** What the writer remembers between publishes (one R2 state object). */
 export interface R2PublishState {
-  /** When every shard was last uploaded in one successful pass; `null` until one completes. */
   fullUploadAt: number | null;
-  /** Shard names in R2 as of the last index written. */
   bundles: string[];
 }
 
 export interface R2PublishResult {
-  /** Shards uploaded this publish. */
   uploaded: number;
-  /** Shards already in R2 (named by content, so unchanged). */
   skipped: number;
   failed: number;
   indexWritten: boolean;
-  /** First upload error message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
   state: R2PublishState;
 }
@@ -75,7 +51,6 @@ export async function publishContractOffersToR2(args: {
   put: R2Put;
 }): Promise<R2PublishResult> {
   const { rows, lastSyncedAt, previous, now, put } = args;
-  // `fullUploadAt === null` means the last refresh pass did not finish: upload every shard again.
   const refresh =
     previous === null ||
     previous.fullUploadAt === null ||
@@ -98,8 +73,6 @@ export async function publishContractOffersToR2(args: {
     }
   });
 
-  // Every name in the index must exist, so a failed shard holds the index back:
-  // readers keep the previous index and its (still present) shards.
   let indexWritten = false;
   if (failed === 0) {
     try {
@@ -110,7 +83,6 @@ export async function publishContractOffersToR2(args: {
       );
       indexWritten = true;
     } catch (error) {
-      // Next publish retries; the shards are already uploaded.
       firstError ??= String(error);
     }
   }
@@ -128,17 +100,13 @@ export async function publishContractOffersToR2(args: {
         }
       : {
           bundles: previous?.bundles ?? [],
-          // A held-back refresh pass drops to `null`, so the next run uploads every shard again.
           fullUploadAt: refresh ? null : (previous?.fullUploadAt ?? null),
         },
   };
 }
 
-/** What the courier writer remembers between publishes (one Firestore doc). */
 export interface CourierR2PublishState {
-  /** Hash of the object that is in R2; `null` until one upload succeeds. */
   hash: string | null;
-  /** When that object was last uploaded, for the lifecycle-refresh rule above. */
   uploadedAt: number | null;
 }
 
@@ -149,11 +117,6 @@ export interface CourierR2PublishResult {
   state: CourierR2PublishState;
 }
 
-/**
- * The courier snapshot is one object (see `courierContractObjects.ts`): upload
- * it when its hash changed or the refresh interval lapsed, then `index.json`.
- * A failed upload holds the index back, so readers keep the previous pair.
- */
 export async function publishCourierContractsToR2(args: {
   rows: readonly PublicCourierContractRow[];
   lastSyncedAt: number;
@@ -195,10 +158,6 @@ export async function publishCourierContractsToR2(args: {
   return { uploaded, indexWritten, firstError, state };
 }
 
-/**
- * What one R2 publish means for the run (issue #4270). R2 is the only store,
- * so a failed upload or index write fails the run.
- */
 export type R2PublishOutcome = { kind: 'complete' } | { kind: 'failed'; error: string };
 
 export function r2PublishOutcome(result: {
@@ -214,13 +173,6 @@ export function r2PublishOutcome(result: {
   };
 }
 
-/**
- * What the contract-offers job does with both publishes' outcomes (issue
- * #4270): any failure fails the run, naming each snapshot that failed; the
- * archive fingerprint is stored only when both are complete, so a failed run
- * is retried next cycle rather than skipped as "archive
- * unchanged".
- */
 export function publicContractsRunVerdict(
   courier: R2PublishOutcome,
   offers: R2PublishOutcome

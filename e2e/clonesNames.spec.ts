@@ -1,8 +1,3 @@
-/**
- * Jump clone names in the Clones list (issues #2087, #3002): the name shows
- * beside the place, and a long one wraps inside its card instead of widening
- * the list past its Panel, down to a phone. A blank one is headed by its place.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -26,7 +21,6 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, 
     page,
   }) => {
     await page.setViewportSize(size);
-    // The shared mock answers /clones with no clones; seed this spec's own.
     await page.route(`**/characters/${CHARACTER_ID}/clones`, (route) =>
       route.fulfill({
         status: 200,
@@ -60,10 +54,6 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, 
   });
 }
 
-/**
- * Layout invariants for the Clones summary strip and Settings > Data age
- * (no overlap between the strip's columns, no sideways page scroll).
- */
 for (const size of [{ width: 1024, height: 768 }, PHONE]) {
   test(`the clones summary strip does not overlap and the page does not scroll sideways at ${size.width}px`, async ({
     page,
@@ -83,7 +73,6 @@ for (const size of [{ width: 1024, height: 768 }, PHONE]) {
       a.y + a.height <= b.y + 1 ||
       b.y + b.height <= a.y + 1;
     expect(apart).toBe(true);
-    // The cooldown header is said once (the old chip label repeated it).
     await expect(page.getByText('Jump Cooldown', { exact: true })).toHaveCount(0);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -96,15 +85,12 @@ test('Settings > Data age stays inside a 390px page', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './clones');
   await expect(page.getByRole('region', { name: 'You are in' })).toBeVisible();
-  // Client-side navigation: the Data age list is session-only, built from this
-  // visit's fetches, so a reload would empty it.
   await page.evaluate(() => {
     const base = location.pathname.replace(/\/clones\/?$/, '');
     history.pushState({}, '', `${base}/settings/dataAge`);
     dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.getByRole('heading', { name: /^Data age$/i })).toBeVisible();
-  // Folded by default: the log's rows are absent, only the header shows.
   await expect(page.getByRole('table', { name: /data age/i })).toHaveCount(0);
   const caret = page.getByRole('button', { name: /show data age/i });
   await expect(caret).toBeVisible();

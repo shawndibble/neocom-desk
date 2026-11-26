@@ -1,37 +1,21 @@
-/**
- * "Finish setting up {character}" state (issue #6103). The step in flight lives
- * in sessionStorage like the Alerts walk's queue: it survives EVE's redirect
- * between approvals, expires with a Pending Login's bound, and is cleared on
- * Not now, on close and when the step is done. The player's Not now answers are
- * a device-local setting, per Character and per approval.
- */
 import type { ApprovalKind, FinishSetupChain } from '@/engine/character/finishSetup';
 import { isId, isRecord } from '@/engine/guards';
 import { MINUTE_MS } from '@/lib/age';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 const KEY = 'neocom.finishSetup';
-/** Same bound as a Pending Login: the step outlives no login that could still complete. */
 const TTL_MS = 15 * MINUTE_MS;
 
-/** `offer`: a sign-in just landed, the step is still to be worked out. `running`: Continue was pressed. */
 export type FinishSetupSaved =
-  /** `offeredAt`: when the sign-in landed, telling one offer from the next. */
   | { stage: 'offer'; characterId: number; offeredAt?: number }
   | { stage: 'running'; chain: FinishSetupChain };
 
 function write(saved: FinishSetupSaved): void {
   try {
     sessionStorage.setItem(KEY, JSON.stringify({ ...saved, createdAt: Date.now() }));
-  } catch {
-    // No storage: the step is not offered; every approval stays available where it lives.
-  }
+  } catch {}
 }
 
-/**
- * A sign-in for this Character landed: offer its remaining approvals on the next
- * page. A chain the player is part way through is kept, not replaced.
- */
 export function offerFinishSetup(characterId: number): void {
   if (readFinishSetup()?.stage === 'running') return;
   write({ stage: 'offer', characterId });
@@ -53,7 +37,6 @@ function isChain(raw: unknown): raw is FinishSetupChain {
   );
 }
 
-/** The step in flight, or null when absent, expired or malformed (which also clears it). */
 export function readFinishSetup(): FinishSetupSaved | null {
   try {
     const raw = sessionStorage.getItem(KEY);
@@ -85,12 +68,9 @@ export function readFinishSetup(): FinishSetupSaved | null {
 export function clearFinishSetup(): void {
   try {
     sessionStorage.removeItem(KEY);
-  } catch {
-    // Nothing stored that could reopen the step.
-  }
+  } catch {}
 }
 
-/** Not now, per Character (the key) and per approval. */
 export type FinishSetupNotNow = Record<string, ApprovalKind[]>;
 
 export function parseNotNow(raw: unknown): FinishSetupNotNow | null {

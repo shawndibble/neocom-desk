@@ -1,10 +1,3 @@
-/**
- * Variations table (GLOSSARY.md round 6): the selected item's Tech/Meta/
- * Faction variation group, or its Market Group siblings when the item has
- * none, sorted by Sell ascending by default so the cheapest alternative
- * leads. Clicking a row selects it, which re-anchors this table as a side
- * effect of the route's own selection state.
- */
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -20,12 +13,8 @@ import { versusSelf, type VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
 import type { Translate } from '@/lib/translate';
 
-/** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
-
-/** Tech I/II/III rank in that order; every other meta group (Faction, Storyline, Officer, …) sorts after them, alphabetically among themselves — not plain alphabetical, which would put "Faction" ahead of "T1". */
 const KNOWN_TIER_RANK: Record<string, number> = { T1: 0, T2: 1, T3: 2 };
 
-/** `null` (a sibling-fallback row with no meta-group classification) sinks to the end like any other undefined sort value. */
 function tierSortValue(tier: string | null): string | undefined {
   if (tier === null) return undefined;
   const rank = KNOWN_TIER_RANK[tier] ?? 99;
@@ -34,31 +23,19 @@ function tierSortValue(tier: string | null): string | undefined {
 
 export interface VariationsTableProps {
   rows: readonly VariationRow[];
-  /** Absent key = not yet requested; undefined value = still loading. */
   prices: ReadonlyMap<number, OrderBookSummary | undefined>;
   onSelect: (typeId: number) => void;
-  /** Adds every row currently shown here to the Compare Set and opens the Compare drawer on Attributes — both the header button and each row's "Compare Variations" menu action. */
   onCompare: () => void;
-  /** The item the rows vary, which each row's price is measured against. */
   selfName: string;
-  /** Its own book at the same location the rows are priced at; `undefined` while loading. */
   selfSummary: OrderBookSummary | undefined;
-  /** Where the rows are priced: the header's hub or region. */
   scopeName: string;
 }
 
-/** "+1.44M" / "−350.1K": compact, and signed so the colour never carries it alone. A signed delta string, not an IskAmount figure (exception). */
 function signedCompactIsk(value: number): string {
   const text = formatIskCompact(Math.abs(value));
   return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
 }
 
-/**
- * Loading, then this row's own side, then the other side's presence (matches
- * the order-book tables' empty-state pair), then neither. A real price is
- * shorthand — this is a comparison board, scanned down a column — with the
- * exact figure a long press away, since the row's own tap selects the item.
- */
 function priceCell(
   summary: OrderBookSummary | undefined,
   side: 'sell' | 'buy',
@@ -98,18 +75,12 @@ export function VariationsTable({
     );
   }
 
-  /** A row's best sell against the item it varies. */
-
-  // Sibling-fallback rows carry no meta-group classification, so the column would be all dashes.
   const hasTier = rows.some((row) => row.tier !== null);
   const columns: DataTableColumn<VariationRow>[] = [
     {
       id: 'name',
       header: t('market.variations.name'),
       sortValue: (row) => row.name,
-      // The row navigates (re-anchors the page): a real link on the name,
-      // a plain click is handled in place.
-      // The whole row stays a pointer shortcut (onRowClick below).
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
           <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
@@ -166,7 +137,6 @@ export function VariationsTable({
         const delta = versusSelf(selfSummary, prices, row.typeId);
         if (delta === null) return <span className="text-text-dim">—</span>;
         return (
-          // Cheaper than the item you opened reads as good news.
           <span
             className={delta.delta < 0 ? 'text-isk-pos' : delta.delta > 0 ? 'text-isk-neg' : ''}
           >
@@ -177,10 +147,6 @@ export function VariationsTable({
     },
   ];
 
-  // Tiers group, so a twenty-row variation list reads as Tech I, Faction,
-  // Officer…; a tier nobody sells here folds shut on its own (Officer
-  // modules, mostly), still one click away. A sibling-fallback list has no
-  // tiers and stays flat.
   const hasSellOrders = (group: readonly VariationRow[]) =>
     group.some((row) => {
       const summary = prices.get(row.typeId);

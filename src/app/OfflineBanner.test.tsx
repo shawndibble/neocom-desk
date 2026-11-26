@@ -14,9 +14,6 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, 'onLine');
 });
 
-// Once the live region fills, the same sentence is in the DOM twice (the sr-only
-// announcement and the visible strip), so the text alone is not a query: the
-// strip is found by its test id, the announcement by its role.
 const strip = () => screen.queryByTestId('offline-banner');
 
 describe('OfflineBanner', () => {
@@ -31,7 +28,6 @@ describe('OfflineBanner', () => {
     go(false);
     render(<OfflineBanner />);
     expect(strip()).toHaveTextContent(TEXT);
-    // The visible text has no role; the single live region carries the announcement.
     const region = screen.getByRole('status');
     await waitFor(() => expect(region).toHaveTextContent(TEXT));
     expect(screen.getAllByRole('status')).toHaveLength(1);
@@ -46,7 +42,6 @@ describe('OfflineBanner', () => {
 
     act(() => go(false));
     expect(await screen.findByTestId('offline-banner')).toHaveTextContent(TEXT);
-    // The live region that announces it was already mounted: same node, filled.
     expect(screen.getByRole('status')).toBe(region);
     await waitFor(() => expect(region).toHaveTextContent(TEXT));
 

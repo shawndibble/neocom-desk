@@ -1,26 +1,12 @@
-// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
-/**
- * SRP doctrine-fit match. Pure, self-contained (no imports): it lives once in
- * functions/src and src/engine re-exports it.
- *
- * Compares what a killmail's ship was fitted with to a hull's Doctrine Fits:
- * hull, modules (high/mid/low/subsystem) and rigs, by exact type, order ignored.
- * Charges, drones, cargo, implants never count. A mutated (abyssal) module matches
- * a doctrine module that is one of its possible bases.
- */
-
 export type DoctrineRack = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
-/** A corp's snapshot of a fit. Both lists are sorted multisets of type ids (JSON/Firestore friendly). */
 export interface DoctrineFitSnapshot {
   hullTypeId: number;
   name: string;
-  /** High, mid, low and subsystem modules together; a mutated one is stored as its base. */
   modules: number[];
   rigs: number[];
 }
 
-/** What a killmail's ship was fitted with; same shape rules as the snapshot. */
 export interface FittedSet {
   hullTypeId: number;
   modules: number[];
@@ -34,10 +20,8 @@ export interface DoctrineDiff {
   extraRigs: number[];
 }
 
-/** The snapshot stored on a claim at filing. */
 export interface DoctrineCheck {
   status: 'not-checked' | 'matched' | 'off-doctrine';
-  /** The matched fit, or for off-doctrine the nearest one. */
   doctrineId?: string;
   diff?: DoctrineDiff;
 }
@@ -47,12 +31,10 @@ export interface DoctrineCandidate {
   fit: DoctrineFitSnapshot;
 }
 
-/** An abyssal type's possible base type ids; undefined when the type is not abyssal. */
 export type BasesOf = (typeId: number) => readonly number[] | undefined;
 
 export const sortedIds = (ids: readonly number[]): number[] => [...ids].sort((a, b) => a - b);
 
-// ESI inventory flags: LoSlot0 11, MedSlot0 19, HiSlot0 27, RigSlot0 92, SubSystem0 125; 8 each.
 const FLAG_RACKS: readonly { rack: DoctrineRack; base: number }[] = [
   { rack: 'low', base: 11 },
   { rack: 'medium', base: 19 },
@@ -76,11 +58,6 @@ export interface KillmailVictimItems {
   }[];
 }
 
-/**
- * The fitted modules and rigs of a killmail victim; destroyed and dropped both count.
- * A slot flag also holds the module's loaded charge, so an item counts only when
- * `rackOf` (the SDE fitting-slot map) says its type belongs in that flag's rack.
- */
 export function killmailFittedSet(
   victim: KillmailVictimItems,
   rackOf: (typeId: number) => string | undefined
@@ -97,7 +74,6 @@ export function killmailFittedSet(
   return { hullTypeId: victim.ship_type_id, modules: sortedIds(modules), rigs: sortedIds(rigs) };
 }
 
-/** `basesOf` from the bundled mutaplasmids.json shape. */
 export function basesOfFromData(data: {
   mutaplasmids: Record<string, { result: number; bases: readonly number[] }>;
 }): BasesOf {
@@ -113,7 +89,6 @@ export function basesOfFromData(data: {
   };
 }
 
-/** Pairs killmail items to doctrine items; returns what each side has left over. */
 function diffMultiset(
   killed: readonly number[],
   wanted: readonly number[],
@@ -121,14 +96,12 @@ function diffMultiset(
 ): { missing: number[]; extra: number[] } {
   const wantedLeft = [...wanted];
   const killedLeft: number[] = [];
-  // Exact types first: never worse than any other pairing.
   for (const t of killed) {
     const i = wantedLeft.indexOf(t);
     if (i >= 0) wantedLeft.splice(i, 1);
     else killedLeft.push(t);
   }
-  // Mutated leftovers: bipartite matching onto the doctrine's remaining modules.
-  const matchOf: number[] = wantedLeft.map(() => -1); // doctrine idx -> killed idx
+  const matchOf: number[] = wantedLeft.map(() => -1);
   const canBe = (k: number, w: number): boolean =>
     basesOf?.(killedLeft[k])?.includes(wantedLeft[w]) ?? false;
   const augment = (k: number, seen: Set<number>): boolean => {
@@ -168,11 +141,6 @@ function diffAgainst(
 const diffSize = (d: DoctrineDiff): number =>
   d.missingModules.length + d.extraModules.length + d.missingRigs.length + d.extraRigs.length;
 
-/**
- * Checks a killmail's fit against the Doctrine Fits of its hull. No fit for the hull:
- * 'not-checked'. Any one exact match: 'matched' with that fit. Otherwise
- * 'off-doctrine' with the diff against the nearest fit (fewest differences; first on a tie).
- */
 export function matchDoctrine(
   fitted: FittedSet,
   doctrines: readonly DoctrineCandidate[],

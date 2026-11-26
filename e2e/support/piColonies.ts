@@ -1,13 +1,3 @@
-/**
- * A small PI operation for the signed-in fixture Character: four colonies
- * across a highsec and a nullsec system, each with a measured extractor
- * program and one link to its Launchpad, so the Goal Planner has real rates,
- * real budgets and a measured link cost to fit against.
- *
- * Planet ids are real ones carried by `public/data/pi-planet-radius.json`, so
- * the link cost is priced from the shipped radius rather than borrowed. Names,
- * systems and security are this fixture's own (mocked below).
- */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
@@ -24,18 +14,12 @@ export interface Colony {
   name: string;
   type: string;
   level: number;
-  /** P0 typeIds, one ECU each. */
   extracts: number[];
   heads: number;
-  /** Basic factories per extractor; default two, `0` sells the raw. */
   basicsPerEcu?: number;
-  /** Hours until the extractors expire; negative is already stopped. */
   expiresInHours?: number;
-  /** Hours since the programs were installed. Default 20. */
   installedHoursAgo?: number;
-  /** Extra Basic factories set to a schematic nothing feeds, so they sit idle. */
   idleBasics?: number;
-  /** P0 per cycle per ECU. Default 6,000 (+500 per extra ECU). */
   qtyPerCycle?: number;
 }
 
@@ -80,7 +64,6 @@ const COLONIES: Colony[] = [
 
 const HOUR = 3_600_000;
 
-/** P0 typeId to the basic schematic that refines it on the spot. */
 const BASIC_SCHEMATIC: Record<number, number> = { 2267: 126, 2268: 121, 2309: 123, 2310: 124 };
 
 function detailFor(colony: Colony, now: number) {
@@ -103,8 +86,6 @@ function detailFor(colony: Colony, now: number) {
     },
   }));
   pins.push({ pin_id: 1, type_id: 2256, latitude: 0.4, longitude: 1.4 });
-  // Each ECU's P0 refined on the spot, as a real colony runs it: two Basic
-  // Industry Facilities per program (~12,000 P0/h against 6,000 each).
   const basics = colony.extracts.flatMap((product, i) =>
     Array.from({ length: colony.basicsPerEcu ?? 2 }, (_, j) => j).map((j) => ({
       pin_id: 200 + i * 2 + j,
@@ -116,7 +97,6 @@ function detailFor(colony: Colony, now: number) {
   );
   pins.push(...basics);
   for (let k = 0; k < (colony.idleBasics ?? 0); k += 1) {
-    // Electrolytes needs Ionic Solutions, which no colony here extracts.
     const idle = {
       pin_id: 300 + k,
       type_id: 2469,
@@ -127,7 +107,6 @@ function detailFor(colony: Colony, now: number) {
     basics.push(idle);
     pins.push(idle);
   }
-  // A tree rooted at the Launchpad: every ECU and every basic one hop from it.
   const links = [...colony.extracts.map((_, i) => 100 + i), ...basics.map((b) => b.pin_id)].map(
     (pinId) => ({ source_pin_id: 1, destination_pin_id: pinId, link_level: 0 })
   );
@@ -138,16 +117,10 @@ function detailFor(colony: Colony, now: number) {
   return { pins, links, routes: [] };
 }
 
-/** The default colonies with per-planet overrides layered on, for a spec that needs one stopped, one expiring and so on. */
 export function withVariants(variants: Record<number, Partial<Colony>>): Colony[] {
   return COLONIES.map((colony) => ({ ...colony, ...variants[colony.planetId] }));
 }
 
-/**
- * Colonies with something to fix, for the Plan tab's "Make more" view: one
- * selling raw P0 (a rebuild), one with a stopped extractor (a quick win), and
- * one with factories nothing feeds.
- */
 export const PLAN_WINS_COLONIES: Colony[] = [
   {
     planetId: 40009077,
@@ -181,7 +154,6 @@ export const PLAN_WINS_COLONIES: Colony[] = [
   },
 ];
 
-/** Routes the active Character's colony reads, and the public lookups they pull. */
 export async function mockPlannerColonies(
   page: Page,
   colonies: readonly Colony[] = COLONIES
@@ -213,7 +185,6 @@ export async function mockPlannerColonies(
       )
     );
   });
-  // The Colonies tab names each basic's schematic.
   await page.route('https://esi.evetech.net/universe/schematics/**', (route) => {
     const id = Number(new URL(route.request().url()).pathname.match(/schematics\/(\d+)/)?.[1]);
     const names: Record<number, string> = {
@@ -255,14 +226,8 @@ export async function mockPlannerColonies(
   });
 }
 
-/** Flat per tier, high enough that a made tier out-earns selling the raw ore. */
 const UNIT_PRICE = [5, 1_500, 36_000, 140_000, 1_000_000];
 
-/**
- * Quotes every planetary type the app asks the hub about, at its tier's price,
- * both sides of the book. A later `page.route` wins over an earlier one — see
- * `support/testBase.ts`.
- */
 export async function mockPiHubPrices(page: Page): Promise<void> {
   const pi = JSON.parse(
     readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -285,11 +250,6 @@ export async function mockPiHubPrices(page: Page): Promise<void> {
   });
 }
 
-/**
- * A pilot with Command Center Upgrades V and Interplanetary Consolidation III,
- * so the ranking has a colony budget to fit recipes in (the default fixture's
- * untrained pilot fits none).
- */
 export async function mockPiSkills(page: Page): Promise<void> {
   await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/skills`, (route) =>
     route.fulfill({

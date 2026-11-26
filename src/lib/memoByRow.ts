@@ -1,4 +1,3 @@
-/** Caches `compute` per row object, so several export columns reading one derived figure work it out once per row. */
 export function memoByRow<Row extends object, Result>(
   compute: (row: Row) => Result
 ): (row: Row) => Result {

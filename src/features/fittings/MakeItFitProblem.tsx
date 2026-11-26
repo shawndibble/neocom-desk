@@ -1,8 +1,3 @@
-/**
- * The top of Make it fit: how far over each budget the Fitting is, as a bar
- * full to what it needs with a line where the hull's limit falls, so the
- * pilot sees the size of the problem before the fixes that close it.
- */
 import { useTranslation } from 'react-i18next';
 import { ProgressBar } from '@/components/ui';
 import type { FittingStats } from '@/engine/fittings/types';

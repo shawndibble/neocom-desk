@@ -1,8 +1,3 @@
-/**
- * Mercenary Den clocks on the Calendar (issue #4806): a reinforced den and an
- * open operation land on the Coming Up rail, the map draws each kind as its
- * own glyph, and the filter menu is the legend (glyph, name, count).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE } from './support/testBase';
 import { CHARACTER_ID, PRE_6102_BASE_SCOPES } from './support/fixtureData';
@@ -99,7 +94,6 @@ test('a pilot without the Mercenary dens grant sees no den clocks and no "new lo
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  // Dens mocked anyway: a regression that read them without the grant would show rows.
   await mockDens(page);
   await page.route(`**/characters/${CHARACTER_ID}/calendar`, (route) =>
     route.fulfill({
@@ -118,7 +112,6 @@ test('a pilot without the Mercenary dens grant sees no den clocks and no "new lo
   );
   await signInAndGoto(page, './calendar', PRE_6102_BASE_SCOPES);
 
-  // The board reads every source together, so a shown event means the den read landed too.
   await expect(page.getByText('Base grant fleet op').first()).toBeVisible();
   await expect(page.getByText(/needs? a new login/i)).toHaveCount(0);
   await expect(page.getByText('leaves reinforcement')).toHaveCount(0);

@@ -1,10 +1,3 @@
-/**
- * "Match from in-game numbers": the pilot reads the Structure Role
- * Bonus off the Industry window's material and job-duration tooltips, types
- * them in, and picks
- * the rig fit that produces them. ESI never exposes a structure's rigs, so
- * this is the only way to fill a fit in without knowing it by heart.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, LiveStatus, Modal, TextInput } from '@/components/ui';

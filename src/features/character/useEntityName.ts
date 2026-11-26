@@ -1,8 +1,3 @@
-/**
- * One entity's name (a faction, a corp, a pilot) through `resolveNames`, for a
- * component that needs a single name it was handed an id for. Null until it
- * resolves, and for an id that never does — the caller prints `#id` itself.
- */
 import { useCallback } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { resolveNames } from './names';

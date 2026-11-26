@@ -1,4 +1,3 @@
-/** The Appraisal result Panel's header actions: Compare Hubs, columns, Share and the copy/export menu. */
 import { useTranslation } from 'react-i18next';
 import {
   ColumnPickerMenu,
@@ -64,7 +63,6 @@ export function AppraisalResultActions({
     share.status === 'saving';
   return (
     <>
-      {/* An icon at every width, like the Columns, Share and export controls beside it. */}
       {compare !== null && (
         <IconButton
           size="sm"
@@ -123,7 +121,6 @@ export function AppraisalResultActions({
       >
         {COPY_LISTS.map((list) =>
           list === 'turnIn' && copyLists.traders.length > 0 ? (
-            // Split per Item Trader: each is handed in apart. Empty, it is disabled like the rest.
             <MenuSub key={list}>
               <MenuSubTrigger>
                 {t('market.appraisal.copyList.turnIn')}

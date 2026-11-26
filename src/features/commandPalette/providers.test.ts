@@ -10,7 +10,6 @@ import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
 
 const signal = new AbortController().signal;
 
-/** Every provider here is synchronous; the async contract is `usePaletteSearch`'s test. */
 function searchSync(provider: PaletteProvider, query: string): readonly PaletteResult[] {
   const answer = provider.search(query, signal);
   if (!Array.isArray(answer)) throw new Error(`${provider.id} answered asynchronously`);

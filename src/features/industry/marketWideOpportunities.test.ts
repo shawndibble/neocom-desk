@@ -9,11 +9,8 @@ import { researchFor, runMarketWideScan } from './marketWideOpportunities';
 
 vi.mock('@/market/prices', () => ({
   getHubPrices: vi.fn(),
-  // Unreachable by default: the troll-price check is skipped, as in production.
   getAdjustedPrices: vi.fn(() => Promise.reject(new Error('offline'))),
 }));
-// Pricing is `marketWidePlanPricing.test.ts`'s concern; the scan's is which
-// candidates survive, and that each is priced as the plan a click would open.
 vi.mock('./marketWidePlanPricing', () => ({ priceCandidatesAsPlans: vi.fn() }));
 
 import { getAdjustedPrices, getHubPrices } from '@/market/prices';
@@ -171,7 +168,7 @@ describe('runMarketWideScan', () => {
           typeIds.map((id) => [
             id,
             id === TROLL
-              ? { sellMin: 1_000_000_000_000, sellVolume: 1 } // one joke order
+              ? { sellMin: 1_000_000_000_000, sellVolume: 1 }
               : id === PRODUCT
                 ? { sellMin: 1_000_000, sellVolume: 1_000 }
                 : { sellMin: 5, sellVolume: 1 },
@@ -193,8 +190,6 @@ describe('runMarketWideScan', () => {
       Promise.resolve({ ...NO_SOURCES, market: new Set([501, 502]) }),
       { topNPerMarketGroup: 1, liquidityFloorIsk: 1 }
     );
-    // Priced at its 1M average, the troll's depth is 1M, under the real
-    // product's 1B, so the real product keeps the group's one slot.
     expect(rows.map((row) => [row.productTypeID, row.priceCapped])).toEqual([[PRODUCT, false]]);
   });
 

@@ -1,18 +1,3 @@
-/**
- * Every Character's manufacturing and PI "needs attention" state at once, for
- * the Characters table view. A composition layer, not new infrastructure —
- * same shape as `roster.ts`: nothing here talks to ESI directly, it reads the
- * rows the per-character read-through loaders already write, or (in `live`
- * mode) calls those loaders themselves (docs/ARCHITECTURE.md §7 step 3: never
- * reimplement read-through).
- *
- * The planets scope is checked up front, per Character — same trap
- * `features/pi/roster.ts` documents: a live 403 raises the app-wide re-auth
- * banner naming an alt the player never asked about. A Character without a
- * scope reads as `undefined` for that column, same as one whose scoped read
- * simply hasn't been cached yet — the table draws both as a dash, and neither
- * is worth telling apart from the other in a glance view.
- */
 import { db, type CharacterRecord } from '@/db';
 import { readCachedRows } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -36,22 +21,13 @@ const PLANETS_SCOPE = ESI_REGISTRY.getCharacterPlanets.scope;
 
 export interface AttentionEntry {
   characterId: number;
-  /** Running jobs per slot category. Undefined: no scope, or nothing cached yet. */
   jobCounts: Record<JobSlotCategory, number> | undefined;
   jobCountsFetchedAt: Date | null;
-  /** Worst colony's attention. Undefined: no scope, no colonies, or nothing cached yet. */
   piAttention: ColonyAttention | undefined;
-  /**
-   * The same worst colony's own soonest extractor expiry — null when it has
-   * none running (a colony can be the "worst" on attention alone, e.g.
-   * `decayed`, with nothing currently extracting). Undefined only alongside
-   * `piAttention` being undefined (no scope / no colonies / not cached yet).
-   */
   piSoonestExpiryMs: number | null | undefined;
   piFetchedAt: Date | null;
 }
 
-/** A cached `piSoonestExpiryMs` the clock has since passed — the one "expired always wins" check both the Characters table's `pi` column and its card view's attention chip apply to a category that can otherwise lag a stale roster load. */
 export function isPiExpired(expiryMs: number | null | undefined, nowMs: number): boolean {
   return expiryMs != null && expiryMs <= nowMs;
 }
@@ -80,7 +56,6 @@ async function grantedScopesByCharacter(
   return map;
 }
 
-/** The worst-attention colony across everything a Character owns — same ranking `sortColoniesByAttention` sorts by, read off its first result rather than duplicated here. */
 function worstColonyStatus(statuses: readonly ColonyStatus[], nowMs: number): ColonyStatus {
   const [worst] = sortColoniesByAttention(statuses, (status) => status, nowMs);
   return worst;
@@ -142,13 +117,6 @@ async function cacheOnlyAttention(
   );
 }
 
-/**
- * Flattened to one entry per *request*, not per character — same reasoning as
- * `roster.ts`'s `loadLive`: `ESI_FANOUT_CONCURRENCY` caps requests in flight,
- * not characters, so a character needing both reads doesn't count double
- * against the cap. Each request settles on its own; a failing one leaves its
- * field at the `emptyEntry` default rather than sinking the character.
- */
 async function liveAttention(
   characters: readonly CharacterRecord[],
   nowMs: number
@@ -196,18 +164,12 @@ async function liveAttention(
   await mapWithConcurrencyLimit(requests, ESI_FANOUT_CONCURRENCY, async (run) => {
     try {
       await run();
-    } catch {
-      // Field stays at the emptyEntry default.
-    }
+    } catch {}
   });
 
   return entries;
 }
 
-/**
- * Cache-only by default (no live ESI call); `live: true` refreshes with
- * capped concurrency — same contract as `roster.ts`'s `loadRosterSnapshot`.
- */
 export async function loadRosterAttention(opts?: {
   live?: boolean;
   now?: number;

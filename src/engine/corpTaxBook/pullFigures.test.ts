@@ -11,9 +11,6 @@ import { moonDocUsable, planMoonScope, withMoonDocs } from './pullFigures';
 import { extractionId } from './sync';
 import type { ObservedMiningEntry } from './types';
 
-// The moon page prints one pull from its rows and the moon's other cycles from their docs
-// (#5716, ADR 0032). Fed the same book, the figures must match the whole-book view.
-
 const CORP = 98000001;
 const ORE = 45490;
 const SURVEY_ORE = 45491;
@@ -40,7 +37,6 @@ const pull = (startDay: string, arriveDay: string, laserDay: string, extra = {})
   ...extra,
 });
 
-// Frozen by August's Statements; later billed-but-unpaid-free; open (September); survey-sourced.
 const FROZEN = pull('2026-08-01', '2026-08-05', '2026-08-05');
 const SURVEYED = pull('2026-08-08', '2026-08-12', '2026-08-12', {
   oreLines: undefined,
@@ -65,7 +61,6 @@ function book(): BookViewInput {
       entry(2, '2026-08-06', 700),
       entry(1, '2026-08-12', 400, SURVEY_ORE),
       entry(2, '2026-08-13', 200, SURVEY_ORE),
-      // Open: never on a Statement.
       entry(1, '2026-09-17', 500),
       entry(1, '2026-09-18', 250),
       entry(3, '2026-09-18', 100),
@@ -116,7 +111,6 @@ function docsOf(input: BookViewInput): Map<string, MoonDoc> {
   );
 }
 
-/** What the moon page's read returns for `shown`: only the planned pulls' rows. */
 function scopedView(input: BookViewInput, shown: string, docs: Map<string, MoonDoc>) {
   const scope = planMoonScope({
     extractionId: shown,
@@ -152,7 +146,6 @@ describe('the moon page from the moon docs', () => {
   const ids = input.extractions.map(extractionId);
 
   it('prints every cycle the same from the docs as from the whole-book view', () => {
-    // The scenario covers what the page shows, so an empty comparison cannot pass.
     for (const x of whole.extractions) expect(x.tax).toBeGreaterThan(0);
     for (const x of whole.extractions) expect(x.minedPct).toBeGreaterThan(0);
     for (const shown of ids) {
@@ -196,13 +189,12 @@ describe('the moon page from the moon docs', () => {
 });
 
 describe('moon ore variants from the moon docs (no ledger rows read)', () => {
-  const BRIMFUL = 46280; // Brimful Zeolites: the notification names only Zeolites (ORE).
+  const BRIMFUL = 46280;
   const input = (prices: Map<number, number>): BookViewInput => ({
     ...book(),
     extractions: [FROZEN],
     entries: [entry(1, '2026-08-05', 300), entry(2, '2026-08-05', 500, BRIMFUL)],
     pricesOn: () => ({ prices, sources: new Map() }),
-    // A survey scanned part-way through mining: 75/25, where the ledger shows 3/5.
     surveyOreLines: new Map([
       [
         extractionId(FROZEN),

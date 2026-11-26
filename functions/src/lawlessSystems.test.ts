@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LAWLESS_CORRUPTION_STATE, parseLawlessSystemIds } from './lawlessSystems.js';
 
-// Trimmed from a real response (2026-10-07): a list of campaigns, each with
-// its insurgencies. Only `corruptionState` 5 is lawless; Aivonen and Akidagi
-// are suppressed (suppressionState 5) with corruptionState 3.
 const campaign = (insurgencies: unknown[]) => ({
   campaignId: 165,
   state: 'ACTIVE',

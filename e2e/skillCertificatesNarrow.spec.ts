@@ -1,13 +1,3 @@
-/**
- * Skills › Certificates add-to-plan action (issue #2523): every certificate
- * row's "Add to plan" was a `primary` (accent-filled) button — about
- * 70 solid accent blocks down the page, against DESIGN.md's one-primary-per-
- * view rule. It now uses `Button`'s default ghost variant at every width.
- *
- * Asserted on the computed background rather than the class string: the
- * accent token is resolved through a probe element so the check follows the
- * token, not a hard-coded colour.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -33,7 +23,6 @@ async function assertNoAccentFilledAddButtons(page: Page) {
     return { accent, backgrounds: buttons.map((b) => getComputedStyle(b).backgroundColor) };
   });
 
-  // An unresolved var computes to transparent, not ''.
   expect(accent).not.toBe('rgba(0, 0, 0, 0)');
   expect(backgrounds.length).toBeGreaterThan(0);
   for (const background of backgrounds) expect(background).not.toBe(accent);

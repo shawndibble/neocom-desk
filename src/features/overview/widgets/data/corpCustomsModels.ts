@@ -1,8 +1,3 @@
-/**
- * Customs offices builder (issue #4611). Same contract as `models.ts`: pure,
- * derived at render time. The reinforce window is a standing daily schedule
- * (two whole hours, UTC), not a deadline, so nothing here ticks down.
- */
 import type { CorporationCustomsOffice } from '@/esi/endpoints';
 import { formatNumber } from '@/lib/numberLocale';
 import {
@@ -21,7 +16,6 @@ const K = 'overview.widgets.corpCustomsOffices';
 
 type RateKey = Extract<keyof CorporationCustomsOffice, `${string}_tax_rate`>;
 
-/** Who each rate is for, in the order the game client lists them. */
 const RATES: readonly { key: RateKey; label: string }[] = [
   { key: 'corporation_tax_rate', label: 'corporation' },
   { key: 'alliance_tax_rate', label: 'alliance' },
@@ -32,12 +26,10 @@ const RATES: readonly { key: RateKey; label: string }[] = [
   { key: 'terrible_standing_tax_rate', label: 'terrible' },
 ];
 
-/** ESI sends a fraction (0.05); at most one decimal, no trailing zero. */
 function percent(rate: number): string {
   return `${formatNumber(Math.round(rate * 1000) / 10)}%`;
 }
 
-/** The rates ESI sent, "Corporation 5% · Good 8%"; a level it did not send is not allowed, so it is left out. */
 function ratesOf(office: CorporationCustomsOffice, t: Translate): string {
   const parts = RATES.flatMap(({ key, label }) => {
     const rate = office[key];

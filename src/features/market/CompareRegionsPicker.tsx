@@ -8,27 +8,14 @@ import type { MarketRegionEntry } from '@/sde/marketTypes';
 import { compareRegionStroke, PRIMARY_REGION_STROKE } from './compareRegionStrokes';
 
 interface CompareRegionsPickerProps {
-  /** The order book's region — already the main line, so not offered. */
   primaryRegionId: number;
-  /** Picked regions, in pick order. */
   selected: readonly number[];
   onChange: (next: number[]) => void;
   regions: readonly MarketRegionEntry[];
   className?: string;
-  /**
-   * The picker chooses the regions outright, the primary one included (the
-   * Item Detail's Market tab, which has no Browser scope to supply one):
-   * nothing is left out of the list, and the last pick cannot be cleared.
-   */
   required?: boolean;
 }
 
-/**
- * The Price History tab's "Compare regions" control. Trade-hub regions are
- * listed first as the obvious picks, then every other market region. A pick
- * past `MAX_COMPARE_REGIONS` is ignored (`toggleCompareRegion`) and the
- * popover says why; a picked region's swatch is its line on the chart.
- */
 export function CompareRegionsPicker({
   primaryRegionId,
   selected,
@@ -40,14 +27,9 @@ export function CompareRegionsPicker({
   const { t } = useTranslation();
   const groups = useMemo<MultiSelectGroup<number>[]>(() => {
     const swatch = (id: number) => {
-      // With `required` the first pick is the primary region: the chart's main
-      // colour (accent), with no comparison stroke of its own.
       const index = selected.indexOf(id);
       if (index < 0) return undefined;
       const slot = index - (required ? 1 : 0);
-      // The region's colour and dash, which its line on the chart carries
-      // whether it draws an average or a Buy / Sell pair (those two differ by
-      // weight, shown in the chart legend).
       const stroke = slot < 0 ? PRIMARY_REGION_STROKE : compareRegionStroke(slot);
       return (
         <svg width="14" height="8" aria-hidden="true" className="shrink-0">

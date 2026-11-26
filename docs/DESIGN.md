@@ -415,7 +415,7 @@ shape has to be carried into them by hand.
   row a component lays out), and `e2e/support/controlHeights.ts`'s
   `expectInlineControlsAligned` is there for a surface neither reaches (a
   dialog, a seeded backend — see `communitiesControlHeights.dev.spec.ts`). A mismatch you mean opts out with
-  `data-inline-height="exempt"` and a comment saying why. `SegmentedControl`'s
+  `data-inline-height="exempt"`, with the reason in a scope decision. `SegmentedControl`'s
   border is inside its height, so it sits level with a `Button` of its size.
 - A control that would otherwise get `md` for its own sake (a primary
   action, a pin/target toggle) but sits paired beside an `sm` control in the

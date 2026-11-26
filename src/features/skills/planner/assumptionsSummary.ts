@@ -1,23 +1,13 @@
 import type { WhatIfImplantSelection } from '@/db';
 import type { Translate } from '@/lib/translate';
 
-/** The planner's three standing assumptions, as the Assumptions row reads them. */
 export interface AssumptionsState {
-  /** The character is costed as an Alpha clone. */
   alpha: boolean;
   whatIf: WhatIfImplantSelection;
-  /** The What-If Implants selection is one of the character's jump clones. */
   matchedJumpClone?: boolean;
-  /** How many Boosters the plan carries. */
   boosterCount: number;
 }
 
-/**
- * One line saying what the plan is costed under: whichever of Alpha, an
- * implant what-if and a Booster is set, in the order the controls sit, or
- * "Defaults". Alpha, implants and Booster change every number on the page, so
- * the closed Assumptions row keeps them visible instead of hiding them.
- */
 export function assumptionsSummary(state: AssumptionsState, t: Translate): string {
   const parts: string[] = [];
   if (state.alpha) parts.push(t('plans.assumptions.alpha'));

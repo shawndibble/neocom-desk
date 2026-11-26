@@ -18,7 +18,6 @@ const payment = (id: string, amount: number, at: string): TaxPayment => ({
 const charge = (id: string, date: string, tax: number, over: Partial<LedgerCharge> = {}) =>
   ({ id, date, kind: 'mined', tax, ...over }) as LedgerCharge;
 
-/** Builds the account from the same charges and payments the ledger is given, as a caller does. */
 function source(
   charges: LedgerCharge[],
   payments: TaxPayment[],
@@ -292,7 +291,6 @@ describe('payeeLedger: what an officer’s page needs (C3)', () => {
         reversed: { at: '2026-10-05T10:00:00Z', reason: 'Entered twice' },
       }),
     ];
-    // The account no longer counts the reversed correction.
     const account = MinerRunningAccount.build({
       days: [{ date: '2026-10-01', tax: 1_000_000 }],
       payments: [],

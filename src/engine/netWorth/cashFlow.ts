@@ -1,8 +1,3 @@
-/**
- * The Balance tab's Cash flow: ISK earned and spent over the last 7, 30 or 90
- * UTC days, from the wallet journal. Pure: journal rows in, figures out. Same
- * rules as the Journal's daily flow (own-Character transfers left out).
- */
 import { journalDailyFlow, type JournalDayFlow } from '../journalDailyFlow';
 import type { JournalRow } from '../journalNetting';
 import { parseInstant } from '../esiInstant';
@@ -14,23 +9,13 @@ export interface CashFlow {
   earned: number;
   spent: number;
   net: number;
-  /** Earned per day over the window. */
   perDay: number;
-  /** One entry per day of the window, oldest first. */
   days: JournalDayFlow[];
-  /** Earned in the window just before this one; null when the history does not reach back that far. */
   earnedBefore: number | null;
-  /** The newest of each Character's oldest journal day (see `coveredFromAll`), or null with no lines. */
   coveredFrom: string | null;
-  /** The history starts inside the window, so the figures undercount. */
   partial: boolean;
 }
 
-/**
- * The newest "oldest day held" over the Characters in `rows`: a period counts
- * as covered only when every Character's history reaches back to it. Rows
- * without a `characterId` are one group.
- */
 function coveredFromAll(rows: readonly JournalRow[]): string | null {
   const oldest = new Map<number | undefined, string>();
   for (const row of rows) {

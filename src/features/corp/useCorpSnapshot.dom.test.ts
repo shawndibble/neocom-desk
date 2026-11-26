@@ -41,7 +41,6 @@ describe('useCorpSnapshot', () => {
     load.mockImplementation(async () => 'second');
     rerender({ key: 'k2' });
 
-    // The old key's data must not leak into the new key's first render.
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.data).toBe('second'));
     expect(load).toHaveBeenCalledTimes(2);
@@ -62,8 +61,6 @@ describe('useCorpSnapshot', () => {
     rerender({ key: 'k2' });
     await waitFor(() => expect(result.current.data).toBe('second'));
 
-    // The k1 load finally resolves after k2 already landed — must not
-    // overwrite it with stale data.
     resolveFirst('first');
     await Promise.resolve();
     expect(result.current.data).toBe('second');

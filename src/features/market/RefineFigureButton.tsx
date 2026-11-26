@@ -2,10 +2,6 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { figureOpenerClassName } from '@/components/ui/controlStyles';
 
-/**
- * A row's Refine figure as the control that opens its breakdown: the figure
- * itself, dashed underlined. The press never reaches the row beneath.
- */
 export function RefineFigureButton({
   name,
   onOpen,

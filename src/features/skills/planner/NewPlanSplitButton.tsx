@@ -22,20 +22,11 @@ import { CertifiedPlanDialog } from './CertifiedPlanDialog';
 import type { RemapAvailability } from './remapAvailability';
 import { lazyNamed } from '@/app/lazyNamed';
 
-// Firebase stays out of the Skills bundle until a pilot opens the Community browse.
 const CommunityPlansDialog = lazyNamed(
   () => import('@/features/communities/CommunityPlansDialog'),
   'CommunityPlansDialog'
 );
 
-/**
- * A split button: "New plan" stays one click for a blank plan, and the caret
- * holds the other starting points (certified, community) without costing a
- * narrow header the width a second labelled button would. Owns the dialogs
- * those starts open, so every place that offers "New plan" gets the same set.
- * A host that also offers the certified start elsewhere (the no-plans card's
- * hint link) passes `certified` to drive this dialog, not render a second one.
- */
 export function NewPlanSplitButton({
   activeCharacterId,
   remapInfo,
@@ -46,9 +37,7 @@ export function NewPlanSplitButton({
   activeCharacterId: number;
   remapInfo: RemapAvailability | null;
   certified?: { open: boolean; onOpenChange: (open: boolean) => void };
-  /** Adds "from your skill queue, optimized" (the phone's home for Optimize queue); omitted hides it. */
   onOptimizeQueue?: () => void;
-  /** The in-game queue is empty: the item stays listed, disabled, with the reason beneath it. */
   queueEmpty?: boolean;
 }) {
   const { t } = useTranslation();
@@ -58,7 +47,6 @@ export function NewPlanSplitButton({
   const [certifiedOpenState, setCertifiedOpenState] = useState(false);
   const certifiedOpen = certified ? certified.open : certifiedOpenState;
   const setCertifiedOpen = certified ? certified.onOpenChange : setCertifiedOpenState;
-  // `?browse=community` (the Community page's link) opens the browse straight away.
   const [communityOpen, setCommunityOpen] = useState(
     () => new URLSearchParams(location.search).get('browse') === 'community'
   );
@@ -71,7 +59,6 @@ export function NewPlanSplitButton({
 
   function closeCommunity() {
     setCommunityOpen(false);
-    // The link's own param must not reopen the dialog on a back or a remount.
     if (new URLSearchParams(location.search).has('browse')) {
       navigate({ pathname: location.pathname }, { replace: true });
     }
@@ -81,11 +68,9 @@ export function NewPlanSplitButton({
     const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapInfo?.available ?? 0);
     await db.skillPlans.add(plan);
     syncAfterEdit();
-    // The flag lands the pilot on the new plan's list row, ready to rename.
     navigate(`/skills/plans/${plan.id}`, { state: { focusName: true } });
   }
 
-  // Named after the certified plan already, so no rename-on-arrival flag.
   async function handleCreateFromCertified(
     certified: CertifiedPlan,
     skillNameFor: (skillTypeID: number) => string,
@@ -105,7 +90,6 @@ export function NewPlanSplitButton({
   }
 
   async function handleCreateFromCommunity(shared: { name: string; entries: PlanEntry[] }) {
-    // A second click while the first is still adding must not make a second plan.
     if (copyingFromCommunity.current) return;
     copyingFromCommunity.current = true;
     try {
@@ -148,11 +132,9 @@ export function NewPlanSplitButton({
                 aria-label={t('plans.fromQueueOptimizedItem')}
                 aria-disabled={queueEmpty || undefined}
                 onSelect={(event) => {
-                  // Stays focusable so its reason can be read; selecting does nothing.
                   if (queueEmpty) event.preventDefault();
                   else newPlanMenu.run(onOptimizeQueue);
                 }}
-                // A phone has no hover for the desktop button's tooltip: the reason is printed.
                 aria-describedby={queueEmpty ? queueEmptyId : undefined}
                 className={queueEmpty ? 'flex-col items-start opacity-50' : undefined}
               >

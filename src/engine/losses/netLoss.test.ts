@@ -10,9 +10,9 @@ const HULL = 100;
 const victim = {
   ship_type_id: HULL,
   items: [
-    { item_type_id: 1, flag: 27, quantity_destroyed: 1, singleton: 0 }, // high slot
-    { item_type_id: 2, flag: 19, quantity_dropped: 1, singleton: 0 }, // mid slot, survived
-    { item_type_id: 3, flag: 5, quantity_destroyed: 3, quantity_dropped: 2, singleton: 0 }, // cargo
+    { item_type_id: 1, flag: 27, quantity_destroyed: 1, singleton: 0 },
+    { item_type_id: 2, flag: 19, quantity_dropped: 1, singleton: 0 },
+    { item_type_id: 3, flag: 5, quantity_destroyed: 3, quantity_dropped: 2, singleton: 0 },
   ],
 };
 const prices = new Map<number, number | null>([

@@ -62,8 +62,6 @@ describe('UnloggedDeliveriesBadge', () => {
 
   it('renders nothing when every delivery is logged', async () => {
     await db.industryJobHistory.put({ characterId: 1, jobs: [], fetchedAt: 1 });
-    // Another Character with an unlogged delivery, beside it: once that badge
-    // is up, the same reads have answered for Character 1 too.
     await db.industryJobHistory.put({ characterId: 2, jobs: [delivered(1)], fetchedAt: 1 });
     render(
       <MemoryRouter>

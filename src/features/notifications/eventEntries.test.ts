@@ -1,9 +1,3 @@
-/**
- * The Event Entry catalog (issue #1285): one entry per Notification Event
- * declaring its diff, copy, projectability and thresholds. These tests drive
- * one event at a time through its own entry — snapshot pair in, rendered copy
- * out — with no poll harness, no fetch and no Dexie.
- */
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';

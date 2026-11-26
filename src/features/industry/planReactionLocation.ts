@@ -1,8 +1,3 @@
-/**
- * Where a Build Plan's reactions are planned, and whether that place can host
- * them (issue #2908). Reactions cannot run in highsec, so the plan warns —
- * the detail hero and the list row both read this one answer.
- */
 import type { BuildPlanRecord } from '@/db';
 import {
   reactionLocationState,
@@ -16,11 +11,6 @@ export interface PlanReactionLocation {
   system: { id: number; name: string } | null;
 }
 
-/**
- * The place reactions run for this plan: its own Build Location for a
- * reaction-activity plan, the Reaction Location when Include Reactions is on,
- * and null for a plan with no reactions at all.
- */
 export function planReactionLocation(
   plan: Pick<
     BuildPlanRecord,
@@ -53,7 +43,6 @@ export function planReactionLocation(
       ? { id: plan.reactionBuildSystemId, name: plan.reactionBuildSystemName }
       : null;
   return {
-    // An unchosen location's stored band is only a pricing default (highsec).
     state: reactionLocationState(plan.reactionSecurity ?? 'highsec', system !== null),
     facilityName: FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name,
     system,

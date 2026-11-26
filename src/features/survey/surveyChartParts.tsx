@@ -1,9 +1,3 @@
-/**
- * Pieces the Survey tab's charts share: layout constants, the common time axis,
- * the standard value axis and the scan-node dot. Statically imports `recharts`,
- * so — same rule as `SurveyCharts.tsx` — this must only be reached through the
- * dynamic `import()` of `SurveyCharts` from `SurveyBoard.tsx`.
- */
 import { DAY_MS } from '@/lib/age';
 import { scalePx } from '@/lib/fontScale';
 import type { ReactElement } from 'react';
@@ -17,10 +11,8 @@ import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { SurveyScanNode } from './SurveyScanNode';
 
-/** Left edge shared by the charts so their time axes line up. */
 export const Y_AXIS_WIDTH = 52;
 export const COMPACT_Y_AXIS_WIDTH = 36;
-/** The Survey tab's volume chart height, px (Tailwind h-56). */
 export const FULL_HEIGHT = 224;
 export const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
 
@@ -31,20 +23,16 @@ const shortDate = (t: number): string =>
     timeZone: 'UTC',
   });
 
-/** The shared time axis: its domain, ticks, and an `<XAxis>` factory (`hide` hides it). */
 export function timeAxis(summary: SurveySummary): {
   domain: [number, number];
   ticks: number[];
   xAxis: (hide: boolean) => ReactElement;
 } {
-  // A hair past the finish so its marker is not clipped; the label sits left of the line.
   const end = summary.etaAt ?? summary.lastAt;
   const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.01];
   const { axis } = summary;
   const ticks = axis?.ticks ?? timeTicks(domain[0], domain[1]);
-  // Past a day the clock alone repeats ("00:00" twice), so a midnight tick names its date.
   const multiDay = !axis && domain[1] - domain[0] > DAY_MS;
-  // A tick that starts a stretch of scans (or midnight, past a day) carries its date under the clock.
   const showsDate = (x: number): boolean => {
     return axis ? axis.dateTicks.has(x) : multiDay && x % DAY_MS === 0;
   };
@@ -89,18 +77,14 @@ export function timeAxis(summary: SurveySummary): {
   return { domain, ticks, xAxis };
 }
 
-/** A position on the chart's time axis as the EVE clock it stands for. */
 export const clock = (summary: SurveySummary, x: number): string =>
   formatEveClock(realTime(summary, x));
 
-/** Room the label text of a break needs, px at the base font: "23h 35m" at 11px. */
 const BREAK_LABEL_WIDTH = 46;
 
-/** The text in a break's band, left out when the band is too narrow to hold it (a phone). */
 const breakLabel =
   (text: string) =>
   ({ viewBox }: { viewBox?: object }) => {
-    // A ReferenceArea hands its label the area's rectangle.
     const { x = 0, y = 0, width = 0, height = 0 } = (viewBox ?? {}) as Partial<CartesianViewBox>;
     if (width < scalePx(BREAK_LABEL_WIDTH)) return null;
     return (
@@ -116,10 +100,6 @@ const breakLabel =
     );
   };
 
-/**
- * A shaded band over each squeezed gap, labelled with how long it was. Spread it
- * into a chart's children: Recharts reads its direct children only.
- */
 export function gapBreaks(summary: SurveySummary, label: boolean): ReactElement[] {
   return (summary.axis?.breaks ?? []).map((b) => (
     <ReferenceArea
@@ -136,7 +116,6 @@ export function gapBreaks(summary: SurveySummary, label: boolean): ReactElement[
   ));
 }
 
-/** The standard value axis; `compact` narrows it, `label` adds an axis title. */
 export function yAxis(
   opts: {
     compact?: boolean;
@@ -156,17 +135,14 @@ export function yAxis(
   );
 }
 
-/** What Recharts hands a custom dot. */
 interface NodeDotProps {
   cx?: number;
   cy?: number;
   payload?: { at?: number };
 }
 
-/** Builds the `dot` renderer drawing a SurveyScanNode on each scan; `onRemove` enables its menu. */
 export function makeScanDot(
   onRemove?: (at: number) => void,
-  /** Maps a position on a squeezed axis to the scan's real time, which names the node and is what `onRemove` gets. */
   toTime: (x: number) => number = (x) => x
 ) {
   return function nodeDot({ cx, cy, payload }: NodeDotProps): ReactElement<SVGElement> {
@@ -182,12 +158,6 @@ export function makeScanDot(
   };
 }
 
-/**
- * Which labels fit on a chart: the indexes of `labels` (at a time, with a
- * weight for who wins a clash) to draw, `gap` px apart at least. `plotWidth`
- * is the chart's reported width; before it reports one there is nothing to
- * measure, so all show.
- */
 export function thinLabels(
   labels: { at: number; weight: number }[],
   domain: [number, number] | readonly [number, number],
@@ -205,10 +175,6 @@ export function thinLabels(
   );
 }
 
-/**
- * A percent for display: whole numbers from 10 up, one decimal below, and "<0.1" for a positive
- * sliver that would round to 0 while its line still draws.
- */
 export const formatPace = (v: number): string => {
   if (v >= 10) return String(Math.round(v));
   const r = Math.round(v * 10) / 10;

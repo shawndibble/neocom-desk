@@ -4,34 +4,16 @@ import { LiveStatus, LoadFailedState, Spinner } from '@/components/ui';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 
 interface DataGateProps {
-  /** Where the load stands: still running, failed, or in and ready for `children`. */
   status: 'busy' | 'failed' | 'ok';
-  /** Already-translated headline saying what couldn't load. Announced when `status` becomes `failed`. */
   title: string;
-  /** Overrides the default hint ("Connect once…" offline, "Try again" online). */
   hint?: string;
-  /** Tries the load again. Omit when something else (a reconnect, a Refresh button) already does. */
   onRetry?: () => void;
-  /** Another Character (or anything else that restarts the load) drops a pending retry's focus. */
   resetKey?: unknown;
-  /** What shows while `busy`; a centred `Spinner` when omitted. */
   busy?: ReactNode;
   className?: string;
-  /** Shown once `status` is `ok`. */
   children?: ReactNode;
 }
 
-/**
- * A view's load, from spinner to result to "couldn't load".
- *
- * Use it instead of a spinner that a rejected load would leave up forever: a
- * failure says what is missing, that one connection fixes it, and offers Retry.
- * It owns the two things a failed state needs that callers keep getting wrong:
- * an always-mounted `LiveStatus` that announces the failure (a `role="status"`
- * node mounted together with its text is not announced), and `useRetryFocus`
- * (DESIGN.md Focus), so Retry unmounting into the busy state never drops focus
- * on `<body>`. Its wrapper is therefore mounted in every state.
- */
 export function DataGate({
   status,
   title,

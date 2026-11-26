@@ -41,35 +41,28 @@ import { SectionHeading, SuccessBadge } from './implantFinderBits';
 
 interface GoalResultsProps {
   goal: ImplantGoal;
-  /** Nothing on this Fitting uses the goal, so no item moves it. */
   off: boolean;
   baseline: FittingStats;
   context: GoalContext;
   results: FamilyResult[] | null;
   fixes: FixResult[];
-  /** The slot picked on the strip, when `results` and `fixes` are narrowed to it. */
   slot: { kind: ImplantKind; label: string } | null;
   hubId: string;
   nameOf: (typeId: number) => string;
-  /** The shown results are from before the last change; their buttons wait for the new ones. */
   busy: boolean;
   onBack: () => void;
   onAdd: (typeIds: readonly number[]) => void;
   onRemove: (typeId: number) => void;
   onInfo: (typeId: number) => void;
-  /** What an item would displace in the set right now; null when its slot is empty. */
   replacesOf: (typeId: number) => number | null;
   sort: ImplantSort;
   onSort: (sort: ImplantSort) => void;
 }
 
-/** What an item (or a fix) does to the goal, and whether that's good news. */
 interface Effect {
   text: string;
   fits: boolean;
-  /** How much it moves the goal: percent for a figure, units of budget freed for CPU / powergrid. */
   gain: number;
-  /** What `gain` is counted in, for a cost per gain. */
   gainUnit: 'pct' | 'unit';
 }
 
@@ -103,7 +96,6 @@ export function GoalResults({
     if (goal.kind === 'budget') {
       const budget = goal.read(after);
       const over = shortfall(budget);
-      // Headroom gained, so an implant that raises the total counts as well as one that cuts the use.
       const freed = headroomGain(goal, baseline, after);
       return over > 0
         ? {
@@ -141,13 +133,11 @@ export function GoalResults({
   const implants = (results ?? []).filter((r) => r.family.kind === 'implant');
   const boosters = (results ?? []).filter((r) => r.family.kind === 'booster');
 
-  /** What it costs the pilot to get a grade: the source shown for it, else nothing known. */
   const costOf = (row: GradeResult) => (row.best ?? row.sources?.[0] ?? null)?.cost ?? null;
   const perGainOf = (row: GradeResult) => {
     const e = effect(row.stats);
     return costPerGain(costOf(row), e.gain);
   };
-  // Prices stream in: until every grade has its sources, keep the order, so cards don't jump under the cursor.
   const pricing = (results ?? []).some(({ grades }) => grades.some((g) => g.sources === null));
   const sorted = (list: FamilyResult[]) =>
     sort === 'gain' || pricing
@@ -160,12 +150,10 @@ export function GoalResults({
     <ul className="grid items-start gap-2 @3xl:grid-cols-2">
       {sorted(unsorted).map(({ family, grades }) => {
         const highest = family.grades[family.grades.length - 1]!;
-        // Every grade usually displaces the same item: say so once, not on each row.
         const displaced = new Set(
           grades.filter((row) => row.replaces !== null && !row.inSet).map((row) => row.replaces)
         );
         const sharedReplaces = displaced.size === 1 ? [...displaced][0]! : null;
-        // One grade: its action sits in the header, so the row below gets the whole width.
         const single = grades.length === 1 ? grades[0]! : null;
         return (
           <li key={family.key} className="space-y-1 rounded-xs border border-line bg-panel-2 p-2.5">
@@ -232,7 +220,6 @@ export function GoalResults({
     </ul>
   );
 
-  /** ↑ / ↓ walk the Replace / Add buttons down the list, so a pilot can run it from the keyboard. */
   function moveBetweenActions(event: KeyboardEvent<HTMLElement>) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     const from = (event.target as HTMLElement).closest<HTMLElement>('[data-implant-action]');
@@ -307,7 +294,6 @@ export function GoalResults({
                 )}
               >
                 {i === 0 && (
-                  // Opaque under the badge, so the card's border does not show through it.
                   <span className="absolute -top-2 left-2 rounded-xs bg-panel-2">
                     <SuccessBadge>{t('fittings.implantFinder.cheapest')}</SuccessBadge>
                   </span>
@@ -402,7 +388,6 @@ export function GoalResults({
             </span>
           </div>
         )}
-        {/* A booster slot has no implants to list; still loading (null) shows the spinner. */}
         {!off && (!slot || (slot.kind === 'implant' && results?.length !== 0)) && (
           <div className="space-y-1.5">
             <SectionHeading>{t('fittings.implantFinder.helpersHeading')}</SectionHeading>
@@ -437,12 +422,6 @@ export function GoalResults({
   );
 }
 
-/** How a source line names a Trade Hub and a turn-in — resolved once for the whole window. */
-
-/**
- * Where one item comes from, in a line: a hub's sell orders, or the terms of an LP Store offer.
- * An offer's store, total and LP shortfall are the summary above its breakdown, so they aren't said twice.
- */
 function ImplantSourceLine({ source }: { source: Source }) {
   const { t } = useTranslation();
   const { hubName, itemName } = useContext(SourceNames);
@@ -481,7 +460,6 @@ function ImplantSourceLine({ source }: { source: Source }) {
       })
     );
   }
-  // An unreadable LP balance is said once, in the toolbar — not on every offer.
   return (
     <>
       <Trans
@@ -508,7 +486,6 @@ function ImplantSourceLine({ source }: { source: Source }) {
   );
 }
 
-/** "Replaces <item>": the item's name opens its details, so the pilot can judge what they'd lose. */
 function ReplacesLine({
   typeId,
   name,
@@ -534,7 +511,6 @@ function ReplacesLine({
   );
 }
 
-/** The one action a grade offers: Replace or Add (primary) or Remove (ghost). */
 function GradeAction({
   row,
   name,
@@ -569,7 +545,6 @@ function GradeAction({
   );
 }
 
-/** One way to get an item. A market source is one line; an LP offer is a one-line price with its full breakdown a click away. */
 function SourceRow({ source }: { source: Source }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -621,7 +596,6 @@ function SourceRow({ source }: { source: Source }) {
   );
 }
 
-/** Where to see an item's sources: the market on the hub the shown price is from, each LP Store on its offer. */
 function SourceLinks({ typeId, sources }: { typeId: number; sources: readonly (Source | null)[] }) {
   const { t } = useTranslation();
   const market = sources.find((source) => source?.kind === 'market');
@@ -674,9 +648,7 @@ function GradeRow({
   effect: Effect;
   fixesIt: boolean;
   replacesName: string | null;
-  /** The card's header already carries this grade's action. */
   inHeader: boolean;
-  /** ISK per unit of gain; null without a price. */
   perGain: number | null;
   gainUnit: 'pct' | 'unit';
   unit: string;
@@ -687,7 +659,6 @@ function GradeRow({
 }) {
   const { t } = useTranslation();
   const { best, sources } = row;
-  // What the pilot can buy now; failing that, the best way there is, warnings and all.
   const shown = best ?? sources?.[0] ?? null;
   const alt = sources && shown ? alternativeSource(sources, shown) : null;
   return (

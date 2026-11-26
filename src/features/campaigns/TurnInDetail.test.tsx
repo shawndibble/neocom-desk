@@ -123,7 +123,6 @@ describe('TurnInDetail', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Set destination to Onnamon' }));
     await waitFor(() => expect(setWaypointsInGame).toHaveBeenCalledWith(ALT_ID, [30045324]));
-    // Neither the trigger nor the popover reaches the row beneath.
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
@@ -204,7 +203,6 @@ describe('TurnInBreakdown', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Turn in: ~30M' });
     expect(within(dialog).getByText('Secure Strength Trader · Onnamon')).toBeInTheDocument();
     expect(within(dialog).getByText('Trail of Silence Trader · Amo')).toBeInTheDocument();
-    // Active Character granted and joined: the per-item column.
     expect((await within(dialog).findAllByText('Participating')).length).toBeGreaterThan(0);
 
     await user.click(

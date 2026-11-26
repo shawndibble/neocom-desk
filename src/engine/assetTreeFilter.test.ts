@@ -12,8 +12,6 @@ const asset = (
   ...over,
 });
 
-// Station 1: ship (type 10) holding ammo (type 20 x100) and a rifle (type 30) in cargo.
-// Station 2: loose rifle (type 30).
 const assets: EngineAsset[] = [
   asset({ item_id: 1, type_id: 10 }),
   asset({

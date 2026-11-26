@@ -19,68 +19,25 @@ import { menuItemClassName } from './menuStyles';
 export type { MultiSelectGroup, MultiSelectOption };
 
 export interface MultiSelectProps<Id> {
-  /**
-   * The trigger's visible text: the field's name ("Compare regions"), or a
-   * value that names itself ("All locations"). Defaults to `label`.
-   */
   triggerLabel?: string;
-  /** A short dim read of the selection after `triggerLabel` — a count ("2 / 4"). */
   summary?: ReactNode;
-  /**
-   * The trigger's accessible name, when its visible text alone doesn't say
-   * enough ("Compare regions, 2 of 4 picked" for "Compare regions 2 / 4").
-   * Start it with the visible field name, so a speech user can say what they
-   * see (WCAG 2.5.3). Without it, a `triggerLabel` that differs from `label`
-   * is named "label: triggerLabel" ("Location: All locations"), the way
-   * `CheckboxSelect` names its trigger; otherwise the visible text names it.
-   */
   triggerAriaLabel?: string;
-  /** The trigger's control size; share it with the row's other controls (DESIGN.md §3). */
   size?: ControlSize;
-  /** The trigger's classes — its width in a toolbar row. */
   className?: string;
-  /** This filter is set away from its default: draws the accent border (DESIGN.md §6c). */
   active?: boolean;
-  /** Flat, ungrouped options. Ignored if `groups` is given. */
   options?: readonly MultiSelectOption<Id>[];
-  /** Grouped options, each under its own heading. Takes precedence over `options`. */
   groups?: readonly MultiSelectGroup<Id>[];
   selected: ReadonlySet<Id>;
   onToggle: (id: Id) => void;
-  /** Names the popover dialog and its listbox. */
   label: string;
   searchPlaceholder: string;
   noResultsLabel: string;
-  /**
-   * Rendered above the search box — e.g. "select all" quick-actions. Given a
-   * function, it's called with `close` so an action can dismiss the popover
-   * after firing (unlike toggling an option, which stays open across
-   * multiple picks).
-   */
   extraContent?: ReactNode | ((close: () => void) => ReactNode);
   contentClassName?: string;
-  /**
-   * Makes each group heading tickable: the checked state it shows, and what
-   * ticking it does (usually ticking or clearing every option under it). A
-   * search also matches heading text, keeping the whole group.
-   */
   groupState?: (group: MultiSelectGroup<Id>) => boolean | 'mixed';
   onToggleGroup?: (group: MultiSelectGroup<Id>) => void;
 }
 
-/**
- * A select-shaped, checkbox-style multiselect with a type-to-filter search
- * box. Built on `Popover` rather than `DropdownMenu`: Radix's menu family
- * expects arrow-key/typeahead navigation between `menuitem`s, which conflicts
- * with a live text input inside the same content — see
- * docs/context/decisions/20260905-114550-hand-build-aria-comboboxes-rather-than-buy-radix.md.
- * Options use the `listbox`/`option` roles instead of Radix's `menuitemcheckbox`
- * for the same reason. Keyboard nav follows the same hand-built shape as
- * `RegionSelect`: focus stays in the search input, `aria-activedescendant`
- * tracks a roving highlight moved by arrow keys, and Enter acts on the
- * highlighted option — Space is left alone since typing one into the search
- * box must still insert a space, not toggle a row.
- */
 export function MultiSelect<Id>({
   triggerLabel,
   summary,
@@ -102,7 +59,6 @@ export function MultiSelect<Id>({
 }: MultiSelectProps<Id>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // A phone keyboard would cover the list; touch users tap the field themselves.
   const coarse = useMediaQuery(COARSE_POINTER_QUERY);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
@@ -118,7 +74,6 @@ export function MultiSelect<Id>({
   );
   const hasResults = filteredGroups.some((group) => group.options.length > 0);
   const tickableHeadings = onToggleGroup !== undefined;
-  // What the arrow keys walk: each tickable heading, then its options.
   const navItems = useMemo(
     () =>
       filteredGroups.flatMap((group) => [
@@ -127,7 +82,6 @@ export function MultiSelect<Id>({
       ]),
     [filteredGroups, tickableHeadings]
   );
-  // A heading acts on its whole group, not only the options the search left.
   const fullGroup = (group: MultiSelectGroup<Id>) =>
     normalizedGroups.find((candidate) => candidate.label === group.label) ?? group;
   function activate(item: { group: MultiSelectGroup<Id>; option: MultiSelectOption<Id> | null }) {
@@ -164,8 +118,6 @@ export function MultiSelect<Id>({
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      {/* Field chrome, never a `Button`: a multi-pick opens a list to pick
-          from, the same intent as a `Select` (DESIGN.md §6c). */}
       <PopoverTrigger
         aria-label={
           triggerAriaLabel ??

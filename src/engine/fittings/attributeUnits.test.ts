@@ -3,7 +3,6 @@ import { displayAttributeValue, displaySourceValue } from './attributeUnits';
 
 describe('displayAttributeValue', () => {
   it('shows milliseconds as seconds', () => {
-    // A large turret's Rate of fire (unit 101): 12000 ms.
     expect(displayAttributeValue(12000, 101, 's')).toEqual({ value: 12, unit: 's' });
     expect(displayAttributeValue(9760, 101, 's').value).toBeCloseTo(9.76, 9);
   });
@@ -19,12 +18,10 @@ describe('displayAttributeValue', () => {
   });
 
   it('shows an absolute percent (a share) as a percentage', () => {
-    // Mining critical success chance, 0.01.
     expect(displayAttributeValue(0.01, 127, '%').value).toBeCloseTo(1, 9);
   });
 
   it('leaves a value already in percent, a multiplier or a length as it is', () => {
-    // Target Painter II signature radius bonus (124), a disruptor's 105, a crystal's 121.
     expect(displayAttributeValue(30, 124, '%')).toEqual({ value: 30, unit: '%' });
     expect(displayAttributeValue(-17.19, 105, '%')).toEqual({ value: -17.19, unit: '%' });
     expect(displayAttributeValue(34, 121, '%')).toEqual({ value: 34, unit: '%' });

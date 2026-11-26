@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import Dexie from 'dexie';
 
-/**
- * Every shipped schema version, as the stores each one *changed* (`null` drops
- * a table). Kept here as its own copy of history, so the test stays valid
- * whatever shape `./index.ts` declares its versions in.
- */
 const HISTORY: [number, Record<string, string | null>][] = [
   [1, { characters: 'characterId', tokens: 'characterId', settings: 'key' }],
   [2, { skillPlans: 'id, characterId', esiCache: '[characterId+key]' }],
@@ -86,7 +81,6 @@ const HISTORY: [number, Record<string, string | null>][] = [
   [34, { miningTaxPaymentLinks: 'id, characterId, payeeId' }],
 ];
 
-/** The complete schema at `version`: every delta up to it, drops removed. */
 function schemaAt(version: number): Record<string, string> {
   const stores: Record<string, string | null> = {};
   for (const [v, delta] of HISTORY) if (v <= version) Object.assign(stores, delta);
@@ -109,11 +103,6 @@ const FIELD_VALUES: Record<string, unknown> = {
   transaction_id: 8,
 };
 
-/**
- * One row for `table`, carrying a value at every key path the *latest* schema
- * indexes — so a row written under an old version is still reachable through
- * an index the upgrade adds later.
- */
 function rowFor(table: string, latest: Record<string, string>): Record<string, unknown> {
   const row: Record<string, unknown> = { payload: `${table}-payload` };
   for (const path of splitKeyPaths(latest[table]).flatMap((p) =>
@@ -146,7 +135,6 @@ describe('opening the current database over every historical version', () => {
     await db.open();
 
     expect(db.verno).toBe(latestVersion);
-    // The schema matches the history exactly: no table lost, none left over.
     expect(db.tables.map((t) => t.name).sort()).toEqual(Object.keys(latest).sort());
     for (const [name, spec] of Object.entries(latest)) {
       const [primary, ...indexes] = spec.split(',').map((s) => s.trim());
@@ -158,12 +146,11 @@ describe('opening the current database over every historical version', () => {
     }
 
     for (const name of Object.keys(written)) {
-      if (!(name in latest)) continue; // dropped by a later version on purpose
+      if (!(name in latest)) continue;
       const table = db.table(name);
       const expected = rowFor(name, latest);
       expect(await table.count(), `${name} row count`).toBe(1);
       expect(await table.toArray(), `${name} rows`).toEqual([expected]);
-      // Every index the code can query finds the row.
       for (const index of table.schema.indexes) {
         const value = index.compound
           ? (index.keyPath as string[]).map((p) => expected[p])

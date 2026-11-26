@@ -1,12 +1,3 @@
-/**
- * How a member's personal Mining Ledger Entry meets the Corp Tax Books that
- * observed it (D12, D30). The personal ledger knows only the solar system, so
- * several books in one system on one day split the entry by what each
- * observed; ore no book claims is Unattributed, owed to no one. When the
- * member already gave the day to another Payee, a book's share comes from the
- * Unattributed part first; the rest is a visible conflict, not owed, that
- * resolves to the corp 14 days after it was raised.
- */
 import type { OreLine } from './types';
 import { DAY_MS } from '@/lib/age';
 
@@ -14,7 +5,6 @@ export const CONFLICT_RESOLVE_DAYS = 14;
 
 export interface BookObservation {
   bookId: string;
-  /** What the book observed for this character, day and system, summed over its refineries there. */
   oreLines: readonly OreLine[];
 }
 
@@ -40,7 +30,6 @@ export function splitAcrossBooks(
     if (claimed <= line.quantity) {
       given = claims;
     } else {
-      // Proportional by observed quantity, largest remainder, so no unit is lost or invented.
       const exact = claims.map((q) => (q * line.quantity) / claimed);
       given = exact.map(Math.floor);
       let left = line.quantity - given.reduce((sum, q) => sum + q, 0);
@@ -66,23 +55,16 @@ export function splitAcrossBooks(
 }
 
 export interface BookShareInput {
-  /** The book's share of the personal entry (`splitAcrossBooks`). */
   share: readonly OreLine[];
-  /** The personal entry's ore the member has given to no Payee. */
   free: readonly OreLine[];
-  /** When the conflict was first raised; absent when it is new. */
   conflictSince?: string;
   now: string;
 }
 
 export interface BookShare {
-  /** Covered by ore the member had not given to anyone. */
   fromFree: OreLine[];
-  /** The free ore this book did not take — pass it to the next book in the system. */
   freeLeft: OreLine[];
-  /** Ore the member gave another Payee that this book also observed. */
   conflict: OreLine[];
-  /** The conflict has run its 14 days and now belongs to the corp. */
   conflictOwed: boolean;
   conflictResolvesAt?: string;
 }

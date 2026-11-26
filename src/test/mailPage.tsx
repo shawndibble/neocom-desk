@@ -17,16 +17,6 @@ import { Mail } from '@/routes/Mail';
 import { renderPageRoute } from '@/test/renderPage';
 import { stubViewport } from '@/test/viewport';
 
-// Shared harness for the Mail route tests (src/routes/Mail*.test.tsx), one file
-// per concern so CI runs them in parallel. The `vi.mock` calls stay in each test
-// file (vitest hoists them per file).
-
-/**
- * jsdom's `matchMedia` stub (`vitest.setup.dom.ts`) never matches, which
- * `useIsDesktop` reads as narrow/phone. The reading-pane header's empty-state
- * acceptance criteria (issue #2104) are asserted at desktop widths (1024px
- * and 1440px both satisfy `min-width: 64rem`), so force that here.
- */
 export function useDesktopViewport(): void {
   stubViewport(DESKTOP_QUERY);
 }
@@ -88,34 +78,20 @@ export const server = mswServer(
       recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
     })
   ),
-  // Default success for the mark-read write — tests that care about its
-  // request body/URL override this per-test.
   http.put(
     'https://esi.evetech.net/characters/:characterId/mail/:mailId/',
     () => new HttpResponse(null, { status: 204 })
   ),
-  // No contacts and no affiliation by default — the standing cross-reference
-  // tests below override these per-scenario. `:characterId` rather than a
-  // literal id: the character-switch test below re-fires this for CHAR_ID_2.
   http.get('https://esi.evetech.net/characters/:characterId/contacts', () => HttpResponse.json([])),
   http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
-/**
- * Renders the Mail route on its own (its ScopeGate and info modals, no App boot
- * or shell) at the current `window.location`. The tests that prove the App
- * wiring (the URL is reachable inside the shell) render `<App />` (Mail.test.tsx).
- */
 export function renderMailRoute() {
   return renderPageRoute('/mail', <Mail />);
 }
 
 export function installMailHarness(): void {
   beforeAll(async () => {
-    // One throwaway render, so no test pays for the first one: compiling the
-    // route chunk, warming jsdom and React and the first data load (Dexie, MSW,
-    // the ESI cache) land here under the hook's own budget instead of tipping
-    // whichever test runs first past its findBy timeout.
     await routeChunks.loadMail();
     await seed();
     const { unmount } = renderMailRoute();
@@ -137,8 +113,6 @@ export async function seed() {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   usePublicInfoModalStore.setState({ request: null });
-  // Module-scoped store: without this the folder selection one test makes
-  // leaks into the next, and `hydrate` short-circuits on `hydrated`.
   useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
   useMailScope.setState({ value: 'current', hydrated: false });
   resetMailRefreshThrottle();
@@ -155,10 +129,8 @@ export async function seed() {
   window.history.pushState({}, '', '/mail');
 }
 
-/** The body paragraph 'Undock <b>now</b>.': bold splits its text across elements. */
 export const findUndockBody = () =>
   screen.findByText((_, el) => el?.tagName === 'P' && el.textContent === 'Undock now.');
-/** Turns off every folder chip except the named ones. */
 export async function onlyFolders(user: ReturnType<typeof userEvent.setup>, keep: string[]) {
   const group = screen.getByRole('group', { name: 'Mail folders' });
   for (const chip of within(group).getAllByRole('button')) {
@@ -166,7 +138,6 @@ export async function onlyFolders(user: ReturnType<typeof userEvent.setup>, keep
   }
 }
 
-/** A second signed-in Character (CHAR_ID_2) with the mail scopes. */
 export async function addSecondCharacter() {
   await db.characters.put({
     characterId: CHAR_ID_2,

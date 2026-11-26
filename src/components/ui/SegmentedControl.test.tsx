@@ -28,9 +28,6 @@ describe('SegmentedControl', () => {
     expect(onChange).toHaveBeenCalledWith('c');
   });
 
-  // The group's border sits inside the control height, so the whole control is
-  // exactly as tall as a Button of the same size beside it (a segment at full
-  // height inside a 1px border made it 2px taller).
   it('sizes the group, border included, from the control scale', () => {
     const { rerender } = render(
       <SegmentedControl label="Pick" options={options} value="a" onChange={noop} />

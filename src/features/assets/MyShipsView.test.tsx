@@ -59,7 +59,6 @@ function renderShips(
   );
 }
 
-/** One query param off the page's current URL, as `LocationProbe` prints it. */
 const urlParam = (key: string) =>
   new URLSearchParams(screen.getByTestId('location').textContent?.split('?')[1] ?? '').get(key);
 

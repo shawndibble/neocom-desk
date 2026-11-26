@@ -1,10 +1,3 @@
-/**
- * "Change owner" on the survey's footer (owner only): a dialog that finds any EVE
- * Character by name (ESI's character search, so not just people who use the app),
- * then asks to confirm before the survey's owner is rewritten. The warning says the
- * new owner may need to log into Neocom Desk before they can edit it. The previous
- * owner is a viewer afterwards: the survey tab reads `owned` off the owner name.
- */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, SearchInput, textActionClassName } from '@/components/ui';
@@ -25,10 +18,8 @@ export function SurveyOwnerChange({
   surveyId,
   onChanged,
 }: {
-  /** The pilot searching (any logged-in Character can search names). */
   characterId: number;
   surveyId: string;
-  /** The owner was rewritten; the caller reloads the survey. */
   onChanged: () => void;
 }) {
   const { t } = useTranslation();

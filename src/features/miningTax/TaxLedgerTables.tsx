@@ -27,17 +27,12 @@ interface TaxOpenLedgerProps {
   visibleRows: readonly DisplayRow[];
   openRows: DisplayRow[];
   openColumns: DataTableColumn<DisplayRow>[];
-  /** Every column on offer, ticked or not: what the picker lists. */
   allColumns: DataTableColumn<DisplayRow>[];
   taxSort: UrlSortState;
   taxExport: UseTableExport<DisplayRow>;
   rowProps: TaxRowProps;
 }
 
-/**
- * The filters sit right on top of the Open list they filter first: no
- * "Open" heading between them, since every row in it already carries its status.
- */
 export function TaxOpenLedger({
   ledgerPayees,
   characters,
@@ -67,8 +62,6 @@ export function TaxOpenLedger({
           />
         )}
 
-        {/* On a phone the stacked cards have no header row to sort
-        from; the picker lives here rather than above the list. */}
         {isPhone && openRows.length > 1 && (
           <DataTableSortPicker
             columns={openColumns}
@@ -87,8 +80,6 @@ export function TaxOpenLedger({
         )}
       </div>
 
-      {/* An empty ledger is EmptyState's to explain below; "nothing
-      open — every entry is paid" would contradict it. */}
       {visibleRows.length > 0 && (
         <section aria-labelledby="mining-tax-open">
           <h2 id="mining-tax-open" className="sr-only">
@@ -129,7 +120,6 @@ interface TaxHistoryLedgerProps {
   rowProps: TaxRowProps;
 }
 
-/** Everything settled, a month to a fold. */
 export function TaxHistoryLedger({
   historyRows,
   history,
@@ -148,8 +138,6 @@ export function TaxHistoryLedger({
           <DataTable
             columns={historyColumns}
             rows={historyRows}
-            // Months are sections here, not folded duplicates:
-            // their entries line up with Open's, unindented.
             className="dt-flat-groups dt-sep-trailing dt-actions-pinned-only sm:table-fixed"
             rowKey={(dr) => dr.key}
             label={t('miningTax.sections.history')}
@@ -160,7 +148,6 @@ export function TaxHistoryLedger({
               key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
               allWidths: true,
               minSize: 1,
-              // The newest month opens; older ones stay folded.
               defaultExpanded: (rows) =>
                 (dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7) === history[0]?.month,
               renderHeader: (rows) => (

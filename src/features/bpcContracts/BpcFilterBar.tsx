@@ -30,7 +30,6 @@ import {
 
 export type UiFilter = BpcSourcingFilter;
 
-/** `FilterBar`'s value: the URL fields flattened beside Source, Space and Distance. */
 type CompositeFilter = UiFilter & Omit<BpcFilterState, 'filter'>;
 
 function toState({ sources, spaceKinds, jumps, ...filter }: CompositeFilter): BpcFilterState {
@@ -41,10 +40,6 @@ function fromState({ filter, sources, spaceKinds, jumps }: BpcFilterState): Comp
   return { ...filter, sources, spaceKinds, jumps };
 }
 
-/**
- * A chip's pill: captioned as its control's `FilterField`, so a click on it
- * focuses that control.
- */
 function chipPill(
   chip: BpcFilterChip,
   t: TFunction,
@@ -110,13 +105,9 @@ interface BpcFilterBarProps {
   jumps: JumpRange;
   onJumpsChange: (next: JumpRange) => void;
   currentSystem: CurrentSystemState;
-  /** The pilot's own Exclude defaults (Settings): hiding at the default is not an active filter. */
   hideDefaults: BpcHideDefaults;
-  /** The blueprint box's combobox wiring — role, expanded state, active option and arrow keys — owned by the panel, which renders the listbox. */
   searchComboboxProps: InputHTMLAttributes<HTMLInputElement>;
-  /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
-  /** Rows the filters leave, for the phone sheet's done button. */
   resultCount?: number;
 }
 
@@ -139,7 +130,6 @@ export function BpcFilterBar({
   const { t } = useTranslation();
   const compositeValue: CompositeFilter = { ...filter, sources, spaceKinds, jumps };
   const regionNames = new Map(regionOptions.map((region) => [region.id, region.name]));
-  // Never the search text: the box above already shows it.
   const active: ActiveFilter<CompositeFilter>[] = bpcActiveFilterChips(
     toState(compositeValue),
     hideDefaults
@@ -148,7 +138,6 @@ export function BpcFilterBar({
     clear: (value) => fromState(chip.clear(toState(value))),
   }));
 
-  /** Widened past `UiFilter` so Source/Space/Distance commit through the same `FilterBar` value as the other fields (matching Contracts.tsx and Market's FilterBar usage). Space is a Dexie-backed preference, written here and nowhere else. */
   function handleCompositeChange(next: CompositeFilter) {
     const {
       sources: nextSources,

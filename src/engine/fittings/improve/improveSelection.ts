@@ -8,31 +8,23 @@ export type SelectionProblem =
 
 export interface SelectionSummary {
   count: number;
-  /** Sum of the priced rows' cost: new minus old. */
   isk: number;
-  /** Rows with no hub price, which `isk` leaves out. */
   unpriced: number;
-  /** The whole fit's price with the set made; null when the fit's price is unknown. */
   total: number | null;
   dps: { before: number; after: number };
   ehp: { before: number; after: number };
-  /** What stops the set being applied; empty means it fits. */
   problems: SelectionProblem[];
 }
 
 interface Params {
   options: readonly ImproveOption[];
-  /** The fit's own stats, under the same conditions as `after`. */
   before: FittingStats;
-  /** One whole-fit recalculation of every ticked row made together. */
   after: FittingStats;
   iskBudget: number | null;
-  /** What the fit costs now (for the budget). */
   fitTotal: number | null;
   target?: TargetProfile;
 }
 
-/** The ticked rows as one set: each row was scored alone, so the combined fit is checked here. */
 export function summariseSelection({
   options,
   before,

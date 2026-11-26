@@ -1,9 +1,3 @@
-/**
- * The item menu's "Set stock target": put one item on a market's **Stock
- * List** with how many to keep listed, from wherever the pilot noticed they
- * need it. A market is set up on Market › Stock, where its station is picked;
- * with none yet, the dialog points there.
- */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -53,7 +47,6 @@ export function StockTargetDialog({
   const quantityRef = useRef<HTMLInputElement>(null);
   const openStockRef = useRef<HTMLButtonElement>(null);
 
-  // The form mounts once the lists have loaded, after the Modal's own first focus.
   useEffect(() => {
     if (!hydrated) return;
     (lists.length > 0 ? quantityRef : openStockRef).current?.focus();

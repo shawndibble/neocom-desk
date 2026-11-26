@@ -38,7 +38,6 @@ describe('linkUnlinkedPayees', () => {
     expect(lookupMock.lookupPayeeNames).toHaveBeenCalledTimes(1);
     expect(lookupMock.lookupPayeeNames).toHaveBeenCalledWith(['moon corp', 'Moon 1 Planet 2']);
     expect(done?.map((p) => p.id)).toEqual(['p1']);
-    // By id alone: unverified, so a confirmed payment can still correct it.
     const p1 = await db.payees.get('p1');
     expect(p1).toMatchObject({ name: 'moon corp', entityId: 2 });
     expect(p1 && 'entityKind' in p1).toBe(false);
@@ -70,7 +69,6 @@ describe('linkUnlinkedPayees', () => {
     expect('entityId' in ((await db.payees.get('p1')) ?? {})).toBe(false);
   });
 
-  // "Bob" is some stranger: a character name is flagged for the pilot, never linked unasked.
   it('never links a Payee whose name is a character', async () => {
     lookupMock.lookupPayeeNames.mockResolvedValue(
       new Map([
@@ -83,7 +81,6 @@ describe('linkUnlinkedPayees', () => {
 });
 
 describe('useAutoLinkPayees when EVE is unreachable', () => {
-  // An outage is not "nobody in EVE has this name": nothing is flagged.
   it('flags nothing', async () => {
     lookupMock.lookupPayeeNames.mockRejectedValue(new Error('offline'));
     await linkUnlinkedPayees([moonCorp, moonLabel]);
@@ -96,7 +93,6 @@ describe('useAutoLinkPayees', () => {
   it('reports the Payees still unlinked once checked, and reloads when it linked one', async () => {
     const onLinked = vi.fn();
     const { result } = renderHook(() => useAutoLinkPayees([moonCorp, moonLabel, linked], onLinked));
-    // Nothing is said about a Payee before its check has answered.
     expect(result.current).toEqual([]);
     await waitFor(() => expect(onLinked).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.map((p) => p.id)).toEqual(['p2']));

@@ -106,7 +106,6 @@ describe('loadBoard', () => {
       ['char:2', 8],
       ['char:3', 1],
     ]);
-    // The merged board is the new cache: the same stamp now costs one read.
     store.calls = [];
     await loadBoard(1, 'c1', 2000);
     expect(store.calls).toEqual(['version']);

@@ -22,8 +22,6 @@ function entry(over: Partial<SkillQueueEntry> & Pick<SkillQueueEntry, 'queue_pos
 
 describe('classifySkillQueue', () => {
   it('marks an entry whose finish_date has passed as completed, not training', () => {
-    // ESI keeps these until the character next logs in — they are the
-    // difference between /skills and reality, not stale junk to drop.
     const rows = classifySkillQueue(
       [entry({ queue_position: 0, finish_date: at('2026-08-29T12:00:00Z') })],
       NOW
@@ -65,8 +63,6 @@ describe('classifySkillQueue', () => {
   });
 
   it('treats an entry with no finish_date as paused, never as starting now', () => {
-    // EVEMon's bug (peterhaneve/evemon#40): synthesizing a start time for a
-    // paused entry marks skills falsely complete. Absent means unknown.
     const rows = classifySkillQueue([entry({ queue_position: 0 })], NOW);
     expect(rows[0].status).toBe('paused');
     expect(rows[0].secondsRemaining).toBeNull();
@@ -94,8 +90,6 @@ describe('classifySkillQueue', () => {
   });
 
   it('treats an unparseable finish_date as paused rather than completed', () => {
-    // Date.parse returns NaN; every comparison against it is false, so an
-    // unguarded implementation silently files this under "still training".
     const rows = classifySkillQueue([entry({ queue_position: 0, finish_date: 'not-a-date' })], NOW);
     expect(rows[0].status).toBe('paused');
   });
@@ -155,8 +149,6 @@ describe('completedQueueLevels', () => {
   });
 
   it('ignores a paused queue entirely — an absent date is not a past date', () => {
-    // peterhaneve/evemon#40: synthesizing a time for paused entries marked
-    // skills falsely complete. An absent date means "ETA unknown", never "done".
     const levels = completedQueueLevels(
       [entry({ queue_position: 0, skill_id: 3300, finished_level: 5 })],
       NOW
@@ -165,8 +157,6 @@ describe('completedQueueLevels', () => {
   });
 
   it('keeps the highest finished_level when one skill completed twice', () => {
-    // Queue order does not guarantee ascending level, so last-write-wins is
-    // not the same thing as max.
     const levels = completedQueueLevels(
       [
         entry({
@@ -367,9 +357,6 @@ describe('completedQueueLevels: ESI responses are untrusted input', () => {
   it.each([0, 6, 99, -1, 2.5, Number.NaN])(
     'ignores an entry claiming finished_level %p, rather than passing it to the engine',
     (finished_level) => {
-      // SkillQueueEntry is a cast over an ESI response and over a Dexie cache
-      // replay, so nothing here is guaranteed. A level outside 1..5 throws in
-      // engine/industry/time.ts and silently empties a plan in normalizePlan.
       const levels = completedQueueLevels(
         [entry({ queue_position: 0, skill_id: 3300, finished_level, finish_date: past })],
         NOW
@@ -399,7 +386,6 @@ describe('completedQueueLevels: ESI responses are untrusted input', () => {
 });
 
 describe('applyTrainingProgress', () => {
-  // Half-way through a 24h training: 12h of it elapsed as of NOW.
   const training = (over: Partial<SkillQueueEntry> = {}) =>
     entry({
       queue_position: 0,
@@ -413,9 +399,6 @@ describe('applyTrainingProgress', () => {
     });
 
   it('interpolates the training skill SP across its own start/finish window', () => {
-    // The whole point: /skills reports SP as of the last apply, so the skill
-    // currently training reads stale and the planner charges a level the
-    // character is part-way through in full.
     const merged = applyTrainingProgress(
       new Map([[60378, { level: 3, sp: 100_000 }]]),
       [training()],
@@ -466,8 +449,6 @@ describe('applyTrainingProgress', () => {
   });
 
   it('contributes nothing when the head entry has already finished', () => {
-    // A past finish_date is `completed`, which applyCompletedQueueEntries
-    // owns. Interpolating it here would double-count against that pass.
     const trained = new Map([[60378, { level: 3, sp: 100_000 }]]);
     const merged = applyTrainingProgress(
       trained,
@@ -483,8 +464,6 @@ describe('applyTrainingProgress', () => {
   });
 
   it('falls back to training_start_sp as a floor when the queue is paused', () => {
-    // A paused queue omits its dates, so there is nothing to interpolate
-    // across — but the SP banked when training began is still a lower bound.
     const merged = applyTrainingProgress(
       new Map([[60378, { level: 3, sp: 48_000 }]]),
       [entry({ queue_position: 0, skill_id: 60378, training_start_sp: 100_000 })],
@@ -505,19 +484,13 @@ describe('applyTrainingProgress', () => {
 
   it('survives a zero-length or malformed training window', () => {
     const trained = new Map([[60378, { level: 3, sp: 48_000 }]]);
-    for (const over of [
-      { start_date: at('2026-08-31T00:00:00Z') }, // start === finish
-      { start_date: 'not-a-date' },
-    ]) {
+    for (const over of [{ start_date: at('2026-08-31T00:00:00Z') }, { start_date: 'not-a-date' }]) {
       const merged = applyTrainingProgress(trained, [training(over)], NOW);
-      // Falls back to the banked floor rather than NaN or a divide-by-zero.
       expect(merged.get(60378)).toEqual({ level: 3, sp: 100_000 });
     }
   });
 
   it('does not credit SP past the level end when the clock has run over', () => {
-    // start_date in the future is nonsense but reachable via clock skew;
-    // the fraction is clamped both ways rather than extrapolated.
     const merged = applyTrainingProgress(
       new Map([[60378, { level: 3, sp: 0 }]]),
       [
@@ -583,8 +556,6 @@ describe('projectQueueEnd', () => {
       entry({ queue_position: 2, finished_level: 4, finish_date: '2026-09-11T12:00:00Z' }),
       entry({ queue_position: 3, finished_level: 2, finish_date: '2026-09-20T12:00:00Z' }),
     ];
-    // 102 is planned; 103 trains after it in game, so waiting for the queue's
-    // end would count 102's time twice.
     const r = projectQueueEnd(trained, queue, NOW, [{ skillTypeID: 102, targetLevel: 5 }]);
     expect(r.startMs).toBe(Date.parse('2026-09-01T12:00:00Z'));
     expect(r.trained.get(101)?.level).toBe(3);
@@ -594,9 +565,6 @@ describe('projectQueueEnd', () => {
   });
 
   it('still waits on the rest of the lead when the plan lists the queue head', () => {
-    // 101 (the in-progress head) is also a plan entry, but 102 behind it is
-    // not, so 102 stays lead — the plan cannot start before the live queue
-    // gets to it either way.
     const queue = [
       entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
       entry({ queue_position: 2, finished_level: 4, finish_date: '2026-09-11T12:00:00Z' }),

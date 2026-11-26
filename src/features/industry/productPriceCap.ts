@@ -1,11 +1,6 @@
 import { cappedSellPrice } from '@/engine/industry/marketWideSanity';
 import type { MarketSnapshot } from './marketData';
 
-/**
- * The product's hub sell price, capped at CCP's average when the hub's
- * cheapest order is a troll price (`cappedSellPrice`, the rule Market-Wide
- * uses). Null with no snapshot, no product or no sell order.
- */
 export function productSalePrice(
   snapshot: MarketSnapshot | null,
   productTypeID: number | null | undefined
@@ -17,12 +12,6 @@ export function productSalePrice(
   return cappedSellPrice(sellMin, snapshot.averagePrices?.[productTypeID]);
 }
 
-/**
- * The snapshot with the product's hub sell price at `productSalePrice`, for
- * the engine to price revenue off. Ranked rows and the Build Plan they open
- * both price the product through this, so they agree. Materials are
- * untouched; uncapped, the snapshot comes back as is.
- */
 export function capProductPrice<S extends MarketSnapshot | null>(
   snapshot: S,
   productTypeID: number | null | undefined
@@ -37,12 +26,6 @@ export function capProductPrice<S extends MarketSnapshot | null>(
   };
 }
 
-/**
- * The snapshot with the plan's own sale price standing in for the product's
- * hub price (a nullsec market, a contract). The pilot's number is not a troll
- * price, so the product's average is dropped and `productSalePrice` cannot cap
- * it. A blank or unusable price leaves the snapshot alone.
- */
 export function applyProductSalePrice<S extends MarketSnapshot | null>(
   snapshot: S,
   productTypeID: number | null | undefined,

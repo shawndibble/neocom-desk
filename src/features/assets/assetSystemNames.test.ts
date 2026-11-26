@@ -24,7 +24,6 @@ describe('rootPlaceRefs', () => {
       asset({ item_id: 1 }),
       asset({ item_id: 2 }),
       asset({ item_id: 3, location_id: 1_000_000_000_001, location_type: 'other' }),
-      // A parent ESI never listed as an asset is a structure.
       asset({ item_id: 4, location_id: 1_000_000_000_001, location_type: 'item' }),
     ];
     expect(rootPlaceRefs(assets, names, () => 7)).toEqual([

@@ -1,25 +1,13 @@
-/**
- * Loads what the Assets pages need to value their blueprint copies — the
- * Public Contract Offers snapshot plus the owner's blueprint records for
- * ME/TE/runs — and hands them to `engine/blueprintCopyValue.ts`.
- *
- * Best-effort throughout: no snapshot means every copy is worth 0, and an
- * unreadable blueprints endpoint (scope not granted, not a Director) means
- * each copy prices at the ME0/TE0 tier. Neither fails the page.
- */
-
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { blueprintCopyValues } from '@/engine/blueprintCopyValue';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 
-/** The asset-row fields this needs: only rows ESI flags `is_blueprint_copy` are valued here. */
 export interface CopyAssetRow {
   item_id: number;
   type_id: number;
   is_blueprint_copy?: boolean;
 }
 
-/** Blueprint records keyed by item_id, or null when they can't be read. */
 export type LoadBlueprints = () => Promise<
   | readonly Pick<
       CharacterBlueprint,
@@ -28,11 +16,6 @@ export type LoadBlueprints = () => Promise<
   | null
 >;
 
-/**
- * Imported on demand: it pulls in the R2 snapshot reader and the SDE
- * blueprints, which a page without copies never needs. BPOs ride along so the engine can tell a contract
- * selling a copy beside its original apart from one selling copies alone.
- */
 async function loadCopyOffers(): Promise<readonly BpcContractRow[]> {
   try {
     const { loadBpcOfferRows } = await import('@/features/bpcContracts/bpcOfferRows');
@@ -50,7 +33,6 @@ async function safely<T>(load: () => Promise<T | null>): Promise<T | null> {
   }
 }
 
-/** Per-item value of every blueprint copy in `assets`; empty (and nothing loaded) when there are none. */
 export async function loadAssetCopyValues(
   characterId: number,
   assets: readonly CopyAssetRow[],

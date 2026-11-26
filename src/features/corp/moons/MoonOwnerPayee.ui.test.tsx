@@ -105,7 +105,6 @@ describe('moon owner payee line', () => {
     expect(notice.textContent).not.toMatch(/48|hour|wait|remov|feeder|collector/i);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('status', { name: 'Who gets paid changed' })).toBeNull();
-    // Dismissed on this device: it stays gone on the next visit.
     cleanup();
     ownerView(over);
     expect(screen.queryByRole('status', { name: 'Who gets paid changed' })).toBeNull();

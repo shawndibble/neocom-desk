@@ -1,8 +1,3 @@
-/**
- * The Manager view: every Stock Target, worst first. The Stock Target edits
- * in place (§6c's faint pencil); a row opens Show Info; the row's ⋮ is the
- * item menu every other item row has, plus "Remove from list".
- */
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -48,23 +43,17 @@ function TargetCell({
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  // Set once the field has closed, so the blur its own unmount fires cannot save an escaped value.
   const closed = useRef(false);
-  // Set when a typed digit opened the field: that digit stays, never selected for replacing.
   const seeded = useRef(false);
   const focusAfterCommit = useFocusAfterCommit();
   function close() {
     closed.current = true;
     setDraft(null);
-    // The field swaps back to the button: focus follows it (DESIGN.md §7). A new
-    // target can move the row out of the status filter, so the heading backs it up.
     focusAfterCommit(buttonRef, () =>
       document.querySelector<HTMLElement>('[data-stock-market-title]')
     );
   }
   if (draft !== null) {
-    // An unusable value keeps the field open with what was typed, and says so;
-    // only Escape discards it. The same value as now is a quiet no-op.
     const commit = (moveFocus = true) => {
       if (closed.current) return;
       const next = Math.floor(Number(draft));
@@ -75,7 +64,6 @@ function TargetCell({
       if (next !== row.target) onSetTarget(row.typeId, next);
       if (moveFocus) close();
       else {
-        // Blur: focus is already where the user sent it.
         closed.current = true;
         setDraft(null);
       }
@@ -85,8 +73,6 @@ function TargetCell({
       <span className="inline-flex flex-col items-end">
         <TextInput
           size="sm"
-          // Text with a numeric keypad, not type="number": a seeded digit needs
-          // the caret after it, and a number field can't place its caret.
           inputMode="numeric"
           autoFocus
           aria-label={t('stockTargets.table.targetFor', { name })}
@@ -105,7 +91,6 @@ function TargetCell({
           }}
           onClick={(e) => e.stopPropagation()}
           onBlur={() => {
-            // Blur that is not the field's own close saves, as leaving any edit field does.
             commit(false);
           }}
           onKeyDown={(e) => {
@@ -132,7 +117,6 @@ function TargetCell({
       onEdit={(seed) => {
         closed.current = false;
         setInvalid(false);
-        // A target is a whole number: only a digit seeds the field.
         const digit = seed !== undefined && /^\d$/.test(seed);
         seeded.current = digit;
         setDraft(digit ? seed : String(row.target));
@@ -155,11 +139,8 @@ export function StockManagerTable({
 }: {
   rows: readonly StockRow[];
   nameOf: (typeId: number) => string;
-  /** The item's top-level Market Group, under its name on desktop. */
   groupOf: (typeId: number) => string | undefined;
-  /** Names the Character holding a count; undefined while only one Character has data, when naming them says nothing. */
   characterName: ((characterId: number) => string) | undefined;
-  /** Names what the ticks were made in (Character, list, filters): a change drops them. */
   selectionKey: string;
   onSetTarget: (typeId: number, target: number) => void;
   onRemove: (typeId: number) => void;
@@ -173,11 +154,9 @@ export function StockManagerTable({
       ? null
       : document.querySelector<HTMLElement>(`[data-stock-target-edit="${typeId}"]`);
 
-  /** Removing a row moves focus to the next row's control, else the previous one (DESIGN.md §7). */
   function remove(typeId: number) {
     const index = rows.findIndex((row) => row.typeId === typeId);
     onRemove(typeId);
-    // After the row menu has put focus back on its ⋮, or that focus cancels the request.
     window.setTimeout(() =>
       focusAfterCommit(
         editButton(rows[index + 1]?.typeId),
@@ -192,7 +171,6 @@ export function StockManagerTable({
     rows.map((row) => row.typeId)
   );
 
-  /** Bulk remove acts at once (the page offers Undo); focus lands on the row that took its place. */
   function removeSelected() {
     const chosen = rows.filter((row) => selection.selected.has(row.typeId));
     if (chosen.length === 0) return;
@@ -226,7 +204,6 @@ export function StockManagerTable({
   };
 
   const nowMs = useNow();
-  /** "first done in 3h", or ready once the soonest job's window has ended. */
   function jobEndLabel(endDate: string): string {
     const seconds = (Date.parse(endDate) - nowMs) / 1000;
     return seconds > 0
@@ -245,7 +222,6 @@ export function StockManagerTable({
         return (
           <>
             <span className="font-medium">{nameOf(row.typeId)}</span>
-            {/* Desktop only: the phone card's title stays one line (§4a). */}
             {group && (
               <span className="hidden text-[0.6875rem] text-text-dim sm:block">{group}</span>
             )}
@@ -343,7 +319,6 @@ export function StockManagerTable({
     {
       id: 'fill',
       header: t('stockTargets.table.fill'),
-      // Between `sm` and `xl` the table is wider than its panel: the Status pill carries the bar's reading there (the card keeps it below `sm`).
       headerCellClassName: 'sm:w-28 max-xl:sm:hidden',
       className: 'max-xl:sm:hidden',
       stackEdge: 'below',
@@ -360,7 +335,6 @@ export function StockManagerTable({
     {
       id: 'restock',
       header: t('stockTargets.table.restock'),
-      // Between `sm` and `xl` every pixel counts (see the fill column): tighter side padding.
       headerClassName: 'max-xl:sm:px-2',
       className: 'max-xl:sm:px-2',
       render: (row) =>
@@ -369,7 +343,6 @@ export function StockManagerTable({
             —
           </span>
         ) : (
-          // Two lines on desktop; one run of text on a phone card, where a block breaks the line (§4a).
           <span className="sm:flex sm:flex-col">
             {row.fromHangar > 0 && (
               <span className="text-accent sm:whitespace-nowrap">
@@ -392,7 +365,6 @@ export function StockManagerTable({
             )}
           </span>
         ),
-      // Sorts by Shortfall; the cell shows it as its two halves.
       sortValue: (row) => row.shortfall,
     },
     {
@@ -420,12 +392,10 @@ export function StockManagerTable({
       id: 'status',
       header: t('stockTargets.table.status'),
       headerCellClassName: 'sm:w-24',
-      // The sort glyph widened this header; tighter side padding between `sm` and `xl` keeps the table inside 1024px.
       headerClassName: 'max-xl:sm:px-2',
       className: 'max-xl:sm:px-2',
       cardCorner: true,
       render: (row) => <StockStatusPill status={row.status} />,
-      // Worst first on the first click, like the page's own order.
       sortValue: (row) => stockStatusRank(row.status),
       sortFirst: 'asc',
     },
@@ -439,7 +409,6 @@ export function StockManagerTable({
     StockColumnId,
     DataTableColumn<StockRow>
   >;
-  // No row has a running job: the column would be a wall of zeros, so it stays out until one does.
   const anyJobs = rows.some((row) => row.inJobs > 0);
   const shownColumns = columns.filter(
     (column) =>
@@ -494,7 +463,6 @@ export function StockManagerTable({
         {...stockExport.tableProps}
         label={t('stockTargets.table.label')}
         stackLayout="dense"
-        // The ⋮ pins to the card's edge on a phone, so line one stays text-tall (§4a).
         className="dt-actions-pinned-only"
         onRowClick={(row) => showInfo(row.typeId, nameOf(row.typeId))}
         rowMoreActions
@@ -502,7 +470,6 @@ export function StockManagerTable({
           <ItemContextMenu
             typeId={row.typeId}
             itemName={nameOf(row.typeId)}
-            // The pencil already edits the Stock Target here (§6c restraint).
             hideStockTarget
             extraItems={
               <>

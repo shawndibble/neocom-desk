@@ -23,20 +23,9 @@ interface ChargesTabProps {
   context: FittingContext | null;
   moduleResults: FittingModuleResult[] | null;
   onLoadCharge?: (chargeTypeId: number) => void;
-  /** A charge drags onto the modules that take it. */
   dragToFit: boolean;
 }
 
-/**
- * Per fitted module type that takes charges: for a weapon, the Charge
- * Picker (grouped by type or faction, with this Fitting's damage, range and
- * the hub's price); for a cap booster, its guide (how the capacitor fares on
- * each charge, GJ/s, ISK per GJ); for a mining laser, its crystal guide
- * (what A, B and C are for, each ore family's crystals side by side); for
- * anything else (scripts, paste), the
- * plain list of what it takes. Each module's section collapses under its
- * header, which then names the charge loaded in it.
- */
 export function ChargesTab({
   fitting,
   catalogue,
@@ -60,7 +49,6 @@ export function ChargesTab({
 
   const name = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 
-  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it, right-click menu. */
   const wrapRow = (chargeTypeId: number, row: ReactNode) => {
     const draggable = dragToFit && actions !== null;
     const inner = (
@@ -100,7 +88,6 @@ export function ChargesTab({
     return <p className="text-xs text-text-dim">{t('fittings.add.noChargeTakers')}</p>;
   }
   const weaponChoices = groups.filter((g) => g.isWeapon).flatMap((g) => g.choices);
-  // The shared View/Sort/distance controls go with the weapon sections they drive.
   const anyWeaponOpen = groups.some((g) => g.isWeapon && !collapsed.has(g.moduleTypeId));
   const maxKm = Math.ceil(
     (Math.max(0, ...weaponChoices.map((c) => c.optimal + c.falloff)) / 1000) * 1.2
@@ -136,7 +123,6 @@ export function ChargesTab({
                     name: name(group.moduleTypeId),
                   })}
                 </span>
-                {/* The name always carries what's loaded, so it reads the same open or shut. */}
                 {loadedNames !== '' && (
                   <span className="sr-only">
                     {t('fittings.add.chargeTakerLoaded', { names: loadedNames })}
@@ -152,7 +138,6 @@ export function ChargesTab({
                 )}
               </button>
             </h3>
-            {/* Hidden rather than unmounted, so a type opened inside stays open. */}
             <div id={bodyId} hidden={!open}>
               {group.isMiner ? (
                 <MiningCrystalGuide

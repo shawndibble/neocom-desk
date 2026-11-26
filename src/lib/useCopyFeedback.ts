@@ -1,12 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useAutoDismiss } from './useAutoDismiss';
 
-/**
- * A "Copied" flash: `flash(value)` shows `value` in `copied`, then clears it
- * to `null` after `ms`. A new flash replaces the value and restarts the timer;
- * unmount cancels it. `T` defaults to `true` (plain flag, `flash()`); pass a
- * key or status when the flash must say *which* control copied.
- */
 export function useCopyFeedback<T = true>(
   ms: number
 ): { copied: T | null; flash: (value?: T) => void; clear: () => void } {

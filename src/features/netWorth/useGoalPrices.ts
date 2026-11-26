@@ -6,28 +6,19 @@ import type { FittingChoices } from '@/features/fittings/useFittingChoices';
 import type { TradeHub } from '@/market/hubs';
 import type { WalletGoal } from './walletGoalSetting';
 
-/** Absent while loading. `partial`: some items have no sell order, so a total would undercount. */
 export type GoalPrice =
   { status: 'failed' } | { status: 'partial' } | { status: 'ready'; sell: number };
 
-/** Identity of a Goal's price: a new Fitting on the same Goal is a new price. */
 export const goalPriceKey = (goal: Pick<WalletGoal, 'id' | 'fittingId'>) =>
   JSON.stringify([goal.id, goal.fittingId]);
 
 export interface GoalPrices {
-  /** Keyed by `goalPriceKey`; absent while loading. */
   prices: ReadonlyMap<string, GoalPrice>;
-  /** Where each Fitting-priced Goal's Fitting opens, keyed by `goalPriceKey`; absent until it resolves or when it is too large to share. */
   links: ReadonlyMap<string, FittingEditLocation>;
 }
 
 const NONE: GoalPrices = { prices: new Map(), links: new Map() };
 
-/**
- * The target of each Fitting-priced Goal: the Fitting's sell price at `hub`
- * (what buying it off the hub costs), read again on each visit so it follows
- * the market, and the editor location that opens that Fitting.
- */
 export function useGoalPrices(
   goals: readonly WalletGoal[],
   hub: TradeHub,
@@ -54,8 +45,6 @@ export function useGoalPrices(
         try {
           const picked = await resolve(fittingId);
           if (!picked) return failed;
-          // A saved Fitting opens by its own code; an In-game one is encoded. A failed
-          // encode costs the link, never the price.
           const link = picked.code
             ? fittingEditLocation(picked.code)
             : await fittingEditLocationFor(picked.fitting);
@@ -87,10 +76,8 @@ export function useGoalPrices(
     return () => {
       cancelled = true;
     };
-    // `effectKey` stands for `hub` and the wanted pairs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectKey, resolve, ready]);
 
-  // A load for another hub or Goal set is not this one's answer.
   return useMemo(() => (loaded.key === effectKey ? loaded.result : NONE), [loaded, effectKey]);
 }

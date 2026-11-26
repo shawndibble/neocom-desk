@@ -1,12 +1,3 @@
-/**
- * "What do you do in EVE?": the first-run question, and Customize's "Start from
- * a role". Pick any number of Roles; the four base widgets are always in, and
- * the union of the chosen Roles' kinds follows.
- *
- * First run offers Just the basics (the base four) beside Build my Overview.
- * Reached later, from the edit bar, it is a dialog with Cancel instead, and the
- * layout it builds replaces the current one (undoably: the caller decides).
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, Modal } from '@/components/ui';
@@ -16,18 +7,14 @@ import type { OverviewLayout } from './layout';
 import { ROLE_IDS, basicsLayout, buildLayoutFromRoles, type RoleId } from './roles';
 
 interface RoleChooserProps {
-  /** First run: the heading is the question and the second button is Just the basics. */
   firstRun: boolean;
   onChoose: (layout: OverviewLayout) => void;
-  /** Reached later: what Cancel does. */
   onCancel?: () => void;
 }
 
 export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<readonly RoleId[]>([]);
-  // Only `ready` capabilities match what the corp widgets can read: a grant missing a
-  // scope still reports the role. Until then corp kinds stay out; the Gallery adds them.
   const corp = useCorpAccess();
   const held = corp.state === 'ready' ? corp.capabilities : null;
   const toggle = (role: RoleId) =>
@@ -40,7 +27,6 @@ export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) 
         firstRun ? 'grid max-w-2xl gap-3 rounded-xs border border-line bg-panel p-4' : 'grid gap-3'
       }
     >
-      {/* The dialog's own title is the heading when this is reached from Customize. */}
       {firstRun && <h2 className="text-lg font-semibold">{t('overview.roles.title')}</h2>}
       <p className="text-sm text-text-dim">{t('overview.roles.body')}</p>
       <div role="group" aria-label={t('overview.roles.group')} className="flex flex-wrap gap-2">
@@ -74,7 +60,6 @@ export function RoleChooser({ firstRun, onChoose, onCancel }: RoleChooserProps) 
   );
 }
 
-/** The chooser reached from Customize, as a dialog. */
 export function RoleChooserDialog({
   open,
   onChoose,

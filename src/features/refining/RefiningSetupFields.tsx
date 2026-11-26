@@ -6,24 +6,8 @@ import { InlinePercent } from './InlinePercent';
 import { useReferenceSkillsMultiplier } from './useReferenceSkillsMultiplier';
 import type { useRefiningSetup } from './useRefiningSetup';
 
-/**
- * Pulls the value's text onto the control column's edge (the hint and the
- * selects sit there): the button's 1px border and `px-1` are 5px of inset, so
- * its hover box hangs into the gutter instead. Phone rows keep the inset.
- */
 const ON_COLUMN_EDGE = 'md:-ml-[5px]';
 
-/**
- * The Refining Setup's settings fields for a Settings-style form: Settings ›
- * Market and the Appraisal page settings render the same pair.
- *
- * The first is the **Reprocessing Yield**, the figure the EVE client shows, as
- * that is the one a pilot reads and changes. What is saved is still the
- * Facility Base Yield behind it, worked out with the active Character's skills
- * (`useReferenceSkillsMultiplier`), so it stays right as skills change. With no
- * Character to take skills from the Facility Base Yield box is shown instead,
- * so nobody is left without a way to set it.
- */
 export function RefiningSetupFields({
   refining,
 }: {

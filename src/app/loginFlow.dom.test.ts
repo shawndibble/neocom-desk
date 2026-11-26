@@ -21,14 +21,8 @@ import {
 
 const CHAR_ID = 2112625428;
 const OTHER_CHAR_ID = 90000001;
-/**
- * A scope outside the Base Grant — an incrementally granted one. Since #6102
- * every read is in the Base Grant, so it is a Write to EVE scope: the base
- * consent screen must not carry it, and no re-login fills it in.
- */
 const EXTRA_SCOPE = 'esi-ui.open_window.v1';
 
-/** The `scope` parameter of the authorize URL the flow navigated to. */
 function requestedScopes(): string[] {
   const url = new URL(assignLocation.mock.calls.at(-1)![0]);
   return (url.searchParams.get('scope') ?? '').split(' ').filter(Boolean);
@@ -48,12 +42,6 @@ function b64url(s: string): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/**
- * SSO echoing back exactly the scopes the authorize URL asked for — which is
- * what makes the end-to-end cases below a check of the flow rather than of a
- * fixture, and what makes them mirror EVE's real behaviour: the token carries
- * what was requested and approved, never a scope the request omitted.
- */
 mswServer(
   http.post('https://login.eveonline.com/v2/oauth/token', () => {
     const payload = {
@@ -75,22 +63,12 @@ mswServer(
 beforeEach(async () => {
   sessionStorage.clear();
   assignLocation.mockClear();
-  // Set explicitly in every test that cares: `beginEveLogin` defaults to the
-  // active Character, so a test relying on the store's initial value would be
-  // proving the default rather than the branch it names.
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   await db.tokens.clear();
   await db.characters.clear();
   await db.esiCache.clear();
   await db.settings.clear();
 });
-
-// ---------------------------------------------------------------------------
-// Branch 1 — add a character. SSO decides who comes back, after this redirect,
-// so the app cannot know whose grant to union with. It asks for the base set
-// and nothing else, and `auth/session` judges the answer against *that*
-// (issue #295).
-// ---------------------------------------------------------------------------
 
 describe('beginAddCharacterLogin', () => {
   it('sends the base SCOPES when no character has logged in yet', async () => {
@@ -112,11 +90,6 @@ describe('beginAddCharacterLogin', () => {
   });
 
   it('does NOT inherit another character’s wider grant', async () => {
-    // #293 unioned across every stored character, because it could not
-    // under-ask without tripping the purge. Now the purge judges requested vs
-    // granted, so the union is no longer needed to stay safe — and asking an
-    // alt for corp scopes only a main ever granted is the consent bloat this
-    // whole ticket exists to prevent.
     await seedGrant(OTHER_CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
 
     await beginAddCharacterLogin();
@@ -125,9 +98,6 @@ describe('beginAddCharacterLogin', () => {
   });
 
   it('does NOT inherit the ACTIVE character’s grant either', async () => {
-    // The reason this is its own entry point rather than `beginEveLogin()`:
-    // somebody is usually signed in when Add character is pressed, and the
-    // character arriving is by definition somebody else.
     await seedGrant(CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
     useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
 
@@ -146,11 +116,6 @@ describe('beginAddCharacterLogin', () => {
   });
 
   it('end to end: a widened grant re-running the BASE login keeps its cache', async () => {
-    // #293 AC 3, preserved through the change of mechanism. The narrowing is
-    // now real — the new refresh token genuinely carries only what was asked
-    // for, so the stored grant drops back to the base set — but the cache
-    // survives, because a scope the app never asked for is no evidence that
-    // the character revoked it. Re-granting is one click in Settings.
     await db.characters.put({
       characterId: CHAR_ID,
       name: 'CCP Alpha',
@@ -168,13 +133,6 @@ describe('beginAddCharacterLogin', () => {
     expect((await db.tokens.get(CHAR_ID))?.scopes).not.toContain(EXTRA_SCOPE);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Branch 2 — a known character. Every entry point here is initiated from a
-// character context (the Settings Corporation Permission row, the role-gain prompt, the
-// ReauthBanner), so the grant to union with *is* knowable, and asking for less
-// than it would throw away a grant the character already made.
-// ---------------------------------------------------------------------------
 
 describe('beginEveLogin: re-auth for a known character', () => {
   it('unions with THAT character’s stored grant, so a re-auth is never a narrowing', async () => {
@@ -203,8 +161,6 @@ describe('beginEveLogin: re-auth for a known character', () => {
   });
 
   it('leaves out a Permission the player unticked in Customize', async () => {
-    // #1520's concern, kept: a re-login must not re-request what the player
-    // declined. Customize is where they declined it.
     await db.settings.put({
       key: CUSTOMIZE_SELECTION_KEY,
       value: { groups: DEFAULT_ON_GROUPS.filter((group) => group !== 'killmails') },
@@ -229,13 +185,6 @@ describe('beginEveLogin: re-auth for a known character', () => {
     expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
   });
 
-  /**
-   * The default is what makes the ~15 `ReauthBanner` / `ScopeGate` /
-   * `AuthFailureNotice` call sites branch 2 without each naming a character:
-   * every one of them is pressed while looking at the active Character's data,
-   * and asking for less than that Character holds would silently drop their
-   * corp grant.
-   */
   it('defaults to the ACTIVE character, so a bare re-auth is not a narrowing', async () => {
     await seedGrant(CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
     useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
@@ -263,12 +212,6 @@ describe('beginEveLogin: re-auth for a known character', () => {
     expect(requestedScopes()).toContain(EXTRA_SCOPE);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Where the round trip lands. A re-auth or grant is pressed while looking at
-// a page, so `/callback` brings the user back to it; Add Character keeps the
-// ordinary landing.
-// ---------------------------------------------------------------------------
 
 describe('post-login landing', () => {
   afterEach(() => window.history.replaceState(null, '', '/'));
@@ -359,12 +302,6 @@ describe('post-login landing', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Branch 1b — Add Character through the Customize permissions dialog (#1522):
-// same "nobody to union with" reasoning as `beginAddCharacterLogin`, but with
-// a hand-picked set of Permissions instead of every default-on one.
-// ---------------------------------------------------------------------------
-
 describe('beginCustomizedAddCharacterLogin', () => {
   it('sends only the Core Grant when every Permission is unchecked (Select none)', async () => {
     await beginCustomizedAddCharacterLogin([]);
@@ -423,16 +360,8 @@ describe('beginCustomizedAddCharacterLogin', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Requesting an opt-in group.
-// ---------------------------------------------------------------------------
-
 describe('beginEveLogin: requesting a scope group', () => {
   it('asks for the named group and every other default-on gap, minus what Customize unticked (#6102)', async () => {
-    // A Character holding only the Core Grant plus Wallet presses the Mail
-    // banner: one trip asks for Core + Wallet (stored) + Mail (named) + every
-    // other default-on Permission it lacks, except Contracts, which the player
-    // unticked in Customize.
     await seedGrant(CHAR_ID, [...CORE_GRANT, ...scopesForGroup('wallet')]);
     await db.settings.put({
       key: CUSTOMIZE_SELECTION_KEY,
@@ -524,7 +453,6 @@ describe('beginEveLogin: requesting a scope group', () => {
 
 describe('beginEveLogin: a broken Dexie', () => {
   it('still fills the default-on gaps when the stored grant cannot be read', async () => {
-    // A broken Dexie must cost the user their cache, never their way back in.
     const get = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
 
     await beginEveLogin({ characterId: CHAR_ID });
@@ -534,8 +462,6 @@ describe('beginEveLogin: a broken Dexie', () => {
   });
 
   it('falls back to the Core Grant when the Customize choice cannot be read either', async () => {
-    // Without the choice, a fill could re-request a Permission the player
-    // declined, so it asks for nothing beyond Core.
     const tokens = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
     const settings = vi.spyOn(db.settings, 'get').mockRejectedValue(new Error('store closed'));
 
@@ -547,8 +473,6 @@ describe('beginEveLogin: a broken Dexie', () => {
   });
 
   it('still asks for a requested group when the stored grant cannot be read', async () => {
-    // The group is named by the caller, not read from Dexie, so a failed read
-    // must not silently turn a Grant press into an ordinary re-auth.
     const get = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
 
     await beginEveLogin({ characterId: CHAR_ID, groups: ['corp'] });
@@ -557,11 +481,6 @@ describe('beginEveLogin: a broken Dexie', () => {
     expect(requestedScopes()).toEqual(expect.arrayContaining([...scopesForGroup('corp')]));
   });
 });
-
-// ---------------------------------------------------------------------------
-// Alerts Grant (ADR 0020, 0028, 0029): EVE issues a token with exactly what was
-// requested, so every round trip must name every extra the Character keeps.
-// ---------------------------------------------------------------------------
 
 describe('beginAlertsLogin', () => {
   const NOTIFICATIONS = 'esi-characters.read_notifications.v1';

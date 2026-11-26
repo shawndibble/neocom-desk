@@ -1,19 +1,3 @@
-/**
- * Shared Skill Plans client: a Member copies one Skill Plan's name and ordered
- * skill targets into a Community, one plan at a time (there is no "share all"),
- * and every Member reads them from that Community's `skillPlans` collection.
- * Rules gate reads by membership and writes by the owning Character
- * (`firestore.rules`); leaving or removal deletes them server-side.
- *
- * Plans have no single save path to hook (the list, the editor, the target
- * picker and sync all write them), so a shared copy is kept current by a sweep
- * (`syncSharedPlans`: at boot, every half hour and when the Skill plans tab
- * opens) that compares each plan's own `updatedAt` with the one its copy was
- * made from. Nothing is ever shared by the sweep; it only refreshes or removes
- * copies the Member already made.
- *
- * Firestore here is the `lite` build (no listeners), so callers refetch.
- */
 import {
   collection,
   deleteDoc,
@@ -42,7 +26,6 @@ import { listCommunityIds } from './communityStore';
 import { markPlansShared } from './shareSelection';
 
 const MAX_NAME_LENGTH = 200;
-/** Most shared plans one Community read takes. */
 export const COMMUNITY_PLANS_CAP = 1000;
 
 type PlanToShare = Pick<SkillPlanRecord, 'id' | 'name' | 'entries' | 'updatedAt'>;
@@ -51,7 +34,6 @@ function plansOf(characterId: number, communityId: string) {
   return collection(getSyncFirestore(characterId), 'communities', communityId, 'skillPlans');
 }
 
-/** The data a Community stores for a plan; null when it cannot be shared (too many skills, or no owner on this device). */
 async function toDoc(characterId: number, plan: PlanToShare) {
   const entries = encodePlanEntries(plan.entries);
   const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
@@ -66,7 +48,6 @@ async function toDoc(characterId: number, plan: PlanToShare) {
   };
 }
 
-/** Shares (or refreshes) one plan in one Community. False when it can't be shared. */
 export async function sharePlan(
   characterId: number,
   communityId: string,
@@ -94,7 +75,6 @@ export async function unsharePlan(
   );
 }
 
-/** The plans this Character has in a Community: plan id to the `updatedAt` its copy was made from. */
 export async function loadMySharedPlans(
   characterId: number,
   communityId: string
@@ -120,7 +100,6 @@ export async function loadMySharedPlans(
   return shared;
 }
 
-/** Every plan shared into one Community, by anyone; a doc that does not decode is skipped. */
 export async function loadCommunityPlans(
   characterId: number,
   communityId: string
@@ -150,14 +129,7 @@ export async function loadCommunityPlans(
   return plans;
 }
 
-/**
- * Keeps one Community's copies of this Character's plans current: refreshes a
- * shared plan edited since its copy was made, removes the copy of a plan that
- * is gone. Never throws; a failure leaves the copies as they were until the
- * next sweep.
- */
 export async function syncSharedPlans(characterId: number, communityId: string): Promise<void> {
-  // A stand-in backend (Storybook) has nothing to write to.
   if (communityBackendOverride()) return;
   try {
     const shared = await loadMySharedPlans(characterId, communityId);
@@ -165,33 +137,24 @@ export async function syncSharedPlans(characterId: number, communityId: string):
     const local = await localDb.skillPlans.where('characterId').equals(characterId).toArray();
     const { push, remove } = planSyncActions(local, shared);
     const byId = new Map(local.map((plan) => [plan.id, plan]));
-    // One failing action must not stop the rest of the sweep.
     for (const planId of push) {
       try {
-        // A plan that can no longer be shared (edited past the cap) must not
-        // keep an old copy up: the Community would read it as current.
         if (!(await sharePlan(characterId, communityId, byId.get(planId)!))) {
           await unsharePlan(characterId, communityId, planId);
         }
-      } catch {
-        // Retried by the next sweep.
-      }
+      } catch {}
     }
     for (const planId of remove) {
       await unsharePlan(characterId, communityId, planId).catch(() => undefined);
     }
-  } catch {
-    // Best effort.
-  }
+  } catch {}
 }
 
-/** The sweep: every Community the Character is in. */
 export async function syncAllSharedPlans(characterId: number): Promise<void> {
   const ids = await listCommunityIds(characterId).catch(() => []);
   for (const communityId of ids) await syncSharedPlans(characterId, communityId);
 }
 
-/** The logout prompt's "remove what I shared": every Community, best effort per Community. */
 export async function unshareAllPlansEverywhere(characterId: number): Promise<void> {
   const ids = await listCommunityIds(characterId).catch(() => []);
   await Promise.allSettled(

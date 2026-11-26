@@ -1,8 +1,4 @@
 /* eslint-disable react-refresh/only-export-components -- mockup parts share constants with their stories */
-/**
- * Phone (390px) pieces of the SRP officer mockups: dense cards, the sticky
- * selection bar, the full-width result toast. Sample data only.
- */
 import type { ReactNode } from 'react';
 import {
   Button,
@@ -48,7 +44,6 @@ const pilotColumn: DataTableColumn<SrpClaim> = {
 
 const metaLine = (row: SrpClaim) => [row.hull, row.system, row.note].filter(Boolean).join(' · ');
 
-/** Two equal 44px buttons side by side. */
 function ButtonPair({ children }: { children: ReactNode }) {
   return (
     <span className="grid grid-cols-2 gap-2 [&>button]:w-full [&>button]:whitespace-nowrap [&>button]:px-2">
@@ -192,7 +187,6 @@ export function PhoneTable({
   );
 }
 
-/** "Select all" as the one small text button in the list header. */
 export function SelectAllAction({ count }: { count: number }) {
   return (
     <button type="button" className={textActionClassName()}>
@@ -201,7 +195,6 @@ export function SelectAllAction({ count }: { count: number }) {
   );
 }
 
-/** The sticky bottom bar (pinned to the screen's bottom on a phone; in flow here so the picture hides no card) that appears once a row is ticked; the toast, if any, sits above it. */
 export function PhoneSelectionBar({
   count,
   total,
@@ -238,7 +231,6 @@ export function PhoneSelectionBar({
   );
 }
 
-/** Full-width result toast: one or two lines, Undo at the right; the mail outcome is a dim second line. */
 export function PhoneResultToast({ title, detail }: { title: string; detail: string }) {
   return (
     <NewComponent name="SrpResultToast">

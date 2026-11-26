@@ -6,7 +6,6 @@ import { OptimizeForMeModal, RemapPreviewModal } from '../RemapPreviewModal';
 import type { usePlanOptimize } from './usePlanOptimize';
 import type { PlanScheduleResult } from './usePlanSchedule';
 
-/** The preview modals every optimize flow opens before it changes the plan. */
 export function PlanOptimizeModals({
   optimize,
   schedule,
@@ -87,11 +86,6 @@ export function PlanOptimizeModals({
         title={t('plans.optimizeRemaps')}
         open={optimizeResult !== null}
         verdict={optimizeVerdict}
-        // `remapNoGain` blames the entry order and points at "Suggest
-        // reorder" — true only when a remap was actually weighed and lost,
-        // never when there was none to spend. No segments on this branch:
-        // a search that found nothing to remap has no plan-as-trained to
-        // show, unlike the markers Modal, which already has one.
         segments={optimizeVerdict?.kind === 'saves' && optimizeResult ? optimizeResult : null}
         message={
           optimizeVerdict?.kind === 'noRemapsAvailable'
@@ -109,10 +103,6 @@ export function PlanOptimizeModals({
         title={t('plans.optimizeAtMarkers')}
         open={markersPanelOpen && markersAtCurrentPositions !== null}
         verdict={markersVerdict}
-        // Segments are the plan as the markers would train it — worth
-        // seeing even when the trade is poor, but not when no marker split
-        // anything: the lone "keep current attributes" row would then read
-        // as a contradiction of the message above it.
         segments={
           markersAtCurrentPositions && markersVerdict?.kind !== 'markersAtEnd'
             ? {

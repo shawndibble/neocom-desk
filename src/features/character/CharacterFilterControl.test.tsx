@@ -201,8 +201,6 @@ describe('CharacterFilterControl', () => {
       expect(trigger.querySelectorAll('[data-stack-placeholder]')).toHaveLength(3);
       expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
       for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
-      // Seeding is one write per Character, so the first three faces can render
-      // before the last two exist; the "+2" is only true once all five have.
       await waitFor(() => {
         expect(faceIds(trigger)).toEqual(['1', '2', '3']);
         expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
@@ -342,7 +340,6 @@ describe('CharacterFilterControl', () => {
     );
     const trigger = screen.getByRole('button', { name: 'This character' }).className.split(/\s+/);
     const sibling = screen.getByRole('button', { name: 'Sibling' }).className.split(/\s+/);
-    // IconButton's md box is size-N; the trigger's height is the same N at every tier.
     for (const tier of ['']) {
       const size = sibling.find((c) => c.startsWith(`${tier}size-`));
       const height = trigger.find((c) => c.startsWith(`${tier}h-`));
@@ -422,8 +419,6 @@ describe('CharacterFilterControl', () => {
     it('keeps the dot inside the trigger box, so it never spills past the header edge', () => {
       render(<CharacterFilterControl {...partial} value="all" />);
       const dot = screen.getByRole('button').querySelector('[data-partial-dot]');
-      // A negative inset (`-top-1`, `-right-1`) pushed it 4px outside the trigger;
-      // as the last control on a phone header that ran into the page gutter.
       expect(dot?.className).toMatch(/\babsolute\b/);
       expect(dot?.className).not.toMatch(/(^|\s)-(top|right|bottom|left|inset)-/);
     });
@@ -443,7 +438,6 @@ describe('CharacterFilterControl', () => {
     });
 
     it('announces nothing with full coverage or on "This character"', () => {
-      // The region fills a timer tick after its text is set (LiveStatus): step past it.
       vi.useFakeTimers();
       try {
         const { rerender } = render(
@@ -502,7 +496,6 @@ describe('CharacterFilterControl', () => {
       const spinner = trigger.querySelector('[role="status"]');
       expect(spinner).toBeInTheDocument();
       expect(spinner?.closest('[aria-hidden="true"]')).not.toBeNull();
-      // The faces stay, invisible, under the spinner: the width does not jump.
       expect(trigger.querySelector('img')?.closest('.invisible')).not.toBeNull();
     });
 
@@ -531,7 +524,6 @@ describe('CharacterFilterControl', () => {
     );
     const picker = screen.getByRole('button', { name: 'This character' });
     const refresh = screen.getByRole('button', { name: 'Refresh' });
-    // 36px at every width, like Refresh.
     expect(picker).toHaveClass('h-9');
     expect(refresh).toHaveClass('size-9');
     expect(picker).not.toHaveClass('md:h-7');
@@ -564,7 +556,6 @@ describe('CharacterFilterControl', () => {
         expect(found).not.toBeNull();
         return found as HTMLImageElement;
       });
-      // The Buildings glyph holds the box until the logo has loaded.
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
       fireEvent.load(img);
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeNull();
@@ -603,8 +594,6 @@ describe('CharacterFilterControl', () => {
       await seedCharacter(1, 'Aria');
       await seedCharacter(2, 'Bex', { corporationId: 98000001 });
       renderCorp();
-      // A Character whose corporation is known, beside it: once its logo is up,
-      // the same Dexie read has answered for the trigger too.
       const { container: control } = render(<CorporationLogoGlyph characterId={2} size="md" />);
       await waitFor(() => expect(control.querySelector('img')).not.toBeNull());
       const trigger = screen.getByRole('button', { name: 'Corporation' });

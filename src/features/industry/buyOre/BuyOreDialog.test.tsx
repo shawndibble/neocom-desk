@@ -46,7 +46,6 @@ describe('BuyOreDialog', () => {
         mineralsTotal={6000}
       />
     );
-    // 1000 trit at 200 a batch = 5 batches = 500 units at 5 ISK = 2,500 ISK.
     expect(await screen.findByText('Compressed Veldspar')).toBeTruthy();
     expect(screen.getByText(/Refining uses a 50.0% facility base yield/)).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Copy buy list' })).toBeTruthy();

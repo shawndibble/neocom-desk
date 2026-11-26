@@ -11,26 +11,18 @@ import {
 } from './achievement';
 
 const loadEntry = (entry: string) => loadCharacterAchievement(Number(entry));
-// Read at call time: a test's @/sde/loadSde mock without this export throws on access.
 const loadTitles = () => loadCharacterTitles();
 
-/** The baked `characterTitles` table, read only once a title is on screen. */
 function useTitleNames(needed: boolean): Readonly<Record<string, string>> | null {
   const titles = useKeyedLoad(needed ? 'characterTitles' : null, loadTitles);
   return titles.status === 'ready' ? titles.data : null;
 }
 
 export interface AchievementLookup {
-  /** Undefined until loaded; null when there is nothing to show. */
   partsOf: (characterId: number) => AchievementParts | null | undefined;
   scoreOf: (characterId: number) => number | undefined;
 }
 
-/**
- * Each Character's score and title (issue #4777), a few public records at a
- * time. With `enabled` false nothing is read: Contacts reads only while its
- * column shows.
- */
 export function useCharacterAchievements(
   characterIds: readonly number[],
   enabled = true
@@ -53,7 +45,6 @@ export function useCharacterAchievements(
   );
 }
 
-/** An already-read score and title (Show info's profile), with the title named. */
 export function useAchievementParts(achievement: CharacterAchievement): AchievementParts | null {
   const titleNames = useTitleNames(achievement.titleId !== null);
   return achievementParts(achievement, titleNames);

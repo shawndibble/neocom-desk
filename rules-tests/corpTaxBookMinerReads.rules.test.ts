@@ -16,18 +16,14 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Issue #4622: what a miner's personal tab reads beyond its own lines. The moon owner's
-// coverage copy (billed miners only, never the feeder record) and the Miner's own
-// Adjustments, write-offs, declarations and disputes. Nothing here is client-writable.
 let env: RulesTestEnvironment;
 
 const BOOK = 'corps/98000001';
 const COVERAGE = `${BOOK}/feederCoverage/98000002`;
 const RECORD = `${BOOK}/feeders/98000002`;
-const MINER = 3; // billed by the book
-const STRANGER = 4; // never mined there
+const MINER = 3;
+const STRANGER = 4;
 const OFFICER = 1;
-// #6206: declarations and disputes join them, so the Miner sees each one's answer.
 const OWN_KINDS = [
   'adjustments',
   'writeOffs',

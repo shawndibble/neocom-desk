@@ -1,8 +1,3 @@
-/**
- * What each "ask the corporation" outcome sends (resolving in the app): the record the
- * corporation's officers answer in Needs you — always — and an EVE mail to whoever the book says
- * answers tax questions, best effort, for an officer who is not in the app when it happens.
- */
 import type { TaxContact } from '@/engine/corpTaxBook/bookDocs';
 import type { ClaimCheck, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
@@ -22,7 +17,6 @@ export interface MailContext {
   contact: TaxContact | undefined;
 }
 
-/** Best effort: the record already reached Needs you, so a mail that fails is said, not thrown. */
 async function mail(
   ctx: MailContext,
   input: Parameters<typeof sendTaxQuestionMail>[0]['input']
@@ -44,7 +38,6 @@ const dayLines = (row: BookRowView, lines = row.oreLines) =>
     .filter((l) => l.quantity > 0)
     .map((l) => ({ recordKey: row.recordKey!, typeId: l.typeId, quantity: l.quantity }));
 
-/** "Not paying — tell them why": a `notPaying` dispute of the day, then the mail. */
 export async function tellNotPaying(ctx: MailContext, row: BookRowView, reason: string) {
   await disputeCorpTaxBookConflict(ctx.characterId, {
     corporationId: ctx.corporationId,
@@ -63,11 +56,6 @@ export async function tellNotPaying(ctx: MailContext, row: BookRowView, reason: 
   });
 }
 
-/**
- * "I don't owe this": the dispute the day's own figures name (`notOwedPlan`). Never a
- * whole-day quantity dispute: with nothing the member's record disagrees with there is nothing
- * to send, and it throws rather than ask an officer to waive a bill the member did not question.
- */
 export async function tellNotOwed(
   ctx: MailContext,
   row: BookRowView,
@@ -102,7 +90,6 @@ export async function tellNotOwed(
   return mailNotOwed(ctx, row, reason);
 }
 
-/** The EVE mail that goes with an "I don't owe this" dispute (best effort: the record is already in Needs you). */
 export function mailNotOwed(
   ctx: MailContext,
   row: Pick<BookRowView, 'date' | 'billed'>,
@@ -118,11 +105,6 @@ export function mailNotOwed(
   });
 }
 
-/**
- * "I already paid": the declaration with the transfers from the member's own journal. The
- * server checks them first; when every one was in the corporation's wallet it is credited at
- * once and no mail goes — there is nothing left to ask.
- */
 export async function sendProof(
   ctx: MailContext,
   noticeId: string,
@@ -153,11 +135,6 @@ export async function sendProof(
   return { checks, confirmed, mailed };
 }
 
-/**
- * "I already paid" for donations the book holds for review (#6207) with no Late notice to declare
- * on: each is claimed by its donor as tax (`claimCorpTaxBookPayment` with `inReview`), which the
- * server audits and credits at once. Nothing is asked of an officer, so no mail goes.
- */
 export async function countHeldDonations(
   ctx: Pick<MailContext, 'corporationId'>,
   held: readonly { id: string; characterId: number }[]

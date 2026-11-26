@@ -1,8 +1,3 @@
-/**
- * The Order Book's filter bar — Jump Range, Security, Min quantity, NPC
- * stations only, Hide bait sells — and what each one implies for the book
- * (does the range fan out over regions, do the station-level filters apply).
- */
 import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -21,15 +16,6 @@ import {
 } from '@/features/route/currentSystem';
 import { useBrowserFilterSetting } from '@/features/market/browserFilterSetting';
 
-/**
- * The order book's filter bar as one `useUrlParams` group, so an edit that
- * touches several fields lands in one write rather than four
- * writers racing in one tick (see `navigateTo` in `useMarketBrowser.ts`). Each
- * field's stored default (`browserFilterSetting.ts`) sits behind the URL via
- * `useRememberedUrlParams`, so a filter set once survives a reload or a
- * fresh visit with no matching query string — same pattern as Location
- * Mode/Trade Hub in `useMarketBrowser.ts`.
- */
 const BROWSER_FILTER_PARAMS = {
   'browser.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'browser.sec': enumSetParam(SPACE_KINDS),
@@ -46,14 +32,6 @@ export interface BrowserFilterValue {
   hideBait: boolean;
 }
 
-/**
- * The filters set away from their default, most telling first: the range
- * changes which stations the book is, the rest only thin it.
- *
- * Only what this mode shows counts: a Security filter left in the URL does
- * nothing on a one-station Hub book, so a pill for it would claim a filter
- * that isn't on.
- */
 export function activeBrowserFilters(
   value: BrowserFilterValue,
   regionMode: boolean,
@@ -93,16 +71,12 @@ export function activeBrowserFilters(
 }
 
 export interface BrowserFilters {
-  /** The stored filter defaults have been read; a fetch before this would fire against the wrong ones. */
   hydrated: boolean;
   currentSystem: CurrentSystemState;
   jumpRangeFilter: JumpRangeFilter;
   rangeSet: boolean;
-  /** A set, measurable Jump Range: the book spans every region in reach, not the header's hub or region. */
   rangeAcross: boolean;
-  /** `rangeAcross`, or the range is still resolving and will be. */
   rangeReaches: boolean;
-  /** The book spans stations (Region mode or a set range), so Security and NPC only apply. */
   spansStations: boolean;
   spaceKinds: ReadonlySet<SpaceKind>;
   minQuantity: number;
@@ -110,21 +84,11 @@ export interface BrowserFilters {
   hideBait: boolean;
   browserFilterValue: BrowserFilterValue;
   handleBrowserFiltersChange: (next: BrowserFilterValue) => void;
-  /** `activeBrowserFilters` for this mode: the filter bars' pills and badge. */
   activeFilters: ActiveFilter<BrowserFilterValue>[];
   activeFilterCount: number;
   jumpNoteShown: boolean;
 }
 
-/**
- * The Jump Range applies in every mode: set, it replaces the header's hub or
- * region with every region in reach. Security and NPC stations only apply
- * only once the book spans stations — Region mode, or a set range — since Hub
- * mode alone is one NPC station; otherwise they're neither shown nor applied,
- * whatever the URL says. Min quantity applies in both. All narrow the book
- * next to the station filter, see `orderBookView.ts`'s
- * `allowedSystems`/`minQuantity`/`npcStationIds`.
- */
 export function useBrowserFilters(regionMode: boolean): BrowserFilters {
   const { t } = useTranslation();
   const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
@@ -165,9 +129,6 @@ export function useBrowserFilters(regionMode: boolean): BrowserFilters {
   const hideBait = browserFilters['browser.hideBait'];
   const currentSystem = useCurrentSystem();
   const jumpRangeFilter = useJumpRangeFilter(currentSystem, jumpRange);
-  // A set range fans out like All regions, over every region in reach — once
-  // it can be measured. Unmeasurable (no origin, no graph), the book falls
-  // back to the header's hub or region and the note says why.
   const rangeWaiting = rangeSet && jumpRangeFilter.status === 'loading';
   const rangeAcross = rangeSet && jumpRangeFilter.status === 'ready';
   const rangeReaches = rangeAcross || rangeWaiting;
@@ -199,7 +160,6 @@ export function useBrowserFilters(regionMode: boolean): BrowserFilters {
     },
     [setBrowserFilters]
   );
-  // Only "can't measure" earns a line: a range that applies needs no caption.
   const jumpNoteShown =
     rangeSet && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
 

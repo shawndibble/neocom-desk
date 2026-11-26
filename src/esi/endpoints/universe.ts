@@ -7,12 +7,6 @@ import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { EndpointOptions } from './options';
 import { postChunked } from './postChunked';
 
-// --- GET /universe/types/{type_id} (public) ---
-
-/**
- * One dogma attribute value on a type. Verified live (2026-08): `value` is a
- * float even for integer-valued attributes (e.g. a skill requirement typeID).
- */
 export interface DogmaAttribute {
   attribute_id: number;
   value: number;
@@ -24,13 +18,9 @@ export interface UniverseType {
   description: string;
   group_id: number;
   published: boolean;
-  /** Absent for types with no volume (e.g. skills, some non-item types). */
   volume?: number;
-  /** m3 once packaged — what a hauler's hold actually carries. Absent where packaging changes nothing. */
   packaged_volume?: number;
-  /** Absent for types with no dogma (most non-item types). */
   dogma_attributes?: DogmaAttribute[];
-  /** The type's dogma effects — e.g. `turretFitted` (42) / `launcherFitted` (40) on a weapon. */
   dogma_effects?: { effect_id: number; is_default: boolean }[];
 }
 
@@ -44,20 +34,9 @@ export function getUniverseType(
   });
 }
 
-// --- GET /dogma/dynamic/items/{type_id}/{item_id} (public) ---
-
-/**
- * One mutated item's base, mutaplasmid and full dogma set, absolute values
- * (live 2026-10-16: 23 attributes on a Heavy Abyssal Neut, not only the rolls).
- * A non-mutated id answers 400 against ESI's error limit: fetch through
- * `features/abyssal/dynamicItems.ts`.
- */
 export interface DynamicItem {
-  /** Character id of the pilot who applied the mutaplasmid. */
   created_by: number;
-  /** The base module or drone type. */
   source_type_id: number;
-  /** The mutaplasmid type. */
   mutator_type_id: number;
   dogma_attributes: DogmaAttribute[];
   dogma_effects: { effect_id: number; is_default: boolean }[];
@@ -74,14 +53,6 @@ export function getDogmaDynamicItem(
   });
 }
 
-// --- GET /universe/groups/{group_id} (public) ---
-
-/**
- * An item **Group** (`invGroups`) — the taxonomy node a type belongs to, not
- * a Market Group (GLOSSARY.md). The build-time SDE snapshot carries no
- * groupID->name map, so the dogma attributes that reference a Group by id
- * ("Used with (Charge Group)", "Can be fitted to") resolve through here.
- */
 export interface UniverseGroup {
   group_id: number;
   name: string;
@@ -100,8 +71,6 @@ export function getUniverseGroup(
   });
 }
 
-// --- GET /universe/regions/{region_id} (public) ---
-
 export interface UniverseRegion {
   region_id: number;
   name: string;
@@ -117,14 +86,11 @@ export function getUniverseRegion(
   });
 }
 
-// --- GET /universe/stations/{station_id} (public) ---
-
 export interface UniverseStation {
   station_id: number;
   name: string;
   type_id: number;
   system_id: number;
-  /** Owning corporation id — used to resolve the character's broker-fee standings. */
   owner?: number;
 }
 
@@ -138,9 +104,6 @@ export function getUniverseStation(
   });
 }
 
-// --- GET /universe/moons/{moon_id} (public) ---
-
-/** A moon: its name ("Efa V - Moon 3") is what the Corp Tax Book prints for a drilled moon. */
 export interface UniverseMoon {
   moon_id: number;
   name: string;
@@ -157,16 +120,8 @@ export function getUniverseMoon(
   });
 }
 
-// --- GET /universe/stargates/{stargate_id} (public) ---
-
-/**
- * A stargate and where it leads (issue #2329). `/universe/names` cannot name
- * a stargate — ESI rejects the whole batch — so Route Safety reads each gate
- * zKillboard places a kill at from here, once per session.
- */
 export interface UniverseStargate {
   stargate_id: number;
-  /** "Stargate (Nourvukaiken)". */
   name: string;
   system_id: number;
   destination: { stargate_id: number; system_id: number };
@@ -182,24 +137,10 @@ export function getUniverseStargate(
   });
 }
 
-// --- GET /universe/systems/{system_id} (public) ---
-
 export interface UniverseSystem {
   system_id: number;
   name: string;
   security_status: number;
-  /**
-   * The system's planets, and each planet's own moons and asteroid belts.
-   * Optional because a system can have none — the shattered Thera-like and
-   * Abyssal systems do — and ESI then omits the field rather than sending an
-   * empty array.
-   *
-   * This is the only way to learn what a system a Character has no colony on
-   * holds: `/characters/{id}/planets` covers owned colonies only. A planet's
-   * type then comes from `/universe/planets/{planet_id}`, whose `type_id`
-   * maps through `PiData.planetTypeByTypeId` to the same `PlanetType` string
-   * an owned colony reports.
-   */
   planets?: {
     planet_id: number;
     moons?: number[];
@@ -217,27 +158,19 @@ export function getUniverseSystem(
   });
 }
 
-// --- GET /universe/factions (public) ---
-
-/** An NPC faction. Fields verified against live ESI (2026-10-28); `Unknown` and the like omit the optional ones. */
 export interface UniverseFaction {
   faction_id: number;
   name: string;
   description: string;
-  /** The faction's main corporation (its headquarters), absent for a faction without one. */
   corporation_id?: number;
-  /** The Faction Warfare militia corporation; only the four empires have one. */
   militia_corporation_id?: number;
-  /** Relative size, 0 for factions with no stations. */
   size_factor: number;
-  /** The faction's capital system. */
   solar_system_id?: number;
   station_count: number;
   station_system_count: number;
   is_unique: boolean;
 }
 
-/** Every NPC faction in one call. */
 export function getUniverseFactions(
   options: EndpointOptions = {}
 ): Promise<EsiResult<UniverseFaction[]>> {
@@ -247,35 +180,22 @@ export function getUniverseFactions(
   });
 }
 
-// --- GET /incursions (public) ---
-
-/** Every active Incursion: its constellation, staging system, state and influence. */
 export function getIncursions(options: EndpointOptions = {}): Promise<EsiResult<IncursionEntry[]>> {
   return esiFetch<IncursionEntry[]>('/incursions', { ...options, endpointId: 'getIncursions' });
 }
 
-// --- GET /skyhooks/raidable (public) ---
-
-/** A skyhook whose theft window is open now or opens shortly; no owner, no stock. */
 export interface RaidableSkyhook {
   solar_system_id: number;
   planet_id: number;
   theft_vulnerability?: { start: string; end: string };
 }
 
-/** Every skyhook raidable now or shortly, universe-wide (issue #4798). */
 export function getRaidableSkyhooks(
   options: EndpointOptions = {}
 ): Promise<EsiResult<{ skyhooks: RaidableSkyhook[] }>> {
   return esiFetch('/skyhooks/raidable', { ...options, endpointId: 'getRaidableSkyhooks' });
 }
 
-// --- GET /universe/system_kills (public) ---
-
-/**
- * Ship, pod and NPC kills per solar system in the last hour. ESI lists only
- * systems that had kills, and none in wormhole space.
- */
 export function getUniverseSystemKills(
   options: EndpointOptions = {}
 ): Promise<EsiResult<SystemKillsEntry[]>> {
@@ -285,12 +205,6 @@ export function getUniverseSystemKills(
   });
 }
 
-// --- GET /universe/system_jumps (public) ---
-
-/**
- * Ship jumps per solar system in the last hour. ESI lists only systems that
- * had jumps, and none in wormhole space.
- */
 export function getUniverseSystemJumps(
   options: EndpointOptions = {}
 ): Promise<EsiResult<SystemJumpsEntry[]>> {
@@ -299,8 +213,6 @@ export function getUniverseSystemJumps(
     endpointId: 'getUniverseSystemJumps',
   });
 }
-
-// --- POST /universe/names (public) ---
 
 export interface UniverseName {
   id: number;
@@ -329,8 +241,6 @@ export async function postUniverseNames(
   );
 }
 
-// --- POST /characters/affiliation (public) ---
-
 export interface CharacterAffiliation {
   character_id: number;
   corporation_id: number;
@@ -338,12 +248,6 @@ export interface CharacterAffiliation {
   faction_id?: number;
 }
 
-/**
- * Bulk corp/alliance lookup for many characters in one round trip (up to 1000
- * per request; more are chunked into sequential requests) — replaces N
- * `getCharacterPublicInfo` calls with the one field the roster page actually
- * needs from each (issue: /characters page N+1 ESI calls).
- */
 export async function postCharactersAffiliation(
   characterIds: number[],
   options: { signal?: AbortSignal } = {}
@@ -356,14 +260,6 @@ export async function postCharactersAffiliation(
   );
 }
 
-// --- POST /universe/ids (public) ---
-
-/**
- * Name -> id resolution. Only the buckets a caller reads are modelled — the
- * Build Plan's build-system field (`systems`) and Pilot Lookup's exact-name
- * fallback (`characters`). ESI returns a bucket per category, so an
- * unmodelled bucket is simply ignored rather than an error.
- */
 export interface UniverseIds {
   systems?: { id: number; name: string }[];
   characters?: { id: number; name: string }[];
@@ -371,21 +267,14 @@ export interface UniverseIds {
   alliances?: { id: number; name: string }[];
 }
 
-/** ESI's cap on names per `/universe/ids` request (maxItems in the spec). */
 const UNIVERSE_IDS_BATCH = 500;
 
-/**
- * Exact-name (case-insensitive) lookup. Empty input never calls ESI. More than
- * 500 names (a busy pasted Local, issue #5668) go one batch at a time, their
- * buckets merged in batch order.
- */
 export async function postUniverseIds(
   names: string[],
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseIds> {
   const batches = chunk(names, UNIVERSE_IDS_BATCH);
   const answers: UniverseIds[] = batches.map(() => ({}));
-  // Two in flight, as `postChunked`: ESI bills errors against a shared budget.
   await mapWithConcurrencyLimit(batches, 2, async (batch) => {
     const result = await esiFetch<UniverseIds>('/universe/ids', {
       method: 'POST',
@@ -405,15 +294,6 @@ export async function postUniverseIds(
   return merged;
 }
 
-// --- GET /universe/structures/{structure_id} (esi-universe.read_structures.v1) ---
-
-/**
- * ACL-checked: ESI returns 403 for any structure outside the token's ACL,
- * even when the scope is held, so this is an authenticated call
- * (`characterId` attaches the bearer token) despite living beside the public
- * universe wrappers. Callers must not treat that 403 as a re-auth signal —
- * see `features/character/structures.ts`.
- */
 export interface UniverseStructure {
   name: string;
   owner_id: number;
@@ -434,35 +314,12 @@ export function getUniverseStructure(
   });
 }
 
-// --- POST /route/{origin_system_id}/{destination_system_id} (public) ---
-
 export interface RouteOptions extends EndpointOptions {
-  /**
-   * ESI's route preference, in its own words — the app's names map onto
-   * these in one place (it is no longer called for jump counts).
-   */
   preference?: 'Shorter' | 'Safer' | 'LessSecure';
-  /**
-   * 0–100, ESI's default 50: how strongly `preference` bends the route —
-   * the game's own security-penalty slider. Verified live: Safer at 0 routes
-   * Jita–Amarr in 11 jumps, at 50 in 45.
-   */
   securityPenalty?: number;
-  /**
-   * Systems the route must not enter (ESI caps it at 1000). Verified live: a
-   * hard filter — 404 "No route found" when the only way runs through one;
-   * an avoided destination is fine. the app no longer routes through it.
-   */
   avoid?: readonly number[];
 }
 
-/**
- * Waypoint solar-system ids, including both origin and destination.
- *
- * The POST endpoint (compatibility date 2025-09-30) replaced
- * `GET /route/{origin}/{destination}`: only it takes a security penalty,
- * and the legacy one is gone from the current spec.
- */
 export async function postRoute(
   origin: number,
   destination: number,

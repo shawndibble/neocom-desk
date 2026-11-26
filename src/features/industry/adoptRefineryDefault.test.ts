@@ -16,9 +16,6 @@ describe('adoptRefineryDefaultAsReactionLocation', () => {
 
     await adoptRefineryDefaultAsReactionLocation();
 
-    // The rig fit and tax survive the move — that record *was* the pilot's
-    // answer to "where do my reactions run", just stored where nothing reads
-    // it any more.
     expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
       value: RIGGED_TATARA,
     });
@@ -37,7 +34,6 @@ describe('adoptRefineryDefaultAsReactionLocation', () => {
     expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
       value: athanor,
     });
-    // Nothing moved, so nothing is vacated either.
     expect(await db.settings.get(FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
       value: RIGGED_TATARA,
     });
@@ -58,9 +54,6 @@ describe('adoptRefineryDefaultAsReactionLocation', () => {
 
     await adoptRefineryDefaultAsReactionLocation();
 
-    // Same reasoning as `useSyncedSetting`'s legacyKey adoption: a value this
-    // device may have set months ago must not outrank yesterday's real edit
-    // on another device.
     expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).not.toHaveProperty(
       'updatedAt'
     );

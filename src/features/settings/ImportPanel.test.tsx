@@ -20,7 +20,6 @@ const EMPTY = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The panel reloads 2s after an import that adds something; jsdom cannot.
   const realSetTimeout = window.setTimeout;
   vi.spyOn(window, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) =>
     ms === 2000 ? 0 : realSetTimeout(fn, ms)) as never);

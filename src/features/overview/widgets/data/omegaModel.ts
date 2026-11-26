@@ -1,12 +1,3 @@
-/**
- * The Omega coverage widget's builder (issue #3920): net income per window (7, 30 or 90 days)
- * against what one Omega account costs in ISK, as a count of accounts the
- * income could keep on Omega, plus a bar per period with a line at each
- * account's cost. Pure, like every builder.
- *
- * Facts only: it never asks how many accounts the pilot has. The plan (PLEX
- * per 30 days) is the pilot's own setting, so it is worded as theirs.
- */
 import {
   accountCost,
   accountsCovered,
@@ -28,10 +19,8 @@ import { utcDay } from '@/engine/localDay';
 const D = 'overview.widgets.data.omega';
 const C = 'overview.widgets.chart.omega';
 const W = 'overview.widgets.omega';
-/** The Wallet page, where the journal behind the figure lives. */
 const OMEGA_PATH = '/wallet';
 
-/** The day a period's last moment falls on. */
 const lastDay = (p: OmegaPeriod) => utcDay(p.endMs - 1);
 
 function periodTitle(t: Translate, p: OmegaPeriod): string {
@@ -80,7 +69,6 @@ export const omega: Builder = (
     data.truncated ? t(`${C}.truncated`) : '',
     everyone && data.skippedCount > 0 ? t(`${C}.skipped`, { count: data.skippedCount }) : '',
   ].filter(Boolean);
-  // The Number view's plain lines; the chart carries the same in its note.
   const numberNotes = [
     latest.partial ? t(`${C}.partialLatest`, days) : '',
     data.truncated ? t(`${C}.truncated`) : '',
@@ -202,7 +190,6 @@ function tableColumns(t: Translate, range: number) {
   ];
 }
 
-/** Newest first: the table reads from the headline's period down. */
 function periodRows(t: Translate, periods: OmegaPeriod[], cost: number | null): TableRowModel[] {
   return [...periods].reverse().map((p) => ({
     key: String(p.startMs),

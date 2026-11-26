@@ -87,7 +87,6 @@ describe('computeLoyaltyOfferRows', () => {
     expect(row.isBlueprint).toBe(true);
     expect(row.productTypeId).toBe(ASTERO_ID);
     expect(row.build).not.toBeNull();
-    // revenue 26M, materials 1,000,000 * 5 = 5M, isk_cost 12M -> profit ~9M minus a nonzero job fee
     expect(row.profit.profit).not.toBeNull();
     expect(row.build!.jobFee.total).toBeGreaterThan(0);
     expect(row.profit.profit).toBeLessThan(26_000_000 - 12_000_000 - 5_000_000);
@@ -186,8 +185,8 @@ describe('computeLoyaltyOfferRows', () => {
     const [row] = computeLoyaltyOfferRows({
       offers: [probes],
       catalog: makeCatalog(),
-      hubPrices: { [PROBE_ID]: 1_800 }, // sell basis — should be ignored for revenue here
-      revenueHubPrices: { [PROBE_ID]: 1_500 }, // buy basis
+      hubPrices: { [PROBE_ID]: 1_800 },
+      revenueHubPrices: { [PROBE_ID]: 1_500 },
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
@@ -231,7 +230,7 @@ describe('computeLoyaltyOfferRows', () => {
       offers: [astero],
       catalog: makeCatalog(),
       hubPrices: { [TRITANIUM_ID]: 5, [ASTERO_ID]: 26_000_000 },
-      revenueHubPrices: { [ASTERO_ID]: 24_000_000 }, // lower buy-order price for the built product
+      revenueHubPrices: { [ASTERO_ID]: 24_000_000 },
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
@@ -242,7 +241,6 @@ describe('computeLoyaltyOfferRows', () => {
 
     expect(sellBasis.profit.revenue).toBe(26_000_000);
     expect(buyBasis.profit.revenue).toBe(24_000_000);
-    // Materials cost is unaffected by the revenue basis — same buildCost either way.
     expect(buyBasis.build!.materialCost).toBe(sellBasis.build!.materialCost);
     expect(buyBasis.profit.profit).toBeLessThan(sellBasis.profit.profit!);
   });
@@ -252,7 +250,7 @@ describe('computeLoyaltyOfferRows', () => {
       offers: [astero],
       catalog: makeCatalog(),
       hubPrices: { [TRITANIUM_ID]: 5, [ASTERO_ID]: 26_000_000 },
-      revenueHubPrices: {}, // no buy-order price for the product at this hub
+      revenueHubPrices: {},
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
@@ -312,7 +310,7 @@ describe('computeLoyaltyOfferRows', () => {
       skills: {},
       liquidationBasis: 'order',
       materialSourcing: { [TRITANIUM_ID]: { ownedQuantity: 1_000_000 } },
-      useOwnMaterialsFor: new Set(), // flag not set for this offer
+      useOwnMaterialsFor: new Set(),
       playerLp: 1_000_000,
     })[0];
     const buyAll = computeLoyaltyOfferRows({
@@ -334,7 +332,7 @@ describe('computeLoyaltyOfferRows', () => {
     const [row] = computeLoyaltyOfferRows({
       offers: [astero],
       catalog: makeCatalog(),
-      hubPrices: { [ASTERO_ID]: 26_000_000 }, // no Tritanium price
+      hubPrices: { [ASTERO_ID]: 26_000_000 },
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
@@ -361,7 +359,6 @@ describe('computeLoyaltyOfferRows', () => {
       playerLp: 1_000_000,
     });
 
-    // 1 run of the fixture's blueprint needs 1,000,000 Tritanium, not 3,000,000.
     expect(row.build!.materials[0].baseQuantity).toBe(1_000_000);
   });
   it('charges the broker fee only on the "Sell order" basis, sales tax on both', () => {
@@ -385,10 +382,6 @@ describe('computeLoyaltyOfferRows', () => {
   });
 
   it("nets a blueprint offer's fees once, agreeing with the plain-item path on an equivalent offer", () => {
-    // Regression for the double-netting trap: `buildVsBuy` nets its own sales
-    // tax and broker fee into `build.profit`, which the blueprint path must
-    // never inherit. Fold the blueprint's build cost into a plain item's ISK
-    // sticker price and the two paths must reach the same profit.
     const [blueprintRow] = computeLoyaltyOfferRows({
       offers: [astero],
       catalog: makeCatalog(),
@@ -487,9 +480,6 @@ describe('computeLoyaltyOfferRows', () => {
       ]);
       const expectedCost = 8 * 200_000 + 1 * 30_000_000;
       expect(row.requiredItemsCost).toBe(expectedCost);
-      // The exact figure already subtracted from profit — no independent
-      // recomputation to drift from `loyaltyOfferProfit`'s own arithmetic.
-      // offerWithTurnIn.quantity is 1, unlike the `probes` fixture.
       const revenue = 1 * 1_800;
       expect(row.profit.profit).toBeCloseTo(
         revenue - salesTax(revenue, 0) - brokerFee(revenue, 0) - expectedCost,
@@ -518,7 +508,7 @@ describe('computeLoyaltyOfferRows', () => {
       const [row] = computeLoyaltyOfferRows({
         offers: [offerWithTurnIn],
         catalog: makeCatalog(),
-        hubPrices: { [PROBE_ID]: 1_800, [GOLD_TAG_ID]: 30_000_000 }, // TAG_ID unpriced
+        hubPrices: { [PROBE_ID]: 1_800, [GOLD_TAG_ID]: 30_000_000 },
         adjustedPrices: {},
         systemCostIndex: 0,
         skills: {},
@@ -545,7 +535,7 @@ describe('computeLoyaltyOfferRows', () => {
         quantity: 1,
         required_items: [
           { type_id: 40_000, quantity: 8 },
-          { type_id: PROBE_ID, quantity: 1 }, // also an offer's own type_id elsewhere
+          { type_id: PROBE_ID, quantity: 1 },
         ],
         type_id: ASTERO_BP_ID,
       };

@@ -9,9 +9,7 @@ import { NotCoveredNote } from './NotCoveredNote';
 export interface FileFormErrors {
   link?: string;
   fleet?: string;
-  /** Nothing a field can fix: SRP is off, the network failed. */
   form?: string;
-  /** The corp does not cover the pasted hull. */
   notCovered?: boolean;
 }
 
@@ -21,19 +19,15 @@ interface MemberFileFormProps {
   fleet: string;
   onFleet: (value: string) => void;
   fleetRef: RefObject<HTMLInputElement | null>;
-  /** The corp made Fleet or FC required. */
   fleetRequired: boolean;
   windowDays: number;
   errors: FileFormErrors;
-  /** The doctrine check of the link above, once read; a hull the corp does not check has none. */
   doctrine?: { check: DoctrineCheckRecord | undefined; checking: boolean };
   busy: boolean;
   onSubmit: () => void;
-  /** Phone: the button spans the width and the hint line goes. */
   fullWidth?: boolean;
 }
 
-/** Paste a killmail link, optional (or required) Fleet or FC, File claim. The server fills in the rest. */
 export function MemberFileForm({
   link,
   onLink,

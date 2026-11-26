@@ -45,7 +45,6 @@ function stockOf(placements: readonly OwnedStockPlacement[]): DetectedOwnedStock
   ]);
 }
 
-/** jsdom's `matchMedia` never matches; the bottom sheet needs the narrow query to. */
 function goNarrow() {
   stubViewport(NARROW_QUERY);
 }
@@ -172,7 +171,6 @@ describe('OwnedStockScopeControl', () => {
     const station = screen.getByRole('checkbox', { name: CORP_STATION });
     expect(station).toHaveProperty('indeterminate', true);
     expect(station).toHaveAttribute('aria-checked', 'mixed');
-    // A saved narrowed scope opens on its children.
     expect(screen.getByRole('checkbox', { name: 'Hangar 2' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Hangar 1' })).not.toBeChecked();
   });

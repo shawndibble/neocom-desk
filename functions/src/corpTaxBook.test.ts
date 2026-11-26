@@ -185,10 +185,8 @@ describe('parsers', () => {
       divisions: [1, 3],
       divisionsBase: [1, 2],
     });
-    // A base only says what a new `divisions` list started from.
     expect(() => parseSettingsPatch({ divisionsBase: [1] })).toThrow();
     expect(() => parseSettingsPatch({ divisions: [1], divisionsBase: [9] })).toThrow();
-    // `addDivision` adds to the stored list; a base check alongside it would never run.
     expect(() =>
       parseSettingsPatch({ addDivision: 2, divisions: [1, 2], divisionsBase: [1] })
     ).toThrow();
@@ -351,11 +349,9 @@ describe('parsers', () => {
     ).toEqual({
       corporationId: 9,
       date: '2026-11-01',
-      // A client older than kinds sends none: the original payee dispute.
       kind: 'payee',
       lines: [line],
     });
-    // A line from another day is not this day's dispute.
     expect(() =>
       parseDisputeConflictInput({
         corporationId: 9,
@@ -401,7 +397,6 @@ describe('parsers', () => {
       claimedPct: 10,
       lines: [{ ...line, payeeName: '' }],
     });
-    // Not paying, without saying why, is the member's own hide: nothing reaches the server.
     expect(() =>
       parseDisputeConflictInput({
         corporationId: 9,
@@ -476,7 +471,6 @@ describe('parsers', () => {
       reason: 'Their ore',
     };
     expect(parseEditAction(base)).toEqual(base);
-    // The server prices it; the client's figure is only a fallback, never zero.
     expect(() => parseEditAction({ ...base, amountIsk: 0 })).toThrow();
     const { amountIsk: _a, ...unpriced } = base;
     void _a;
@@ -523,7 +517,6 @@ describe('parsers', () => {
       expect(reasonOf(() => mergeDisputeLines([], [line({ quantity: 101 })], recorded))).toBe(
         'not-on-record'
       );
-      // Split between two Payees across calls, the total still cannot pass the record.
       expect(
         reasonOf(() =>
           mergeDisputeLines(
@@ -546,7 +539,6 @@ describe('parsers', () => {
   });
 
   describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it forgives (#6307)', () => {
-    // The Miner's account as it stands now: what each unpaid day still owes, oldest first.
     const live = {
       owed: 900_000,
       unpaidDays: [
@@ -607,7 +599,6 @@ describe('parsers', () => {
         { lines: [mined('60:1000:2026-11-01', 45490, 100)] },
         { lines: [mined('77:1000:2026-11-01', 45491, 50, 20)] },
       ];
-      // 100 × 1000 × 10% + 50 × 2000 × 20%
       expect(billedDisputeTax(disputed, notices)).toBe(30_000);
     });
 
@@ -627,7 +618,6 @@ describe('parsers', () => {
       expect(billedDisputeTax(disputed, [])).toBeUndefined();
     });
 
-    // A rate dispute is about the rate: waiving it credits the gap, never the whole tax.
     it('prices a rate dispute as the gap between the billed and claimed rates', () => {
       const notices = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
       const rate = {
@@ -1059,7 +1049,6 @@ describe('startDateMoveReason (CX-23)', () => {
     expect(
       startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-05', '2026-10-12')])
     ).toBe('start-over-billed');
-    // The days between two listed days were not listed.
     expect(
       startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-09-30', '2026-10-12')])
     ).toBeNull();
@@ -1105,7 +1094,6 @@ describe('settings patch: start date and member visibility', () => {
     expect(parseSettingsPatch({ divisionNames: { '1': ' Master ', '5': 'MOON TAXES' } })).toEqual({
       divisionNames: { '1': 'Master', '5': 'MOON TAXES' },
     });
-    // An empty map clears the names: the corp reset them to defaults.
     expect(parseSettingsPatch({ divisionNames: {} })).toEqual({ divisionNames: {} });
     expect(() => parseSettingsPatch({ divisionNames: { '8': 'x' } })).toThrow();
     expect(() => parseSettingsPatch({ divisionNames: { '0': 'x' } })).toThrow();
@@ -1194,8 +1182,6 @@ describe('Pop Sharing edits (#6222)', () => {
   });
 });
 
-// Resolving in the app: an "I already paid" is checked against what the book synced of the
-// corporation's wallet before any officer sees it.
 describe('checkClaimedTransfer', () => {
   const transfer = {
     amount: 25_000_000,
@@ -1251,8 +1237,6 @@ describe('checkClaimedTransfer', () => {
     );
   });
 
-  // ESI keeps 30 days of a wallet journal: older than that before the last sync, the book
-  // could not have seen it, so "not found" would be a claim it cannot make.
   it('says too old to check, never not found, beyond what the book could have read', () => {
     expect(checkClaimedTransfer({ ...transfer, at: '2026-10-01T00:00:00.000Z' }, ctx).result).toBe(
       'tooOld'
@@ -1277,7 +1261,6 @@ describe('checkClaimedTransfer', () => {
         paymentId: 'j1_9',
         minerId: 'm-a',
       });
-      // One still open wins: that is the one the claim can credit.
       expect(
         checkClaimedTransfer(transfer, {
           ...ctx,
@@ -1297,21 +1280,17 @@ describe('checkClaimedTransfer', () => {
         checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, reviewReason: 'x' }] })
           .result
       ).toBe('notFound');
-      // Partly not tax: the rest is still tax.
       expect(
         checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, notTaxAmount: 1 }] }).result
       ).toBe('found');
     });
 
-    // The sender's own donation the sync held because their Miner seemed to owe nothing: the
-    // book holds the member's money, and the proof says it was tax. Credited, not "not found".
     it("finds the sender's own donation held for review (no-open-balance)", () => {
       const held = { ...open, reviewReason: 'no-open-balance' };
       expect(checkClaimedTransfer(transfer, { ...ctx, payments: [held] })).toEqual({
         result: 'found',
         paymentId: 'j1_9',
       });
-      // Still only the sender's own, and never twice.
       expect(
         checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...held, characterId: 8 }] }).result
       ).toBe('notFound');
@@ -1324,7 +1303,6 @@ describe('checkClaimedTransfer', () => {
         checkClaimedTransfer(transfer, { ...ctx, payments: [held, { ...open, id: 'j1_10' }] })
           .result
       ).toBe('ambiguous');
-      // Paid before the book bills from: it paid no mining the book bills, so it stays held.
       expect(
         checkClaimedTransfer(transfer, { ...ctx, payments: [held], startDate: '2026-11-03' }).result
       ).toBe('tooOld');
@@ -1637,7 +1615,6 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       expect(() => parse({ credit: -1 })).toThrow();
       expect(() => parse({ owed: [{ date: 'x', remaining: 1 }] })).toThrow();
       expect(() => parse({ paidThrough: 5 })).toThrow();
-      // The day's whole figures and the characters it summed are required.
       expect(() => parse({ owed: [{ date: '2026-09-02', remaining: 50 }] })).toThrow();
       expect(() => parse({ characterIds: undefined })).toThrow();
       expect(() => parse({ owed: [{ ...snapshot.owed[0], held: 'yes' }] })).toThrow();
@@ -1652,7 +1629,6 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
 });
 
 describe('checkpointRefusal: one snapshot per Miner per lock date', () => {
-  // On 18 Nov the lock date is 1 Sep: a snapshot covers every day through 31 Aug.
   const k = {
     minerId: 'solo:5',
     through: '2026-08-31',
@@ -1685,7 +1661,6 @@ describe('checkpointRefusal: one snapshot per Miner per lock date', () => {
     expect(checkpointRefusal(k, { ...ctx, stored: strictCache })).toBeUndefined();
     const others = { ...stored, characterIds: [5, 6] };
     expect(checkpointRefusal(k, { ...ctx, stored: others })).toBeUndefined();
-    // One stored with no record of when is no snapshot either.
     const undated = { ...stored, at: undefined as unknown as string };
     expect(checkpointRefusal(k, { ...ctx, stored: undated })).toBeUndefined();
   });

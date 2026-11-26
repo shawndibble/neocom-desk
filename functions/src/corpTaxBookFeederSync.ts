@@ -1,19 +1,3 @@
-// The scheduled read of one feeder's mining ledger (issue #4509, spec #4504, ADR 0025).
-// A feeder's grant is the ledger (`esi-industry.read_corporation_mining.v1`), plus, on grants
-// from #4654 on, `esi-universe.read_structures.v1`. The ledger read is two things — the observer
-// list and each refinery's ledger; a grant with the structure scope then looks up the names and
-// systems of refineries not read this week. Nothing calls an endpoint the grant cannot reach
-// (each 403 would burn the shared ESI error budget). After a good ledger read the same grant also
-// reads the corporation's Extractions (#6097), so its refineries and coming chunks show before
-// anyone mines; a refusal there (no Station_Manager) is remembered for a week and never moves the
-// feeder's health. Rows go into the Collector's `observed` collection tagged with the feeder's
-// corporation id; the Collector book's own `lastSync` and gaps are not touched.
-//
-// What the read means for the feeder (the pure rules are corpTaxBookEngine.ts's
-// `advanceFeederHealth`): a refusal (403, dead token, lost role) marks it stale, a read
-// that lands clears that, and 30 days stale disconnects it. Nothing here logs or
-// returns a token.
-
 import { DAY_MS } from './timeConstants.js';
 import { FieldPath, FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { BOOKS_COLLECTION, FEEDERS, REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
@@ -46,15 +30,11 @@ import {
 } from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
-/** A refinery's name is re-read, or a refused lookup retried, after this long (#4654). */
 export const STRUCTURE_RECHECK_MS = 7 * DAY_MS;
-/** The most structure lookups one feeder's run makes; the rest wait for the next run. */
 export const MAX_STRUCTURE_LOOKUPS = 20;
 
-/** This many refusals in a row across feeders stop the run reading more of them: a 403 storm. */
 export const FEEDER_FORBIDDEN_STORM = 5;
 
-/** Feeders whose ledger is still read: not removed, left or disconnected. */
 export const READABLE_FEEDER_STATUSES: readonly FeederRecord['status'][] = [
   'active',
   'pending-removal',
@@ -62,13 +42,10 @@ export const READABLE_FEEDER_STATUSES: readonly FeederRecord['status'][] = [
 
 export type FeederLedgerRead =
   | { kind: 'ok'; rows: ObservedRow[]; refineries: number; truncated: boolean }
-  /** ESI refused the token: revoked, role lost, holder gone. */
   | { kind: 'refused' }
-  /** ESI's shared budget is low or it answered 420/429. */
   | { kind: 'budget' }
   | { kind: 'unavailable' };
 
-/** Read every refinery's ledger for a feeder; all of it or nothing (no partial day). */
 export async function readFeederLedger(
   esi: SyncEsi,
   feederCorporationId: number,
@@ -81,7 +58,6 @@ export async function readFeederLedger(
   const rows: ObservedRow[] = [];
   let truncated = observers.truncated;
   for (const structureId of observers.data) {
-    // The first refusal ends this feeder's read: more calls would only repeat it.
     if (esi.budgetLow()) return { kind: 'budget' };
     const ledger = await esi.ledger(feederCorporationId, structureId, accessToken);
     if (ledger.kind === 'forbidden') return { kind: 'refused' };
@@ -95,7 +71,6 @@ export async function readFeederLedger(
   return { kind: 'ok', rows, refineries: observers.data.length, truncated };
 }
 
-/** The refineries to look up this run: new ones, and those last read or refused a week ago. */
 export function structuresToLookUp(
   structureIds: Iterable<number>,
   cached: Readonly<Record<string, RefineryStructureDoc>> | undefined,
@@ -110,11 +85,6 @@ export function structuresToLookUp(
   return out;
 }
 
-/**
- * Each refinery's name and system, with the moon owner's own token. A 403 or 404 is remembered
- * as refused; an unanswered lookup is not kept (the next run tries again); a 420/429 or a low
- * shared budget stops it. Never touches the feeder's health.
- */
 export async function lookUpRefineryStructures(
   esi: SyncEsi,
   structureIds: readonly number[],
@@ -135,12 +105,6 @@ export async function lookUpRefineryStructures(
   return found;
 }
 
-/**
- * After a good ledger read: look up the refineries that need it (only when the grant carries the
- * structure scope) and keep them on the record, with whether the grant reads names and the
- * Extraction started notifications at all. Best effort: a failure here is logged by the caller
- * and never fails the read.
- */
 export async function refreshRefineryStructures(
   deps: BookDeps,
   esi: SyncEsi,
@@ -186,10 +150,8 @@ export async function refreshRefineryStructures(
   });
 }
 
-/** Refused Extractions are asked for again after this long (#6097). */
 export const EXTRACTIONS_RECHECK_MS = STRUCTURE_RECHECK_MS;
 
-/** Whether this run asks ESI for the moon owner's Extractions: not within a week of a refusal. */
 export const extractionsDue = (
   record: Pick<FeederRecord, 'extractionsRefusedAt'>,
   now: number
@@ -198,20 +160,10 @@ export const extractionsDue = (
   now - record.extractionsRefusedAt >= EXTRACTIONS_RECHECK_MS;
 
 export type FeederExtractionsRead =
-  /** `complete`: ESI's list was whole, so a coming chunk missing from it was cancelled. */
   | { kind: 'ok'; extractions: FeederExtraction[]; complete: boolean }
-  /** ESI said 403: the grant holder lacks Station_Manager. */
   | { kind: 'refused' }
-  /** Unanswered, rate limited, or the shared budget is low: the next run asks again. */
   | { kind: 'none' };
 
-/**
- * A moon owner's current Extractions, tagged with its corporation id. The grant's mining scope
- * is the one the endpoint needs. The ore of a chunk is in the Extraction started notification of
- * the grant holder's own feed, read when the grant carries the notifications scope (`notes`:
- * that feed's notifications and the Extractions already stored, so a chunk keeps its start). A
- * grant without it leaves the ore to a linked Survey, else unknown.
- */
 export async function readFeederExtractions(
   esi: SyncEsi,
   feederCorporationId: number,
@@ -229,8 +181,6 @@ export async function readFeederExtractions(
   return {
     kind: 'ok',
     extractions: reconcileExtractions(read.data, notes.notifications, notes.stored)
-      // A chunk only a notification names is added once it has arrived: a coming one that ESI
-      // does not list was cancelled, and a missing cancel notification must not revive it.
       .filter(
         (x) =>
           Date.parse(x.chunkArrivalTime) <= notes.now ||
@@ -245,33 +195,22 @@ export async function readFeederExtractions(
   };
 }
 
-/**
- * After a good ledger read: read the moon owner's Extractions and keep them in the Collector's
- * book, or remember a refusal on the record. Returns their refineries, so one nobody has mined
- * at yet gets its name looked up too. Best effort: a failure here is logged by the caller and
- * never fails the read or moves the feeder's health.
- */
 export async function refreshFeederExtractions(
   deps: BookDeps,
   esi: SyncEsi,
   collectorCorporationId: number,
   record: Pick<FeederRecord, 'corporationId' | 'extractionsRefusedAt'>,
   accessToken: string,
-  /** The grant holder, when the grant carries the notifications scope. */
   notificationsOf?: number
 ): Promise<number[]> {
   const now = deps.now();
   if (!extractionsDue(record, now)) return [];
-  // The feed is best effort: unread (or throwing), the Extractions still land, with the ore they
-  // already hold.
   let notifications: MoonNotification[] = [];
   if (notificationsOf !== undefined) {
     try {
       const feed = await esi.notifications(notificationsOf, accessToken);
       if (feed.kind === 'ok') notifications = moonNotificationsOf(feed.data);
-    } catch {
-      // Nothing to add: the schedule asks again.
-    }
+    } catch {}
   }
   const stored =
     notifications.length > 0
@@ -305,13 +244,11 @@ export async function refreshFeederExtractions(
   return refineries;
 }
 
-/** The health outcome a ledger read stands for. */
 export function outcomeOf(read: FeederLedgerRead): FeederReadOutcome {
   if (read.kind === 'ok') return 'ok';
   return read.kind === 'refused' ? 'stale' : 'none';
 }
 
-/** Counts refusals in a row; once it trips the rest of the run skips ESI for feeders. */
 export class FeederStorm {
   private streak = 0;
   record(outcome: FeederReadOutcome): void {
@@ -326,27 +263,15 @@ const iso = (ms: number | undefined) => (ms === undefined ? undefined : new Date
 
 export interface FeederReadRecord {
   outcome: FeederReadOutcome;
-  /** Why a read did not land, for the feeder's `lastSyncResult.reason`. */
   reason?: string;
-  /** `synced` carries what was read. */
   refineries?: number;
 }
 
 export interface FeederReadResult {
   status: 'active' | 'disconnected';
-  /**
-   * False when the read moved nothing the moon owner's view or the miners' coverage shows: a
-   * skip, or another refusal in a spell already stale. Those need no rebuild.
-   */
   viewChanged: boolean;
 }
 
-/**
- * Write what one run found onto the feeder record and move its health: lastReadWellAt,
- * staleSince, lastSyncResult and, at 30 days stale, the disconnect (coverage ends on the
- * last fully synced day; nothing is deleted; the balance stays). Guarded on the record
- * still being readable. Returns the new status, or null when nothing was written.
- */
 export async function recordFeederRead(
   deps: BookDeps,
   collectorCorporationId: number,
@@ -378,8 +303,6 @@ export async function recordFeederRead(
       },
       staleSince: next.staleSince ? Date.parse(next.staleSince) : FieldValue.delete(),
     };
-    // The reason is the spell's first one: `lastSyncResult` holds only the latest, and a dead token
-    // makes every later run read `no-grant`.
     if (next.staleSince === undefined) update.staleReason = FieldValue.delete();
     else if (record.staleSince === undefined) update.staleReason = read.reason ?? 'unknown';
     if (read.outcome === 'ok') update.lastReadWellAt = now;
@@ -388,7 +311,6 @@ export async function recordFeederRead(
       update.status = 'disconnected';
       update.disconnectedAt = now;
       update.coveragePeriods = disconnectedCoverage(record.coveragePeriods, next, grace);
-      // A removal pending at the disconnect ends with it: its strip and its link would go stale.
       update.removal = FieldValue.delete();
       update.removalLinkId = FieldValue.delete();
       if (record.removalLinkId) {
@@ -407,13 +329,11 @@ export async function recordFeederRead(
     const staleMoved = (record.staleSince === undefined) !== (next.staleSince === undefined);
     return {
       status: next.status,
-      // A good read moves `lastReadWellAt`, so which days are Billable.
       viewChanged: read.outcome === 'ok' || next.status === 'disconnected' || staleMoved,
     };
   });
 }
 
-/** The pointer records of every corporation that feeds a book (a top-level collection: no index). */
 export async function feedersToRead(
   db: Firestore,
   pointerCollection: string
@@ -431,16 +351,9 @@ export async function feedersToRead(
 export interface ReadableFeeder {
   feederCorporationId: number;
   collectorCorporationId: number;
-  /** The record as the query saw it; absent on the pointer fallback. */
   record?: FeederRecord;
 }
 
-/**
- * The feeders a run still reads: one collection-group query over the records whose status is
- * readable, not every pointer and then every record. Disconnected, left and removed feeders
- * cost nothing. Until its index is deployed (indexes go out by hand) the query fails and the
- * run falls back to the pointer scan, whose records the caller reads itself.
- */
 export async function readableFeeders(
   db: Firestore,
   pointerCollection: string,

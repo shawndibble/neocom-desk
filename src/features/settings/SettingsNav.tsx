@@ -23,12 +23,6 @@ interface SettingsNavProps {
   value: SettingsSectionId;
 }
 
-/**
- * Settings' own navigation from `md` up: a grouped rail beside the app rail.
- * Its entries are real links, so a section can be opened in a new tab or
- * bookmarked. A phone has no room for a second column and gets
- * `SettingsIndex` at `/settings` instead.
- */
 export function SettingsNav({ groups, value }: SettingsNavProps) {
   const { t } = useTranslation();
   const updateAvailable = useUpdateStatusLine().status === 'available';
@@ -67,15 +61,9 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
 
 interface SettingsIndexProps {
   groups: readonly SettingsGroup[];
-  /** One-line current value per section, where there is a cheap one. */
   summaries: Partial<Record<SettingsSectionId, string>>;
 }
 
-/**
- * The phone's Settings: a full-screen grouped list at `/settings`, each row a
- * push to its section so Back returns here. `SettingsNav` is the same
- * grouping for `md` up.
- */
 export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
   const { t } = useTranslation();
   const { status, line } = useUpdateStatusLine();
@@ -161,7 +149,6 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
   );
 }
 
-/** On a phone, a section's way back to the list; the page header's right-hand side. */
 export function SettingsBackLink() {
   const { t } = useTranslation();
 

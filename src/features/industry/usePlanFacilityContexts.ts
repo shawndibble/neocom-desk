@@ -4,25 +4,16 @@ import { craftScope } from '@/engine/industry/craftScope';
 import type { IndustryActivity } from '@/engine/industry/types';
 import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
 
-/**
- * The plan's "where and how a job runs" inputs, which don't depend on whether
- * prices have loaded yet: the production methods it may mark buildable, and
- * the Build and Reaction facility contexts Auto Build's depth walk needs.
- */
 export function usePlanFacilityContexts(
   plan: BuildPlanRecord,
   activity: IndustryActivity,
   includeReactions: boolean
 ) {
-  // Production methods this plan may currently mark buildable — the one
-  // answer the recursive engine, the manual toggle and Auto Build all share,
-  // so they cannot disagree (`craftScope`'s own doc comment).
   const craftScopeList = useMemo(
     () => craftScope(activity, includeReactions),
     [activity, includeReactions]
   );
 
-  /** @see facilityContext — the Reaction Location's own "where and how" half, `null` until one is configured. */
   const reactionPlanFacilityContext = useMemo(
     () =>
       reactionPlanFacilityContextFor({
@@ -34,7 +25,6 @@ export function usePlanFacilityContexts(
     [plan.reactionFacility, plan.reactionRigFit, plan.reactionSecurity, plan.reactionFacilityTaxPct]
   );
 
-  /** The facility/rig/security/tax inputs Auto Build's depth walk needs. */
   const facilityContext = useMemo(
     () =>
       facilityContextFor({

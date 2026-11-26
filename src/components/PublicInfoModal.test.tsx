@@ -6,7 +6,6 @@ import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import '@/i18n';
 
-// The Character tab is Pilot Lookup's view; its zKillboard reads and type catalog are stubbed.
 vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: vi.fn(async () => ({ kind: 'no-history' })),
@@ -40,7 +39,6 @@ beforeEach(async () => {
   await db.esiCache.clear();
   await db.characters.clear();
   usePublicInfoModalStore.setState({ request: null });
-  // No live affiliation by default, so a character's public record decides its corp and alliance.
   server.use(
     http.post(`${ESI_BASE_URL}/characters/affiliation`, () => HttpResponse.json([])),
     http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([])),
@@ -209,7 +207,6 @@ describe('PublicInfoModal', () => {
 
     within(dialog).getByRole('tab', { name: 'Corporation' }).click();
     await screen.findByText('[SOME]');
-    // This corp's founder is also its CEO, so the name shows on both rows.
     expect(screen.getAllByText('CEO Pilot')).toHaveLength(2);
   });
 
@@ -394,7 +391,6 @@ describe('PublicInfoModal', () => {
     );
     within(dialog).getByRole('button', { name: 'Try again' }).click();
 
-    // The Corporation tab drops out while the lookups re-run, then comes back, still the open one.
     await waitFor(() =>
       expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toHaveAttribute(
         'aria-selected',
@@ -569,7 +565,6 @@ describe('PublicInfoModal', () => {
       creator_id: 104,
       member_count: 2,
       tax_rates: { isk: 0 },
-      // Cached corp record still names an alliance the live affiliation has left.
       alliance_id: 13,
     });
     mockNames([

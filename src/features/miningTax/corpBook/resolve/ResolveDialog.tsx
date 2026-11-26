@@ -31,31 +31,17 @@ const k = (key: string) => `miningTax.resolve.${key}`;
 
 interface Props {
   problem: ResolveProblem;
-  /** Who is asking, and who answers tax questions for the book. */
   mail: MailContext;
-  /** The member's own journal transfers that make the "I already paid" proof, when already known. */
   transfers?: ClaimedTransfer[];
-  /** Every payment the member made from their wallet: "Which payment was it?" lists the ones around the billed period. */
   payments?: readonly MadePayment[];
-  /**
-   * The Characters whose payments the server accepts as proof for the Late notice: the picker lists
-   * only theirs. Absent: every payment given.
-   */
   senderIds?: readonly number[];
-  /** The billed period's first day (ISO): payments before it are not listed. */
   paidSince?: string;
-  /** The Payee the member's own entry gave a Conflict day's ore to. */
   payeeName?: string;
-  /** The facts above the choices: what the app knows about the problem. */
   facts: ReactNode;
-  /** The key "Not paying" hides this problem under. */
   hideKey: string;
   onHide: (key: string) => Promise<unknown>;
-  /** Pay it: the book's own pay flow. */
   onPay: () => void;
-  /** Fix my records: the day, on its takeover. */
   onFixRecords?: () => void;
-  /** Something reached the book: read it again. */
   onSent: () => void;
   onClose: () => void;
 }
@@ -65,23 +51,14 @@ type Done =
   | {
       kind: 'sent';
       checks?: ClaimCheck[];
-      /** The transfers that went with it, in the order `checks` answers them. */
       transfers?: readonly ClaimedTransfer[];
       confirmed?: boolean;
       holdsUntil?: string;
-      /** Said again after an officer kept the bill: the day is not held a second time. */
       again?: boolean;
-      /** Donations the book held for review, counted by the member's own claim. */
       held?: boolean;
       mailed?: TaxQuestionMailOutcome;
     };
 
-/**
- * One problem on the Tax tab and every way out of it (resolving in the app, mockup B): settle it
- * yourself — pay it, fix my records, not paying — or ask the corporation — I already paid, I don't
- * owe this. Only what applies, self-service first, the likeliest preselected; the chosen one opens
- * its own inputs, and what was done is said before the dialog closes.
- */
 export function ResolveDialog({
   problem,
   mail,
@@ -103,7 +80,6 @@ export function ResolveDialog({
   const [choice, setChoice] = useState<OutcomeId>(offer.preselected);
   const [tell, setTell] = useState(false);
   const [text, setText] = useState('');
-  // The server only counts a payment from a Character the Late notice bills.
   const payments = senderIds
     ? allPayments?.filter((p) => senderIds.includes(p.characterId))
     : allPayments;
@@ -112,8 +88,6 @@ export function ResolveDialog({
   const [done, setDone] = useState<Done | null>(null);
   const [picked, setPicked] = useState<ReadonlySet<number>>(new Set());
   const [pickedTransfers, setPickedTransfers] = useState<ClaimedTransfer[]>([]);
-  // Transfers the app already knows (the donations it could not credit) are the proof as they
-  // stand; otherwise the member picks which of their own payments it was.
   const transfers = presetTransfers.length > 0 ? presetTransfers : pickedTransfers;
   const picking = presetTransfers.length === 0 && payments !== undefined;
   const corp = problem.corpName;
@@ -122,7 +96,6 @@ export function ResolveDialog({
     problem.kind === 'uncredited' || problem.kind === 'kept' || problem.kind === 'overdue'
       ? problem.noticeId
       : undefined;
-  // Donations the book holds for review: without a Late notice to declare on, each is claimed.
   const held = problem.kind === 'uncredited' ? problem.held : undefined;
   const countsHeld = held !== undefined && noticeId === undefined;
 
@@ -163,7 +136,6 @@ export function ResolveDialog({
         onSent();
         setDone({ kind: 'sent', confirmed: true, held: true });
       } else if (choice === 'paid' && noticeId) {
-        // Every day the proof covers, not just the first: the officer reads what it paid.
         const days =
           problem.kind === 'uncredited' && problem.days
             ? problem.days.join(', ')
@@ -216,8 +188,6 @@ export function ResolveDialog({
 
   const choiceView = (id: OutcomeId) => {
     const checked = choice === id;
-    // Only the radio, its title and its hint are the label: the chosen outcome's own inputs sit
-    // beside it, so each keeps its own name and the radio's name stays the outcome.
     return (
       <div
         key={id}
@@ -395,7 +365,6 @@ export function ResolveDialog({
   );
 }
 
-/** i18next context for an outcome's wording on a given problem. */
 function outcomeContext(kind: ResolveProblem['kind'], id: OutcomeId): string | undefined {
   if (id === 'pay' && kind === 'uncredited') return 'again';
   if (id === 'pay' && kind === 'overdue') return 'plain';
@@ -420,8 +389,7 @@ function DoneView({ done, corp }: { done: Done; corp: string }) {
               ? t(k('result.sentAgain'), { corp })
               : done.holdsUntil
                 ? t(k('result.sent'), { corp, date: isoDay(done.holdsUntil) })
-                : // "I already paid" holds no day: only a dispute does.
-                  t(k('result.sentPaid'), { corp })}
+                : t(k('result.sentPaid'), { corp })}
         </p>
       )}
       {done.checks && done.checks.length > 0 && (

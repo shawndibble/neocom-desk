@@ -1,5 +1,3 @@
-// Sync now for moon owners (issue #6117) against the Firestore emulator.
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -26,7 +24,6 @@ const T0 = Date.parse('2026-10-18T12:00:00Z');
 const KEY = Buffer.alloc(32, 7);
 const COLLECTOR_CEO = 1;
 const OUTSIDER = 14;
-/** One CEO alt per moon owner: the alt's id picks its corporation. */
 const ALT_OF = { [FEEDER_A]: 12, [FEEDER_B]: 13 } as Record<number, number>;
 const CORP_OF_ALT = new Map(Object.entries(ALT_OF).map(([corp, alt]) => [alt, Number(corp)]));
 
@@ -34,7 +31,6 @@ let now = T0;
 const calls: string[] = [];
 const extractions = new Map<number, EsiExtractionLike[]>();
 const noObservers = new Set<number>();
-/** Runs inside each observer read: lets a test make a pull slow. */
 let duringPull: (() => void) | undefined;
 const identities = new Map<number, CorpIdentity>();
 
@@ -177,7 +173,6 @@ emulatorSuite('sync moon owners now', () => {
     expect(await storedExtractions()).toMatchObject([
       { structureId: 7001, sourceCorporationId: FEEDER_A },
     ]);
-    // What officers read without the raw rows: the pull's moon doc and the Overview's window.
     const id = `7001_${Date.parse(CHUNK.extraction_start_time)}`;
     expect((await collectorBook().collection('moonDocs').doc(id).get()).exists).toBe(true);
     const overview = (await collectorBook().collection('readModels').doc('overview').get()).data();

@@ -1,10 +1,3 @@
-/**
- * A Community's Requests board, cached per Character and Community (issue #5244). Opening the board
- * reads only the version stamp (`loadBoardVersion`); when it has not moved the cached board is
- * shown. When it has, only the Requests and Pledges written since the cache's watermark are read
- * and merged in. A stamp whose `reset` moved (a Request or Pledge was deleted, which a delta cannot
- * show), a cache older than `BOARD_MAX_AGE_MS`, or a delta that fails, reads the whole board again.
- */
 import { MINUTE_MS } from '@/lib/age';
 import type {
   CommunityRequest,
@@ -19,13 +12,8 @@ import {
   loadRequestsActiveSince,
 } from './requestStore';
 
-/**
- * A callable stamps `lastActivityAt` when it starts, not when it commits, so a retried one can land
- * behind a newer mark. The Request delta reads this far back from the mark (a re-read is a no-op).
- */
 export const REQUEST_DELTA_MARGIN_MS = MINUTE_MS;
 
-/** Backstop for a deletion made without a stamp (an older callable, a failed stamp write). */
 export const BOARD_MAX_AGE_MS = 15 * MINUTE_MS;
 
 interface CachedBoard {
@@ -38,7 +26,6 @@ interface CachedBoard {
 
 export interface Board {
   requests: CommunityRequest[];
-  /** Null when the Pledge read failed: the board must not pass an unread Request off as Open. */
   pledges: PledgesByRequest | null;
 }
 
@@ -51,7 +38,6 @@ export function clearBoardCache(): void {
 const newestFirst = (requests: Iterable<CommunityRequest>): CommunityRequest[] =>
   [...requests].sort((a, b) => b.createdAt - a.createdAt);
 
-/** The newest `lastActivityAt` in the cache: what the next delta reads from. */
 const requestMark = (requests: ReadonlyMap<string, CommunityRequest>): number =>
   Math.max(0, ...[...requests.values()].map((r) => r.lastActivityAt));
 
@@ -81,7 +67,6 @@ async function readWhole(characterId: number, communityId: string): Promise<Boar
   return { requests, pledges };
 }
 
-/** The Community's board: from the cache when the stamp has not moved, else a delta or a whole read. */
 export async function loadBoard(
   characterId: number,
   communityId: string,

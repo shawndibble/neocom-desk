@@ -9,7 +9,6 @@ describe('capacitorTone', () => {
   it('is warning when it lasts a minute or more', () => {
     expect(capacitorTone({ stable: false, depletesInSeconds: 60 })).toBe('warning');
     expect(capacitorTone({ stable: false, depletesInSeconds: 600 })).toBe('warning');
-    // Shown as "60s", so not red.
     expect(capacitorTone({ stable: false, depletesInSeconds: 59.6 })).toBe('warning');
   });
 

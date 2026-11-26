@@ -1,13 +1,3 @@
-/**
- * The SDE's blueprint typeIDs, for telling a **BPO** apart from an ordinary
- * item on the Assets pages (`engine/blueprintKind.ts`).
- *
- * Off the page's critical path: the badge is a progressive enhancement, so a
- * BPC badge shows at once (ESI flags copies) and a BPO badge appears once
- * this lands, never blocking the list. `loadBlueprints` is memoized for the
- * session, so the Assets page's lazily loaded Build Plan catalog reuses the
- * same fetch rather than repeating it.
- */
 import { useMemo } from 'react';
 import { mayBeBlueprintName } from '@/engine/blueprintKind';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -25,12 +15,6 @@ function blueprintTypeIdSet(source: BlueprintMap): ReadonlySet<number> {
 
 const loadBlueprintTypeIds = () => loadBlueprints().then(blueprintTypeIdSet);
 
-/**
- * The set once loaded; null while still loading, on a failed load (a missing
- * BPO badge is not worth an error), or when no name in `typeNames` — the
- * listed asset types — could be a blueprint's: most asset lists hold none,
- * and the file is 1.6 MB, so it is fetched only once one could.
- */
 export function useBlueprintTypeIds(
   typeNames: ReadonlyMap<number, string>
 ): ReadonlySet<number> | null {

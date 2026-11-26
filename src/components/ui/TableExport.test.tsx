@@ -73,7 +73,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Into the submenu by keyboard, as RowActions.test.tsx drives submenus (jsdom has no hover intent). */
 async function openExportSub(user: ReturnType<typeof userEvent.setup>) {
   (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
   await user.keyboard('{ArrowRight}');
@@ -197,7 +196,6 @@ describe("useTableExport source: 'sorted-rows'", () => {
     { id: 3, item: 'Pyerite', amount: 5 },
   ];
 
-  /** Mounts only the first two rows, as a "Show all"-capped table does. */
   function Capped() {
     const tableExport = useTableExport({
       surface: 'market-sell',

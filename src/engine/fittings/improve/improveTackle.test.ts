@@ -196,7 +196,6 @@ describe('tackle and EWAR Rework groups and jobs', () => {
     expect(scoredJobs('ewar')).toEqual(['ewar']);
     expect(jobOf(52)).toBe('scram');
     expect(jobOf(201)).toBe('ewar');
-    // Neutralizers are not scored by Stronger EWAR, so losing the last one stays guarded.
     expect(jobOf(71)).not.toBe('ewar');
     expect(jobOf(71)).not.toBeNull();
   });

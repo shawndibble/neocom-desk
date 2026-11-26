@@ -1,15 +1,9 @@
-// A hand-made table in a mail body: the sender padded columns with runs of
-// spaces (or tabs) to line up in the client's proportional font, which can't
-// be reproduced in ours, or wrote markdown-style `| a | b |` pipe rows. Detect
-// those rows and let the caller render a real table instead.
-
 const MIN_CELLS = 3;
 const MIN_PIPE_CELLS = 2;
 const MIN_ROWS = 2;
 const NUMERIC = /^[~+-]?\d[\d,.\s]*[a-zA-Z%]{0,3}$/;
 const PIPE_SEPARATOR = /^:?-{2,}:?$/;
 
-/** A separator row of a markdown pipe table: carries no data. */
 const SEPARATOR = Symbol('separator');
 
 function pipeCellsOf(line: string): CellSpan[] | typeof SEPARATOR | null {
@@ -31,7 +25,6 @@ function pipeCellsOf(line: string): CellSpan[] | typeof SEPARATOR | null {
 }
 
 function spaceCellsOf(line: string): CellSpan[] | null {
-  // A cell is a run of words joined by single spaces; tabs or 2+ spaces split cells.
   const cells = Array.from(line.matchAll(/\S+(?: \S+)*/g), (m) => ({
     text: m[0],
     start: m.index,
@@ -47,20 +40,17 @@ function cellsOf(line: string): CellSpan[] | typeof SEPARATOR | null {
 function alignOf(rows: string[][]): ('left' | 'right')[] {
   const width = Math.max(...rows.map((r) => r.length));
   return Array.from({ length: width }, (_, col) => {
-    // Row 0 is the header; a short row leaves its trailing columns empty.
     const body = rows.slice(1).flatMap((r) => (r[col] === undefined ? [] : [r[col]]));
     return body.length > 0 && body.every((c) => NUMERIC.test(c)) ? 'right' : 'left';
   });
 }
 
-/** A cell's text and its `[start, end)` offsets within its line. */
 export interface CellSpan {
   text: string;
   start: number;
   end: number;
 }
 
-/** A block of consecutive lines: `[start, end)` indexes into the input lines. */
 export type MailLineBlock =
   | { kind: 'text'; start: number; end: number }
   | {
@@ -68,17 +58,11 @@ export type MailLineBlock =
       start: number;
       end: number;
       rows: string[][];
-      /** Per row and cell: where the cell sits in its line, so a caller can keep its formatting. */
       spans: CellSpan[][];
-      /** The input line index each row came from. */
       rowLines: number[];
       align: ('left' | 'right')[];
     };
 
-/**
- * Split a body's lines into prose and table ranges. A table is space-aligned
- * columns or markdown pipe rows (`| a | b |`, optional `|---|---|` separator).
- */
 export function splitMailLines(lines: readonly string[]): MailLineBlock[] {
   const blocks: MailLineBlock[] = [];
   let proseStart = 0;
@@ -90,10 +74,9 @@ export function splitMailLines(lines: readonly string[]): MailLineBlock[] {
       i++;
       continue;
     }
-    // Gather tabular lines, tolerating blank lines between them.
     const spans = [first];
     const rowLines = [i];
-    let end = i + 1; // exclusive end of the consumed lines
+    let end = i + 1;
     for (let j = i + 1; j < lines.length; j++) {
       if (lines[j].trim() === '') continue;
       const cells = cellsOf(lines[j]);

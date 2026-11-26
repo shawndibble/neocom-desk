@@ -39,7 +39,6 @@ afterEach(() => {
   loadStructureSummary.mockReset();
 });
 
-/** ESI's search answers each query only when the test says so. */
 function heldSearch() {
   const waiting = new Map<string, (ids: number[]) => void>();
   getCharacterSearch.mockImplementation(

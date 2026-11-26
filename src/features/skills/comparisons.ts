@@ -1,11 +1,3 @@
-/**
- * Saved skill comparisons: which characters a user groups to compare skills
- * side by side. Device-local (docs/plans/feature-parity §5.7) — EVE SSO
- * exposes no account identifier, so a cross-character grouping cannot be
- * synced without inventing an unverifiable account identity. Stored as one
- * array-valued key carrying its own `updatedAt`, shaped like a synced key
- * would be but without the `sync.` prefix that would turn syncing on.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export interface SavedComparison {
@@ -48,10 +40,6 @@ export const useSkillComparisons = createLocalSetting<SkillComparisonsValue>({
   parse: parseComparisonsValue,
 });
 
-/**
- * Adds a comparison, or replaces the one with the same id in place — never
- * duplicates, and never reorders the list just because an entry was edited.
- */
 export function upsertComparison(
   value: SkillComparisonsValue,
   comparison: SavedComparison,
@@ -72,11 +60,6 @@ export function removeComparison(
   return { items: value.items.filter((item) => item.id !== id), updatedAt: nowMs };
 }
 
-/**
- * A saved comparison's character ids, filtered down to characters still on
- * this device. The saved record itself is never rewritten — a character
- * removed today and re-added later reappears in the comparison for free.
- */
 export function resolveComparisonCharacterIds(
   comparison: Pick<SavedComparison, 'characterIds'>,
   knownCharacterIds: ReadonlySet<number>

@@ -1,15 +1,3 @@
-/**
- * Skill Plan editor: "Import from skill queue" on a non-empty plan (#1402).
- *
- * The one-row queue is seeded via a `page.route` override on
- * `GET /characters/{id}/skillqueue`, registered before `signInAndGoto` — the
- * same pattern `mailNarrow.spec.ts`/`openOrdersNarrow.spec.ts` use for a
- * boot-time prefetch. `app/prefetch.ts` calls `loadCharacterSkillQueue`
- * immediately after login and caches whatever it gets for
- * `STALE_AFTER.default` (10 minutes); overriding the route after sign-in
- * would leave that boot fetch's already-cached empty result in place with
- * nothing left to force a live re-fetch.
- */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { addCaldariCruiserToNewPlan } from './support/planHelpers';

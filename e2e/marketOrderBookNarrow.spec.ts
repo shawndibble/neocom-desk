@@ -1,48 +1,11 @@
-/**
- * Market Browser's order-book Sell/Buy tables at 390px (issue #2095): both
- * `DataTable`s left `stackColumns` at its default `1`, so every non-primary
- * column (Quantity, Location, Security, Jumps, Expires, and Buy's own Range
- * and Min. Volume) got its own line — a sell card ran five lines below the
- * price, a buy card seven, and a normal 12-order book was a multi-thousand-
- * pixel scroll to see four or five orders. Fixed the same way `stackColumns`
- * already is for Appraisal (#1097), Appraisal Share (#1113), Mining Tax
- * Yield Detail (#1130) and PI Plan Sensitivity (#1134): `stackColumns={2}`,
- * pairing the short figures two per line.
- *
- * The order book rework (2026-10-04) went further: an order is now the dense
- * two-line card — station and price, then quantity, distance, security and
- * expiry — and a phone shows one side at a time behind a Sell | Buy toggle.
- * The card is picked by the order book's own width, not the viewport, so a
- * desktop whose finder column leaves the book narrow (1280px) gets it too.
- *
- * Playwright rather than jsdom, same reasoning `miningTaxYieldDetailNarrow.spec.ts`
- * gives: the card lives in `.dt-stack-dense` (`.dt-stacked`,
- * `src/styles/index.css`), which jsdom cannot evaluate. Assertions are
- * bounding boxes: which cells share a line, and that a long station name and
- * an 8-figure quantity still fit without overlap or sideways scroll.
- *
- * Orders are seeded via a `page.route` override on `GET
- * /markets/{region}/orders`, registered before `signInAndGoto` — the same
- * precedent `openOrdersNarrow.spec.ts` sets for `/characters/{id}/orders`,
- * since a route registered inside the test body wins over the one
- * `installEsiMock` (a `testBase` fixture) already registered. Jita 4-4
- * (60003760) is a real NPC station, resolved from the bundled SDE snapshot
- * (`useMarketCatalogue`) rather than a live ESI call, so its real ~48-
- * character name is the long station name the acceptance criteria asks for
- * with no extra fixture needed. Both orders sit in Jita itself (system_id
- * 30000142), the mocked character's current system
- * (`/characters/{id}/location` in `mockEsi.ts`), so the Jumps column
- * resolves locally off the bundled stargate graph — no `/route/` call.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 import type { RegionOrder } from '../src/esi/endpoints';
 
-const REGION = 10000002; // The Forge
+const REGION = 10000002;
 const TRITANIUM = 34;
-/** Real NPC station, bundled in `public/data/market/stations.json` — its ~46-character name is the long station name the acceptance criteria asks for. */
 const STATION_A = 60003760;
 const STATION_A_NAME = 'Jita 4 - Moon 4 - Caldari Navy Assembly Plant';
 const JITA_SYSTEM = 30000142;
@@ -75,8 +38,6 @@ const BUY_ORDER = order({
 });
 
 async function seedOrderBook(page: Page): Promise<void> {
-  // Every region, since a Jump Range reads the regions in reach; only the
-  // Forge has orders.
   await page.route('**/markets/*/orders*', (route) =>
     route.fulfill({
       status: 200,
@@ -86,9 +47,6 @@ async function seedOrderBook(page: Page): Promise<void> {
       ),
     })
   );
-  // Not in `mockEsi.ts`'s bundled `UNIVERSE_TYPES` fixture (that set is only
-  // the implants it needs elsewhere) — `ItemDetailModal`'s dogma lookup for
-  // Tritanium falls through to the network guard without this.
   await page.route('https://esi.evetech.net/universe/types/34', (route) =>
     route.fulfill({
       status: 200,
@@ -104,16 +62,10 @@ async function seedOrderBook(page: Page): Promise<void> {
   );
 }
 
-/**
- * A Jump Range by default, so the book spans stations and keeps its Location
- * column; `singleStation` reads the hub alone, whose scope bar names the
- * station instead.
- */
 async function openTritanium(page: Page, { singleStation = false } = {}): Promise<void> {
   await signInAndGoto(page, singleStation ? './market' : './market?browser.jumps=5');
   await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
   await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
-  // Only Sell: a phone shows one side at a time, behind the Sell | Buy toggle.
   await expect(page.getByRole('table', { name: 'Sell Orders' })).toBeVisible();
 }
 
@@ -123,7 +75,6 @@ interface CellBox {
   top: number;
   left: number;
   width: number;
-  /** A wrapped-but-clipped cell would still pass every geometry check above — its box never grows past its track, it just hides content inside it. This is what actually catches that. */
   clipped: boolean;
 }
 
@@ -142,11 +93,6 @@ async function readRow(page: Page, tableLabel: string, orderId: number): Promise
       const rowEl = table.querySelector(`tbody tr[data-row-key="${key}"]`) as HTMLElement;
       const style = getComputedStyle(rowEl);
       const box = rowEl.getBoundingClientRect();
-      // `rowMoreActions`'s button renders as its own unlabelled `td`, pinned
-      // absolute to the card's corner (`.dt-actions`) rather than flowing
-      // with the labelled fields — excluded here so it can't be mistaken for
-      // a field sharing the primary cell's line.
-      // Cells a width or a card leaves out (`display: none`) have no box.
       const shown = [...rowEl.querySelectorAll(':scope > td[data-label]')].filter(
         (td) => td.getBoundingClientRect().width > 0
       );
@@ -176,12 +122,6 @@ async function readRow(page: Page, tableLabel: string, orderId: number): Promise
   );
 }
 
-/**
- * Cells clustered into the lines they render on, top-to-bottom then
- * left-to-right; 1px tolerance for grid subpixel rounding by default. The
- * dense card aligns its first line on the text baseline, so its bigger price
- * figure sits a few px below the station name on the same line.
- */
 function lines(cells: CellBox[], tolerance = 1): CellBox[][] {
   const grouped: CellBox[][] = [];
   for (const cell of [...cells].sort((a, b) => a.top - b.top || a.left - b.left)) {
@@ -196,7 +136,6 @@ function labelLines(cells: CellBox[], tolerance = 1): string[][] {
   return lines(cells, tolerance).map((line) => line.map((cell) => cell.label));
 }
 
-/** A phone card: the pinned ⋮ is a 36px target centred on the card, with no › beside or under it, clear of line two. */
 async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
   const row = page.locator(`table[aria-label="${tableLabel}"] tr[data-row-key="${orderId}"]`);
   const more = await row.getByRole('button', { name: /^More actions/ }).boundingBox();
@@ -208,10 +147,8 @@ async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
   await expect(row.locator('.dt-lead-caret')).toBeHidden();
   const dy = Math.abs(more!.y + more!.height / 2 - (card!.y + card!.height / 2));
   expect(dy, `⋮ centre-y vs card centre-y (${tableLabel})`).toBeLessThanOrEqual(1);
-  // No overlap: line two ends before the button's box, wider font or not.
   expect(meta!.x + meta!.width, `line two vs ⋮ (${tableLabel})`).toBeLessThanOrEqual(more!.x);
   expect(card!.height, tableLabel).toBeLessThanOrEqual(64);
-  // One line two: every meta cell shares the first one's top.
   const tops = await row
     .locator('td.dt-meta')
     .evaluateAll((tds) =>
@@ -227,7 +164,6 @@ test.describe('Market Browser — order book stacked cards', () => {
     await seedOrderBook(page);
   });
 
-  /** The two-line order card: station and price, then quantity, distance, security and expiry (and a buy's range). */
   async function expectTwoLineCards(page: Page) {
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(sell.display).toBe('flex');
@@ -235,8 +171,6 @@ test.describe('Market Browser — order book stacked cards', () => {
       ['Location', 'Price'],
       ['Qty', 'Jumps', 'Sec', 'Expires'],
     ]);
-    // The real station, not the "Unknown Structure" fallback — truncated on
-    // the card's title line, in full in the DOM (and the expanded row).
     expect(sell.cells.find((c) => c.label === 'Location')!.text).toBe(STATION_A_NAME);
     for (const cell of sell.cells.filter((c) => c.label !== 'Location')) {
       expect(cell.clipped, cell.label).toBe(false);
@@ -276,7 +210,6 @@ test.describe('Market Browser — order book stacked cards', () => {
     await page.setViewportSize(DESKTOP);
     await openTritanium(page);
     await expectTwoLineCards(page);
-    // Both sides at once off a phone — the toggle is phone-only.
     await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeVisible();
   });
 
@@ -305,9 +238,6 @@ test.describe('Market Browser — order book stacked cards', () => {
     await openTritanium(page);
     expect((await readRow(page, 'Sell Orders', SELL_ORDER.order_id)).display).toBe('flex');
 
-    // Fewer columns need less width (`orderBookWidthsRem`): this book fits them as a table.
-    // Two, not one: the budget counts the ⋮ column, so Sec alone no longer
-    // clears the 8-figure quantity at this width.
     await page
       .getByRole('region', { name: 'Sell Orders' })
       .getByRole('button', { name: 'Columns' })
@@ -351,8 +281,6 @@ test.describe('Market Browser — order book stacked cards', () => {
 
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(buy.cells.find((c) => c.label === 'Min. Volume')?.text).toContain('500,000');
-    // Range may ellipsize on a wider font (it is the cell that gives way
-    // before text could meet the ⋮).
     for (const cell of buy.cells.filter((c) => c.label !== 'Location' && c.label !== 'Range')) {
       expect(cell.clipped, cell.label).toBe(false);
     }
@@ -390,8 +318,6 @@ test.describe('Market Browser — order book stacked cards', () => {
     expect(buy.display).toBe('table-row');
     expect(lines(buy.cells)).toHaveLength(1);
 
-    // One trailing control: the ⋮, with no trailing chevron beside it; the
-    // §6c leading caret in the first cell is the expand cue.
     const row = page.locator(
       `table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"]`
     );
@@ -401,18 +327,11 @@ test.describe('Market Browser — order book stacked cards', () => {
   });
 });
 
-/**
- * The item panel header's icon cluster (Add to Quickbar, price alert, More
- * actions ⋮) at phone widths: every button visible, a 36px touch target
- * (§6c touch tier), none overlapping another, and the page not scrolling
- * sideways.
- */
 for (const width of [390, 360]) {
   test(`item header buttons are visible, 36px and non-overlapping at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
-    // Empty books and a stub type: only the header is under test.
     await page.route(/\/markets\/\d+\/orders/, (route) =>
       route.fulfill({
         status: 200,
@@ -440,7 +359,6 @@ for (const width of [390, 360]) {
     await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
 
     const names = [/^Add to Quickbar$/, /^Set price alert$/, /^More actions$/];
-    // The cluster must not squeeze the item name out of the header.
     await expect(page.getByRole('heading', { name: 'Tritanium' })).toBeVisible();
     const boxes = [];
     for (const name of names) {

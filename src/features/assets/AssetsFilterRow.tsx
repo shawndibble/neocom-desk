@@ -17,13 +17,6 @@ import type { AssetSortField } from './assetSortPreference';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
 
-/**
- * The Items page's one filter row (issue #5601): search, Category, Blueprints
- * (only while something under Blueprints & Reactions is ticked), min value and,
- * in a flat list, sort. Category and Blueprints sit in the row from `lg` up
- * (DESIGN.md §4b); between `md` and `lg` they are in the funnel box, and on a
- * phone every control is behind the funnel's sheet.
- */
 export function AssetsFilterRow({
   assetsData,
   assetsRows,
@@ -49,9 +42,6 @@ export function AssetsFilterRow({
   } = assetsData;
   const { searchRef, sortField, setSortField, rows } = assetsRows;
 
-  // Each control sits in a `FilterField` whose label is its pill's, so a pill
-  // tapped opens the box or sheet on that control. In the row (`inline`) a
-  // `FilterField` is `display: contents`, so the control sits as it is.
   const category = categoryIndex && pickerIndex && (
     <FilterField label={t('assets.category.label')}>
       <AssetCategoryPicker
@@ -86,7 +76,6 @@ export function AssetsFilterRow({
     </FilterField>
   );
 
-  // Sort orders the list rather than narrowing it, so it is never a pill.
   const sort = flatModeActive && (
     <FilterField label={t('assets.sort.label')}>
       <Select
@@ -115,9 +104,6 @@ export function AssetsFilterRow({
     />
   );
 
-  // Category and Blueprints are the key filters: in the row on a pointer-width
-  // screen (no pill), in the sheet only on a phone. Sort orders the list, so on
-  // a pointer it is a view control beside the funnel, in the sheet on a phone.
   return (
     <FilterBar
       value={filterValue}
@@ -129,11 +115,8 @@ export function AssetsFilterRow({
           {blueprints}
         </>
       )}
-      // Sort arranges rather than narrows, so it is a view control in `actions`
-      // from `md` up (not `inline`, which is capped at two and starts at `lg`).
       actions={!isNarrow && sort}
       active={activeFilters}
-      // Only a flat list's rows are results; browsing, they are a place's contents.
       resultCount={flatModeActive ? rows.length : undefined}
       title={t('assets.filters.title')}
     >

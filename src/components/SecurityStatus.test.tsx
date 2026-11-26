@@ -5,8 +5,6 @@ import { securityStatusColor } from '@/engine/securityStatus';
 
 describe('SecurityStatus', () => {
   it('rounds to one decimal through shownSecurity, not the raw float', () => {
-    // Balle: 0.4608891 in ESI, 0.5 in game — the exact case `shownSecurity`
-    // exists to fix (see `securityStatus.ts`).
     render(<SecurityStatus security={0.4608891} />);
     expect(screen.getByText('0.5')).toBeInTheDocument();
   });

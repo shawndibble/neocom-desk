@@ -1,10 +1,3 @@
-// Find tracked paths that differ only in letter case. Linux CI tolerates them;
-// macOS/Windows (case-insensitive) checkouts clobber one of the pair (#3890).
-// Every path prefix is compared, so `Foo/a.ts` vs `foo/b.ts` collides on `Foo`/`foo`.
-// Files in one folder also collide when their names match ignoring case once the last
-// extension is dropped: `Foo.tsx` vs `foo.ts` is ambiguous to an extensionless import (#4579).
-
-/** @param {string[]} paths @returns {string[][]} sorted groups of >=2 distinct spellings */
 export function findCaseCollisions(paths) {
   const groups = [...findPathCollisions(paths), ...findStemCollisions(paths)];
   const seen = new Set();
@@ -18,7 +11,6 @@ export function findCaseCollisions(paths) {
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
-/** @param {string[]} paths */
 function findStemCollisions(paths) {
   const byStem = new Map();
   for (const p of new Set(paths)) {
@@ -35,7 +27,6 @@ function findStemCollisions(paths) {
   return [...byStem.values()].filter((e) => e.stems.size > 1).map((e) => e.files.sort());
 }
 
-/** @param {string[]} paths */
 function findPathCollisions(paths) {
   const byLower = new Map();
   for (const p of paths) {

@@ -37,24 +37,16 @@ interface WalletGoalsPanelProps {
   today: string;
 }
 
-/** A Goal being added (`id` null) or edited. */
 interface Draft {
   id: string | null;
   name: string;
-  /** What sets the target: a typed amount, or a Fitting's price. */
   mode: 'amount' | 'fitting';
   amount: string;
-  /** '' until a Fitting is picked. */
   fittingId: string;
 }
 
 const NEW_DRAFT: Draft = { id: null, name: '', mode: 'amount', amount: '', fittingId: '' };
 
-/**
- * The wallet Goals: each a name and a target, either typed or the price of a
- * Fitting at the pilot's Trade Hub, with progress against the summed wallet
- * ISK and the 30 day average and ETA from the last 30 days of snapshots.
- */
 export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const { t, i18n } = useTranslation();
   const goals = useWalletGoals((s) => s.value);
@@ -89,7 +81,6 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const save = () => {
     if (!draft || !canSave) return;
     const picked = choices.all.find((choice) => choice.id === draft.fittingId);
-    // A Fitting that is gone from the lists keeps the name it was picked under.
     const kept = goals.find((g) => g.id === draft.id && g.fittingId === draft.fittingId);
     const goal: WalletGoal = {
       id: draft.id ?? crypto.randomUUID(),
@@ -260,7 +251,6 @@ interface GoalRowProps {
   today: string;
   hubName: string;
   price: GoalPrice | undefined;
-  /** Where the goal's Fitting opens, once known. */
   fittingLink: FittingEditLocation | undefined;
   formatDay: (day: string) => string;
   onEdit: () => void;

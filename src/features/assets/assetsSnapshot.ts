@@ -21,21 +21,14 @@ import { getAveragePriceByType } from '@/market/prices';
 
 export interface Snapshot {
   assetsResult: CachedResult<CharacterAsset[]> | null;
-  /** Pages were capped or missing — the list below is partial. */
   assetsTruncated: boolean;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
-  /** Global average market price per type, used for the tree's estimated-value badges. */
   priceByTypeId: Map<number, number>;
-  /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
   copyValueByItemId: Map<number, number>;
-  /** False in an early partial: values read 0 until prices land, so value filters must not apply. */
   pricesReady: boolean;
-  /** m3 per unit, from the slim SDE snapshot only — best-effort, missing for market/asset-only types it doesn't cover. */
   volumeByTypeId: Map<number, number>;
-  /** In-game ship/container names by item id (issue #5652); empty until read, and when ESI cannot name anything. */
   assetNames: AssetNameMap;
 }
 
@@ -43,7 +36,6 @@ function loadOwnBlueprints(characterId: number): LoadBlueprints {
   return async () => (await loadCharacterBlueprints(characterId)).cached?.data ?? null;
 }
 
-/** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
 function loadOwnCopyValues(
   characterId: number,
   assets: readonly CharacterAsset[]
@@ -55,14 +47,12 @@ export async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal<Snapshot>
 ): Promise<Snapshot> {
-  // Not awaited with the assets: a first-ever price read is the slowest call.
   const pricesPromise = getAveragePriceByType();
   const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
     await loadCharacterAssets(characterId);
   const assetsTruncated = assetsResult?.truncated ?? false;
   const assets = assetsResult?.data ?? [];
 
-  // Rows first, the slow reads (prices, Firestore copy values) fill in behind.
   let shown: Snapshot = {
     assetsResult,
     assetsTruncated,
@@ -82,14 +72,12 @@ export async function loadAssetsSnapshot(
   show({});
   void pricesPromise.then((priceByTypeId) => show({ priceByTypeId, pricesReady: true }));
 
-  // Already superseded: skip the ESI name resolves, their results would be discarded.
   const typeIds = signal.cancelled ? [] : [...new Set(assets.map((a) => a.type_id))];
   const reads = startAssetReads({
     characterId,
     assets,
     typeIds,
     loadBlueprints: loadOwnBlueprints(characterId),
-    // Names fill in behind the rows, like prices; a failed read leaves type names.
     loadAssetNames: () => loadCharacterAssetNames(characterId, assets),
     cancelled: signal.cancelled,
   });
@@ -117,13 +105,6 @@ export async function loadAssetsSnapshot(
           assets.filter((a) => a.location_type === 'solar_system').map((a) => a.location_id)
         ),
       ];
-  // A `location_type: "item"` asset whose location_id matches no item_id in
-  // this same fetch has a parent ESI never returned a row for — most often a
-  // personal-hangar division inside a player-owned structure, which the
-  // structures endpoint still resolves even though it never appears as its
-  // own asset row. Cheap to try (only ever hit once per distinct missing
-  // parent) and harmless to miss: an unresolvable id just 403/404s, same as
-  // today's silent fallback.
   const itemIds = signal.cancelled ? new Set<number>() : new Set(assets.map((a) => a.item_id));
   const orphanParentIds = signal.cancelled
     ? []
@@ -136,12 +117,6 @@ export async function loadAssetsSnapshot(
       ];
   const [resolvedStations, resolvedStructures, resolvedSystems, resolvedOrphanParents] =
     await Promise.all([
-      // Uncapped on purpose: `location_type: 'station'` means every one of
-      // these is an NPC station, and those resolve out of the SDE snapshot
-      // with no request at all (issue #655), so capping would slow a map
-      // lookup down rather than spare ESI anything. It reverts to a request
-      // per id only when the snapshot cannot be read — rare, and the fallback
-      // is what keeps names working when the file cannot be fetched.
       Promise.all(stationIds.map((id) => loadStationName(id))),
       Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
       Promise.all(systemIds.map((id) => loadSystemName(id))),
@@ -186,27 +161,16 @@ export async function loadAssetsSnapshot(
   };
 }
 
-/** Everything the cross-character Character filter (issue #746) merges into the active Character's own snapshot. */
 export interface CrossCharacterData {
   entries: OtherCharacterAssets[];
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
-  /** Owning Character per asset item_id — item ids are globally unique, so this is safe to merge flat across Characters. */
   characterIdByItemId: Map<number, number>;
   characterNameById: Map<number, string>;
-  /** Every other Character's blueprint copies, valued the same way as the active one's. */
   copyValueByItemId: Map<number, number>;
-  /** Chosen Characters whose assets could not be read: a search here cannot see their items. */
   skipped: SkippedCharacterAssets[];
 }
 
-/**
- * Type/location names for every other Character's assets, mirroring
- * `loadAssetsSnapshot`'s own resolution but per-Character for structures:
- * `loadStructureName` is ACL-checked and cached per Character (structures.ts),
- * so a structure must resolve under the Character whose asset actually sits
- * in it, not the active Character running the search.
- */
 async function loadCrossCharacterNames(
   entries: readonly OtherCharacterAssets[]
 ): Promise<{ typeNames: Map<number, string>; locationNames: Map<number, string> }> {
@@ -217,7 +181,6 @@ async function loadCrossCharacterNames(
   const stationIds = [
     ...new Set(allAssets.filter((a) => a.location_type === 'station').map((a) => a.location_id)),
   ];
-  // A snapshot lookup per id, not a request per id — see `loadAssetsSnapshot`.
   const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];
@@ -246,9 +209,6 @@ async function loadCrossCharacterNames(
       })
     );
 
-    // Same best-effort orphan-parent resolution as `loadAssetsSnapshot` — see
-    // its comment. Scoped per-entry since a missing parent is ACL-checked
-    // under the Character whose asset actually sits there.
     const itemIds = new Set(entry.assets.map((a) => a.item_id));
     const orphanParentIds = [
       ...new Set(
@@ -268,7 +228,6 @@ async function loadCrossCharacterNames(
   return { typeNames, locationNames };
 }
 
-/** Fetches + resolves everything the cross-character Character filter needs, once per resolved id set. */
 export async function loadCrossCharacterData(
   otherCharacterIds: readonly number[]
 ): Promise<CrossCharacterData> {

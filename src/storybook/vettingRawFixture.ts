@@ -1,10 +1,3 @@
-/**
- * The rows a sample review "kept" (#6341), for the Vetting data page in stories and component
- * tests. The rows a check used come from each sample's own dealings (so a flag's evidence is in
- * the data); a seeded generator adds the rest, so one busy trader has thousands of wallet rows and
- * a screenshot never changes. Served in chunks per character, characters interleaved, as the
- * server stores them.
- */
 import {
   VETTING_RAW_SOURCES,
   type VettingDealing,
@@ -15,7 +8,6 @@ import {
 } from '@/engine/vetting';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 
-/** What a sample character needs to have its rows made. */
 export interface RawSample {
   characterId: number;
   corporationId: number;
@@ -28,9 +20,7 @@ export interface RawSample {
 
 export type RawSet = Record<VettingRawSource, VettingRawRow[]>;
 
-/** One stored chunk is this many rows. */
 export const RAW_CHUNK = 500;
-/** The busiest sample's wallet journal: thousands, on purpose. */
 export const RAW_BUSY_WALLET_ROWS = 4652;
 const BUSY_CHARACTER = 2118000001;
 
@@ -57,7 +47,6 @@ const WALLET_TYPES = [
 ];
 const FILLER_SKILLS = [3300, 3301, 3302, 3310, 3327, 3380, 3386, 3392, 3402, 3413];
 
-/** A seeded generator: the same sequence every time. */
 function seeded(seed: number): () => number {
   let state = seed;
   return () => {
@@ -169,7 +158,6 @@ export function rawCountsOf(set: RawSet): Record<VettingRawSource, number> {
   ) as Record<VettingRawSource, number>;
 }
 
-/** One stored chunk after another: each character's rows split into chunks, interleaved. */
 function chunksOf(rows: readonly VettingRawRow[]): VettingRawRow[][] {
   const byCharacter = new Map<number, VettingRawRow[]>();
   for (const row of rows)

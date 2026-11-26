@@ -59,7 +59,6 @@ import {
 const DELIVERY_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
 const SEND_MAIL_GROUPS = permissionsForEndpoints(SEND_MAIL_ENDPOINTS);
 
-/** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
   if (line.kind === 'item') return '';
   return [
@@ -72,17 +71,6 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
     .join(', ');
 }
 
-/**
- * A Request's side panel: its terms and each line's progress. A Member who
- * can Pledge (any Member but the requester, while the Request is open) also
- * gets each line's quantity field with Pledge, Update pledge and Withdraw
- * (issue #3808); Pledges are written straight to the Member's own document.
- * The requester gets Extend 30 days and Close request (Reopen once closed)
- * and no Pledge controls; everyone else also gets Message <requester>…, which
- * opens an in-game mail to them. The Community admin also gets Remove
- * request… and, per Pledger, Remove on their Pledge (issue #3812), each with an
- * Undo toast; the server checks the admin, this only hides the controls.
- */
 export function RequestPanel({
   request,
   mine,
@@ -108,18 +96,12 @@ export function RequestPanel({
   characterId: number;
   communityId: string;
   communityName: string;
-  /** The viewer administers this Community: may remove the Request or any Pledge. */
   isAdmin: boolean;
-  /** Member uid to display name, for naming each Pledger to the admin. */
   memberNames: ReadonlyMap<string, string>;
   onClose: () => void;
-  /** The Request changed on the server: refetch the board. */
   onChanged: () => void;
-  /** The requester opens the edit dialog for this Request. */
   onEdit: () => void;
-  /** The admin removed this Request: the board hides it, closes the panel and writes after its Undo toast. */
   onRemove: (removal: { message: string; commit: () => Promise<void> }) => void;
-  /** Re-reads this Request's Pledges into the board after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }) {
   const { t } = useTranslation();
@@ -128,18 +110,14 @@ export function RequestPanel({
   const [pledgeBusy, setPledgeBusy] = useState<string | null>(null);
   const [pledgeError, setPledgeError] = useState<string | null>(null);
   const [syncTick, setSyncTick] = useState(0);
-  /** What the Pledge mail to the requester came to, for the quiet line under the lines. */
   const [mailOutcome, setMailOutcome] = useState<PledgeMailOutcome | null>(null);
-  /** Pledge mails settled this session (sent, or already on the server): not asked again on an update. */
   const mailSettled = useRef(false);
-  // A removed Pledge stays hidden until its Undo toast ends and the write lands.
   const pendingPledgeRemovals = useDeferredCommits();
   const pledges = useMemo(
     () => allPledges.filter((p) => !pendingPledgeRemovals.hiddenIds.has(p.uid)),
     [allPledges, pendingPledgeRemovals.hiddenIds]
   );
 
-  // The board only loads Pledges for open Requests, and may be minutes old: read this one fresh.
   useEffect(() => {
     refreshPledges(request.id).catch(() =>
       setPledgeError(t('communities.board.pledgesLoadFailed'))
@@ -147,7 +125,6 @@ export function RequestPanel({
   }, [request.id, refreshPledges, t]);
 
   const myPledge = pledges.find((p) => p.uid === myUid);
-  // A buyback is sold to, not pledged on: Sell to arrives with the quote.
   const mayPledge = !request.standing && canPledge(request, myUid, now);
   const lacksContracts = useCharacterLacksEndpoints(characterId, DELIVERY_ENDPOINTS);
   const lacksSendMail = useCharacterLacksEndpoints(characterId, SEND_MAIL_ENDPOINTS);
@@ -161,7 +138,6 @@ export function RequestPanel({
     refreshPledges,
   });
 
-  /** One in-game mail to the requester about a Pledge already saved; a failure never touches the Pledge. */
   const mailRequester = async (saved: RequestPledge) => {
     const lines = pledgedRequestLines(request, saved.lines);
     if (lines.length === 0) return;
@@ -178,7 +154,6 @@ export function RequestPanel({
       },
       pledgeMailDeps(characterId, communityId, request.id)
     );
-    // Sent, or sent before: a later update does not ask again. A failure may be tried on the next one.
     if (outcome === 'sent' || outcome === 'alreadyMailed' || outcome === 'unsure') {
       mailSettled.current = true;
     }
@@ -192,7 +167,6 @@ export function RequestPanel({
   ) => {
     setPledgeBusy(key);
     setPledgeError(null);
-    // A delivery run that began before this edit read the Pledge as it was: it must not write over it.
     notePledgeEdit(characterId, communityId);
     try {
       const saved = await updateMyPledge(characterId, communityId, request.id, change);
@@ -238,10 +212,8 @@ export function RequestPanel({
         (count) => t('communities.board.more', { count })
       );
   const buyerId = request.standing?.buyerCharacterId ?? null;
-  // The Character the contracts go to, and so who reads the Quotes' contracts.
   const contractBuyerId = buyerOf(request);
   const isBuyerView = request.standing !== undefined && (mine || contractBuyerId === characterId);
-  // A buyer is a Member, so the roster names them; never fall back to the requester, who is not who the contract goes to.
   const buyerName =
     buyerId === null
       ? request.ownerName
@@ -346,7 +318,6 @@ export function RequestPanel({
                   flags={delivery?.flags.get(slotKey(request.id, index))}
                   manualEntry={mayPledge}
                   onSaveDelivered={(amount) =>
-                    // A cleared amount falls back to contracts: run the sync again after saving.
                     void changePledge(key, (lines) => {
                       const stored = lines[index];
                       return stored

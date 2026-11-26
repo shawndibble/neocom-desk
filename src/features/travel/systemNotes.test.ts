@@ -14,7 +14,6 @@ describe('parseSystemNotes', () => {
     });
   });
 
-  /* Written by another device, maybe another build: a bad entry costs only itself. */
   it('drops malformed entries', () => {
     const raw = {
       '30002813': { text: 'ok', updatedAt: 5 },

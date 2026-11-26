@@ -1,12 +1,7 @@
-// Decode EVE SSO access token (JWT) payload.
-// No signature verification: token arrives from login.eveonline.com over TLS
-// and is only used client-side; ESI verifies it server-side on every request.
-
 export interface DecodedAccessToken {
   characterId: number;
   name: string;
   ownerHash: string;
-  /** Expiry, epoch milliseconds. */
   expiresAt: number;
   scopes: string[];
 }

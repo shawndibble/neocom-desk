@@ -1,8 +1,3 @@
-/**
- * The corporation's members for "Review a member": the Members page's own reads
- * (`../members.ts`, `../roleAudit.ts`), joined. The member list is the data; titles and last seen
- * are optional extras that a missing role or scope only leaves out.
- */
 import { useCallback } from 'react';
 import { resolveNames } from '@/features/character/names';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -16,17 +11,12 @@ import type { RosterMember } from './reviewRoster';
 
 export interface ReviewRoster {
   members: RosterMember[];
-  /** The corp's own title names, for the role chips. */
   titles: string[];
 }
 
 export type ReviewRosterState =
-  | { status: 'loading' }
-  /** The member list could not be read: the dialog asks for the exact name instead. */
-  | { status: 'unreadable' }
-  | { status: 'ready'; roster: ReviewRoster };
+  { status: 'loading' } | { status: 'unreadable' } | { status: 'ready'; roster: ReviewRoster };
 
-/** Resolves to null when the optional read had nothing. */
 async function optional<T>(read: Promise<{ cached: { data: T } | null }>): Promise<T | null> {
   try {
     return (await read).cached?.data ?? null;
@@ -61,7 +51,7 @@ export async function loadReviewRoster(
   );
   const members: RosterMember[] = ids.flatMap((id) => {
     const name = names.get(id);
-    if (name === undefined) return []; // Cannot be asked for by name.
+    if (name === undefined) return [];
     const title = titleNames.get(id)?.[0];
     const lastSeenMs = seen.get(id);
     return [

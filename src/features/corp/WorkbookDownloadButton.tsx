@@ -1,4 +1,3 @@
-/** One dataset, one format: a download button, not a menu (decision `20261024-094549`). */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -17,10 +16,8 @@ export function WorkbookDownloadButton({
   onBusyChange,
 }: {
   label: string;
-  /** Reads the data, writes the workbook and starts the download. */
   build: () => Promise<WorkbookDownload>;
   className?: string;
-  /** Fires around the build, so a caller can hold an action that would cut the copy short. */
   onBusyChange?: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();

@@ -1,8 +1,4 @@
-// Must stay the first import: Sentry has to initialise before any other
-// module gets a chance to throw. See src/instrument.ts.
 import './instrument';
-// Second, so a returning user's signed-in shell chunks start fetching before
-// the rest of the entry evaluates. See src/app/bootShellPreload.ts.
 import './app/bootShellPreload';
 
 import { StrictMode } from 'react';
@@ -31,21 +27,7 @@ import {
 import './i18n';
 import './styles/index.css';
 
-// Routes load as separate chunks (`app/routeChunks.ts`), and a chunk can fail
-// to fetch — typically a deploy replaced its hashed file while this tab still
-// ran the old entry, or the service worker's precache still serves the old
-// `index.html`. Vite announces that as `vite:preloadError`. A plain reload
-// cannot cure the second case, so drop the worker and its precache first
-// (`app/staleBuildRecovery.ts`). Whether to cancel the failure
-// (`preventDefault`) is decided here, synchronously, and only when a recovery
-// will follow: offline, or once per minute (a genuinely unreachable chunk, a
-// broken deploy), the failure is left alone, the import rejects, and the
-// route's error boundary renders. A recovery whose network probe then fails
-// (online, but no route to the host) purges nothing, and `guarded` rejects the
-// cancelled import into the same boundary.
 window.addEventListener('vite:preloadError', (event) => {
-  // Vite fires this once per failed dependency; follow-ups to a recovery
-  // already running are cancelled too, not rejected into the error boundary.
   if (isRecoveringFromStaleBuild()) {
     event.preventDefault();
     return;
@@ -53,7 +35,6 @@ window.addEventListener('vite:preloadError', (event) => {
   const env = defaultStaleBuildEnv();
   if (!canRecoverFromStaleBuild(env)) return;
   event.preventDefault();
-  // Cover the page so the purge-and-reload reads as a boot; uncover if it declined.
   showBootCover();
   void recoverFromStaleBuild(env).then((reloading) => {
     if (!reloading) hideBootCover();
@@ -63,24 +44,11 @@ window.addEventListener('vite:preloadError', (event) => {
 installTranslateGuard();
 installInputModality();
 
-// React 19 reports render errors through these three root hooks rather than
-// through `window.onerror`: `onCaughtError` fires for anything `ErrorBoundary`
-// catches, `onUncaughtError` for a throw that escapes every boundary, and
-// `onRecoverableError` when React retries and survives. This is the only
-// reporting hookup — `ErrorBoundary` itself deliberately does not also
-// capture, which would file every boundary-caught error twice.
-// The prerendered landing hero (`app/landingShell.ts`) hides `#root` until
-// the first real screen lets it go. A render error shows `#root` at once, so
-// the error screen is never stuck behind it, and the timer is the backstop for
-// anything else that keeps that screen from arriving.
 const reportError = reactErrorHandler();
-/** Lets Sentry's transport send a report before a deliberate reload. */
 const SENTRY_FLUSH_GRACE_MS = 500;
 function releaseAndReport(...args: Parameters<typeof reportError>) {
   releaseLandingShell();
   if (isIdbConnectionLost(args[0])) {
-    // WebKit dropped its IndexedDB connection: one reload cures it. Report
-    // first, tagged and grouped as one issue, and give the send a moment.
     void characterRowCount(() => db.characters.count()).then((characterRows) => {
       withScope((scope) => {
         scope.setTag('idb_connection_lost', 'true');
@@ -93,9 +61,6 @@ function releaseAndReport(...args: Parameters<typeof reportError>) {
     return;
   }
   if (!isRouteChunkFailure(args[0])) return reportError(...args);
-  // A failed chunk is usually the visitor's network or a blocker, so it is a
-  // warning; a burst after a deploy is a broken release, which a Sentry alert
-  // on this tag counts. `reportError` captures synchronously, inside the scope.
   withScope((scope) => {
     scope.setLevel('warning');
     scope.setTag('chunk_load', 'failed');

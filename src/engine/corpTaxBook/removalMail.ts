@@ -1,12 +1,3 @@
-/**
- * The two mails around removing a moon owner (issue #4520): the notice, and the short
- * one when it is cancelled. Pure; the caller supplies names and the link.
- *
- * Player-facing wording only: "moon owner" and "accounting corporation". Neither mail ever
- * names the miner rate or the margin. The notice carries a placeholder for when it takes
- * effect because the 24 hours start when the queue sends a copy to the moon owner
- * (`fillTakesEffect`); every later copy states that recorded time.
- */
 import {
   markupBr as br,
   markupText as text,
@@ -16,17 +7,12 @@ import {
 import { MONTHS } from './monthNames';
 import { REMOVAL_WAIT_MS } from './removal';
 
-/** Where the send-time stands in a composed notice. */
 export const TAKES_EFFECT_TOKEN = '{{takes-effect}}';
 
 export interface RemovalMailInput {
-  /** The accounting corporation. */
   accountingName: string;
-  /** The moon owner being removed. */
   ownerName: string;
-  /** The officer who started it (or cancelled it). */
   officerName: string;
-  /** The payee's "Remove now" page. */
   link?: string;
 }
 
@@ -82,7 +68,6 @@ export function composeRemovalCancelledMail(input: Omit<RemovalMailInput, 'link'
   };
 }
 
-/** "18 Oct 2026 14:22 EVE time" for an instant. */
 export function eveTimeLabel(at: number): string {
   const d = new Date(at);
   const month = MONTHS[d.getUTCMonth()];
@@ -91,14 +76,8 @@ export function eveTimeLabel(at: number): string {
   return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()} ${hh}:${mm} EVE time`;
 }
 
-/** What an accounting officer's copy says while no copy to the moon owner side has gone out. */
 export const TAKES_EFFECT_NOT_STARTED = '24 hours after the moon owner is notified';
 
-/**
- * When a copy sent at `now` says the removal takes effect: the recorded time once the clock has
- * started, else 24 hours from this send when this copy starts it (a copy to the moon owner's
- * side), else null: an accounting officer's own copy never starts the clock (#4621).
- */
 export function removalTakesEffectAt(
   item: { effectiveAt?: number; startsClock?: boolean },
   now: number
@@ -107,7 +86,6 @@ export function removalTakesEffectAt(
   return item.startsClock === false ? null : now + REMOVAL_WAIT_MS;
 }
 
-/** The notice with its "takes effect" time filled in; null says it starts once the moon owner is notified. */
 export function fillTakesEffect(body: string, effectiveAt: number | null): string {
   return body.replaceAll(
     TAKES_EFFECT_TOKEN,

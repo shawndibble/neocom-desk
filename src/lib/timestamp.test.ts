@@ -7,19 +7,8 @@ import {
   splitTimestamp,
 } from './timestamp';
 
-/**
- * Expectations are built from `Intl` rather than hardcoded ("Sep 6"), so the
- * assertions hold on any locale or ICU build — a developer machine and the
- * Linux CI runner do not have to agree on month names.
- */
 const SAMPLE = new Date('2026-09-06T14:30:45.000Z');
 
-/**
- * A third clock group (`14:30:45`) is the only shape seconds can take. The
- * `toBe` assertions above each pin the exact format and would also catch a
- * `second` option — but they are satisfiable by editing the expected options
- * to match. These pin the requirement instead, which no format edit can.
- */
 const SECONDS = /\d{1,2}:\d{2}:\d{2}/;
 
 describe('formatTimestamp', () => {
@@ -80,7 +69,6 @@ describe('formatDateOnly', () => {
   });
 
   it('honours an explicit time zone, so a late-UTC instant can fall on another day', () => {
-    // 2026-09-06T23:30Z is already the 7th in Tokyo and still the 6th in UTC.
     const lateUtc = new Date('2026-09-06T23:30:00.000Z');
     expect(formatDateOnly(lateUtc, 'UTC')).not.toBe(formatDateOnly(lateUtc, 'Asia/Tokyo'));
   });
@@ -108,7 +96,6 @@ describe('EVE time is a 24-hour clock', () => {
   it('reads the first minutes after midnight as 00:05, not 24:05', () => {
     expect(formatTimeOfDay(justAfterMidnight, 'UTC')).toBe('00:05');
     expect(formatTimestamp(justAfterMidnight, 'UTC')).not.toMatch(/\b24:/);
-    // The split must still land on the clock, or it falls back to unsplit.
     const split = splitTimestamp(justAfterMidnight, 'UTC');
     expect(split.time).toMatch(/^0?0:05$/);
     expect(split.date + split.time).toBe(formatTimestamp(justAfterMidnight, 'UTC'));

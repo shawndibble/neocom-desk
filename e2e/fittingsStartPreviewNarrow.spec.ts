@@ -1,9 +1,3 @@
-/**
- * Fittings Start screen (issue #2000): the picked fitting's preview sits in a
- * pane far narrower than the viewport, so it lays out by its own width — the
- * Ring stacks above the stats at 1024px and stays beside them at 1440px, and
- * the page never scrolls sideways.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -48,8 +42,6 @@ test.describe('Fittings Start preview at desktop widths', () => {
       const value = page
         .getByRole('meter', { name: label })
         .locator('xpath=following-sibling::span');
-      // The preview fills in a meter at a time, and a value mid-render can wrap for a frame: wait
-      // for it to settle on one line (a value that never does still fails, by timeout).
       await expect
         .poll(async () => {
           const box = await value.boundingBox();
@@ -63,7 +55,6 @@ test.describe('Fittings Start preview at desktop widths', () => {
 
     const boxes = [];
     for (const name of ['EM', 'Therm', 'Kin', 'Exp']) {
-      // The resist table can render a beat after the meters: a header not yet laid out has no box.
       const header = page.getByRole('columnheader', { name, exact: true }).first();
       await expect(header).toBeVisible();
       boxes.push((await header.boundingBox())!);

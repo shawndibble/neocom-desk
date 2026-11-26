@@ -1,10 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 
-/**
- * "1234 / 10000" beside a compose field; danger-toned once `count` passes `max`.
- * With `warnFrom` (a fraction of `max`), warning-toned from that point up to the limit.
- */
 export function MailCounter({
   id,
   count,

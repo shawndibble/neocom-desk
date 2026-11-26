@@ -1,65 +1,27 @@
-/**
- * A Running account's snapshot (decision 20261120-235011, "a lock date"): what a Miner's account
- * stood at through the day before the lock date, so a load reads the snapshot and only the days
- * after it instead of the whole history.
- *
- * History before the lock date is read-only (`isLocked`): the server refuses any edit dated before
- * it, so a snapshot never goes stale. An officer's tab records one per Miner per lock date, through
- * `snapshotThroughFor(today)`; only a change to the Miner's characters deletes it.
- *
- * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free.
- * Stored as `snapshot` on `corps/{id}/accounts/{minerId}` for a Corp Tax Book (written by an
- * officer's tab through `recordAccounts`: the server has no prices) and on the pilot's device for
- * a personal Payee.
- */
 import { DAY_MS, utcDay } from './timeConstants.js';
 
-/**
- * A day still owed at the checkpoint, with what was left of it. `remaining` is the day's whole
- * `tax` less what was `credited` into it and what the day tolerance `writtenOff`, so a rebuild
- * applies the tolerance to the whole day and reports its full figures.
- */
 export interface CheckpointOwedDay {
   date: string;
   remaining: number;
-  /** The day's whole tax. Required by the server; absent from a checkpoint recorded before it. */
   tax?: number;
-  /** What was paid or credited into the day on or before `through`. */
   credited?: number;
-  /** What the day tolerance wrote off. */
   writtenOff?: number;
-  /** Of `remaining`, what officers' charges make up: never forgiven by a later paid-through. */
   charge?: number;
-  /**
-   * An open dispute holds the day: it stays in `owed` but out of `balance`, and the paid-through
-   * day may pass it (decision 20261120-235011).
-   */
   held?: boolean;
 }
 
 export interface RunningAccountCheckpoint {
   minerId: string;
-  /** The last closed day, `YYYY-MM-DD`: every day on or before it is summed up here. */
   through: string;
-  /** Days on or before `through` still owed, oldest first (usually none). */
   owed: CheckpointOwedDay[];
-  /** Money ahead of every billed day at the checkpoint. */
   credit: number;
-  /** Everything billed through `through` less everything paid, forgiven or written off. */
   balance: number;
-  /** The newest day with nothing owed on or before it, at the checkpoint. */
   paidThrough: string | null;
-  /**
-   * The Miner's characters when it was summed. A checkpoint whose characters are not the Miner's
-   * now is read as absent (`checkpointFits`): the account's history is no longer the one summed.
-   */
   characterIds?: number[];
-  /** ISO instant it was recorded, and who recorded it (a Character id; absent on a device). */
   at: string;
   by?: number;
 }
 
-/** Whether a stored checkpoint still stands for a Miner with these characters now. */
 export function checkpointFits(
   checkpoint: Pick<RunningAccountCheckpoint, 'characterIds'>,
   characterIds: readonly number[]
@@ -70,46 +32,23 @@ export function checkpointFits(
   return held.every((c) => now.has(c)) && now.size === held.length;
 }
 
-/**
- * The lock date on `today` (`YYYY-MM-DD`, UTC): the 1st of the month two months back. Nothing
- * dated before it can be added, changed or removed, and a snapshot covers every day before it
- * (decision 20261120-235011, "a lock date"). On Dec 1 and on Dec 15 alike it is Oct 1.
- */
 export function lockDateFor(today: string): string {
   const [y, m] = today.split('-').map(Number);
   return utcDay(Date.UTC(y, m - 3, 1));
 }
 
-/** The last day a snapshot on `today` covers: the day before the lock date. */
 export function snapshotThroughFor(today: string): string {
   return utcDay(Date.parse(`${lockDateFor(today)}T00:00:00Z`) - DAY_MS);
 }
 
-/**
- * Whether an edit dated `date` (a day or an instant) falls before the lock date on `today`, so the
- * server refuses it. An undated one is never locked.
- */
 export function isLocked(date: string | undefined, today: string): boolean {
   return !!date && date.slice(0, 10) < lockDateFor(today);
 }
 
-/**
- * Whether a stored checkpoint is a snapshot: through a day already locked on the day it was
- * recorded, so nothing it summed can have changed since. One recorded through days still open
- * then (the strict cache it replaced) is not, and is recorded again.
- */
 export function isSnapshot(checkpoint: Pick<RunningAccountCheckpoint, 'through' | 'at'>): boolean {
   return checkpoint.through <= snapshotThroughFor(checkpoint.at.slice(0, 10));
 }
 
-/**
- * Whether a dismissal waives `date`, read off its lock-date stamps (owner's decision, option A):
- * a Miner, moon or Extraction dismissal is stored with `from`, the lock date when it was made, and
- * waives only days on or after it; a reversal is stored with its own `from` and ends the
- * dismissal from that day, so days before the lock date stay as they were. A dismissal or a
- * reversal stored without `from` (before the lock date existed) reaches every day. Which charges a
- * dismissal's scope covers is the engine's to say; this is only its dates.
- */
 export function dismissalWaives(
   d: { from?: string; reversed?: { from?: string } | null },
   date: string
@@ -118,7 +57,6 @@ export function dismissalWaives(
   return !d.reversed || (d.reversed.from !== undefined && date < d.reversed.from);
 }
 
-/** Why a checkpoint does not add up. */
 export type CheckpointProblem =
   | 'owed-order'
   | 'owed-after-through'
@@ -129,19 +67,8 @@ export type CheckpointProblem =
   | 'balance'
   | 'paid-through';
 
-/** Within an ISK: a fraction of per-day rounding is no mismatch. */
 const close = (a: number, b: number) => Math.abs(a - b) < 1;
 
-/**
- * Every way a checkpoint does not add up in itself, none when it does:
- * - owed days oldest first, once each, none after `through`;
- * - each day still owes something, `remaining` = `tax` − `credited` − `writtenOff`, and an
- *   officer's charge is no more than it owes;
- * - no negative credit, and `balance` = what the days not held by a dispute owe, less the credit;
- * - the paid-through day is no later than `through` and before the oldest day a sync still owes:
- *   one neither held by a dispute nor owing only an officer's charge (a charge is never forgiven
- *   by paying through it).
- */
 export function checkpointProblems(
   c: Pick<RunningAccountCheckpoint, 'through' | 'owed' | 'credit' | 'balance' | 'paidThrough'>
 ): CheckpointProblem[] {

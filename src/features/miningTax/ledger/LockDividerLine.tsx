@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
 
-/** The divider's one line and its hint: what the lock date is, and how to fix a locked day. */
 export function LockDividerLine({ date }: { date: string }) {
   const { t } = useTranslation();
   return (

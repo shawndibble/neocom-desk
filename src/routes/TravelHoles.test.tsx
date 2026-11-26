@@ -52,7 +52,6 @@ vi.mock('@/features/market/useHubJumps', async () =>
 installTravelHarness();
 
 describe('Travel › Route Safety › Thera / Turnur holes', () => {
-  /** Jita ─ Niyabainen ─ Muvolailen ─ Sobaseki ─ Uedama by gate; Thera has none. */
   const LONG_WAY = {
     [JITA]: [NIYABAINEN],
     [NIYABAINEN]: [JITA, MUVOLAILEN],
@@ -108,7 +107,6 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     expect(routeFact('Jumps')).toBe('2');
     expect(routeFact('By gate')).toBe('0');
     expect(routeFact('Wormhole')).toBe('2');
-    // Thera is counted as wormhole jumps, never as a nullsec system or the lowest security.
     expect(routeFact('High')).toBe('2');
     expect(routeFact('Null')).toBe('0');
     expect(routeFact('Lowest')).toBe('0.5');
@@ -233,7 +231,6 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       );
       expect(pinInLink()).toBe('gates');
       await waitFor(() => expect(routeFact('Jumps')).toBe('4'));
-      // The leg re-plans, so the panel is drawn afresh.
       await waitFor(async () =>
         expect(within(await waysPanel()).getAllByRole('listitem')[0]).toHaveTextContent(
           /^Gates onlyIn use/
@@ -258,8 +255,6 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       await user.click(await screen.findByRole('menuitem', { name: 'Avoid' }));
       const dialog = await screen.findByRole('dialog', { name: 'Avoid Muvolailen?' });
 
-      // Gates only is pinned, and gates only has no way around Muvolailen: the
-      // trip stays 4 jumps, never the unpinned hole route's 2.
       expect(
         await within(dialog).findByText(/^The route becomes 4 jumps \(\+0\)/)
       ).toBeInTheDocument();
@@ -307,7 +302,6 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       expect(
         await screen.findByText('Add a stop to fly there through the pinned wormhole.')
       ).toBeInTheDocument();
-      // With no stops the destination is a field already on the page, not an Add stop button.
       await user.type(await systemPickerInput(), 'Ueda');
       await user.click(await screen.findByRole('option', { name: /Uedama/ }));
 

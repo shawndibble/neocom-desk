@@ -1,16 +1,3 @@
-/**
- * One outcome for every **Load** (GLOSSARY.md): EFT text, a DNA string or
- * chat link, an eveship.fit link, an EVE Workbench fit link, a killmail, a Loaded fittings-file entry
- * and an In-game Fitting all end as either a Fitting plus what it couldn't
- * place, or a failure. A caller holds the last outcome whole, so a new Load
- * replaces the previous one's warnings rather than leaving a stale list
- * behind for someone to clear.
- *
- * `loadText` is the text half: it works out which source a pasted string is
- * and reads it. Everything it needs from outside — the type catalog, hull
- * names, zKillboard, ESI and EVE Workbench — comes in through `TextLoadSources`, so this
- * stays fetch-free.
- */
 import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
 import type { MutaplasmidLookup } from './mutaplasmids';
 import {
@@ -28,43 +15,27 @@ import type {
   FittingSlotKind,
 } from './types';
 
-/**
- * What kind of thing a Load couldn't place — what code reads, where `reason`
- * is only the wording shown to the pilot.
- */
 export type LoadWarningKind =
   | { kind: 'unknown-ship' }
   | {
       kind: 'unknown-item';
-      /** EFT only: the line was written with a count (`x1`), so it was never a fitted module. */
       countWritten?: true;
     }
   | { kind: 'too-many-slots'; rack: FittingSlotKind }
   | { kind: 'malformed-item' }
-  /** An In-game Fitting item in an ESI flag the app doesn't fit (a service slot, say). */
   | { kind: 'unsupported-slot' }
-  /** A fittings-file entry whose slot string isn't a rack, bay or cargo. */
   | { kind: 'unknown-slot' }
-  /** A line the EFT parser couldn't read at all: the author's typo, not the game's. */
   | { kind: 'parse-error' }
-  /**
-   * A Pyfa mutation block naming a mutaplasmid this build doesn't know, or one
-   * that doesn't apply to its module: the plain base module was loaded instead.
-   */
   | { kind: 'unknown-mutation' };
 
-/** One thing a Load couldn't place. `line` is the pasted text's line, for a text Load. */
 export type LoadWarning = {
   line?: number;
   text: string;
-  /** Displayed wording only; branch on `kind`, never on this. */
   reason: string;
 } & LoadWarningKind;
 
-/** Where a Load came from — which the warnings' wording depends on. */
 export type LoadSource = 'text' | 'file' | 'in-game';
 
-/** Why a Load produced no Fitting, beyond its warnings. */
 export type LoadError =
   | 'unrecognised'
   | 'eve-workbench-not-found'
@@ -73,16 +44,13 @@ export type LoadError =
   | 'killmail-unreachable'
   | 'killmail-failed';
 
-/** A Fitting's parts as each loader resolves them, before it has a name. */
 export type LoadParts =
   | {
       hullTypeId: number;
       modules: FittingModule[];
       drones: FittingDrone[];
       cargo: FittingCargoItem[];
-      /** A name the source itself carried (an EFT header's fit name); absent → the hull's. */
       fitName?: string;
-      /** Absent or empty: none (most formats, and every hull without tubes). */
       fighters?: FittingFighter[];
       unresolved: LoadWarning[];
     }
@@ -95,7 +63,6 @@ export interface LoadedFitting {
   unresolved: LoadWarning[];
 }
 
-/** `error: null` when the warnings already say why (an unknown hull). */
 export interface FailedLoad {
   kind: 'failed';
   source: LoadSource;
@@ -105,16 +72,11 @@ export interface FailedLoad {
 
 export type LoadOutcome = LoadedFitting | FailedLoad;
 
-/**
- * A text Load that was itself a Fitting Share Code: the caller opens the code as-is,
- * so it round-trips unchanged instead of being re-encoded.
- */
 export interface ShareLoad {
   kind: 'share';
   code: string;
 }
 
-/** Turns a loader's parts into its outcome; `name` is unused when the hull didn't resolve. */
 export function toLoadOutcome(parts: LoadParts, name: string, source: LoadSource): LoadOutcome {
   if (parts.hullTypeId === null) {
     return { kind: 'failed', source, error: null, unresolved: parts.unresolved };
@@ -134,38 +96,21 @@ export function toLoadOutcome(parts: LoadParts, name: string, source: LoadSource
   };
 }
 
-/**
- * What EVE Workbench answered for a fit id. `not-found` covers a fit that was
- * deleted, never existed, or isn't published — Workbench's API doesn't tell
- * those apart. `failed` is Workbench unreachable or answering nonsense.
- */
 export type EveWorkbenchEft =
   { status: 'ok'; eft: string } | { status: 'not-found' } | { status: 'failed' };
 
-/**
- * What zKillboard answered for a killmail's hash. `not-found` is a killmail it
- * doesn't know; `unreachable` is zKillboard not answering at all (offline, a
- * timeout, an error status), which says nothing about the killmail.
- */
 export type KillmailHashLookup =
   { status: 'ok'; hash: string } | { status: 'not-found' } | { status: 'unreachable' };
 
 export interface TextLoadSources {
-  /**
-   * Name → typeId and typeId → rack; read only for text that needs them.
-   * `mutaplasmids` (optional): see `loadEftFitting`.
-   */
   catalog: () => Promise<{
     typeByName: EftTypeLookup;
     slotByTypeId: EftSlotLookup;
     mutaplasmids?: MutaplasmidLookup;
   }>;
   hullName: (typeId: number) => Promise<string>;
-  /** zKillboard's hash for a killmail. */
   killmailHash: (killmailId: number) => Promise<KillmailHashLookup>;
-  /** ESI's killmail victim; null or a throw when ESI couldn't supply it. */
   killmailVictim: (killmailId: number, hash: string) => Promise<KillmailVictim | null>;
-  /** A published EVE Workbench fit's EFT; a throw reads as unreachable. */
   eveWorkbenchEft: (fitId: string) => Promise<EveWorkbenchEft>;
 }
 
@@ -194,7 +139,6 @@ async function readKillmail(
   }
 }
 
-/** For EFT the pilot never saw: a warning names the item, not a line number. */
 function withoutLineNumbers(parts: LoadParts): LoadParts {
   return {
     ...parts,
@@ -220,10 +164,6 @@ async function readEveWorkbench(
   }
 }
 
-/**
- * Loads EFT text, a DNA string / chat link, a Fitting Share Code, an
- * eveship.fit link, an EVE Workbench fit link, or a killmail link.
- */
 export async function loadText(
   text: string,
   sources: TextLoadSources
@@ -232,7 +172,6 @@ export async function loadText(
   if (input.kind === 'unknown') return failed('unrecognised');
   if (input.kind === 'share') return { kind: 'share', code: input.code };
 
-  // Read before the catalog, so a fit Workbench won't serve costs nothing else.
   let workbenchEft = '';
   if (input.kind === 'eveWorkbench') {
     const read = await readEveWorkbench(input.fitId, sources);

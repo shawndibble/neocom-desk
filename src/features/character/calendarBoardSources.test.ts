@@ -45,11 +45,6 @@ describe('toCalendarEventSources', () => {
     expect(source.deadlineMs).toBe(Date.parse('2026-09-07T21:00:00Z'));
   });
 
-  /**
-   * ESI documents `importance` as an integer and uses it as a flag in
-   * practice. Anything above zero is "important"; treating it as a scale would
-   * invent a hierarchy the API does not promise.
-   */
   it('treats any non-zero importance as important', () => {
     expect(toCalendarEventSources([event({ importance: 0 })])[0].important).toBe(false);
     expect(toCalendarEventSources([event({ importance: 5 })])[0].important).toBe(true);
@@ -76,17 +71,10 @@ describe('toSkillTrainingSources', () => {
     expect(source.deadlineMs).toBe(Date.parse('2026-09-08T21:00:00Z'));
   });
 
-  /**
-   * A paused queue has no `finish_date` at all — ESI drops it. There is no
-   * clock to count down, and "not training" is a standing fault the
-   * notification system already reports, so these are dropped rather than
-   * turned into rows with nothing to sort on.
-   */
   it('drops an entry from a paused queue', () => {
     expect(toSkillTrainingSources([entry({ finish_date: undefined })], name)).toEqual([]);
   });
 
-  /** `queue_position` is the stable identity — `skill_id` repeats across levels. */
   it('keys on queue position so two levels of one skill do not collide', () => {
     const sources = toSkillTrainingSources(
       [
@@ -124,11 +112,6 @@ describe('toIndustryJobSources', () => {
     ).toBe('Type 1000');
   });
 
-  /**
-   * `ready` is the one that matters most — the job is finished and sitting
-   * undelivered, which is exactly the thing a pilot forgets. Its `end_date` is
-   * already past, so it arrives overdue and sorts to the top on its own.
-   */
   it('keeps active and ready jobs and drops the finished ones', () => {
     const sources = toIndustryJobSources(
       [
@@ -143,13 +126,6 @@ describe('toIndustryJobSources', () => {
     expect(sources.map((source) => source.id)).toEqual(['1', '2']);
   });
 
-  /**
-   * Issue #1715: a job past its deadline's headline already reads "ready to
-   * deliver" (`pastDeadlineLabelKey`) — an empty detail here stops the row
-   * saying it twice. Keyed on the deadline, not `job.status`: ESI can still
-   * report `active` for a moment after `end_date` passes, and that must not
-   * leave the headline and this line disagreeing.
-   */
   it('clears the detail once the deadline has passed, regardless of status', () => {
     expect(toIndustryJobSources([job({ status: 'ready' })], name, AFTER_END)[0].detail).toBe('');
     expect(toIndustryJobSources([job({ status: 'active' })], name, AFTER_END)[0].detail).toBe('');
@@ -179,7 +155,6 @@ describe('toPlanetExtractionSources', () => {
     expect(source.deadlineMs).toBe(Date.parse('2026-09-08T02:00:00Z'));
   });
 
-  /** A factory or a storage pin has no program and no clock. */
   it('ignores pins that are not extractors', () => {
     expect(
       toPlanetExtractionSources([
@@ -188,7 +163,6 @@ describe('toPlanetExtractionSources', () => {
     ).toEqual([]);
   });
 
-  /** An extractor that has never been started carries no `expiry_time`. */
   it('ignores an extractor with no program running', () => {
     expect(
       toPlanetExtractionSources([{ planetName: 'Hek IV', pins: [pin({ expiry_time: undefined })] }])
@@ -277,9 +251,6 @@ describe('toContractExpirySources', () => {
     ...overrides,
   });
 
-  // A distinguishable stand-in for `contracts.typeCourier` etc — proves the
-  // source actually calls the resolver rather than falling back to the raw
-  // ESI enum some other way.
   const typeLabel = (type: Contract['type']) => `LABEL:${type}`;
   const noRoute = () => undefined;
 
@@ -293,14 +264,12 @@ describe('toContractExpirySources', () => {
     ).toBe('Jita run');
   });
 
-  /** An untitled contract is the common case; the translated type label is the fallback name. */
   it('falls back to the translated type label when untitled and no route resolved', () => {
     expect(toContractExpirySources([contract()], typeLabel, noRoute)[0].subject).toBe(
       'LABEL:courier'
     );
   });
 
-  /** Issue #1715: an untitled courier's route beats the generic type label. */
   it('prefers the resolved route over the type label for an untitled courier', () => {
     const route = 'Jita IV - Moon 4 → Amarr VIII';
     expect(toContractExpirySources([contract()], typeLabel, () => route)[0].subject).toBe(route);
@@ -322,7 +291,6 @@ describe('toContractExpirySources', () => {
 
   const EXPIRY_MS = Date.parse('2026-09-09T15:00:00Z');
 
-  /** The under-warning case: accepted early in a long window, so the clock must shorten. */
   it('counts an accepted courier down to acceptance plus the allowed days', () => {
     const [source] = toContractExpirySources(
       [
@@ -339,7 +307,6 @@ describe('toContractExpirySources', () => {
     expect(source.deadlineMs).toBeLessThan(EXPIRY_MS);
   });
 
-  /** The mirror case: accepted late, so delivery falls past the expiry — replaced, not capped. */
   it('lets an accepted courier run past the offer expiry', () => {
     const [source] = toContractExpirySources(
       [
@@ -385,7 +352,6 @@ describe('toContractExpirySources', () => {
     ['no acceptance time', { days_to_complete: 3 }],
     ['no allowed days', { date_accepted: ISO('2026-09-01T06:00:00Z') }],
     ['an unparseable acceptance time', { date_accepted: 'soon', days_to_complete: 3 }],
-    // `0` is no window at all; as a duration it would read permanently overdue.
     ['no completion window', { date_accepted: ISO('2026-09-01T06:00:00Z'), days_to_complete: 0 }],
   ])(
     'falls back to the offer expiry for an accepted courier with %s',
@@ -416,12 +382,6 @@ describe('toOrderExpirySources', () => {
     ...overrides,
   });
 
-  /**
-   * The one genuinely derived deadline on the board: ESI gives an issue date
-   * and a duration in whole days, and never an absolute expiry. Getting this
-   * arithmetic wrong would be invisible — the row would simply sit in the
-   * wrong place in an otherwise plausible list.
-   */
   it('computes expiry as the issue date plus the duration in days', () => {
     const [source] = toOrderExpirySources([order()], name);
     expect(source.deadlineMs).toBe(Date.parse('2026-09-01T12:00:00Z') + 90 * 86_400_000);

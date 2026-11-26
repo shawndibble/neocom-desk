@@ -1,14 +1,3 @@
-/**
- * An assembled ship in the Character's assets, read as a Fitting — the
- * Assets page's "Open in Fittings". The assets inside a ship carry the same
- * location flags an In-game Fitting's items do (`HiSlot0`, `DroneBay`,
- * `Cargo`…), with one difference: a loaded charge is an asset too, sitting
- * in its module's slot. Which of a slot's items is the module takes the
- * static data (`isModule`: it has a rack), which this pure module never
- * loads itself. Fighter squadrons read as an In-game Fitting's do: a tube's
- * launched, the fighter bay's waiting. Bays the editor has no place for
- * (fleet hangar, ore hold…) are left out.
- */
 import { fighterFlagState, slotFromFlag } from './inventoryFlags';
 import {
   sortFittingModules,
@@ -23,13 +12,10 @@ import {
 export interface ShipAssetItem {
   typeId: number;
   quantity: number;
-  /** The asset's `location_flag` inside the ship. */
   flag: string;
-  /** The asset's own `item_id`: what a mutated item's rolls are looked up by. */
   itemId?: number;
 }
 
-/** One asset inside a ship, as the mapper reads it. */
 export function shipAssetItem(asset: {
   type_id: number;
   quantity: number;
@@ -44,7 +30,6 @@ export function shipAssetItem(asset: {
   };
 }
 
-/** `mutations`: rolls by item id (`mutationsForItems`); an abyssal item absent from it loads base unknown. */
 export function assetShipToFitting(
   ship: { typeId: number; name: string },
   items: readonly ShipAssetItem[],

@@ -1,18 +1,8 @@
-/**
- * The broker fee a structure's owner charges, as the pilot typed it — Editable
- * Data, so it syncs (issue #2911). ESI exposes no structure fee schedule, and
- * skills and standings do not reduce it, so it can only be entered. One blob
- * for every structure for the same reason `features/pi/customsOverride.ts`
- * gives: `mergeSettings` is whole-value last-write-wins per key and the
- * allow-list is exact-match. Clearing a structure empties an entry; the key is
- * never deleted.
- */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { MAX_STRUCTURE_OWNER_PCT } from '@/engine/market/structureFee';
 
 export const SYNCED_STRUCTURE_FEES_KEY = 'sync.structureBrokerFees';
 
-/** Structure id to the OWNER's broker fee, percent (2.0 = 2%); excludes the 0.5% SCC surcharge. */
 export type StructureFees = Record<number, number>;
 
 function usablePct(value: unknown): value is number {
@@ -24,7 +14,6 @@ function usablePct(value: unknown): value is number {
   );
 }
 
-/** The stored blob, validated entry by entry: it may come from another build or a hand edit. */
 export function parseStructureFees(raw: unknown): StructureFees {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
   const out: StructureFees = {};
@@ -37,7 +26,6 @@ export function parseStructureFees(raw: unknown): StructureFees {
   return out;
 }
 
-/** The fees with one structure set. A non-numeric rate is refused, not clamped to a free structure. */
 export function withStructureFee(
   fees: StructureFees,
   structureId: number,

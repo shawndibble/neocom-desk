@@ -53,7 +53,6 @@ describe('CopyablePrice', () => {
     expect(buttons[0]).toHaveTextContent('12.34');
     expect(buttons[0].querySelector('svg')).toBeNull();
 
-    // The copy hint is a Tooltip, so keyboard focus reveals it too.
     await userEvent.setup().tab();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Copy 12.34');
   });

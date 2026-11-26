@@ -11,13 +11,6 @@ import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
 type State =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; rows: SharedPlanRow[] };
 
-/**
- * Browse the Skill Plans the active Character's Communities share (Skills ›
- * Plans › New plan › From a Community plan): a search over every shared plan
- * with who shared it and where, and Copy to my plans, which hands the name and
- * skills back to the plan list to add as one of the pilot's own. Copying makes
- * an ordinary plan; it does not follow the original.
- */
 export function CommunityPlansDialog({
   characterId,
   onCopy,

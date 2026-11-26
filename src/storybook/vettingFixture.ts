@@ -1,12 +1,3 @@
-/**
- * An in-memory `VettingBackend` for stories, component tests and the e2e spec: one corp's
- * settings, a queue of reviews and an applicant's draft, all sample data. Reports are worked out
- * by the real `assessVetting`, so a flag here is one the checks would raise. Install it with
- * `setVettingBackendOverride(createVettingFixture())`; nothing touches Firebase or EVE.
- *
- * A read takes an "access token" like every real call. The fixture reads `fixture:<characterId>`
- * as that sample character and anything else as the next unread one.
- */
 import {
   assessVetting,
   settleVettingAnswers,
@@ -41,16 +32,13 @@ export const VETTING_FIXTURE_CORPORATION = {
   ticker: 'BRASS',
 };
 
-/** The review ids stories and specs open by name. */
 export const VETTING_FIXTURE_REVIEWS = {
   flagged: 'v-0042',
   promotion: 'v-0041',
   nothing: 'v-0040',
   incomplete: 'v-0039',
   waiting: 'v-0038',
-  /** Promotion request the signed-in officer asked and already mailed (`extra: 'requests'`). */
   mailed: 'v-0037',
-  /** A review about the signed-in officer (`extra: 'requests'`): closed to them. */
   aboutYou: 'v-0036',
   decided: 'v-0031',
 } as const;
@@ -59,11 +47,6 @@ const BLACK_KITE = 98111001;
 const CORVIN = 2118000010;
 const ORRIN = 2118000011;
 
-/**
- * A corp that set everything up: a welcome and contact line, three questions (two required),
- * minimums the sample applicant meets, and a softer no that shows its reason. Pass it as
- * `settings` to see the options at work; the default fixture is a corp that never opened Settings.
- */
 export const VETTING_FIXTURE_CONFIGURED: Partial<VettingSettings> = {
   welcome:
     'We fly out of Hollow Reach, EU and early US evenings. Mining, hauling and home defence.\nRead the pinned mail before you apply.',
@@ -100,7 +83,6 @@ interface Sample {
   name: string;
   corporationId: number;
   corporationName: string;
-  /** Years old and skill points, as the report's table shows them. */
   years: number;
   skillPoints: number;
   corporations: number;
@@ -127,7 +109,6 @@ const TAMSIN: Sample = {
   years: 7.5,
   skillPoints: 84_200_000,
   corporations: 6,
-  // Cynosural Field Theory V, and no declared character flies a capital.
   skills: [{ id: 21603, level: 5 }],
   dealings: (now) => [
     donation(now, 3, CORVIN, 500_000_000),
@@ -234,7 +215,6 @@ const OLD: Sample = {
   corporations: 3,
 };
 
-/** The applicant's characters, in the order the fixture "reads" them. */
 export const VETTING_FIXTURE_APPLICANT = [TAMSIN, MIRA, VELL_HAULING].map((sample) => ({
   characterId: sample.characterId,
   name: sample.name,
@@ -254,7 +234,6 @@ function inputFor(sample: Sample, now: number): VettingCharacterInput {
   };
 }
 
-/** A refusal as the callables word one: a code, and the reason in `details` (vettingStore.ts). */
 function refusal(reason: string, message = reason): Error {
   const code =
     reason === 'not-found' || reason === 'unknown-corp' || reason === 'unknown-name'
@@ -273,7 +252,6 @@ interface ReviewSeed {
   samples: Sample[];
   pilot?: { characterId: number; name: string; corporationName: string };
   note?: string;
-  /** The label of the invite link the application started from. */
   invite?: string;
   needed: number;
   ageMs: number;
@@ -350,7 +328,6 @@ function buildReview(
         ? [{ at, characterId: pilot.characterId, name: pilot.name, action: 'shared' as const }]
         : []),
     ],
-    // From the moment it is shared: an undecided review goes after `VETTING_OPEN_KEEP_DAYS`.
     deleteAt:
       decidedAt !== null
         ? decidedAt + VETTING_KEEP_DAYS * DAY_MS
@@ -404,35 +381,20 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
 }
 
 export interface VettingFixtureOptions {
-  /** The fixture's "now"; defaults to the moment it is made. */
   now?: number;
-  /** Vetting on for the corp (default) or off. */
   on?: boolean;
-  /** No reviews at all: the empty queue. */
   empty?: boolean;
-  /** The signed-in sample pilot is no Director: no Settings. */
   canConfigure?: boolean;
-  /**
-   * An officer asked the signed-in sample pilot for a promotion review: still waiting
-   * (`true`, answered by `myRequests`) or already shared and with the reviewers (`'shared'`).
-   */
   request?: boolean | 'shared';
-  /** More requests in the queue: one already mailed, and one about the signed-in officer. */
   extra?: 'requests';
-  /** Where the applicant's own application stands when the page opens. */
   application?: 'none' | 'draft' | 'sent' | 'opened' | 'accepted' | 'rejected';
-  /** What the corp set, over the defaults (`VETTING_FIXTURE_CONFIGURED` is one that set it all). */
   settings?: Partial<VettingSettings>;
-  /** Every call waits this long first, so a "Reading" row can be seen. */
   delayMs?: number;
 }
 
 export interface VettingFixture extends VettingBackend {
-  /** The handle of the applicant's application, for a story to put where the page looks. */
   applicationHandle: VettingHandle;
-  /** The handle of the member's review request, likewise. */
   requestHandle: VettingHandle;
-  /** What each method was called with, newest last: tests assert on it. */
   calls: { method: keyof VettingBackend; args: unknown[] }[];
 }
 
@@ -494,7 +456,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
           needed: 2,
           ageMs: DAY_MS,
           requestedBy: BRAM,
-          // Decided, and hidden until the caller decides: no `decision` on the wire.
           signOffs: [{ ...ILSE, you: false, at: now - 20 * HOUR_MS }],
         },
         {
@@ -582,7 +543,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
   const reviews = new Map(
     seeds.map((seed) => [seed.id, buildReview(seed, now, watchIds(), answersNow())])
   );
-  // The rows each read review kept (#6341), and how many of each.
   const rawSets = new Map(
     seeds
       .filter((seed) => seed.samples.length > 0)
@@ -598,7 +558,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
   const mailed = reviews.get(VETTING_FIXTURE_REVIEWS.mailed);
   if (mailed) mailed.barred = true;
 
-  // The pilot's side: one application (public page) and one request (the signed-in member).
   const applicationHandle: VettingHandle = {
     corporationId: corp.corporationId,
     reviewId: 'v-apply',
@@ -644,7 +603,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     answers: [],
     unmet: [],
   });
-  /** An application draft's unmet minimums, worked out as the server does on every read. */
   const withUnmet = (status: VettingStatus): VettingStatus =>
     status.kind !== 'application' || status.state !== 'draft'
       ? status
@@ -732,7 +690,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     statuses.set(status.id, status);
     return structuredClone(status);
   };
-  /** Reads one character into a status: the one the token names, else the next unread one. */
   const read = (status: VettingStatus, accessToken: string): VettingStatus => {
     if (status.state !== 'draft' && status.state !== 'requested') throw refusal('wrong-state');
     const pool = pools.get(status.id) ?? [];
@@ -742,9 +699,7 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
       : (pool.find(
           (candidate) =>
             !status.characters.some((character) => character.characterId === candidate.characterId)
-        ) ??
-        // Everyone is read: a second sign-in is a re-read of whoever was missing something.
-        pool.find((candidate) => (candidate.missing ?? []).length > 0));
+        ) ?? pool.find((candidate) => (candidate.missing ?? []).length > 0));
     if (!sample) throw refusal('esi-forbidden');
     const again = status.characters.some(
       (character) => character.characterId === sample.characterId
@@ -776,7 +731,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     corpInfo: async (corporationId, invite) => {
       if (corporationId !== corp.corporationId) throw refusal('unknown-corp');
       const inviteOk = !settings.inviteOnly || liveInvite(invite) !== undefined;
-      // As the server: an invite-only corp tells a stranger nothing it wrote or set.
       return {
         ...corp,
         on: settings.on,
@@ -837,7 +791,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     overview: async () => overview(),
     open: async (_characterId, _corporationId, reviewId) => {
       const review = reviewOf(reviewId);
-      // The server never opens a review about the caller.
       if (review.pilot.characterId === reviewer.characterId) throw refusal('own-review');
       review.log = [
         ...review.log,
@@ -856,7 +809,6 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
       const review = reviewOf(reviewId);
       if (review.barred) throw refusal('barred');
       if (review.signOffs.some((signOff) => signOff.you)) throw refusal('already-signed');
-      // The caller has decided, so every other reviewer's decision is shown.
       review.signOffs = [
         ...review.signOffs.map((signOff) => ({
           ...signOff,
@@ -870,13 +822,11 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
           at: now,
           decision,
           note,
-          // Stamped when written, as the server does: a later settings change does not move it.
           reasonShown: settings.rejection.showReason,
         },
       ];
       review.signed = review.signOffs.length;
       review.yours = false;
-      // Open until every sign-off needed is in; then any "no" rejects it.
       if (review.signed >= review.needed) {
         const refused = review.signOffs.some((signOff) => signOff.decision === 'no');
         review.state = refused ? 'rejected' : 'accepted';

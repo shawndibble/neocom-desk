@@ -19,7 +19,6 @@ import {
 } from './orderScopeState';
 import { ScopeRow } from './OrderScopeRow';
 
-/** "Who is cheaper?" (a buy order: "Who bids higher?"): the station, system and region rivals, and the on-demand deeper check. */
 export function OrderWhoCheaperSection({
   row,
   station,
@@ -62,8 +61,6 @@ export function OrderWhoCheaperSection({
   })();
   const whoLabel = t(row.isBuyOrder ? 'market.orders.whoBidsHigher' : 'market.orders.whoIsCheaper');
 
-  // The grid below is a div table, not a DataTable, so it exports these rows
-  // as built — same order, own order last.
   const scopeCsvRows: ScopeOrderCsvRow[] = [
     scopeCsvRow('station', station, t, {
       stationName: row.stationName,
@@ -99,19 +96,12 @@ export function OrderWhoCheaperSection({
   return (
     <section>
       <Disclosure label={whoLabel} trailing={whoTrailing} expanded={expanded} onToggle={onToggle}>
-        {/* The Disclosure's own header is its toggle button, so the grid's ⋯
-                  menu heads the panel it opens instead. */}
         <div className="flex items-center justify-between gap-2 pr-1.5">
           <p className="px-2.5 pt-1.5 text-[0.6875rem] text-text-dim">
             {t('market.orders.scopeTightestBites')}
           </p>
           <TableActionsMenu name={whoLabel} tableExport={scopeExport} />
         </div>
-        {/*
-                ONE grid so the price column lines up down the table. Rows are
-                `display: contents` + `role="row"` (still a table to assistive
-                tech), so the row rule and "my order" tint paint per cell.
-              */}
         <div
           ref={whoTableRef}
           tabIndex={-1}
@@ -152,7 +142,6 @@ export function OrderWhoCheaperSection({
             }
             jumps={regionJumps}
           />
-          {/* My own order last, as the line every row above is measured against. */}
           <div role="row" className="contents">
             <span
               role="rowheader"
@@ -176,19 +165,12 @@ export function OrderWhoCheaperSection({
           {allClean && (
             <p className="pt-1.5 text-xs text-success">{t('market.orders.onlySeller')}</p>
           )}
-          {deep?.truncated && (
-            // A truncated fetch isn't the pre-fetch state (the button below
-            // stays hidden, same as any other resolved `deep`) — say why
-            // system/region above read "not checked" instead of leaving the
-            // user to wonder where the "check deeper" button went.
-            <IncompleteNotice className="pt-1.5" />
-          )}
+          {deep?.truncated && <IncompleteNotice className="pt-1.5" />}
           {showCheckDeeper && (
             <p className="pt-2">
               <Button
                 size="sm"
                 onClick={() => {
-                  // The button unmounts; keep focus inside the dialog.
                   whoTableRef.current?.focus({ preventScroll: true });
                   onCheckDeeper();
                 }}

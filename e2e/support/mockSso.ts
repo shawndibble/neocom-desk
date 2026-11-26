@@ -1,13 +1,7 @@
-/**
- * Mocks EVE SSO v2 OAuth end to end: no real request ever reaches
- * login.eveonline.com. src/auth/jwt.ts does no signature check, so a
- * hand-built (unsigned) JWT is accepted exactly like a real one.
- */
 import type { Page } from '@playwright/test';
 import { CHARACTER_ID, CHARACTER_NAME, OWNER_HASH, SCOPES } from './fixtureData';
 
-/** Far-future expiry (seconds since epoch) so the mocked session never needs a refresh. */
-export const EXP_SECONDS = 4_102_444_800; // 2100-01-01T00:00:00Z
+export const EXP_SECONDS = 4_102_444_800;
 
 function base64url(json: unknown): string {
   return Buffer.from(JSON.stringify(json), 'utf-8')
@@ -17,12 +11,6 @@ function base64url(json: unknown): string {
     .replace(/=+$/, '');
 }
 
-/**
- * Access token shaped exactly as src/auth/jwt.ts's decodeAccessToken expects.
- * `scopes` defaults to the full fixture grant so every existing caller is
- * unaffected; a spec proving a narrower grant (e.g. Core Grant only) passes
- * its own.
- */
 export function makeAccessToken(scopes: readonly string[] = SCOPES): string {
   const header = base64url({ alg: 'RS256', typ: 'JWT' });
   const payload = base64url({
@@ -40,8 +28,6 @@ export async function installSsoMock(
   page: Page,
   scopes: readonly string[] = SCOPES
 ): Promise<void> {
-  // GET /v2/oauth/authorize -> 302 straight back to the app's own callback,
-  // echoing state and the caller's redirect_uri (works for any dev port).
   await page.route('https://login.eveonline.com/v2/oauth/authorize*', async (route) => {
     const url = new URL(route.request().url());
     const redirectUri = url.searchParams.get('redirect_uri');
@@ -54,8 +40,6 @@ export async function installSsoMock(
     await route.fulfill({ status: 302, headers: { location } });
   });
 
-  // POST /v2/oauth/token -> hand-built token response. Used for both the
-  // initial code exchange and any refresh_token grant.
   await page.route('https://login.eveonline.com/v2/oauth/token', async (route) => {
     if (route.request().method() !== 'POST') {
       await route.fallback();

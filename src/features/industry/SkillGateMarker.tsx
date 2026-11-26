@@ -1,15 +1,3 @@
-/**
- * Marks a build row whose blueprint no character on the account can install.
- * Shared by Market-Wide Build Opportunities, Build Plan detail's material rows
- * and the plan header so the surfaces never say the shortfall differently.
- * Only renders for a gated verdict — there's no positive "you can build this"
- * state.
- *
- * The chip names the missing skill. Clicking it opens a popover for the
- * closest character: each missing skill (a Skill modal link), how long it
- * takes to train, and an Add to Skill Plan button. The data hooks live in the
- * popover body, so a list of many markers loads nothing until one is opened.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
@@ -35,18 +23,8 @@ export interface SkillGateMarkerProps {
   verdict: GatedVerdict;
   nameForSkill: (typeID: number) => string;
   nameForCharacter: (characterId: number) => string;
-  /** Names the Skill Plan "Add" creates when the character has none yet. */
   newPlanName?: string;
-  /**
-   * Icon only, no warning chip: for a gate most rows of the page share, which
-   * the panel's footer rule already states. The click still opens the
-   * popover, so a quiet row is no less actionable than a loud one.
-   */
   quiet?: boolean;
-  /**
-   * Icon only, but in the warning colour: the lock on a Build instead button
-   * is the whole cue, so it cannot sit dim the way a quiet row's does.
-   */
   lockOnly?: boolean;
 }
 
@@ -74,7 +52,6 @@ export function SkillGateMarker({
         <button
           type="button"
           aria-label={`${t('industry.skillGateTooltipTitle')}: ${label}`}
-          // A row click or a card link behind the chip must not also fire.
           onClick={(event) => event.stopPropagation()}
           className={cx(
             'inline-flex max-w-full shrink-0 items-center gap-1 rounded-xs text-left',
@@ -129,8 +106,6 @@ function SkillGatePopoverBody({
     (): PlanEntry[] => shortfall.map((s) => ({ skillTypeID: s.typeID, targetLevel: s.needLevel })),
     [shortfall]
   );
-  // Prerequisites the character is missing are scheduled ahead of these
-  // entries, so the total is the whole schedule, not just the entries' own.
   const scheduled = useMemo(
     () =>
       catalog

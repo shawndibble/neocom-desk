@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import type { AppraisalUnmatched } from '@/engine/market/appraisalMatch';
 
-/** A boxed list of pasted lines under a heading: the unmatched ones, or the abyssal ones. */
 export function PastedLinesNote({
   heading,
   headingClassName = 'text-text-dim',

@@ -25,15 +25,9 @@ export interface CharacterContracts {
 
 export interface MergedContracts {
   contracts: Contract[];
-  /** contract_id to the Character the row is shown for. */
   ownerByContractId: Map<number, number>;
 }
 
-/**
- * One row per `contract_id`. A contract between two of the pilot's own Characters
- * is read twice; it belongs to its issuer when the issuer is among them, else to
- * the first Character (in roster order) that read it.
- */
 export function mergeCharacterContracts(entries: readonly CharacterContracts[]): MergedContracts {
   const ownerByContractId = new Map<number, number>();
   const byId = new Map<number, Contract>();
@@ -55,9 +49,7 @@ export function mergeCharacterContracts(entries: readonly CharacterContracts[]):
 export interface AllContractsSnapshot {
   contractsResult: CachedResult<Contract[]> | null;
   entries: CharacterContracts[];
-  /** Characters that never granted the contracts scope: listed, never read. */
   skipped: { characterId: number; name: string }[];
-  /** Every read Character needs a fresh login: nothing to show. */
   needsReauth: boolean;
   truncated: boolean;
   ownerByContractId: Map<number, number>;
@@ -68,11 +60,6 @@ export interface AllContractsSnapshot {
   issuerAffiliations: Map<number, CharacterAffiliation>;
 }
 
-/**
- * Contracts › History across every Character holding the contracts scope: one
- * `loadContractsWithArchive` read each, the scope checked up front so an ungranted alt is
- * skipped rather than raising a re-auth banner (`fanOutAllCharacters`).
- */
 export async function loadAllContractsSnapshot(
   _characterId: number,
   signal: RouteSnapshotSignal
@@ -99,13 +86,11 @@ export async function loadAllContractsSnapshot(
       ? null
       : {
           data: contracts,
-          // The oldest read bounds how fresh the whole list is.
           fetchedAt: new Date(Math.min(...answered.map((e) => e.fetchedAt))),
           fromCache: answered.some((e) => e.fromCache),
           truncated: entries.some((e) => e.truncated),
         };
 
-  // Standings only for owners that hold the contacts scope: an ungranted read would 403.
   const tokens = await db.tokens.bulkGet(entries.map((e) => e.characterId));
   const hasContacts = new Set(
     entries

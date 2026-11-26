@@ -1,7 +1,3 @@
-/**
- * The fit-goal picker's rows (issue #3564): each saved Fitting's state for
- * the active Character under this plan, from `evaluateFitGoal`.
- */
 import { evaluateFitGoal } from '@/engine/fitGoal';
 import { stepKey, type StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
@@ -14,7 +10,6 @@ export type FitGoalOption =
   | { id: string; name: string; state: 'on-date'; date: Date }
   | { id: string; name: string; state: 'missing'; missingLevels: number; toAdd: PlanEntry[] };
 
-/** Whether the picker can pick this row: not still loading, not unconfirmable, not already flyable. */
 export function isFitGoalPickable(
   option: FitGoalOption
 ): option is Exclude<FitGoalOption, { state: 'loading' | 'unknown' | 'flyable-now' }> {

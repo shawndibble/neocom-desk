@@ -74,7 +74,6 @@ function StepText({ step }: { step: ChecklistStep }) {
   }
 }
 
-/** Which of the shared tag looks a step takes; its label is the step's own. */
 const STEP_TAG = {
   upgrade: 'build',
   remove: 'remove',
@@ -96,10 +95,6 @@ function StepVerb({ verb }: { verb: ChecklistStep['verb'] }) {
   return <VerbTag verb={STEP_TAG[verb]} label={t(`piPlan.make.verb.${verb}`)} />;
 }
 
-/**
- * A rebuild's in-game steps, opened in its own row: the row already names the
- * planet and the change, so the steps carry no header of their own.
- */
 export function RebuildSteps({
   id,
   column,

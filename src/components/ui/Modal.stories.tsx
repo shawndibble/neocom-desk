@@ -2,11 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-/**
- * @summary Native-`<dialog>` modal; the parent owns `open`. §6c "…" cue: a button whose label ends
- * in "…" opens a dialog that needs more input or a confirmation. Every placement is a story
- * below, open, since a closed Modal renders nothing.
- */
 const meta = {
   title: 'ui/Modal',
   component: Modal,
@@ -33,15 +28,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary `center` (default): a short dialog that needs input or a confirmation. */
 export const Center: Story = { args: { placement: 'center' } };
 
-/** @summary `sheet`: a bottom-anchored mobile drawer. */
 export const Top: Story = { args: { placement: 'top', title: 'Search' } };
 
 export const Sheet: Story = { args: { placement: 'sheet', title: 'Filters' } };
 
-/** @summary `sheet-full`: the same drawer at full viewport height, for long lists. */
 export const SheetFull: Story = {
   args: {
     placement: 'sheet-full',
@@ -58,7 +50,6 @@ export const SheetFull: Story = {
   },
 };
 
-/** @summary `medium`: two columns that outgrow `center` but not `wide` (max-w-3xl). */
 export const Medium: Story = {
   args: {
     placement: 'medium',
@@ -72,7 +63,6 @@ export const Medium: Story = {
   },
 };
 
-/** @summary `wide`: multi-column content such as a comparison matrix. */
 export const Wide: Story = {
   args: {
     placement: 'wide',
@@ -87,7 +77,6 @@ export const Wide: Story = {
   },
 };
 
-/** @summary `page`: a whole page as a layer over another; full screen on a phone, 72rem or 95% wide and tall from `md`. */
 export const Page: Story = {
   args: {
     placement: 'page',
@@ -96,7 +85,6 @@ export const Page: Story = {
   },
 };
 
-/** @summary `media`: an enlarged image, sized to its content up to 95% of the viewport. */
 export const Media: Story = {
   args: {
     placement: 'media',
@@ -105,15 +93,10 @@ export const Media: Story = {
   },
 };
 
-/** @summary `titleActions`: a control beside the title, outside the heading that names the dialog. */
 export const WithTitleActions: Story = {
   args: { titleActions: <Button size="sm">More</Button> },
 };
 
-/**
- * @summary `footer`: an action bar pinned to the dialog's foot, outside the scrolling body, which
- * scrolls above it.
- */
 export const WithFooter: Story = {
   args: {
     placement: 'sheet',

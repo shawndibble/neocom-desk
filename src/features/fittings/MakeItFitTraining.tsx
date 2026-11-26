@@ -1,10 +1,3 @@
-/**
- * Make it fit's "Train" section: the skill levels that bring the Fitting
- * under budget with nothing swapped out (`useSkillFixes`, the run What to
- * train shares), each with its time and Add to plan. Only for the active
- * Character's real skills, as What to train is: under All 0 / All V or skill
- * overrides there is nothing of theirs to train.
- */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner, Toast } from '@/components/ui';
@@ -22,7 +15,6 @@ interface Props {
   open: boolean;
   evaluator: SkillGainEvaluator | null;
   characterId: number | null;
-  /** Names the Skill Plan Add to plan creates when the Character has none yet. */
   fittingName: string;
 }
 
@@ -30,7 +22,6 @@ export function MakeItFitTraining({ open, evaluator, characterId, fittingName }:
   const overridden = useSkillOverrides((state) => hasSkillOverrides(state.skills));
   if (characterId === null || overridden) return null;
   return (
-    // Keyed so an Undo toast can't outlive a Character switch.
     <Training
       key={characterId}
       open={open}
@@ -60,7 +51,6 @@ function Training({
     entries: readonly PlanEntry[];
   } | null>(null);
 
-  // A failed run or no training that fits says nothing: the other sections still can.
   if (failed || (fixes !== null && fixes.length === 0)) return null;
 
   async function add(entries: readonly PlanEntry[]) {

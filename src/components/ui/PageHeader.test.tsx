@@ -63,7 +63,6 @@ describe('PageHeader', () => {
 
   it('always draws the alerts bell in the actions cluster, even with no controls', () => {
     render(<PageHeader title="Settings" />);
-    // Dim at zero, but there: the corner does not shift when the first alert arrives.
     expect(screen.getByRole('button', { name: 'Alerts, none waiting' })).toBeInTheDocument();
   });
 
@@ -103,7 +102,6 @@ describe('PageHeader', () => {
       const cluster = screen.getByRole('button', { name: 'All characters' }).parentElement;
       expect(cluster).toHaveClass('shrink-0', 'flex-nowrap');
       expect(cluster).not.toHaveClass('flex-wrap');
-      // Clips, but keeps room for a focus ring and never collapses to nothing.
       expect(screen.getByText('12m ago').parentElement).toHaveClass(
         'min-w-10',
         'overflow-hidden',
@@ -113,8 +111,6 @@ describe('PageHeader', () => {
       );
     });
 
-    // Market's meta is a portal target, always rendered and empty until a tab
-    // fills it: an empty slot must not hold the clip's 40px minimum open.
     it('takes no room for a meta slot that has nothing in it (yet)', () => {
       const { rerender } = render(
         <PageHeader
@@ -140,8 +136,6 @@ describe('PageHeader', () => {
       expect(wrapper.matches(':has(>:only-child:empty)')).toBe(false);
     });
 
-    // A `DataAgeBadge` is `hidden md:inline-flex`: on a phone the clip around it
-    // would otherwise hold 40px (plus its gap) of nothing beside the title.
     it('hides the meta wrapper below md when its one child is itself hidden there', () => {
       render(
         <PageHeader

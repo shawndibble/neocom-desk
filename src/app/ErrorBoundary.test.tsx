@@ -7,7 +7,6 @@ function Boom(): never {
   throw new Error('dexie is unhappy');
 }
 
-// React logs the caught error; silence it so a passing run stays readable.
 const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 afterEach(() => {
   consoleError.mockClear();
@@ -68,7 +67,6 @@ describe('ErrorBoundary', () => {
       </main>
     );
     expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument();
-    // One landmark: the shell's own `<main>`, not a second one nested in it.
     expect(screen.getAllByRole('main')).toHaveLength(1);
   });
 

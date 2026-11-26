@@ -2,13 +2,6 @@ import { ganttBar, ganttNowPercent } from './geometry';
 import { CHART_COLOR } from './palette';
 import type { GanttChartModel } from './types';
 
-/**
- * Jobs laid on one shared time axis: a bar from each start to its end, a
- * dashed now marker through every row and the axis labelled at its start, now
- * and end. A bar that runs past either edge of the axis ends in an arrow; a
- * finished job is a full bar with its "Ready" at the row's end, so colour is
- * never the only cue.
- */
 export function Gantt({ model, maxRows }: { model: GanttChartModel; maxRows: number }) {
   const now = ganttNowPercent(model.axis);
   return (

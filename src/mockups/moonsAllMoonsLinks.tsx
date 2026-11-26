@@ -12,7 +12,6 @@ const cols: DataTableColumn<MoonRow>[] = [
     header: 'Moon',
     primary: true,
     render: (r) => (
-      // No row click on this table, so each name is a real link to the new page (§6c Entities).
       <a href={`/corp/moons/moons/${r.id}`} className={entityLinkClassName('font-medium')}>
         {r.moon}
       </a>
@@ -40,7 +39,6 @@ const cols: DataTableColumn<MoonRow>[] = [
   },
 ];
 
-/** Moon owner page: its moons, each name a real link (the table has no row click). */
 export function OwnerMoons() {
   return (
     <Panel title="Tallow Station Co: moons" padded={false}>
@@ -61,7 +59,6 @@ const extractionCols: DataTableColumn<MoonRow>[] = [
     id: 'moon',
     header: 'Moon',
     primary: true,
-    // The row opens that Extraction's page; the moon name is a real link to the moon page (§6c).
     render: (r) => (
       <span className="block">
         <a href={`/corp/moons/moons/${r.id}`} className={entityLinkClassName('font-medium')}>
@@ -86,7 +83,6 @@ const extractionCols: DataTableColumn<MoonRow>[] = [
   },
 ];
 
-/** Extractions tab: the row opens that pop on its moon's page, not the old pop page. */
 export function ExtractionsRows() {
   return (
     <Panel title="Extractions" padded={false}>

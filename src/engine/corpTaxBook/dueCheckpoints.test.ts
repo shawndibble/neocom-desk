@@ -13,7 +13,6 @@ const entry = (characterId: number, date: string): ObservedMiningEntry => ({
   oreLines: [{ typeId: ORE, quantity: 1000 }],
 });
 
-/** A December visit: the lock date is 1 Oct, so a snapshot covers through 30 Sep. */
 function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   return {
     corporationId: CORP,
@@ -78,7 +77,6 @@ describe('dueCheckpoints (a snapshot once per lock date)', () => {
   });
 
   it('records none while a day up to it is not billable yet', () => {
-    // The last sync read through 20 Sep: the days after it are not billable, the 30th included.
     const view = buildBookView(input({ lastSyncedAt: '2026-09-20T12:00:00Z' }));
     expect(dueCheckpoints(view, at)).toEqual([]);
   });
@@ -87,7 +85,6 @@ describe('dueCheckpoints (a snapshot once per lock date)', () => {
 describe('a stored checkpoint that is no snapshot', () => {
   it('is not used, and a snapshot is recorded over it', () => {
     const [snapshot] = dueCheckpoints(buildBookView(input()), at);
-    // Through 30 Sep but recorded on 5 Nov, while Sep was still open: the old strict cache.
     const stale = { ...snapshot!, at: '2026-11-05T14:00:00Z' };
     const view = buildBookView(input({ checkpoints: new Map([['solo:1', stale]]) }));
     expect(view.internals.byMiner.get('solo:1')?.account.input.checkpoint).toBeUndefined();

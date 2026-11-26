@@ -3,11 +3,6 @@ import { assignmentsMovedWithPayee } from '@/features/miningTax/ledgerActions';
 import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { isBilled, type PayeeRunningAccounts } from './payeeRunningAccounts';
 
-/**
- * Every Payee record's owed total, entry count and how many entries would move with it, for the
- * Payee manager's rows. What is owed is its account's (`owes`), as on the balance cards; the count
- * is the entries that bill it and still owe something of their day.
- */
 export function computeOwedByPayee(
   everyAssignment: readonly MiningTaxAssignmentRecord[],
   accounts: PayeeRunningAccounts

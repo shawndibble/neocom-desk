@@ -6,7 +6,6 @@ describe('the Defense control shows the fit’s own tank side', () => {
     expect(shownDefense('keep', 'armor')).toBe('armor');
     expect(shownDefense('keep', 'shield')).toBe('shield');
     expect(shownDefense('shield', 'armor')).toBe('shield');
-    // No tank side: nothing is selected until the pilot picks one.
     expect(shownDefense('keep', null)).toBe('keep');
   });
 

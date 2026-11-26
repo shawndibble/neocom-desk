@@ -1,7 +1,6 @@
 import type { BaseValue } from '@/engine/fittings/mutationEdit';
 import { loadTypeDetail, type LoadTypeDetailOptions } from '@/features/skills/typeDetail';
 
-/** A mutation's base module's own attribute values; null when its dogma won't load or is empty. */
 export async function loadBaseValues(
   typeId: number,
   options?: LoadTypeDetailOptions

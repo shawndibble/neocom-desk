@@ -10,7 +10,6 @@ import { MailQueueChip } from './MailQueueChip';
 import { MailQueuePanel } from './MailQueuePanel';
 import { EditableMailPreview, LateNoticeMailPreview } from './LateNoticeMailPreview';
 
-// The rich editor is its own chunk (Tiptap); a plain field stands in for it here.
 vi.mock('@/features/character/MailBodyEditor', async () => {
   const { TextArea } = await import('@/components/ui');
   return {
@@ -134,7 +133,6 @@ describe('MailQueueChip', () => {
       />
     );
     const chip = screen.getByRole('button', { name: 'Late notice mail: 50% sent, 1 failed' });
-    // One badge: the failures come first, since they need someone.
     expect(within(chip).getByText('1')).toBeInTheDocument();
     await userEvent.click(chip);
     expect(await screen.findByText('Late notice mail queue')).toBeInTheDocument();
@@ -177,7 +175,6 @@ describe('EditableMailPreview', () => {
     const props = { mail, edited: false, onSave, onReset: () => {} };
     const { rerender } = render(<EditableMailPreview {...props} basis="owe 5" />);
     await userEvent.click(screen.getByRole('button', { name: 'Edit mail' }));
-    // A payment lands while the draft is open: the standard mail now says something else.
     rerender(<EditableMailPreview {...props} basis="owe 2" />);
     await userEvent.type(screen.getByRole('textbox', { name: 'Subject' }), '!');
     await userEvent.click(screen.getByRole('button', { name: 'Save mail' }));

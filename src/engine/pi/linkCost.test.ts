@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { greatCircleKm, linksLoad, newLinkLoad, type LinkGeometry } from './linkCost';
 import type { PiLinkSpec } from '@/sde/types';
 
-/** The shipped Link type (2280) attributes, verified against the dump. */
 const SPEC: PiLinkSpec = {
   cpu: 15,
   powergrid: 10,
@@ -19,21 +18,14 @@ describe('greatCircleKm', () => {
   });
 
   it('scales linearly with the planet, which is the whole reason radius ships', () => {
-    // Two colonies of identical shape cost wildly different amounts purely
-    // because their planets differ in size. This is the property that makes a
-    // constant radius wrong rather than merely imprecise.
     const a = { latitude: 1.5826, longitude: 5.9771 };
     const b = { latitude: 1.5946, longitude: 5.9783 };
     expect(greatCircleKm(a, b, 85_400) / greatCircleKm(a, b, 6_030)).toBeCloseTo(85_400 / 6_030, 6);
   });
 
   it('treats latitude as a polar angle, not a signed latitude', () => {
-    // ESI's pin latitudes cluster around pi/2 and run 0..pi, so they are
-    // colatitude. Reading them as signed latitude would put a pin at 1.57 rad
-    // near the pole instead of the equator and shrink every distance.
     const equatorA = { latitude: Math.PI / 2, longitude: 0 };
     const equatorB = { latitude: Math.PI / 2, longitude: 1 };
-    // A quarter-turn along the equator on a unit-ish sphere: 1 rad * R.
     expect(greatCircleKm(equatorA, equatorB, 1_000)).toBeCloseTo(1_000, 6);
   });
 
@@ -44,7 +36,6 @@ describe('greatCircleKm', () => {
 });
 
 describe('linksLoad', () => {
-  /** Efa II: 12 links, 6,030 km planet. Real colony, from ESI. */
   const EFA_II: LinkGeometry[] = [
     [
       { latitude: 1.5703743696212769, longitude: 5.977902412414551 },
@@ -91,18 +82,12 @@ describe('linksLoad', () => {
   });
 
   it('refuses a radius it cannot use rather than reporting links as free', () => {
-    // A planet whose radius did not resolve must not silently cost nothing —
-    // that is the uncharged-link bug this module exists to fix.
     expect(() => linksLoad(EFA_II, 0, SPEC)).toThrow(/radius/i);
     expect(() => linksLoad(EFA_II, Number.NaN, SPEC)).toThrow(/radius/i);
   });
 });
 
 describe('against the reported colony', () => {
-  // Efa II and Efa IV, both read from ESI, with radii from the shipped
-  // payload. The pilot reported both colonies as full; the check is that
-  // neither is priced over its Command Center's 17,000 MW, and that the big
-  // planet's links are what consume its headroom.
   it('keeps a real colony inside its Powergrid budget on a small planet', () => {
     const links = [
       [1.5703743696212769, 5.977902412414551, 1.570561170578003, 5.965033054351807],
@@ -124,7 +109,6 @@ describe('against the reported colony', () => {
     }));
 
     const load = linksLoad(links, 6_030, SPEC);
-    // Pins alone measured 15,900 MW of a 17,000 MW budget.
     expect(15_900 + load.powergrid).toBeLessThan(17_000);
     expect(load.powergrid).toBeGreaterThan(200);
   });
@@ -139,8 +123,6 @@ describe('against the reported colony', () => {
 });
 
 describe('newLinkLoad', () => {
-  // Three pins on one equator at 0.1 and 0.25 rad on a 1,000 km planet: hops
-  // of 100 km and 150 km.
   const equator = (longitude: number) => ({ latitude: Math.PI / 2, longitude });
   const hops: LinkGeometry[] = [
     { a: equator(0), b: equator(0.1), level: 0 },
@@ -148,27 +130,17 @@ describe('newLinkLoad', () => {
   ];
 
   it('prices a link the colony has not built at its longest existing hop', () => {
-    // The mean would quote 125 km, and a pin placed anywhere past the middle
-    // of this colony costs more than that — which is the direction
-    // `colonyBudget.ts` calls the one the Advisor must not err in. The longest
-    // hop is a measured number, and it makes the headroom count a floor.
     const load = newLinkLoad(hops, 1_000, SPEC);
     expect(load?.cpu).toBeCloseTo(15 + 0.2 * 150, 6);
     expect(load?.powergrid).toBeCloseTo(10 + 0.15 * 150, 6);
   });
 
   it('prices it at link level 0, whatever the colony’s own links are upgraded to', () => {
-    // A link you have not built yet is a level-0 link. Carrying the level
-    // modifiers of upgraded ones into the quote would price a new link at
-    // something no new link pays — and would do it off this module's own
-    // explicitly unverified reading of those modifiers.
     const upgraded = hops.map((hop) => ({ ...hop, level: 3 }));
     expect(newLinkLoad(upgraded, 1_000, SPEC)).toEqual(newLinkLoad(hops, 1_000, SPEC));
   });
 
   it('has no answer for a colony with no link to measure', () => {
-    // Not zero: a new pin still needs a link, and there is simply nothing here
-    // to price one from. The caller has to say so.
     expect(newLinkLoad([], 1_000, SPEC)).toBeNull();
   });
 

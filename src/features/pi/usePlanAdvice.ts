@@ -7,12 +7,10 @@ import { usePiAdviceInputs } from './usePiAdviceInputs';
 
 export type PlanAdviceState =
   | { status: 'loading' }
-  /** `advice` is built on empty books: only what needs no price survives, every ISK figure null. */
   | { status: 'prices-failed'; advice: PlanAdvice | null }
   | { status: 'error' }
   | { status: 'ready'; advice: PlanAdvice; pricesFetchedAt: Date; hubName: string };
 
-/** The Plan tab's advice: the shared inputs (`usePiAdviceInputs`) run through the one model, off the main thread (`useAdviceOf`). */
 export function usePlanAdvice(
   snapshot: GoalPlannerSnapshot,
   characterId: number,

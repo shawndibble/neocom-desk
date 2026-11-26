@@ -18,7 +18,6 @@ import { PreviewedFigure } from '../statPreview';
 import { STAT_EYEBROW, STAT_EYEBROW_TYPE } from '../statKit';
 import { fmt0 } from './fixedFormat';
 
-/** One resist, as the game draws it: the damage type's colour filling the share resisted. */
 function ResistCell({
   resonance,
   tone,
@@ -27,15 +26,11 @@ function ResistCell({
   base,
   renderSkilled,
 }: {
-  /** The stat a previewed change to it shows in place of the percentage. */
   statKey?: StatChangeKey;
   resonance: number;
   tone: DamageType;
-  /** The unheated resist as shown, when heat changed it ("Overheat all"). */
   unheated?: string;
-  /** Item Detail: the resonance before the pilot's skills; the cell reads "base → skilled" when they print differently. */
   base?: number;
-  /** Draws the pilot's figure when it differs from `base` (Item Detail's opener); plain emphasis without it. */
   renderSkilled?: (base: string, value: string) => ReactNode;
 }) {
   const { t } = useTranslation();
@@ -78,7 +73,6 @@ const RESONANCE_STAT = {
   explosiveResonance: 'ExplosiveResonance',
 } as const;
 
-/** The stat key for a layer row's HP or resist cell; none for an adapted-hardener row. */
 function layerKey(
   rowKey: string,
   field: 'Hp' | keyof typeof RESONANCE_STAT
@@ -93,23 +87,13 @@ export interface ResistRow {
   label: string;
   sub?: ReactNode;
   resonances: Resonances;
-  /** Item Detail: the resonances before the pilot's skills, when they change them. */
   baseResonances?: Resonances;
-  /** Item Detail: draws a changed resist's "base → skilled" (its sources' opener). */
   renderSkilled?: (type: DamageType, base: string, value: string) => ReactNode;
   ehp?: number;
-  /** Adapted rows read as a note on the row above. */
   tone?: 'note';
-  /** Under "Overheat all", each cell heat changed: its unheated value as shown. */
   unheated?: Partial<Record<DamageType | 'ehp', string>>;
 }
 
-/**
- * The Defense table (mockup A): a row per layer — its raw HP beneath the
- * name, a cell per damage type, EHP last — and the Reactive Armor
- * Hardener's adapted resists. With no row carrying an EHP (Item Detail's
- * base values, which have no Damage Profile), the EHP column is left out.
- */
 export function ResistTable({ rows }: { rows: ResistRow[] }) {
   const { t } = useTranslation();
   const showEhp = rows.some((row) => row.ehp !== undefined || row.unheated?.ehp !== undefined);

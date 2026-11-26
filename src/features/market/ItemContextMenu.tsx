@@ -1,10 +1,3 @@
-/**
- * Right-click menu for an item — the tree, search results (same tree,
- * GLOSSARY.md round 8), the Quickbar, the Assets tree (issue #83), the
- * Variations table (issue #147) and every item name on a Build Plan page —
- * materials (round 27), product heading, revenue and owned-sale rows, and the
- * recipe and Blueprint Acquisition modals.
- */
 import { useEffect, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,67 +21,35 @@ import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { MarketOnly } from '@/features/abyssal/MarketOnly';
 import { loadedMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { ViewInMarketMenuItem } from './ViewInMarketMenuItem';
-// Re-exported: menus built on this module's entries import it from here.
 export { ViewInMarketMenuItem };
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
   typeId: number;
   itemName: string;
-  /** A Mutated module's item id: Show info opens on its own Rolls. */
   itemId?: number;
-  /**
-   * The blueprint behind Build Plan, when the row already knows it (an
-   * industry job, a Loyalty Store offer); null when nothing produces the item.
-   * Undefined while the row's own catalog hasn't loaded ("checking…").
-   * Omitted, the page's Item Actions look it up — "checking…" until the lazy
-   * catalog loads, which the menu requests as it opens.
-   */
   blueprintTypeID?: number | null | undefined;
-  /** The product the Build Plan action opens when it isn't `typeId` itself � a blueprint row (Assets) plans what it builds. */
   planProductTypeID?: number;
-  /** Variations-table rows only (issue #147): adds the row's variation group to the Compare Set and opens the Compare drawer on Attributes. Omitted elsewhere. */
   onCompareVariations?: () => void;
-  /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
-  /**
-   * Only the actions a held stack needs: Show info, View in Market and Set stock
-   * target. Leaves out Quickbar, price alert, Open in EVE, Compare, Copy name,
-   * Build Plan and PI (Corp assets, DESIGN.md §6c restraint).
-   */
   holdingsOnly?: boolean;
-  /** Leaves out "Set stock target" where the page already edits the Stock Target in place (Assets › Targets). */
   hideStockTarget?: boolean;
-  /** Leaves out "Build Plan" where the page is already a Build Plan (Industry › Plans detail). */
   hideBuildPlan?: boolean;
-  /** Leaves out "Add to Compare" where the page has no Compare drawer to show the set (Industry › Plans detail). */
   hideCompare?: boolean;
-  /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
-  /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
   linksKeepBrowserMenu?: boolean;
-  /** A click on the row (or its name) goes to this page: both menus lead with "Open in new tab" (`RowActionsMenu`'s `openHref`). */
   openHref?: string;
   children: ReactElement;
 }
 
-/**
- * Wraps `trigger` in this menu for `typeId`, the caller having already bound
- * the rest of the props. How a page that knows item names and blueprints
- * hands the menu down to children that only know a type ID — same shape as
- * `DataTable`'s `rowContextMenu`.
- */
 export type ItemMenuFor = (
   typeId: number,
   trigger: ReactElement,
-  /** Entries for this one row, after the page's own (the Build Plan's "Used by"). */
   extraItems?: ReactNode
 ) => ReactElement;
 
-/** Everything the menu's entries need — the props minus the trigger wiring. */
 type ItemMenuProps = Omit<ItemContextMenuProps, 'children'>;
 
-/** The item menu's "Show info" — also reused as-is by menus that aren't item menus (the Fittings editor's). */
 export function ShowInfoMenuItem({
   typeId,
   itemName,
@@ -111,17 +72,11 @@ export function ShowInfoMenuItem({
   );
 }
 
-/**
- * "Open in EVE" for an item, for every menu that carries `ShowInfoMenuItem`.
- * Market details only: ESI's information window opens characters,
- * corporations and alliances, and silently ignores an inventory type.
- */
 export function OpenInEveItemMenuItems({
   typeId,
   specific,
 }: {
   typeId: number;
-  /** The menu also offers another Open in EVE item (a place's window). */
   specific?: boolean;
 }) {
   return (
@@ -131,12 +86,6 @@ export function OpenInEveItemMenuItems({
   );
 }
 
-/**
- * "Build Plan" and "View blueprint in Market" for an item — reused as
- * `ShowInfoMenuItem` is, by menus that aren't item menus (the Fittings
- * editor's). Both go off while nothing produces the item; the lazy blueprint
- * catalog loads when the entries first render, i.e. as the menu opens.
- */
 export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -178,27 +127,6 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
   );
 }
 
-/**
- * The item menu's entries, shared by `ItemContextMenu` (right-click, and the
- * row's `RowMoreActions` button it publishes to) and `ItemMoreActions` (a
- * standalone button, issue #1498) — one list, so none of them can drift.
- * Written with the kind-agnostic `MenuItem`, which renders as whichever menu
- * family it lands in. `onAlertRequest` opens the caller's own
- * `PriceAlertDialog`.
- *
- * Add to Quickbar, set a price alert or a stock target, show info, add to Compare, view in
- * Market, copy name, jump to a Build Plan, jump to a PI Plan. Abyssal types drop
- * Quickbar, price alert, View in Market and Open in EVE (`MarketOnly`).
- *
- * The PI action asks for itself rather than going through the page's Item
- * Actions the way `blueprintTypeID` does: `pi.json` is 15KB against
- * `blueprints.json`'s 1.4MB, so there is nothing to defend by loading it
- * once per page. It is also rendered only when the answer is yes — a
- * permanently-disabled row on every item in the game buys nothing, where the
- * Build Plan row's disabled state is telling the user something they might
- * have expected otherwise. Nothing renders while the answer is unknown, so
- * the row never appears under a cursor already in the menu.
- */
 function useItemMenuItems(
   props: ItemMenuProps,
   onAlertRequest: () => void,
@@ -219,12 +147,8 @@ function useItemMenuItems(
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
   const { canAddToQuickbar, addToQuickbar, blueprintFor } = useItemActions();
-  // Present-but-undefined is the row's own "checking…"; only an omitted prop defers to the page.
   const blueprintTypeID = 'blueprintTypeID' in props ? props.blueprintTypeID : blueprintFor(typeId);
 
-  // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
-  // action on the pages this richer menu doesn't reach (the BPC search table,
-  // a contract's item list), and one action wants one set of labels.
   const buildPlanLabel =
     blueprintTypeID === undefined
       ? t('industry.contextMenu.buildPlanChecking')
@@ -247,10 +171,6 @@ function useItemMenuItems(
     );
   }
 
-  // Groups, not a flat list (DESIGN.md §6c "Menu length"): `MenuGroup` sorts,
-  // divides and folds them, on the `size` each declares. An Abyssal type has
-  // no market entries (`MarketOnly`); the lookup is read only if already
-  // loaded, so a row never pulls it in, and until then the guess is "market".
   const marketItems = loadedMutaplasmidLookup()?.isAbyssalType(typeId) ? 0 : 1;
   return (
     <>
@@ -327,11 +247,6 @@ function useItemMenuItems(
   );
 }
 
-/**
- * Item context menu. Also publishes its items, so a `RowMoreActions` in the
- * row (or `DataTable`'s `rowMoreActions` column) opens exactly these (WCAG
- * 2.1.1, issue #1497).
- */
 export function ItemContextMenu(props: ItemContextMenuProps) {
   const { typeId, itemName, linksKeepBrowserMenu, openHref, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
@@ -370,12 +285,6 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
   );
 }
 
-/**
- * Visible "More actions" trigger for the same item menu (WCAG 2.1.1, issue
- * #1498), for a surface whose button can't sit inside `ItemContextMenu`'s
- * trigger — it builds its own copy of the items rather than reading a
- * surrounding `ItemContextMenu`'s.
- */
 export function ItemMoreActions(
   props: ItemMenuProps & Pick<ComponentProps<typeof RowMoreActions>, 'variant' | 'size'>
 ) {
@@ -387,7 +296,6 @@ export function ItemMoreActions(
     () => setAlertOpen(true),
     () => setStockOpen(true)
   );
-  // Like the right-click menu: opening loads the blueprint catalog, so Build Plan is ready (or "checking…").
   const { requestBlueprints } = useItemActions();
   const onOpenChange = (open: boolean) => {
     if (open) requestBlueprints();

@@ -27,16 +27,6 @@ const isSkyhookAlertEntry = shapeGuard<SkyhookAlertEntry>({
   withinJumps: is.number,
 });
 
-/**
- * A raidable skyhook window within the pilot's N jumps (issue #4784, raider
- * half). One cached read of the public universe-wide list (the same cache row
- * the Overview's raids widget reads, so it costs one request per cache
- * window, never one per Character or skyhook), one of the location, and one
- * local pass over the stargate graph under Route Safety's jump basis. A
- * listing with no readable window is dropped: there is no window to be
- * "once per". An input it cannot read skips the poll (`null`) rather than
- * writing a baseline that would fire a burst on the next good poll.
- */
 export const skyhookNearbyDomain = defineDomain<
   SkyhookAlertEntry,
   SkyhookAlertSnapshot,
@@ -48,8 +38,6 @@ export const skyhookNearbyDomain = defineDomain<
   entriesKey: 'entries',
   isEntry: isSkyhookAlertEntry,
   load: async (characterId) => {
-    // A raid window lasts hours: a location up to the default window old is
-    // plenty, and the 5 s page window would send every poll to ESI.
     const originSystemId = await loadCurrentSystemId(characterId, STALE_AFTER.default);
     if (originSystemId === null) return null;
     const list = await loadRaidableList().catch(() => null);

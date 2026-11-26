@@ -42,7 +42,6 @@ const NAMES = new Map([
   [3, 'Goonswarm Federation'],
 ]);
 
-/** An NPC agent and an NPC corporation, by CCP's id blocks. */
 const NPCS: CharacterContact[] = [
   contact(3008416, 'character', 5),
   contact(1000125, 'corporation', 5),

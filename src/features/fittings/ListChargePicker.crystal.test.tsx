@@ -78,8 +78,6 @@ describe('ListChargePicker — a mining laser', () => {
     expect(screen.queryByRole('dialog', { name: 'Mining crystal types' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'What the crystal types do' })).toBeInTheDocument();
 
-    // With the help shut, Escape closes the picker as before: focus is back on
-    // the ?, whose tooltip takes the first one.
     await user.keyboard('{Escape}{Escape}');
     expect(
       screen.queryByRole('button', { name: 'What the crystal types do' })

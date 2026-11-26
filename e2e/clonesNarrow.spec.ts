@@ -1,8 +1,3 @@
-/**
- * Clones on a phone (issue #3487): the training verdict leads the page, ahead
- * of the cooldown / "You are in" / Respawn panels. From md up the panels keep
- * their place above it.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';

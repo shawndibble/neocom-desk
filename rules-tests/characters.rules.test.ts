@@ -16,8 +16,6 @@ import {
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Smoke coverage for the existing per-character sync rules: proves the
-// harness loads firestore.rules and enforces the ownerHash guard.
 let env: RulesTestEnvironment;
 
 beforeAll(async () => {
@@ -73,8 +71,6 @@ describe('characters/{uid}/plans', () => {
   });
 });
 
-// Issue #5073: the change marker is `syncVersion` on the parent doc, beside the
-// `lastSyncedAt` heartbeat. Owner-only, a whole number, nothing else on the doc.
 describe('characters/{uid} change marker', () => {
   const owner = () => characterAuth(env, 1, 'hash-a').firestore();
   const parent = (db: ReturnType<typeof owner>, uid = 'char:1') => doc(db, `characters/${uid}`);

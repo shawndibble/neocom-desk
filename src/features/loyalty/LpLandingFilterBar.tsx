@@ -26,7 +26,6 @@ import {
 } from './lpLanding';
 import type { LpLandingOption } from './useLpStoreLanding';
 
-/** The URL's empty category list is the shared multi-select's `all`. */
 function toggleCategory(
   chosen: readonly number[],
   options: readonly LpLandingOption[],
@@ -45,18 +44,11 @@ type ShowOnlyKey = (typeof SHOW_ONLY_KEYS)[number];
 
 export type LpLandingView = 'stores' | 'offers';
 
-/** The filters plus the two persisted settings the numbers are priced at, edited together. */
 export interface LpLandingFilterValue extends LpLandingFilters {
   hubId: TradeHub['id'];
   priceBasis: PriceBasis;
 }
 
-/**
- * The landing's one filter row (DESIGN.md §4b): the view switch and the search
- * box, the column picker for the view on screen, and the funnel. The view
- * switch sits in the search slot (the Ship Tree precedent): it changes what
- * the box searches, not what the filters narrow.
- */
 export function LpLandingFilterBar({
   view,
   onViewChange,
@@ -77,7 +69,6 @@ export function LpLandingFilterBar({
   onChange: (next: LpLandingFilterValue) => void;
   factions: readonly LpLandingOption[];
   categories: readonly LpLandingOption[];
-  /** Stores the Character holds LP with; 0 disables the chips that need a balance, null while unread. */
   heldStores: number | null;
   columnPicker: ReactNode;
 }) {

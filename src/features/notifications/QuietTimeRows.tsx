@@ -1,10 +1,3 @@
-/**
- * Settings > Notifications > Alerts when closed: the Quiet time rows (issue
- * #4566). One switch; on, two time inputs and "Let attacks through". Per
- * device, so it sits with the device's other delivery choices, and it applies
- * to everything pushed to a closed app. A change re-uploads through the
- * Projection rebuild (`preferences.ts`), so no separate save step.
- */
 import { useTranslation } from 'react-i18next';
 import { Checkbox, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';

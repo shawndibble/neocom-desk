@@ -9,11 +9,6 @@ import { useTaxColumns } from '../useTaxColumns';
 import { buildDisplayRows } from './corpRows';
 import { useCorpStateLabel } from './useCorpStateText';
 
-/**
- * The corporation's lines on a miner's Moon Mining Tax tab (issue #4622): the refinery beside
- * the corporation, a correction that keeps the old figure, and the mark for ore the miner's
- * own list also gives a Payee. The real Tax tab columns, fed from a fixed overlay.
- */
 const ZEO = 45490;
 const CORP = 98000001;
 const CORP_NAME = 'Brass Meridian Logistics';
@@ -129,5 +124,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Refinery labels, a corrected line, an overlap mark and a waived (written-off) line. */
 export const Default: Story = {};

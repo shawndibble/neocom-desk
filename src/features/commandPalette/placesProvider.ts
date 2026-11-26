@@ -1,14 +1,3 @@
-/**
- * The Command Palette's Places group (#5742): solar systems, NPC stations and
- * the structures this device already knows, found by name or by the pilot's
- * Place Nickname. Enter opens Route Safety there; Shift+Enter sets the
- * in-game waypoint.
- *
- * Local reads only, like the Assets group: the SDE snapshots, the structure
- * names `searchKnownPlaces` reads from Dexie, and the synced nicknames. Typing
- * never costs a request. A structure the active Character cannot see is
- * dropped, never guessed.
- */
 import { rankedSearch } from '@/lib/rankedSearch';
 import { classifyPlaceId } from '@/features/places/classify';
 import type { FoundPlace } from '@/features/places/useKnownPlaces';
@@ -22,25 +11,18 @@ import {
 
 export interface PlacesProviderOptions {
   loadSystems(): Promise<readonly SolarSystemEntry[]>;
-  /** Stations and known structures matching the query, each with its system. */
   searchPlaces(query: string, limit: number): Promise<readonly FoundPlace[]>;
-  /** Place Nickname by location id, read live. */
   nicknames(): Readonly<Record<number, string>>;
-  /** A nicknamed place's real name and system, or null when it cannot be named. */
   resolvePlace(locationId: number): Promise<{ name: string; systemId: number } | null>;
-  /** Route Safety to a system, naming the station when the row is one. */
   openRoute(systemId: number, stationId: number | null): void;
-  /** Sets the in-game waypoint; the outcome is shown in the palette. */
   setWaypoint(locationId: number, placeName: string): Promise<PaletteAltOutcome>;
   waypointLabel: string;
-  /** "0.9" style security for a system's sublabel. */
   describeSystem(system: SolarSystemEntry): string;
   describeStation(place: { name: string; systemName: string | null }, nickname?: string): string;
 }
 
 interface PlaceRow {
   id: number;
-  /** What the row reads: the nickname when there is one, else the real name. */
   label: string;
   name: string;
   nickname: string | undefined;
@@ -48,9 +30,7 @@ interface PlaceRow {
   kind: 'station' | 'structure';
 }
 
-/** Stations and structures need a query this long, so a short word lists systems only. */
 const STATION_MIN_QUERY_LENGTH = 4;
-/** Candidates read before the prefix filter, so a real prefix hit is not cut by the row cap. */
 const STATION_FETCH_LIMIT = GROUP_LIMIT * 8;
 
 export function createPlacesProvider(options: PlacesProviderOptions): PaletteProvider {
@@ -67,17 +47,12 @@ export function createPlacesProvider(options: PlacesProviderOptions): PalettePro
         wantStations ? options.searchPlaces(query, STATION_FETCH_LIMIT) : Promise.resolve([]),
         resolveNicknamed(query, nicknames, options),
       ]);
-      // An NPC station's name starts with its system's, so a broad word would
-      // bury the systems under dozens of stations that merely mention it: only a
-      // name the query is the start of counts. The few structures this device
-      // knows are the pilot's own, so any word of their name finds them.
       const prefix = query.trim().toLowerCase();
       const found = searched.filter(
         (place) => place.kind === 'structure' || place.name.toLowerCase().startsWith(prefix)
       );
       const systemById = new Map(systems.map((system) => [system.id, system]));
 
-      // One row per location id: a nickname hit and a name hit are the same place.
       const rows = new Map<number, PlaceRow>();
       for (const place of found) {
         const nickname = nicknames[place.id];
@@ -124,7 +99,6 @@ export function createPlacesProvider(options: PlacesProviderOptions): PalettePro
   };
 }
 
-/** Places whose Place Nickname matches the query, resolved to a real name and system. */
 async function resolveNicknamed(
   query: string,
   nicknames: Readonly<Record<number, string>>,

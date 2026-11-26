@@ -27,12 +27,6 @@ type Contracts =
   | { status: 'needs-scope' | 'failed' }
   | { status: 'ok'; byId: ReadonlyMap<number, Contract> };
 
-/**
- * The buyer's view of a standing buyback Request (issue #4780): every Member's
- * held Quote, and under each the contracts that Member linked to it, with the
- * status, the price the buyer's own ESI reads off the contract, and a note where
- * that price is not the quoted one. Only ids and statuses come from Firestore.
- */
 export function BuyerQuotes({
   request,
   pledges,
@@ -47,7 +41,6 @@ export function BuyerQuotes({
   memberNames: ReadonlyMap<string, string>;
   communityId: string;
   communityName: string;
-  /** The Character the contracts go to: whose contracts are read here. */
   buyerCharacterId: number;
   now: number;
 }) {
@@ -60,7 +53,6 @@ export function BuyerQuotes({
         .sort((a, b) => b.quote.quotedAt - a.quote.quotedAt),
     [pledges]
   );
-  // A key, not a Set: a re-read of the same Pledges must not read the buyer's contracts again.
   const wantedKey = useMemo(
     () =>
       [...new Set(quoted.flatMap(({ quote }) => (quote.links ?? []).map((l) => l.contractId)))]
@@ -69,7 +61,6 @@ export function BuyerQuotes({
     [quoted]
   );
 
-  // The buyer's own contracts, read only when some quote has a contract worth looking up.
   useEffect(() => {
     if (wantedKey === '') return;
     let cancelled = false;
@@ -93,8 +84,6 @@ export function BuyerQuotes({
   const byId = contracts.status === 'ok' ? contracts.byId : undefined;
   const title = requestHeadline(request, t);
 
-  // The Member who wrote a quote wrote its links, so a link is only trusted when the buyer's own copy of
-  // the contract is that Member's item exchange to the buyer. One that is not is dropped, never shown.
   const rowsByUid = useMemo(() => {
     const out = new Map<string, LinkedContractRow[]>();
     for (const { uid, quote } of quoted) {
@@ -111,7 +100,6 @@ export function BuyerQuotes({
             contractId: link.contractId,
             status,
             contract,
-            // Without the buyer's copy this is only the Member's word.
             unverified: contract === undefined,
             priceDiffers:
               contract?.price !== undefined && priceDiffers(contract.price, quote.total),
@@ -123,7 +111,6 @@ export function BuyerQuotes({
     return out;
   }, [quoted, byId, buyerCharacterId, now]);
 
-  // What the Contracts page marks for the buyer: only contracts the buyer's own copy confirmed.
   const found = useMemo(() => {
     const map = new Map<number, BuybackLinkInfo>();
     for (const { uid, quote } of quoted) {

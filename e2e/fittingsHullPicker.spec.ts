@@ -1,8 +1,3 @@
-/**
- * Fittings hull picker (issue #1637), opened from the Start screen's New from hull button: the class list scrolls
- * vertically only — no class is stranded off the right edge of a
- * height-capped multi-column box.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
@@ -14,15 +9,11 @@ test.describe('Fittings — hull picker', () => {
       await page.setViewportSize(viewport);
       await signInAndGoto(page, './ships/fittings');
 
-      // The picker is behind the Start screen's "New from hull" button.
       const newFromHull = page.getByRole('button', { name: 'New from hull' });
       const hullSearch = page.getByRole('searchbox', { name: 'Search hulls' });
       await newFromHull.or(hullSearch).first().waitFor();
       if (await newFromHull.isVisible()) await newFromHull.click();
 
-      // Nothing is listed until the player searches; "e" matches (nearly) every
-      // class, so the full list is what gets measured. The list renders once the
-      // static market catalogue has loaded.
       await page.getByRole('searchbox', { name: 'Search hulls' }).fill('e');
       const list = page.getByTestId('hull-list');
       await expect(list).toBeVisible({ timeout: 30_000 });

@@ -20,12 +20,6 @@ const AMARR_SYSTEM = 30002187;
 const RANCER = 60011740;
 const RANCER_SYSTEM = 30002809;
 const SINQ_LAISON = 10000032;
-/**
- * A wormhole end. Invented ids and an invented J-name: this file hand-builds
- * the endpoint map to exercise the *filter*, so the band is stated outright
- * rather than classified — and no real NPC station sits in J-space, so
- * borrowing real ids here would suggest a row the SDE cannot produce.
- */
 const WORMHOLE_STATION = 69000001;
 const WORMHOLE_SYSTEM = 69000002;
 const WORMHOLE_REGION = 69000003;
@@ -128,37 +122,22 @@ describe('resolveCourierRoutes', () => {
   });
 
   it('leaves an unresolvable endpoint unnamed rather than inventing a name', () => {
-    // A player structure: `stations.json` does not hold it, and resolving one
-    // costs an ESI call per id against an ACL that usually refuses. The id is
-    // what the UI shows; it is not a name.
     const [route] = routes([row({ destinationLocationId: STRUCTURE })]);
 
     expect(route.destination).toEqual({
       locationId: STRUCTURE,
       name: null,
       systemName: null,
-      // No system either, so this haul has no measurable distance — the case
-      // the jumps column renders as unavailable.
       systemId: null,
       regionId: null,
-      // No system, so no security status either — the same "cannot place it"
-      // reasoning the band below states out loud.
       security: null,
-      // And no band: nothing local places it, so there is no security status
-      // to classify. A space filter excludes it rather than guessing highsec.
       space: null,
-      // Reached the fallback, which means this id was never in the index at
-      // all — nothing was concluded about it, which is not the same as
-      // concluding it is a player structure.
       resolution: 'unknown',
       hasStargates: null,
     });
   });
 
   it("falls back to the row's own region for an unresolvable origin", () => {
-    // `regionId` on the row is the contract's region — where it was posted,
-    // i.e. the pickup end — so an unnamed origin structure still places the
-    // haul on the map, and the origin-region filter still sees it.
     const [route] = routes([row({ originLocationId: STRUCTURE, regionId: DOMAIN })]);
 
     expect(route.origin.name).toBeNull();
@@ -193,8 +172,6 @@ describe('filterCourierContracts', () => {
   });
 
   it('excludes a haul whose destination never resolved from a destination-region filter', () => {
-    // Unknown is not a match: claiming an unresolved structure sits in the
-    // asked-for region would put a haul on a route list it may not belong to.
     const unresolved = routes([row({ contractId: 3, destinationLocationId: STRUCTURE })]);
 
     expect(filterCourierContracts(unresolved, { destinationRegionId: DOMAIN })).toEqual([]);
@@ -209,9 +186,6 @@ describe('filterCourierContracts', () => {
   });
 
   it('reads an absent collateral as none rather than as unknown', () => {
-    // The snapshot omits the column when the contract asks for no collateral,
-    // so a hauler capping what they will put up should still see it — it asks
-    // for nothing, which is under every ceiling.
     const rows = routes([row({ contractId: 1, collateral: undefined })]);
 
     expect(filterCourierContracts(rows, { maxCollateral: 0 }).map((r) => r.contractId)).toEqual([
@@ -243,8 +217,6 @@ describe('filterCourierContracts', () => {
   });
 
   it('passes a haul that states no deadline rather than excluding it on a number it does not carry', () => {
-    // Same rule `contractSearch.ts` applies to an auction with no buyout: a
-    // missing figure is unknowable, not disqualifying.
     const rows = routes([row({ contractId: 1, daysToComplete: undefined })]);
 
     expect(
@@ -270,18 +242,11 @@ describe('filterCourierContracts', () => {
   });
 });
 
-/**
- * Endpoint security, never route security (issue #939). A highsec pickup and a
- * highsec delivery can still route through lowsec, and nothing here claims
- * otherwise — this narrows on where a haul *ends*, which is the one thing the
- * local snapshots can answer without a request per row.
- */
 describe('filterCourierContracts — destination space', () => {
   const HAULS = [
     row({ contractId: 1, destinationLocationId: AMARR }),
     row({ contractId: 2, destinationLocationId: RANCER }),
     row({ contractId: 3, destinationLocationId: WORMHOLE_STATION }),
-    // A player structure: nothing local places it, so it has no band at all.
     row({ contractId: 4, destinationLocationId: STRUCTURE }),
   ];
 
@@ -300,8 +265,6 @@ describe('filterCourierContracts — destination space', () => {
   });
 
   it('excludes a destination nothing local places, rather than guessing a band', () => {
-    // It already drops out of the destination-region filter for the same
-    // reason. "Unknown" is not a band, and is certainly not "highsec".
     expect(matching(['highsec', 'lowsec', 'nullsec', 'wormhole'])).not.toContain(4);
   });
 
@@ -313,9 +276,6 @@ describe('filterCourierContracts — destination space', () => {
   });
 
   it('matches nothing when no band is chosen', () => {
-    // Deselecting every band asks for hauls ending in none of them, which is
-    // an empty answer — not a silent "show everything". The panel maps
-    // all-selected to no filter at all, which is where "show everything" lives.
     expect(matching([])).toEqual([]);
   });
 });

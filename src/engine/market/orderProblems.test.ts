@@ -8,7 +8,6 @@ import {
   type OrderProblemFacts,
 } from './orderProblems';
 
-/** A perfectly healthy sell order: nothing wrong anywhere. */
 function healthySellFacts(overrides: Partial<OrderProblemFacts> = {}): OrderProblemFacts {
   return {
     isBuyOrder: false,

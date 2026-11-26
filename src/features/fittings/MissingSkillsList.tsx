@@ -13,15 +13,10 @@ import type { MissingSkillRows } from './useMissingSkillRows';
 interface MissingSkillsListProps {
   entries: readonly PlanEntry[];
   characterId: number;
-  /** Names a new Skill Plan the skills go into. */
   fittingName: string;
   missing: MissingSkillRows;
 }
 
-/**
- * The missing skills, each with its time and whether a Skill Plan already
- * covers it, and Fit Check's plan picker to add the rest.
- */
 export function MissingSkillsList({
   entries,
   characterId,

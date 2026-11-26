@@ -1,9 +1,3 @@
-/**
- * The Sovereignty widget on the Corp Board: added from the Gallery, one row
- * per skyhook with its unsecured ISK, no horizontal scroll at any width, and a
- * row that opens its facts in a modal with the jump count linking to Route
- * Safety.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { CORPORATION_ID } from './support/fixtureData';
 import { openCorpOverview, overflow } from './support/corpBoard';
@@ -98,7 +92,6 @@ test.describe('Sovereignty widget', () => {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    // Reagents are newer than the slim SDE snapshot, so their names come from ESI.
     await page.route('https://esi.evetech.net/universe/names**', async (route) => {
       const ids = (route.request().postDataJSON() ?? []) as number[];
       const names = { [GAS]: 'Magmatic Gas', [ICE]: 'Superionic Ice' } as Record<number, string>;

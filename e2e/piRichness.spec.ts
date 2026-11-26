@@ -1,9 +1,3 @@
-/**
- * The planet richness override (#2685): the Colonies row links to the Map's
- * `?planet=` drawer, where the pilot ticks the resources they would pull.
- * Playwright for the real layout at phone and laptop width.
- * `PI_SHOTS=<dir>` writes screenshots there.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -47,7 +41,6 @@ for (const [label, size] of [
     await expect(first).toHaveAttribute('aria-pressed', 'true');
     await shot(page, `richness-${label}`);
 
-    // Saved: the write lands, and the pick survives a reload.
     await expect
       .poll(() =>
         page.evaluate(

@@ -13,8 +13,6 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { HOUR_MS, currentThresholds, resolveProjectionNames } from './shared';
 
-/* Mercenary Dens ------------------------------------------------------------- */
-
 const isDenEntrySnapshot = shapeGuard<DenEntrySnapshot>({
   denId: is.number,
   planetId: is.number,
@@ -25,12 +23,6 @@ const isDenEntrySnapshot = shapeGuard<DenEntrySnapshot>({
   anarchyPct: is.number,
 });
 
-/**
- * A Character's dens through the Overview widget's own cached reads, so the
- * poll adds no request beyond that read's cache window. A Character the
- * server cannot read (reauth or failure) skips the poll (`null`) instead of
- * writing an empty baseline that would announce every den as new.
- */
 export const mercenaryDensDomain = defineDomain<
   DenEntrySnapshot,
   DenSnapshot,
@@ -52,9 +44,6 @@ export const mercenaryDensDomain = defineDomain<
     }));
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  // As in the colony domain: the baseline keeps the lead time the diff needs,
-  // while the Projection reads the current one so a Settings change rebuilt
-  // from that baseline projects the new warning time.
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const leadMs = (await currentThresholds(characterId)).mercenaryDenReinforcedLeadHours * HOUR_MS;
     const entries = snapshot.entries.map((entry) => ({ ...entry, leadMs }));

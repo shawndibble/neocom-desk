@@ -1,41 +1,17 @@
-// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
-/**
- * SRP Reimbursement chain (ADR 0026). Pure: no fetch/DOM/Dexie.
- *
- * Chain:
- *  1. Hull Rule Pay with a fixed ISK amount for the hull, else its class
- *     (a hull's rule of any mode beats the class's rule).
- *  2. Else killmail value x the corp's killmail percent.
- *  3. Else Jita Appraisal value of the killmail's items x Appraisal percent.
- *  4. Else no amount: the officer types it.
- * Not covered -> refused. Officer decides -> never a computed amount, but the
- * percent-chain value (steps 2-3) comes back as `suggested`.
- *
- * Percents are corp-set, valid 1-100 inclusive; anything else (null, blank,
- * NaN, 0, out of range) is unset and skips its step. 0 counts as unset: a
- * silent 0 ISK Reimbursement is worse than falling through.
- * Values / fixed ISK under 1 or null, NaN, infinite count as missing (a 0 value is
- * a lookup gap, not a free ship; a 0 fixed price is a blank field).
- * Amounts are whole ISK, rounded down.
- */
-
 export type SrpHullRule =
   | {
       mode: 'pay';
-      /** Fixed ISK; null/blank/invalid = the corp's percent of value. */ fixedIsk?: number | null;
+      fixedIsk?: number | null;
     }
   | { mode: 'not-covered' }
   | { mode: 'officer' };
 
 export interface SrpPricingInput {
   hullTypeId: number;
-  /** Hull class (market group / ship group) id. */
   classId: number;
   hullRules: Readonly<Record<number, SrpHullRule | undefined>>;
   classRules: Readonly<Record<number, SrpHullRule | undefined>>;
-  /** zKillboard value; null when unavailable. */
   killmailValue: number | null | undefined;
-  /** Jita Appraisal of the killmail's items; null when unavailable. */
   appraisalValue: number | null | undefined;
   killmailPercent?: number | null;
   appraisalPercent?: number | null;

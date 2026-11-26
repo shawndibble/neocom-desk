@@ -11,12 +11,6 @@ import { useFittingItemActions } from '../fittingItemActions';
 import { CargoMenuItems } from './CargoMenuItems';
 import { ChargeLoadItems, GuardedMenuItem } from './shared';
 
-/**
- * An Add panel Cargo result's actions: put the asked quantity in the hold,
- * then — once the type is in it — everything the List's cargo row offers
- * (`CargoMenuItems`), so the two can't drift; before that, what any Add
- * panel item offers.
- */
 export function AddCargoMenuItems({
   typeId,
   count,
@@ -24,7 +18,6 @@ export function AddCargoMenuItems({
   onAddCargo,
 }: {
   typeId: number;
-  /** The quantity the tab asks for; below 1, adding is off. */
   count: number;
   inHold: boolean;
   onAddCargo: (typeId: number, quantity: number) => void;
@@ -44,15 +37,7 @@ export function AddCargoMenuItems({
   );
 }
 
-/** An Add panel item's actions: a module or drone fits, a charge loads. */
-export function AddItemMenuItems({
-  typeId,
-  rack,
-}: {
-  typeId: number;
-  /** Where it fits; undefined for a charge. */
-  rack?: CandidateRack;
-}) {
+export function AddItemMenuItems({ typeId, rack }: { typeId: number; rack?: CandidateRack }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
   if (actions === null) return null;

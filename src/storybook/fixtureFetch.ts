@@ -1,15 +1,3 @@
-/**
- * Stories never reach the network. `installFixtureFetch` replaces
- * `window.fetch` with a router over fixture responses; any request it has no
- * fixture for is recorded and rejected, and logged as a console error. ESI's
- * client turns a rejected request into a silent offline/empty state, so the
- * record, not the throw, is what makes a missed fixture visible to a test that
- * asserts `unexpectedRequests()` empty (`src/routes/Wallet.stories.test.tsx`).
- * The story smoke (`src/test/storySmoke.tsx`) checks page stories for rendering
- * only, so a miss there shows up as this console error and an empty state.
- *
- * Same-origin requests (the SDE bake, fonts) pass through to the real fetch.
- */
 import {
   SAMPLE_CHARACTERS,
   SAMPLE_STATION_ID,
@@ -30,7 +18,6 @@ export interface FixtureResponse {
 
 export interface FixtureRoute {
   method?: 'GET' | 'POST';
-  /** Matched against the URL path (no query). */
   path: string | RegExp;
   respond: (request: FixtureRequest) => FixtureResponse;
 }
@@ -38,11 +25,6 @@ export interface FixtureRoute {
 const unexpected: { request: string; owner: string | undefined }[] = [];
 let currentOwner: () => string | undefined = () => undefined;
 
-/**
- * Lets the story smoke stamp each request with the story that issued it (it
- * reads an async context), so a request that outlives its story is never blamed
- * on the next one. Returns a function that stops stamping.
- */
 export function attributeRequestsTo(owner: () => string | undefined): () => void {
   currentOwner = owner;
   return () => {
@@ -50,30 +32,12 @@ export function attributeRequestsTo(owner: () => string | undefined): () => void
   };
 }
 
-/**
- * Requests the installed router had no fixture for since the last `install`;
- * given an `owner`, only those that owner issued (see `attributeRequestsTo`).
- */
 export function unexpectedRequests(owner?: string): readonly string[] {
   return unexpected
     .filter((entry) => owner === undefined || entry.owner === owner)
     .map((entry) => entry.request);
 }
 
-/**
- * Every shell story seeds `SAMPLE_CHARACTERS`, and the app reads their public
- * sheets from work no one story owns (the corp identity read, public info), which
- * can run while no table that answers them is installed. A CI run recorded one as
- * unexpected (#6114), so the router answers these itself, after every installed
- * table so a story's own fixture still wins. Any other Character's sheet is still
- * recorded.
- *
- * A page's load also outlives its story: one story's `/location` or `/skillqueue`
- * read can land after the next story installed a table without it (#6126:
- * the Requests stories' location read under the next Communities story, the
- * Hauling skill queue under Market Stock). Those two get the same fallback: docked
- * at the sample station, nothing training.
- */
 const SAMPLE_IDS = SAMPLE_CHARACTERS.map((c) => c.characterId).join('|');
 const sampleRead = (tail: string) => new RegExp(`^/characters/(${SAMPLE_IDS})${tail}$`);
 const SAMPLE_CHARACTER_READS: readonly FixtureRoute[] = [
@@ -105,16 +69,7 @@ async function readBody(init: RequestInit | undefined): Promise<unknown> {
 }
 
 let original: typeof globalThis.fetch | undefined;
-/** Route tables of every installed story; stories on one docs page overlap. */
 const installed = new Set<readonly FixtureRoute[]>();
-/**
- * Tables of unmounted stories, still answering until fetch goes quiet. A page's
- * work can outlive its story; without these, its late requests reached the real
- * network, or were recorded against the next story's table (#6113). In the
- * Storybook UI, which never drains between stories, a retiring table can also
- * answer the next story for a path that story has no fixture for; the smoke
- * drains each story first, so its record is unaffected.
- */
 const retiring = new Set<readonly FixtureRoute[]>();
 let lastActivity = 0;
 let lastRequest = '';
@@ -125,16 +80,10 @@ async function pollUntil(done: () => boolean): Promise<void> {
   }
 }
 
-/** Resolves once no request has gone through the fixture fetch for `quietMs`. */
 export async function whenFetchQuiet(quietMs = 300): Promise<void> {
   await pollUntil(() => Date.now() - lastActivity >= quietMs);
 }
 
-/**
- * Resolves once every uninstalled table has stopped answering and the real fetch
- * is back. Rejects after `timeoutMs`, naming the last request, if something keeps
- * fetching after its story unmounted (a poll nobody stopped).
- */
 export async function whenFixturesRetired(timeoutMs = 3000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   await pollUntil(() => retiring.size === 0 || Date.now() >= deadline);
@@ -178,10 +127,6 @@ function restoreIfIdle() {
   }
 }
 
-/**
- * Returns an uninstall function. An uninstalled table keeps answering, behind every
- * installed one, until fetch goes quiet; the real `fetch` returns once none is left.
- */
 export function installFixtureFetch(routes: readonly FixtureRoute[]): () => void {
   if (!original) {
     original = globalThis.fetch;

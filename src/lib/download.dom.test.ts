@@ -25,16 +25,12 @@ describe('downloadTextFile', () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(createObjectURL.mock.calls[0][0]).toBeInstanceOf(Blob);
     expect(clickSpy).toHaveBeenCalledTimes(1);
-    // Firefox cancels an in-flight download if the URL dies in the same
-    // task, so the revoke is deferred — it has not run yet.
     expect(revokeObjectURL).not.toHaveBeenCalled();
     vi.runAllTimers();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
   });
 
   it('has the anchor in the document at click time, and removes it after', () => {
-    // Firefox ignores a synthetic click on a detached anchor, so being in
-    // the document during the click is the behaviour, not an artefact.
     URL.createObjectURL = vi.fn().mockReturnValue('blob:fake-url');
     URL.revokeObjectURL = vi.fn();
     let connectedAtClick: boolean | undefined;

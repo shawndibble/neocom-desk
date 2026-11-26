@@ -9,16 +9,9 @@ import {
 } from '@/features/corpTaxBook/groupingApi';
 
 interface Question extends PendingGrouping {
-  /** The tracked Character being asked: the one whose own sign-in answers. */
   characterId: number;
 }
 
-/**
- * A guest signed in to the app answers a hand-made grouping here (D26b, issue
- * #4210). Each question is asked of, and answered as, the tracked Character
- * being added, so the confirm rests on that Character's own sign-in. A read
- * that fails drops the notice; the personal ledger never depends on it.
- */
 export function PendingGroupingNotice({
   characters,
 }: {

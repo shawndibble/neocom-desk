@@ -1,11 +1,3 @@
-/**
- * Item Detail's attribute sections (`itemAttributeSections`): each group a
- * heading over name/value rows, and the shield/armor/hull resistances as the
- * Fittings Defense table (`ResistTable`) with each layer's HP under its name.
- * A row, HP or resist the pilot's skills change (`withSkilledValues`) reads
- * "base → skilled" (`SkilledValue`): the pilot's figure green, opening what
- * made it.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -25,7 +17,6 @@ import { rowValueText, skilledChange, skilledHpChange } from './skilledFigures';
 
 const SECTION_HEADING = cx(eyebrowClassName, 'border-b border-line pb-1');
 
-/** What made each skilled value, by attribute id (`useSkilledAttributes`). */
 type SourcesById = ReadonlyMap<number, readonly NamedSkilledSource[]>;
 
 function ResistSection({ layers, sources }: { layers: ResistLayer[]; sources?: SourcesById }) {
@@ -50,7 +41,6 @@ function ResistSection({ layers, sources }: { layers: ResistLayer[]; sources?: S
       key: layer.layer,
       label,
       ...(sub === undefined ? {} : { sub }),
-      // The pilot's resists, each cell reading "base → skilled" where they print differently.
       resonances: layer.skilled?.resonances ?? layer.resonances,
       ...(layer.skilled ? { baseResonances: layer.resonances } : {}),
       renderSkilled: (type, base, value) => (
@@ -83,13 +73,7 @@ export function ItemAttributeSections({
   renderSkillList,
 }: {
   sections: readonly AttributeSection[];
-  /** What made each skilled value; a changed figure opens these. */
   skilledSources?: SourcesById;
-  /**
-   * The skills that change a row, for its popover (null when none do): on a
-   * changed figure they join the sources; on an unchanged one they are all it
-   * opens, from the plain base number. One number, one trigger either way.
-   */
   renderSkillList?: (attribute: DisplayAttribute) => ReactNode;
 }) {
   const { t } = useTranslation();

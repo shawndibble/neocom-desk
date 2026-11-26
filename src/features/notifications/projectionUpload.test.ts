@@ -61,7 +61,6 @@ describe('uploadProjectionRows', () => {
         eveTypesByCharacter: TYPES,
         serverEventsByCharacter: new Map(),
         quietHours: null,
-        // No Character wants a nearby push, so the Travel Settings are not read.
         routeRules: null,
       }
     );

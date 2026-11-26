@@ -109,7 +109,7 @@ describe('scheduleJobs', () => {
   });
 
   it('fills a second freeing slot before waiting on the first one again', () => {
-    const skills = { ...NO_SKILLS, massProduction: 1 }; // 2 slots
+    const skills = { ...NO_SKILLS, massProduction: 1 };
     const jobs = [
       { activityId: 1, endMs: NOW + 10_000 },
       { activityId: 1, endMs: NOW + 40_000 },
@@ -162,7 +162,6 @@ describe('scheduleJobs', () => {
       { skills: ALL_V, jobs: [] },
       NOW
     );
-    // Back-to-back jobs share a slot: a finish at t frees it before a start at t.
     expect(s.peakSlots).toBe(3);
   });
 

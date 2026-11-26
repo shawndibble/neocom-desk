@@ -1,22 +1,11 @@
-/**
- * The Balance tab's wallet Goals, per device. Not synced. A Goal is a name and
- * either a fixed ISK target or a Fitting whose price at the default Trade Hub
- * is the target, so it moves with the market.
- *
- * Stored under the key the single-Goal version used: `parseWalletGoals` also
- * reads that older `{ name, target }` object, so an existing Goal survives.
- */
 import { GOAL_MAX_TARGET } from '@/engine/netWorth/waiting';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export interface WalletGoal {
   id: string;
   name: string;
-  /** A fixed ISK target; null when `fittingId` sets it. */
   target: number | null;
-  /** A Fitting (saved record id or `game-<id>`) priced as the target; null for a fixed target. */
   fittingId: string | null;
-  /** The Fitting's name when it was picked, shown while it loads or if it is gone. */
   fittingName: string | null;
 }
 

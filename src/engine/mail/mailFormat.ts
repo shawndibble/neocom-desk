@@ -1,10 +1,3 @@
-/**
- * Editor-independent logic behind the mail format bar: size and colour
- * presets, toolbar state from the runs a selection covers, source-mode tag
- * wrapping, and pipe tables (the only table EVE mail can carry). Pure: the
- * wire format itself stays `eveMarkup.ts`'s job; tags here are produced by
- * its serializer, never typed out a second time.
- */
 import {
   MARKUP_MAX_SIZE,
   MARKUP_MIN_SIZE,
@@ -16,17 +9,8 @@ import {
 } from './eveMarkup';
 import { splitMailLines } from './mailBodyBlocks';
 
-// --- Presets ---------------------------------------------------------------
-
 export type SizePresetId = 'small' | 'normal' | 'large' | 'huge';
 
-/**
- * Size steps. `normal` is "no size tag": the game's own default applies, so a
- * mail that never touches size carries no `<font size>` at all. The px values
- * are relative to the client's default mail text and sit inside the markup's
- * 6–64 range; they are unverified in game until the test mail
- * (docs/features/mail.md "Verification checklist").
- */
 export const MAIL_SIZE_PRESETS: readonly { id: SizePresetId; px: number | null }[] = [
   { id: 'small', px: 10 },
   { id: 'normal', px: null },
@@ -40,12 +24,10 @@ for (const p of MAIL_SIZE_PRESETS) {
   }
 }
 
-/** The preset a size belongs to (`null` size is `normal`), or `null` for a custom size. */
 export function sizePresetOf(px: number | null): SizePresetId | null {
   return MAIL_SIZE_PRESETS.find((p) => p.px === px)?.id ?? null;
 }
 
-/** Opaque `#aarrggbb` swatches, chosen to read on the dark mail surface. */
 export const MAIL_COLOR_SWATCHES: readonly string[] = [
   '#ffffffff',
   '#ffbfbfbf',
@@ -61,7 +43,6 @@ export const MAIL_COLOR_SWATCHES: readonly string[] = [
   '#ff8a8a8a',
 ];
 
-/** `#rgb` / `#rrggbb` (hash optional) as opaque `#ffrrggbb`; `null` when not a hex colour. */
 export function normalizeHexColor(input: string): string | null {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(input.trim());
   if (!m) return null;
@@ -69,7 +50,6 @@ export function normalizeHexColor(input: string): string | null {
   return `#ff${hex.toLowerCase()}`;
 }
 
-/** Adds `https://` to a bare address, and accepts only http(s). */
 export function normalizeLinkInput(input: string): string | null {
   const value = input.trim();
   if (value === '') return null;
@@ -78,26 +58,13 @@ export function normalizeLinkInput(input: string): string | null {
   return target?.kind === 'http' ? target.url : null;
 }
 
-// --- Link dialog -----------------------------------------------------------
-
-/** Longest visible link text the dialog accepts. */
 export const MAIL_LINK_TEXT_MAX = 200;
 
-/**
- * The range a link edit replaces, and what is in it. A caret is an empty range;
- * a caret or selection inside an existing link widens to that link's whole
- * range with its `href`. Positions are the surface's own (editor or textarea).
- */
 export interface LinkTarget {
   from: number;
   to: number;
   text: string;
   href: string | null;
-  /**
-   * The selection spans blocks or table cells, so replacing it with one text node
-   * would merge blocks or mangle the table: only the link mark is applied, to
-   * `ranges` (or `[from, to]`), and the text is left alone.
-   */
   markOnly?: boolean;
   ranges?: readonly (readonly [number, number])[];
 }
@@ -107,7 +74,6 @@ export interface LinkDraft {
   url: string;
 }
 
-/** What the two fields start with. */
 export function linkDraftOf(target: LinkTarget): LinkDraft {
   return { text: target.markOnly ? '' : target.text, url: target.href ?? '' };
 }
@@ -115,12 +81,10 @@ export function linkDraftOf(target: LinkTarget): LinkDraft {
 export type LinkFormResult =
   { ok: true; text: string; href: string } | { ok: false; errors: { url?: true; text?: true } };
 
-/** Checks the fields; empty text falls back to the address as the visible text. */
 export function validateLinkForm(form: LinkDraft, prefilledText?: string): LinkFormResult {
   const href = normalizeLinkInput(form.url);
   const errors: { url?: true; text?: true } = {};
   if (href === null) errors.url = true;
-  // A long selection prefilled and left alone must still link by address alone.
   if (form.text.length > MAIL_LINK_TEXT_MAX && form.text !== prefilledText) errors.text = true;
   if (href === null || errors.text) return { ok: false, errors };
   return { ok: true, text: form.text.trim() === '' ? href : form.text, href };
@@ -137,7 +101,6 @@ function linkTagOf(form: { text: string; href: string }): string {
   ]);
 }
 
-/** Source view: the selection, or the whole `<a>` tag when that is exactly what is selected. */
 export function sourceLinkAt(source: string, from: number, to: number): LinkTarget {
   const lo = Math.min(from, to);
   const hi = Math.max(from, to);
@@ -152,11 +115,9 @@ export function sourceLinkAt(source: string, from: number, to: number): LinkTarg
   ) {
     return { from: lo, to: hi, text: markupPlainText(only.children), href: only.href };
   }
-  // The visible text, so the serializer escaping it again on apply does not double-escape.
   return { from: lo, to: hi, text: markupPlainText(nodes), href: null };
 }
 
-/** Source view: write `<a href="URL">TEXT</a>` over the range, the tag selected after. */
 export function planSourceLink(
   source: string,
   from: number,
@@ -173,9 +134,6 @@ export function planSourceLink(
   };
 }
 
-// --- Toolbar state ---------------------------------------------------------
-
-/** The formatting of one stretch of text (or of the caret). */
 export interface FormatRun {
   bold: boolean;
   italic: boolean;
@@ -185,7 +143,6 @@ export interface FormatRun {
   link: string | null;
 }
 
-/** What the format bar shows: a mark is on only when the whole selection has it. */
 export interface FormatState {
   bold: boolean;
   italic: boolean;
@@ -220,15 +177,12 @@ export function formatStateOfRuns(runs: readonly FormatRun[]): FormatState {
   };
 }
 
-// --- Source mode -----------------------------------------------------------
-
 export type SourceTag =
   | { kind: 'bold' | 'italic' | 'underline' }
   | { kind: 'size'; px: number }
   | { kind: 'color'; color: string }
   | { kind: 'link'; href: string };
 
-/** The open and close tag for a format, exactly as the serializer would write them. */
 export function sourceTagPair(tag: SourceTag): [string, string] {
   const marker = '\u0000';
   const children: MarkupNode[] = [{ type: 'text', text: marker }];
@@ -259,12 +213,10 @@ export function sourceTagPair(tag: SourceTag): [string, string] {
 
 export interface SourceEdit {
   value: string;
-  /** New selection, in the edited string. */
   start: number;
   end: number;
 }
 
-/** Wraps `[from, to)` in a tag pair; with no selection the caret lands between the tags. */
 export function wrapSourceSelection(
   source: string,
   from: number,
@@ -280,8 +232,6 @@ export function wrapSourceSelection(
   };
 }
 
-// --- Tables ----------------------------------------------------------------
-
 function cellToPipe(text: string): string {
   return text
     .replace(/\r?\n|\r/g, ' ')
@@ -292,7 +242,6 @@ function cellToPipe(text: string): string {
     .trim();
 }
 
-/** Pipe rows for a table, header first, a `|---|` separator under it. EVE has no table markup. */
 export function buildPipeTableLines(rows: readonly (readonly string[])[]): string[] {
   const line = (cells: readonly string[]) => `| ${cells.map(cellToPipe).join(' | ')} |`;
   const width = Math.max(1, ...rows.map((r) => r.length));
@@ -301,7 +250,6 @@ export function buildPipeTableLines(rows: readonly (readonly string[])[]): strin
   return out;
 }
 
-/** A pipe-table block in a list of plain-text lines. */
 export type PipeBlock =
   | { kind: 'text'; start: number; end: number }
   | { kind: 'table'; start: number; end: number; rows: string[][] };
@@ -311,11 +259,6 @@ function rectangular(rows: string[][]): string[][] {
   return rows.map((r) => [...r, ...Array.from({ length: width - r.length }, () => '')]);
 }
 
-/**
- * Splits plain-text lines into prose and markdown pipe tables. Space-aligned
- * tables (which the reader also draws) stay prose here: the editor only makes
- * tables out of `| a | b |` rows.
- */
 export function splitPipeBlocks(lines: readonly string[]): PipeBlock[] {
   return splitMailLines(lines).flatMap((b): PipeBlock[] => {
     if (b.kind === 'text') return [b];
@@ -328,7 +271,6 @@ export function splitPipeBlocks(lines: readonly string[]): PipeBlock[] {
   });
 }
 
-/** A pasted markdown pipe table as rows, or `null` unless the whole paste is exactly one. */
 export function parsePastedPipeTable(text: string): string[][] | null {
   const lines = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
   const blocks = splitPipeBlocks(lines);

@@ -5,7 +5,6 @@ import { RESIST_TYPES, RESONANCE_KEY, formatEhp } from './resistFormat';
 import { fmt0 } from './fixedFormat';
 import type { Translate } from '@/lib/translate';
 
-/** The Defense table's rows: shield, armor, hull, then one row per RAH with its adapted resists. */
 export function resistRows(
   s: FittingStats,
   adaptedHardeners: readonly ResistRow['resonances'][],
@@ -19,7 +18,6 @@ export function resistRows(
   ];
   const rows: ResistRow[] = [];
   for (const { key, label, layer } of layers) {
-    // "Overheat all": the cells heat changed, with what they read unheated.
     const unheated: NonNullable<ResistRow['unheated']> = {};
     for (const type of RESIST_TYPES) {
       const was = unheatedIfChanged(s, (x) => fmt0(resistPct(x[key][RESONANCE_KEY[type]])));

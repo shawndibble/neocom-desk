@@ -1,18 +1,3 @@
-/**
- * Notification preferences: device-local by default (GLOSSARY.md round 20,
- * same category as font scale / Market's Location Mode), since the browser
- * permission the master switch and browser channel eventually gate is itself
- * per-device. One master switch gates everything; below it, every
- * Notification Event is independently toggleable per Character, on by
- * default (absence from a character's map means enabled — see
- * `eventSelection.ts`).
- *
- * The **feed** half of those per-Character toggles, plus the structure-fuel
- * and corp-wallet thresholds, are the exception (GLOSSARY.md round 44/45,
- * issue #363): nothing about the feed is device-gated, so those sync —
- * `hydrateNotificationPreferences` below splices the synced slice in on top
- * of this store's own local row. See `syncedPreferences.ts`.
- */
 import { setSyncedSetting, scheduleSync } from '@/sync';
 import { quietHoursPayload } from './quietTime';
 import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
@@ -56,8 +41,6 @@ import {
   type NotificationPreferencesValue,
 } from './preferencesStore';
 
-// The read side lives in `preferencesStore.ts` so the Service Worker can
-// import it without this file's `@/sync` writers — see that file's header.
 export {
   NOTIFICATION_PREFS_SETTING_KEY,
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -72,7 +55,6 @@ export {
   type NotificationPreferencesValue,
 } from './preferencesStore';
 export type { CharacterEventThresholds } from './eventThresholdFields';
-/** Re-export so preferences importers needn't reach `eventThresholdFields.ts`. */
 export {
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
@@ -98,13 +80,6 @@ export {
   DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
 } from './eventThresholdFields';
 
-/**
- * The slice of preferences the uploaded Projection reads (`projectionRebuild.ts`),
- * normalized so "absent" and "set to the default" compare equal: the master
- * switch, the browser gate, each Character's browser-channel opinions,
- * and the lead-time thresholds a projecting domain uses. Feed flags and the
- * wallet thresholds feed no upload, so they are left out.
- */
 const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   [],
   [],
@@ -132,8 +107,6 @@ function projectionInputs(value: NotificationPreferencesValue): string {
     const characterId = Number(id);
     const events = characterEventPrefs(value, characterId);
     const eveTypes = characterEveTypePrefs(value, characterId);
-    // Keys whose browser flag differs from that key's own default (some
-    // events and most EVE types default browser-off).
     const eventsOffDefault = Object.keys(events)
       .filter((key) => {
         const eventId = key as NotificationEventId;
@@ -178,10 +151,8 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       skyhookRaidableMinUnits,
       sharedMoonPopLeadMinutes,
     ]);
-    // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;
   }
-  // Quiet time rides the same upload as the Projection, so a change re-uploads.
   return JSON.stringify([
     value.masterEnabled,
     isBrowserChannelEnabled(value),
@@ -191,12 +162,6 @@ function projectionInputs(value: NotificationPreferencesValue): string {
   ]);
 }
 
-/**
- * Writes `next` to the local store, and schedules a coalesced Projection
- * rebuild when it changes anything the upload reads (issue #1259) — every
- * preference write goes through here, so no call site can forget it. The
- * scheduler gets the write itself, so the rebuild waits for it to settle.
- */
 function writeLocalPrefs(
   next: NotificationPreferencesValue,
   persist: () => Promise<void>
@@ -208,32 +173,10 @@ function writeLocalPrefs(
   return write;
 }
 
-/**
- * Device-local-only writes: the master switch and the browser/feed channel
- * gates. None of that belongs on the wire, so no sync push — but the master
- * switch and browser gate still change what the Projection uploads.
- */
 export function setDeviceNotificationPrefs(next: NotificationPreferencesValue): Promise<void> {
   return writeLocalPrefs(next, () => useNotificationPreferences.getState().setValue(next));
 }
 
-/**
- * Writes a preference change and, unless it only touched the device-local
- * browser channel, pushes the feed-only slice to the synced setting (issue
- * #363) and schedules a sync. `setSyncedSetting` itself leaves scheduling to
- * the caller.
- *
- * `channel` names which delivery channel this particular write touched, for
- * callers driven by a per-channel control (a threshold write has no channel
- * — it always syncs). A `'browser'` write must skip the sync push entirely,
- * not just contribute nothing to `toSyncedFeedPrefs`: pushing still stamps
- * `sync.notificationFeedPrefs`'s LWW `updatedAt`, so a browser-only edit
- * would otherwise be able to clobber a genuine, still-unsynced feed edit
- * made concurrently on another device.
- *
- * Shared by `NotificationsPanel` (Settings) and the feed's mute
- * (issue #364) so the sync-vs-local branching lives in one place.
- */
 export function updateNotificationPrefs(
   characterId: number,
   next: NotificationPreferencesValue,
@@ -247,7 +190,6 @@ export function updateNotificationPrefs(
   });
 }
 
-/** Mutes or unmutes one sharing corporation's Shared Moon Pops (issue #6225). */
 export function withSharedPopCorporationMuted(
   value: NotificationPreferencesValue,
   corporationId: number,
@@ -257,10 +199,6 @@ export function withSharedPopCorporationMuted(
   return { ...value, mutedSharedPopCorporations: muted ? [...others, corporationId] : others };
 }
 
-/**
- * Writes a sharing corporation's mute for the whole account: locally, to the synced feed slice,
- * and a sync for every Character on the device, since the list belongs to none of them.
- */
 export function setSharedPopCorporationMuted(
   characterIds: readonly number[],
   corporationId: number,
@@ -339,17 +277,6 @@ export function withEveNotificationTypeToggled(
   };
 }
 
-/**
- * Toggles one event's channel and writes it in one call — `channel` is
- * stated once rather than passed to `withEventChannelToggled` and then again
- * to `updateNotificationPrefs`'s own `channel` argument, which used to let a
- * caller's two copies silently disagree (nothing checked that a browser
- * toggle's builder call and its write call named the same channel). The
- * two toggle pairs below and `updateNotificationPrefs` itself are the only
- * way a caller should apply a channel toggle; a threshold write has no
- * channel and keeps calling `updateNotificationPrefs` directly, since it
- * always syncs.
- */
 export async function toggleEventChannelPref(
   characterId: number,
   value: NotificationPreferencesValue,
@@ -376,27 +303,6 @@ export async function toggleEveTypeChannelPref(
   );
 }
 
-/**
- * Silence (or restore) one notification type for several Characters at once,
- * on the given delivery channels.
- *
- * A `set`, not a toggle, and that is the whole reason it exists. A type is one
- * row spanning every Character it fired for, and those Characters can disagree
- * about it: one muted from a context menu months ago, the rest not. Looping the
- * existing `toggle*ChannelPref` over them would flip each independently and leave
- * the row in the *inverted* mixed state it started in. Passing the intended end
- * state instead makes the row's own reading of itself ("muted" = muted for all of
- * them) the thing that changes. The same holds per channel: a type already off
- * for `browser` stays off, rather than being flipped back on.
- *
- * Sequential, re-reading the store between writes: `updateNotificationPrefs`
- * takes a whole next value, so a parallel fan-out would have every write build
- * on the same pre-loop snapshot and only the last would survive. A `browser`
- * write stays on the device (`updateNotificationPrefs`), a `feed` write syncs.
- *
- * `characterIds[0]` drives the sync scheduling, so put a signed-in Character
- * (the active one) first.
- */
 export async function setMutedForCharacters(
   characterIds: readonly number[],
   target: EntryChannelTarget,
@@ -420,7 +326,6 @@ export async function setMutedForCharacters(
   }
 }
 
-/** The same, for the **feed** channel alone — what the Alerts page's per-type row does. */
 export function setFeedMutedForCharacters(
   characterIds: readonly number[],
   target: EntryChannelTarget,
@@ -429,7 +334,6 @@ export function setFeedMutedForCharacters(
   return setMutedForCharacters(characterIds, target, muted, ['feed']);
 }
 
-/** Whether this Character would actually raise `characterNotTraining` in the Feed — its one per-pilot opt-out (issue #1731), read by the Overview board and Characters page so neither can disagree with the alert itself. */
 export function isNotTrainingAlertEnabledFor(
   value: NotificationPreferencesValue,
   characterId: number
@@ -437,7 +341,6 @@ export function isNotTrainingAlertEnabledFor(
   return isEventEnabledFor(characterEventPrefs(value, characterId), 'characterNotTraining', 'feed');
 }
 
-/** One Character's thresholds, defaulted (issue #299) — the shape both the settings row and the poller read. */
 export function characterEventThresholds(
   value: NotificationPreferencesValue,
   characterId: number
@@ -445,7 +348,6 @@ export function characterEventThresholds(
   return defaultedThresholds(value.thresholdsByCharacter?.[characterId] ?? {});
 }
 
-/** Sets one threshold field for one Character, preserving the others (issue #299). */
 export function withCharacterEventThreshold<K extends keyof CharacterEventThresholds>(
   value: NotificationPreferencesValue,
   characterId: number,
@@ -462,14 +364,6 @@ export function withCharacterEventThreshold<K extends keyof CharacterEventThresh
   };
 }
 
-/**
- * Writes a batch of already-computed per-Character flags into `field` (issue
- * #738, #745) — the shared shell both broadcast functions below reduce to.
- * `characterIds[0]` drives `updateNotificationPrefs`'s sync scheduling;
- * callers put the active Character first so this is always a signed-in
- * Character with a usable token, not just Dexie's insertion order
- * (`NotificationsPanel.tsx`'s `allCharacterIds`).
- */
 async function writeBroadcastFlags(
   field: 'perCharacter' | 'eveNotificationTypesByCharacter',
   characterIds: readonly number[],
@@ -485,13 +379,6 @@ async function writeBroadcastFlags(
   await updateNotificationPrefs(characterIds[0], next, channel);
 }
 
-/**
- * Broadcasts one event's channel value to every known Character at once
- * (issue #738) — the event-first list's row-level control. A
- * one-time broadcast to Characters that exist right now, not a saved default
- * applied to ones added later; each can still be edited independently
- * afterward.
- */
 export async function broadcastEventChannelPref(
   characterIds: readonly number[],
   value: NotificationPreferencesValue,
@@ -507,12 +394,6 @@ export async function broadcastEventChannelPref(
   );
 }
 
-/**
- * Broadcasts one EVE Notification type's channel value to every known
- * Character at once (issue #745) — the EVE type rows'
- * control underneath `eveNotification`, same one-time-broadcast contract as
- * `broadcastEventChannelPref`.
- */
 export async function broadcastEveTypeChannelPref(
   characterIds: readonly number[],
   value: NotificationPreferencesValue,
@@ -533,7 +414,6 @@ export async function broadcastEveTypeChannelPref(
   );
 }
 
-/** Same as `broadcastEveTypeChannelPref`, for a Family's own select-all across every Character too. */
 export async function broadcastAllEveTypesChannelPref(
   characterIds: readonly number[],
   value: NotificationPreferencesValue,
@@ -554,5 +434,4 @@ export async function broadcastAllEveTypesChannelPref(
   );
 }
 
-/** Re-exported so callers gate on one import rather than reaching into eventSelection too. */
 export { isEventEnabledFor, isEveTypeEnabledFor };

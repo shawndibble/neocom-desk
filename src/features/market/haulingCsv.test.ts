@@ -5,7 +5,6 @@ import { haulingCsvColumns } from './haulingCsv';
 
 const t = (k: string) => k;
 
-/** Only the fields the export reads; the rest of a scan row is irrelevant here. */
 function row(overrides: Partial<HaulingViewRow> = {}): HaulingViewRow {
   return {
     mode: 'list',

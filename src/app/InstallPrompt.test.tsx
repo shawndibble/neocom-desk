@@ -64,7 +64,6 @@ function renderPrompt() {
 
 beforeEach(async () => {
   await db.settings.clear();
-  // Most cases are about what shows once the visit gate is met.
   await db.settings.put({
     key: INSTALL_PROMPT_PAGE_VISITS_KEY,
     value: INSTALL_PROMPT_MIN_PAGE_VISITS,
@@ -89,7 +88,6 @@ describe('InstallPrompt', () => {
   it('stays hidden on desktop even when beforeinstallprompt fires', async () => {
     renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
-    // Inside act, so the render the captured event causes has happened by the assert.
     act(() => dispatchBeforeInstallPrompt());
     expect(useInstallApp.getState().deferredPrompt).not.toBeNull();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -215,8 +213,6 @@ describe('InstallPrompt', () => {
     act(() => void router.navigate('/skills'));
     act(() => void router.navigate('/skills/trained', { replace: true }));
 
-    // A count applies at once (persisted after), in the effects each act above flushed:
-    // a second one for the redirect would already show.
     expect(useInstallPromptPageVisits.getState().value).toBe(1);
   });
 

@@ -7,14 +7,6 @@ import type { SpendPlanView } from '@/features/loyalty/useSpendPlan';
 import type { AsyncLoad } from '@/lib/useAsyncLoad';
 import { NewComponent } from './NewComponent';
 
-/**
- * LP Store "Spend my LP" (issue #6199): the button in the offers list's header
- * and the plan it opens above the offers, in each state the ticket asks for.
- * Sample data, built from the real components.
- *
- * New components in this mockup: `SpendLpButton`, `SpendPlanPanel`.
- */
-
 const names: Record<number, string> = {
   1: 'Caldari Navy Hookbill',
   2: 'Caldari Navy Mjolnir Heavy Missile',
@@ -173,7 +165,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Populated plan that stopped at the pilot's typed LP Value, naming the offer. */
 export const StoppedAtLpValue: Story = {
   render: () => (
     <Frame
@@ -193,7 +184,6 @@ export const StoppedAtLpValue: Story = {
   ),
 };
 
-/** @summary The next redemption needed more ISK than the wallet holds. */
 export const StoppedAtWallet: Story = {
   render: () => (
     <Frame
@@ -208,7 +198,6 @@ export const StoppedAtWallet: Story = {
   ),
 };
 
-/** @summary Under 70% of the best (no LP Value, no market rate), wallet unknown. */
 export const StoppedAtBestShare: Story = {
   render: () => (
     <Frame
@@ -228,7 +217,6 @@ export const StoppedAtBestShare: Story = {
   ),
 };
 
-/** @summary Nothing in the store earns ISK on instant sell. */
 export const NothingProfitable: Story = {
   render: () => (
     <Frame
@@ -239,12 +227,10 @@ export const NothingProfitable: Story = {
   ),
 };
 
-/** @summary Reading the order books after the press. */
 export const Loading: Story = {
   render: () => <Frame plan={{ status: 'loading', data: undefined, retry: () => {} }} />,
 };
 
-/** @summary 0 LP: the button is aria-disabled with its reason in a tooltip; no plan opens. */
 export const ZeroLpDisabled: Story = {
   render: () => (
     <div className="mx-auto max-w-page p-4">
@@ -260,7 +246,6 @@ export const ZeroLpDisabled: Story = {
   ),
 };
 
-/** @summary The populated plan in the phone shell. */
 export const StoppedAtLpValuePhone: Story = {
   ...StoppedAtLpValue,
   globals: { viewport: { value: 'mobile1', isRotated: false } },

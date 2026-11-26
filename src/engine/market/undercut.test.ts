@@ -98,9 +98,9 @@ describe('findUndercut — scopes', () => {
 
   it('worst picks the tightest scope with a rival: station over system over region', () => {
     const result = findUndercut(mySell, [
-      rival({ orderId: 2, price: 95, locationId: mySell.locationId, systemId: mySell.systemId }), // station
-      rival({ orderId: 3, price: 90, locationId: 60003761, systemId: mySell.systemId }), // system only
-      rival({ orderId: 4, price: 80, locationId: 60009999, systemId: 30099999 }), // region only
+      rival({ orderId: 2, price: 95, locationId: mySell.locationId, systemId: mySell.systemId }),
+      rival({ orderId: 3, price: 90, locationId: 60003761, systemId: mySell.systemId }),
+      rival({ orderId: 4, price: 80, locationId: 60009999, systemId: 30099999 }),
     ]);
     expect(result.worst?.scope).toBe('station');
     expect(result.worst?.price).toBe(95);
@@ -137,7 +137,6 @@ describe('findUndercut — scopes', () => {
     const station = result.byScope.station?.price ?? Infinity;
     const system = result.byScope.system?.price ?? Infinity;
     const region = result.byScope.region?.price ?? Infinity;
-    // sell side: lower is better for the rival, so region <= system <= station
     expect(region).toBeLessThanOrEqual(system);
     expect(system).toBeLessThanOrEqual(station);
   });
@@ -158,7 +157,6 @@ describe('findUndercut — scopesChecked', () => {
       [rival({ orderId: 2, price: 90, locationId: mySell.locationId })],
       ['system', 'region']
     );
-    // the station rival exists but station was not checked
     expect(result.byScope.system?.price).toBe(90);
     expect(result.worst?.scope).toBe('system');
   });
@@ -169,11 +167,10 @@ describe('findUndercut — aggregates', () => {
     const result = findUndercut(mySell, [
       rival({ orderId: 2, price: 95, volumeRemain: 5 }),
       rival({ orderId: 3, price: 90, volumeRemain: 20 }),
-      rival({ orderId: 4, price: 100 }), // does not beat (equal)
+      rival({ orderId: 4, price: 100 }),
     ]);
     expect(result.byScope.station?.ordersBeatingMe).toBe(2);
     expect(result.byScope.station?.unitsBeatingMe).toBe(25);
-    // best (lowest) price wins as the reported rival
     expect(result.byScope.station?.price).toBe(90);
     expect(result.byScope.station?.volumeRemain).toBe(20);
   });
@@ -190,8 +187,6 @@ describe('findUndercut — deterministic tie-breaking', () => {
   });
 
   it('prefers the lower orderId when price and volumeRemain both tie', () => {
-    // orderId is not on UndercutRival, so use distinct locationId per
-    // candidate to prove which competing order won the tie-break.
     const result = findUndercut(mySell, [
       rival({ orderId: 30, price: 90, volumeRemain: 10, locationId: 111 }),
       rival({ orderId: 5, price: 90, volumeRemain: 10, locationId: 222 }),

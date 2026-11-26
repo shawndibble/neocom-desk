@@ -34,101 +34,44 @@ import type { SettleUpRecheck } from './useSettleUpRecheck';
 import { DividedList } from '@/components/ui/DividedList';
 import { UnlinkedSentNote, type UnlinkedSent } from './UnlinkedSentNote';
 
-/** One Outstanding entry of the Payee being paid, and who mined it. */
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
   characterName: string;
   payeeName: string;
   payeeId?: string;
-  /** The Payee's EVE entity id, when it has one — Settle up opens it in EVE from here. */
   payeeEntityId?: number;
 }
 
-/** What Settle up records for a personal Payee: one payment, linked to it. */
 export interface SettlePayment {
-  /** Whole ISK, as the in-game transfer field takes it. */
   amount: number;
-  /** The pilot's own calendar date. */
   paidOn: string;
   method: MiningTaxPaymentMethod;
-  /** A payment in kind's contract, when the pilot gave its id. */
   contractId?: number;
-  /** The Character sending it: the link's owner. */
   payerId: number | null;
 }
 
 interface SettleUpDialogProps {
   open: boolean;
   onClose: () => void;
-  /**
-   * The Payee's Outstanding entries in view: who can pay, and the entries the "Ore still
-   * arriving" line watches. Never ticked: a payment pays the Payee's oldest unpaid days.
-   */
   rows: readonly SettleUpRow[];
   onPaid: () => void;
-  /**
-   * What the Payee's account owes now, for the paying Character (a Corp Tax Book's: the payer's
-   * Miner's account).
-   */
   owedFor: (payerId: number | null) => number;
-  /**
-   * What sending `amount` would do, read off the account (`previewPayment`): the days it pays,
-   * oldest first, and the credit it leaves. Undefined while there is nothing to preview.
-   */
   preview: (amount: number, paidOn: string, payerId: number | null) => PaymentOutcome | undefined;
-  /**
-   * Records the payment as a link to the Payee. Absent for a Corp Tax Book, which credits the
-   * donation from its own wallet: the dialog then only says how to send it.
-   */
   record?: (payment: SettlePayment) => Promise<LedgerActionResult>;
-  /**
-   * "Already in my wallet? Pick it" — hands off to the wallet-payment picker for when the transfer
-   * already shows in the journal. The button shows only when this is given.
-   */
   onPickFromWallet?: () => void;
-  /**
-   * Payments the pilot already sent this Payee that nothing here accounts for yet. The owed figure
-   * is overstated until they are linked, so the dialog warns, as the Payee card does, and
-   * `onPickFromWallet` (when given) is the way to link them first.
-   */
   unlinked?: UnlinkedSent;
-  /**
-   * "Dismiss balance": the pilot won't pay what this personal Payee is owed, so every entry in
-   * `rows` becomes a dismissal (no tax owed). Absent for a Corp Tax Book, whose own officers
-   * waive what is owed. Asks to confirm first, since it changes what the pilot owes.
-   */
   onDismissBalance?: () => Promise<LedgerActionResult>;
-  /** The fresh ledger pull behind the "Ore still arriving" line. */
   arrivalCheck?: SettleUpRecheck;
-  /** The Character paying; absent, the Character owing most. */
   payerId?: number;
-  /**
-   * The Reason to copy. A function follows the paying Character and what the amount about to be
-   * sent pays (`outcome`, undefined while there is nothing to pay), so the Reason can name the
-   * days it covers.
-   */
   reason:
     string | ((payerId: number | null, outcome: PaymentOutcome | undefined) => string | undefined);
-  /** A note on the Reason, shown as an info tooltip beside it. */
   reasonHint?: string;
-  /** The ways the payment may have been made; absent, a donation or a contract. */
   methods?: readonly MiningTaxPaymentMethod[];
-  /** Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent). */
   notice?: ReactNode | ((payerId: number | null, amount: number) => ReactNode);
 }
 
-/** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
 const MAX_SEGMENTED_PAYERS = 4;
 
-/**
- * Settle up (issue #523), on one screen and on the Payee's Running account (decision
- * 20261120-235011): the whole-ISK figure the account owes, the Payee and a Reason, each copyable
- * since the app cannot move ISK, and what the amount pays, oldest day first, with any credit it
- * leaves. Nothing is ticked: money pays the oldest unpaid days, whichever entries the pilot has in
- * mind. A personal Payee's payment is recorded as a link (`record`), which the matcher later
- * swaps for its wallet transaction; a Corp Tax Book records nothing, since it credits the
- * donation from its own wallet.
- */
 export function SettleUpDialog({
   open,
   onClose,
@@ -154,7 +97,6 @@ export function SettleUpDialog({
   );
   const fromId = useId();
   const payerName = payers.find((p) => p.characterId === payer)?.characterName;
-  // The date the pilot paid, in their own calendar — a local date, not an EVE one.
   const [paidOn, setPaidOn] = useState(() => formatLocalDate(new Date()));
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
@@ -166,7 +108,6 @@ export function SettleUpDialog({
 
   const owed = owedFor(payer);
   const sentAmount = different ? unmaskNumber(sentText) : undefined;
-  // Whole ISK: the in-game transfer field takes no fractions.
   const amountToSend = Math.round(sentAmount ?? owed);
   const outcome = amountToSend > 0 ? preview(amountToSend, paidOn, payer) : undefined;
 
@@ -284,7 +225,6 @@ export function SettleUpDialog({
           </div>
         )}
 
-        {/* Right-aligned: the label names the paying Character, too long to share the To row. */}
         <div className="flex justify-end empty:hidden">
           <PayeeOpenInEveButton
             name={payeeName}
@@ -456,7 +396,6 @@ export function SettleUpDialog({
   );
 }
 
-/** What the amount pays off the account, oldest day first, and the credit it leaves. */
 export function PaymentPreview({ outcome }: { outcome: PaymentOutcome }) {
   const { t } = useTranslation();
   const k = (key: string, opts?: Record<string, unknown>) =>

@@ -1,6 +1,3 @@
-// The one public door of the Improve engine. Everything outside this folder
-// imports from `@/engine/fittings/improve`; deep paths are lint-forbidden.
-// Modules not listed here are internal to the folder.
 export * from './improve';
 export * from './improveCandidateFilter';
 export * from './improveCharges';

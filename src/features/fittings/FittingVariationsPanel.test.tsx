@@ -30,7 +30,6 @@ function defaultProps(
   };
 }
 
-/** ItemContextMenu calls useNavigate/useLocation unconditionally, so a non-empty render needs a Router ancestor. */
 function renderPanel(overrides: Partial<FittingVariationsPanelProps> = {}) {
   const actions = fakeItemActions();
   const result = render(

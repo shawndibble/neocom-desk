@@ -1,103 +1,31 @@
-/**
- * Age-based pruning of per-id `esiCache` rows.
- *
- * Most keys are one row per Character (`skills`, `assets`, `mail:headers`) —
- * bounded, refreshed on every visit, and the user's main data. Those are never
- * touched here. A family of keys is instead one row *per id the app ever
- * looked up*: every name, type, structure, public profile, mail body, market
- * price, market history series. Nothing ever deleted those, so the table grew
- * for the life of the install — storage-quota pressure, and eviction under
- * pressure would take the refresh tokens in the same database with it.
- *
- * The rule: an allowlisted per-id row whose `fetchedAt` — its last
- * *successful* fetch, not its last read — is older than a generous multiple
- * of its staleness window is dropped. Every allowlisted key has a loader that
- * refetches on a miss, so a pruned row costs at most one lookup if it is ever
- * wanted again. Keys some reader consults cache-only, with nothing to refill
- * them, are left off the allowlist instead: `system:` (the PI Advisor's alt
- * colonies read security cache-only — a pruned lowsec system would read as
- * highsec), PI's `planet:`/`planet-info:`/`schematic:`, and a citadel's
- * ACL-gated `structure:<id>` name. Scope decision:
- * docs/context/decisions/20260928-182530-esicache-retention-age-prune-per-id-rows.md.
- *
- * Cost shape: ages come from `esiCacheMeta` (value-free, see
- * `@/db/esiCacheMeta`), scanned in primary-key pages — a cached value is
- * never deserialized to learn its age. Deletes go in small chunks, each in
- * its own short transaction that re-checks the row's meta first, so a row
- * refreshed between the scan and the delete survives. The DBCore middleware
- * mirrors every delete onto meta.
- */
 import { captureException } from '@sentry/react';
 import { db, type EsiCacheMetaRecord } from '@/db';
 import { DAY_MS } from '@/lib/age';
 
-/** Rows `STALE_AFTER.static` (24 h) would already refetch: 30x that. */
 export const STATIC_RETENTION_MS = 30 * DAY_MS;
-/**
- * A route asked around an avoid list, from when jump counts asked ESI's
- * `/route/`. Legacy rows no longer written, kept in the prune list so ones
- * already on a device still age out: two days, not thirty.
- */
 export const AVOID_ROUTE_RETENTION_MS = 2 * DAY_MS;
-/**
- * A downloaded mail body. Bodies never change, so this is only how long an
- * opened or prefetched mail stays readable offline; past it the body is
- * fetched again when the mail is opened. Applies even to a mail still in the
- * cached header list (the rule has no `referencedBy`).
- */
 export const MAIL_BODY_RETENTION_MS = 7 * DAY_MS;
-/** An unsent mail draft nobody has touched in this long is dropped. */
 export const MAIL_DRAFT_RETENTION_MS = 30 * DAY_MS;
-/** Market rows, stale after 5-15 minutes: a week is still generous. */
 export const MARKET_RETENTION_MS = 7 * DAY_MS;
-/**
- * A pilot's stored Local-list kill history: shown from disk for a day, so a
- * week keeps the pilots who turn up again and drops the ones who do not.
- */
 export const PILOT_KILLS_RETENTION_MS = 7 * DAY_MS;
-/** A stored share's 7-day life, plus a day. */
 export const SHARE_COPY_RETENTION_MS = 8 * DAY_MS;
-/** A run at most this often. */
 export const PRUNE_MIN_INTERVAL_MS = DAY_MS;
 
-/** When the last run started. Device-local — not a `sync.` key. */
 export const PRUNE_LAST_RUN_KEY = 'esiCache.pruneLastRun';
-/**
- * When this device first ran the prune, written once. Rows lacking meta were
- * written before `esiCacheMeta` existed, so before this — once it is older
- * than a rule's window, a meta-less row under that rule is too.
- */
 export const PRUNE_FIRST_RUN_KEY = 'esiCache.pruneFirstRun';
-/**
- * Set once a run finds no allowlisted row without meta. None can appear after
- * that — every write since `esiCacheMeta` existed carries meta — so the
- * key-only scan of the whole table stops running daily forever.
- */
 export const PRUNE_LEGACY_CLEARED_KEY = 'esiCache.pruneLegacyCleared';
 
 interface Reference {
-  /** The same Character's list row that can still point at this id. */
   listKey: string;
-  /** The id field on that list's entries. */
   idField: string;
 }
 
 export interface PruneRule {
-  /** Anchored; group 1 is the id when `referencedBy` is set. */
   pattern: RegExp;
   maxAgeMs: number;
-  /** Rows still reachable from a cached list are kept regardless of age. */
   referencedBy?: readonly Reference[];
 }
 
-/**
- * The allowlist. A key matching nothing here is never pruned. Deliberately
- * absent: every single-row-per-Character key, anything under `corp:` (its own
- * purge path), a citadel's `structure:<id>` name (see its rule), `system:`
- * (read cache-only for alt colonies' security; bounded by ~8k systems), and
- * PI's `planet:`/`planet-info:`/`schematic:` — the alt-colony view reads
- * those cache-only, and they are bounded by colonies.
- */
 export const PRUNE_RULES: readonly PruneRule[] = [
   ...[
     'name',
@@ -121,21 +49,12 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     'contract-location',
     'public-contract-items',
   ].map((prefix) => ({ pattern: new RegExp(`^${prefix}:\\d+$`), maxAgeMs: STATIC_RETENTION_MS })),
-  // Only the refusal memos (valid 24 h). The name row `structure:<id>` is
-  // ACL-gated: after a Character loses access every refetch is a 403 that
-  // never rewrites it, so a pruned name could not come back.
-  // `contract-location:`/`bpc-blueprint-location:v2:` re-resolve through it.
   { pattern: /^structure:\d+:(?:forbidden|roster-forbidden)$/, maxAgeMs: STATIC_RETENTION_MS },
-  // Legacy ESI route rows (jump counts now run on the local graph), keyed by
-  // the Travel rules: preference, then the penalty, then the avoid list's size
-  // and hash. The older `route:<o>:<d>:shortest|safest` rows still match the second.
   {
     pattern: /^route:\d+:\d+:[a-z-]+(?::p\d+)?:a\d+:[0-9a-z]+$/,
     maxAgeMs: AVOID_ROUTE_RETENTION_MS,
   },
   { pattern: /^route:\d+:\d+:[a-z-]+(?::p\d+)?$/, maxAgeMs: STATIC_RETENTION_MS },
-  // No `referencedBy`: mail content is the most private thing cached here, so a
-  // body ages out on its own clock even while its header is still listed.
   { pattern: /^mail:(\d+)$/, maxAgeMs: MAIL_BODY_RETENTION_MS },
   {
     pattern: /^calendar:(\d+)$/,
@@ -150,17 +69,12 @@ export const PRUNE_RULES: readonly PruneRule[] = [
     maxAgeMs: STATIC_RETENTION_MS,
     referencedBy: [{ listKey: 'contracts', idField: 'contract_id' }],
   },
-  // A Share Link copy kept under the sentinel Character (`shareStore.ts`): its
-  // share lives 7 days, so a day past that it can no longer be served.
   { pattern: /^share:/, maxAgeMs: SHARE_COPY_RETENTION_MS },
   { pattern: /^pilot-kills:\d+$/, maxAgeMs: PILOT_KILLS_RETENTION_MS },
-  // Pasted name -> character id (reused for a day); a name has no digits-only form.
   { pattern: /^pilot-id:.+$/, maxAgeMs: STATIC_RETENTION_MS },
   { pattern: /^marketPrice:/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^market-history:\d+:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
   { pattern: /^structure-market:\d+$/, maxAgeMs: MARKET_RETENTION_MS },
-  // No longer written (hub mining prices read from R2 since #4277); kept so
-  // rows a browser already holds still age out.
   { pattern: /^marketHistory:/, maxAgeMs: MARKET_RETENTION_MS },
 ];
 
@@ -173,19 +87,15 @@ type CacheKey = [characterId: number, key: string];
 interface Candidate {
   id: CacheKey;
   rule: PruneRule;
-  /** Found by key alone (no meta at scan time). */
   metaless: boolean;
 }
 
 export interface PruneOptions {
   now: number;
-  /** When set, meta-less rows are eligible under rules this is older than. */
   firstRunAt?: number;
   chunkSize?: number;
   scanPageSize?: number;
-  /** Awaited before each delete chunk: the yield point (and a test seam). */
   beforeChunk?: () => Promise<unknown>;
-  /** Called when the meta-less scan ran and found no allowlisted row at all. */
   onNoLegacyRows?: () => Promise<unknown>;
 }
 
@@ -221,11 +131,6 @@ async function scanMeta(
   }
 }
 
-/**
- * Key-only, in pages: `primaryKeys()` walks a key cursor, never a value.
- * Resolves to how many allowlisted meta-less rows exist (eligible or not),
- * or `null` when no rule's window has passed yet and nothing was scanned.
- */
 async function scanMetaless(
   now: number,
   firstRunAt: number,
@@ -256,11 +161,6 @@ async function scanMetaless(
   }
 }
 
-/**
- * Drops candidates a same-Character list still points at. Reads those list
- * rows' values — bounded (a header page, a contract list), and only for a
- * Character that has a referenced candidate at all.
- */
 async function withoutReferenced(candidates: Candidate[]): Promise<Candidate[]> {
   const lists = new Map<string, Promise<Set<string>>>();
   const referencedIds = (characterId: number, ref: Reference) => {
@@ -301,12 +201,6 @@ async function withoutReferenced(candidates: Candidate[]): Promise<Candidate[]> 
   return kept;
 }
 
-/**
- * One chunk, in one short transaction: re-read the chunk's meta and delete
- * only rows still past their window (or still meta-less). A row refreshed
- * since the scan has fresh meta by now and is left alone. Dexie calls only
- * inside — a native-promise hop could let the transaction auto-commit.
- */
 function deleteChunk(chunk: readonly Candidate[], now: number): Promise<number> {
   return db.transaction('rw', db.esiCache, db.esiCacheMeta, async () => {
     const metas = await db.esiCacheMeta.bulkGet(chunk.map((candidate) => candidate.id));
@@ -322,12 +216,10 @@ function deleteChunk(chunk: readonly Candidate[], now: number): Promise<number> 
   });
 }
 
-/** Deletes mail drafts not edited for `MAIL_DRAFT_RETENTION_MS`. Returns how many went. */
 export function pruneStaleMailDrafts(now: number): Promise<number> {
   return db.mailDrafts.filter((draft) => now - draft.updatedAt > MAIL_DRAFT_RETENTION_MS).delete();
 }
 
-/** One prune pass. Returns how many rows it deleted. */
 export async function pruneEsiCache(options: PruneOptions): Promise<number> {
   const { now, firstRunAt, chunkSize = 200, scanPageSize = 500 } = options;
   const beforeChunk = options.beforeChunk ?? yieldToMainThread;
@@ -349,13 +241,6 @@ export async function pruneEsiCache(options: PruneOptions): Promise<number> {
   return deleted;
 }
 
-/**
- * Claims today's run: read-compare-write in one transaction, so two tabs
- * booting together cannot both run. Stamped at the start, so a run that
- * throws does not retry on every boot. Resolves to the first-run stamp
- * (`undefined` once legacy rows are cleared: nothing left to scan for), or
- * `null` when a run already happened inside the interval.
- */
 function claimRun(now: number): Promise<{ firstRunAt: number | undefined } | null> {
   return db.transaction('rw', db.settings, async () => {
     const last = (await db.settings.get(PRUNE_LAST_RUN_KEY))?.value;
@@ -371,18 +256,11 @@ function claimRun(now: number): Promise<{ firstRunAt: number | undefined } | nul
   });
 }
 
-/**
- * The scheduled entry point: at most once per `PRUNE_MIN_INTERVAL_MS`, and
- * never offline — a row pruned there could not be refetched. Resolves to the
- * number of rows deleted, or `null` when it did not run.
- */
 export async function runDailyEsiCachePrune(): Promise<number | null> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
   const now = Date.now();
   const claim = await claimRun(now);
   if (claim === null) return null;
-  // Same daily cadence. A failure is reported, and must not skip the cache prune
-  // below; the next daily run tries the drafts again.
   await pruneStaleMailDrafts(now).catch((error: unknown) => {
     captureException(error);
     return 0;

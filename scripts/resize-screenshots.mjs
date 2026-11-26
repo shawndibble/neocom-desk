@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// `npm run shots:resize`: writes the smaller landing-page variants of every
-// original in public/screenshots/ as `<file>-<width>.webp`.
-//
-// The originals are the files without a `-<width>` suffix. Widths must match
-// DESKTOP_VARIANT_WIDTHS / PHONE_VARIANT_WIDTHS in
-// src/features/landing/screenshots.ts (screenshotReferences.test.ts fails on
-// drift). Resizing runs in the repo's Playwright Chromium (canvas -> webp), so
-// it needs no image dependency. Re-running regenerates every variant.
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

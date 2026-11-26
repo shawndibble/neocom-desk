@@ -54,7 +54,7 @@ describe('abyssalHullRule', () => {
       ships: 1,
       confirmed: true,
     });
-    expect(abyssalHullRule(358)).toMatchObject({ shipClass: 'cruiser' }); // heavy assault
+    expect(abyssalHullRule(358)).toMatchObject({ shipClass: 'cruiser' });
   });
   it('bars Tech 3 cruisers', () => {
     expect(abyssalHullRule(963)).toEqual({ eligible: false, reason: 'tech3Cruiser' });
@@ -84,10 +84,10 @@ describe('abyssalHullRule', () => {
   it('turns away anything bigger, and says so for a group it has no rule for', () => {
     expect(abyssalHullRule(419)).toEqual({ eligible: false, reason: 'tooLarge' });
     expect(abyssalHullRule(27)).toEqual({ eligible: false, reason: 'tooLarge' });
-    expect(abyssalHullRule(902)).toEqual({ eligible: false, reason: 'tooLarge' }); // jump freighter
+    expect(abyssalHullRule(902)).toEqual({ eligible: false, reason: 'tooLarge' });
     expect(abyssalHullRule(31)).toEqual({ eligible: false, reason: 'unlisted' });
-    expect(abyssalHullRule(237)).toEqual({ eligible: false, reason: 'unlisted' }); // rookie ship
-    expect(abyssalHullRule(1972)).toEqual({ eligible: false, reason: 'unlisted' }); // flag cruiser
+    expect(abyssalHullRule(237)).toEqual({ eligible: false, reason: 'unlisted' });
+    expect(abyssalHullRule(1972)).toEqual({ eligible: false, reason: 'unlisted' });
     expect(abyssalHullRule(undefined)).toEqual({ eligible: false, reason: 'unlisted' });
   });
 });

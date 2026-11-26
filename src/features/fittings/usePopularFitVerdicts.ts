@@ -1,8 +1,3 @@
-/**
- * Each Popular fits row's can-fly verdict (#6011), from the editor chip's own
- * sources, with requirements read once per set of types. `null` with no
- * Character, while loading, or when skills can't be read: no verdict beats a guess.
- */
 import { useCallback, useMemo } from 'react';
 import type { RequiredSkill } from '@/engine/import/fitToSkills';
 import { fitSkillVerdict, type FitSkillVerdict } from '@/engine/fittings/fitSkillVerdict';
@@ -15,28 +10,22 @@ import { loadActivePilotProfileState } from './fittingPilotProfile';
 import { shipTreeSkillCatalog } from './shipTree/shipTreeCatalogs';
 import { loadRequirementsForTypes } from './skillRequirements';
 
-/** One listed fit: its row key, and its `fittingRequirementTypeIds`. */
 export interface VerdictFit {
   key: string;
   typeIds: readonly number[];
 }
 
-/** What the verdicts are read from; tests pass stand-ins. */
 export interface FitVerdictSources {
-  /** The Character's Effective Skill Levels; rejects when they couldn't be read. */
   skillLevels: (characterId: number) => Promise<ReadonlyMap<number, number>>;
-  /** Each readable type's required skills; a type left out is unknown. */
   requirements: (
     typeIds: readonly number[]
   ) => Promise<ReadonlyMap<number, readonly RequiredSkill[]>>;
-  /** Skills by type id, for names and the Alpha cap. */
   skills: () => Promise<ReadonlyMap<number, Pick<EngineSkill, 'alphaMaxLevel' | 'name'>>>;
 }
 
 export const fitVerdictSources: FitVerdictSources = {
   skillLevels: async (characterId) => {
     const { profile, skillsKnown } = await loadActivePilotProfileState(characterId);
-    // An empty skill sheet would make every fit read "Missing N skills".
     if (!skillsKnown) throw new Error('skills unknown');
     return profile.skillLevels;
   },
@@ -52,8 +41,6 @@ export function usePopularFitVerdicts(
   const cloneStates = useCloneStates((state) => state.value);
   useHydratedStore(useCloneStates);
 
-  // Keyed on the types, not the list: a row's price or badge landing makes a
-  // new list with the same fits, which must not read everything again.
   const typeKey = useMemo(
     () =>
       fits === null
@@ -77,7 +64,6 @@ export function usePopularFitVerdicts(
   return useMemo(() => {
     if (fits === null || characterId === null || loaded === undefined) return null;
     const input = { ...loaded, cloneState: cloneStateFor(cloneStates, characterId) };
-    // No types: the fit wasn't read (its game data failed), not "needs nothing".
     return new Map(
       fits
         .filter((fit) => fit.typeIds.length > 0)

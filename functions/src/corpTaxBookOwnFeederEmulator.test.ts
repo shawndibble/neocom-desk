@@ -1,5 +1,3 @@
-// "Add my other corps" against the Firestore emulator: the add and remove actions' logic.
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -20,13 +18,12 @@ const FEEDER = 98000002;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
 const KEY = Buffer.alloc(32, 7);
 const COLLECTOR_CEO = 1;
-const PLAYER = 11; // the signed-in player
-const ALT = 12; // the Accountant alt that logs in for the mining scope
+const PLAYER = 11;
+const ALT = 12;
 const FEEDER_NOBODY = 14;
 
 let ledger: 'ok' | 'forbidden' | 'unavailable' = 'ok';
 let now = T0;
-/** Runs during the first pull's observer read: a concurrent write landing mid-save. */
 let duringPull: (() => Promise<void>) | undefined;
 const revoked: string[] = [];
 const identities = new Map<number, CorpIdentity>();
@@ -37,7 +34,6 @@ const ok = <T>(data: T): EsiRead<T> => ({
   fetchedAt: new Date(T0).toISOString(),
   truncated: false,
 });
-/** The scopes a `mine-` token carries; a test may drop to the pre-#4654 mining scope only. */
 let mineScopes: string[] = [...FEEDER_SYNC_SCOPES];
 const esi = (): SyncEsi =>
   ({
@@ -215,7 +211,6 @@ emulatorSuite('add my other corps', () => {
     await add({ coverageFrom: undefined });
     expect((await feederRecord())?.coveragePeriods).toEqual([{ from: '2026-10-18' }]);
     await clearEmulator();
-    // The book began on 2026-10-01, so a day before it clamps up to it.
     await turnOnBook(
       bookDeps(),
       who(COLLECTOR_CEO),
@@ -276,7 +271,6 @@ emulatorSuite('add my other corps', () => {
   });
 
   it('Grant again on a connected own corp reconnects: names read, coverage and mode kept', async () => {
-    // A grant from before the structure scope: its reads carry no refinery names.
     mineScopes = FEEDER_SYNC_SCOPES.filter((s) => !s.includes('structures'));
     await add();
     const before = await feederRecord();
@@ -307,9 +301,7 @@ emulatorSuite('add my other corps', () => {
       readsStructureNames: true,
     });
     expect(await grant()).toMatchObject({ characterId: 17, readsStructures: true });
-    // Reconnect mints no self-invite.
     expect(await invites()).toBe(invitesBefore);
-    // The old grant's token is revoked once the new one works.
     expect(revoked).toContain(`rt-${ALT}`);
   });
 

@@ -44,7 +44,6 @@ describe('combinedLineDefaults', () => {
         [B, 1],
       ])
     );
-    // Market worth 300 vs 300: an even split of the 1,000 actually billed.
     expect(lines.get(Z)).toBeCloseTo(500);
     expect(lines.get(B)).toBeCloseTo(500);
   });

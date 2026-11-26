@@ -1,10 +1,3 @@
-/**
- * Names for the IDs a start link carries, from ESI's public `POST /universe/names`
- * (no login). One ID per request, because ESI answers 404 for the whole batch if
- * any ID in it is unknown, and a link may hold one good ID and one bad. A place
- * must be a solar system or an NPC station (a structure's name needs a login), a
- * payee a corporation, alliance or character; anything else counts as not found.
- */
 import { postUniverseNames } from '@/esi/endpoints';
 import { resolvePayeeName } from '@/features/miningTax/payeeEntitySearch';
 import type { PayeeEntityKind } from '@/features/miningTax/payees';
@@ -39,12 +32,6 @@ export async function resolvePayeeId(id: number, signal?: AbortSignal): Promise<
     : { ok: false };
 }
 
-/**
- * The reverse: a typed payee name, checked against ESI's public exact-name lookup
- * (`resolvePayeeName`). The in-game spelling and the ID come back, so the link can
- * carry the ID. One name that is several things takes the first the Payee manager
- * lists (corporation, then character, then alliance).
- */
 export async function resolveTypedPayee(
   name: string,
   signal?: AbortSignal
@@ -57,11 +44,6 @@ export async function resolveTypedPayee(
   }
 }
 
-/**
- * The details a start link would store, with any ID the live lookup hasn't named
- * yet named now, so a scan pasted straight after the link opened keeps its
- * location and moon tax. An ID ESI can't name stays unnamed, as before.
- */
 export async function nameIds(fields: StartLinkFields, info: InfoFields): Promise<InfoFields> {
   let { location, tax } = info;
   const placeId = fields.place?.id ?? null;

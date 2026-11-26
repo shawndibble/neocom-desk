@@ -7,13 +7,6 @@ import type { LinesChartModel } from './types';
 
 const DIMMED = 0.25;
 
-/**
- * One line gets a soft fill under it and no legend (the title and Number view
- * name it); several lines get thin distinct-colour strokes and a compact
- * legend whose entries, hovered or focused, bring their line to full weight
- * and dim the rest (weight, not colour alone, marks the pick). The drawing is
- * aria-hidden; the summary carries the meaning and the hover reads every line.
- */
 export function Lines({ model, height }: { model: LinesChartModel; height: number }) {
   const [active, setActive] = useState<string | null>(null);
   const runs = linesRuns(

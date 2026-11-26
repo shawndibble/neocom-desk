@@ -3,10 +3,6 @@ import { COMPARED_HUBS, getTradeHub, type TradeHub } from '@/market/hubs';
 import type { CompareHubRow } from './compareHubsRows';
 import type { HubId } from './useCompareHubs';
 
-/**
- * CSV columns for the Trade hubs view. Per hub a status tells "Unreachable" (the read failed)
- * from "No sellers" (it answered, nobody is trading). Raw numbers, empty while loading.
- */
 export function compareHubsCsvColumns(
   t: CsvTranslate,
   context: {

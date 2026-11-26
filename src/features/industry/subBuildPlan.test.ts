@@ -73,7 +73,6 @@ function resolve(
   );
 }
 
-/** A rivet made out of seals, so one typeID ends up built by two different jobs. */
 const rivetFromSealBlueprint: IndustryBlueprint = {
   name: 'Rivet Blueprint',
   time: 900,
@@ -116,8 +115,6 @@ describe('materialTableRows', () => {
 
     const rows = materialTableRows(resolved);
 
-    // The plan's own materials in blueprint order, then what the recipes
-    // introduced — never an input wedged between two blueprint materials.
     expect(rows.map((r) => r.typeID)).toEqual([SEAL, TRITANIUM, FIBRE]);
     expect(rows[0].subBuilds.map((s) => s.runs)).toEqual([50]);
     expect(rows[2].quantity).toBe(500);
@@ -141,7 +138,6 @@ describe('materialTableRows', () => {
 
     const rows = materialTableRows(resolved);
 
-    // 50 seal runs x 10 fibre, plus 10 rivet runs x 4 fibre — one row, not two.
     expect(rows.map((r) => r.typeID)).toEqual([SEAL, RIVET, FIBRE]);
     expect(rows[2].quantity).toBe(540);
   });
@@ -182,7 +178,6 @@ describe('materialTableRows', () => {
     const rows = materialTableRows(resolved);
 
     expect(rows.map((r) => r.typeID)).toEqual([SEAL, TRITANIUM, FIBRE]);
-    // The plan's own 1,000 plus the 1,000 the fibre job eats (500 fibre x 2).
     expect(rows[1].quantity).toBe(2000);
   });
 
@@ -205,7 +200,6 @@ describe('materialTableRows', () => {
     const rows = materialTableRows(resolved);
     const seal = rows.find((r) => r.typeID === SEAL);
 
-    // Built twice: 150 for the plan itself, 40 more for the rivet job.
     expect(seal?.quantity).toBe(190);
     expect(seal?.subBuilds.map((s) => s.runs)).toEqual([50, 14]);
   });
@@ -245,7 +239,6 @@ describe('buildRecipe', () => {
 
     const recipe = buildRecipe(rows[0]);
 
-    // 3 seals a run, so 34 runs to cover 100 — two spare.
     expect(recipe).toMatchObject({
       typeID: SEAL,
       runs: 34,
@@ -278,7 +271,6 @@ describe('buildRecipe', () => {
     const recipe = buildRecipe(rows.find((r) => r.typeID === SEAL)!);
 
     expect(recipe).toMatchObject({ runs: 64, unitsMade: 192, needed: 190, spare: 2 });
-    // 50 runs x 10 fibre plus 14 runs x 10 fibre, on one line.
     expect(recipe?.inputs.map((i) => [i.typeID, i.quantity])).toEqual([[FIBRE, 640]]);
   });
 
@@ -355,7 +347,6 @@ describe('shoppingListMaterials', () => {
     );
 
     const list = shoppingListMaterials(resolved);
-    // 50 seal runs x 10 fibre, plus 10 rivet runs x 4 fibre.
     expect(list.map((m) => m.typeID)).toEqual([FIBRE]);
     expect(list[0].quantity).toBe(540);
   });
@@ -392,9 +383,6 @@ describe('shoppingListMaterials', () => {
 });
 
 describe('shoppingListMaterials — Blueprint Acquisition row merge (issue #1778)', () => {
-  /** A minimal synthetic Blueprint Acquisition row (issue #838), hand-built rather than
-   * through `resolve()`: reproducing it via the engine needs a priced sub-build tree,
-   * where this only needs the one marker `mergeInto` must carry across a merge. */
   function acquisitionRow(typeID: number, remainingQuantity: number) {
     return {
       typeID,
@@ -410,8 +398,6 @@ describe('shoppingListMaterials — Blueprint Acquisition row merge (issue #1778
   }
 
   it('keeps the acquisitionTier marker when the same blueprint is acquired via two branches', () => {
-    // Same blueprint typeID reached through two different sub-builds — `mergeInto`
-    // merges them into one row, and must not lose the marker in the process.
     const resolved = [acquisitionRow(11568, 1), acquisitionRow(11568, 1)];
 
     const list = shoppingListMaterials(resolved);

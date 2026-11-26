@@ -9,14 +9,11 @@ import { stubViewport } from '@/test/viewport';
 import { CommandPaletteHost } from './CommandPaletteHost';
 import { useCommandPalette } from './store';
 
-// Spied, so a "stays put" test can wait until the paste was really classified
-// rather than asserting an absence before the lazy loads have settled.
 vi.mock('@/app/pasteRouting', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/pasteRouting')>();
   return { ...actual, routePaste: vi.fn(actual.routePaste) };
 });
 
-// The data a paste is classified against; the real loaders fetch.
 vi.mock('@/features/market/appraisalData', () => ({
   loadAppraisalCatalogue: () =>
     Promise.resolve(
@@ -93,7 +90,6 @@ function paste(target: Element, text: string) {
   fireEvent.paste(target, { clipboardData: { getData: () => text } });
 }
 
-/** Once the paste has been classified: whatever it was going to do, it has done. */
 async function classified() {
   await waitFor(() => expect(routePaste).toHaveResolved());
 }
@@ -132,7 +128,6 @@ describe('CommandPalette paste', () => {
   it('leaves a single line to the search', async () => {
     const input = await openPalette();
     paste(input, 'Gunnery V');
-    // A single line is never classified: the search keeps it.
     expect(routePaste).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
     expect(screen.getByRole('combobox')).toBeInTheDocument();

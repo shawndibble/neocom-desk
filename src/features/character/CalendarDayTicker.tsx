@@ -1,17 +1,3 @@
-/**
- * The phone's Calendar Map: one swipeable row of days instead of a 7x6 grid.
- *
- * A month grid and a list cannot share a 390px viewport — the grid wins the
- * space and the list, which is the thing being read, gets what is left. So on
- * a phone the map collapses to its useful axis: a week of day columns, each
- * with a count and a bar segmented by kind, scrolled sideways for the weeks
- * after it.
- *
- * The same `DayLoad` buckets the wide grid reads, sliced rather than
- * re-bucketed — a prefix of the engine's answer cannot disagree with the wider
- * view, which is the rule `CorpDeadlineStrip` already settled on for its own
- * narrow branch.
- */
 import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { cellDayStart, dayStart } from '@/engine/localDay';
@@ -59,7 +45,6 @@ export function CalendarDayTicker({
             key={day.key}
             type="button"
             aria-pressed={isSelected}
-            /* The bar is colour and nothing else, so the name carries the words. */
             aria-label={dayLabel(day.date, load, day.isToday)}
             aria-current={day.isToday ? 'date' : undefined}
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
@@ -85,12 +70,6 @@ export function CalendarDayTicker({
             >
               {day.date.getDate()}
             </span>
-            {/*
-              One segment per kind, sharing the bar's width — the phone's
-              version of the grid's row of dots, and the same `load.kinds`
-              order, so a day reads the same on both. Reserved whether or not
-              the day holds anything, so every column lines up.
-            */}
             <span aria-hidden="true" className="flex h-0.5 w-6 gap-px overflow-hidden rounded-full">
               {load?.kinds.map((kind) => (
                 <span key={kind} className={kindSegmentClassName(kind)} />

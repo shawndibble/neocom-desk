@@ -1,9 +1,3 @@
-// SRP officer actions (ADR 0026): the admin-SDK half. Each action re-checks the
-// caller's roles live (Director, Accountant or CEO), then moves a claim in a transaction that
-// re-reads it, so a double click or a racing second officer meets the state guard, and appends the
-// audit entry in the same transaction. Rules and shapes: srpOfficer.ts.
-// Returns what the result mail needs (pilot, amount, reason); sends nothing.
-
 import type { Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { BookCall } from './corpTaxBook.js';
@@ -22,7 +16,6 @@ import {
 } from './srpOfficer.js';
 import { appendSrpAudit, authorizeSrpOfficer, claimRef, type SrpDeps } from './srpStore.js';
 
-/** One claim's result in a batch: the outcome, or why that claim was refused. */
 export type SrpBatchResult =
   | ({ ok: true } & SrpClaimOutcome)
   | { ok: false; killmailId: number; reason: string; message: string };
@@ -49,7 +42,6 @@ async function apply(
   });
 }
 
-/** A refusal in a batch is a result, not a failure of the whole call. */
 async function settle(
   killmailId: number,
   run: () => Promise<SrpClaimOutcome>
@@ -57,7 +49,6 @@ async function settle(
   try {
     return { ok: true, ...(await run()) };
   } catch (err) {
-    // Any failure is that claim's result: the claims before it are already committed.
     if (!(err instanceof HttpsError)) {
       return { ok: false, killmailId, reason: 'internal', message: 'Could not save this claim' };
     }
@@ -112,7 +103,6 @@ async function decideMany<I extends { killmailId: number }>(
 export const approveSrpClaim = (deps: SrpDeps, caller: Caller, call: BookCall, item: ApproveItem) =>
   decideOne(deps, caller, call, item, 'approveClaim', decideApprove);
 
-/** Approve many at once (no overrides: a claim that needs a typed amount is refused on its own). */
 export const approveSrpClaims = (
   deps: SrpDeps,
   caller: Caller,

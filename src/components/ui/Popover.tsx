@@ -5,28 +5,17 @@ import { usePortalContainer } from './portalContainer';
 import { RowTappableContext } from './tooltipHold';
 import { menuContentClassName } from './menuStyles';
 
-/**
- * Click-triggered informational overlay, on the same surface as the menus but
- * with a `dialog` role rather than `menu` — it holds prose and figures, not
- * commands, and a menu role would promise arrow-key item navigation that isn't
- * there. It also hosts a small form a menu cannot: anything with a sortable list or a
- * text field, whose own arrow-key moves a menu's item navigation would fight. Radix (docs/adr/0004) owns dismissal, focus return and collision-aware
- * placement, exactly as it does for `DropdownMenu`.
- */
 export const Popover = PopoverPrimitive.Root;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
-/** Positions the popover on an element other than its trigger, for a hint that opens itself. */
 export const PopoverAnchor = PopoverPrimitive.Anchor;
 
 type PopoverContentBaseProps = Omit<
   ComponentProps<typeof PopoverPrimitive.Content>,
   'aria-label' | 'aria-labelledby'
 > & {
-  /** A pointer toward the anchor, for a hint that names the control it sits beside. */
   arrow?: boolean;
 };
 
-/** The popover is a `dialog`, so it needs a name: a label string, or the id of its visible heading. */
 export type PopoverContentProps = PopoverContentBaseProps &
   (
     | { 'aria-label': string; 'aria-labelledby'?: string }
@@ -40,12 +29,7 @@ export function PopoverContent({
   children,
   ...props
 }: PopoverContentProps) {
-  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
-  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
-  // The provider wraps the portal, never sits inside it: Radix's Portal hands
-  // its child a ref to time the exit animation, and a context provider would
-  // swallow it, unmounting the popover before its fade could play.
   return (
     <RowTappableContext.Provider value={false}>
       <PopoverPrimitive.Portal container={container}>
@@ -53,7 +37,6 @@ export function PopoverContent({
           sideOffset={sideOffset}
           className={cx(
             menuContentClassName,
-            // Tailwind cannot resolve two max-height utilities, so a caller's own cap replaces the default.
             !className?.includes('max-h-') &&
               'max-h-[min(32rem,var(--radix-popover-content-available-height))]',
             'overflow-y-auto overscroll-contain motion-pop-exit',

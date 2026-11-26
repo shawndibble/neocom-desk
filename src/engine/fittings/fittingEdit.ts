@@ -1,14 +1,3 @@
-/**
- * The Fitting editor's edits (issue #1533), each a pure `Fitting -> Fitting`
- * so the workspace can apply one, encode the result into `?f=` and let the
- * URL be the one source of truth for what's open. Never mutates its input.
- *
- * A module is addressed by rack + position (`slot`, `slotIndex`), the same
- * key the Fitting Share Code and `@eveshipfit/dogma-engine` both use. Drones are
- * addressed by type: in the domain a type is carried as at most one stack in
- * space (`'active'`) and one in the bay (`'online'`), which is exactly what
- * `shareMapper.ts`'s all-or-nothing stack coarsening round-trips losslessly.
- */
 import {
   FITTING_SLOT_KINDS,
   type Fitting,
@@ -31,14 +20,12 @@ function isAt(module: FittingModule, slot: FittingSlotKind, slotIndex: number): 
   return module.slot === slot && module.slotIndex === slotIndex;
 }
 
-/** Where a module sits: its rack and position. */
 export type ModuleAt = Pick<FittingModule, 'slot' | 'slotIndex'>;
 
 function isAnyOf(module: FittingModule, at: readonly ModuleAt[]): boolean {
   return at.some((where) => isAt(module, where.slot, where.slotIndex));
 }
 
-/** `module` as it is, with no charge (nor the count of one). */
 function unloaded(module: FittingModule): FittingModule {
   return {
     slot: module.slot,
@@ -62,24 +49,10 @@ function updateModule(
   };
 }
 
-/** A bare hull — the start of a Fitting built from scratch, named after the hull. */
 export function newFitting(shipTypeId: number, name: string): Fitting {
   return { name, shipTypeId, modules: [], drones: [], cargo: [] };
 }
 
-/**
- * Fits `typeId` at `slot`/`slotIndex`, replacing (and unloading) whatever was
- * there. Asks for `'active'`: the engine lowers a requested state to what the
- * module can actually reach, so a passive module simply calculates online.
- *
- * A charge-taking module doesn't land empty: it copies the charge another
- * fitted module of the same type already has loaded, or — with none fitted
- * yet — the first of `defaultChargeCandidates()` (the caller's own
- * allowed-charge list, since resolving one needs the dogma engine this pure
- * module never touches). Lazy, so a sibling copy — the common case — never
- * pays for a candidate list it won't use. Neither applies, it lands empty,
- * same as before.
- */
 export function addModule(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -102,7 +75,6 @@ export function addModule(
   return { ...fitting, modules };
 }
 
-/** Swaps in a sibling variant, keeping state and the exact charge that was loaded — unlike `addModule`'s charge, which is a fresh default, not a carry-over. A charge/state the variant can't reach is left for recalculation to lower, same tolerance `ModuleRow` gives a stale charge. */
 export function swapModuleType(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -112,11 +84,6 @@ export function swapModuleType(
   return updateModule(fitting, slot, slotIndex, (module) => withoutMutation(module, typeId));
 }
 
-/**
- * Moves the module at `from` to `to` within one rack — a drag on the Ring —
- * keeping its state and charge, and swapping with whatever sat at `to`.
- * An empty `from` or `from === to` leaves the Fitting as it was.
- */
 export function moveModule(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -149,10 +116,6 @@ export function setModuleState(
   return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, state }));
 }
 
-/**
- * `fitting.cargo` with back in it what the app took out of the hold for each
- * of `modules` — the Fitting doesn't know how many a charge from anywhere else was.
- */
 function withHeldChargesReturned(
   fitting: Fitting,
   modules: readonly FittingModule[]
@@ -165,7 +128,6 @@ function withHeldChargesReturned(
   return cargo;
 }
 
-/** `null` unloads the charge; what it held from cargo goes back into the hold. */
 export function setModuleCharge(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -182,7 +144,6 @@ export function setModuleCharge(
   return { ...updated, cargo: withHeldChargesReturned(fitting, [module]) };
 }
 
-/** Every module at `at` takes `state` — a weapon group's, in one edit. */
 export function setModulesState(
   fitting: Fitting,
   at: readonly ModuleAt[],
@@ -194,7 +155,6 @@ export function setModulesState(
   };
 }
 
-/** Every module at `at` unloads its charge — a weapon group's, in one edit. */
 export function unloadCharges(fitting: Fitting, at: readonly ModuleAt[]): Fitting {
   return {
     ...fitting,
@@ -206,55 +166,25 @@ export function unloadCharges(fitting: Fitting, at: readonly ModuleAt[]): Fittin
   };
 }
 
-/**
- * Relative slack on capacity ÷ volume. The engine reports a module's
- * capacity as the SDE's float32 (a Medium Ancillary Armor Repairer's 0.32 m3
- * is 0.3199999928…, 31.99999928 pastes of 0.01 m3), which is off by about
- * 1e-7 relative; no real load is anywhere near that close under a whole
- * charge, so a far wider margin is still safe.
- */
 const CHARGE_FIT_TOLERANCE = 1e-5;
 
-/**
- * Charges one full load puts in a module: its charge capacity over the
- * charge's volume, whole charges only, float32 noise forgiven. At least one,
- * and one when either figure is unknown.
- */
 export function chargesPerLoad(capacity: number, volume: number): number {
   if (!(capacity > 0) || !(volume > 0)) return 1;
   return Math.max(1, Math.floor((capacity / volume) * (1 + CHARGE_FIT_TOLERANCE)));
 }
 
-/** How a charge goes in — which modules take it, and what one load of it costs the cargo. */
 export interface ChargeLoad {
-  /**
-   * Whether a fitted module takes the charge: its charge groups plus the
-   * engine's size check, which the caller resolves (this module never
-   * touches the engine). One rule for ammo, missiles, bombs, scripts,
-   * crystals, cap boosters and paste alike.
-   */
   accepts: (module: FittingModule) => boolean;
-  /** Charges one full load of `chargeTypeId` puts in `module` (its capacity over the charge's volume); 1 when unset. */
   chargesPerLoad?: (module: FittingModule, chargeTypeId: number) => number;
-  /**
-   * The charge comes out of the Fitting's own cargo: each load is debited
-   * from it and recorded on the module (`chargeQuantity`), and a charge the
-   * module held goes back into it — as many as were recorded, none when
-   * the charge didn't come out of the hold.
-   */
   fromCargo?: boolean;
-  /** Just this module (an Alt-drop, "Load into") or these (a weapon group), rather than every one that takes it. */
   only?: ModuleAt | readonly ModuleAt[];
 }
 
 export interface ChargeLoadResult {
   fitting: Fitting;
-  /** Modules holding the charge afterwards, of the `wanted` that take it — a part-load counts. */
   loaded: number;
-  /** Of `loaded`, the ones this load put it in — not those already holding it. */
   newlyLoaded: number;
   wanted: number;
-  /** The cargo emptied before every module that takes the charge had some. */
   ranOut: boolean;
 }
 
@@ -262,14 +192,6 @@ function cargoQuantity(cargo: readonly FittingCargoItem[], typeId: number): numb
   return cargo.reduce((sum, item) => (item.typeId === typeId ? sum + item.quantity : sum), 0);
 }
 
-/**
- * Loads `chargeTypeId` into every fitted module that takes it, whatever the
- * module's type (two launcher types that fire the same missile both load),
- * or into `only` one. From cargo, each module takes a full load while there
- * is one and the rest when there isn't; one already holding the charge is
- * left alone. The same Fitting back when nothing changed, so the caller's
- * edit history gets no empty step.
- */
 export function loadChargeIntoCompatible(
   fitting: Fitting,
   chargeTypeId: number,
@@ -298,7 +220,6 @@ export function loadChargeIntoCompatible(
       ranOut = true;
       return module;
     }
-    // Rebuilt, not spread, so a quantity recorded for the charge it held never sticks to the new one.
     const next: FittingModule = { ...unloaded(module), chargeTypeId };
     loaded += 1;
     newlyLoaded += 1;
@@ -322,7 +243,6 @@ export function loadChargeIntoCompatible(
   };
 }
 
-/** Every module of `slot`/`slotIndex`'s type takes on its state and charge (or its lack of one). */
 export function copyToAllOfType(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -351,11 +271,6 @@ export function removeAllOfType(fitting: Fitting, typeId: number): Fitting {
   return { ...fitting, modules: fitting.modules.filter((module) => module.typeId !== typeId) };
 }
 
-/**
- * Fits `typeId` into every empty slot of a rack of `slotCount` — "Fill rack
- * with last used". Each lands as `addModule` would, charge and all. The same
- * Fitting when the rack is already full.
- */
 export function fillRack(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -371,7 +286,6 @@ export function fillRack(
   return next;
 }
 
-/** The lowest position in a rack of `slotCount` slots nothing occupies, or null when it's full. */
 export function firstFreeSlotIndex(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -390,7 +304,6 @@ export interface DroneGroup {
   inBay: number;
 }
 
-/** One entry per drone type, first-seen order, however many stacks it arrived as. */
 export function droneGroups(fitting: Fitting): DroneGroup[] {
   const groups = new Map<number, DroneGroup>();
   for (const drone of fitting.drones) {
@@ -406,10 +319,6 @@ function wholeCount(value: number): number {
   return Math.max(0, Math.floor(value));
 }
 
-/**
- * Rewrites every stack of `typeId` as (at most) one stack in space and one in
- * the bay, where the type first appeared; both zero removes the type.
- */
 export function setDroneCounts(
   fitting: Fitting,
   typeId: number,
@@ -438,11 +347,6 @@ export function setDroneCounts(
   return { ...fitting, drones };
 }
 
-/**
- * `setDroneCounts` when the type has mutated drones, which are never merged.
- * Space first, then bay, in listed order; excess dropped from the end, any
- * shortfall plain drones; plain stacks worked in counts, one per state.
- */
 function setMutatedDroneCounts(
   fitting: Fitting,
   typeId: number,
@@ -494,13 +398,9 @@ function setMutatedDroneCounts(
   return { ...fitting, drones };
 }
 
-/** What a pilot can have in space at once: the hull's bandwidth, and the Drones skill's count. */
 export interface DroneLaunchLimits {
-  /** Mbit/s the hull has. */
   bandwidthTotal: number;
-  /** Drones the pilot can control at once (0 without the Drones skill). */
   maxActive: number;
-  /** Mbit/s one drone of a type draws. */
   bandwidthOf: (typeId: number) => number;
 }
 
@@ -509,11 +409,6 @@ type LaunchLimitStats = Pick<
   'droneBandwidthTotal' | 'maxActiveDrones' | 'droneBandwidthByType'
 >;
 
-/**
- * The launch limits off a Fitting's stats; null before they're known. A
- * drone type the engine gave no bandwidth for draws an infinite amount, so it
- * stays in the bay rather than launching unlimited.
- */
 export function launchLimitsFrom(stats: LaunchLimitStats): DroneLaunchLimits;
 export function launchLimitsFrom(stats: LaunchLimitStats | null): DroneLaunchLimits | null;
 export function launchLimitsFrom(stats: LaunchLimitStats | null): DroneLaunchLimits | null {
@@ -525,17 +420,12 @@ export function launchLimitsFrom(stats: LaunchLimitStats | null): DroneLaunchLim
   };
 }
 
-/** Bandwidth and drone count the drones already in space leave free. */
 interface LaunchHeadroom {
   bandwidthLeft: number;
   countLeft: number;
 }
 
 function launchHeadroom(groups: readonly DroneGroup[], limits: DroneLaunchLimits): LaunchHeadroom {
-  // Only drones already out draw bandwidth. One whose bandwidth isn't known
-  // yet (just dropped into space, before the engine recalculates) counts as
-  // none rather than infinite, so it doesn't freeze every other launch; the
-  // bandwidth bar shows its real draw once calculated.
   const bandwidthUsed = groups.reduce((sum, group) => {
     const each = limits.bandwidthOf(group.typeId);
     return group.inSpace > 0 && Number.isFinite(each) ? sum + group.inSpace * each : sum;
@@ -546,7 +436,6 @@ function launchHeadroom(groups: readonly DroneGroup[], limits: DroneLaunchLimits
   };
 }
 
-/** How many of a drone drawing `each` Mbit/s the headroom takes, never below zero. */
 function launchable(each: number, headroom: LaunchHeadroom): number {
   const byBandwidth = !Number.isFinite(each)
     ? 0
@@ -556,11 +445,6 @@ function launchable(each: number, headroom: LaunchHeadroom): number {
   return Math.max(0, Math.min(headroom.countLeft, byBandwidth));
 }
 
-/**
- * How many more of `typeId` could be in space beside those already out —
- * bandwidth and the pilot's drone count, never the bay. `Infinity` before the
- * limits are known (`null`), so a missing figure never blocks an edit.
- */
 export function droneLaunchRoom(
   fitting: Fitting,
   typeId: number,
@@ -570,13 +454,6 @@ export function droneLaunchRoom(
   return launchable(limits.bandwidthOf(typeId), launchHeadroom(droneGroups(fitting), limits));
 }
 
-/**
- * Launches drones from the bay, in the order the Fitting lists them, as far
- * as bandwidth and the pilot's drone count allow — counting any already in
- * space against both. With `onlyTypeId`, only that type launches (a drone's
- * "Launch all", or one dropped on the Drones rack). The same Fitting back
- * when none can launch.
- */
 export function launchDrones(
   fitting: Fitting,
   limits: DroneLaunchLimits,
@@ -601,14 +478,6 @@ export function launchDrones(
   return next;
 }
 
-/**
- * A drone from the Add panel dropped on the Drones rack: one more is carried,
- * if the bay has room, and the type launches as far as bandwidth and the
- * pilot allow. A type new to the Fitting has no bandwidth from the engine
- * yet, so it launches while any bandwidth and a drone of the pilot's count
- * are left; the bandwidth bar shows any overage once it's calculated. The
- * same Fitting when the bay is full.
- */
 export function launchNewDrone(
   fitting: Fitting,
   typeId: number,
@@ -631,11 +500,6 @@ export function launchNewDrone(
   return launched;
 }
 
-/**
- * Brings every one of `typeId` back from space into the bay — they're
- * carried already, so the bay always has room. The same Fitting when none is
- * out.
- */
 export function recallDrones(fitting: Fitting, typeId: number): Fitting {
   const group = droneGroupOf(fitting, typeId);
   if (!group || group.inSpace === 0) return fitting;
@@ -644,10 +508,6 @@ export function recallDrones(fitting: Fitting, typeId: number): Fitting {
 
 const MODULE_STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
 
-/**
- * The states a module's controls offer: each up to the highest it can reach
- * (`maxState`, from its own calculation), plus the one it is shown in.
- */
 export function reachableModuleStates(
   maxState: FittingItemState,
   shown: FittingItemState
@@ -657,10 +517,6 @@ export function reachableModuleStates(
   return states;
 }
 
-/**
- * The state a click on a module moves it to: the next of its reachable states
- * (the menu's own list), wrapping from the last back to offline.
- */
 export function nextModuleState(
   shown: FittingItemState,
   maxState: FittingItemState
@@ -669,11 +525,6 @@ export function nextModuleState(
   return states[(states.indexOf(shown) + 1) % states.length];
 }
 
-/**
- * The state a module shows: the one the engine reached, or the one asked for
- * until it has. A subsystem always shows online — it has no state to toggle,
- * though the engine, finding no online effect on it, reports it offline.
- */
 export function shownModuleState(
   slot: FittingSlotKind,
   reached: FittingItemState | undefined,
@@ -682,7 +533,6 @@ export function shownModuleState(
   return slot === 'subsystem' ? 'online' : (reached ?? asked);
 }
 
-/** Puts `quantity` more of `typeId` in the bay. */
 export function addDrones(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const current = droneGroupOf(fitting, typeId);
   return setDroneCounts(fitting, typeId, {
@@ -691,11 +541,6 @@ export function addDrones(fitting: Fitting, typeId: number, quantity: number): F
   });
 }
 
-/**
- * Sets how many of `typeId` the cargo holds, as one stack where the type
- * first appeared (a new last stack when it holds none yet); zero or less
- * removes it.
- */
 export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const whole = wholeCount(quantity);
   const cargo: FittingCargoItem[] = [];
@@ -712,7 +557,6 @@ export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: num
   return { ...fitting, cargo };
 }
 
-/** Puts `quantity` more of `typeId` in the cargo, on its stack or as a new last one. */
 export function addCargo(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const whole = wholeCount(quantity);
   if (whole === 0) return fitting;
@@ -721,7 +565,6 @@ export function addCargo(fitting: Fitting, typeId: number, quantity: number): Fi
   return setCargoQuantity(fitting, typeId, held + whole);
 }
 
-/** Takes `quantity` of a type out of the cargo (a module fitted from it), down to none. */
 export function takeCargo(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const held = cargoQuantity(fitting.cargo, typeId);
   const taken = Math.min(wholeCount(quantity), held);
@@ -729,7 +572,6 @@ export function takeCargo(fitting: Fitting, typeId: number, quantity: number): F
   return setCargoQuantity(fitting, typeId, held - taken);
 }
 
-/** m3 the cargo takes, every stack of it. */
 export function cargoVolumeUsed(
   fitting: Pick<Fitting, 'cargo'>,
   volumeOf: (typeId: number) => number
@@ -737,10 +579,6 @@ export function cargoVolumeUsed(
   return fitting.cargo.reduce((sum, item) => sum + volumeOf(item.typeId) * item.quantity, 0);
 }
 
-/**
- * One entry per cargo type, first-seen order, however many stacks it arrived
- * as (a paste can list a type twice) — what the editor shows and edits.
- */
 export function cargoGroups(fitting: Fitting): FittingCargoItem[] {
   const groups = new Map<number, number>();
   for (const item of fitting.cargo) {
@@ -749,41 +587,23 @@ export function cargoGroups(fitting: Fitting): FittingCargoItem[] {
   return [...groups].map(([typeId, quantity]) => ({ typeId, quantity }));
 }
 
-/**
- * m3 of the drone bay the Fitting's drones take: every one it carries,
- * launched or not — a launched drone came out of the bay and goes back in.
- */
 export function droneBayUsed(fitting: Fitting, volumeOf: (typeId: number) => number): number {
   return fitting.drones.reduce((sum, drone) => sum + volumeOf(drone.typeId) * drone.quantity, 0);
 }
 
-/** A drone bay: its size, and how big each drone is. */
 export interface DroneBay {
-  /** m3. */
   capacity: number;
-  /** m3 of one drone of a type; 0 when unknown. */
   volumeOf: (typeId: number) => number;
 }
 
-/**
- * How many more of `typeId` fit the bay beside what it already holds —
- * never below zero, even on a fit already over the cap. `Infinity` when the
- * type's volume or the bay (`null`, before the ship data) is unknown, so a
- * missing figure never blocks an edit.
- */
 export function droneRoom(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
   if (bay === null) return Infinity;
   const volume = bay.volumeOf(typeId);
   if (volume <= 0) return Infinity;
   const free = bay.capacity - droneBayUsed(fitting, bay.volumeOf);
-  // A hair of tolerance, so 50 m3 of 5 m3 drones counts as ten, not 9.999….
   return Math.max(0, Math.floor(free / volume + 1e-9));
 }
 
-/**
- * `addDrones`, stopping at what the bay holds. Returns the same Fitting when
- * none fit, so the caller's edit history gets no empty step.
- */
 export function addDronesWithinBay(
   fitting: Fitting,
   typeId: number,
@@ -798,25 +618,15 @@ function droneGroupOf(fitting: Fitting, typeId: number): DroneGroup | undefined 
   return droneGroups(fitting).find((entry) => entry.typeId === typeId);
 }
 
-/** How many of a type the Fitting carries: in space and in the bay together. */
 export function droneCarried(group: DroneGroup | undefined): number {
   return group ? group.inSpace + group.inBay : 0;
 }
 
-/**
- * The most of `typeId` the Fitting may carry: what it carries now, plus what
- * the bay has room for.
- */
 export function droneCarriedMax(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
   const group = droneGroupOf(fitting, typeId);
   return droneCarried(group) + droneRoom(fitting, typeId, bay);
 }
 
-/**
- * Sets how many of `typeId` the Fitting carries — the List's bay count. More
- * go in the bay, stopping at what it holds; fewer come out of the bay first,
- * then out of space. Zero removes the type. A count may always come down.
- */
 export function setDronesCarried(
   fitting: Fitting,
   typeId: number,
@@ -829,11 +639,6 @@ export function setDronesCarried(
   return setDroneCounts(fitting, typeId, { inSpace, inBay: total - inSpace });
 }
 
-/**
- * The most of `typeId` that may be launched: those out already plus what
- * bandwidth and the pilot's drone count leave, and never more than the
- * Fitting carries.
- */
 export function droneLaunchedMax(
   fitting: Fitting,
   typeId: number,
@@ -846,11 +651,6 @@ export function droneLaunchedMax(
   );
 }
 
-/**
- * Launches or recalls `typeId` until `count` are in space — the drone row's
- * launch squares. Only moves drones between the bay and space; how many are
- * carried never changes.
- */
 export function setDronesLaunched(
   fitting: Fitting,
   typeId: number,
@@ -863,7 +663,6 @@ export function setDronesLaunched(
   return setDroneCounts(fitting, typeId, { inSpace, inBay: droneCarried(group) - inSpace });
 }
 
-/** Drones launched and drones carried (launched or not), every type together. */
 export function droneTotals(fitting: Fitting): { inSpace: number; carried: number } {
   return droneGroups(fitting).reduce(
     (sum, group) => ({

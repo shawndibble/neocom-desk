@@ -15,12 +15,6 @@ describe('shownKinds', () => {
     expect(shown.size).toBe(CHARACTER_BOARD_ITEM_KINDS.length - 2);
   });
 
-  /**
-   * The point of storing exclusions rather than selections: a kind added to
-   * the board later is not in anyone's stored array, and must therefore arrive
-   * switched *on*. Stored as selections it would have arrived hidden, invisible
-   * to exactly the pilots who already use the page.
-   */
   it('shows a kind nobody has an opinion about', () => {
     const hidden = ['industryJob'] as const;
     for (const kind of CHARACTER_BOARD_ITEM_KINDS) {
@@ -28,7 +22,6 @@ describe('shownKinds', () => {
     }
   });
 
-  /** Deselecting every kind is a thing a pilot can do, and the view owes them an explicit say-so. */
   it('can show nothing at all', () => {
     expect(shownKinds(CHARACTER_BOARD_ITEM_KINDS).size).toBe(0);
   });

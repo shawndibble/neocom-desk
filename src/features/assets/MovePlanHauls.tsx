@@ -11,11 +11,6 @@ interface PickupHaulListProps {
   name: (typeId: number) => string;
 }
 
-/**
- * One pickup's load split into hauls: what goes in the cargo hold and what in
- * the fleet hangar, haul by haul. Identical neighbouring hauls fold into one
- * range; every line is shown.
- */
 export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
   const { t } = useTranslation();
   const total = pickup.hauls.length;

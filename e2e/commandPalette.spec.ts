@@ -1,17 +1,7 @@
-/**
- * Command Palette smoke (#2318): Ctrl+K opens it over a signed-in page, a
- * search finds a tab, Enter navigates there. The rail's Go to button and the
- * phone's More-sheet search open it too (scope decision
- * `20261002-145653-go-to-button-opens-the-command-palette`).
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-/**
- * The shell (and its Ctrl+K listener) is up once the rail is. Not `main`: the
- * boot screen has one too, and a chord pressed there goes nowhere.
- */
 async function shellReady(page: Page): Promise<void> {
   await expect(
     page.getByRole('complementary').getByRole('link', { name: 'Overview' })

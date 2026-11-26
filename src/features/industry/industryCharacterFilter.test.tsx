@@ -117,7 +117,6 @@ describe('useIndustryCharacterFilter', () => {
     await waitFor(() => expect(result.current.jobs[0]).toBe('current'));
     const params = new URLSearchParams(result.current.search);
     expect(params.has('opps.chars')).toBe(false);
-    // The remembered pick is what an absent param already means.
     expect(params.has('industry.chars')).toBe(false);
   });
 

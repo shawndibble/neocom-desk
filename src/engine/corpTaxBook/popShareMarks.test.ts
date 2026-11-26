@@ -79,7 +79,6 @@ describe('popShareMarks', () => {
         { corporationId: 555 },
         { corporationId: 556, popSharingOptOut: OPTED_OUT },
         { corporationId: 557 },
-        // Opted out before its first Extraction synced: still marked.
         { corporationId: 558, popSharingOptOut: OPTED_OUT },
       ],
       popSharingFrom({

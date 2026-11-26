@@ -8,7 +8,6 @@ import { FittingPreview } from './FittingPreview';
 import { setDogmaEngineStatus } from './dogmaEngineStatus';
 import type { LibraryRow } from './useLibraryFittings';
 
-// The numbers and the Ring are other modules' jobs; this proves what the preview offers per row.
 vi.mock('./FittingRing', () => ({ FittingRing: () => <div data-testid="ring" /> }));
 const compared = vi.hoisted(() => ({
   state: { values: [null] as unknown[], failed: [false], retry: vi.fn() },

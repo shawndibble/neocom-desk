@@ -1,5 +1,3 @@
-// The callable router actions are strings on the wire. These hold the manifest to the registrations
-// in index.ts (the client side is covered at compile time: callRouted takes a CallableAction).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +8,6 @@ import {
   type CallableGroup,
 } from './callableManifest.js';
 
-// Frozen: deployed clients send these names. Add a line for a new action; never edit or delete one.
 const WIRE_NAMES = [
   'alerts:registerDevice',
   'alerts:saveAlertGrant',

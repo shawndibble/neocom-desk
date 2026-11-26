@@ -83,7 +83,6 @@ describe('visibleAvailableColumns', () => {
   it('drops spReady from a stored preference while monitoring is off, without mutating the preference itself', () => {
     const stored = ['name', 'spReady', 'alerts'] as const;
     expect(visibleAvailableColumns(stored, false, true)).toEqual(['name', 'alerts']);
-    // The stored array itself is untouched — only the render-time view is narrowed.
     expect(stored).toEqual(['name', 'spReady', 'alerts']);
   });
 

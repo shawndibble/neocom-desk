@@ -372,11 +372,6 @@ describe('activeOpenOrdersFilters', () => {
   });
 });
 
-/*
- * The Overview board's count tiles link here already narrowed to what they
- * counted, so these two are the deep-link vocabulary: one writes it, one reads
- * it, and the round-trip below is what stops them drifting apart.
- */
 describe('the deep-link vocabulary', () => {
   const problemsCodec = OPEN_ORDERS_FILTER_PARAMS['orders.problems'] as UrlParamCodec<
     readonly string[]
@@ -414,24 +409,11 @@ describe('the deep-link vocabulary', () => {
     expect(locationsCodec.parse('60008494,60003760')).toEqual([60003760, 60008494]);
   });
 
-  /*
-   * A URL is typed, shared and edited by hand. Every one of these is somebody
-   * arriving with a link that has rotted or been mangled, and the page they
-   * asked for — orders — is still the right answer.
-   */
   it('drops what it does not recognise instead of throwing', () => {
     expect(problemsCodec.parse('undercutStation,nonsense')).toEqual(['undercutStation']);
     expect(charactersCodec.parse('91,abc')).toEqual([]);
   });
 
-  /*
-   * `healthy` is a real word in this vocabulary and still not one this
-   * endpoint can honour: healthy orders sit under the All segment, so a filter
-   * naming it empties the default Needs you segment — nought, with a chip the
-   * reader cannot reason about. The
-   * funnel already cannot produce that state (`PROBLEM_FILTER_OPTIONS` leaves
-   * `healthy` out); only a URL can.
-   */
   it('refuses `healthy`, which would filter to a guaranteed empty page', () => {
     expect(problemsCodec.parse('healthy')).toEqual([]);
     expect(problemsCodec.parse('healthy,outbid')).toEqual(['outbid']);

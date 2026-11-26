@@ -1,12 +1,3 @@
-/**
- * Generated ESI data for the manual-testing sandbox (.claude/skills/manual-testing): a busy
- * Character with a skill queue, a wallet journal, assets in two hubs, industry jobs, a
- * mining ledger and market orders. Routes are registered after `installEsiMock`, so they win
- * over its empty answers; anything not listed here still falls through to it.
- *
- * Deterministic on purpose (no Math.random): a reload shows the same rows. Dates are relative
- * to "now" so the data never looks stale. Type ids are real (checked against the bundled SDE).
- */
 import type { Page } from '@playwright/test';
 import { CHARACTER_ID } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
@@ -42,7 +33,6 @@ const ORES = [1230, 1228, 1224];
 const MOON_ORES = [45490, 45491, 45492];
 const SHIPS = [587, 24698, 638, 16240, 22544, 17476, 28606];
 const MODULES = [2048, 3841, 12058, 21896];
-/** Blueprint type -> product type (manufacturing). */
 const BLUEPRINTS: [number, number][] = [
   [24699, 24698],
   [691, 587],
@@ -211,7 +201,6 @@ function orders() {
 }
 
 function skillQueue() {
-  // Skills known to the bundled data (public/data/skills.json); ids picked from the fixture set.
   return [3380, 3392, 3402, 3300].map((skillId, i) => ({
     skill_id: skillId,
     queue_position: i,
@@ -224,7 +213,6 @@ function skillQueue() {
   }));
 }
 
-/** Registers the routes; call after `installEsiMock` so these take precedence. */
 export async function installPersonalEsi(page: Page): Promise<void> {
   const c = `/characters/${CHARACTER_ID}`;
   const lists: Record<string, () => unknown> = {

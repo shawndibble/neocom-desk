@@ -8,24 +8,12 @@ import { exportFlag } from '@/lib/exportFlag';
 import { endpointSystemName } from './courierEndpointNames';
 import { markedEndpointRisks, RISK_COPY } from './courierRiskLabels';
 
-/** The board's own spellings and distances, so the export matches what is drawn. */
 export interface CourierCsvLookups {
-  /** `null` for an end with no region (an unplaced structure). */
   regionName: (regionId: number | null) => string | null;
-  /** Jumps under the board's route preference; `null` when unknown or unreachable. */
   jumps: (row: CourierRouteRow) => number | null;
-  /** How many times the market's going rate the haul pays; `null` when unstatable (no distance, volume or enough corpus). */
   goingRateMultiple: (row: CourierRouteRow) => number | null;
 }
 
-/**
- * CSV columns for the courier board. The table's Route cell folds both ends
- * and their regions into one; a spreadsheet wants them apart, so each gets a
- * column under the board's own Pick up / From region / Drop off / To region
- * labels. Figures are raw numbers; a rate with no distance to divide by is
- * blank, never 0. A haul asking no collateral is 0 (a real "none asked"). The
- * expiry is epoch ms in the row, handed on as an ISO UTC timestamp.
- */
 export function courierContractsCsvColumns(
   t: CsvTranslate,
   lookups: CourierCsvLookups
@@ -65,13 +53,11 @@ export function courierContractsCsvColumns(
       header: t('contractSearch.expiresColumn'),
       value: (row) => new Date(row.dateExpired).toISOString(),
     },
-    // Endpoint security, as the Route cell prints it beside each system name.
     { header: t('contractSearch.originSecurityColumn'), value: (row) => row.origin.security },
     {
       header: t('contractSearch.destinationSecurityColumn'),
       value: (row) => row.destination.security,
     },
-    // The warning markers the Route cell wears beside each end.
     {
       header: t('contractSearch.originRiskColumn'),
       value: (row) => riskText(row.origin, 'origin'),

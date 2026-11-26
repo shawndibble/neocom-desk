@@ -11,7 +11,6 @@ import type { LocationState } from './orderScopeState';
 import { CostLedger } from './OrderCostLedger';
 import { formatCount } from '@/lib/formatCount';
 
-/** "Cost basis" (sell orders only): the ledger the floor came from, the structure fee and the build link. */
 export function OrderCostSection({
   row,
   location,
@@ -28,10 +27,6 @@ export function OrderCostSection({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  // The one floor this app shows as a figure (20260906-155913), rounded UP
-  // to the nearest legal price (issue #1421): safe to type into an order,
-  // never below the exact break-even — `belowFloor` detection elsewhere still
-  // compares against the exact `row.floor.relist`, never this.
   const floorShown = row.floor ? shownFloorPrice(row.floor) : null;
 
   const costTrailing =

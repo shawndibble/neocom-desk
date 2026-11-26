@@ -6,10 +6,6 @@ import { loadContractLocationName } from './contractLocationName';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
-/**
- * Names for the courier start and end places of `contracts`, for the export (a sync read can't
- * wait on a lookup). One keyed load on the contracts' own ids, so a filter change doesn't reload.
- */
 export function useCourierLocationNames(
   contracts: readonly Contract[],
   characterIdFor: (contract: Contract) => number | null,
@@ -29,7 +25,6 @@ export function useCourierLocationNames(
   }, [contracts, characterIdFor]);
   const key =
     places.length > 0 ? places.map(([id, characterId]) => `${characterId}:${id}`).join(',') : null;
-  // Reads the key, not `places`, so the loader only changes when the ids do.
   const load = useCallback(async () => {
     const found = new Map<number, string>();
     const wanted = (key?.split(',') ?? []).map((pair) => pair.split(':').map(Number));

@@ -69,7 +69,6 @@ describe('ComingUpRail overdue-before-today items', () => {
     important: false,
   });
   afterEach(() => useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false }));
-  // 12:00 UTC on the EVE clock: an item 1/24 of a day old went overdue today.
   const items = [extractor('Old A', 31), extractor('Old B', 1), extractor('Fresh', 1 / 24)];
 
   it('folds items overdue from before today into one summary row that expands', async () => {

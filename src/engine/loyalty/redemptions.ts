@@ -1,16 +1,3 @@
-/**
- * LP Store Offer Detail's "How many" box (issue #5659): an offer redeemed N
- * times, priced by walking the order books instead of at the top of book.
- *
- * Pure, like every `src/engine` module: the caller (`features/loyalty`) fetches
- * the books. Required items walk the station's sell book for N × quantity
- * (`walkSellBook`). The output walks the reachable buy book on the instant
- * basis (`walkSellIntoBuys`, #5653) and stays at top of book on the list-order
- * basis. Fees are `loyaltyOfferProfit`'s: N redemptions are one stack, one
- * listing. A required item the book cannot fill leaves the cost unpriced (the
- * redemption cannot be bought out); output units a buy book cannot take earn
- * nothing and are stated.
- */
 import { walkSellBook } from '@/engine/industry/depthPrice';
 import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import type { SkillLevels } from '@/engine/industry/types';
@@ -21,27 +8,17 @@ import type { ResolvedStandings } from '@/engine/market/standings';
 import { loyaltyOfferProfit, type LoyaltyOfferProfit } from './offerProfit';
 
 export interface RedemptionsInput {
-  /** N, at least 1. */
   redemptions: number;
-  /** Per redemption. */
   iskCost: number;
   lpCost: number;
-  /** Per redemption; `unitPrice` is the top-of-book price the row already shows. */
   requiredItems: readonly { typeId: number; quantity: number; unitPrice: number | null }[];
-  /** Units of the output one redemption hands over; null when unknown. */
   outputUnits: number | null;
-  /** The row's top-of-book unit price for the output; null when unpriced. */
   outputTopUnitPrice: number | null;
-  /** Per redemption: a blueprint's materials plus job fee, 0 for a plain item. */
   buildCost: number;
   stationId: number;
-  /** The station's sell book per required type; absent while loading or failed. */
   sellBooks: ReadonlyMap<number, readonly HubOrder[]>;
-  /** `instant` walks `buyOrders`; `order` keeps the output at top of book. */
   outputBasis: 'order' | 'instant';
-  /** Buy orders that reach the station; undefined while the book is loading. */
   buyOrders: readonly ReachableBuyOrder[] | undefined;
-  /** The output's **Traded Price Ceiling**: a bid far above it counts at it (margin-trading bait). */
   outputPriceCeiling?: number | null;
   liquidationBasis: LiquidationBasis;
   skills: SkillLevels;
@@ -54,9 +31,7 @@ export interface RedemptionsLine {
   unitsNeeded: number;
   filled: number;
   unfilled: number;
-  /** ISK for the filled units; null when the line cannot be priced. */
   lineCost: number | null;
-  /** The walked average is above the top of book. */
   moved: boolean;
 }
 
@@ -65,7 +40,6 @@ export interface RedemptionsOutput {
   filled: number;
   unsold: number;
   revenue: number | null;
-  /** The walked average is below the top bid. */
   moved: boolean;
 }
 

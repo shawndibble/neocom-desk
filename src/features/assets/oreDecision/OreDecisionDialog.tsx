@@ -1,13 +1,3 @@
-/**
- * "What to do with this ore" (issue #2836, design A): an Assets stack of ore
- * set against its three exits: sell it raw, refine it then sell the minerals,
- * or use it in a Build Plan that still has to buy those minerals.
- *
- * Built like the Mining day detail (`YieldDetailModal`): three cards, a
- * "Refines into" table and a "How this is priced" note. Sell now only, at the
- * Market Hub's buy price less sales tax, both exits taxed alike so they compare
- * like with like. The refining facility is an assumption the dialog states.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { fixed1, fixed2 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
@@ -72,7 +62,6 @@ interface OreData {
   recipe: OreRecipe | null;
   modifiers: CharacterModifiers;
   hub: TradeHub;
-  /** Hub buy price per type id, for the ore and the minerals it refines into. */
   buyPrices: Record<number, number>;
   names: ReadonlyMap<number, string>;
 }
@@ -110,8 +99,6 @@ function Card({
           {suggested && <span className="sr-only"> — {t('assets.oreDecision.suggested')}</span>}
         </p>
         {suggested && (
-          // Decorative twin of a screen-reader "Suggested": hue alone never
-          // marks the pick (WCAG 1.4.1), and `accent-dim` is not for text.
           <span
             aria-hidden="true"
             className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide text-accent uppercase"
@@ -148,8 +135,6 @@ export function OreDecisionDialog({
   const [data, setData] = useState<OreData | null>(null);
   const [planId, setPlanId] = useState<string | null>(null);
 
-  // What couldn't load, rather than a spinner for good: the reprocessing data
-  // is a lazy download that can be missing offline; anything else is a plain failure.
   const {
     failed: loadFailed,
     attempt: loadAttempt,
@@ -160,7 +145,6 @@ export function OreDecisionDialog({
   const [reprocessingMissing, setReprocessingMissing] = useState(false);
 
   useEffect(() => {
-    // Priced only once the hub is read, so the figures never load twice.
     if (!hubHydrated) return;
     let cancelled = false;
     clearLoadFailure();
@@ -207,7 +191,6 @@ export function OreDecisionDialog({
     };
   }, [typeId, hubId, hubHydrated, activeCharacterId, loadAttempt, failLoad, clearLoadFailure]);
 
-  // Plans: resolved exactly as the Industry index resolves them.
   const workspace = useIndustryWorkspace();
   const plansQuery = useLiveQuery(
     async () =>
@@ -262,7 +245,6 @@ export function OreDecisionDialog({
     [stack, data, taxPct, refiningSetup.taxRate]
   );
 
-  /** Plans still buying a mineral this ore refines into, with that remaining need. */
   const eligible = useMemo(() => {
     if (!exits) return [];
     const yields = new Set(exits.outputs.map((o) => o.typeId));

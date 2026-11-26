@@ -20,11 +20,6 @@ import { useReorder } from '../useReorder';
 import type { PlanEditorProps } from './types';
 import type { PlanScheduleResult } from './usePlanSchedule';
 
-/**
- * Every optimize flow the Optimize menu offers (Optimize remaps, Optimize for me,
- * reorder / shortest-first, Optimize at my markers), sharing one remap budget, one set of
- * remap-placement inputs and one pricing context.
- */
 export function usePlanOptimize({
   plan,
   engineSkills,
@@ -65,19 +60,12 @@ export function usePlanOptimize({
   onUpdate: PlanEditorProps['onUpdate'];
 }) {
   const { scheduled, priorityMap, markersResult: markersAtCurrentPositions } = schedule;
-  // `new Date()` matches every other "plan starts now" read in this
-  // component (e.g. `scheduleFromNow`). Memoized so its reference stays
-  // stable across renders, not invalidating the header badge's own memo.
   const budget = useMemo(
     () => remapBudget(remapInfo, plan.remapCount, new Date()),
     [remapInfo, plan.remapCount]
   );
-  // `requestedRemapCount` stays uncapped so `evaluateOptimizationBadge` can
-  // tell a genuine over-cap request from one the timed remap alone accounts
-  // for; `remapCount` is what the optimizer actually gets.
   const { timed: timedRemap, count: requestedRemapCount, evaluatedCount: remapCount } = budget;
 
-  // Remap-placement inputs shared by every optimize flow that calls `placeRemaps` (directly, or via `optimizeForMe`).
   function buildRemapOptions(): PlaceRemapsOptions {
     return {
       remapCount,
@@ -85,8 +73,6 @@ export function usePlanOptimize({
       implants: effectiveImplants,
       cloneState,
       timedRemap: timedRemap ?? undefined,
-      // The same Boosters the computed queue schedules with, so the savings
-      // figure and the queue total cannot disagree.
       booster:
         activeBoosters.length > 0
           ? { boosters: activeBoosters, startDate: new Date(queueProjection.startMs) }

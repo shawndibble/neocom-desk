@@ -61,7 +61,6 @@ describe('buildAssetTree', () => {
       asset({ item_id: 3, type_id: 999 }),
     ];
     const tree = buildAssetTree(assets, prices, new Map([[1, 5_000_000]]));
-    // Copy 1 at its contract value, copy 2 unpriced (0), the original at the type price.
     expect(tree[0].estimatedValue).toBe(2_005_000_000);
   });
 
@@ -112,7 +111,6 @@ describe('buildAssetTree', () => {
       'droneBay',
       'fitting',
     ]);
-    // Self-exclusion: the ship's own badge is its contents only, not its own hull.
     expect(ship.itemCount).toBe(50 + 3 + 1);
   });
 
@@ -177,7 +175,6 @@ describe('buildAssetTree', () => {
     expect(inner.children).toEqual([
       { kind: 'item', asset: expect.objectContaining({ item_id: 3 }) },
     ]);
-    // The outer badge counts the inner container itself (qty 1) plus the leaf inside it (qty 9).
     expect(outer.itemCount).toBe(10);
   });
 
@@ -262,12 +259,6 @@ describe('buildAssetTree', () => {
     expect(grandTotal).toBe(totalQuantity);
   });
 
-  // A player-owned structure is never an asset row of its own: ESI reports
-  // everything docked there as location_type 'item' pointing at the structure
-  // id. That makes the ships AND their contents orphan candidates, so an input
-  // order that puts a ship's cargo ahead of the ship itself used to promote the
-  // ship's own item_id to a top-level group while still nesting that ship under
-  // the structure — the same hull and cargo counted in two places.
   it("conserves total quantity when a structure's ships are listed after their cargo", () => {
     const structureId = 1_040_000_000_001;
     const indices = [1, 2, 3, 4, 5];
@@ -295,12 +286,10 @@ describe('buildAssetTree', () => {
 
     const totalQuantity = assets.reduce((sum, a) => sum + a.quantity, 0);
     expect(tree.reduce((sum, station) => sum + station.itemCount, 0)).toBe(totalQuantity);
-    // ...and no phantom location row keyed on a ship's item_id beside the structure.
     expect(tree.map((station) => station.locationId)).toEqual([structureId]);
   });
 
   it('cuts a reachable cycle instead of recursing forever', () => {
-    // A claims to be a top-level orphan container holding B; B claims to hold A back.
     const assets = [
       asset({
         item_id: 1,
@@ -329,7 +318,6 @@ describe('buildAssetTree', () => {
     expect(outer.kind).toBe('container');
     const inner = outer.children[0] as AssetTreeContainerNode;
     expect(inner.kind).toBe('container');
-    // The cycle is cut here: this leaf points back to `outer`'s own asset instead of recursing.
     expect(inner.children).toEqual([
       { kind: 'item', asset: expect.objectContaining({ item_id: outer.asset.item_id }) },
     ]);
@@ -593,14 +581,14 @@ describe('buildAssetGroups', () => {
   it('recurses into a container root the same way a station does, nesting its contents rather than flag-bucketing them separately', () => {
     const groups = buildAssetGroups(
       [
-        flagAsset({ item_id: 10, type_id: 650, location_flag: 'CorpSAG1' }), // container root
+        flagAsset({ item_id: 10, type_id: 650, location_flag: 'CorpSAG1' }),
         flagAsset({
           item_id: 11,
           quantity: 50,
           location_id: 10,
           location_type: 'item',
           location_flag: 'Unlocked',
-        }), // nested inside it
+        }),
       ],
       DIVISIONS,
       ALWAYS,
@@ -613,11 +601,9 @@ describe('buildAssetGroups', () => {
         children: [{ kind: 'item', asset: expect.objectContaining({ item_id: 11 }) }],
       }),
     ]);
-    // The container's own quantity (1) plus its nested contents (50).
     expect(division1?.itemCount).toBe(51);
   });
 
-  /** Every asset's own `item_id`, whether it ended up a leaf or a container/ship/bay's own node. */
   function collectAllItemIds(node: AssetTreeNode): number[] {
     if (node.kind === 'bay') return node.children.flatMap(collectAllItemIds);
     if (node.kind === 'item') return [node.asset.item_id];
@@ -625,9 +611,6 @@ describe('buildAssetGroups', () => {
   }
 
   it('rescues an orphan whose parent has no row in this fetch, rather than dropping it', () => {
-    // item_id 4 is 'item'-typed pointing at location_id 3, but nothing with
-    // item_id 3 exists in this asset list — the structure-not-returned case
-    // buildAssetTree's own absentParentGroups pass exists for.
     const groups = buildAssetGroups(
       [flagAsset({ item_id: 4, location_id: 3, location_type: 'item', location_flag: 'CorpSAG2' })],
       DIVISIONS,
@@ -643,10 +626,10 @@ describe('buildAssetGroups', () => {
     const assets = [
       flagAsset({ item_id: 1, location_flag: 'CorpSAG1' }),
       flagAsset({ item_id: 2, location_flag: 'CorpSAG2' }),
-      flagAsset({ item_id: 3, type_id: 650, location_flag: 'CorpSAG3' }), // container root
-      flagAsset({ item_id: 4, location_id: 3, location_type: 'item', location_flag: 'Unlocked' }), // nested
-      flagAsset({ item_id: 5, location_flag: 'SomeFutureFlag' }), // falls into 'other'
-      flagAsset({ item_id: 6, location_id: 999, location_type: 'item', location_flag: 'CorpSAG1' }), // orphan: parent absent
+      flagAsset({ item_id: 3, type_id: 650, location_flag: 'CorpSAG3' }),
+      flagAsset({ item_id: 4, location_id: 3, location_type: 'item', location_flag: 'Unlocked' }),
+      flagAsset({ item_id: 5, location_flag: 'SomeFutureFlag' }),
+      flagAsset({ item_id: 6, location_id: 999, location_type: 'item', location_flag: 'CorpSAG1' }),
     ];
     const groups = buildAssetGroups(assets, DIVISIONS, ALWAYS, groupIdFor);
     const reachable = groups.flatMap((g) => g.children.flatMap(collectAllItemIds));
@@ -654,13 +637,6 @@ describe('buildAssetGroups', () => {
     expect(reachable).toHaveLength(assets.length);
   });
 
-  /**
-   * `buildNode`'s ancestor guard cuts a cycle by turning the closing edge into
-   * a duplicate leaf stub (same mechanism `buildAssetTree` itself relies on)
-   * — so a cycle's members are promoted rather than dropped, but can appear
-   * more than once in the result. This only checks "not dropped", not
-   * "exactly once", since the duplicate is inherent to that shared cut.
-   */
   it('promotes an isolated cycle rather than dropping its members', () => {
     const assets = [
       flagAsset({ item_id: 7, location_id: 8, location_type: 'item', location_flag: 'CorpSAG2' }),

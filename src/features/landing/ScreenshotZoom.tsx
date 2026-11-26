@@ -4,10 +4,6 @@ import { ICON_SIZE, Search } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { screenshotSrc, type Screenshot } from './screenshots';
 
-/**
- * The enlarged view of a landing screenshot: one Modal for the section, `shot`
- * null while closed. Shared by the question grid and the showcase.
- */
 export function ScreenshotZoom({
   shot,
   onClose,
@@ -36,11 +32,6 @@ export function ScreenshotZoom({
   );
 }
 
-/**
- * The magnifier in a picture's corner (DESIGN.md §6c "Magnifier badge"). The
- * nearest `group` is either the button itself (`group-focus-visible`) or a
- * wrapper around it (`group-has-[:focus-visible]`); both reveal it on focus.
- */
 export function ZoomBadge({ className }: { className?: string }) {
   return (
     <span

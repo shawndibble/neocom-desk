@@ -9,14 +9,9 @@ import * as feederView from './corpTaxBookFeederView.js';
 import { CORPS_COLLECTION, SRP_COLLECTIONS } from './srpTypes.js';
 import * as vetting from './vettingTypes.js';
 
-// deleteBook keeps every `corps/{id}` subcollection named in SRP_COLLECTIONS or
-// VETTING_COLLECTIONS and deletes the rest, so a vetting collection missing from the list would
-// be wiped with the book.
-
 const here = dirname(fileURLToPath(import.meta.url));
 const exported = { ...vetting, CORPS_COLLECTION } as unknown as Record<string, unknown>;
 
-/** Every `.collection(...)` argument in the non-test vetting sources, as a resolved name. */
 function sourceCollections(): string[] {
   const names = new Set<string>();
   for (const file of readdirSync(here)) {
@@ -35,7 +30,6 @@ function sourceCollections(): string[] {
 
 describe('VETTING_COLLECTIONS', () => {
   it('names every collection the vetting code keeps directly under corps/{id}', () => {
-    // Both sit under a review: no collection of their own.
     const used = sourceCollections().filter(
       (name) =>
         name !== CORPS_COLLECTION && name !== vetting.VETTING_INPUTS && name !== vetting.VETTING_RAW

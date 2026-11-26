@@ -10,7 +10,6 @@ import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
 import { exportFlag } from '@/lib/exportFlag';
 import { BPC_SEARCH_COLUMN_IDS, type BpcSearchColumnId } from './bpcSearchColumns';
 
-/** What the "BPO too" badge says about a row's blueprint original. */
 export interface BpcBpoBadge {
   price: number;
   locationName: string | null;
@@ -21,22 +20,12 @@ export interface BpcBpoBadge {
 export interface BpcSourcingCsvContext {
   nameFor: (typeId: number) => string;
   regionName: (regionId: number) => string;
-  /** The row's settled jump count; null while pending, unmeasurable, or unplaced. */
   jumpsFor: (row: BpcSearchRow) => number | null;
-  /** The row's solar system security, or null when it has no resolved system. */
   securityFor: (row: BpcSearchRow) => number | null;
-  /** The contract copy's percent from its similar copies' median per run; null with no comparison. */
   peerDiffFor: (row: BpcContractRow) => number | null;
-  /** The BPO the table's "BPO too" badge sits on, by row (see `bpoBadgeRows`); a row without one is absent. */
   bpoBadges: ReadonlyMap<BpcSearchRow, BpcBpoBadge>;
 }
 
-/**
- * The ISK a row asks for, raw. A contract's is `effectivePrice` (an auction's
- * buyout) — except a PLEX barter's, whose ask isn't ISK at all, so it is blank
- * rather than a misleading 0 (a PLEX ask *plus* a real ISK price keeps the ISK
- * figure). An owned row has no price.
- */
 function priceOf(row: BpcSearchRow): number | null {
   if (row.source === 'market' || row.source === 'lp' || row.source === 'community') {
     return row.price;
@@ -51,12 +40,6 @@ function regionIdOf(row: BpcSearchRow): number | null {
   return row.source === 'contract' ? row.contract.regionId : row.regionId;
 }
 
-/**
- * Export columns for BPC Sourcing's table: Item, then every column the table
- * can show (whether or not the pilot has it visible), then the facts the table
- * keeps in badges and sub-lines. Every figure raw; a BPO's -1 runs, and every
- * cell the table fills with "n/a", is blank.
- */
 export function bpcSourcingCsvColumns(
   t: CsvTranslate,
   context: BpcSourcingCsvContext

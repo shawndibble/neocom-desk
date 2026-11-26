@@ -68,7 +68,6 @@ describe('MemberSrp', () => {
     ).toBe(true);
     expect(within(lost).getByText('Claimed')).toBeTruthy();
     expect(within(lost).getByText('Not covered')).toBeTruthy();
-    // A loss past the corp's window (the 45-day Gila) is not listed at all.
     expect(within(lost).queryByText('Too old')).toBeNull();
     expect(within(lost).queryByRole('button', { name: 'Gila' })).toBeNull();
     const claims = screen.getByRole('table', { name: 'My SRP claims' });
@@ -159,7 +158,6 @@ describe('MemberSrp', () => {
         killedAt: Date.now() - 90 * 86_400_000,
       },
     ]);
-    // The spy lands after the first read: reload through Retry-free remount.
     cleanup();
     render(
       <MemoryRouter>
@@ -261,7 +259,6 @@ describe('MemberSrp', () => {
     await userEvent.type(screen.getByLabelText('Note'), 'It was a fleet.');
     const submit = screen.getByRole('button', { name: 'Re-file claim' });
     expect((submit as HTMLButtonElement).getAttribute('aria-disabled')).toBe('true');
-    // The dialog's field is the last one in the document; the page form's comes first.
     await userEvent.type(screen.getAllByLabelText('Fleet or FC').at(-1)!, 'Kestrel Vane');
     await userEvent.click(submit);
     await waitFor(() =>
@@ -332,8 +329,6 @@ describe('MemberSrp', () => {
       setup();
       const preview = vi.spyOn(backend, 'previewDoctrine');
       await paste('https://zkillboard.com/kill/123/hurricane');
-      // The link field shows once the hull rules have loaded, and with none checked
-      // the preview never arms its debounce: nothing is pending, not even a check.
       expect(screen.queryByText('Checking your fit against the corp’s Doctrine Fits…')).toBeNull();
       expect(preview).not.toHaveBeenCalled();
     });

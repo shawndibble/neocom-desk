@@ -1,13 +1,3 @@
-/**
- * The Profit widget: what the pilot made over 7, 30 or 90 days, from the
- * widget's Source (decision `20261024-191335`). Builds is the logged industry
- * runs (`buildProfit`), Trading the market sales priced against the buys they
- * used up (`tradingProfit`), each drawn exactly as its own widget was; Both
- * adds them up here, with the summing in `profitCombine.ts`.
- *
- * Scope: every Source can read All characters: Builds the logged runs of each
- * Character, Trading its pooled fills (`KindDef.bySettings` in `kindModels.ts`).
- */
 import { formatIskCompactSigned } from '@/lib/isk';
 import { WALLET_TRADE_ENDPOINTS } from '../kinds';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
@@ -18,27 +8,17 @@ import { readTrading, tradingNotes, tradingProfit, tradingSource } from './tradi
 import type { KindView, ListRow, TableModel } from './types';
 import { buildProfit, buildsSource, vsPrevious } from './worldModels';
 
-// Keys a `${prefix}.word` template names pin `word` in every lazy locale section into the
-// startup shell (localeSplit's third shape), so a key whose last segment is common stays literal.
 const W = 'overview.widgets.profit';
 const C = 'overview.widgets.chart.profit';
-/** The chart strings every bar chart shares. */
 const CS = 'overview.widgets.chart';
 
 export const profit: Builder = (allFeeds, ctx) => {
-  // On All characters the builds read is every Character's runs, drawn by the same builders.
   const feeds = ctx.scopeAll ? { ...allFeeds, profit: allFeeds.profitAll } : allFeeds;
   if (ctx.profitSource === 'trading') return tradingProfit(feeds, ctx);
   if (ctx.profitSource === 'both') return bothProfit(feeds, ctx);
   return buildProfit(feeds, ctx);
 };
 
-/**
- * Builds plus Trading. The builds read leads: until it lands the widget is
- * loading, and its failure is the widget's. A Trading read that failed, or a
- * Character that cannot read its wallet, leaves the builds alone on show, with
- * a note or a Grant access saying what is missing.
- */
 const bothProfit: Builder = (feeds, ctx) => {
   const { t, now, range } = ctx;
   const to = '/industry';
@@ -47,7 +27,6 @@ const bothProfit: Builder = (feeds, ctx) => {
   const builds = buildsFeed?.data ?? null;
   const trades = tradingFeed?.data ?? null;
   if (!builds) return blank(to, statusOf(buildsFeed));
-  // One figure from two reads: wait for both rather than redraw when the second lands.
   if (!trades && (tradingFeed?.loading ?? true)) {
     return blank(to, statusOf(buildsFeed, { loading: true, hasData: false }));
   }
@@ -75,7 +54,6 @@ const bothProfit: Builder = (feeds, ctx) => {
     ],
     rows: combined.rows.map((row) => ({
       key: `${row.source}:${row.key}`,
-      // Toned like Trading's own table, so a gain or a loss reads the same from either source.
       cells: [
         row.name,
         row.profit === null ? UNKNOWN : signedCell(formatIskCompactSigned(row.profit), row.profit),
@@ -110,7 +88,6 @@ const bothProfit: Builder = (feeds, ctx) => {
     ...blank(to, statusOf(buildsFeed, { isEmpty: empty })),
     ...(trades ? { fetchedAt: trades.fetchedAt } : {}),
     emptyMessage: t('overview.widgets.profit.emptyBoth'),
-    // A Character in scope with no wallet read: the builds still show, with the grant Trading needs under them.
     ...(trades && read === null ? { grantEndpoints: WALLET_TRADE_ENDPOINTS } : {}),
     number: {
       value: formatIskCompactSigned(combined.total),
@@ -132,7 +109,6 @@ const bothProfit: Builder = (feeds, ctx) => {
               key: 'builds',
               label: label('builds'),
               color: 's1',
-              // The legend reads where the line ends: the latest period.
               end: formatIskCompactSigned(buildValues.at(-1) ?? 0),
               values: buildValues,
             },

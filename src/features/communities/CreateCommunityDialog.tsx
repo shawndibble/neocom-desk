@@ -7,7 +7,6 @@ import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const MAX_NAME_LENGTH = 60;
 
-/** Names a new Community; the creating Character becomes its admin and first Member. */
 export function CreateCommunityDialog({
   open,
   characterId,

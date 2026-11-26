@@ -51,7 +51,6 @@ interface BpcColumnsInput {
   selectedTypeId: number | null;
   visibleColumns: readonly BpcSearchColumnId[];
   displayRows: BpcSearchRow[];
-  /** A copy's percent from its similar copies' median, judged against every listed copy, not the filtered board. */
   peerDiffOf: (row: BpcContractRow) => number | null;
   bpoByType: ReadonlyMap<number, BpoOffer>;
   bpcRowJumps: (row: BpcSearchRow) => JumpsCellValue;
@@ -61,7 +60,6 @@ interface BpcColumnsInput {
   onAsk: (row: Extract<BpcSearchRow, { source: 'community' }>) => void;
 }
 
-/** The table's columns, the sort, and the capped rows the sort keeps (`RESULT_LIMIT`). */
 export function useBpcColumns({
   blueprintNames,
   regionNames,
@@ -108,15 +106,10 @@ export function useBpcColumns({
         className: 'truncate',
         sortValue: (row) => (row.source === 'lp' ? row.corpName : (row.locationName ?? '')),
         render: (row) => {
-          // An LP offer's place is its corporation; its nearest station, once found, sits beneath.
           const name =
             row.source === 'lp'
               ? row.corpName
               : (row.locationName ?? t('bpcContracts.notApplicable'));
-          // The station's security after its name, the figure a buyer weighs
-          // a trip by. On the phone card's meta line a fifty-character
-          // station name is cut short — it opens with its system's name, so
-          // "Jita IV - Moon 4 -…" still says where.
           const system = row.systemId == null ? undefined : solarSystems?.get(row.systemId);
           const security = system && <SecurityStatus security={system.security} />;
           const place = (
@@ -134,7 +127,6 @@ export function useBpcColumns({
                 : security}
             </>
           );
-          // The owner's #1240 rule for market BPOs: the whole region, the hub's own station marked.
           if (row.source !== 'market' || !row.atHub)
             return <DataTableDenseCell>{place}</DataTableDenseCell>;
           return (
@@ -148,12 +140,6 @@ export function useBpcColumns({
         },
       },
       jumps: {
-        // A row's own distance from the Current System, independent of
-        // whether the Jump Range filter above is even active
-        // (`jumpFilter.jumps`/`jumpsStatus` are populated at every range,
-        // `useJumpRangeFilter`). A row with no resolved system at all (still
-        // loading, or ESI never placed it) sinks to a settled `null` — the
-        // filter's own status has nothing to say about a row it never saw.
         id: 'jumps',
         header: t('bpcContracts.jumpsColumn'),
         width: COL_SMALL_NUMBER,
@@ -161,8 +147,6 @@ export function useBpcColumns({
         className: 'tabular-nums',
         sortFirst: 'asc',
         sortValue: (row) => jumpsCellSortValue(bpcRowJumps(row)),
-        // The dense phone card has no header row, and a bare "7" beside a
-        // system name says nothing about what it counts.
         stackAffix: { before: t('bpcContracts.mobile.jumpsAffix') },
         render: (row) =>
           renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint', row.systemId),
@@ -175,8 +159,6 @@ export function useBpcColumns({
         className: 'tabular-nums',
         sortValue: (row) => row.me,
         stackAffix: { before: t('bpcContracts.mobile.meAffix') },
-        // Full text, not the meta line's dim: on the phone card the copy's
-        // quality is what a buyer reads after its price.
         render: (row) => <QualityValue omitOnCard={blueprintPicked}>{row.me}</QualityValue>,
       },
       te: {
@@ -197,7 +179,6 @@ export function useBpcColumns({
         className: 'tabular-nums',
         sortValue: (row) => row.runs ?? undefined,
         stackAffix: { after: t('bpcContracts.mobile.runsAffix') },
-        // A BPO's -1 renders as ∞, not a nonsensical negative count.
         render: (row) => (
           <QualityValue omitOnCard={blueprintPicked}>
             {row.runs === null
@@ -223,15 +204,8 @@ export function useBpcColumns({
         header: t('bpcContracts.priceColumn'),
         width: '20ch',
         align: 'right',
-        // The headline figure of the dense phone card, on the title line.
         cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
-        // `effectivePrice`, not the `buyout ?? price` this used to inline: EVE
-        // Ref's CSV carries a buyout on non-auction contracts too whenever the
-        // field parses, so an item_exchange row with `buyout: 0` sorted to the
-        // top of the table while rendering — and now summarising — at its real
-        // price. An owned row costs nothing, so it sorts at 0 beside Community
-        // rows: sorted last it fell past the result cap and never showed.
         sortFirst: 'asc',
         sortValue: (row) => {
           if (row.source === 'market' || row.source === 'lp' || row.source === 'community') {
@@ -239,10 +213,6 @@ export function useBpcColumns({
           }
           const contract = asContract(row);
           if (!contract) return 0;
-          // A PLEX-for-item barter's real ask isn't ISK at all (issue #1105)
-          // — sorting it at its `0` ISK price would put it above every real
-          // priced offer as "cheapest", which it isn't. Sorts last, unlike an
-          // owned or Community row, whose free price is real.
           if (contract.requestedPlex) return Infinity;
           return effectivePrice(contract);
         },
@@ -266,20 +236,6 @@ export function useBpcColumns({
           }
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
-          // An auction's figure carries a short "buyout"/"bid" tag after
-          // it, Contract Search's own, rather than "Starting bid: 12,000,000"
-          // — too wide for the phone card's headline corner, and the number
-          // alone would read as a fixed ask. Sorting is unaffected:
-          // `sortValue` reads `effectivePrice`. Long press, not tap: a row
-          // tap opens the contract.
-          //
-          // A contract asking for PLEX (issue #1105) usually has an ISK
-          // `price` of `0` — the ask is the PLEX, not a real zero — so its
-          // requested quantity is shown here instead of the ISK figure
-          // `sortValue` would otherwise reflect as "free". Some issuers ask
-          // for both an ISK amount and PLEX in the same contract, so a real
-          // (non-zero) price alongside `requestedPlex` is shown as both
-          // figures rather than the PLEX one alone hiding the ISK ask.
           const amount = contract.requestedPlex ? (
             contract.price > 0 ? (
               t('bpcContracts.iskPlusPlexPrice', {
@@ -299,14 +255,8 @@ export function useBpcColumns({
           ) : (
             <IskAmount value={contract.price} />
           );
-          // A multi-type contract's ask is real but indivisible (issue
-          // #1076) — marked rather than attributed to this one blueprint;
-          // the row itself already opens the contract detail, which prices
-          // both sides of a bundle.
           if (!contract.isMultiType) return amount;
           return (
-            // Right-hugging at every width: on the phone card the price is
-            // the title line's right-hand figure, not a labelled field.
             <span className="flex flex-col items-end">
               <span>{amount}</span>
               <span className="text-[0.6875rem] text-text-dim">
@@ -322,9 +272,6 @@ export function useBpcColumns({
         width: '16ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        // Same rule as the Courier board's ISK/jump: no rate sinks the row in
-        // either direction, `undefined` rather than a sentinel that would lead
-        // the table on one of them. An owned row has no asking price at all.
         sortValue: (row) => {
           const contract = asContract(row);
           if (!contract) return undefined;
@@ -357,14 +304,10 @@ export function useBpcColumns({
         width: '12ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        // No comparison (a bundle, a barter, under three similar copies, a
-        // non-contract source) sinks the row in either direction, as ISK/run
-        // does, and its cell is empty, never a 0%.
         sortValue: (row) => {
           const contract = asContract(row);
           return contract ? (peerDiffOf(contract) ?? undefined) : undefined;
         },
-        // Neutral text: the reader's side is unknown (contract price check).
         render: (row) => {
           const contract = asContract(row);
           const diff = contract ? peerDiffOf(contract) : null;
@@ -376,10 +319,6 @@ export function useBpcColumns({
         header: t('bpcContracts.regionColumn'),
         width: '18ch',
         className: 'truncate',
-        // An owned row's `regionId` comes from its resolved location
-        // (issue #796) rather than `contract.regionId` — before that
-        // resolution existed this column had nothing to show an owned row at
-        // all, which is the "—" the issue reported.
         sortValue: (row) => {
           const regionId = row.source === 'contract' ? row.contract.regionId : row.regionId;
           return regionId == null ? '' : (regionNames.get(regionId) ?? `#${regionId}`);
@@ -404,8 +343,6 @@ export function useBpcColumns({
         header: t('bpcContracts.expiresColumn'),
         width: COL_DATETIME,
         className: 'whitespace-nowrap text-text-dim',
-        // Infinity sorts an owned row last, rather than epoch 0 reading as
-        // "expires soonest."
         sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
         stackAffix: { before: t('bpcContracts.mobile.expiresAffix') },
         render: (row) => {
@@ -425,20 +362,12 @@ export function useBpcColumns({
     (row: BpcSearchRow) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
     [blueprintNames]
   );
-  // In table order. Shared by `columns` below and the sort, which is resolved
-  // before `columns` exists: the cap sorts first, and the badges the Item
-  // column renders are picked from what it keeps.
   const shownColumnIds = useMemo(
     () => BPC_SEARCH_COLUMN_IDS.filter((id) => visibleColumns.includes(id)),
     [visibleColumns]
   );
   const sortColumnIds = useMemo(() => ['item', ...shownColumnIds], [shownColumnIds]);
   const sortProps = useUrlSort(BPC_SOURCING_SORT_KEY, OFFERS_DEFAULT_SORT, sortColumnIds);
-  // The top `RESULT_LIMIT` rows by the table's own sort (`sortRows` is the
-  // rule `DataTable` sorts with), so the cap keeps the cheapest copies under
-  // the default Price sort, the nearest under Jumps, and so on. The sort is
-  // stable, so ties keep `displayRows`' source order (the hidden secondary
-  // sort, `rankBpcOffers`); `DataTable`'s own re-sort preserves it too.
   const shownRows = useMemo(() => {
     const { columnId, direction } = sortProps.sort;
     const column =
@@ -448,9 +377,6 @@ export function useBpcColumns({
     const sorted = column ? sortRows(displayRows, column, direction) : displayRows;
     return sorted.slice(0, RESULT_LIMIT);
   }, [displayRows, sortProps.sort, itemSortValue, bpcColumnsById]);
-  // With several blueprints listed, one copy row per type carries the BPO
-  // badge; with one picked, the callout cards say it instead (issue #1241).
-  // Picked from the shown rows, so the cap never drops a type's only badge.
   const badgedRows = useMemo(
     () => (selectedTypeId === null ? bpoBadgeRows(shownRows) : new Set<BpcSearchRow>()),
     [selectedTypeId, shownRows]
@@ -466,19 +392,8 @@ export function useBpcColumns({
         sortValue: itemSortValue,
         render: (row) => {
           const name = blueprintNames.get(row.typeId) ?? `#${row.typeId}`;
-          // A BPO row is the BPO itself; only a copy gets the "BPO too" badge,
-          // and only one copy per type (`bpoBadgeRows`).
           const bpo = badgedRows.has(row) ? bpoByType.get(row.typeId) : undefined;
-          // An owned copy has no price column to mark it apart from a for-sale
-          // one, so the Item cell carries the tag instead — independent of
-          // which columns are visible.
           const owned = row.source === 'owned';
-          // One blueprint picked: every phone card would repeat its name, so
-          // the card's title is the copy's quality instead, and ME/TE/runs
-          // leave the meta line under it (`QualityValue`). The table keeps
-          // the name.
-          // Decided in JS (`useIsPhone`, the line `DataTable` stacks at), not
-          // a CSS pair, so the cell holds one title at any width.
           const title =
             blueprintPicked && isPhone ? (
               <span className="tabular-nums">
@@ -489,12 +404,6 @@ export function useBpcColumns({
                 })}
               </span>
             ) : (
-              // Ellipsised on the phone card, so a long name stops short of the
-              // price beside it instead of running under it.
-              // Plain text: the row opens the contract modal (which lists the
-              // item with its Market link) or, for a market row, the item's
-              // Market entry (DESIGN.md §6c, a row's primary action beats
-              // name links inside it).
               <span className={entityLinkClassName('block truncate')}>{name}</span>
             );
           if (row.source === 'community') {
@@ -509,8 +418,6 @@ export function useBpcColumns({
           }
           if (!bpo && !owned) return title;
           return (
-            // One wrapping line on the phone card, so a tag sits beside the
-            // name rather than pushing the title line into three.
             <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-col sm:flex-nowrap sm:items-start sm:gap-1">
               <span className="min-w-0 max-w-full">{title}</span>
               {owned && (

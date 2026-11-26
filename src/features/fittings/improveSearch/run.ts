@@ -1,10 +1,3 @@
-/**
- * One Improve search of the open Fitting (`findImprovements`): every fitted
- * module's variations the hull takes and the pilot can fly, recalculated whole
- * under the same evaluator the page's stats come from, scored against the
- * page's Target Profile and priced at the pilot's Trade Hub; then, for Rework,
- * the Makeover. No React here: the hook owns the status, the timer and Cancel.
- */
 import {
   effectiveHold,
   findImprovements,
@@ -32,10 +25,6 @@ import type {
 
 const unpriced: PriceOf = () => null;
 
-/**
- * Runs the search. Null when `events.signal` aborts it; rejects when it fails
- * (a stats calculation, or prices a budget needs).
- */
 export async function runImproveSearch(
   request: ImproveRequest,
   ports: ImproveSearchPorts,
@@ -54,12 +43,9 @@ export async function runImproveSearch(
   const { before: own } = await ports.compare(fitting, signal);
   if (signal.aborted) return null;
   events.onBaseline?.(own);
-  // A fit that doesn't fit has nothing to improve yet (`20261019-144736`).
   const over = overBudgetResources(own);
   if (over.length > 0) return { status: 'overBudget', resources: over };
-  // A remembered goal this fit cannot score (Longer reach on a drone boat) searches the role's default.
   const searched = searchableGoal(request.goal, own, request.hull);
-  // What the hull's community fits say for this Job; null (no fits, a failed load) leaves the search as it is.
   const commonality = (await ports.commonality())?.[config.job] ?? null;
   if (signal.aborted) return null;
   const targetShare = targetShareOf(commonality, ctx.groupOf);
@@ -68,12 +54,10 @@ export async function runImproveSearch(
 
   const [prices, fitTotal] = await Promise.all([
     ports.prices(plan.typeIds).catch(() => null),
-    // The Price section's own total, for the budget.
     ports.fitTotal().catch(() => null),
   ]);
   if (signal.aborted) return null;
   const { iskBudget } = config;
-  // A cap that cannot be checked is not silently waived.
   if (iskBudget !== null && (prices === null || fitTotal === null))
     throw new Error('Prices unavailable for the spend cap');
   if (iskBudget !== null && fitTotal !== null && iskBudget < fitTotal)
@@ -116,12 +100,10 @@ export async function runImproveSearch(
     if (signal.aborted || result === null) return null;
     results.push(result);
     done += set.candidates.length;
-    // "Show best so far" ends the whole search: the other side was not searched, so it is not compared.
     if (shouldStop()) break;
   }
   const { listed, checked, sides, neutral } = combineSides(plan.sets, results, ctx.groupOf);
 
-  // The Makeover: only after the single swaps ran to the end ("Show best so far" skips it), and only if it beats the best of them.
   let makeover: MakeoverResult | undefined;
   let makeoverStopped = false;
   if (plan.movesFor && !shouldStop() && results.length > 0) {
@@ -135,7 +117,6 @@ export async function runImproveSearch(
       onProgress: (n, total) => progress({ checked: n, total, makeover: true }),
     });
     if (signal.aborted || search === null) return null;
-    // Only the pilot's "Show best so far" reads as stopped; the Makeover's own calculation cap is its normal end.
     makeoverStopped = search.stopped && shouldStop();
     makeover = search.makeover ?? undefined;
   }
@@ -174,7 +155,6 @@ export async function runImproveSearch(
   };
 }
 
-/** The completion pool, fetched on the first ask; a failed lookup is asked again next time, not remembered. */
 function completionOf(
   ports: ImproveSearchPorts,
   swapsOf: () => CompletionPool['swaps']

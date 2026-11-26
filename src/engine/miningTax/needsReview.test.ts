@@ -13,8 +13,6 @@ describe('diffAssignedOreLines', () => {
   });
 
   it('reports no diff when the fresh ledger reports LESS than the snapshot', () => {
-    // Never observed in practice per the decision doc, but must not flip —
-    // only a strict increase is a "needs-review" signal.
     const assigned: OreLine[] = [{ typeId: A, quantity: 100 }];
     const fresh: OreLine[] = [{ typeId: A, quantity: 90 }];
     expect(diffAssignedOreLines(assigned, fresh)).toEqual([]);

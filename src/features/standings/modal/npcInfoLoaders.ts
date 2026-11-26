@@ -1,8 +1,3 @@
-/**
- * What each block of the NPC info modal reads. One loader per block, so a slow
- * or failed read costs that block alone. Loaders that need the pilot take a
- * Character id; the modal never calls them without one.
- */
 import type { CharacterStandingEntry } from '@/engine/market/standings';
 import {
   NO_SOCIAL_SKILLS,
@@ -39,36 +34,24 @@ import {
   type WhereRow,
 } from './npcInfoModel';
 
-/** What a row of the Standings table or a link opens: an agent's id is its character id. */
 export type NpcInfoTarget =
   | { kind: 'faction'; id: number }
   | { kind: 'corporation'; id: number }
   | { kind: 'agent'; id: number };
 
-/** A target that owns stations and has agents or corporations under it. */
 export type OwnerTarget = Exclude<NpcInfoTarget, { kind: 'agent' }>;
 
 export interface ChainData {
   chain: StandingChain;
-  /** The standings ESI reported, for the blocks that look up other entities. */
   standings: readonly CharacterStandingEntry[];
-  /** Null when the pilot's skills could not be read: effective then equals base. */
   skills: StandingSkills | null;
   corporationFactions: ReadonlyMap<number, number>;
-  /** The agent, when the target is one the baked agent file holds. */
   agent: NpcAgent | null;
-  /** The corporation an agent or corporation target belongs to. */
   corporationId: number | null;
   nameOf: (link: ChainLink) => string;
   corporationName: (corporationId: number) => string;
 }
 
-/**
- * The chain of standings that govern the target. `null` when there is nothing
- * honest to show: no standings readable (no scope, or ESI and the cache both
- * silent), or an agent the baked file does not hold (a storyline, Faction
- * Warfare or research agent). Rejects when a data file cannot be read.
- */
 export async function loadChainData(
   characterId: number,
   target: NpcInfoTarget
@@ -108,7 +91,6 @@ export async function loadChainData(
   };
 }
 
-/** Broker fee and reprocessing tax; empty rows for an owner of no station the snapshot knows. */
 export async function loadStationsModel(
   target: OwnerTarget,
   data: ChainData
@@ -174,11 +156,6 @@ export interface FactionFacts {
   description: string;
 }
 
-/**
- * The faction's name and description from ESI's faction list; when that could
- * not be read, the name alone from the baked NPC-corporation file. Null when
- * neither knows the id.
- */
 export async function loadFactionFacts(factionId: number): Promise<FactionFacts | null> {
   const [factions, index] = await Promise.all([
     loadFactions(),
@@ -195,7 +172,6 @@ export interface CorporationFaction {
   name: string;
 }
 
-/** The faction an NPC corporation belongs to (ESI's corporation record rarely says); null when it has none. */
 export async function loadCorporationFaction(
   corporationId: number
 ): Promise<CorporationFaction | null> {
@@ -216,7 +192,6 @@ async function loadAgentSystems(systemIds: readonly number[]): Promise<Map<numbe
   return systems;
 }
 
-/** A corporation's agents (all of them) or a faction's corporations the pilot holds a standing with. */
 export async function loadKnownRows(
   characterId: number,
   target: OwnerTarget,
@@ -253,7 +228,6 @@ export async function loadKnownRows(
   };
 }
 
-/** `null` for a corporation with neither a store nor points, or when the balances are unreadable. */
 export async function loadLoyalty(
   characterId: number,
   corporationId: number

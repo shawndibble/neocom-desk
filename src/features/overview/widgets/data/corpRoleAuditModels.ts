@@ -1,8 +1,3 @@
-/**
- * Roles audit builder (issue #4613). Same contract as `models.ts`: pure,
- * derived at render time. Counts Directors, and role changes in the last
- * `WIDGET_CHANGE_DAYS` days (ESI keeps about a month; nothing here ticks).
- */
 import {
   WIDGET_CHANGE_DAYS,
   recentChanges,
@@ -35,7 +30,6 @@ export const corpRoleAudit: Builder = (feeds, { t, now }) => {
   const recent = changes === null ? null : recentChanges(changes, now, WIDGET_CHANGE_DAYS);
 
   const lastChange = new Map<number, RoleChange>();
-  // `changes` is newest first, so the first one seen per member is the latest.
   for (const change of changes ?? []) {
     if (!lastChange.has(change.characterId)) lastChange.set(change.characterId, change);
   }

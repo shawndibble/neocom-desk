@@ -17,16 +17,13 @@ const require = createRequire(import.meta.url);
 const readJson = async <T>(path: string): Promise<T> =>
   JSON.parse(await readFile(require.resolve(`../../../public/data/${path}`), 'utf8')) as T;
 
-/** Jita sell, 2026-10-30. */
 const PRICES: Record<string, number> = {
   'Zeugma Integrated Analyzer': 536_900_000,
   'Ligature Integrated Analyzer': 249_800_000,
-  // Illustrative: only the order matters.
   'Sisters Core Probe Launcher': 20_000_000,
   'Core Probe Launcher I': 30_000,
 };
 
-/** The Astero a pilot asked about: Cheaper offered nothing for its 537M Zeugma. */
 const RACKS: Record<FittingSlotKind, string[]> = {
   low: [
     'Inertial Stabilizers II',
@@ -117,7 +114,6 @@ describe('Cheaper on an exploration Astero (real engine)', () => {
       (option) => option.candidate.toTypeId === id('Ligature Integrated Analyzer')
     );
     expect(ligature?.iskDelta).toBe(-287_100_000);
-    // An Integrated Analyzer opens both sites, so both strengths drop.
     for (const key of ['dataStrength', 'relicStrength']) {
       const strength = ligature?.lost.find((lost) => lost.change.key === key);
       expect(strength?.change.before).toBeGreaterThan(strength?.change.after ?? Infinity);
@@ -126,7 +122,6 @@ describe('Cheaper on an exploration Astero (real engine)', () => {
       id('Ligature Integrated Analyzer')
     );
 
-    // The launcher is empty (the probes are in cargo), so its own bonus is what is lost.
     const launcher = result?.tradeOffs.find(
       (option) => option.candidate.toTypeId === id('Core Probe Launcher I')
     );

@@ -1,25 +1,3 @@
-/**
- * The per-Character Permissions section in Settings (#1524): every Permission
- * with its label, caption and granted/missing state, and a Grant button on each
- * missing one — `beginEveLogin` asks for the stored grant plus the Core Grant
- * plus that Permission (#1520). There is no Remove — revocation stays on CCP's own site
- * (docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md).
- *
- * Replaces the old Corp access row, whose two-axis gate lives on in the
- * Corporation row: hidden for a Character with no Corp Role (`none`), because
- * granting would unlock nothing for them, and grantable for
- * `roles-without-grant` and `not-granted`. The latter keeps its button because
- * the roles scope is itself in the `corp` group — until it is granted, whether
- * this Character holds a role is unknowable, and this row is the only way in
- * (docs/context/decisions/20260910-123303-move-read-corporation-roles-into-the-corp-scope.md).
- * A Character in a known NPC corporation can never hold a Corp Role, so it is
- * treated like `none` and the Corporation projects row hides with it
- * (docs/context/decisions/20261107-000911-a-known-npc-corporation-is-treated-like-none.md).
- *
- * Scoped to the active Character, like `useCorpAccess` itself: roles are only
- * knowable by asking ESI per Character, so a section per stored Character
- * would mean a read per stored Character on every visit to Settings.
- */
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -40,13 +18,8 @@ import { SettingsHint } from '@/features/settings/settingsFields';
 import { usePhoneFold } from '@/features/settings/usePhoneFold';
 import { usePermissionMarkDismissals } from './permissionMarkDismissals';
 
-/**
- * `checking` while the answer is still loading — never `missing`, which would
- * flash a Grant button on every row of every cold load.
- */
 type RowStatus = 'checking' | 'granted' | 'missing';
 
-/** `none` never reaches this: the Corporation row is not rendered for it. */
 const CORP_STATUS = {
   unknown: 'checking',
   'not-granted': 'missing',
@@ -55,7 +28,6 @@ const CORP_STATUS = {
   ready: 'granted',
 } as const satisfies Record<CorpAccessState, RowStatus>;
 
-/** Permissions whose row says, in a tooltip, which pages they unlock. */
 const UNLOCKS_TOOLTIP: Partial<Record<ScopeGroup, string>> = {
   corp: 'settings.permissions.unlocks.corp',
   corpProjects: 'settings.permissions.unlocks.corpProjects',
@@ -64,7 +36,6 @@ const UNLOCKS_TOOLTIP: Partial<Record<ScopeGroup, string>> = {
   militaryCampaigns: 'settings.permissions.unlocks.militaryCampaigns',
 };
 
-/** `?grant=a,b` from a "Grant missing Permissions" link: the Permissions whose button should flash. */
 function useFlaggedGroups(): ReadonlySet<ScopeGroup> {
   const [params] = useSearchParams();
   const raw = params.get('grant');
@@ -73,7 +44,6 @@ function useFlaggedGroups(): ReadonlySet<ScopeGroup> {
   return new Set(SCOPE_GROUPS.filter((group) => wanted.includes(group)));
 }
 
-/** Brings the flashing button into view once, as it mounts. */
 function scrollIntoViewOnce(node: HTMLElement | null) {
   node?.scrollIntoView?.({
     block: 'center',
@@ -88,11 +58,8 @@ export function PermissionsPanel() {
   const granted = useGrantedScopes();
   const corp = useCorpAccess();
   const inNpcCorporation = useActiveNpcCorporation() != null;
-  // A phone keeps the rows that need action open and folds the Granted ones.
   const grantedFold = usePhoneFold();
-  // "Don't ask again" on a PermissionCellMark is account-wide; this page is the way back (#6704).
   const marks = usePermissionMarkDismissals();
-  // Tagged with its Character so a switch drops the ticks instead of carrying them over.
   const [selection, setSelection] = useState<{
     characterId: number | null;
     groups: ReadonlySet<ScopeGroup>;
@@ -114,7 +81,6 @@ export function PermissionsPanel() {
     return isPermissionGranted(group, granted) ? 'granted' : 'missing';
   }
 
-  /** The role half of the Corporation row's gate, which only CCP can change. */
   function corpNote(): string | null {
     if (corp.state === 'not-granted') return t('settings.permissions.corpRolesUnknown');
     if (corp.roles.length === 0) return null;
@@ -128,12 +94,9 @@ export function PermissionsPanel() {
     (group) => !(group === 'corp' && hideCorp) && !(group === 'corpProjects' && inNpcCorporation)
   );
   const missing = groups.filter((group) => statusOf(group) === 'missing');
-  // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
   const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];
-  // Only a confirmed grant folds on a phone: a row still checking stays in sight.
   const foldedRows = grantedFold.phone ? rows.filter((group) => statusOf(group) === 'granted') : [];
   const shownRows = rows.filter((group) => !foldedRows.includes(group));
-  // Derived from `missing`, so a row that gets granted (or hidden) drops out of the request.
   const firstFlagged = rows.find((group) => flagged.has(group) && missing.includes(group));
   const chosen = missing.filter((group) => picked.has(group));
 
@@ -161,7 +124,6 @@ export function PermissionsPanel() {
             />
           </label>
         ) : (
-          // Keeps labels aligned with the rows that have a checkbox.
           missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-9" />
         )}
         <div className="min-w-0 flex-1">
@@ -199,12 +161,6 @@ export function PermissionsPanel() {
           ) : (
             <>
               <span className="text-text-dim">{t('settings.permissions.missing')}</span>
-              {/*
-                `ghost`, not `primary`: the per-row grants repeat down the
-                list, so the one `primary` of this view is the bulk
-                "Grant selected" button (docs/DESIGN.md §6, "One `primary`
-                button per view"; each Settings section is its own view).
-              */}
               <NeedsConnection>
                 <Button
                   size="sm"
@@ -225,8 +181,6 @@ export function PermissionsPanel() {
     );
   }
 
-  // Two columns from `xl`: one full-width list put each status a screen away from its name.
-  // The Write to EVE rows sit under their own heading, below the reads; the folded list drops it so the heading shows once.
   function renderRows(list: ScopeGroup[], headed = true) {
     const writes = list.filter((group) => WRITE_GROUPS.includes(group));
     const reads = list.filter((group) => !WRITE_GROUPS.includes(group));

@@ -1,15 +1,8 @@
 import type { PinState } from '@/features/assets/stationPins';
 
-/** One entry of an Assets place row's menu, in the order it is offered. */
 export type PlaceMenuAction =
   'setWaypoint' | 'addWaypoint' | 'openInEve' | 'copyName' | 'rename' | 'togglePin';
 
-/**
- * Which actions a place row's menu offers. A station or structure row is a
- * place; a container row offers the place it sits in. An unresolved place (an
- * orphan group, or a container whose station is unknown) has nothing to send
- * to the client, so only the name copies. Only what applies: no disabled wall.
- */
 export function placeMenuActions({
   kind,
   pinnable,
@@ -18,7 +11,6 @@ export function placeMenuActions({
 }: {
   kind: 'station' | 'container';
   pinnable: boolean;
-  /** The page keeps Place Nicknames (Assets, not corp): offers Rename on a station. */
   renamable?: boolean;
   resolved: boolean;
 }): PlaceMenuAction[] {
@@ -34,7 +26,6 @@ export function placeMenuActions({
   ];
 }
 
-/** The menu item's label key: the step the pin toggle takes next. */
 export function nextPinLabelKey(state: PinState): string {
   switch (state) {
     case 'unpinned':

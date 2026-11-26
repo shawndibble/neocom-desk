@@ -10,7 +10,6 @@ import { MoonOwnersTable } from './MoonOwnersTable';
 import { useMoonOwners } from './useMoonOwners';
 import { usePopShareMarks } from './usePopShareMarks';
 
-/** The Moon owners tab of `/corp/moons`: the book's moon owners, from the book's own data. */
 export function MoonOwnersTab({ onInvite }: { onInvite?: () => void }) {
   const { t } = useTranslation();
   const { names, canEdit } = useBook();

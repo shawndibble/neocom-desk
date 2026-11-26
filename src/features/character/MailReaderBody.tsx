@@ -17,12 +17,9 @@ import type { CachedResult } from '@/esi/cache';
 import type { CharacterAffiliation, MailBody, MailHeader } from '@/esi/endpoints';
 
 interface MailReaderBodyProps {
-  /** Focus target for a failed body load or "Try again"; see `useRetryFocus`. */
   bodyRetryRef: Ref<HTMLDivElement>;
   selectedKey: string | null;
-  /** Whether the reading pane is on screen (a phone hides it behind the list). */
   readerVisible: boolean;
-  /** `undefined` while loading, `null` when it could not be read. */
   body: CachedResult<MailBody> | null | undefined;
   bodyText: string;
   online: boolean;
@@ -36,15 +33,12 @@ interface MailReaderBodyProps {
   resolveRecipientName: (r: { recipient_id: number; recipient_type: string }) => string;
   composeKind: ComposeKind | null;
   timeZone: Parameters<typeof formatTimestamp>[1];
-  /** A phone carries the date and the "for" owner here; the desktop header carries them. */
   isDesktop: boolean;
-  /** All-characters scope: the mail belongs to one of several owners. */
   isAll: boolean;
   onCloseCompose: () => void;
   onSent: (ownerId: number) => void;
 }
 
-/** The reading pane's content: empty hint, spinner, failed-load retry, or the open mail with its Reply/Forward box. */
 export function MailReaderBody({
   bodyRetryRef,
   selectedKey,
@@ -73,9 +67,6 @@ export function MailReaderBody({
   return (
     <div ref={bodyRetryRef} tabIndex={-1} className="min-w-0 focus:outline-none">
       {selectedKey === null ? (
-        // Only while the pane is on screen: a phone hides it behind
-        // the list (and floats its own Compose), and the inline
-        // composer replaces it on a wide screen.
         readerVisible && (
           <EmptyState
             title={t('mail.readerEmptyTitle')}
@@ -94,10 +85,6 @@ export function MailReaderBody({
           <Spinner size="sm" label={t('common.loading')} />
         </div>
       ) : body === null ? (
-        // Still gets the reader-heading focus target (issue #1485):
-        // a failed/uncached body is the same "opening this mail
-        // just changed the pane" transition as the success path
-        // below, just with nothing to read yet.
         <div
           ref={(el) => {
             readerHeadingRef.current = el;
@@ -182,12 +169,6 @@ export function MailReaderBody({
             )}
             <MailLabelTags names={selectedRow?.labelNames ?? []} />
           </div>
-          {/* The body renders from the raw markup (`MailBodyView` parses
-            it to a safe tree: bold, colour, links, tables) on the
-            reader's fixed dark surface; `bodyText` is only the
-            flattened text the compose box quotes. `break-words`
-            inside the view keeps an unbroken URL from pushing the
-            pane sideways. */}
           <MailBodyView text={bodyText} markup={body?.data.body ?? undefined} />
 
           {composeKind !== null && selectedRow !== null && (

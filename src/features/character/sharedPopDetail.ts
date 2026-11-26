@@ -1,8 +1,3 @@
-/**
- * A Shared Pop's detail modal and its Survey start link (issue #6224). Imported by the Calendar
- * route only: `startLink.ts` reaches the Survey store and so Firebase, which the boot graph that
- * `calendarBoardData.ts` sits in must not (`bootImportGraph.test.ts`).
- */
 import type { RowDetailModel } from '@/features/overview/widgets/data/types';
 import { startLinkPath, withPop } from '@/features/survey/startLink';
 import { HOUR_MS, formatAge } from '@/lib/age';
@@ -17,10 +12,6 @@ import {
   type SharedPopTimePref,
 } from './calendarSharedPops';
 
-/**
- * The Survey start link: the refinery as location, the sharing corporation as payee, the
- * book's rate. Built when shown, so a settings change reaches every link.
- */
 export function sharedPopStartLink(entry: SharedPopEntry): string {
   const { pop } = entry;
   const path = startLinkPath({
@@ -33,14 +24,11 @@ export function sharedPopStartLink(entry: SharedPopEntry): string {
     rate: pop.ratePct,
     notes: '',
   });
-  // The pop rides along so the Survey this link starts is linked back to it (`SurveyStartScreen`).
   return withPop(path, pop.id);
 }
 
-/** A book that has not synced for this long may have missed a laser shot or a cancel. */
 export const SHARED_POP_STALE_MS = 12 * HOUR_MS;
 
-/** The data's age: when the sharing book last synced, flagged once it is stale. */
 function syncedFact(
   syncedAt: number | null,
   nowMs: number,
@@ -60,10 +48,6 @@ const POP_TIME_KEY = {
   'auto-fracture': 'calendar.sharedPop.popTime.autoFracture',
 } as const;
 
-/**
- * What is known of the moon being mined out: an officer's flag, the likely-done guess, or, once
- * popped, plainly that nobody has marked it. The Survey's own state is its own fact.
- */
 function miningFacts(
   entry: SharedPopEntry,
   popped: boolean,
@@ -102,11 +86,6 @@ function miningFacts(
   return facts;
 }
 
-/**
- * The detail modal: refinery, moon, both Pop Times and the countdown, mining state, data age,
- * ore make-up, notes, start link. Ore make-up shared but not known (a moon owner's moon) reads
- * "Unknown"; not shared, it is absent.
- */
 export function sharedPopDetail(
   entry: SharedPopEntry,
   nowMs: number,
@@ -117,10 +96,8 @@ export function sharedPopDetail(
   const { pop } = entry;
   const popAtMs = sharedPopShownAtMs(pop, pref);
   const popped = nowMs >= popAtMs;
-  // A chunk past its auto-fracture time has fractured whatever the book last synced.
   const autoMs = pop.autoFractureAt === undefined ? NaN : Date.parse(pop.autoFractureAt);
   const fractured = pop.fractured || nowMs >= autoMs;
-  // Both Pop Times once the server publishes them and the chunk has not fractured early.
   const { readyAt, autoFractureAt } = pop;
   const bothTimes =
     !fractured &&
@@ -165,7 +142,6 @@ export function sharedPopDetail(
     ...(synced ? [synced] : []),
   ];
   const oreKnown = entry.ore !== null && entry.ore.length > 0;
-  // No book make-up: the linked Survey's scans still show what the field held.
   const surveyOres = !oreKnown ? (entry.survey?.ores ?? []) : [];
   if (!oreKnown && surveyOres.length === 0 && pop.oreShared === true)
     facts.push({ label: t('calendar.sharedPop.ore'), value: t('calendar.sharedPop.oreUnknown') });
@@ -220,10 +196,6 @@ export function sharedPopDetail(
   };
 }
 
-/**
- * The Survey links. A moon already fully mined (an officer's flag or a finished Survey) has
- * nothing left to survey, so it offers no start link; a linked Survey stays openable.
- */
 function surveyLinks(
   entry: SharedPopEntry,
   fullyMined: boolean,

@@ -1,12 +1,3 @@
-/**
- * Effective material quantities.
- * required = max(runs, ceil(round(runs * baseQuantity * materialModifier, 2)))
- * materialModifier = (1 - ME/100) * (1 - structure%/100) * (1 - rig%*secMult/100)
- * Rounding is per job, not per run; the round-to-2-decimals happens before ceil.
- * Sources: EVE University wiki "Manufacturing" (per-job rounding), EVE Online
- * forums / eve-industry.org "Formulas for EVE Industry" (exact expression).
- */
-
 import type {
   EffectiveMaterial,
   FacilityContext,
@@ -26,7 +17,6 @@ function assertRuns(runs: number): void {
   }
 }
 
-/** Combined material multiplier for ME level + facility + rig. */
 export function materialModifier(
   me: number,
   ctx: FacilityContext,
@@ -36,21 +26,17 @@ export function materialModifier(
     throw new RangeError(`ME must be an integer 0..${ME_MAX}, got ${me}`);
   }
   const structurePct = ctx.facility.materialBonusPct;
-  // Rigs only work on player structures. Reactor rigs scale by security band
-  // on a different table than manufacturing rigs (issue #460).
   const rigPct = ctx.facility.structure
     ? rigBonusPct(ctx.rigFit, 'me', ctx.facility.activity, ctx.security, productScope)
     : 0;
   return (1 - me / 100) * (1 - structurePct / 100) * (1 - rigPct / 100);
 }
 
-/** Units of one material consumed by a whole job. */
 export function effectiveMaterialQuantity(baseQty: number, runs: number, modifier: number): number {
   assertRuns(runs);
   return Math.max(runs, Math.ceil(round2(runs * baseQty * modifier)));
 }
 
-/** Per-job effective quantities for every blueprint material. */
 export function effectiveMaterials(
   blueprint: IndustryBlueprint,
   runs: number,

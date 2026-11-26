@@ -38,7 +38,6 @@ import { formatNumber } from '@/lib/numberLocale';
 
 const MICRO = eyebrowClassName;
 
-/** Units a day a reinstall would recover right now, from `engine/pi/extraction`'s own curve. */
 function resetGainPerDay(program: ExtractorYieldProgram, nowMs: number): number {
   const peak = extractorCycleYields(program, 1)[0] ?? 0;
   const current = peak * fractionOfPeak(program, nowMs);
@@ -100,7 +99,6 @@ interface ColonyExpandedProps {
   pinTypeNames: ReadonlyMap<number, string>;
   productNames: ReadonlyMap<number, string>;
   schematicNames: ReadonlyMap<number, string>;
-  /** Plan's link for this colony; absent for another Character's colony. */
   planHref: string | null;
   haulLabel: string;
 }

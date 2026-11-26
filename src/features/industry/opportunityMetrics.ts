@@ -1,10 +1,3 @@
-/**
- * Small pure helpers shared by `OpportunitiesPanel` (the desktop table) and
- * `MobileOpportunityList` (the phone ranked list) — its own module rather
- * than exported from either component file, so pulling one into the other
- * doesn't mix plain functions/constants into a component file (breaks Fast
- * Refresh for both).
- */
 import type { StatChipTone } from '@/components/ui';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { TFunction } from 'i18next';
@@ -23,7 +16,6 @@ export const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   unknown: 'default',
 };
 
-/** Sort rank for `OrderDepthLevel` — an enum, not an alphabetical string. */
 export const ORDER_DEPTH_RANK: Record<OrderDepthLevel, number> = {
   deep: 3,
   moderate: 2,
@@ -42,23 +34,15 @@ export function unitMargin(row: OpportunityRow): number | null {
   return units > 0 ? row.result.profit / units : null;
 }
 
-/** Share of material cost (at the row's own pricing) a row's owned stock must cover for "mostly". */
 export const MOSTLY_COVERED_PCT = 75;
 
 export type StockFilter = 'any' | 'mostly' | 'full';
 
 export interface StockCoverage {
-  /** 0–100: owned material value over total material value. */
   coveredPct: number;
-  /** ISK left to buy after owned stock is claimed. */
   stillToBuyIsk: number;
 }
 
-/**
- * How much of a row's top-level materials owned stock covers, valued at the
- * row's own unit prices. Null when any material is unpriced (a partial
- * percentage would mislead) or the row has no materials.
- */
 export function stockCoverage(row: OpportunityRow): StockCoverage | null {
   const materials = row.result.materials;
   if (materials.length === 0) return null;
@@ -81,7 +65,6 @@ export function matchesActivityFilter(
   return filter === 'all' || row.candidate.catalogEntry.blueprint.activity === filter;
 }
 
-/** The Manufacturing / Reactions filter's options, for Ranked and All owned alike. */
 export function activityFilterOptions(t: TFunction) {
   return [
     { value: 'all' as const, label: t('industry.ownedBlueprintsAll') },
@@ -90,7 +73,6 @@ export function activityFilterOptions(t: TFunction) {
   ];
 }
 
-/** What a row was priced from, as the table chip and the export name it: a formula, a BPO or a BPC. */
 export function blueprintKindKey(candidate: OpportunityCandidate): string {
   if (isReaction(candidate)) return 'industry.ownedBlueprintsActivity.reaction';
   return candidate.blueprint.runs === -1 ? 'industry.bpo' : 'industry.bpc';

@@ -123,7 +123,6 @@ describe('usePlanEditorData', () => {
     );
     expect(invalidateFreshness).not.toHaveBeenCalled();
     act(() => result.current.reload());
-    // A manual refresh must reach ESI, not the cached rows' freshness window.
     expect(invalidateFreshness).toHaveBeenCalledTimes(1);
     expect(loadCorrectedSkills).toHaveBeenCalledTimes(2);
     expect(loadCorrectedSkills.mock.calls[1][0]).toBe(7);

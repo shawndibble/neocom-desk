@@ -67,12 +67,9 @@ import { useRememberedCharacterFilter } from '@/features/character/characterFilt
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 
 const CORP_CONTRACTS_SCOPE = ESI_REGISTRY.getCorporationContracts.scope;
-/** `?scope=corp` on History: the corporation's contracts. Absent is the Character's own (ADR 0015). */
 const SCOPE_PARAM = optionalEnumParam(['corp'] as const);
-/** What History reads from, in the URL: Corporation, else This / All characters (remembered, ADR 0015). */
 const SOURCE_PARAMS = { scope: SCOPE_PARAM, 'history.chars': characterFilterParam('current') };
 
-/** The corp read is its own chunk: its loaders are for the pilots who can use them. */
 const loadCorpSnapshot: typeof import('@/features/contracts/corpContractsSnapshot').loadCorpContractsSnapshot =
   (characterId, signal) =>
     import('@/features/contracts/corpContractsSnapshot').then((m) =>
@@ -82,20 +79,16 @@ const loadCorpSnapshot: typeof import('@/features/contracts/corpContractsSnapsho
 const CONTRACT_STATUSES = Object.keys(CONTRACT_STATUS_KEY) as Contract['status'][];
 const CONTRACT_TYPES = Object.keys(CONTRACT_TYPE_KEY) as Contract['type'][];
 
-/** The History table's own filter, in the URL (ADR 0015) as one group. */
 const HISTORY_FILTER_PARAMS = {
   'history.q': textParam(),
   'history.status': optionalEnumParam(CONTRACT_STATUSES),
   'history.type': optionalEnumParam(CONTRACT_TYPES),
 };
-/** Newest-issued first — an untouched History view. */
 const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 
-/** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
 
-  // The open contract belongs to the source it was read under (see `selectionScope`).
   const [picked, setPicked] = useState<{ scope: string; contract: Contract } | null>(null);
   const [historyParams, setHistoryParams] = useUrlParams(HISTORY_FILTER_PARAMS);
   const filter = useMemo<ContractsFilter>(
@@ -106,8 +99,6 @@ export function Contracts() {
     }),
     [historyParams]
   );
-  // Rows derive from a deferred copy so a keystroke paints the box first
-  // (`useUrlFilter`'s rule); the bar and its setter keep the immediate one.
   const rowsFilter = useDeferredValue(filter);
   const setFilter = (next: ContractsFilter) =>
     setHistoryParams({
@@ -115,30 +106,14 @@ export function Contracts() {
       'history.status': next.status,
       'history.type': next.type,
     });
-  // The contract a `contractAccepted` alert pointed at, if any. It opens the modal too, as `?open=` does.
   const highlightParamId = useHighlightParam();
-  // `?open=` opens the contract's modal as a row click would, and flashes the row too.
   const openParamId = useOpenParam();
   const highlightedContractId = highlightParamId ?? openParamId;
 
-  /**
-   * Item search's and Courier's own freshness and reload, reported up by the panel so the
-   * page header can draw them beside the route title — the same slot the
-   * History tab's badge and Refresh use, and the same slot every other route
-   * puts them in. Null until that panel has mounted and loaded something.
-   */
   const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
 
-  /**
-   * The page's tab id is a full path suffix (`search/items`, `search/courier`,
-   * `history`) — see `CONTRACTS_TABS`. Item search and Courier are one
-   * public-contracts panel showing either corpus, so `tab` folds them together
-   * for what the page header and body draw, and `mode` says which corpus.
-   */
   const [tabId, setTabId] = usePageTab(CONTRACTS_TABS);
   const tabsId = useTabsId();
-  // Hide, don't lock: no Corp choice for a Character without the grant. ESI asks for no
-  // in-game role on this read, so the scope alone is the gate (decision 20261020-215532).
   const granted = useGrantedScopes();
   const rememberedChars = useRememberedCharacterFilter<typeof SOURCE_PARAMS>(
     'contracts',
@@ -151,12 +126,9 @@ export function Contracts() {
   const corpAvailable = granted?.includes(CORP_CONTRACTS_SCOPE) ?? false;
   const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
   const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
-  // A `?scope=corp` link names the corp source before the grant is known. Hold that choice
-  // (no Character read of any kind) until `granted` resolves.
   const corpRequested = tab === 'history' && scopeParam === 'corp';
   const corpPending = corpRequested && granted === undefined;
   const corpSource = corpRequested && corpAvailable;
-  // "All characters" needs more than one Character; the count is unknown for a moment.
   const allRequested = tab === 'history' && !corpRequested && charactersValue === 'all';
   const allPending = allRequested && characterCount === undefined;
   const allSource = allRequested && (characterCount ?? 0) > 1;
@@ -194,10 +166,7 @@ export function Contracts() {
       scope: next === 'corporation' ? 'corp' : null,
       'history.chars': next === 'corporation' ? charactersValue : next,
     });
-  // A switch of Character, source or corporation drops the open contract, so the modal
-  // never pairs one party's reads with another's contract id.
   const selectionScope = `${source}:${activeCharacterId}:${view.corporationId}`;
-  // A param read off the History tab is spent: a later switch to History must not open it.
   const [paramOpenDismissed, setParamOpenDismissed] = useState(tab !== 'history');
   const openContract = useCallback(
     (contract: Contract | null) => {
@@ -231,10 +200,6 @@ export function Contracts() {
       issuerAffiliations: view.issuerAffiliations,
       onOpen: openContract,
     });
-  // The full catalog, not just `columns`' currently-visible ids: a sort
-  // picked while a column was shown should still resolve once the picker
-  // hides it, ready to take effect again the moment it's shown back
-  // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
   const historySortProps = useUrlSort('history.sort', HISTORY_SORT, [
     'contract',
     'character',
@@ -247,13 +212,10 @@ export function Contracts() {
     [contractsResult]
   );
 
-  // `?open=` and `?highlight=` wait for the contract to load and show it until the reader picks
-  // or closes one; a contract that never appears opens nothing.
   const paramContract =
     highlightedContractId !== null && !paramOpenDismissed
       ? (contracts.find((c) => c.contract_id === highlightedContractId) ?? null)
       : null;
-  // A linked contract in neither ESI's window nor the archive: say so, rather than open nothing.
   const highlightGone =
     tab === 'history' &&
     source === 'current' &&
@@ -272,7 +234,6 @@ export function Contracts() {
   );
   const characterNames = useCharacterNames();
   const buybackLinks = useBuybackLinks(activeCharacterId);
-  // Whose ESI reads a row's places run as: its owner, or the active Character.
   const courierCharacterOf = useCallback(
     (contract: Contract) => (source === 'all' ? view.ownerOf(contract) : activeCharacterId),
     [source, view, activeCharacterId]
@@ -287,7 +248,6 @@ export function Contracts() {
       contractsCsvColumns(t, {
         nameFor: (id) => issuerNames.get(id) ?? `#${id}`,
         selfId: selfOf,
-        // The corporation's contracts have no character owner: `ownerOf` is the corporation.
         characterNameFor:
           source === 'corporation'
             ? undefined
@@ -334,7 +294,6 @@ export function Contracts() {
   const modalStandings = modalOwner === null ? null : view.standingIndexFor(modalOwner);
   const standingOf = (id: number) =>
     modalStandings ? characterStanding(modalStandings, id, view.issuerAffiliations) : null;
-  // The ESI reads for a row's items and places run as the Character it was read for.
   const modalCharacterId = source === 'all' ? modalOwner : activeCharacterId;
   const sourceLabel = {
     current: {
@@ -359,12 +318,6 @@ export function Contracts() {
 
   return (
     <div className="mx-auto max-w-page space-y-2 sm:space-y-4">
-      {/* Both tabs read something datable and reloadable, but not the same
-          thing: History is the chosen source's contract list (this Character,
-          all of them, or the corporation; the table looks the same for each),
-          Search a shared public snapshot the panel below owns. So the badge and
-          the Refresh are per tab — the export button is History-only, because
-          it exports that list and nothing on Search corresponds to it. */}
       <PageHeader
         title={t('contracts.title')}
         meta={
@@ -379,7 +332,6 @@ export function Contracts() {
             <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
           ) : undefined
         }
-        // History only: the Search tabs read a shared public snapshot, nobody's.
         scope={
           tab === 'history' ? (
             <CharacterFilterControl<CharacterScopeChoice>
@@ -387,9 +339,7 @@ export function Contracts() {
               characterCount={characterCount}
               activeCharacterId={activeCharacterId}
               value={pickerValue}
-              // A source switch spins in the trigger while the body waits on it.
               loading={sourceHeld || (loading && !active.data)}
-              // Who "All" leaves out (never granted contracts): the trigger's dot and menu note.
               missingNames={view.skipped.map((c) => c.name)}
               onChange={changeSource}
             />
@@ -427,9 +377,6 @@ export function Contracts() {
 
       <TabPanel tabsId={tabsId} tabId={tabId} className="space-y-2 sm:space-y-4">
         {highlightGone && <p className="text-sm text-text-dim">{t('contracts.highlightGone')}</p>}
-        {/* Switched outside the history chain below, not inside it: Search needs
-          neither this character's contracts nor its `contracts` scope, so a
-          character with an empty history or a 403 must still reach it. */}
         {tab === 'search' ? (
           <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
         ) : sourceHeld || (loading && !active.data) ? (

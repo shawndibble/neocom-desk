@@ -1,7 +1,3 @@
-/**
- * A ready book for the settings dialog's test and story: two refineries of a moon owner whose
- * ledger-only rows never carry a moon, and one per-refinery rate already set (#4621).
- */
 import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
@@ -25,7 +21,6 @@ const rates: TaxRate[] = [
   { scope: 'feeder', feederId: OWNER, pct: 8, effectiveFrom: '2026-10-05' },
 ];
 
-/** A moon owner that left: no rate can be set for it any more. */
 export const LEFT_OWNER = 98000003;
 
 export function bookSettingsValue(

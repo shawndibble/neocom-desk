@@ -1,14 +1,3 @@
-/**
- * The kills at one Route Safety location, or at a whole system (issue #5929):
- * newest first, each with who died, in what, for how much, and, expanded,
- * who was on the mail. Reads only what the route walk already fetched; the
- * names come from ESI as the modal opens (victims) and as a kill is expanded
- * (attackers), and a name that does not resolve is simply left out.
- *
- * States conditions, never verdicts (decision `20260912-172628`): the hull
- * summary counts kills that carried a class, never attackers, and nothing
- * here says what the kills mean for the pilot.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, TypeIcon } from '@/components/ui';
@@ -32,9 +21,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { killZkillUrl, systemZkillUrl } from '@/lib/zkillboard';
 import { useTypeLabel } from './useTypeLabel';
 
-/** Attackers listed per expanded kill before "and N more"; the final blow is always among them. */
 export const ATTACKER_CAP = 15;
-/** Hull classes named in the header. */
 const HULL_CHIPS = 4;
 
 function victimIds(kills: readonly RecentKillView[]): number[] {
@@ -54,7 +41,6 @@ function attackerIds(kill: RecentKillView): number[] {
   ]);
 }
 
-/** Names for ids, filled in as ESI answers; an id that never resolves stays absent. */
 function useNames(ids: readonly number[], enabled: boolean): ReadonlyMap<number, string> {
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
   const key = [...new Set(ids)].sort((a, b) => a - b).join(',');
@@ -111,14 +97,12 @@ function AttackerList({
 }) {
   const { t } = useTranslation();
   const { shown: capped, more } = capAttackers(kill.attackers, ATTACKER_CAP);
-  // An attacker with nothing to show (no pilot name, ship or weapon) is left out, not drawn empty.
   const shown = capped.filter(
     (attacker) =>
       attacker.shipTypeId !== undefined ||
       attacker.weaponTypeId !== undefined ||
       (attacker.characterId !== undefined && names.has(attacker.characterId))
   );
-  // Say so only when the list is not the whole mail: a cap, or attackers with nothing to show.
   const footnote =
     more > 0
       ? t('travel.kills.modal.attackersMore', { count: more })
@@ -135,11 +119,7 @@ function AttackerList({
           const pilot =
             attacker.characterId === undefined ? undefined : names.get(attacker.characterId);
           return (
-            <li
-              // Attackers repeat no id, so the position is the stable key.
-              key={index}
-              className="flex flex-wrap items-center gap-x-3 gap-y-0.5"
-            >
+            <li key={index} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
               {pilot !== undefined && (
                 <span className="font-medium text-text sm:w-44">{pilot}</span>
               )}
@@ -176,7 +156,6 @@ function AttackerList({
   );
 }
 
-/** How many different attackers a group of mails had; the mails' own sizes when some have no ids. */
 function attackerCount(group: readonly RecentKillView[]): number {
   const everyone = group.flatMap((kill) => kill.attackers);
   if (everyone.every((attacker) => attacker.characterId !== undefined)) {
@@ -185,10 +164,6 @@ function attackerCount(group: readonly RecentKillView[]): number {
   return everyone.length;
 }
 
-/**
- * One pilot's loss: their ship, and the pod that followed it when there was
- * one, grouped on one row (`groupVictimKills`). Oldest mail first.
- */
 function KillRow({
   group,
   victimNames,
@@ -215,7 +190,6 @@ function KillRow({
     .flatMap((kill) => (kill.victim?.shipTypeId == null ? [] : [typeLabel(kill.victim.shipTypeId)]))
     .join(' + ');
   const values = group.flatMap((kill) => (kill.value == null ? [] : [kill.value]));
-  // A total only when every mail has a value: a partial sum would pass for the whole loss.
   const value =
     values.length === 0 || values.length < group.length
       ? null
@@ -295,11 +269,8 @@ export interface KillLocationModalProps {
   onClose: () => void;
   systemId: number;
   systemName: string;
-  /** One location, or every location of the system (on-path gates first). */
   locations: readonly RecentKillLocation[];
-  /** Hull classes over the whole list, counted per kill. */
   hulls: readonly HullKillCount[];
-  /** `location` titles the modal with the place; `system` with the system. */
   scope: 'location' | 'system';
 }
 
@@ -315,8 +286,6 @@ export function KillLocationModal({
   const { t } = useTranslation();
   const phone = useIsPhone();
   const typeLabel = useTypeLabel();
-  // The modal mounts when it is opened, so both are a snapshot of that moment:
-  // a refresh of the route's kills does not shuffle rows under the reader.
   const [now] = useState(() => Date.now());
   const [locations] = useState(openLocations);
   const ordered = useMemo(

@@ -37,10 +37,8 @@ import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee
 import { isk, monthLabel, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
-/** An ore's name; undefined until it resolves. */
 type TypeNames = (typeId: number) => string | undefined;
 
-/** Page B's plain account: who handles the tax, what is owed, what was paid. */
 function OwedToYou({ view, name }: { view: FeederView; name: string }) {
   const { t } = useTranslation();
   const s = view.summary;
@@ -103,10 +101,6 @@ function OwedToYou({ view, name }: { view: FeederView; name: string }) {
   );
 }
 
-/**
- * Settled otherwise: the note, mined volume and value. Nothing more builds up in ISK, but what was
- * owed before the switch stays owed and shows here until it is paid (#6209).
- */
 function SettledOtherwise({
   view,
   name,
@@ -160,13 +154,8 @@ function SettledOtherwise({
   );
 }
 
-/** The month filter's "every month" value: Radix Select has no empty value. */
 const ALL_MONTHS = 'all';
 
-/**
- * Who mined at the moon owner's refineries, per day, character, refinery and ore, so each day
- * can be checked against the moon owner's own ledger (#6210); a month at a time. Nothing is capped.
- */
 function MinedTable({
   view,
   names,
@@ -262,7 +251,6 @@ function MinedTable({
   );
 }
 
-/** The rate line, with "Ask for a different rate" for the corporation's officers. */
 function RateLine({
   view,
   name,
@@ -303,10 +291,6 @@ function RateLine({
 
 const METHOD = { donation: 'donation', other: 'other' } as const;
 
-/**
- * The payments to the moon owner, newest first. With `onDispute` (its officers), each one can be
- * flagged as a payment it disputes, or the flag withdrawn (#6209); the accounting side sees it.
- */
 function Payments({
   view,
   onDispute,
@@ -360,10 +344,6 @@ function Payments({
   );
 }
 
-/**
- * The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons, on by default.
- * Off stops the accounting corporation sharing their pops at once; on lets it again.
- */
 function PopSharingSwitch({
   name,
   share,
@@ -371,7 +351,6 @@ function PopSharingSwitch({
 }: {
   name: string;
   share: boolean;
-  /** Absent: shown, not changeable (not an officer who edits). */
   onChange?: (share: boolean) => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -441,12 +420,6 @@ function AskRateDialog({
   );
 }
 
-/**
- * A moon owner's page from the server-written view: Page B, statement first,
- * then who mined at its refineries, then payments and rate. `banner` is the stale
- * ledger strip; `afterCard` sits between the after-leaving card and the history
- * (the own-book / paste-an-invite choice). Never says feeder or Collector.
- */
 export function MoonOwnerView({
   view,
   names,
@@ -464,21 +437,14 @@ export function MoonOwnerView({
   afterCard,
 }: {
   view: FeederView;
-  /** Character and corporation names, the payee's included. */
   names: Names;
-  /** Ore names for the Mined table's Ore column. */
   typeName?: TypeNames;
-  /** A resolved name (a system, the moon owner) or undefined, for the refinery label chain. */
   nameOf?: (id: number) => string | undefined;
   canEdit: boolean;
-  /** Label a refinery for both sides; null clears it. With `canEdit`, shows the pencil. */
   onSetRefineryLabel?: (structureId: number, label: string | null) => Promise<void>;
   onRequestRate: (pct: number) => Promise<void>;
-  /** Flag a payment as disputed, or withdraw it (#6209); with `canEdit`, shows Dispute. */
   onDisputePayout?: (payoutId: string, disputed: boolean) => Promise<void>;
-  /** The Pop Sharing opt-out (#6222): false stops the pops being shared. With `canEdit`, it changes. */
   onSetPopSharing?: (share: boolean) => Promise<void>;
-  /** Whose token the payee name search runs under; with `onSetPayee`, shows Change. */
   characterId?: number;
   onSetPayee?: (payee: Payee, name: string) => Promise<void>;
   banner?: ReactNode;
@@ -488,7 +454,6 @@ export function MoonOwnerView({
   const { t } = useTranslation();
   const [asking, setAsking] = useState(false);
   const [changingPayee, setChangingPayee] = useState(false);
-  // The server takes a payee only while the moon owner is active or being removed.
   const payeeOpen = view.summary.status === 'active' || view.summary.status === 'pending-removal';
   const canSetPayee = payeeOpen && canEdit && onSetPayee !== undefined && characterId !== undefined;
   const state = pageState(view.summary);
@@ -501,20 +466,17 @@ export function MoonOwnerView({
     />
   );
   const setBy = view.summary.payeeSetBy ?? null;
-  // The accounting corporation changed who gets paid (#4653): a strip until dismissed.
   const payeeNotice = payeeChangeNotice({
     payee: view.summary.payee,
     payeeSetBy: setBy,
     viewer: 'moon-owner',
   });
-  // Settled after leaving folds to its one line: no history under it.
   const folded = isSettledAfterLeaving(view.summary);
   const ownerName = nameOf?.(view.summary.feederCorporationId);
   const refineryName = viewRefineryLabeler(view.refineries, {
     ...(nameOf ? { systemName: nameOf } : {}),
     ...(ownerName ? { ownerName } : {}),
   });
-  // The server takes a label until the moon owner leaves or is removed (disconnected included).
   const labelEdit =
     !ended && canEdit && onSetRefineryLabel
       ? {

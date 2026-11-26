@@ -47,8 +47,6 @@ describe('payeesOfBookCorporation', () => {
     ]);
   });
 
-  // EVE names are unique: an unlinked Payee named exactly as the book's corporation is it, and
-  // is linked so every device agrees.
   it('takes an unlinked Payee named exactly as the corporation, to be linked', () => {
     expect(
       payeesOfBookCorporation([payee({ name: ' bureau of unified harvesting ' })], bureau)
@@ -67,7 +65,6 @@ describe('payeesOfBookCorporation', () => {
     ).toEqual([{ id: 'linked', link: false }]);
   });
 
-  // Payees are per Character: an alt's unlinked one is judged on its own, not hidden by the main's.
   it("judges each Character's Payees apart", () => {
     expect(
       payeesOfBookCorporation(

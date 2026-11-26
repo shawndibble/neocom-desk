@@ -51,7 +51,6 @@ describe('JournalDescriptionCell', () => {
         />
       </MemoryRouter>
     );
-    // The goal's name replaces both ESI's `-` description and the bare id.
     expect(container.textContent).toBe('Complete 3 Jumps');
   });
 
@@ -67,7 +66,6 @@ describe('JournalDescriptionCell', () => {
     );
     expect(container).toHaveTextContent('Daily goal');
     expect(container).not.toHaveTextContent('999');
-    // Kept in a tooltip, so the goal can be named later.
     await userEvent.hover(screen.getByText('Daily goal'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Goal id 999');
   });

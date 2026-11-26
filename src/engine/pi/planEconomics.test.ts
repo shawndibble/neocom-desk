@@ -82,10 +82,6 @@ function cost(
   return { plan, baseline, economics: planEconomics(plan, colonies, baseline, books) };
 }
 
-/**
- * Each P1 Coolant needs comes off one colony; the temperate one yields only
- * Biofuels, which Coolant does not need, so it is the host.
- */
 function coolantColonies(hostTax: number): PlannerColony[] {
   return [
     colony(1, 'gas', { rates: [IONIC_SOLUTIONS] }),
@@ -103,10 +99,8 @@ describe('planEconomics', () => {
     const capped = planEconomics(plan, colonies, baseline, BOOKS, new Map([[COOLANT, 2 * 24]]));
     const open = planEconomics(plan, colonies, baseline, BOOKS);
     if (capped.status !== 'costed' || open.status !== 'costed') throw new Error('costed');
-    // 5 Coolant an hour made, 2 an hour counted.
     expect(open.revenue - capped.revenue).toBeCloseTo(3 * 20_000);
     expect(open.salesTax - capped.salesTax).toBeCloseTo(3 * 20_000 * 0.04);
-    // Customs still paid on every unit shipped.
     expect(capped.customs.exportFromHost).toBeCloseTo(open.customs.exportFromHost);
     expect(open.netPerHour - capped.netPerHour).toBeCloseTo(3 * 20_000 * 0.96);
   });
@@ -139,7 +133,6 @@ describe('planEconomics', () => {
     if (economics.status !== 'costed') throw new Error(economics.status);
     expect(economics.netPerHour).toBeCloseTo(baseline.iskPerHour, 6);
     expect(economics.liftPerHour).toBeCloseTo(0, 6);
-    // Each extractor pays export customs at its own rate.
     expect(economics.customs.exportFromExtractors).toBeCloseTo(40 * 400 * 0.05 + 40 * 400 * 0.2);
     expect(economics.perColony.get(2)?.planIskPerHour).toBeCloseTo(
       economics.perColony.get(2)!.baselineIskPerHour
@@ -155,7 +148,6 @@ describe('planEconomics', () => {
     expect(plan.factoryHost?.planetId).toBe(3);
     if (economics.status !== 'costed') throw new Error(economics.status);
     expect(economics.customs.importToHost).toBeCloseTo((40 + 40) * 0.3 * 400 * 0.5);
-    // The Coolant, plus the Biofuels its spare slot sells.
     expect(economics.customs.exportFromHost).toBeCloseTo(5 * 0.3 * 7200 + 40 * 0.3 * 400);
     expect(economics.revenue).toBeCloseTo(5 * 20_000 + 40 * 300);
     expect(economics.salesTax).toBeCloseTo((5 * 20_000 + 40 * 300) * 0.04);
@@ -169,7 +161,6 @@ describe('planEconomics', () => {
   });
 
   it('charges no customs on P1 the host makes and consumes itself, and lifts above shipping it in', () => {
-    // Gas yields both of Coolant's P0s, so one gas colony runs P0 -> P2 alone.
     const books = { ...BOOKS, bid: { ...BOOKS.bid, [COOLANT]: 40_000 } };
     const local = cost(
       [{ typeId: COOLANT, unitsPerDay: perDay(5) }],
@@ -183,7 +174,6 @@ describe('planEconomics', () => {
     expect(local.economics.customs.exportFromExtractors).toBe(0);
     expect(local.plan.hauling.m3PerWeek).toBeCloseTo(5 * 0.75 * 168);
 
-    // Same P0s, but the factories sit on a Barren that yields neither.
     const shipped = cost(
       [{ typeId: COOLANT, unitsPerDay: perDay(5) }],
       [
@@ -220,7 +210,6 @@ describe('planEconomics', () => {
 
     const withBuy = cost(goals, colonies, { ...POLICY, buyTiers: [1] }).economics;
     if (withBuy.status !== 'costed') throw new Error(withBuy.status);
-    // 72 made, 48 bought at the ask, all 120 valued at the bid.
     expect(withBuy.buys).toBeCloseTo(48 * 550);
     expect(withBuy.revenue).toBeCloseTo(120 * 500);
   });

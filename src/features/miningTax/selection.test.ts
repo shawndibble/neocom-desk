@@ -36,7 +36,6 @@ function row(overrides: Partial<MoonMiningTaxRow> = {}): MoonMiningTaxRow {
   };
 }
 
-/** An ordinary assigned, Outstanding display row. */
 function assigned(id: string, overrides: Partial<MiningTaxAssignmentRecord> = {}): DisplayRow {
   const a = assignment({ id, ...overrides });
   return {
@@ -56,7 +55,6 @@ function assigned(id: string, overrides: Partial<MiningTaxAssignmentRecord> = {}
   };
 }
 
-/** An unassigned-residual display row. */
 function unassigned(date: string, solarSystemId = 1, characterId = CHAR_A): DisplayRow {
   const r = row({
     characterId,
@@ -71,7 +69,6 @@ function unassigned(date: string, solarSystemId = 1, characterId = CHAR_A): Disp
   };
 }
 
-/** A joined group's display row: `primary` plus `siblings`, all sharing `groupId`. */
 function grouped(groupId: string, primaryId: string, siblingIds: readonly string[]): DisplayRow {
   const primary = assigned(primaryId, { groupId });
   return {
@@ -141,8 +138,6 @@ describe('combineEligibility', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // The sibling a2 already carries groupId g1 — re-tagging it would be a no-op
-    // write, and passing it would double-count the group in joinAssignments.
     expect(result.rows.map((dr) => dr.key)).toEqual(['a1', 'a3']);
   });
 
@@ -167,8 +162,6 @@ describe('combineEligibility', () => {
 
   it('checks terms across every member of a group, not just its primary', () => {
     const group = grouped('g1', 'a1', ['a2']);
-    // A per-member edit (GroupSummaryModal) can leave a group's own members
-    // disagreeing — combining more rows into it would compound the ambiguity.
     group.groupMembers = [
       {
         row: group.groupMembers![0].row,
@@ -200,11 +193,6 @@ describe('agreedTerms', () => {
     expect(agreedTerms([assignment(), assignment({ taxPct: 5 })])).toEqual({ ok: false });
   });
 
-  // The rule both join entry points must agree on. `joinAssignments` re-checks
-  // nothing, and `joinCandidatesFor` (the row-detail picker) only filters
-  // candidates against the *primary* — so with an unassigned primary it passes
-  // every assigned candidate through, and it is this function that has to
-  // catch two of them disagreeing.
   it('refuses two assigned rows that disagree even when the primary is unassigned', () => {
     const fromUnassignedPrimary = [
       assignment({ id: 'a2', payeeId: 'payee-1' }),

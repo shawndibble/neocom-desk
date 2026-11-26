@@ -23,8 +23,6 @@ describe('partitionByWeight', () => {
   });
 
   it('gives a file with no measurement the median weight, not zero', () => {
-    // Unmeasured files weigh 10 (the only measurement), so the second one
-    // goes back to the first shard; at weight 0 both would pile onto shard 2.
     const shards = partitionByWeight(
       ['e2e/a.spec.ts', 'e2e/n1.spec.ts', 'e2e/n2.spec.ts'],
       { 'e2e/a.spec.ts': 10 },

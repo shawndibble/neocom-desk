@@ -4,28 +4,15 @@ import { Caret } from './Disclosure';
 import { focusRingInsetClassName, rowInteractiveClassName } from './controlStyles';
 
 interface QuestionRowProps {
-  /** The question, read as a sentence. */
   question: string;
   expanded: boolean;
   onToggle: () => void;
-  /** The answer, shown under the question while `expanded`. */
   children: ReactNode;
-  /** An anchor id on the row, so `#<id>` can open and scroll to it. */
   id?: string;
-  /** The row's frame (border, fill, scroll margin); the toggle and answer are fixed. */
   className?: string;
-  /** Text tone of the answer, e.g. `text-text-dim`. */
   answerClassName?: string;
 }
 
-/**
- * One FAQ question: a body-size row that opens its answer below. Not
- * `Disclosure`, whose label is a micro-heading: a question is read as a
- * sentence. The caller owns `expanded`, so a list can open several at once or
- * follow a URL hash. Render inside a `<ul>`.
- *
- * @summary A body-size FAQ row (caret and question) that opens its answer below.
- */
 export function QuestionRow({
   question,
   expanded,

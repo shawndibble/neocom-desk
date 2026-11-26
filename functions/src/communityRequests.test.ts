@@ -264,7 +264,6 @@ describe('Pledge mail', () => {
     expect(decideRequestMail({ ...state, day: DAY, dailyCount: MAX_REQUEST_MAILS_PER_DAY })).toBe(
       'daily-cap'
     );
-    // The invite count is not the Request-mail count.
     expect(decideRequestMail({ ...state, day: DAY, dailyCount: MAX_MAIL_INVITES_PER_DAY })).toBe(
       'ok'
     );

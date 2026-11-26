@@ -1,9 +1,3 @@
-/**
- * Sample books for the Compare drawer "Trade hubs" mockup (issue #4696): four
- * large shield extenders priced at every Trade Hub, served as ESI region
- * orders so the real Market Browser and today's Prices view render them, and
- * read directly by the proposed view (a mockup draws, it does not fetch).
- */
 import type { RegionOrder } from '@/esi/endpoints';
 import { COMPARED_HUBS, type ComparedHub, type ComparedHubId } from '@/market/hubs';
 import { walletFixtureRoutes } from '@/storybook/esiFixtureRoutes';
@@ -23,17 +17,14 @@ export const COMPARE_ITEMS: readonly SampleCompareItem[] = [
   { typeId: 2281, itemName: 'Multispectrum Shield Hardener II' },
 ];
 
-/** Best sell / best buy at a hub; null = no orders on that side. */
 export interface HubQuote {
   sell: number | null;
   buy: number | null;
-  /** Units listed at the best sell and above, for the volume line. */
   sellVolume: number;
 }
 
 type HubId = ComparedHubId;
 
-/** Plausible October 2026 figures: Jita cheapest for most, a Rens dip, an empty Hek book. */
 export const HUB_QUOTES: Readonly<Record<number, Readonly<Record<HubId, HubQuote>>>> = {
   3841: {
     jita: { sell: 1_289_000, buy: 1_102_000, sellVolume: 2_431 },
@@ -65,7 +56,6 @@ export const HUB_QUOTES: Readonly<Record<number, Readonly<Record<HubId, HubQuote
   },
 };
 
-/** Jumps from the pilot (docked in Perimeter, next door to Jita), shortest safe route. */
 export const HUB_JUMPS: Readonly<Record<HubId, number>> = {
   jita: 1,
   amarr: 12,
@@ -110,12 +100,10 @@ export function compareHubFixtureRoutes(): FixtureRoute[] {
   const at = (tail: string) => new RegExp(String.raw`^/characters/\d+${tail}$`);
   return [
     ...walletFixtureRoutes(),
-    // Read for the after-fees column: no standings, no fee skills trained.
     { path: at('/standings/'), respond: () => ({ body: [] }) },
     { path: at('/skills'), respond: () => ({ body: { skills: [], total_sp: 0 } }) },
     { path: at('/skillqueue'), respond: () => ({ body: [] }) },
     { path: at('/implants'), respond: () => ({ body: [] }) },
-    // Docked in Perimeter, one jump from Jita.
     { path: at('/location'), respond: () => ({ body: { solar_system_id: 30000144 } }) },
     {
       path: /^\/universe\/types\/\d+$/,

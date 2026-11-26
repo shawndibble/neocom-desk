@@ -2,12 +2,6 @@ import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { TRADE_HUBS } from '@/market/hubs';
 
-/**
- * Compare mode's optional columns, in table order. The plan name always shows.
- * Everything past `hubBuyOrders` starts unticked: they answer narrower
- * questions (what the build costs by part, how crowded the hub's book is), and
- * the table already scrolls sideways at 1024px.
- */
 export const COMPARE_COLUMN_IDS = [
   'product',
   'runs',
@@ -42,7 +36,6 @@ export const COMPARE_DEFAULT_COLUMNS: readonly CompareColumnId[] = [
   'hubBuyOrders',
 ];
 
-/** The columns read off the hub's live order book rather than off the plan's own result (`hubOrdersPerDay` reads the hub's region history instead). */
 export const HUB_COLUMN_IDS: readonly CompareColumnId[] = [
   'hubOrdersPerDay',
   'hubBuyOrders',
@@ -51,7 +44,6 @@ export const HUB_COLUMN_IDS: readonly CompareColumnId[] = [
   'hubSellVolume',
 ];
 
-/** The columns read off the hub station's live order book (Fuzzwork) — the only ones that need that request. */
 export const HUB_BOOK_COLUMN_IDS: readonly CompareColumnId[] = HUB_COLUMN_IDS.filter(
   (id) => id !== 'hubOrdersPerDay'
 );
@@ -62,7 +54,6 @@ export const useVisibleCompareColumns = createColumnVisibilitySetting({
   defaultVisible: COMPARE_DEFAULT_COLUMNS,
 });
 
-/** Which hub the market columns read: each plan's own, or one hub for every row. */
 export const PLAN_HUB = 'plan';
 export type CompareHubChoice = typeof PLAN_HUB | (typeof TRADE_HUBS)[number]['id'];
 

@@ -24,19 +24,11 @@ import {
 } from '@/components/ui/icons';
 import { DESKTOP_SIZE, type Screenshot } from './screenshots';
 
-/** One catalog entry: its glyph and the `login.features.<key>` name. */
 export interface Feature {
   icon: ComponentType<IconProps>;
   key: string;
 }
 
-/**
- * One tab of the showcase: an area of the app, the screenshot that shows it,
- * what it does (`login.showcase.<id>.<bullet>`), and the catalog entries it
- * covers. Together the tabs name every `login.features.*` row exactly once; a
- * row that only repeats the tab's own name is not listed under the tab. Each
- * capture is used once on the whole page (`screenshotReferences.test.ts`).
- */
 export interface ShowcaseTab {
   id: string;
   shot: Screenshot;

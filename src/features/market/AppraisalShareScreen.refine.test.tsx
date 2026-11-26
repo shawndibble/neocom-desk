@@ -28,7 +28,6 @@ vi.mock('@/features/refining/useRefiningSetup', () => ({
   }),
 }));
 
-/** 1,000 units at 1,000 ISK is 1M as is; 90% efficiency refines to 14,400 x 10 x 10 portions. */
 const snapshot: AppraisalSnapshot = {
   v: 1,
   hub: 'jita',
@@ -110,17 +109,14 @@ describe('a Shared Appraisal with refine figures', () => {
       screen.getByRole('button', { name: /Show how the Refine figure is worked out/ })
     );
     const dialog = screen.getByRole('dialog');
-    // The button is replaced while it loads, so look it up again on every try.
     await waitFor(() =>
       expect(within(dialog).getByRole('button', { name: 'Use my numbers' })).toBeEnabled()
     );
     await user.click(within(dialog).getByRole('button', { name: 'Use my numbers' }));
     expect(within(dialog).getByText('Using your numbers')).toBeInTheDocument();
-    // 60% yield, no skills: 10 portions x floor(16,000 x 0.6) = 96,000 Pyerite at 10 ISK.
     expect(within(dialog).getByRole('cell', { name: '96,000' })).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Back to shared numbers' }));
     expect(within(dialog).getByText('Shared with you')).toBeInTheDocument();
-    // The sharer's 90%: 10 portions x floor(16,000 x 0.9).
     expect(within(dialog).getByRole('cell', { name: '144,000' })).toBeInTheDocument();
   });
 });

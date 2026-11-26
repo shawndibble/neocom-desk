@@ -1,8 +1,4 @@
 /* eslint-disable react-refresh/only-export-components -- mockup parts share constants with their stories */
-/**
- * Pieces of the SRP officer mockups: page chrome, queue columns, bulk bar,
- * dialogs, claim detail and the activity feed. Sample data only.
- */
 import { useState, type ReactNode } from 'react';
 import {
   Button,
@@ -87,7 +83,6 @@ function CorpSubNav() {
   );
 }
 
-/** Header, summary line and tabs; the tab body is `children`. */
 export function SrpPage({
   tab,
   children,
@@ -149,12 +144,6 @@ export function SrpPage({
   );
 }
 
-// ------------------------------------------------------------------ bulk bar
-
-/**
- * Select all / Select none and the count-labelled bulk buttons (DESIGN.md
- * Bulk selection): the buttons appear once a row is ticked.
- */
 export function BulkBar({
   selected,
   selectable,
@@ -181,8 +170,6 @@ export function BulkBar({
     </NewComponent>
   );
 }
-
-// ------------------------------------------------------------------- columns
 
 function Pilot({ claim }: { claim: SrpClaim }) {
   return (
@@ -315,7 +302,6 @@ export function pendingColumns(selectedIds: string[]): DataTableColumn<SrpClaim>
   ];
 }
 
-/** A copy button for the bare amount, so the officer can paste it into the in-game wallet. */
 export function CopyAmount({ claim, copied }: { claim: SrpClaim; copied?: boolean }) {
   return (
     <Button
@@ -439,8 +425,6 @@ export function ClaimTable({
   );
 }
 
-// ------------------------------------------------------------------- dialogs
-
 function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-1">
@@ -541,8 +525,6 @@ export function OverrideDialog({ claim }: { claim: SrpClaim }) {
   );
 }
 
-// ------------------------------------------------------------------- detail
-
 export function AuditTrail({ entries }: { entries: AuditEntry[] }) {
   return (
     <NewComponent name="SrpAuditTrail">
@@ -580,7 +562,6 @@ const STATE_TONE = {
   Rejected: 'danger',
 } as const;
 
-/** One claim's detail in a `SlideOver`: facts, amount with its basis, audit trail and the state's actions. */
 export function ClaimDetail({ claim, audit }: { claim: SrpClaim; audit: AuditEntry[] }) {
   const [open] = useState(true);
   const phone = useIsPhone();
@@ -672,8 +653,6 @@ export function ClaimDetail({ claim, audit }: { claim: SrpClaim; audit: AuditEnt
 
 export const DETAIL_PENDING = { claim: PENDING[0]!, audit: AUDIT_PENDING };
 export const DETAIL_OVERRIDDEN = { claim: APPROVED[2]!, audit: AUDIT_OVERRIDDEN };
-
-// ------------------------------------------------------------------ activity
 
 export function ActivityFeed() {
   const phone = useIsPhone();

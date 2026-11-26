@@ -5,11 +5,6 @@ import { importBackup, type ImportSummary } from '@/backup/io';
 import { requestPersistence } from '@/lib/persistStorage';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
-/**
- * The counterpart to {@link ExportPanel}. Conflict policy (issue #789, not
- * relitigated here): a Character already on this device is skipped whole —
- * its token and data are untouched — a new Character is written in full.
- */
 export function ImportPanel() {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
@@ -29,15 +24,6 @@ export function ImportPanel() {
       setPassword('');
       setFile(null);
       setStatus('idle');
-      // A newly-added character's token needs `ensureSignedIn`/`planSync` to
-      // run before it's usable, and any imported `sync.` setting is already
-      // on disk but not in the zustand store that read it at boot — same gap
-      // `ResetViewPreferences` above hits, and the same fix: reload once the
-      // pilot has had a moment to read the summary below.
-      // Restored Characters are only worth having if the browser keeps them: a
-      // device set up by import never signs in "first", so this is its ask
-      // (`@/lib/persistStorage`). On the pilot's own press, so not the
-      // once-only flag. Not awaited: a prompt must not hold the summary.
       if (result.addedCharacterIds.length > 0) {
         void requestPersistence().catch(() => undefined);
       }

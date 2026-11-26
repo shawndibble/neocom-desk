@@ -72,7 +72,6 @@ describe('paid-to-a-person picker', () => {
       {
         bookCorporationId: 1000,
         linked: new Set(['journal:3']),
-        // The corp's journal entry for donation 1, a minute later: the book holds it.
         held: [{ characterId: 7, amount: 5_000_000, at: '2026-11-04T10:01:00Z' }],
       }
     );

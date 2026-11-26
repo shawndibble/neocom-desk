@@ -9,10 +9,6 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { loadTypes } from '@/sde/loadSde';
 import { SHIP_TREE_PATH } from './fittingRoutes';
 
-/**
- * The flown hull, or null without the current-ship Permission or in a pod
- * (nothing to fit). `settled` once that is known, so the buttons never jump.
- */
 function useFlownHull(): { hull: StartHull | null; settled: boolean } {
   const ship = useCharacterShipTypeId();
   const typeId = ship.status === 'ready' ? ship.typeId : null;
@@ -25,12 +21,6 @@ function useFlownHull(): { hull: StartHull | null; settled: boolean } {
   return { hull: { typeId, name: type.name }, settled };
 }
 
-/**
- * The Fittings library page with nothing in it: what a Fitting is, the Ship
- * Tree for "what can I fly?", and the ways to start one. With the assets
- * grant the flown ship is an Active Fit row instead, so "Fit your ship" is
- * for a pilot without it.
- */
 export function FittingLibraryEmpty({
   onNewFromHull,
   onStartHull,

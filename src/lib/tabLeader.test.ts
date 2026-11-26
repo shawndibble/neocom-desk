@@ -8,7 +8,6 @@ import {
 } from './tabLeader';
 import { createFakeLockManager, type FakeLockManager } from './fakeLockManager';
 
-/** One simulated tab: its own document and window, sharing the origin's locks. */
 function makeTab(
   locks: FakeLockManager | undefined,
   visibility: 'visible' | 'hidden' = 'visible',
@@ -52,7 +51,6 @@ afterEach(() => {
   startedElections.splice(0).forEach((elections) => elections.stopAll());
 });
 
-/** A tab's per-job elections, sharing the origin's locks. */
 function makeElections(locks: FakeLockManager) {
   const doc = Object.assign(new EventTarget(), {
     visibilityState: 'visible' as DocumentVisibilityState,
@@ -62,10 +60,7 @@ function makeElections(locks: FakeLockManager) {
   return elections;
 }
 
-/** Let the fake's queued grants and releases run. */
 async function settle() {
-  // The fake models the browser's lock queue on timer turns, and drains in a bounded number of
-  // them; there is no single settled signal to wait on.
   // eslint-disable-next-line no-restricted-syntax -- the fake lock queue runs on timer turns; no settled signal
   for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 }

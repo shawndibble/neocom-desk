@@ -19,8 +19,6 @@ export function BuildPlanSortHeader({
 }) {
   const { t } = useTranslation();
   const active = sort?.columnId === sortKey;
-  // The app's sort glyph trio (DataTable headers, Order History): the neutral
-  // glyph marks a sortable column that isn't sorting — here, manual order.
   const Glyph = !active ? Icon.Sort : sort.direction === 'asc' ? Icon.Ascending : Icon.Descending;
   return (
     <span className={className}>

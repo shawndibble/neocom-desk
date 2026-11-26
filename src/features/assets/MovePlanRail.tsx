@@ -3,12 +3,6 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { pickupHueVar } from './movePlanView';
 
-/**
- * The vertical rail Plan a move draws on both of its screens: Character
- * headings and, under them, one stop per pickup location, ending at the
- * destination. The rail is a drawing of the route's shape, not a sequence:
- * the engine does not order pickups, so the dots are not numbered.
- */
 export function Rail({ children }: { children: ReactNode }) {
   return (
     <ol className="relative m-0 flex list-none flex-col gap-2.5 p-0 before:absolute before:top-3 before:bottom-4 before:left-[9px] before:w-0.5 before:bg-line-bright/55">
@@ -17,14 +11,12 @@ export function Rail({ children }: { children: ReactNode }) {
   );
 }
 
-/** A Character's name on the rail, with their initial in place of a dot. */
 export function RailHeading({
   name,
   leading,
   children,
 }: {
   name: string;
-  /** A control that selects everything under this heading. */
   leading?: ReactNode;
   children?: ReactNode;
 }) {
@@ -45,7 +37,6 @@ export function RailHeading({
   );
 }
 
-/** One stop: a dot in the pickup's colour (or accent, filled, for the destination) and a card. */
 export function RailStop({
   hue,
   destination = false,
@@ -55,7 +46,6 @@ export function RailStop({
 }: {
   hue?: number;
   destination?: boolean;
-  /** A stop that is not part of the plan (already at the destination): a grey dot. */
   neutral?: boolean;
   className?: string;
   children: ReactNode;
@@ -82,7 +72,6 @@ export function RailStop({
   );
 }
 
-/** Up to two initials: "Kira Vandt" is KV, "Test" is T. */
 function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   return (words[0]?.charAt(0) + (words[1]?.charAt(0) ?? '')).toUpperCase();

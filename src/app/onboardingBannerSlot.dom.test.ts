@@ -42,9 +42,6 @@ describe('useOnboardingBannerSlot', () => {
     expect(result.current).toBe(false);
   });
 
-  // No forced `rerender()` anywhere below: a losing banner re-rendering itself
-  // off its own store subscription is the whole mechanism, and a forced
-  // rerender would hide a broken subscription by re-reading the store anyway.
   it('grants the slot to the highest-priority claimant only', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
     expect(install.result.current).toBe(true);

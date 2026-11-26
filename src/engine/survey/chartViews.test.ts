@@ -5,7 +5,6 @@ import { summarizeSurvey, type SurveyScan } from './series';
 
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 
-/** A scan whose rocks carry ISK: [ore, volume, isk]. */
 function iskScan(minutes: number, ...rocks: [string, number, number][]): SurveyScan {
   return {
     at: T0 + minutes * MINUTE_MS,
@@ -50,7 +49,6 @@ describe('depletionSeries', () => {
   });
 
   it('an ore not yet shown is omitted so its line starts at its first scan', () => {
-    // B first appears in scan 2 (came into range); its start volume is 200.
     const s = summarizeSurvey([
       scan(0, ['A', 100]),
       scan(5, ['A', 80], ['B', 200]),
@@ -69,7 +67,6 @@ describe('depletionSeries', () => {
 
   it('clamps to 0..100 (a later rock for an ore can grow its volume past its start)', () => {
     const s = summarizeSurvey([scan(0, ['A', 100]), scan(5, ['A', 100], ['A', 100])])!;
-    // startVolume counts the added rock, so this stays <= 100; clamp guards float drift.
     for (const row of depletionSeries(s)) {
       expect(row.A as number).toBeLessThanOrEqual(100);
       expect(row.A as number).toBeGreaterThanOrEqual(0);
@@ -144,10 +141,7 @@ describe('paceShareSeries', () => {
   });
 
   it('keeps each ore percent of its own start, and turns them into shares summing to 100', () => {
-    const s = summarizeSurvey([
-      scan(0, ['A', 1000], ['B', 500]),
-      scan(5, ['A', 700], ['B', 400]), // A 30%, B 20%
-    ])!;
+    const s = summarizeSurvey([scan(0, ['A', 1000], ['B', 500]), scan(5, ['A', 700], ['B', 400])])!;
     const { intervals, activeOres, toneIndex } = paceShareSeries(s);
     expect(activeOres).toEqual(['A', 'B']);
     expect(toneIndex).toEqual({ A: 0, B: 1 });
@@ -160,10 +154,7 @@ describe('paceShareSeries', () => {
   });
 
   it('measures progress as m3 mined over the whole starting volume', () => {
-    const s = summarizeSurvey([
-      scan(0, ['A', 1000], ['B', 500]),
-      scan(5, ['A', 700], ['B', 400]), // 400 of 1500 m3
-    ])!;
+    const s = summarizeSurvey([scan(0, ['A', 1000], ['B', 500]), scan(5, ['A', 700], ['B', 400])])!;
     expect(paceShareSeries(s).intervals[0].progress).toBeCloseTo((400 / 1500) * 100);
   });
 
@@ -179,7 +170,7 @@ describe('paceShareSeries', () => {
   it('gives an interval where nothing was mined no shares and no progress', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 100]),
-      scan(5, ['A', 100], ['B', 50]), // B appears: added, nothing mined
+      scan(5, ['A', 100], ['B', 50]),
       scan(10, ['A', 50], ['B', 50]),
     ])!;
     const [idle] = paceShareSeries(s).intervals;

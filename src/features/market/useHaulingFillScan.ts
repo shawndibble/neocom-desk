@@ -1,14 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-/**
- * The on-demand scan behind "Fill the free space": batch after batch of the
- * same Hauling Opportunities scan as `useHaulingScan`, over every Hauling
- * category's type ids less those the table already holds and those earlier
- * batches returned or examined, until `haulingFillStop` says stop (or the user does).
- *
- * Runs only when asked (`find`, `more`), never by itself: each batch costs a
- * scan's ESI budget. Batches run one after another, never side by side. A
- * route, category, mode or Max price change aborts → idle, dropping what was found.
- */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   haulingFillStop,
@@ -27,7 +17,6 @@ import {
 import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 
-/** What sizing everything found so far gives: `FillBatchOutcome`'s filtered, planned half. */
 export type HaulingFillMeasure = Pick<
   FillBatchOutcome,
   'freeM3' | 'capacityM3' | 'binding' | 'newLines' | 'batchRows'
@@ -35,7 +24,6 @@ export type HaulingFillMeasure = Pick<
 
 export type HaulingFillScanState =
   | { status: 'idle' }
-  /** `batch` counts every batch since Find, Find more's included; `freeM3` is null before the first one lands. */
   | {
       status: 'loading';
       batch: number;
@@ -55,43 +43,30 @@ export interface HaulingFillScanInput {
   from: HaulingEnd;
   to: HaulingEnd;
   mode: HaulMode;
-  /** Max price per item, for each batch's own price pass (as the category scan's). */
   maxUnitPrice: number | null;
-  /** The route, category, mode and Max price as one key: a new one aborts → idle. */
   laneKey: string;
-  /** Type ids already in the table (scanned and added): never scanned again. Read before each batch. */
   excludeIds: () => Iterable<number>;
-  /** Filters and sizes every row found so far; `batchIds` are the last batch's. Null before a sizer is bound. */
   measure: (
     rows: readonly HaulingScanRow[],
     batchIds: ReadonlySet<number>
   ) => HaulingFillMeasure | null;
 }
 
-/**
- * A batch's cache scope: the ids it leaves out of every Hauling category,
- * which name its id set exactly, so two batches never share an entry. A
- * string, so it never collides with a category's numeric scope.
- */
 export function haulingFillScope(skipped: Iterable<number>): string {
   return `fill:${idSetKey(skipped)}`;
 }
 
-/** One press: Find starts afresh; Find more and Try again carry on. */
 interface Run {
   laneKey: string;
   fresh: boolean;
 }
 
-/** What a lane's fill has found across presses. */
 interface Found {
   laneKey: string;
   rows: HaulingScanRow[];
-  /** Every id a batch looked at past pass 1 (`HaulingScan.examinedTypeIds`): never scanned again. */
   examined: Set<number>;
   batches: number;
   freeM3: number | null;
-  /** Every cache key a batch filled, so a reset drops exactly those. */
   cacheKeys: Set<string>;
 }
 
@@ -108,7 +83,6 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
     setSeenLane(laneKey);
     setRun(null);
   }
-  // Tagged with the press it answers, so an old lane's rows never show for a new one.
   const [view, setView] = useState<{ run: Run; state: HaulingFillScanState } | null>(null);
   const found = useRef<Found | null>(null);
   const stopRun = useRef<(() => void) | null>(null);
@@ -145,7 +119,6 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
       });
     };
 
-    // Every Hauling category's ids, read once per press from the SDE the first batch loads.
     let everyId: number[] | null = null;
     void (async () => {
       for (let batchInPress = 1; ; batchInPress += 1) {
@@ -180,11 +153,9 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
             loading
           );
         } catch {
-          // An abort lands nowhere (`show` checks); any other failure, IndexedDB's included, is an error.
           show({ status: 'error', rows: lane.rows, batches: lane.batches });
           return;
         }
-        // A cached batch answers at once, without looking at the signal.
         if (signal.aborted) return;
         lane.cacheKeys.add(haulingScanCacheKey({ from, to, scope, mode, maxUnitPrice }));
         lane.rows = [...lane.rows, ...scan.rows];
@@ -199,7 +170,6 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         }
         if (measured !== null) lane.freeM3 = measured.freeM3;
         const reason = haulingFillStop({
-          // No sizer yet: judge the scan alone, never stop for want of one.
           ...(measured ?? {
             freeM3: Number.POSITIVE_INFINITY,
             capacityM3: 0,
@@ -224,11 +194,9 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
 
   const find = useCallback(() => setRun({ laneKey, fresh: true }), [laneKey]);
   const more = useCallback(() => setRun({ laneKey, fresh: false }), [laneKey]);
-  /** Ends the run after the batch in flight is dropped, keeping what earlier batches found. */
   const stop = useCallback(() => {
     stopRun.current?.();
   }, []);
-  /** Back to idle, dropping what was found and only the fill's own cache entries. */
   const reset = useCallback(() => {
     for (const key of found.current?.cacheKeys ?? []) evictHaulingScan(key);
     found.current = null;
@@ -239,7 +207,6 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
   if (active !== null) {
     if (view?.run === active) state = view.state;
     else {
-      // The frame before the run's first update.
       const last =
         !active.fresh && view?.run.laneKey === laneKey && view.state.status !== 'idle'
           ? view.state

@@ -100,8 +100,6 @@ describe('memberStanding', () => {
 
   it('honours a corp that writes its inactivity policy in a different span', () => {
     const seen = ago(45 * DAY_MS);
-    // 45 days is dark to a 30-day corp and current to a 60-day one. Same
-    // member, same instant — only the policy differs.
     expect(memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW, 30).isDark).toBe(true);
     expect(memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW, 60).isDark).toBe(false);
   });
@@ -133,9 +131,6 @@ describe('memberStanding', () => {
   });
 
   it('leaves a future last-seen negative rather than clamping it', () => {
-    // Clock skew between the client and ESI. Clamping here would make every
-    // skewed member tie at zero in the sort; display is where a negative span
-    // is rounded away.
     const standing = memberStanding(
       member({ logonMs: NOW + HOUR_MS, logoffMs: NOW + HOUR_MS }),
       NOW

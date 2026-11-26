@@ -3,11 +3,6 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { gameItemLookup } from '@/engine/fittings/fitCurrency';
 
-/**
- * The shipped `typeNames.json`, read as the Workbench's out-of-date check
- * reads it: every name the game has, so an item the loader's catalogue
- * leaves out is never called removed.
- */
 function shipped<T>(file: string): T {
   return JSON.parse(readFileSync(resolve(process.cwd(), 'public/data', file), 'utf8')) as T;
 }

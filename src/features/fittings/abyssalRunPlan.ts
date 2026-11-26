@@ -1,4 +1,3 @@
-/** Planner picks the weather picker lacks: filament tier, activation security. Session-only, not saved. */
 import { create } from 'zustand';
 import type { AbyssalSecurity, AbyssalTier } from '@/engine/fittings/abyssalRun';
 

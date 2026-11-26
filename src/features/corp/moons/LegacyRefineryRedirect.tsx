@@ -6,11 +6,6 @@ import { Crumb } from './moonsParts';
 import { refineriesTabPath, refineryPath } from './moonsPaths';
 import { useBook } from './useBook';
 
-/**
- * The retired moon page (`/corp/moons/moons/:moonId`) and moon owner refinery page open the
- * refinery page (#6348): the refinery itself, or the moon's newest refinery. A moon with no
- * Extraction in the book has no refinery to open.
- */
 export function LegacyRefineryRedirect({
   structureId,
   moonId,

@@ -1,16 +1,7 @@
 import { MAX_JOB_RUNS } from './types';
 
-/** The most runs a plan can hold; trials past it would price identically. */
 export const BREAK_EVEN_MAX_RUNS = MAX_JOB_RUNS;
 
-/**
- * A run count, at or above `currentRuns`, where profit is not negative —
- * the smallest one when profit only rises with runs. Profit is not linear in
- * runs (ME rounding, a blueprint bought once, sourcing tiers), so this probes
- * `profitAt` rather than solving an equation: double until profit is reached,
- * then bisect. A profitable pocket between two doublings can be missed. `null`
- * when profit is unknown or no probe reaches zero within `BREAK_EVEN_MAX_RUNS`.
- */
 export function breakEvenRuns(
   profitAt: (runs: number) => number | null,
   currentRuns: number
@@ -25,7 +16,7 @@ export function breakEvenRuns(
   if (atStart === null) return null;
   if (atStart) return start;
 
-  let lo = start; // known losing
+  let lo = start;
   let hi = start;
   for (;;) {
     if (hi >= BREAK_EVEN_MAX_RUNS) return null;

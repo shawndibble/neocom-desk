@@ -1,12 +1,3 @@
-/**
- * The pure half of the officer sync client (issue #4062, epic #4055, D9): what
- * an officer's visit uploads to the Corp Tax Book and what it concludes from
- * the book afterwards. Nothing here fetches; `features/corp/taxBook/` reads
- * ESI and Firestore and hands the results in.
- *
- * Two jobs the backend deliberately leaves to the client (#4061 hand-off):
- * resolve each donation's Miner, and report history ESI no longer holds.
- */
 import type { EveNotificationPayload } from '../eveNotificationPayload';
 import { shiftDate } from '../miningTax/yieldRange';
 import { matchBookOf, type MatchBook } from '../../../functions/src/corpTaxBookDonationMatch';
@@ -28,9 +19,7 @@ import type { ObservedRow } from './types';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { utcDay } from '@/engine/localDay';
 
-/** What ESI is assumed to keep of a refinery's ledger: the character ledger's 30 days; the corp's is unconfirmed. */
 export const ESI_LEDGER_RETENTION_DAYS = 30;
-/** The moon drill notification types the sync reads (the server mirrors the list; a test pins it). */
 export const MOON_NOTIFICATION_TYPES = [
   'MoonminingExtractionStarted',
   'MoonminingExtractionFinished',
@@ -38,16 +27,11 @@ export const MOON_NOTIFICATION_TYPES = [
   'MoonminingAutomaticFracture',
   'MoonminingExtractionCancelled',
 ] as const;
-/** After this long without a sync the book warns (D9). */
 export const STALE_AFTER_DAYS = 3;
-/** The server keeps at most this many gaps in a sync. */
 export const MAX_GAPS = 20;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-// --- Observer ledger ------------------------------------------------------
-
-/** One row of `GET /corporation/{id}/mining/observers/{observer_id}`. */
 export interface LedgerRowLike {
   character_id: number;
   recorded_corporation_id: number;
@@ -56,7 +40,6 @@ export interface LedgerRowLike {
   last_updated: string;
 }
 
-/** The ledger as `ObservedRow`s, dropping what the callable would reject. */
 export function observedRowsFromLedger(
   structureId: number,
   rows: readonly LedgerRowLike[],
@@ -79,33 +62,21 @@ export function observedRowsFromLedger(
     }));
 }
 
-// --- Gaps -----------------------------------------------------------------
-
 export interface SyncGap {
   structureId: number;
-  /** First lost day, inclusive. */
   from: string;
-  /** Last lost day, inclusive. */
   to: string;
 }
 
 export interface GapInput {
-  /** When the book was last synced by anyone; null before the first sync. */
   lastSyncAt: number | null;
   now: number;
   startDate: string;
   structureIds: readonly number[];
-  /** The oldest day ESI returned per refinery this time: proof of a longer retention. */
   oldestEsiDate: Readonly<Record<number, string | undefined>>;
   retentionDays?: number;
 }
 
-/**
- * Days nobody recorded and ESI no longer lists. A sync captures a day only as
- * far as it had grown, so the day of the last sync is lost with the days after
- * it that have since aged out. With no earlier sync nothing was missed: the
- * book starts with what ESI holds.
- */
 export function detectGaps(input: GapInput): SyncGap[] {
   if (input.lastSyncAt === null) return [];
   const retention = input.retentionDays ?? ESI_LEDGER_RETENTION_DAYS;
@@ -121,7 +92,6 @@ export function detectGaps(input: GapInput): SyncGap[] {
   return gaps;
 }
 
-/** Earlier gaps stay (lost history stays lost); overlapping or touching ones join; the newest `MAX_GAPS` are kept. */
 export function mergeGaps(prior: readonly SyncGap[], fresh: readonly SyncGap[]): SyncGap[] {
   const byStructure = new Map<number, SyncGap[]>();
   for (const gap of [...prior, ...fresh]) {
@@ -146,15 +116,10 @@ export function mergeGaps(prior: readonly SyncGap[], fresh: readonly SyncGap[]):
     .slice(-MAX_GAPS);
 }
 
-// --- Last synced ----------------------------------------------------------
-
-/** `corps/{corp}.lastSync`. */
 export interface LastSync {
-  /** Epoch ms, server time. */
   at: number;
   byCharacterId: number;
   byName: string;
-  /** Set when the scheduled server sync made this record, not an officer's visit (ADR 0025). */
   scheduled?: boolean;
   gaps: SyncGap[];
 }
@@ -167,7 +132,6 @@ export type SyncStatus =
       ageMs: number;
       byCharacterId: number;
       byName: string;
-      /** The scheduled server sync made it (ADR 0025); `byName` is then the grant holder. */
       scheduled: boolean;
       gaps: SyncGap[];
     };
@@ -185,8 +149,6 @@ export function syncStatus(lastSync: LastSync | null | undefined, now: number): 
     gaps: lastSync.gaps ?? [],
   };
 }
-
-// --- Donations ------------------------------------------------------------
 
 export interface JournalEntryLike {
   id: number;
@@ -206,11 +168,9 @@ export interface JournalDonation {
   at: string;
   reason?: string;
   minerId?: string;
-  /** Set when a known sender's Miner owed nothing, so it stays Unmatched for review (#6207). */
   reviewReason?: 'no-open-balance';
 }
 
-/** ISK players sent into one wallet division: `player_donation`s from someone other than the corporation. */
 export function donationsFromJournal(
   entries: readonly JournalEntryLike[],
   division: number,
@@ -234,12 +194,6 @@ export function donationsFromJournal(
   return out;
 }
 
-/**
- * The book as the shared donation rule reads it (`donationOwner`, functions/src/
- * corpTaxBookDonationMatch.ts): its Miners, every code it recognises, the Characters it has seen
- * mine and whom each payer paid before. The officer tab's one way into that rule, so it cannot
- * drift from the server's.
- */
 export function donationMatchBook(book: {
   miners: readonly Miner[];
   notices: readonly Pick<LateNotice, 'id' | 'minerId' | 'code'>[];
@@ -254,17 +208,13 @@ export function donationMatchBook(book: {
     miners: book.miners,
     notices: book.notices,
     minedCharacterIds: book.minedCharacterIds,
-    // The Miners the book holds a record of, as the server counts them: a notice or a payment.
     recordedMinerIds: [...book.notices.map((n) => n.minerId), ...[...paidBefore.values()].flat()],
     paidBefore,
   });
 }
 
-// --- Settlement -----------------------------------------------------------
-
 export type SettlePayment = Omit<TaxPayment, 'minerId'> & { minerId?: string };
 
-/** An Extraction as the book stores it (the sync callable's shape). */
 export interface SyncExtraction {
   structureId: number;
   moonId: number;
@@ -274,20 +224,15 @@ export interface SyncExtraction {
   laserFiredAt?: string;
   cancelledAt?: string;
   oreLines?: { typeId: number; quantity: number }[];
-  /** A Moon Ore Survey (Share Link id) an officer linked as the ore source when there is no notification (D13). */
   surveyId?: string;
-  /** That Survey's first scan, kept with the link so the make-up outlives the Survey's 7-day link. */
   surveyScan?: SurveyScanSnapshot;
-  /** Set by an officer once the chunk is mined out (#5257); absent when not flagged. */
   fullyMined?: { by: number; byName: string; at: string };
-  /** The moon owner whose grant read it (#6097); absent means the book's own corporation. */
   sourceCorporationId?: number;
 }
 
 export const extractionId = (x: Pick<SyncExtraction, 'structureId' | 'extractionStartTime'>) =>
   `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
 
-/** The engine's `Extraction` from a stored one. */
 export function toEngineExtraction(x: SyncExtraction): Extraction {
   return {
     id: extractionId(x),
@@ -301,10 +246,6 @@ export function toEngineExtraction(x: SyncExtraction): Extraction {
   };
 }
 
-/**
- * The Extraction a refinery was working on a given day and its moon: from the
- * day the chunk fractured to the day its belt expired. Empty when none covers it.
- */
 export function moonOnDay(
   extractions: readonly Extraction[],
   structureId: number | undefined,
@@ -327,12 +268,6 @@ export function moonOnDay(
   return {};
 }
 
-/**
- * Observer rows with the refinery's solar system and that day's moon (#4181),
- * so members, who cannot read Extractions, still line up by system and get
- * per-moon rates. A refinery with no known system or Extraction keeps its row
- * as it was: the fields are omitted, never guessed.
- */
 export function placeObservedRows(
   rows: readonly ObservedRow[],
   extractions: readonly SyncExtraction[],
@@ -350,11 +285,6 @@ export function placeObservedRows(
   });
 }
 
-/**
- * Rows with the `extractionId` of the pull covering their day, for rows that have none. Uses
- * the per-structure expiry, like read-time placement (`placeOfFactory`), so the stamp and the
- * view agree. A row no pull covers keeps no stamp; a stamped row is left as it is.
- */
 export function stampExtractionIds(
   rows: readonly ObservedRow[],
   extractions: readonly SyncExtraction[],
@@ -368,11 +298,6 @@ export function stampExtractionIds(
   });
 }
 
-/**
- * The rows whose stamp is not the one the current Extractions give: after an Extraction is
- * corrected (a later laser time, a cancel) or an expiry changes. `extractionId` undefined means
- * no pull covers the row any more, so its stamp is cleared.
- */
 export function restampPlan(
   rows: readonly ObservedRow[],
   extractions: readonly SyncExtraction[],
@@ -385,10 +310,7 @@ export function restampPlan(
   });
 }
 
-/** Which stored rows a sync reads to match donations: the shared rules (corpTaxBookMatchRows). */
 export { billableStoredRows, minedSinceStart, storedRowsWanted };
-
-// --- Extractions ----------------------------------------------------------
 
 export interface EsiExtractionLike {
   structure_id: number;
@@ -400,12 +322,10 @@ export interface EsiExtractionLike {
 
 export interface MoonNotification {
   type: string;
-  /** The notification's own timestamp. */
   timestamp: string;
   payload: EveNotificationPayload;
 }
 
-/** What the book already stores of an Extraction — enough to keep its identity. */
 export type StoredExtractionKey = Pick<
   SyncExtraction,
   'structureId' | 'moonId' | 'extractionStartTime' | 'chunkArrivalTime'
@@ -416,18 +336,15 @@ const SAME_CHUNK_MS = 10 * MINUTE_MS;
 const WINDOW_SLACK_MS = 5 * MINUTE_MS;
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** The notifications sent once a chunk has arrived that also name its ore. */
 const ORE_AFTER_ARRIVAL: ReadonlySet<string> = new Set([
   'MoonminingExtractionFinished',
   'MoonminingLaserFired',
   'MoonminingAutomaticFracture',
 ]);
 
-/** Whether an after-arrival notification is about the chunk arriving at `arrival`, fracturing by `decay`. */
 function namesChunk(n: MoonNotification, arrival: number, decay: number): boolean {
   const at = Date.parse(n.timestamp);
   if (n.type === 'MoonminingExtractionFinished') {
-    // Sent as the chunk arrives; its autoTime is that chunk's own fracture time.
     const auto = n.payload.autoTimeMs;
     return auto !== undefined
       ? Math.abs(auto - decay) <= SAME_CHUNK_MS
@@ -442,18 +359,6 @@ const unitsOf = (volumes: readonly { typeId: number; volumeM3: number }[]) =>
     quantity: Math.floor(o.volumeM3 / MOON_ORE_M3_PER_UNIT),
   }));
 
-/**
- * The Extractions to upload: ESI's current ones, plus any a started
- * notification remembers that ESI no longer lists, plus a stored one ESI no
- * longer lists whose ore a later notification names, each carrying what the
- * moon notifications add (the chunk's ore, when the laser fired, a
- * cancellation). The ore is the started notification's; without it, that of
- * Extraction finished, Laser fired or Automatic fracture, which name the same
- * chunk (the started one is weeks old by then, often gone from the feed).
- * Identity is structure + start time on the server, so an
- * Extraction the book already stores keeps its stored start time even when
- * ESI and the notification disagree by seconds.
- */
 export function reconcileExtractions(
   esi: readonly EsiExtractionLike[],
   notifications: readonly MoonNotification[],
@@ -527,8 +432,6 @@ export function reconcileExtractions(
       const arrival = Date.parse(out.chunkArrivalTime);
       const start = Date.parse(out.extractionStartTime);
       const decay = Date.parse(out.naturalDecayTime);
-      // Ore the book already holds (stored by an earlier sync), or the started notification's once
-      // read here, is never replaced by a later notification's: they name the same chunk.
       let oreHeld = (keep?.oreLines?.length ?? 0) > 0;
       for (const n of notifications) {
         if (n.payload.structureId !== out.structureId || n.payload.moonId !== out.moonId) continue;

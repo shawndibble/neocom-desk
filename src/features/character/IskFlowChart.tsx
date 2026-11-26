@@ -1,11 +1,3 @@
-/**
- * "Daily flow" (issue #3914): the Journal panel's one-bar-per-day In / Out
- * chart. Reads the same filtered, netted rows as the panel's totals, so a ref
- * type picked in the panel draws that type alone. On a mouse, a click on a day
- * sets the Journal's date range to that day (again clears it); on touch a tap
- * only reads the bar. `recharts` stays behind a lazy import
- * (`IskFlowChartBars.tsx`); this file never imports it.
- */
 import { lazy, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
@@ -24,7 +16,6 @@ import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 const LazyIskFlowChartBars = lazy(() => guarded(() => import('./IskFlowChartBars')));
 
 interface IskFlowChartProps {
-  /** The Journal's rows under every filter but the date range. */
   rows: readonly JournalRow[];
   filter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
@@ -42,7 +33,6 @@ export function IskFlowChart({ rows, filter, onFilterChange }: IskFlowChartProps
     [startDate, endDate, today]
   );
   const days = useMemo(() => journalDailyFlow(rows, flowSpan), [rows, flowSpan]);
-  // No flow in the span: a heading and toggle would control nothing.
   if (!hydrated || !days.some((d) => d.in > 0 || d.out > 0)) return null;
   const selectedDay =
     filter.startDate !== null && filter.startDate === filter.endDate ? filter.startDate : null;

@@ -1,10 +1,3 @@
-/**
- * Sets a scan of a Survey aside (or brings it back). Only the owner does, or the
- * device that started the Survey with no account; the rules can't tell who that is,
- * so the caller offering it is the guard. `characterId` is the signed-in Character,
- * or null for that device. `failed` is true after a write that did not land, until
- * the next attempt.
- */
 import { useCallback, useState } from 'react';
 import { setSurveyScanIgnored } from './surveyStore';
 

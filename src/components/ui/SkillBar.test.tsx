@@ -22,10 +22,8 @@ describe('SkillBar', () => {
   it('renders a partial fill on the segment just past level, sized to progress', () => {
     render(<SkillBar level={2} progress={0.5} />);
     const segments = screen.getByRole('img').querySelectorAll('[aria-hidden="true"]');
-    // Segment index 2 (0-based) is level 3 — the level just past the trained level 2.
     const fill = segments[2]?.querySelector('span');
     expect(fill).toHaveStyle({ width: '50%' });
-    // Fully-trained segments (0, 1) get no partial-fill child.
     expect(segments[0]?.querySelector('span')).toBeNull();
   });
 

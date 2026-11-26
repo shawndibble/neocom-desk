@@ -1,9 +1,3 @@
-/**
- * One way to fix a budget, as Make it fit's Implants and Swap sections draw it:
- * what goes in (an icon and name per item), what it does to the budget the pilot
- * clicked ("Frees 41 tf" and a bar to where it lands, under the limit), what it
- * costs, and the trade-offs as chips. The whole card is the apply target.
- */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, ProgressBar, TypeIcon } from '@/components/ui';
@@ -22,23 +16,16 @@ export interface FixCardItem {
   key: string;
   typeId: number;
   name: string;
-  /** Dim second line ("replaces X · Mid slot 2"). */
   detail?: string;
 }
 
 interface Props {
-  /** Left edge colour: what kind of fix this is. */
   tone: 'accent' | 'warning';
-  /** "Cheapest", "Recommended": the one this list leads with. */
   tag?: string;
   items: FixCardItem[];
-  /** "Frees 41 tf"; null when nothing is freed on the clicked budget. */
   freed: string | null;
-  /** The budget the pilot clicked, with the stats before and after, for the landing bar. */
   budget: { resource: Resource; before: FittingStats; after: FittingStats } | null;
-  /** ISK to buy it; negative saves; null when a price is unknown. */
   cost: number | null;
-  /** Trade-off chips, then the "All changes" disclosure, under the card. */
   chips?: ReactNode;
   footer?: ReactNode;
   onApply: () => void;
@@ -56,7 +43,6 @@ export function MakeItFitFixCard({
   onApply,
 }: Props) {
   const { t } = useTranslation();
-  // The engine offers only fixes that clear every budget, so this holds for all three; checked, not assumed.
   const fits = budget !== null && fitsResourceBudget(budget.after);
   return (
     <li
@@ -67,7 +53,6 @@ export function MakeItFitFixCard({
       )}
     >
       {tag && (
-        // Opaque under the Pill's translucent tint, so the card's border does not show through the label.
         <span className="bg-panel absolute -top-2 left-2 rounded-xs">
           <Pill tone="success">{tag}</Pill>
         </span>
@@ -111,7 +96,6 @@ export function MakeItFitFixCard({
             <ProgressBar
               label={t('fittings.makeItFit.landsAt')}
               value={usedOf(budget.after, budget.resource)}
-              // How full the budget is once the fix is in: what the Fitting uses of what the ship has.
               max={Math.max(
                 totalOf(budget.after, budget.resource),
                 usedOf(budget.after, budget.resource)

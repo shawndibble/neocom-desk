@@ -38,7 +38,6 @@ describe('removal input', () => {
 });
 
 describe('payee input', () => {
-  // The moon owner's own corporation: the moon owner sets its payee (#4619).
   const base = { corporationId: 98000002, accessToken: 'tok' };
   it('takes a player or a corporation', () => {
     expect(
@@ -62,7 +61,6 @@ describe('payee input', () => {
   });
 });
 
-// Nothing here is due (no effectiveAt), so these pin only how the hourly run finds candidates.
 describe('finalizeDueRemovals reads', () => {
   const pending = { status: 'pending-removal', removal: { startedAt: 1 } };
   function fakeDeps(opts: { missingIndex?: boolean; failRead?: string } = {}) {
@@ -121,7 +119,7 @@ describe('finalizeDueRemovals reads', () => {
     const f = fakeDeps({ missingIndex: true, failRead: 'corps/1/feeders/2' });
     expect(await finalizeDueRemovals(f.deps, 'pointers')).toEqual({ ended: 0 });
     expect(f.reads).toEqual(['pointers', 'corps/1/feeders/2', 'corps/1/feeders/4']);
-    expect(f.log).toHaveBeenCalledTimes(2); // the fallback notice and the failed read
+    expect(f.log).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -143,11 +141,9 @@ describe('the stale-ledger mail claim', () => {
     expect(
       staleMailClaimable({ ...claimed, staleMailClaimedAt: now - STALE_MAIL_CLAIM_MS }, now)
     ).toBe(true);
-    // Sent: final.
     expect(
       staleMailClaimable({ ...claimed, staleMailClaimedAt: 0, staleMailSentFor: spell }, now)
     ).toBe(false);
-    // A claim from before claims carried a time stays final.
     expect(staleMailClaimable(claimed, now)).toBe(false);
   });
 

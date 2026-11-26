@@ -33,10 +33,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Rows with sortable columns. */
 export const Sortable: Story = {};
 
-/** @summary Opens already sorted by quantity, largest first. */
 export const DefaultSorted: Story = {
   args: { defaultSort: { columnId: 'quantity', direction: 'desc' } },
 };
@@ -50,9 +48,6 @@ const groupedRows: Row[] = [
   { name: 'Mexallon', quantity: 50 },
 ];
 
-/**
- * @summary Groups ranked by `groupCompare` (most rows first) while the rows inside each stay in the column sort.
- */
 export const GroupsOrderedByCompare: Story = {
   args: {
     rows: groupedRows,
@@ -82,22 +77,13 @@ const denseColumns = [
 
 const phone = { globals: { viewport: { value: 'phone390', isRotated: false } } } as const;
 
-/** @summary Tighter rows for a long list. */
 export const Compact: Story = { args: { density: 'compact' } };
 
-/**
- * Below `sm` each row becomes a labelled card. `stacked` forces the cards at
- * any width so the story reads the same everywhere; real tables just follow
- * the viewport.
- *
- * @summary Phone cards: one labelled field per line, with a phone sort picker.
- */
 export const PhoneCards: Story = {
   args: { stacked: true, mobileSort: true, stackSummary: '3 materials' },
   ...phone,
 };
 
-/** @summary Icon-only sort picker: a 36px icon button with the OS picker laid over it. */
 export const SortPickerIconOnly: Story = {
   render: () => (
     <DataTableSortPicker
@@ -111,19 +97,11 @@ export const SortPickerIconOnly: Story = {
   ...phone,
 };
 
-/** @summary Phone cards with two short figures side by side, label above the value. */
 export const PhoneCardsTwoColumns: Story = {
   args: { stacked: true, stackColumns: 2 },
   ...phone,
 };
 
-/**
- * For a long list read by scanning: title and `cardCorner` figure on line one,
- * the rest inline and unlabelled on line two, so a phone shows three times the
- * rows. `stackAffix` supplies the words the dropped headers carried.
- *
- * @summary Phone dense cards: two-line rows for scanning a long list.
- */
 export const PhoneDenseCards: Story = {
   args: {
     stacked: true,
@@ -133,20 +111,12 @@ export const PhoneDenseCards: Story = {
   ...phone,
 };
 
-/**
- * A card hides the leading caret (the card is the tap target), so a stacked table whose rows open
- * in place (`expandableRow` with `leadingIcon`) draws a trailing chevron on each card, which turns
- * when the card is open. A table that cannot expand shows none.
- *
- * @summary Phone cards that open in place: a trailing chevron says so and turns when open.
- */
 export const PhoneCardsExpandable: Story = {
   args: {
     stacked: true,
     expandableRow: {
       leadingIcon: true,
       initialKey: 'Pyerite',
-      // The story's args are typed `unknown`-row, as the meta's component generic is.
       renderDetail: (r: unknown) => {
         const { name, quantity } = r as Row;
         return `${name}: ${quantity.toLocaleString('en')} units in stock.`;
@@ -156,5 +126,4 @@ export const PhoneCardsExpandable: Story = {
   ...phone,
 };
 
-/** @summary Keeps real columns on a phone and scrolls sideways; right when comparing across columns is the point. */
 export const TableOnPhone: Story = { args: { responsive: 'table' }, ...phone };

@@ -148,13 +148,11 @@ describe('donationOwner', () => {
       minerId: 'g2',
       by: 'payer',
     });
-    // Two earlier names for one grouping are one Miner; two Miners are for an officer.
     expect(donationOwner({ characterId: 41 }, book)).toMatchObject({ minerId: 'g1' });
     expect(donationOwner({ characterId: 42 }, book)).toEqual({
       kind: 'ambiguous',
       minerIds: ['g1', 'g2'],
     });
-    // A code still says more than an old payment does.
     expect(donationOwner({ characterId: 40, reason: minerPaymentCode('g1') }, book)).toMatchObject({
       minerId: 'g1',
       by: 'code',
@@ -232,7 +230,6 @@ describe('rematchUnmatched: which Unmatched payments now have a Miner', () => {
   });
 
   it('skips a payment dated before the lock date: assigning it is refused for good', () => {
-    // On 2026-11-21 the lock date is 2026-09-01.
     expect(
       rematchUnmatched(
         [

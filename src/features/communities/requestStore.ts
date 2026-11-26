@@ -1,11 +1,3 @@
-/**
- * Community Requests client (issue #3807, ADR 0021): the board reads through
- * Firestore under the membership rules; posting, extending, closing and
- * reopening go through the Request callables, which hold the caps. Pledges
- * (issue #3808) are the Member's own documents, written here directly under
- * the rules. Firestore here is the `lite` build (no listeners), so callers
- * refetch after a change.
- */
 import {
   collection,
   collectionGroup,
@@ -68,7 +60,6 @@ function readRequest(id: string, d: Record<string, unknown>): CommunityRequest |
     .map(readLine)
     .filter((line): line is RequestLine => line !== null);
   const standing = readStanding(d);
-  // A standing Request asks through its buy lines and carries no item lines.
   if (lines.length === 0 && !standing) return null;
   return {
     id,
@@ -86,7 +77,6 @@ function readRequest(id: string, d: Record<string, unknown>): CommunityRequest |
   };
 }
 
-/** Every Request on a Community's board, newest first. A document that does not read as a Request is skipped. */
 export async function loadRequests(
   characterId: number,
   communityId: string
@@ -105,12 +95,6 @@ export async function loadRequests(
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/**
- * The Requests posted after `since` (epoch ms), newest first: what the nav badge
- * counts. A single-field range on `createdAt` (an automatic index), so a tick with
- * nothing new is one read rather than the whole board. Until an index exists it
- * reads the board and filters it, as before.
- */
 export async function loadRequestsSince(
   characterId: number,
   communityId: string,
@@ -141,11 +125,6 @@ export async function loadRequestsSince(
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/**
- * The board's version stamp (issue #5244): `communities/{id}/boardVersion/current`, one read. `stamp`
- * moves on every write to a Request or Pledge, `reset` only on one that deletes (a delta cannot show
- * a deletion). A board with no stamp yet reads 0 / 0. Null under a backend override: no cache there.
- */
 export async function loadBoardVersion(
   characterId: number,
   communityId: string
@@ -163,11 +142,6 @@ export async function loadBoardVersion(
   return { stamp: millis(data.stamp), reset: millis(data.reset) };
 }
 
-/**
- * Sets the board's version stamp after a Pledge write (the callables set it for Requests), and
- * `reset` too when the write deleted a Pledge. Best effort: the Pledge is already saved, and a
- * missed stamp only leaves other devices on their cached board until it ages out.
- */
 export async function bumpBoardVersion(
   characterId: number,
   communityId: string,
@@ -189,7 +163,6 @@ export async function bumpBoardVersion(
   }
 }
 
-/** The Requests whose `lastActivityAt` is at or after `since` (epoch ms): the delta over a cached board. */
 export async function loadRequestsActiveSince(
   characterId: number,
   communityId: string,
@@ -209,10 +182,6 @@ export async function loadRequestsActiveSince(
     .filter((request): request is CommunityRequest => request !== null);
 }
 
-/**
- * Only this Member's own Requests in a Community: one single-field query on
- * `ownerUid` (no composite index), a few documents instead of the whole board.
- */
 export async function loadMyRequests(
   characterId: number,
   communityId: string
@@ -242,11 +211,9 @@ export interface PostRequestDraft {
   terms: string;
   lines: RequestLine[];
   notify: RequestNotify;
-  /** Present on a standing buyback Request: the rate, hub, buyer and what it buys. */
   standing?: StandingRequest;
 }
 
-/** The callable's flat shape: a standing draft sends `standing: true` beside its terms. */
 function draftPayload({ standing, ...draft }: PostRequestDraft) {
   if (!standing) return draft;
   const { buyerCharacterId, ...terms } = standing;
@@ -266,7 +233,6 @@ export function postRequest(characterId: number, communityId: string, draft: Pos
   );
 }
 
-/** The requester edits their own Request (checked server side). */
 export async function editRequest(
   characterId: number,
   communityId: string,
@@ -288,7 +254,6 @@ export function extendRequest(characterId: number, communityId: string, requestI
   );
 }
 
-/** Close a Request, or reopen a closed one. */
 export async function setRequestClosed(
   characterId: number,
   communityId: string,
@@ -302,7 +267,6 @@ export async function setRequestClosed(
   });
 }
 
-/** The Community admin removes any Request, with every Pledge on it (checked server side). */
 export async function removeRequest(
   characterId: number,
   communityId: string,
@@ -311,7 +275,6 @@ export async function removeRequest(
   await callCommunity(characterId, 'removeCommunityRequestCallable', { communityId, requestId });
 }
 
-/** The Community admin removes one Member's Pledge on a Request (checked server side). */
 export async function removePledge(
   characterId: number,
   communityId: string,
@@ -327,7 +290,6 @@ export async function removePledge(
 
 type PledgeLines = RequestPledge['lines'];
 
-/** A Pledge document as stored: the lines keyed by index. Null when it does not read as one. */
 function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | null {
   if (typeof d.lines !== 'object' || d.lines === null) return null;
   const lines: Record<number, PledgeEntry> = {};
@@ -352,7 +314,6 @@ function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | nu
   return { uid, lines, ...(quote ? { quote } : {}), updatedAt: stamp?.toMillis?.() ?? 0 };
 }
 
-/** Every Member's Pledges on one Request. */
 export async function loadPledges(
   characterId: number,
   communityId: string,
@@ -378,12 +339,6 @@ export async function loadPledges(
     .filter((pledge): pledge is RequestPledge => pledge !== null);
 }
 
-/**
- * Every Pledge in a Community, by Request id, in ONE collection-group query on
- * `pledges` filtered by `communityId` (each Pledge repeats its Community, and
- * the rules bind that field to its path). Needs the collection-group index
- * and rule in firestore.indexes.json / firestore.rules to be deployed.
- */
 export async function loadCommunityPledges(
   characterId: number,
   communityId: string
@@ -414,11 +369,6 @@ export async function loadCommunityPledges(
   return found;
 }
 
-/**
- * The Pledges in a Community written at or after `since` (epoch ms), by Request id: the delta over a
- * cached board. A collection-group query on `communityId` and `updatedAt` (a composite index in
- * firestore.indexes.json); callers fall back to the whole read when it is not deployed.
- */
 export async function loadCommunityPledgesSince(
   characterId: number,
   communityId: string,
@@ -444,12 +394,6 @@ export async function loadCommunityPledgesSince(
   return found;
 }
 
-/**
- * This Character's own Pledges in a Community, by Request id: the delivery sweep needs nothing
- * else. One collection-group query on `communityId` and `ownerHash` (every Pledge carries both,
- * the rules bind them), so it costs what the Character has pledged, not the whole Community.
- * Until its composite index is deployed it reads every Pledge in the Community, as before.
- */
 export async function loadMyPledges(
   characterId: number,
   communityId: string
@@ -486,7 +430,6 @@ export async function loadMyPledges(
   const mine = new Map<string, RequestPledge>();
   for (const entry of snap.docs) {
     const requestId = entry.ref.parent.parent?.id;
-    // The document id is the Pledger: an owner hash alone never makes a Pledge this Character's.
     if (!requestId || entry.id !== uid) continue;
     const pledge = readPledge(entry.id, entry.data());
     if (pledge) mine.set(requestId, pledge);
@@ -494,7 +437,6 @@ export async function loadMyPledges(
   return mine;
 }
 
-/** Some Requests of a Community by id, one read each; one since removed is left out. */
 export async function loadRequestsById(
   characterId: number,
   communityId: string,
@@ -518,13 +460,6 @@ export async function loadRequestsById(
     .filter((request): request is CommunityRequest => request !== null);
 }
 
-/**
- * Rewrites this Character's Pledge on one Request: inside a transaction, reads
- * the stored document (so a delivery marked from another device, or a typed
- * amount saved a moment ago, is kept; a concurrent write makes it retry on the
- * fresh document), applies `change`, then writes it, or deletes it when no
- * line is left. Returns the new Pledge, null when withdrawn.
- */
 export async function updateMyPledge(
   characterId: number,
   communityId: string,
@@ -601,11 +536,6 @@ async function writeMyPledge(
   return readPledge(uid, (await getDoc(ref)).data() ?? {});
 }
 
-/**
- * Holds (or, with null, clears) this Character's Quote on a standing Request.
- * The Quote replaces any held one: one Quote per Member per Request. A standing
- * Request takes no line Pledges, so the document is the Quote and nothing else.
- */
 export async function saveMyQuote(
   characterId: number,
   communityId: string,
@@ -648,11 +578,6 @@ export async function saveMyQuote(
   return saved;
 }
 
-/**
- * Saves the contracts linked to this Character's held Quote, when the Quote is
- * still the one that was matched (`quotedAt`): a second paste in the meantime
- * replaced it, and its links start empty. Only ids and statuses are written.
- */
 export async function saveQuoteLinks(
   characterId: number,
   communityId: string,

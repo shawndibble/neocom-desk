@@ -25,13 +25,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Open: the caret hides the body. */
 export const Open: Story = {};
 
-/** @summary Folded: only the header shows, and `meta` still answers the question. */
 export const Folded: Story = { args: { expanded: false } };
 
-/** @summary Folded with a few headline figures in the body so the fold costs the detail, not the answer. */
 export const FoldedWithSummary: Story = {
   args: {
     expanded: false,

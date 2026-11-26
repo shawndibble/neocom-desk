@@ -51,7 +51,6 @@ const CATALOG: BlueprintCatalog = {
   typesById: {
     [BUZZARD]: { name: 'Buzzard', groupID: 830, volume: 19400 },
     [AMMO]: { name: 'Scourge Fury Heavy Missile', groupID: 654, volume: 0.03 },
-    // A faction module: it has a name in the SDE but nothing produces it.
     2000: { name: 'Sisters Core Probe Launcher', groupID: 481, volume: 5 },
   },
 };
@@ -77,8 +76,6 @@ describe('fitBlueprintLookup', () => {
   });
 
   it('returns null for an item nothing produces', () => {
-    // Faction, named and meta modules drop from NPCs and have no blueprint at
-    // all — roughly a fifth of a routine fit.
     expect(lookup('Sisters Core Probe Launcher')).toBeNull();
   });
 
@@ -96,7 +93,6 @@ describe('previewFitImport', () => {
     expect(preview.hull?.productName).toBe('Buzzard');
     expect(preview.groupName).toBe('Max Hacker');
     expect(preview.items).toHaveLength(1);
-    // 150 needed at 100 per run rounds up, leaving 50 over.
     expect(preview.items[0]).toMatchObject({ runs: 2, spare: 50 });
     expect(preview.skipped.map((s) => s.name)).toEqual(['Sisters Core Probe Launcher']);
   });
@@ -131,9 +127,6 @@ describe('fitImportPlans', () => {
   });
 
   it('stamps the hull newer than every other member', () => {
-    // `mostRecentlyUpdatedPlan` uses a strict `>`, so a batch sharing one
-    // timestamp would resolve by UUID order and the pilot's next hand-made
-    // plan would inherit its settings from a random rig (issue #456).
     const plans = build();
     const hull = plans[0];
     expect(plans.slice(1).every((p) => p.updatedAt < hull.updatedAt)).toBe(true);
@@ -144,16 +137,11 @@ describe('fitImportPlans', () => {
   });
 
   it('seeds ME from the assumed-ME preference rather than 0', () => {
-    // Most of a T2 fit needs an invented BPC, which the app cannot see; at ME0
-    // the group would overstate its material cost on nearly every member.
     expect(build(2).every((p) => p.me === 2)).toBe(true);
     expect(build(0).every((p) => p.me === 0)).toBe(true);
   });
 
   it('seeds TE from the assumed-TE preference rather than 0 (#634)', () => {
-    // The same members, and the same reason on the other axis: at TE0 the
-    // group's job time — and the ISK/hour read off it — is wrong by the
-    // research a real invented BPC comes with.
     expect(build(2, 4).every((p) => p.te === 4)).toBe(true);
     expect(build(2, 0).every((p) => p.te === 0)).toBe(true);
   });

@@ -1,25 +1,15 @@
-/**
- * The last Hauling scan, boiled down to what the Overview's Hauling widget
- * shows: the best haul on each lane. The Hauling tab writes it when a scan
- * lands; the widget only ever reads it, so the Overview never fans out the
- * market calls a scan costs (#3579).
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { HaulingViewRow } from './haulingView';
 
-/** One lane's best haul: the item whose suggested load earns the most. */
 export interface HaulingLane {
   fromHub: string;
   toHub: string;
   item: string;
-  /** ISK profit after fees on the suggested load. */
   profit: number;
 }
 
 export interface HaulingSummary {
-  /** When the scan these lanes came from finished, ms since the epoch. */
   fetchedAt: number;
-  /** Best first, at most `MAX_SUMMARY_LANES`. */
   lanes: HaulingLane[];
 }
 
@@ -30,7 +20,6 @@ type SummaryRow = Pick<HaulingViewRow, 'name' | 'profitPerUnit' | 'suggestedUnit
   toHub: { id: string };
 };
 
-/** The best profitable haul on each lane, best lane first; null when no row earns anything. */
 export function summarizeHaulingRows(
   rows: readonly SummaryRow[],
   fetchedAt: number
@@ -70,7 +59,6 @@ export const useHaulingSummary = createLocalSetting<HaulingSummary | null>({
   parse: parseSummary,
 });
 
-/** Saves a scan's summary unless it is the one already stored (the panel recomputes rows as fees load). */
 export function rememberHaulingSummary(summary: HaulingSummary): void {
   const { value, setValue } = useHaulingSummary.getState();
   if (value !== null && JSON.stringify(value) === JSON.stringify(summary)) return;

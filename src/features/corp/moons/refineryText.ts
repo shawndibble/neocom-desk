@@ -4,7 +4,6 @@ import { shortDate } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.refineryLabels.${key}`;
 
-/** The one dim line under a refinery's name: its moon, Extractions and last mined day. */
 export function refineryMeta(t: TFunction, row: RefineryRow, moonName: string | undefined): string {
   return [
     ...(moonName ? [moonName] : []),
@@ -13,6 +12,5 @@ export function refineryMeta(t: TFunction, row: RefineryRow, moonName: string | 
   ].join(' · ');
 }
 
-/** The pill's words for why Archive is offered. */
 export const offerLabel = (t: TFunction, offer: ArchiveOffer): string =>
   offer.kind === 'gone' ? t(k('offerGone')) : t(k('offerIdle'), { count: offer.days });

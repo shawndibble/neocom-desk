@@ -1,7 +1,3 @@
-/**
- * The Calendar's corporation filter: every corp event, none, or one
- * corporation's. Device-local, like the hidden kinds beside it.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import type { BoardCorporation } from '@/engine/character/board';
 import type { CorpEventFilter } from '@/engine/character/deadlines';
@@ -20,7 +16,6 @@ function parseOneOrAll(raw: unknown): CorpEventFilter | null {
   return raw === 'all' || (typeof raw === 'number' && Number.isInteger(raw)) ? raw : null;
 }
 
-/** The sharing-corporation filter on Shared Pops: all of them, or one corporation's. */
 export const CALENDAR_SHARING_CORP_FILTER_KEY = 'calendarSharingCorpFilter';
 
 export const useCalendarSharingCorpFilter = createLocalSetting<CorpEventFilter>({
@@ -29,10 +24,6 @@ export const useCalendarSharingCorpFilter = createLocalSetting<CorpEventFilter>(
   parse: parseOneOrAll,
 });
 
-/**
- * A saved corporation filters nothing once the account can no longer read it,
- * or once it is the only one left: the menu then offers no row to undo it.
- */
 export function activeCorpFilter(
   saved: CorpEventFilter,
   corporations: readonly BoardCorporation[]

@@ -1,59 +1,3 @@
-/**
- * The Appraisal tab's arithmetic: what a pasted pile of items is worth at a
- * Trade Hub, on both sides of the order book, scaled by the pilot's chosen
- * percentage of market.
- *
- * Pure — names are resolved and prices fetched by the caller
- * (`features/market/appraisalData.ts`), because this module must not import
- * fetch, Dexie or the SDE loaders.
- *
- * Two things it is deliberate about:
- *
- * - **An unlisted side stays null.** `HubAggregate` reports "nobody is buying
- *   this" as `null`, never 0 (`market/fuzzwork.ts`, and BUG #5 in its own doc
- *   comment). `null * quantity` is 0 in JavaScript, so a total that summed
- *   blindly would quietly appraise an item nobody trades as free. A null side
- *   produces null figures on the row and is left out of that side's total;
- *   `unpricedRows` says how many rows that happened to, so the reader is told
- *   the total is over a subset rather than being shown a smaller number with
- *   no explanation.
- * - **No rounding.** The percentage is applied as `price * percent / 100`
- *   rather than `price * (percent / 100)` — the integer multiply happens
- *   first, so a whole-ISK price at a whole percentage lands exactly rather
- *   than a binary fraction below it. Everything else is left at full
- *   precision and rounded once, at the edge, by `formatIsk`.
- *
- * Refine-then-sell (issue #672) rides alongside the sell-as-is figures on the
- * same rows and totals, rather than as a parallel `Appraisal`, so the two are
- * always compared over the same priced quantity. It reuses
- * `src/engine/industry/reprocessing.ts` wholesale — this module supplies only
- * `computeAppraisalRefine`, the glue that turns one resolved item plus a
- * character's skills and material prices into the same
- * `{ total, pricedAll }` shape `reprocessingValue` already established, so
- * `buildAppraisal` can scale and total it exactly like buy/sell. A type with
- * no reprocessing data carries no `refine` field at all, distinguishing "no
- * comparison exists" from "the comparison is worth nothing" (a part-portion
- * quantity, which is a real, reportable zero).
- *
- * LP store acquisition rides alongside the same way: a faction/navy item
- * with no blueprint at all (the Astero, say) still often turns up in an NPC
- * corp's LP store, which is a second acquisition path beyond the market's
- * sell side `sellTotal` already prices. `lpOption` on `AppraisalItem` (from
- * `features/market/appraisalLpAcquisition.ts`, which resolves which corp
- * offers it and fetches the LP balance) is never scaled by Price Percent —
- * it is a fixed NPC price, not a market order someone is negotiating a
- * fraction of — and only ever competes with `sellTotal`, never `buyTotal`:
- * redeeming an offer is how a pilot *acquires* the item, not how they
- * dispose of one they already have.
- *
- * Volume (issue #2337) is the m³ a row takes up in a hauler's hold: its
- * quantity times the type's **packaged** volume, supplied per item by the
- * caller from the market type catalogue. It is never scaled by Price Percent
- * — it is not a price. An unknown unit volume follows the same rule as an
- * unlisted price side: the row's volume is null, it is left out of the
- * total, and `volumeUnknownRows` counts it, so a partial total is labelled
- * rather than silently read as the whole pile.
- */
 import {
   reprocessingValue,
   reprocessingYield,
@@ -70,55 +14,27 @@ import type { AppraisalLpOption } from '@/engine/market/lpAcquisition';
 import { undercutPrice } from '@/engine/market/priceTick';
 import type { ResolvedStandings } from '@/engine/market/standings';
 
-/** Refine-then-sell value for one item's full pasted quantity, at 100% price. */
 export interface AppraisalRefine {
-  /** What the priced output materials fetch. Never counts an unpriced material as free. */
   valueAtFullPrice: number;
-  /** False when at least one output material had no price at this hub. */
   pricedAll: boolean;
-  /** Units that could not fill a whole reprocessing portion, and so refined into nothing. */
   unitsLeftOver: number;
-  /**
-   * The same pile's minerals valued at the sell side (what listing them would
-   * ask), net of the same tax. Absent where the sell prices were never read
-   * (a share link from before they travelled with it), never a zero.
-   */
   sellValueAtFullPrice?: number;
-  /** False when at least one output material had no sell price. Set with `sellValueAtFullPrice`. */
   sellPricedAll?: boolean;
-  /**
-   * What the figures above were worked out from, kept so the refine breakdown
-   * can show the arithmetic and a shared link can carry it. Absent on a
-   * refine built before it existed (an old fixture), which has no breakdown.
-   */
   detail?: AppraisalRefineDetail;
 }
 
-/** The inputs behind one item's refine value: the recipe, the yield applied, the prices read. */
 export interface AppraisalRefineDetail {
   portionSize: number;
-  /** Units returned per whole portion at 100% efficiency. */
   materials: readonly ReprocessingMaterial[];
-  /** Facility yield x skills x implant for this type: what `reprocessingYield` multiplied by. */
   efficiency: number;
-  /** Material type id -> ISK a unit at the appraisal's hub, at 100%. A material nobody buys is absent. */
   materialPrices: Readonly<Record<number, number>>;
-  /** The same, at the sell side. Absent where the sell prices were never read. */
   materialSellPrices?: Readonly<Record<number, number>>;
 }
 
-/** Every price basis, in the order they are shown. The one list the type and the comparison are built from. */
 export const REFINE_BASES = ['buy', 'split', 'sell'] as const;
 
-/** Which side of the book a refine comparison prices on: the buy orders, the sell orders, or halfway. */
 export type RefineBasis = (typeof REFINE_BASES)[number];
 
-/**
- * A price on a basis from its two sides: the buy side, the sell side, or their
- * midpoint, which needs both. Null where a side the basis needs has no price.
- * The one place the three bases are told apart; `appraisalRowFigures` and the
- * breakdown's mineral prices go through it.
- */
 export function priceOnBasis(
   basis: RefineBasis,
   buy: number | null | undefined,
@@ -131,45 +47,25 @@ export function priceOnBasis(
   return buySide === null || sellSide === null ? null : (buySide + sellSide) / 2;
 }
 
-/** One resolved, priced item to appraise. Prices are per unit, at 100%. */
 export interface AppraisalItem {
   typeId: number;
   name: string;
   quantity: number;
-  /** Best buy order price, or null where nobody is buying. */
   buy: number | null;
-  /** Best sell order price, or null where nobody is selling. */
   sell: number | null;
-  /** Undefined when this type carries no reprocessing data at all. */
   refine?: AppraisalRefine;
-  /** Undefined when nothing the character holds LP with sells this item. */
   lpOption?: AppraisalLpOption;
-  /** Packaged m³ per unit; null or absent when the catalogue does not know it. */
   unitVolume?: number | null;
-  /** The pilot's own order is (or ties) the cheapest sell, so a list matches it rather than undercutting it (issue #5591). */
   sellIsOwn?: boolean;
-  /**
-   * Where `buy`/`sell` came from on the live-priced Appraisal page: the live
-   * hub book, the cached price while its book is still loading, or the cached
-   * price because the book failed. Absent where nothing prices live.
-   */
   priceState?: PriceState;
-  /**
-   * Set where the live buy walk (issue #5653) priced `buy`: `buy` is then the
-   * average over `filled` units, not the top bid, and `unsold` units no
-   * reachable buy order could take are left out of the buy total.
-   */
   buyWalk?: AppraisalBuyWalk;
 }
 
-/** What walking the reachable buy orders did to a line's Sell now price. */
 export interface AppraisalBuyWalk {
   topBid: number;
   topBidTakes: number;
-  /** Units sold; `buy` is their average. */
   filled: number;
   unsold: number;
-  /** The walk went past the top bid, so `buy` is below it. */
   movedPrice: boolean;
 }
 
@@ -183,78 +79,44 @@ export interface AppraisalRow {
   sellEach: number | null;
   buyTotal: number | null;
   sellTotal: number | null;
-  /** The minerals' net value at the price percent, on the buy side, leaving the leftover units out. The figure the page shows, and the one the verdict compares, are `rowFigures(...).refine`. Undefined when this type carries no reprocessing data at all. */
   refineTotal?: number;
   refinePricedAll?: boolean;
   refineUnitsLeftOver?: number;
-  /** `refineTotal` on the sell side (minerals only); undefined where the sell prices were never read. */
   refineSellTotal?: number;
   refineSellPricedAll?: boolean;
-  /** Undefined when nothing the character holds LP with sells this item. */
   lpCorporationId?: number;
-  /** The store `offer_id` the LP option priced — the Appraisal's link opens the store on it. */
   lpOfferId?: number;
   lpCorpName?: string;
   lpCost?: number;
   lpIskCost?: number;
   lpAffordable?: boolean;
-  /** `quantity` x packaged unit volume, m³; null when the unit volume is unknown. */
   volume: number | null;
-  /** Where the prices came from; see `AppraisalItem.priceState`. */
   priceState?: PriceState;
-  /** See `AppraisalItem.buyWalk`; `buyTotal` covers `buyWalk.filled` units, not `quantity`. */
   buyWalk?: AppraisalBuyWalk;
 }
 
-/**
- * What the pile costs to buy per m³ of cargo it fills — the row's sell total
- * over its packaged volume, so it scales with Price Percent like the total does.
- * Null where either side is unknown (no sell orders, no catalogue volume) or the
- * volume is zero: a missing figure is not a free or an infinitely dense cargo.
- */
 export function iskPerM3(row: Pick<AppraisalRow, 'sellTotal' | 'volume'>): number | null {
   if (row.sellTotal === null || row.volume === null || !(row.volume > 0)) return null;
   return row.sellTotal / row.volume;
 }
 
 export interface AppraisalTotals {
-  /** Summed over rows with a buy price. */
   buy: number;
-  /** Summed over rows with a sell price. */
   sell: number;
-  /** `sell - buy`. */
   spread: number;
-  /** Rows missing a price on at least one side, so the totals are a subset. */
   unpricedRows: number;
-  /** The buy side of the refine total (see `refineSell`): summed over rows carrying reprocessing data, whatever their pricing. */
   refine: number;
-  /** `refine` on the sell side, over rows that have it. */
   refineSell: number;
-  /** Rows with reprocessing data where at least one output material had no price. */
   refineUnpricedRows: number;
-  /**
-   * `sellTotal`, or the cheaper affordable `lpIskCost` where one exists —
-   * "the total" a pilot actually pays to acquire everything pasted, LP store
-   * included. Equal to `sell` whenever no row has a cheaper affordable LP
-   * option, so a paste with nothing LP-redeemable reads exactly as before.
-   */
   cheapestBuy: number;
-  /** Rows whose cheapest-known acquisition path is redeeming an LP offer. */
   cheapestBuyViaLp: number;
-  /** m³, summed over rows with a known volume. */
   volume: number;
-  /** Rows with no known volume, so `volume` is a partial total when above 0. */
   volumeUnknownRows: number;
 }
 
 export interface Appraisal {
   rows: AppraisalRow[];
   totals: AppraisalTotals;
-  /**
-   * The same items, unscaled — `appraisalNet` scales these by Price Percent
-   * itself, and `appraisalUndercut` reads them as real orders. Same order as
-   * `rows`, one per row.
-   */
   items: readonly AppraisalItem[];
 }
 
@@ -262,24 +124,11 @@ function scale(price: number | null, percent: number): number | null {
   return price === null ? null : (price * percent) / 100;
 }
 
-/**
- * Does redeeming this row's LP offer beat buying it off the market?
- *
- * Only ever true against an *affordable* offer — a cheaper option the
- * character lacks the LP for is real information (`row.lpIskCost` still
- * carries it, for display), but it does not win a comparison about what the
- * pilot can actually do today, and `cheapestBuy` must not credit a total the
- * character cannot pay. A market row with no sell price at all (`sellTotal
- * === null`) loses to any affordable offer, the same "an unpriced side must
- * not silently read as free, but it also must not block a real number from
- * winning" rule `unpricedLeafTypeIds` applies on the build side.
- */
 export function lpBeatsMarket(row: AppraisalRow): boolean {
   if (row.lpIskCost === undefined || row.lpAffordable !== true) return false;
   return row.sellTotal === null || row.lpIskCost < row.sellTotal;
 }
 
-/** Prices every item at `pricePercent` of market and totals both sides. */
 export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: number): Appraisal {
   const rows: AppraisalRow[] = [];
   let buy = 0;
@@ -379,57 +228,25 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   };
 }
 
-/** The character inputs `appraisalNet` needs, resolved by the caller from Character Modifiers and hub standings. */
 export interface AppraisalNetFees {
   accountingLevel: number;
   brokerRelationsLevel: number;
-  /** The character's standing toward the trade hub's NPC station owner. */
   standing: ResolvedStandings;
 }
 
-/** What actually reaches the wallet, at 100% of market — see `Appraisal.items`'s doc. */
 export interface AppraisalNetTotals {
-  /** Selling every priced item into buy orders now: raw buy total minus sales tax. */
   instantNet: number;
-  /**
-   * Listing every priced item one legal tick under its best sell: that
-   * undercut total minus sales tax minus broker fee (100 ISK minimum, once
-   * per item — one pasted type is one listing, the same "per stack listed"
-   * rule `ownedStockSale` applies to a material).
-   */
   listNet: number;
-  /** The character's own sales-tax rate, percent — for the chip tooltip. */
   salesTaxPct: number;
-  /** The character's own broker-fee rate at this hub, percent — for the chip tooltip. */
   brokerFeePct: number;
 }
 
-/** The sell-order price that beats every seller at the hub, for one pasted item. */
 export interface AppraisalUndercut {
-  /** One legal tick under the cheapest sell order — what to type into EVE's price field. */
   price: number;
-  /**
-   * True when that price is no better than the best buy order: selling into
-   * the buy order instead pays the same or more, today, with no broker fee.
-   */
   atOrBelowBuy: boolean;
-  /** The pilot's own order is the cheapest sell, so the price is that order's, unchanged. */
   matchesOwn: boolean;
 }
 
-/**
- * The Appraisal's Undercut view: what to list each pasted item at so it
- * sits cheapest at the hub. Reads the unscaled `AppraisalItem`, never a
- * Price-Percent-scaled row — the price is a real order being beaten, not a
- * negotiated fraction of one. `appraisalNet`'s `listNet` undercuts the
- * Price-Percent-scaled sell instead, so the column and the chip agree only at
- * 100%.
- *
- * Null when nobody is selling (nothing to undercut) or the cheapest seller
- * already sits on the 0.01 ISK floor (no legal price below it). When the
- * pilot's own order is the cheapest (`sellIsOwn`), the price matches it
- * instead of undercutting the pilot's own listing (issue #5591).
- */
 export function appraisalUndercut(
   item: Pick<AppraisalItem, 'buy' | 'sell' | 'sellIsOwn'>
 ): AppraisalUndercut | null {
@@ -439,15 +256,6 @@ export function appraisalUndercut(
   return { price, atOrBelowBuy: item.buy !== null && price <= item.buy, matchesOwn };
 }
 
-/**
- * Net-of-fees totals for the two ways to sell what was pasted, at the
- * appraisal's own Price Percent: the buy and sell prices are scaled by it
- * before tax and fees, so the figures sit beside the gross totals they come
- * from. Reads `AppraisalItem.buy`/`.sell` via `Appraisal.items`. An item missing
- * the relevant price is excluded from that side's net only, the same "an
- * unpriced side stays out of a total, never free" rule `buildAppraisal`
- * itself applies.
- */
 export function appraisalNet(
   items: readonly AppraisalItem[],
   { accountingLevel, brokerRelationsLevel, standing }: AppraisalNetFees,
@@ -492,22 +300,12 @@ export function appraisalNet(
   };
 }
 
-/** One Compare Set item's trade margin at the character's own fee rates — see `compareMargin`. */
 export interface CompareMargin {
-  /** Best sell minus best buy, ISK; null when either side has no order. */
   spread: number | null;
-  /** The spread as a percentage of the best buy (the ISK tied up buying); null with no spread or a zero buy. */
   spreadPct: number | null;
-  /**
-   * The spread left after buying at the best buy and selling at the best sell
-   * with orders of your own: broker fee on both orders (100 ISK minimum each,
-   * one unit) plus sales tax on the sell. Uses the same `brokerFee`/`salesTax`
-   * rates as `appraisalNet`, so the two surfaces agree.
-   */
   afterFees: number | null;
 }
 
-/** Spread, spread %, and spread after fees for one unit bought at `bestBuy` and sold at `bestSell`. */
 export function compareMargin(
   bestSell: number | null,
   bestBuy: number | null,
@@ -537,22 +335,11 @@ export function compareMargin(
   };
 }
 
-/** One Trade Hub's row in the Compare Hubs table: both sides, at the given percentage. */
 export interface HubComparisonTotals {
-  /** Null when nothing among the items has a buy price at this hub — a dash, not a 0. */
   buy: number | null;
-  /** Null when nothing among the items has a sell price at this hub — a dash, not a 0. */
   sell: number | null;
 }
 
-/**
- * Collapses `buildAppraisal`'s totals to the two figures a Compare Hubs row
- * needs. `buildAppraisal` already excludes an unpriced row from a side's
- * total rather than treating it as free, but its total is still `0` for a
- * side nothing priced on — indistinguishable from "everything here is
- * genuinely worth nothing". This turns that case to `null` too, so the whole
- * hub column reads as a dash rather than a misleadingly precise 0.
- */
 export function buildHubComparison(
   items: readonly AppraisalItem[],
   pricePercent: number
@@ -564,39 +351,21 @@ export function buildHubComparison(
   };
 }
 
-/** What one item's reprocessing data looks like, resolved from the SDE bake. */
 export interface AppraisalReprocessingEntry {
   portionSize: number;
   materials: readonly ReprocessingMaterial[];
-  /** The SDE's specialisation skill; absent = scrap, refined under Scrapmetal Processing only (issues #1058, #1226). */
   specialisationSkillId?: number;
 }
 
 export interface ComputeAppraisalRefineInput {
-  /** Units of the item pasted, refined together the same way `reprocessingYield` batches them. */
   quantity: number;
-  /** Undefined when the type carries no reprocessing data at all. */
   reprocessing: AppraisalReprocessingEntry | undefined;
   modifiers: CharacterModifiers;
-  /** materialTypeId -> ISK a unit at the appraisal's Trade Hub. */
   materialPrices: Readonly<Record<number, number>>;
-  /** The same, at the sell side; absent = the sell side is not valued. */
   materialSellPrices?: Readonly<Record<number, number>>;
-  /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
   refining?: RefiningSetup;
 }
 
-/**
- * The per-row refine comparison: the pasted quantity, refined with the
- * character's own skills at the pilot's Refining Setup, net of its tax, priced at the
- * appraisal's hub — deliberately not the station-priced comparison
- * `orderExits.ts` makes for one open order, since an Appraisal is quoted at a
- * Trade Hub rather than wherever the pasted stock happens to sit.
- *
- * Undefined in, undefined out: a type with no reprocessing data has no
- * comparison to show, which is different from a comparison that resolves to
- * zero (a part-portion quantity — `reprocessingYield`'s own discipline).
- */
 export function computeAppraisalRefine({
   quantity,
   reprocessing,
@@ -624,13 +393,6 @@ export function computeAppraisalRefine({
   );
 }
 
-/**
- * One item's refine figure from the inputs it is worked out from: the recipe,
- * the yield already applied and the mineral prices. `computeAppraisalRefine`
- * resolves the yield from a character's skills and then comes through here; a
- * shared link, which carries the sharer's resolved yield instead of their
- * skills, comes through here directly, so the two cannot disagree.
- */
 export function refineFromDetail(
   quantity: number,
   detail: AppraisalRefineDetail,

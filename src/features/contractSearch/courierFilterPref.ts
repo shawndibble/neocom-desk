@@ -1,28 +1,3 @@
-/**
- * Contracts Search's Courier filter values, remembered across visits (issue
- * #1719): hull volume and collateral ceiling are the two fields a regular
- * hauler resets every session — about 6 taps and 16 digits — so a bare
- * `/contracts` visit restores the whole filter rather than one field.
- *
- * Deliberately absent:
- * - **The free-text route search** (`courier.q`) — a stale typed query
- *   silently narrowing a fresh visit is a search box's own bad habit, not
- *   the numeric/chip filters this issue is about.
- * - **Route preference** (`courier.pref`) — the pilot's default lives in
- *   Settings → Travel (`features/route/routeRules.ts`); the URL holds only a
- *   one-view override of it.
- *
- * One record, rejected as a whole if any field is unusable — same rule
- * `market/locationMode.ts` follows for a combined
- * setting: a half-restored filter is worse than a fully default one.
- *
- * URL wins whenever present (decision `20260922-221531` / ADR 0015): this
- * setting is consulted only for the fields the URL leaves unset.
- * `CourierResults.tsx` hands it to `useRememberedUrlParams`
- * (`lib/useUrlState.ts`), which owns that per-field presence check — nothing
- * ever mirrors a stored value back into the URL, and this is written to only
- * from an actual filter change.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { SPACE_KINDS, isSpaceKind, type SpaceKind } from '@/engine/space';
 import { OVER_RATE_FILTERS, type OverRateFilter } from './overRateFilter';
@@ -41,7 +16,6 @@ export interface StoredCourierFilter {
   minDays: string;
 }
 
-/** No restriction at all — the same filter a hauler who has never touched the board sees. */
 export const DEFAULT_COURIER_FILTER: StoredCourierFilter = {
   originRegionId: null,
   destinationRegionId: null,

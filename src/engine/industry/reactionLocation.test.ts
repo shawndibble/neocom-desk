@@ -16,7 +16,6 @@ describe('reactionLocationState', () => {
 });
 
 describe('nearestLowsecSystem', () => {
-  // 1 - 2 - 3 - 4 ; 1 high, 2 high, 3 low, 4 low
   const graph: JumpGraph = new Map([
     [1, [2]],
     [2, [1, 3]],

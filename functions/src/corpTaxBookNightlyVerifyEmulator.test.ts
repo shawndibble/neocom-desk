@@ -1,5 +1,3 @@
-// The nightly pass over a book's server-built docs (decision 20261120-235011), against the
-// Firestore emulator. Runs only under `npm run test:rules` at the repo root.
 import { afterAll, beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { MOON_DOC_SCHEMA } from './corpTaxBookMoonDocs.js';
@@ -11,7 +9,6 @@ const CORP = 98000001;
 const NOW = Date.parse('2026-11-18T12:00:00Z');
 const book = () => db.collection('corps').doc(String(CORP));
 
-// Locked: fractured 2 Aug, over by 4 Aug, before the 1 Sep lock date on 18 Nov.
 const closed = {
   structureId: 1000,
   moonId: 7,
@@ -68,7 +65,6 @@ emulatorSuite('the nightly pass (emulator)', () => {
       frozenTax: 0,
     });
     expect(await doc(open)).toMatchObject({ mined: [{ typeId: 45490, quantity: 10 }] });
-    // A row of the closed pull that changed is not read again: its doc is current and closed.
     await row('r1', '2026-08-03', idOf(closed), 99);
     await row('r2', '2026-10-11', idOf(open), 20);
     await verifyBook(db, CORP, () => NOW);

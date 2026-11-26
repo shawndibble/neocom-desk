@@ -1,11 +1,3 @@
-/**
- * Search the market catalogue for one item type: a combobox over
- * `loadMarketTypes` with ranked matches, arrow-key navigation, a retry note
- * when the lazy catalogue download fails, and the announcement for it. The
- * caller owns what happens next (a quantity field, a submit): it learns the
- * chosen type through `onPick` and is told to start over with `resetKey`.
- * Shared by the Stock tab's Add items dialog and the corp Stock targets dialog.
- */
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type Ref } from 'react';
 import { Button, LiveStatus, TextInput } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
@@ -32,13 +24,9 @@ export function MarketTypePicker({
   inputRef: Ref<HTMLInputElement>;
   label: string;
   placeholder: string;
-  /** Shown, and announced, when the catalogue could not be downloaded. */
   unavailableText: string;
-  /** The chosen type, or null while the pilot is still typing. */
   picked: MarketTypeEntry | null;
-  /** Called with the chosen type, and with null once the pilot edits the text again. */
   onPick: (type: MarketTypeEntry | null) => void;
-  /** Changing this empties the field (after the caller has used the pick). */
   resetKey?: number;
   invalid?: boolean;
   describedBy?: string;
@@ -48,7 +36,6 @@ export function MarketTypePicker({
   const [types, setTypes] = useState<readonly MarketTypeEntry[]>([]);
   const [query, setQuery] = useState('');
 
-  // The catalogue is a lazy download, so offline it may be missing: say so.
   const {
     failed: typesFailed,
     attempt: typesAttempt,
@@ -82,7 +69,6 @@ export function MarketTypePicker({
   const open = matches.length > 0;
   const combo = useCombobox({ count: matches.length, open });
 
-  // Start over when the caller bumps `resetKey` (adjusted during render, not in an effect).
   const [seenResetKey, setSeenResetKey] = useState(resetKey);
   if (seenResetKey !== resetKey) {
     setSeenResetKey(resetKey);
@@ -102,7 +88,6 @@ export function MarketTypePicker({
       event.preventDefault();
       choose(matches[combo.highlight ?? 0]);
     } else if (event.key === 'Escape' && open) {
-      // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
       setQuery('');
@@ -138,7 +123,6 @@ export function MarketTypePicker({
           <Button
             size="sm"
             onClick={() => {
-              // The note unmounts into the retry; focus goes on to the search field it serves.
               document.getElementById(`${id}-search`)?.focus();
               retryTypes();
             }}
@@ -147,7 +131,6 @@ export function MarketTypePicker({
           </Button>
         </div>
       )}
-      {/* Always mounted, so the failure is announced when it appears (DESIGN.md §7). */}
       <LiveStatus>{typesFailed ? unavailableText : null}</LiveStatus>
       <ul
         {...combo.listboxProps}

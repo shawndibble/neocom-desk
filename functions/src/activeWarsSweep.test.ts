@@ -23,7 +23,6 @@ interface Route {
   remaining?: string;
 }
 
-/** A fake ESI: `/wars/` lists ids, `/wars/{id}/` answers from `wars`. */
 function fakeEsi(listed: number[], wars: Record<number, Route>, calls: string[] = []) {
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = String(input);
@@ -124,7 +123,6 @@ describe('runActiveWarsSweep', () => {
       updatedAt: number;
       wars: { id: number }[];
     };
-    // The held war stays listed, but the list is not confirmed as of now.
     expect(doc.updatedAt).toBe(777);
     expect(doc.wars.map((war) => war.id)).toEqual([20, 5]);
   });

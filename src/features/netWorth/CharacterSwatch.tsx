@@ -1,6 +1,5 @@
 import { characterStroke } from './layerMeta';
 
-/** Key for one Character's chart line: same hue and dash as the line. The name beside it stays text. */
 export function CharacterSwatch({ index }: { index: number }) {
   const { color, dash } = characterStroke(index);
   return (

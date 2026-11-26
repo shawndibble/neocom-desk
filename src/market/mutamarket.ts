@@ -1,27 +1,3 @@
-/**
- * Abyssal module estimates from MutaMarket — the only price an abyssal
- * (mutated) module has, since no market orders exist for one. Scope decision:
- * docs/context/decisions/20261016-085744-mutamarket-is-the-abyssal-price-source.md.
- *
- * Reaches MutaMarket only via the `mutamarketEstimate` function
- * (`functions/src/mutamarket.ts` says why). Firebase loads with
- * `await import(...)`, so this module is safe on the startup graph.
- *
- * Consumers: call `getAbyssalEstimate` only for an abyssal (mutated) module
- * with an item id. It never throws and never answers 0: anything but
- * `status: 'priced'` has `value: null`, and an unpriced module stays unpriced —
- * leave it out of a total rather than counting it as 0. Show
- * `market.mutamarket.priceFrom` linked to `url` beside a priced value.
- * `importIfMissing` publishes the module on MutaMarket: pass it only on the
- * pilot's explicit ask, never while merely listing assets.
- *
- * Imports run one at a time, lookups a few at once; concurrent asks for one
- * item (same `importIfMissing`) share one. Every answer is cached per item id:
- * in memory and in the `esiCache` table under
- * `GLOBAL_CACHE_CHARACTER_ID`, so a reload inside the TTL does not ask again.
- * `unavailable` (no Firebase config, function not deployed, MutaMarket down)
- * is held in memory only, briefly, so a list of modules doesn't retry each.
- */
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { createSemaphore } from '@/lib/concurrency';
@@ -29,39 +5,23 @@ import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@
 
 export const MUTAMARKET_SITE_URL = 'https://mutamarket.com';
 
-/** A priced estimate: MutaMarket retrains per type every few days. */
 export const ABYSSAL_ESTIMATE_TTL_MS = 6 * HOUR_MS;
-/** `no-estimate` / `unknown`: asking again sooner won't change the answer. */
 export const ABYSSAL_NO_ESTIMATE_TTL_MS = DAY_MS;
-/** `not-imported`: someone may import it meanwhile. */
 export const ABYSSAL_NOT_IMPORTED_TTL_MS = HOUR_MS;
-/** `unavailable`, memory only. */
 export const ABYSSAL_UNAVAILABLE_RETRY_MS = 5 * MINUTE_MS;
 
-/**
- * - `priced`: `value` is MutaMarket's model estimate, ISK, > 0.
- * - `no-estimate`: MutaMarket knows the module (or its type) but has no value.
- * - `not-imported`: MutaMarket hasn't seen the module; `importIfMissing` imports it.
- * - `unknown`: MutaMarket doesn't price this type, or couldn't import the item.
- * - `unavailable`: the lookup failed; try again later.
- */
 export type AbyssalEstimateStatus =
   'priced' | 'no-estimate' | 'not-imported' | 'unknown' | 'unavailable';
 
 export interface AbyssalEstimate {
-  /** ISK; null unless `status` is `priced`. Never 0. */
   value: number | null;
   status: AbyssalEstimateStatus;
   source: 'mutamarket';
-  /** Epoch ms this answer was fetched (or, for `unavailable`, tried). */
   fetchedAt: number;
-  /** When MutaMarket last ran its model for the module, as MutaMarket sends it. */
   valueUpdatedAt: string | null;
-  /** The module's MutaMarket page when known, else MutaMarket's home page. */
   url: string;
 }
 
-/** The callable's answer — mirrors `MutamarketEstimate` in functions/src/mutamarket.ts. */
 export type MutamarketEstimateResponse =
   | { status: 'priced'; value: number; valueUpdatedAt: string | null; url: string | null }
   | { status: 'no-estimate'; url: string | null }
@@ -69,7 +29,6 @@ export type MutamarketEstimateResponse =
   | { status: 'unknown' };
 
 export interface MutamarketRequest {
-  /** Signs in to Firebase as this Character if no session exists. */
   characterId: number;
   typeId: number;
   itemId: number;
@@ -80,10 +39,8 @@ export type MutamarketTransport = (
   request: MutamarketRequest
 ) => Promise<MutamarketEstimateResponse>;
 
-/** The stored part of an estimate; `fetchedAt` is the cache row's own. */
 type StoredEstimate = Pick<AbyssalEstimate, 'value' | 'status' | 'valueUpdatedAt' | 'url'>;
 
-/** Callable timeout: an import behind a short queue can take most of a minute. */
 const CALL_TIMEOUT_MS = 120_000;
 
 async function callableTransport({
@@ -108,7 +65,6 @@ async function callableTransport({
 let transport: MutamarketTransport = callableTransport;
 let now: () => number = () => Date.now();
 
-/** Test seam: swap the callable (and clock) out. `null` restores the defaults. */
 export function configureMutamarket(
   options: { transport?: MutamarketTransport; clock?: () => number } | null
 ): void {
@@ -132,7 +88,6 @@ function safeUrl(url: unknown): string {
     : MUTAMARKET_SITE_URL;
 }
 
-/** The function's answer, re-checked: a malformed or non-positive value is no estimate. */
 export function toStoredEstimate(response: unknown): StoredEstimate {
   const r = (typeof response === 'object' && response !== null ? response : {}) as Record<
     string,
@@ -177,7 +132,6 @@ function unpriced(status: 'unknown' | 'unavailable'): AbyssalEstimate {
   };
 }
 
-/** A cached `not-imported` or `unavailable` doesn't answer the pilot's import click. */
 function answers(estimate: AbyssalEstimate, importIfMissing: boolean): boolean {
   return !(
     importIfMissing &&
@@ -188,11 +142,6 @@ function answers(estimate: AbyssalEstimate, importIfMissing: boolean): boolean {
 type EstimateListener = (itemId: number, estimate: AbyssalEstimate) => void;
 const listeners = new Set<EstimateListener>();
 
-/**
- * Hear every answer as it lands, whoever asked — so a list (Assets) picks up
- * an estimate the pilot asked for elsewhere (Item Detail's import). Returns
- * the unsubscribe.
- */
 export function onAbyssalEstimate(listener: EstimateListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -248,10 +197,6 @@ async function lookup(request: MutamarketRequest): Promise<AbyssalEstimate> {
   return remember(itemId, { ...stored, source: 'mutamarket', fetchedAt });
 }
 
-/**
- * MutaMarket's estimate for one abyssal module, by its type id and item id.
- * Never throws; `value` is null for anything but `status: 'priced'`.
- */
 export function getAbyssalEstimate(
   typeId: number,
   itemId: number,
@@ -276,11 +221,6 @@ export function getAbyssalEstimate(
   return run;
 }
 
-/**
- * Answers already held (memory, then the persisted cache); never calls
- * MutaMarket, never returns `unavailable`. `includeExpired`: past-TTL rows too,
- * so a total doesn't swing with whether the pilot looked recently.
- */
 export async function readCachedAbyssalEstimates(
   itemIds: readonly number[],
   options: { includeExpired?: boolean } = {}
@@ -306,13 +246,10 @@ export async function readCachedAbyssalEstimates(
       if (!options.includeExpired && row.fetchedAt + ttlFor(stored.status) <= now()) continue;
       found.set(itemId, { ...stored, source: 'mutamarket', fetchedAt: row.fetchedAt });
     }
-  } catch {
-    // A cache that can't be read holds nothing.
-  }
+  } catch {}
   return found;
 }
 
-/** Test-only: production relies on TTL expiry. Leaves persisted rows alone. */
 export function clearAbyssalEstimateMemory(): void {
   memory.clear();
   inFlight.clear();

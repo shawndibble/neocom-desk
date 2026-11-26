@@ -4,7 +4,6 @@ import { CharacterAvatar } from './CharacterAvatar';
 
 const CHARACTER_ID = 90000001;
 
-/** Decorative avatars are hidden from the accessibility tree, so query the DOM. */
 function portrait(container: HTMLElement): HTMLImageElement {
   const img = container.querySelector('img');
   if (!img) throw new Error('no portrait rendered');

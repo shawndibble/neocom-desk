@@ -14,7 +14,6 @@ const FORGE = 10000002;
 const DOMAIN = 10000043;
 const JITA = 60003760;
 const AMARR = 60008494;
-/** The station shape (#4279): series keyed by hub station id. */
 const DOC = {
   typeId: 34,
   dates: ['2026-10-01', '2026-10-02'],
@@ -25,7 +24,6 @@ const DOC = {
 };
 const fetchMock = vi.fn();
 
-/** Serves each URL's body; any other URL is an object R2 does not have (404). */
 function serveFiles(files: Record<string, unknown>) {
   fetchMock.mockImplementation(async (url: string) =>
     url in files
@@ -34,10 +32,6 @@ function serveFiles(files: Record<string, unknown>) {
   );
 }
 
-/**
- * The per-type layout only (no shards yet): `data` for any type's own object;
- * `undefined` is an object R2 does not have (404).
- */
 function serve(data: unknown) {
   fetchMock.mockImplementation(async (url: string) =>
     data === undefined || url.includes('/shards/')
@@ -96,7 +90,6 @@ describe('loadMarketOpenPrices', () => {
     });
     expect(domain?.stationId).toBe(AMARR);
     expect(domain?.series.buy).toEqual([1, 2]);
-    // A compared non-hub region simply has no open series.
     expect(other).toBeNull();
     expect(urlsRead()).toEqual([openPricesShardUrl(34), openPricesUrl(34)]);
   });
@@ -159,7 +152,6 @@ describe('the sharded layout', () => {
   });
 
   it("falls back to the type's own object when its shard does not hold it", async () => {
-    // A type with no hub price since the move: its history is only in the old object.
     serveFiles({ [openPricesShardUrl(34)]: { types: {} }, [openPricesUrl(34)]: DOC });
     expect((await loadMarketOpenPrices(FORGE, 34))?.stationId).toBe(JITA);
     expect(urlsRead()).toEqual([openPricesShardUrl(34), openPricesUrl(34)]);

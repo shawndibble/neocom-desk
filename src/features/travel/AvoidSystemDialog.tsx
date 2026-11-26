@@ -1,19 +1,3 @@
-/**
- * Avoid a system from its Route Safety row (issue #2472). The dialog previews
- * the trip with the system avoided before anything is saved, then adds it to
- * the pilot's Avoided Systems — a Travel Setting, so it says the change
- * reaches every jump count in the app.
- *
- * The preview is the page's own trip request with one more Avoid (issue
- * #2547): the same planner and assembly, pins, holes, bridges and Optimize
- * included (`useRouteSafety`'s `planWithAvoid`). Its change is the whole
- * trip's jumps, new less current, so a stop order that moves elsewhere in the
- * trip is counted too.
- *
- * With the Avoided Systems switch off, the list does nothing to routes, so
- * the preview counts it switched on and the dialog offers to switch it on
- * along with the add.
- */
 import { fixed1 } from '@/lib/fixedFormat';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +23,6 @@ type AvoidPreview =
 
 const legRows = (trip: { legs: readonly RouteSafetyLeg[] }) => trip.legs.map((leg) => leg.rows);
 
-/** "+3", "−2", "+0": the change always carries a sign, so +0 reads as no change. */
 function formatJumpDelta(delta: number): string {
   if (delta < 0) return `−${formatNumber(Math.abs(delta))}`;
   return `+${formatNumber(delta)}`;
@@ -71,9 +54,7 @@ export function AvoidSystemDialog({
   route,
   onClose,
 }: {
-  /** `null` keeps the dialog closed. */
   target: AvoidTarget | null;
-  /** The page's trip now, or `null` while it loads. */
   route: Extract<RouteSafetyState, { kind: 'route' }> | null;
   onClose: () => void;
 }) {
@@ -85,8 +66,6 @@ export function AvoidSystemDialog({
   const [planned, setPlanned] = useState<{ key: string; result: AvoidTripResult } | null>(null);
 
   const systemId = target?.systemId ?? null;
-  // Keyed by what it plans, not by the planner's identity: a hole list
-  // refreshed with the same holes is the same trip, and re-plans nothing.
   const previewKey =
     route === null || systemId === null
       ? null
@@ -107,7 +86,6 @@ export function AvoidSystemDialog({
     let cancelled = false;
     void trip
       .planWithAvoid({ systemId: id, avoidList, avoidListEnabled })
-      // A failed plan says it can't be worked out, never spins for good.
       .catch((): AvoidTripResult => ({ kind: 'unknown' }))
       .then((result) => {
         if (!cancelled) setPlanned({ key: previewKey, result });

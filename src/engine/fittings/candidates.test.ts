@@ -47,10 +47,6 @@ describe('classifyRuleBreaks', () => {
 });
 
 describe('browserTree', () => {
-  // Ship Equipment ─┬─ Hull & Armor ── Armor Plates ─┬─ 100mm (items 1, 2)
-  //                 │                                └─ 200mm (item 3)
-  //                 └─ Propulsion ── Afterburners (item 4)
-  // Drones ── Combat Drones ── Light (item 5)
   const groupsById = new Map([
     [1, { id: 1, name: 'Ship Equipment', parentId: null, hasTypes: false }],
     [2, { id: 2, name: 'Hull & Armor', parentId: 1, hasTypes: false }],

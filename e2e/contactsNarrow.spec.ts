@@ -1,13 +1,3 @@
-/**
- * Contacts on a phone (issue #1978): both tables are sortable, but below `sm`
- * `DataTable` stacks into cards and hides the header row with every sort
- * button. `mobileSort` adds the phone-only "Sort by" picker above the cards.
- *
- * Contacts are seeded by overriding the `contacts` route the shared ESI mock
- * answers empty (registered after `signInAndGoto`, so it wins). The Across
- * tab needs a second Character: only its Dexie rows are seeded, with a fresh
- * cached contact list the loader serves without a live token.
- */
 import type { Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -91,7 +81,6 @@ test.describe('Contacts sort picker', () => {
     await page.setViewportSize(PHONE);
     await page.goto('./contacts/across');
 
-    // The Across table itself, not the single-Character fallback.
     await expect(
       page.getByRole('table', { name: 'Contacts across every character' })
     ).toBeVisible();

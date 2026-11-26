@@ -31,8 +31,6 @@ vi.mock('@/features/corp/assets', async (importOriginal) => ({
   loadCorpAssetLabels: vi.fn(),
   resolveMissingLocationNames: vi.fn(),
 }));
-// Show info's modal fetches the type's dogma/market data; a stub that names
-// its item is all the name-button tests need to see it opened.
 vi.mock('@/features/market/ItemDetailModal', () => ({
   ItemDetailModal: ({ itemName }: { itemName: string }) => (
     <div role="dialog" aria-label={`Item detail: ${itemName}`} />
@@ -50,20 +48,16 @@ vi.mock('@/sde/loadSde', async (importOriginal) => ({
     abyssalTypeIds: [ABYSSAL_NEUT],
   })),
 }));
-// Copy valuation reaches Firestore; these tests only need a copy's badge.
 vi.mock('@/features/assets/assetCopyValues', () => ({
   loadAssetCopyValues: vi.fn(async () => new Map()),
 }));
-// Stock targets live in a synced setting; the page only needs the hook's shape.
 vi.mock('@/features/corp/stockTargets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/stockTargets')>()),
   useCorpStockTargets: vi.fn(),
 }));
-// The market catalogue is a lazy download; the Group column only needs its answer.
 vi.mock('@/features/corp/assetCategories', () => ({
   loadTypeCategories: vi.fn(async () => new Map()),
 }));
-// Names for a targeted type the corporation owns none of come from the SDE/ESI resolver.
 vi.mock('@/features/character/typeNames', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/character/typeNames')>()),
   loadTypeNames: vi.fn(
@@ -71,7 +65,6 @@ vi.mock('@/features/character/typeNames', async (importOriginal) => ({
   ),
   loadTypePackagedVolumes: vi.fn(async () => new Map()),
 }));
-// The Move tab reads ship data, the pilot's skills and place names; this file only opens it.
 vi.mock('@/features/fittings/useFittingCatalogue', () => ({
   useFittingCatalogue: () => null,
   useFittingCatalogueFailed: () => false,
@@ -134,7 +127,6 @@ function asset(overrides: Partial<CorporationAsset> & { item_id: number }): Corp
 const OFFICE = 60003760;
 const EMPTY_OFFICE = 60008494;
 
-/** An office with stock in two divisions, a delivery, a copy, an impounded hull, and a second, empty office. */
 function ledgerFixture(): CorporationAsset[] {
   return [
     asset({
@@ -223,13 +215,11 @@ function currentLocation(): string {
   return screen.getByTestId('location').textContent ?? '';
 }
 
-/** Longer than the global async timeout: the page chains several mocked loads before it renders. */
 async function ledger(entry = '/corp/assets') {
   renderAssets(entry);
   return screen.findByRole('tablist', { name: 'Asset state' }, { timeout: 10000 });
 }
 
-/** The item names in table order (first cell of each body row). */
 function itemOrder(): string[] {
   return screen
     .getAllByRole('row')
@@ -343,7 +333,6 @@ describe('state tabs', () => {
     await ledger('/corp/assets/move?q=r');
     expect(screen.getByRole('tab', { name: 'Move', selected: true })).toBeInTheDocument();
     expect(await screen.findByText('Corporation hangars')).toBeInTheDocument();
-    // The stock, not the impounded hull or the delivery.
     expect(
       screen.getByRole('checkbox', { name: /select everything at .* for Corporation hangars/i })
     ).toBeInTheDocument();
@@ -362,7 +351,6 @@ describe('state tabs', () => {
 describe('group by item', () => {
   it('lists one row per item type, with a blueprint copy as its own badged row', async () => {
     await ledger();
-    // A plain name, not a Show info link: the row expands in place (DESIGN.md §6c).
     expect(await screen.findByText('Tritanium')).not.toHaveAttribute('href');
     expect(screen.getAllByText('Tritanium')).toHaveLength(1);
     expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
@@ -383,7 +371,6 @@ describe('group by item', () => {
     await user.click(screen.getByRole('button', { name: /^Qty/ }));
     await waitFor(() => expect(currentLocation()).toContain('sort=quantity'));
     const rows = itemOrder();
-    // Quantity is a number, so the first click puts the larger stack first.
     expect(rows.findIndex((r) => r.includes('Pyerite'))).toBeGreaterThan(
       rows.findIndex((r) => r.includes('Tritanium'))
     );
@@ -396,7 +383,6 @@ describe('group by item', () => {
     expect(screen.queryByRole('button', { name: /^Volume/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Volume' }));
-    // The open menu hides the page from the accessibility tree.
     await user.keyboard('{Escape}');
     expect(await screen.findByRole('button', { name: /^Volume/ })).toBeInTheDocument();
   });
@@ -537,7 +523,6 @@ describe('group by location', () => {
     );
     await ledger('/corp/assets?group=location');
     await user.click((await screen.findAllByText('Ships'))[0]);
-    // Each level opens on its own click: ship, then the container in its cargo.
     const ship = await screen.findByRole('button', { name: /^Rifter/, expanded: false });
     await user.click(ship);
     expect(ship).toHaveAttribute('aria-expanded', 'true');
@@ -545,9 +530,7 @@ describe('group by location', () => {
     expect(screen.queryByText('×40')).not.toBeInTheDocument();
     await user.click(box);
     expect(box).toHaveAttribute('aria-expanded', 'true');
-    // The row click only unfolds: the by-item view is the row menu's.
     expect(currentLocation()).toBe('/corp/assets?group=location');
-    // A nested stack carries the by-item view's item menu.
     await user.click(screen.getByRole('button', { name: 'More actions for Pyerite' }));
     expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
@@ -560,7 +543,6 @@ describe('group by location', () => {
     expect(await screen.findByText('Empty office')).toBeInTheDocument();
     expect(screen.getAllByText('2 of 7 divisions in use').length).toBeGreaterThan(0);
     expect(screen.queryByText('Division 4')).not.toBeInTheDocument();
-    // The empty office is folded: its placeholder row is not mounted.
     expect(screen.queryByText('Nothing stored here')).not.toBeInTheDocument();
   });
 
@@ -577,7 +559,6 @@ describe('group by location', () => {
   it('hides every group with no match under a filter, empty offices included', async () => {
     await ledger('/corp/assets?group=location&q=zzz');
     expect(await screen.findByText('Nothing matches')).toBeInTheDocument();
-    // A filter hides every group with no matching row, empty offices included.
     expect(screen.queryByText('Empty office')).not.toBeInTheDocument();
     expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
   });

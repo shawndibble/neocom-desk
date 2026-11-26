@@ -1,7 +1,3 @@
-// SRP (ADR 0026): the pure half of the callables, input parsing
-// with no Firestore. The admin-SDK half is srpStore.ts; the layout and shapes
-// are in srpTypes.ts.
-
 import { HttpsError } from 'firebase-functions/v2/https';
 import { docId, record } from './communities.js';
 import { oneOf } from './inputParse.js';
@@ -17,10 +13,6 @@ import {
   type SrpSettingsPatch,
 } from './srpTypes.js';
 
-/**
- * A hull rule's Doctrine Fits. Hull scope only: a fit is for one hull, and a class rule has no
- * single hull to compare. Empty or absent means the hull is not checked (old rules read the same).
- */
 function parseDoctrineIds(raw: unknown, scope: HullRuleScope): string[] | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (!Array.isArray(raw)) {
@@ -48,13 +40,11 @@ function parseHullRule(raw: unknown): HullRule {
     if (typeof d.iskAmount !== 'number' || !Number.isFinite(d.iskAmount)) {
       throw new HttpsError('invalid-argument', 'iskAmount must be a number');
     }
-    // The engine treats under 1 ISK as unset, so a smaller amount would silently never pay.
     if (d.iskAmount < 1 || d.iskAmount > 1e13) {
       throw new HttpsError('invalid-argument', 'iskAmount must be 1 to 1e13');
     }
     return { scope, id, kind, iskAmount: d.iskAmount, ...extra };
   }
-  // Pay: corp percent follows the corp's own chain; a stored legacy `pct` is ignored.
   return { scope, id, kind, ...extra };
 }
 
@@ -77,7 +67,6 @@ function parseHullRules(raw: unknown): HullRule[] {
   return rules;
 }
 
-/** 1-100, the range the engine and the settings form use (under 1 reads as unset). */
 function pctField(value: unknown, name: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 100) {
     throw new HttpsError('invalid-argument', `${name} must be 1-100`);
@@ -85,7 +74,6 @@ function pctField(value: unknown, name: string): number {
   return value;
 }
 
-/** A percent, or null for "this step is not used". */
 function nullablePct(value: unknown, field: string): number | null {
   return value === null ? null : pctField(value, field);
 }

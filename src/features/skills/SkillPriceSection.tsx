@@ -1,17 +1,3 @@
-/**
- * "What does this skill cost to buy right now?" — the skill Show info's price
- * rows (GLOSSARY.md round 49 follow-up): lowest sell at the Trade Hub station
- * and anywhere in its region, the fixed NPC price, a hub picker (the same
- * synced default `PriceHubSelect` already drives for Fittings), and links into
- * the Market Browser. A skill's own typeID is the tradeable item's typeID too
- * — modern EVE has no separate skillbook item — so this reads it directly, the
- * same as `InjectorFactsPanel` reads the Large Skill Injector's.
- *
- * Priced from the hub region's ESI order book rather than the hub-station
- * aggregate: NPC-seeded books sit in NPC stations across the region and often
- * not at the hub station at all, which read as "No sell orders" while the
- * region had dozens.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,18 +24,12 @@ export function SkillPriceSection({
   npcPrice,
 }: {
   typeID: number;
-  /** The fixed NPC skillbook price; null hides the row. */
   npcPrice: number | null;
 }) {
   const { t } = useTranslation();
   const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-  // The Skills page's price percent scales the hub's and region's market prices, never the fixed NPC price.
   const percent = usePricePercentFor('skills');
-  // What the currently-rendered prices (if any) were fetched for — a hub or
-  // typeID change invalidates them immediately on render, rather than showing
-  // the previous hub's price under the new hub's label until the next fetch
-  // resolves.
   const priceKey = `${hub.id}:${typeID}`;
 
   const loadPrices = useCallback(
@@ -114,8 +94,6 @@ export function SkillPriceSection({
         )}
       </dl>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {/* The hub's region, not the hub: Hub mode is the one station, which is
-            exactly where an NPC-seeded book is often missing. */}
         <Link
           to={marketBrowserHref(
             buildMarketParams(typeID, { mode: 'region', regionId: hub.regionId })

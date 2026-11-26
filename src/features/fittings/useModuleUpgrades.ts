@@ -1,14 +1,3 @@
-/**
- * "What to train" for a Tech II module: each fitted Tech I module with a
- * Tech II sibling the pilot can't fly yet (`engine/fittings/moduleUpgrades.ts`),
- * worked out with every copy swapped and the whole schedule that unlocks it
- * trained — prerequisites included, since the pilot will have trained those
- * too. Kept only when the upgraded fit still fits its CPU, powergrid and
- * calibration and comes out better overall. The requirements come from the
- * engine's own fitting rules, so nothing goes to ESI. Keyed on its inputs
- * like `useSkillGains`, so a Fitting or Character change mid-way never
- * shows the old fit's rows.
- */
 import { useEffect, useMemo, useState } from 'react';
 import {
   evaluateModuleUpgrades,
@@ -26,12 +15,10 @@ import { yieldToEventLoop } from './yieldToEventLoop';
 export type ModuleUpgradeRow = ModuleUpgradeGain<LevelGain, ScheduledStep>;
 
 export interface ModuleUpgradesState {
-  /** Null while working out (or with nothing to work from); in fit order — the panel ranks them. */
   rows: ModuleUpgradeRow[] | null;
   loading: boolean;
 }
 
-/** Schedules `entries` at the Character's attributes; null until the Character's skills are in. */
 export type ScheduleEntries = (entries: readonly PlanEntry[]) => readonly ScheduledStep[] | null;
 
 interface Computed {
@@ -71,8 +58,6 @@ export function useModuleUpgrades(
           compare: evaluator.compareTrained,
           gain: levelGain,
           fits: fitsResourceBudget,
-          // One swap at a time, as `useSkillGains` does: each is a synchronous
-          // engine calculation, and run together they'd freeze input.
           between: yieldToEventLoop,
           cancelled: () => cancelled,
         }

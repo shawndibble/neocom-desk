@@ -21,7 +21,6 @@ function groups(items: AppraisalItem[], turnIn?: AppraisalTurnInLookup) {
   };
 }
 
-/** 60 ISK each turned in, no LP; type 1's offer unless told otherwise. */
 function offer(overrides: Partial<TurnInOffer> = {}): TurnInOffer {
   return {
     objectiveId: 'obj-1',
@@ -61,7 +60,6 @@ function lookup(
 
 describe('appraisalSellGroups', () => {
   it('turns in an item whose Turn-in Reward beats selling it now', () => {
-    // 10 × 60 turned in against 10 × 50 into the buy orders
     expect(groups([item({ typeId: 1, buy: 50 })], lookup([offer()]))).toEqual({
       sellNow: [],
       list: [],
@@ -116,7 +114,6 @@ describe('appraisalSellGroups', () => {
   });
 
   it('sells now when the undercut price is no better than the best buy order', () => {
-    // undercut of 101 sits one tick under sell; buy 150 pays more, with no broker fee
     expect(groups([item({ typeId: 1, buy: 150, sell: 101 })])).toEqual({
       sellNow: [1],
       list: [],

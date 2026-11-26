@@ -1,7 +1,3 @@
-/**
- * The Courier tab's filter bar and the field controls it is built from. Split
- * out of `CourierResults`; the board still owns every value.
- */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -31,7 +27,6 @@ import { OVER_RATE_FILTERS, type OverRateFilter } from '@/features/contractSearc
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 
-/** The From/To pair: the same control twice, differing only in which end of the haul it reads. */
 function RegionFilterField({
   label,
   value,
@@ -63,30 +58,6 @@ function RegionFilterField({
   );
 }
 
-/**
- * "From my region": sets the origin filter to the region the active character
- * is standing in (issue #940).
- *
- * Region, not station or system, and the label says so. ESI answers this
- * question with a solar system; the filter beside it is region-scoped, so
- * naming anything finer would claim a precision the control does not have.
- *
- * The shortcut is a pinned row inside the From region picker, not a control of its own.
- *
- * The answer is *not* held here. `FilterBar` unmounts its controls whenever
- * the funnel closes or the sheet is dismissed, so state kept in this component
- * would be thrown away every time the hauler collapsed the bar — and the next
- * press would have to ask ESI all over again to re-learn something it had
- * already been told. The board above owns it instead; this only renders it.
- *
- * Three honest states once it has been asked. A region that no haul in the
- * current snapshot starts in disables the control and says so, rather than
- * setting a value the dropdown beside it has no option for — that would leave
- * the filter showing something its own control cannot represent, and an empty
- * table under it. An unresolvable location disables it with a plain reason: a
- * character whose grant predates `esi-location.read_location.v1` should find a
- * convenience missing, never a re-auth banner.
- */
 function myRegionShortcut({
   t,
   state,
@@ -98,13 +69,10 @@ function myRegionShortcut({
   state: MyRegion;
   pending: boolean;
   options: RegionOption[];
-  /** Asks the board to resolve the location, and answers with what it found. */
   onResolve: () => Promise<MyRegion>;
 }): RegionSelectShortcut {
   const offered = (regionId: number) => options.some((option) => option.id === regionId);
   const eligible = state.kind === 'region' && offered(state.regionId);
-  // Disabled while in flight as much as for the answer: on a phone a double
-  // tap is exactly how "at most one request" becomes two.
   const disabled =
     pending || state.kind === 'unavailable' || (state.kind === 'region' && !eligible);
 
@@ -120,8 +88,6 @@ function myRegionShortcut({
     disabled,
     note,
     onSelect: async () => {
-      // Already known and offered — the only way this is reachable with an
-      // answer in hand, since every other answer disables the row.
       if (state.kind === 'region') return state.regionId;
       const resolved = await onResolve();
       return resolved.kind === 'region' && offered(resolved.regionId) ? resolved.regionId : null;
@@ -129,7 +95,6 @@ function myRegionShortcut({
   };
 }
 
-/** An ISK bound — reward floor, collateral ceiling — through the shared `IskInput`. */
 function IskFilterField({
   label,
   value,
@@ -154,7 +119,6 @@ function IskFilterField({
   );
 }
 
-/** A bare numeric bound — reward floor, collateral ceiling, cargo ceiling, deadline floor. */
 function NumericFilterField({
   label,
   value,
@@ -163,7 +127,6 @@ function NumericFilterField({
 }: {
   label: string;
   value: string;
-  /** The field carries the width it needs *in the row*; the sheet stretches it regardless. */
   width: string;
   onChange: (value: string) => void;
 }) {
@@ -183,12 +146,6 @@ function NumericFilterField({
   );
 }
 
-/**
- * Which trip the distances describe. A hauler who only flies highsec and one
- * who will cross a 0.4 system for a shorter run are asking different
- * questions of the same contract, and they get different jump counts — so
- * this is a control, not a constant.
- */
 function RoutePreferenceField({
   value,
   onChange,
@@ -227,9 +184,7 @@ interface CourierFilterBarProps {
   spaceKinds: readonly SpaceKind[];
   preference: RoutePreferenceKind;
   onPreferenceChange: (preference: RoutePreferenceKind) => void;
-  /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
-  /** Hauls the filters leave, for the phone sheet's done button. */
   resultCount?: number;
 }
 
@@ -248,11 +203,6 @@ export function CourierFilterBar({
   resultCount,
 }: CourierFilterBarProps) {
   const { t } = useTranslation();
-  // The one key filter: on the row at pointer width, in the sheet when narrow.
-  // Named for the endpoint, not the route: there is deliberately no "avoid
-  // lowsec" control, which would be a safety claim about the whole trip made
-  // from data that only describes its two ends. Hidden entirely when no band
-  // is on offer (endpoints still being placed, or no local station snapshot).
   const spaceField = (draft: CourierUiFilter, setDraft: (next: CourierUiFilter) => void) =>
     spaceKinds.length > 0 && (
       <FilterField captionInline label={t('contractSearch.destinationSpaceLabel')} stretch={false}>
@@ -350,13 +300,6 @@ export function CourierFilterBar({
             onChange={(minDays) => setDraft({ ...draft, minDays })}
           />
           <RoutePreferenceField value={preference} onChange={onPreferenceChange} />
-          {/*
-            One control, not a per-flag set: a hauler either wants the jobs they
-            may not be able to deliver out of the way or they do not. What it
-            hides — and what it deliberately does not — is `blocksCompletion`'s
-            to decide, which is more than the label has room to say: hence the
-            tooltip, which states both halves and the nullsec exclusion.
-          */}
           <FilterField captionInline label={t('contractSearch.overRateLabel')}>
             <Select
               value={draft.overRate}

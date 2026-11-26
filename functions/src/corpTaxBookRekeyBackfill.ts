@@ -18,16 +18,9 @@ const sub = (db: Firestore, corporationId: number, name: string) =>
 export interface RekeyBackfillPlan {
   corporationId: number;
   writes: RekeyWrite[];
-  /** Miner ids some record names that no grouping holds and no `solo:` id of a grouped Character explains. */
   unresolved: string[];
 }
 
-/**
- * Groups made before #6450 left each absorbed Miner's records under its old id. This finds the
- * ones a `solo:<characterId>` of a now-grouped Character explains and plans their move onto the
- * group, with the same `planRekey` a new grouping uses. A dissolved group's id names no
- * Character, so it is reported in `unresolved` for an officer to look at.
- */
 export async function planRekeyBackfill(
   db: Firestore,
   corporationId: number
@@ -58,7 +51,6 @@ export async function planRekeyBackfill(
     writes.push(...planRekey({ target: group, targetUids: uids, records, existingDisputeIds }));
   }
 
-  // Anything else naming a Miner nobody holds: a dissolved group the backfill cannot place.
   const known = new Set(miners.map((m) => m.id));
   const named = new Set<string>();
   for (const collection of [...MINER_KEYED, DISPUTES])
@@ -70,7 +62,6 @@ export async function planRekeyBackfill(
   return { corporationId, writes, unresolved: [...named] };
 }
 
-/** Applies a plan in batches. A re-run finds nothing left to move. */
 export async function applyRekeyBackfill(db: Firestore, plan: RekeyBackfillPlan): Promise<void> {
   const col = (name: string) => sub(db, plan.corporationId, name);
   const ops: BatchOp[] = plan.writes.flatMap((w): BatchOp[] =>
@@ -84,6 +75,5 @@ export async function applyRekeyBackfill(db: Firestore, plan: RekeyBackfillPlan)
           ]
   );
   await commitInBatches(db, ops);
-  // The Miners and Overview docs were built from the old ids: drop them so the next read rebuilds.
   await invalidateReadModels(db, plan.corporationId);
 }

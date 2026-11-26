@@ -30,22 +30,13 @@ interface FittingStatsColumnProps {
   targetProfiles: TargetProfiles;
   overlay: OverlayFitting | undefined;
   onOpenMakeItFit: (resource: FitResource) => void;
-  /** Improve's ticked or hovered rows, to show in place as `current → after`. */
   preview?: FittingStatsDelta | null;
-  /** What Improve's previewed rows add to the fit's price, for the Price figure. */
   previewIsk?: number | null;
-  /** The fit's rule breaks as sentences. */
   ruleBreaks?: readonly string[];
-  /** Open the Pilot panel on What to train (from Improve); `onWhatToTrainShown` clears it. */
   whatToTrainRequested?: boolean;
   onWhatToTrainShown?: () => void;
 }
 
-/**
- * The editor's stats column: `FittingStatsSections` fed from the workspace,
- * plus the Pilot and Situation panels' extras (tactical mode, implants,
- * missing skills).
- */
 export function FittingStatsColumn({
   workspace,
   catalogue,
@@ -66,13 +57,11 @@ export function FittingStatsColumn({
   onWhatToTrainShown,
 }: FittingStatsColumnProps) {
   const { t } = useTranslation();
-  // What the stats column's Pilot and Situation panels hold beyond its own sections.
   const hasModes = tacticalModesFor(fitting.shipTypeId).length > 0;
   const showMissingSkills = gaps !== null && gaps.missing.length > 0 && characterId !== null;
   const showSkillsUnknown = gaps?.unknown === true && characterId !== null;
   const { edit, stats } = workspace;
 
-  // Under Make it fit's provider too: the Fitting section's figures carry their "Fix" links.
   return (
     <MakeItFitContext.Provider value={onOpenMakeItFit}>
       <FittingStatsSections

@@ -1,8 +1,3 @@
-/**
- * Thera / Turnur's data (issue #2330): EVE-Scout's connection list, the system
- * snapshot for each exit's security, and one local jump sweep from the chosen
- * origin — never a route request per row.
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   buildTheraConnectionRows,
@@ -24,20 +19,16 @@ export type TheraConnectionsState =
   | { kind: 'loading' }
   | {
       kind: 'unavailable';
-      /** Asks EVE-Scout again now, showing the loading state while it does. */
       retry: () => void;
     }
   | {
       kind: 'ready';
       rows: TheraConnectionRow[];
       fetchedAt: Date;
-      /** The jump sweep from the origin has not landed yet. */
       distancesLoading: boolean;
-      /** The origin has no stargates (Thera, J-space), so no exit is reachable by gate. */
       originUngated: boolean;
     };
 
-/** Remaining life counts down in minutes, so the clock ticks once a minute. */
 const TICK_MS = MINUTE_MS;
 
 const NO_SYSTEMS: ReadonlyMap<number, { security: number }> = new Map();
@@ -47,7 +38,6 @@ export function useTheraConnections(
   route: RouteQuery
 ): TheraConnectionsState {
   const now = useTicker(TICK_MS);
-  // Asks again once per cache window; inside it the answer is a memory read.
   const cacheWindow = Math.floor(now / EVE_SCOUT_CACHE_MS);
   const [result, setResult] = useState<TheraConnectionsResult | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -108,7 +98,6 @@ export function useTheraConnections(
       rows: buildTheraConnectionRows(result.connections, { now, systems, distances: value }),
       fetchedAt: result.fetchedAt,
       distancesLoading: originId !== null && settled === null,
-      // A sweep reaching nothing but its own origin started somewhere with no gates.
       originUngated: settled?.kind === 'known' && settled.jumps.size <= 1,
     };
   }, [result, systems, distances, distanceKey, originId, now, retry]);

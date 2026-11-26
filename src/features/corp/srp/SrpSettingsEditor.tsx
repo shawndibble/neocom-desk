@@ -1,9 +1,3 @@
-/**
- * `/corp/srp` Settings, the form: on/off, how the amount is worked out (killmail
- * and Jita Appraisal percents), Hull Rules, claim window and Fleet-or-FC. Edits stay in the form
- * until Save; an `UnsavedChangesBar` pins Discard and Save while there are edits. Percents are
- * 1-100 or blank (blank skips that step), as in `engine/srpPricing.ts`.
- */
 import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -42,7 +36,6 @@ interface Props {
   verdict: SrpOfficerVerdict;
   characterId: number;
   onSave: (patch: ReturnType<typeof formToPatch>, enabled: boolean | null) => Promise<void>;
-  /** The last save failed (kept by the parent: a half-done save reloads and remounts this form). */
   saveFailed: boolean;
   onReclaim: () => Promise<void>;
 }
@@ -102,7 +95,6 @@ export function SrpSettingsEditor({
   const hulls = useHullCatalog();
   const doctrines = useSrpDoctrines(characterId, settings.corporationId);
   const fits = doctrines.state.status === 'ready' ? doctrines.state.fits : [];
-  // Only once the list is read: a deleted fit's id is then left out of what Save sends.
   const liveIds = doctrines.state.status === 'ready' ? new Set(fits.map((f) => f.id)) : undefined;
   const [form, setForm] = useState<SrpSettingsForm>(() => formFromSettings(settings));
   const [added, setAdded] = useState<number[]>([]);

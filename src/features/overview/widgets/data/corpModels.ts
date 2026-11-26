@@ -1,9 +1,3 @@
-/**
- * The Corp Board's widget kinds: the feeds each reads and its builder.
- * Same contract as `models.ts` (pure, derived at render time); joins the
- * registry (`models.ts`) through `registerKindDefs` when the Corp route loads.
- * Structures and Moon extractions are the Overview's own kinds, reused as they are.
- */
 import type { EsiEndpointId } from '@/esi/registry';
 import { byShow, type KindDef } from './builderKit';
 import { acrossFeed } from './corpAcrossKit';
@@ -63,7 +57,6 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
     allFeeds: ['corpWalletAll'],
     scope: 'account',
     build: byShow({ divisions: corpWallet, flow: corpCashFlow, sources: corpIncome }, corpWallet),
-    // Only the balances sum across corporations: Flow and Sources read one corporation's journal.
     bySettings: ({ show }) => ({
       feeds: ['corpWallet'],
       scope: show === 'flow' || show === 'sources' ? 'character' : 'account',

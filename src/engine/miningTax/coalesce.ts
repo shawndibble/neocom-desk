@@ -1,37 +1,12 @@
-/**
- * Putting a joined group back into a consistent shape (issue #523 follow-up).
- *
- * Two stored states the ledger can reach that nothing used to correct:
- *
- * - A **split day that came back together.** `splitAssignment` divides one
- *   Mining Ledger Entry between two Payees; editing the moved half's Payee
- *   back to the original's leaves two Assignments over one entry on identical
- *   terms. That is one obligation stored as two — the pilot sees the same day
- *   listed twice inside a group and cannot get it back to one line.
- * - A **group whose members no longer agree.** An older single-day editor
- *   changed one member's Payee/tax % while its `groupId` survived, so a
- *   group could go on rendering as one row (under whichever Payee happened to
- *   be first) while its members billed two different ones.
- *
- * Both are decided here, purely, so the load-time repair (`features/miningTax/
- * coalesce.ts`) is testable without Dexie — and so the merge arithmetic is the
- * inverse of `split.ts`'s `planSplit` rather than a second, drifting copy.
- */
 import { entryKey, type OreLine } from './types';
 
-/** The fields the two repairs read off a stored Assignment — deliberately narrower than the Dexie record. */
 export interface CoalescableAssignment {
   id: string;
   characterId: number;
   date: string;
   solarSystemId: number;
-  /** Absent on a dismissal, which never merges anyway. */
   payeeId?: string;
   taxPct: number;
-  /**
-   * As its Payee's account reads it: `paid` once its day is on or before the Payee's paid-through
-   * (decision 20261120-235011), whatever the record stores.
-   */
   status: string;
   groupId?: string;
   oreLines: readonly OreLine[];
@@ -40,31 +15,16 @@ export interface CoalescableAssignment {
   collectsGrowth?: boolean;
 }
 
-/** One set of same-entry Assignments to fuse into the single record `keepId` names. */
 export interface EntryMerge {
   keepId: string;
-  /** The records folded into `keepId` — the caller deletes these. */
   absorbedIds: string[];
-  /** Every half's quantities summed per ore type, sorted by `typeId`. */
   oreLines: OreLine[];
-  /**
-   * The halves' snapshots added up, never re-priced: each was a real invoice
-   * moment, and re-pricing would restate a bill the Payee was already quoted.
-   */
   estimatedValue: number;
   taxOwed: number;
-  /**
-   * Set when any half collected this entry's later ore *and* something else
-   * still covers the entry. A fused record left alone on its entry always
-   * collects, so the flag is cleared rather than stored meaninglessly
-   * (`ownership.ts`, and `MiningTaxAssignmentRecord.collectsGrowth`).
-   */
   collectsGrowth: boolean;
-  /** The joined group the fused record belongs to — whichever half carried one, or absent when neither did. */
   groupId?: string;
 }
 
-/** The Payee and rate that decide whether two records are the same obligation. */
 function termsKey(a: CoalescableAssignment): string {
   return `${a.payeeId ?? ''}:${a.taxPct}`;
 }
@@ -75,12 +35,6 @@ function sameLines(a: readonly OreLine[], b: readonly OreLine[]): boolean {
   return a.every((l) => quantities.get(l.typeId) === l.quantity);
 }
 
-/**
- * True when the members together hold more of some ore type than the entry does.
- * Only ever asked of records on identical terms: a split's kept side may
- * legitimately claim more than ESI reports yet (issue #6180), but its sibling
- * bills a different Payee or rate, so the two never share a bucket here.
- */
 function claimsMoreThan(
   members: readonly CoalescableAssignment[],
   entryLines: readonly OreLine[]
@@ -106,45 +60,10 @@ function bucket<T>(items: readonly T[], key: (item: T) => string): Map<string, T
   return out;
 }
 
-/**
- * Which Assignments are two halves of one obligation and should be stored as
- * one (the user-visible ask: "items on the same day recombine").
- *
- * Fused only when every one of these holds, because each is a way two records
- * over one entry can mean genuinely different things:
- *
- * - Same character, EVE/UTC date and solar system — i.e. the same Mining
- *   Ledger Entry. Ownership is defined per entry (`ownership.ts`).
- * - Same Payee and tax % — a split to a *second* Payee is the whole point of
- *   `splitAssignment` and must survive.
- * - Compatible `groupId`s: equal, or one of them absent. A loose half joining
- *   a grouped one is exactly the state "edit the Payee back" produces, and
- *   refusing it would leave the pilot staring at one day listed twice on one
- *   Payee with no way back. Two *rival* groups over one entry do refuse — and
- *   so does a loose half sitting beside them, since which group it belongs to
- *   is not knowable and guessing moves ore between obligations.
- * - `outstanding`: its day is after its Payee's paid-through. A paid day is
- *   history, and stays as it was billed (ADR 0024). `needs-review` is left
- *   alone too: its `reviewDiff` is a before/after over one record's own
- *   snapshot.
- *
- * The surviving record is the lowest id in the set, so a repeated run over
- * unchanged data picks the same one however Dexie ordered the read.
- *
- * Given `entryLinesByKey` (the fresh ledger's ore per entry), records whose
- * ore lines are all identical are told apart: halves that add up to the entry
- * are summed as above, but records that together claim *more* than the entry
- * holds are one obligation stored twice, so the extras are dropped and the
- * kept record's figures stand — summing them doubled the bill. With the entry
- * absent from the map nothing can say which it is, so such a bucket is left
- * alone rather than guessed at.
- */
 export function planEntryMerges(
   assignments: readonly CoalescableAssignment[],
   entryLinesByKey?: ReadonlyMap<string, readonly OreLine[]>
 ): EntryMerge[] {
-  // Every Assignment on an entry, whatever its status — a fused record is the
-  // entry's sole coverer only if nothing else, fusable or not, covers it too.
   const coverageByEntry = new Map<string, number>();
   for (const a of assignments) {
     const key = entryKey(a.characterId, a.date, a.solarSystemId);
@@ -168,8 +87,6 @@ export function planEntryMerges(
     );
     if (entryLinesByKey && identical && !entryLines) continue;
     const duplicate = identical && entryLines !== undefined && claimsMoreThan(members, entryLines);
-    // A duplicate keeps the joined record when there is one — the corp's bill
-    // is the group's — otherwise the lowest id, as ever.
     const ordered = [...members].sort(byId);
     const keep = duplicate
       ? (ordered.find((m) => m.groupId !== undefined) ?? ordered[0])
@@ -202,21 +119,6 @@ export function planEntryMerges(
   return merges;
 }
 
-/**
- * Which Assignments must lose their `groupId` — the ids of members that no
- * longer belong to the group they carry.
- *
- * A joined group is one obligation billed to one Payee at one rate (the
- * decision doc's merge rule), and the ledger renders it as a single row under
- * a single Payee name. So a member edited onto different terms is not a
- * member any more; it has to fall out and stand as its own row, which is what
- * a pilot moving part of a haul to a second Payee is asking for.
- *
- * The group's real terms are its **earliest-dated** member's (lowest id
- * breaks a tie) — the entry the join was anchored on, and a choice that does
- * not change when a later member is edited. A group left with fewer than two
- * agreeing members is dissolved outright rather than left as a group of one.
- */
 export function planGroupEjections(assignments: readonly CoalescableAssignment[]): string[] {
   const grouped = assignments.filter((a) => a.groupId !== undefined);
   const ejected: string[] = [];

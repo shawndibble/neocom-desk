@@ -8,8 +8,6 @@ import {
 } from './skillPlanSchedule';
 import type { Attributes, EngineSkill, PlanEntry } from '@/engine/types';
 
-// A: intelligence/memory, fully Alpha-trainable. B: perception/willpower, not
-// Alpha-trainable at all. C needs A II. X and Y need each other.
 const A: EngineSkill = {
   typeID: 10,
   name: 'A',
@@ -55,7 +53,6 @@ const Y: EngineSkill = {
 const SKILLS = new Map([A, B, C, X, Y].map((s) => [s.typeID, s]));
 const UNKNOWN = 999;
 
-// 20 + 20/2 = 30 SP/min on every pair: a level I (250 SP) takes 500s.
 const ATTRIBUTES: Attributes = {
   intelligence: 20,
   memory: 20,
@@ -88,11 +85,9 @@ describe('computeSkillPlanSchedule', () => {
   describe('totals agree with the scheduled steps', () => {
     it('reads total, finish and skill count off the same scheduled steps', () => {
       const s = computeSkillPlanSchedule(input({ entries: [entry(30)] }));
-      // C pulls in A I and A II ahead of itself.
       expect(s.scheduled.map(stepKey)).toEqual(['10:1', '10:2', '30:1']);
       expect(s.totalSeconds).toBe(s.scheduled[s.scheduled.length - 1].cumulativeSeconds);
       expect(s.finish).toEqual(new Date(START.getTime() + s.totalSeconds * 1000));
-      // Distinct skills scheduled — the injected prereq counts, it is timed too.
       expect(s.skillCount).toBe(2);
       expect(s.startDate).toBe(START);
       expect(s.error).toBeNull();
@@ -127,7 +122,6 @@ describe('computeSkillPlanSchedule', () => {
 
     it('costs the plan total per marker segment, from the same segments the savings badge reads (#1232)', () => {
       const s = computeSkillPlanSchedule(input({ markers: [1], markerAttributes: [override] }));
-      // A on the flat 30 SP/min -> 500s; B on 27 + 21/2 = 37.5 SP/min -> 400s.
       expect(s.totalSeconds).toBe(900);
       expect(s.markerStepIndices).toEqual([1]);
       expect(s.markersResult).not.toBeNull();
@@ -178,7 +172,6 @@ describe('computeSkillPlanSchedule', () => {
         })
       );
       expect([...boosted.boostedSteps]).toEqual([0]);
-      // 30 + 10 on intelligence: A trains at 40 SP/min.
       expect(boosted.scheduled[0].seconds).toBe(375);
       expect(computeSkillPlanSchedule(input()).boostedSteps.size).toBe(0);
     });
@@ -191,14 +184,11 @@ describe('computeSkillPlanSchedule', () => {
       );
       expect(s.error).toBeNull();
       expect(s.scheduled.map(stepKey)).toEqual(['10:1', '20:1']);
-      // One boundary per *known* entry.
       expect(s.entryBoundaries).toEqual([1, 2]);
       expect(s.isKnownSkill(UNKNOWN)).toBe(false);
       expect(s.isKnownSkill(10)).toBe(true);
       expect(s.priorityMap.has(UNKNOWN)).toBe(false);
       expect(s.priorityMap.get(20)).toBe('high');
-      // Marker positions still address the raw entry list: before entries[2]
-      // is after A I, the unknown entry contributing nothing.
       expect(s.markerStepIndices).toEqual([1]);
     });
   });

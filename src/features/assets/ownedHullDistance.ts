@@ -1,7 +1,6 @@
 import type { MoveHullOwnedAt } from '@/engine/assets/movePlan';
 import type { MovePlanSource } from './movePlanInput';
 
-/** One assembled copy of a hull, at a top-level station or structure. */
 export interface OwnedHullCopy {
   typeId: number;
   characterId: number;
@@ -10,7 +9,6 @@ export interface OwnedHullCopy {
   locationType: 'station' | 'structure';
 }
 
-/** Assembled copies of `hullTypeIds`; a ship in a container or in space has no place to name. */
 export function ownedHullCopies(
   sources: readonly MovePlanSource[],
   hullTypeIds: ReadonlySet<number>
@@ -32,11 +30,6 @@ export function ownedHullCopies(
   return copies;
 }
 
-/**
- * The nearest copy of each hull: fewest jumps from the character it is
- * nearest to. A known count beats an unknown one; a copy whose system did not
- * resolve is left out, and so is a hull with none left.
- */
 export function nearestOwnedHulls(
   copies: readonly OwnedHullCopy[],
   systemOf: ReadonlyMap<number, number | null>,

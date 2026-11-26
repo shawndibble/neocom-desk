@@ -1,8 +1,3 @@
-/**
- * Picks the Damage Profile the Defense section's EHP is measured against, and
- * manages the pilot's custom ones (issue #1545) — create, edit, delete, all
- * synced via `damageProfiles.ts`.
- */
 import { useId, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -82,7 +77,6 @@ function ProfileForm({
       setError(t('fittings.damageProfile.errorName'));
       return;
     }
-    // An empty field counts as 0 — "30 / 70 / blank / blank" is a fine mix.
     const mix = {
       em: Number(values.em || 0),
       thermal: Number(values.thermal || 0),
@@ -175,7 +169,6 @@ export function DamageProfilePicker({
   field = false,
 }: {
   damageProfiles: DamageProfiles;
-  /** In the stats column's `StatFields` grid: the label in its column. */
   field?: boolean;
 }) {
   const { t } = useTranslation();

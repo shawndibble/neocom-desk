@@ -2,7 +2,6 @@ import { ChartHover } from './ChartHover';
 import { areaCoords, areaPoints } from './geometry';
 import type { AreaChartModel } from './types';
 
-/** A line with a soft fill under it and its low and high labelled; hover (or a tap) reads a point's `tips`. Drawn aria-hidden; the summary carries the meaning. */
 export function AreaChart({ model, height }: { model: AreaChartModel; height: number }) {
   const { line, polygon } = areaPoints(model.values, height);
   const dotY = areaCoords(model.values, height).map(({ y }) => y / height);

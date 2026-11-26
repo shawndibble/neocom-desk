@@ -1,15 +1,3 @@
-/**
- * Entity name lookups (mail senders, contract issuers, transaction clients)
- * via POST /universe/names, cached per-id in the generic `esiCache` table
- * under the global sentinel (see `esi/cache`).
- *
- * Cache-first, unlike the read-through loaders: a name is asked for by id, so
- * "which of these do I already have" is answerable without a request, and the
- * answer is usually "all of them". The previous shape POSTed every time and
- * used the cache only as an offline fallback, which put a live round-trip in
- * front of every render of Mail, Contracts, Contacts, Assets and Employment
- * History — part of the wait those pages showed a spinner for.
- */
 import { postUniverseNames, type UniverseName } from '@/esi/endpoints';
 import { EsiError } from '@/esi/errors';
 import { chunk } from '@/lib/chunk';
@@ -20,7 +8,6 @@ import {
   writeCachedMany,
 } from '@/esi/cache';
 
-/** ESI's per-request cap for /universe/names. */
 const NAMES_BATCH = 1000;
 
 function cacheKey(id: number): string {
@@ -33,13 +20,6 @@ function categoryKey(id: number): string {
 
 export type NameCategory = UniverseName['category'];
 
-/**
- * What kind of entity each id is (character, corporation, alliance, ...), for
- * a caller that can't tell from context — a contract's acceptor may be a pilot
- * or a corp. Cache-first like `resolveNames`; a name cached before categories
- * were stored has none, so it is looked up once. Ids that can't be resolved
- * are absent.
- */
 export async function resolveCategories(
   ids: readonly number[]
 ): Promise<Map<number, NameCategory>> {
@@ -68,20 +48,6 @@ async function fetchCategories(ids: readonly number[]): Promise<Map<number, Name
   return out;
 }
 
-/**
- * Names for a batch of entity IDs, keyed by id.
- *
- * Three tiers, and only the first blocks on the network:
- * - **No cached name.** Nothing to show, so the caller waits for the POST.
- * - **Cached and lapsed** (`STALE_AFTER.static` — an entity name is a game
- *   constant in all but the rarest case). The stored name is returned at once
- *   and refreshed behind the caller, so a page never waits on a lookup of
- *   something that almost never changes.
- * - **Cached and fresh.** Returned with no request at all.
- *
- * Ids with neither a live nor a cached name are simply absent from the
- * returned map (callers show `#id` themselves).
- */
 export async function resolveNames(ids: readonly number[]): Promise<Map<number, string>> {
   const unique = [...new Set(ids)];
   const map = new Map<number, string>();
@@ -101,8 +67,6 @@ export async function resolveNames(ids: readonly number[]): Promise<Map<number, 
     if (now - row.fetchedAt >= STALE_AFTER.static) lapsed.push(id);
   }
 
-  // One request for both tiers when the caller is waiting anyway: a lapsed
-  // name costs nothing extra to refresh alongside an unknown one.
   if (unknown.length > 0) {
     for (const [id, name] of await fetchNames([...unknown, ...lapsed])) map.set(id, name);
     return map;
@@ -111,11 +75,6 @@ export async function resolveNames(ids: readonly number[]): Promise<Map<number, 
   return map;
 }
 
-/**
- * The cached names for `ids`, lapsed or not, with no request of any kind —
- * for a caller that must never touch the network (the Command Palette
- * searches on every keystroke). Ids never resolved on this device are absent.
- */
 export async function readCachedNames(ids: readonly number[]): Promise<Map<number, string>> {
   const unique = [...new Set(ids)];
   const cached = await readCachedEntries<string>(GLOBAL_CACHE_CHARACTER_ID, unique.map(cacheKey));
@@ -127,10 +86,6 @@ export async function readCachedNames(ids: readonly number[]): Promise<Map<numbe
   return map;
 }
 
-/**
- * Stores names as if ESI had just returned them, so a story or test that shows
- * them never asks `/universe/names`.
- */
 export async function seedCachedNames(names: Readonly<Record<number, string>>): Promise<void> {
   await writeCachedMany(
     GLOBAL_CACHE_CHARACTER_ID,
@@ -139,19 +94,12 @@ export async function seedCachedNames(names: Readonly<Record<number, string>>): 
   );
 }
 
-/** Resolves and caches. Never rejects, so the background call needs no handler of its own. */
 async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> {
   const resolved = new Map<number, string>();
   for (const [id, entry] of await fetchEntries(ids)) resolved.set(id, entry.name);
   return resolved;
 }
 
-/**
- * Ids ESI has refused as invalid, with when, so a page that re-asks for one does
- * not re-spend the error budget finding the same bad id again. Lapses after
- * `REFUSED_TTL_MS`: an id ESI has not indexed yet (a new character) becomes
- * valid later.
- */
 const REFUSED_TTL_MS = 15 * 60_000;
 const refusedIds = new Map<number, number>();
 
@@ -163,23 +111,16 @@ function isRefused(id: number): boolean {
   return false;
 }
 
-/** For tests: forget every refused id. */
 export function clearRefusedNameIds(): void {
   refusedIds.clear();
 }
 
-/**
- * Most 404s one lookup may spend finding bad ids. Each is charged to ESI's
- * shared error budget (100 a minute), so a batch full of bad ids stops
- * splitting and leaves the rest unresolved, as before bisecting existed.
- */
 const MAX_BISECT_404S = 20;
 
 async function fetchEntries(ids: readonly number[]): Promise<Map<number, UniverseName>> {
   const resolved = new Map<number, UniverseName>();
   const askable = ids.filter((id) => !isRefused(id));
   const allowance = { left: MAX_BISECT_404S };
-  // One POST per batch, each guarded, so a failed batch keeps the others' names.
   for (const batch of chunk(askable, NAMES_BATCH)) {
     await fetchBatch(batch, resolved, allowance);
   }

@@ -1,9 +1,3 @@
-/**
- * The Builder view: only what a market still needs once the hangar stock
- * there is listed, split by whether the active Character holds a blueprint
- * for it, and one action that turns the buildable part into a Build Group
- * sized to cover each.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -126,7 +120,6 @@ export function StockBuilderView({
     };
   }, [catalog, blueprints, rows]);
 
-  // One DataGate in either return keeps its focus region mounted across them.
   if (!split) {
     return (
       <DataGate
@@ -144,7 +137,6 @@ export function StockBuilderView({
       const [facilityDefaults, plans] = await Promise.all([
         loadActivityFacilityDefaults(),
         db.buildPlans.where('characterId').equals(activeCharacterId).toArray(),
-        // Outside the Industry page, so nothing has read the hubs a new plan starts at.
         loadNewPlanHubInputs(),
       ]);
       const buildGroupId = crypto.randomUUID();
@@ -171,7 +163,6 @@ export function StockBuilderView({
         ];
       });
       if (newPlans.length === 0) return;
-      // The group goes down before the plans that point at it (buildGroups.ts).
       await setBuildGroups(
         addBuildGroup(buildGroups, activeCharacterId, { id: buildGroupId, name })
       );
@@ -207,7 +198,6 @@ export function StockBuilderView({
       render: (row) => formatNumber(row.toSource),
       sortValue: (row) => row.toSource,
     },
-    // Needs-blueprint table: no row has one; its heading says so.
     ...(withBlueprintColumns
       ? [
           {
@@ -252,7 +242,6 @@ export function StockBuilderView({
       headerCellClassName: 'sm:w-24',
       cardCorner: true,
       render: (row) => <StockStatusPill status={row.status} />,
-      // Worst first, as the Manager's.
       sortValue: (row) => stockStatusRank(row.status),
       sortFirst: 'asc',
     },
@@ -274,7 +263,6 @@ export function StockBuilderView({
 
   const sectionHeadingClassName = eyebrowClassName;
 
-  // Build Groups belong to one Character: with none active the action explains itself (§7).
   const addButton = (className: string) => {
     const label = t('stockTargets.builder.addToGroup', { count: split.buildable.length });
     return activeCharacterId === null ? (
@@ -308,7 +296,6 @@ export function StockBuilderView({
         ) : (
           <>
             <section aria-labelledby={`${headingId}-can`} className="space-y-2">
-              {/* Desktop: on the heading line. Phone: full width under the lists. */}
               <div className="flex items-end gap-2">
                 <h3 id={`${headingId}-can`} className={cx('flex-1', sectionHeadingClassName)}>
                   {t('stockTargets.builder.canBuild', { count: split.buildable.length })}

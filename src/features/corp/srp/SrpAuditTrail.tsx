@@ -4,7 +4,6 @@ import { useTimeZone } from '@/lib/timeFormat';
 import type { SrpAuditEntry } from '../srpClaimTypes';
 import { auditText } from './srpAuditText';
 
-/** One claim's audit entries, oldest first: when, who, what. */
 export function SrpAuditTrail({ entries }: { entries: readonly SrpAuditEntry[] }) {
   const { t } = useTranslation();
   const zone = useTimeZone();

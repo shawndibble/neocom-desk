@@ -42,7 +42,6 @@ function renderDialog() {
   return { onChanged, onClose };
 }
 
-/** The Modal's own close button — the path `handleClose` hangs the refresh off. */
 function closeDialog() {
   return userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
@@ -75,8 +74,6 @@ describe('TypeOverridesDialog', () => {
     await waitFor(async () => {
       expect(await loadManualMoonOreTypeIds()).toEqual([]);
     });
-    // The row re-renders after the Dexie write resolves, not with it — asserting
-    // synchronously here raced on slow CI runners.
     await waitFor(() => expect(screen.queryByText('Chromite')).not.toBeInTheDocument());
   });
 
@@ -87,8 +84,6 @@ describe('TypeOverridesDialog', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Remove the Chromite tag' }));
     await userEvent.click(screen.getByRole('button', { name: 'Remove the Veldspar tag' }));
-    // The route's snapshot is a paginated per-character read; two removals must
-    // not put it in front of the table twice.
     expect(onChanged).not.toHaveBeenCalled();
 
     await closeDialog();
@@ -133,8 +128,6 @@ describe('TypeOverridesDialog', () => {
     await tagAsMoonOre(CHROMITE);
     renderDialog();
 
-    // A dialog whose whole job is recovering from a bad tag must not itself
-    // become a dead end.
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your ore tags.");
   });
 

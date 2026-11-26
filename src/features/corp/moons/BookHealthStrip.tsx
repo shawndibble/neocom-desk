@@ -8,11 +8,6 @@ import { useBook } from './useBook';
 import { shortDate, shortDateTime } from './moonsFormat';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 
-/**
- * D9: how fresh the book is and what is missing from it. A gap is a warning so
- * it leads: the page never reads as complete when it is not. Info rows change
- * no figure.
- */
 export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
@@ -37,9 +32,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       });
     }
   }
-  // ADR 0025: a schedule that stopped is a warning that says why, because the book
-  // quietly goes back to being as fresh as the last officer visit.
-  // Characters two groups claim: the earlier group was kept (never last-writer-wins).
   for (const c of data.groupConflicts ?? []) {
     items.push({
       id: `conflict-${c.characterId}`,
@@ -63,10 +55,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.scheduledStoppedDetail')}</p>,
     });
   }
-  // #6207: a source the last sync could not read (donations, Extractions) shows here, not only
-  // in Settings. With both a running schedule and this visit's sync, a source is unread only when
-  // neither read it: the schedule covers an officer without wallet roles, and a newer visit that
-  // read it clears an older scheduled miss.
   const scheduledRun = scheduled?.status === 'active' ? scheduled.lastRun : undefined;
   const scheduledMissing =
     scheduledRun?.outcome === 'synced' ? (scheduledRun.missing ?? []) : undefined;
@@ -74,8 +62,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     sync.run.phase === 'done' && sync.run.outcome.kind === 'synced'
       ? (sync.run.outcome.missing ?? [])
       : undefined;
-  // The chunk ore is flagged only for the automatic sync (its holder lacks Station_Manager): a
-  // visit by an officer without the role is not a problem the book has.
   const unread =
     scheduledMissing && visitMissing
       ? scheduledMissing.filter((m) => visitMissing.includes(m))
@@ -95,7 +81,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       ),
     });
   }
-  // Counted from the ledger rows, so only on a tab that reads them (the Moon owners tab does not).
   if (data.parts.has('observed') && view.unrated.length > 0) {
     items.push({
       id: 'unrated',
@@ -104,8 +89,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.unratedDetail')}</p>,
     });
   }
-  // A visit that found no refinery to read is not "Synced": say what the book needs instead.
-  // A book that collects for moon owners needs none of its own (decision 20261020-205040).
   const noRefineries =
     (data.feeders ?? []).length === 0 &&
     sync.run.phase === 'done' &&
@@ -126,7 +109,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.neverDetail')}</p>,
     });
   } else if (status.kind === 'stale') {
-    // A fresh sync says nothing here: its age sits beside the page title.
     items.push({
       id: 'sync',
       tone: 'warning',
@@ -146,7 +128,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     });
   }
   if (sync.run.phase === 'done' && sync.run.outcome.kind === 'synced') {
-    // Officers decide a merge the sync would not make: too large, or a character two groups claim.
     for (const p of sync.run.outcome.groupPrompts ?? []) {
       items.push({
         id: `merge-${p.reason}-${p.minerIds.join('+')}`,
@@ -194,7 +175,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       title: t(`corpTaxBook.moons.health.skipped.${sync.run.outcome.reason}`),
     });
   }
-  // The member hold of a new book (72 hours): officers see when members start to see it.
   const seeFrom = settings?.membersSeeFrom;
   const held = !shown && seeFrom !== undefined && openedAt < seeFrom;
   const showToMembers = async () => {
@@ -206,7 +186,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       setShowing(false);
     }
   };
-  // Amber and "needs attention" only when a check fails; otherwise a plain status line.
   const plain = items.every((item) => item.tone === 'info');
   return (
     <>

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { JumpGraph } from '@/engine/route/jumpRoute';
 import { nearestSystemsWithPlanetTypes, type NearestPlanetTypesInput } from './nearestPlanetTypes';
 
-// 1 - 2 - 3 - 4 - 5, plus 2 - 6 (a side branch). System 9 has no gates.
 const graph: JumpGraph = new Map([
   [1, [2]],
   [2, [1, 3, 6]],

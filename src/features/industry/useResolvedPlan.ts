@@ -1,13 +1,3 @@
-/**
- * The Build Plan page's one resolution: the plan priced by `resolveBuildPlan`
- * (the same call Compare and every Group Rollup make, so this page cannot
- * price a plan differently from them), then re-priced at Depth Prices for
- * the materials whose need is large against what the hub lists.
- *
- * One memo, one fresh tier pool: the top-level claim and the tree's nested
- * claims share it, and a re-run starts from nothing rather than re-claiming
- * against copies a previous run already took.
- */
 import { useCallback, useMemo } from 'react';
 import type { BuildPlanRecord } from '@/db';
 import { depthPriceMap } from '@/engine/industry/depthPrice';
@@ -28,19 +18,14 @@ export interface UseResolvedPlanInput {
   hub: TradeHub;
   sources: BuildPlanSources;
   snapshot: MarketSnapshot | null;
-  /** The Reaction Location's own cost index; undefined until that fetch lands. */
   reactionSystemCostIndex: number | null | undefined;
-  /** When the snapshot was fetched; keys the Depth Price reload. */
   fetchedAtMs: number | undefined;
 }
 
 export interface UseResolvedPlanResult {
   resolved: ResolvedBuildPlan;
-  /** The plan's Depth Prices by type, for the materials it buys. */
   depth: ReturnType<typeof useDepthPrices>['depth'];
-  /** Resolves a candidate plan as the page would, walking its own Depth Prices. */
   resolveAt: (candidate: BuildPlanRecord) => ResolvedBuildPlan;
-  /** Resolves a candidate at the lowest sell, no Depth Prices walked: for what quantities need, which prices never move. */
   resolveQuantitiesAt: (candidate: BuildPlanRecord) => ResolvedBuildPlan;
 }
 
@@ -67,8 +52,6 @@ export function useResolvedPlan({
     communityOffersFor,
   } = sources;
 
-  // One resolver for the page's own plan and for Break Even's trial run counts
-  // (each walking its own Depth Prices), so a trial prices as the page would.
   const resolveWith = useCallback(
     (candidate: BuildPlanRecord, depthPrices?: HubPrices) =>
       resolveBuildPlan(
@@ -106,16 +89,11 @@ export function useResolvedPlan({
       reactionSystemCostIndex,
     ]
   );
-  // Depth Prices: the lowest-sell pass says what the plan has to buy;
-  // materials whose need is large against what the hub lists walk the hub's
-  // book, and the plan resolves once more at those prices. One re-resolve,
-  // never iterated: a need is read off the lowest-sell pass only.
   const depthNeedsOf = useCallback(
     (candidate: BuildPlanRecord, lowestSell: ResolvedBuildPlan) =>
       planDepthNeeds(candidate, lowestSell.result, snapshot?.hubSellVolumes ?? {}),
     [snapshot?.hubSellVolumes]
   );
-  // Walked prices at the Industry percent (#6531), as the snapshot's top-of-book prices already are.
   const pricePercent = usePricePercentFor('industry');
   const depthAt = useCallback(
     (prices: HubPrices) => hubPricesAtPercent(prices, pricePercent),
@@ -128,7 +106,6 @@ export function useResolvedPlan({
     () => (depth.size > 0 ? resolveWith(plan, depthAt(depthPriceMap(depth))) : topOfBook),
     [depth, resolveWith, plan, topOfBook, depthAt]
   );
-  // Break Even's trials walk the books for their own run count, as the page would at that count.
   const resolveAt = useCallback(
     (candidate: BuildPlanRecord) => {
       const lowestSell = resolveWith(candidate);

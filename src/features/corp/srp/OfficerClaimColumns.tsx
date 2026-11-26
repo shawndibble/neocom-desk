@@ -1,8 +1,3 @@
-/**
- * The officer queue's table columns: Pending, Owed and History, each as the desktop
- * table and the phone's dense card (DESIGN.md §4a, `stackLayout="dense"`). Handlers come in as a
- * context so the columns stay plain data.
- */
 import { Button, type DataTableColumn } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -101,7 +96,6 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
       sortValue: (row) => row.amount ?? undefined,
-      // Capped so a long basis line wraps here, leaving the room to Pilot and Hull.
       className: 'min-w-36 max-w-44 wrap-anywhere',
       render: (row) => <PendingAmount claim={row} ctx={ctx} />,
     },
@@ -225,8 +219,6 @@ export function historyColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
     },
   ];
 }
-
-// ------------------------------------------------------------------ phone
 
 const metaLine = (ctx: ClaimColumnsContext, row: SrpClaim) =>
   [ctx.names.hull(row.hullTypeId), ctx.names.system(row.solarSystemId), row.fleetOrFc]

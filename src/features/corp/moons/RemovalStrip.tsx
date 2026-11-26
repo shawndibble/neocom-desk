@@ -9,11 +9,6 @@ import { OwnerStatusStrip } from './OwnerStatusStrip';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.page.removal.${key}`;
 
-/**
- * The accounting side of a pending removal: when it takes effect, who started it, and Cancel
- * removal for any officer who can edit. Until the notice is out the 24 hours have not begun,
- * so there is no time yet and a button records a notice sent by hand from EVE.
- */
 export function RemovalStrip({
   removal,
   onCancel,

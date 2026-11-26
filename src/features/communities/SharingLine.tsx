@@ -26,18 +26,12 @@ function sharingText(sharing: TabSharing, t: TFunction): string {
   return t(`communities.sharing.${tab}None`);
 }
 
-/**
- * A content tab's line about what this Character shares there, with My
- * sharing, which opens the share controls for that tab. Until the summary is
- * known the line holds only the button, so it never says "nothing" too early.
- */
 export function SharingLine({
   sharing,
   open,
   onOpen,
 }: {
   sharing: TabSharing | null;
-  /** My sharing is showing (a non-modal panel, so the button says so). */
   open: boolean;
   onOpen: () => void;
 }) {

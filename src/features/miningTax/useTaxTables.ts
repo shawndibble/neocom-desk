@@ -34,7 +34,6 @@ interface Args extends Pick<
   visibleRows: readonly DisplayRow[];
 }
 
-/** The Open and History tables' columns, URL-held sorts, and the CSV export that reads rows as they are shown. */
 export function useTaxTables({
   visibleRows,
   corpStateLabel,
@@ -45,13 +44,8 @@ export function useTaxTables({
 }: Args) {
   const { t } = useTranslation();
 
-  // Only when the rows in view actually come from more than one pilot: a
-  // single-miner ledger repeating the same name on every line is width the
-  // Payee column needs (decision 20261004, "room for long Payee names").
   const showCharacterColumn = new Set(visibleRows.map((dr) => dr.row.characterId)).size > 1;
 
-  // Sized to the longest status on screen, over both tables so Open's and
-  // History's columns still line up.
   const statusWidthClass = useMemo(
     () =>
       statusColumnWidthClass(
@@ -75,7 +69,6 @@ export function useTaxTables({
     statusWidthClass,
   });
 
-  // Validated against the columns shown: unticking the sorted one falls back to the default sort.
   const taxSort = useUrlSort(
     'tax.sort',
     TAX_DEFAULT_SORT,
@@ -87,8 +80,6 @@ export function useTaxTables({
     historyColumns.map((c) => c.id)
   );
 
-  // The table's own cell helpers, so the export reads each row exactly as it
-  // is shown.
   const csvColumns = useMemo(
     () =>
       taxCsvColumns(t, {
@@ -118,11 +109,8 @@ export function useTaxTables({
     surface: 'mining-tax',
     rows: visibleRows,
     columns: csvColumns,
-    // Open and History are two tables; the default reads only the mounted
-    // Open one, so the file would drop every settled record.
     source: 'sorted-rows',
   });
-  // Combined rows are split into their days when the export reads them, not on every render.
   const taxExport = useMemo(() => {
     const getRows = () => expandCombinedRows(baseExport.getRows());
     return {

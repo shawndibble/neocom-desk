@@ -4,8 +4,8 @@ import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { getOrderBook, clearOrderBookCache, ORDER_BOOK_TTL_MS } from './orderBook';
 
-const REGION_ID = 10000002; // The Forge
-const TYPE_ID = 34; // Tritanium
+const REGION_ID = 10000002;
+const TYPE_ID = 34;
 
 const server = mswServer();
 
@@ -54,10 +54,10 @@ describe('getOrderBook', () => {
     expect(first.fetchedAt).toBe(1_000_000);
     expect(hits.count).toBe(1);
 
-    now += 1000; // well within TTL
+    now += 1000;
     const second = await getOrderBook(REGION_ID, TYPE_ID, clock);
-    expect(second.fetchedAt).toBe(1_000_000); // preserved from the original fetch
-    expect(hits.count).toBe(1); // served from cache
+    expect(second.fetchedAt).toBe(1_000_000);
+    expect(hits.count).toBe(1);
   });
 
   it('re-fetches once the 300-second TTL has elapsed', async () => {
@@ -104,8 +104,8 @@ describe('getOrderBook', () => {
     expect(hitsByType.get(String(OTHER_TYPE_ID))).toBe(1);
 
     clearOrderBookCache(REGION_ID, TYPE_ID);
-    await getOrderBook(REGION_ID, TYPE_ID); // cleared: refetches
-    await getOrderBook(REGION_ID, OTHER_TYPE_ID); // untouched: still cached
+    await getOrderBook(REGION_ID, TYPE_ID);
+    await getOrderBook(REGION_ID, OTHER_TYPE_ID);
     expect(hitsByType.get(String(TYPE_ID))).toBe(2);
     expect(hitsByType.get(String(OTHER_TYPE_ID))).toBe(1);
   });

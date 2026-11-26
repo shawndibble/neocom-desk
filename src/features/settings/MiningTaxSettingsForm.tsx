@@ -7,17 +7,9 @@ import { CheckboxField, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 interface MiningTaxSettingsFormProps {
-  /**
-   * Replaces the plain store write for "Continue sessions automatically". The
-   * Tax tab passes its own: switching auto on there first parks the offers
-   * already on screen, so turning the setting on never continues a session the
-   * pilot was still looking at. Settings has no offers on screen, so it writes
-   * the store directly.
-   */
   onAutoContinueChange?: (next: boolean) => void;
 }
 
-/** Moon Mining Tax's settings: Settings → Mining tax, and the Tax tab's settings modal. */
 export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSettingsFormProps) {
   const { t } = useTranslation();
   const oreValueMode = useMiningTaxOreValueMode((state) => state.value);
@@ -50,7 +42,6 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
           checked={oreValueMode}
           onChange={() => void setOreValueMode(!oreValueMode)}
         />
-        {/* Device-local (`continueSessionPref.ts`), unlike the rest of this panel. */}
         <CheckboxField
           id="settings-mining-tax-auto-continue"
           label={t('settings.miningTaxAutoContinueLabel')}

@@ -7,35 +7,6 @@ import { appliedDps, sustainedInputs } from '@/engine/fittings/appliedDps';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { Fitting, FittingModule, FittingStats } from '@/engine/fittings/types';
 
-/**
- * Reference fits: eight standard hulls at All V whose key stats are pinned,
- * each with the source of the number beside it — an engine attribute id, or
- * a formula with its inputs. No value without one.
- *
- * When `@eveshipfit/dogma-engine` / `@eveshipfit/sde` are bumped (together,
- * ADR 0016), run this file and justify every value that moves: a shift must
- * trace to a named change in the engine or SDE, never be re-pinned blind.
- * `docs/agents/testing-and-ci.md` repeats this.
- *
- * Hull attributes read off the pinned SDE with no skills: mass 4, inertia
- * modifier 70, max velocity 37, max target range 76, shield capacity 263,
- * armor HP 265, hull HP 9, capacitor capacity 482, recharge time 55 (ms),
- * armor resonances 267–270, hull resonances 109/110/111/113.
- *
- * Common to every fit (All V skills, engine-applied; each checked against the
- * hull values below):
- * - hull HP = base × 1.25 (Mechanics V); armor HP = base × 1.25 (Hull Upgrades V)
- * - shield HP = (base + extenders) × 1.25 (Shield Management V)
- * - capacitor = base × 1.25 (Energy Management V); recharge time = base × 0.75
- * - max target range = base × 1.25 (Long Range Targeting V)
- * - inertia = base × 0.675; align = ln 4 × inertia × mass / 1e6 seconds
- * - EHP per layer, even damage profile = HP ÷ mean resonance. Damage Control II
- *   scales armor resonances by 0.85 and hull resonances by 0.6; the hull's
- *   base resonance is 0.67 in all four types.
- *
- * Type ids were looked up by exact name in `public/data/types.json`, 2026-10-25.
- */
-
 const DRAKE = 24698;
 const HURRICANE = 24702;
 const OMEN = 2006;
@@ -77,7 +48,6 @@ const AFTERBURNER_1MN_II = 438;
 const AFTERBURNER_10MN_II = 12058;
 const WARP_SCRAMBLER_II = 448;
 
-/** The Cruiser Target Profile (`targetProfile.ts`): 125 m signature, 200 m/s, no resists. */
 const CRUISER = { signatureRadius: 125, velocity: 200 };
 const SHOT_RANGE = 5000;
 
@@ -95,7 +65,6 @@ const slotModule = (
   ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
 });
 
-/** `count` copies of a module in one rack, numbered from `from`. */
 const rack = (
   slot: FittingModule['slot'],
   typeId: number,
@@ -193,25 +162,21 @@ beforeAll(async () => {
 });
 afterAll(() => vi.unstubAllGlobals());
 
-/** Within 0.1% — loose enough for float noise, tight enough that a real shift shows. */
 const near = (actual: number, expected: number, relative = 1e-3) =>
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(Math.abs(expected) * relative);
 
-/** Percent the capacitor settles at; fails with a clear message if the fit stopped being stable. */
 const stablePct = (hull: Hull): number => {
   const { capacitor } = stats[hull];
   expect(capacitor.stable, `${hull} capacitor stable`).toBe(true);
   return (capacitor as { stablePercentage: number }).stablePercentage;
 };
 
-/** Seconds until the capacitor runs dry; fails with a clear message if the fit stopped running dry. */
 const depletesIn = (hull: Hull): number => {
   const { capacitor } = stats[hull];
   expect(capacitor.stable, `${hull} capacitor stable`).toBe(false);
   return (capacitor as { depletesInSeconds: number }).depletesInSeconds;
 };
 
-/** Applied DPS against the Cruiser profile at 5 km, raw and with reloads. */
 const applied = (hull: Hull) => ({
   full: appliedDps(stats[hull].applied, CRUISER, SHOT_RANGE),
   sustained: appliedDps(sustainedInputs(stats[hull].applied), CRUISER, SHOT_RANGE),
@@ -230,186 +195,167 @@ describe('reference fits at All V (real WASM + real pinned SDE)', () => {
 
   it('Drake: 6 HAM II with Scourge HAM', () => {
     const s = stats.drake;
-    // Engine ship-level output: 6 launchers × volley ÷ cycle, skills and 2 Ballistic Control System II applied.
     near(s.offense.dps, 412.84);
-    // Same, averaged over each launcher's reload (the magazine's reload).
     near(s.offense.sustainedDps, 396.1);
-    // volley = 6 × per-launcher damage (attrs 114/116/117/118 of the charge × launcher damage modifier attr 64).
     near(s.offense.volley, 1479.56);
-    // A missile of this explosion radius/velocity applies fully to a 125 m, 200 m/s target (`appliedDps.ts`), so it equals raw.
     near(applied('drake').full, 412.84);
     near(applied('drake').sustained, 396.1);
-    // Shield HP = (5500 + 2 × 2600 Large Shield Extender II) × 1.25 (attr 263).
     near(s.shield.hp, 13375, 1e-6);
-    near(s.shield.ehp, 39043.97); // HP ÷ mean shield resonance (attrs 271–274) after the hardener, engine-applied.
-    near(s.armor.hp, 4062.5, 1e-6); // 3250 (attr 265) × 1.25
-    near(s.armor.ehp, 7080.61); // 4062.5 ÷ (mean(0.5, 0.9, 0.75, 0.55) × 0.85)
-    near(s.hull.hp, 4687.5, 1e-6); // 3750 (attr 9) × 1.25
-    near(s.hull.ehp, 11660.45); // 4687.5 ÷ (0.67 × 0.6)
-    near(s.ehp, 57785.03); // sum of the three layers' EHP
-    // Engine's capacitor simulation: peak recharge vs the hardener's draw (attr 6 per cycle).
+    near(s.shield.ehp, 39043.97);
+    near(s.armor.hp, 4062.5, 1e-6);
+    near(s.armor.ehp, 7080.61);
+    near(s.hull.hp, 4687.5, 1e-6);
+    near(s.hull.ehp, 11660.45);
+    near(s.ehp, 57785.03);
     near(stablePct('drake'), 90.14, 1e-4);
-    near(s.capacitorCapacity, 3125, 1e-6); // 2500 (attr 482) × 1.25
-    near(s.navigation.maxVelocity, 187.5, 1e-6); // 150 (attr 37) × 1.25 (Navigation V)
-    near(align('drake'), 8.2112); // ln4 × (0.65 × 0.675) × 13.5e6 / 1e6
-    near(s.targeting.maxTargetRange, 81250, 1e-6); // 65000 (attr 76) × 1.25
+    near(s.capacitorCapacity, 3125, 1e-6);
+    near(s.navigation.maxVelocity, 187.5, 1e-6);
+    near(align('drake'), 8.2112);
+    near(s.targeting.maxTargetRange, 81250, 1e-6);
   });
 
   it('Hurricane: 6 × 425mm AutoCannon II with Hail M', () => {
     const s = stats.hurricane;
-    near(s.offense.dps, 725.81); // 6 × volley ÷ cycle, Gunnery skills and 2 Gyrostabilizer II applied (engine)
-    near(s.offense.sustainedDps, 701.42); // averaged over reloads (magazine of Hail M)
-    near(s.offense.volley, 1739.22); // 6 × charge damage (attrs 114–118 of Hail M) × turret damage modifier (attr 64)
-    // Turret hit chance at 5 km vs 125 m / 200 m/s: optimal 1875 m + falloff 12698 m (attrs 54/158), tracking attr 160 (`appliedDps.ts`).
+    near(s.offense.dps, 725.81);
+    near(s.offense.sustainedDps, 701.42);
+    near(s.offense.volley, 1739.22);
     near(applied('hurricane').full, 588.82);
     near(applied('hurricane').sustained, 569.03);
-    near(s.shield.hp, 7000, 1e-6); // (4500 + 1100 Medium Shield Extender II) × 1.25
-    near(s.shield.ehp, 11034.48); // 7000 ÷ mean shield resonance (attrs 271–274), engine-applied
-    near(s.armor.hp, 5625, 1e-6); // 4500 × 1.25
-    near(s.armor.ehp, 9803.92); // 5625 ÷ (mean(0.4, 0.9, 0.75, 0.65) × 0.85)
-    near(s.hull.hp, 4375, 1e-6); // 3500 × 1.25
-    near(s.hull.ehp, 10883.08); // 4375 ÷ (0.67 × 0.6)
-    near(s.ehp, 31721.49); // sum of the three layers' EHP
-    near(stablePct('hurricane'), 90.78, 1e-4); // engine's capacitor simulation (peak recharge vs the 10MN AB II's draw per cycle)
-    near(s.capacitorCapacity, 2875, 1e-6); // 2300 × 1.25
-    // Mass: 12.8e6 hull + 5e6 from the 10MN Afterburner II (attr 796) = 17.8e6; speed 180 × 1.25 × (1 + afterburner boost ÷ mass).
+    near(s.shield.hp, 7000, 1e-6);
+    near(s.shield.ehp, 11034.48);
+    near(s.armor.hp, 5625, 1e-6);
+    near(s.armor.ehp, 9803.92);
+    near(s.hull.hp, 4375, 1e-6);
+    near(s.hull.ehp, 10883.08);
+    near(s.ehp, 31721.49);
+    near(stablePct('hurricane'), 90.78, 1e-4);
+    near(s.capacitorCapacity, 2875, 1e-6);
     near(s.navigation.mass, 17_800_000, 1e-9);
     near(s.navigation.maxVelocity, 544.96);
-    near(align('hurricane'), 11.1597); // ln4 × (0.67 × 0.675) × 17.8e6 / 1e6
-    near(s.targeting.maxTargetRange, 75000, 1e-6); // 60000 × 1.25
+    near(align('hurricane'), 11.1597);
+    near(s.targeting.maxTargetRange, 75000, 1e-6);
   });
 
   it('Omen: 5 × Heavy Pulse Laser II with Multifrequency M', () => {
     const s = stats.omen;
-    near(s.offense.dps, 354.2); // 5 × volley ÷ cycle, Gunnery skills and 2 Heat Sink II applied (engine)
-    near(s.offense.sustainedDps, 354.2); // a laser crystal never reloads, so sustained equals raw
-    near(s.offense.volley, 816.72); // 5 × crystal damage (attrs 114–118 of Multifrequency M) × turret damage modifier (attr 64)
-    // Turret hit chance at 5 km vs the Cruiser profile: optimal 7875 m + falloff 6250 m (attrs 54/158), tracking attr 160.
+    near(s.offense.dps, 354.2);
+    near(s.offense.sustainedDps, 354.2);
+    near(s.offense.volley, 816.72);
     near(applied('omen').full, 307.58);
-    near(s.shield.hp, 1500, 1e-6); // 1200 × 1.25
-    near(s.shield.ehp, 2364.53); // 1500 ÷ mean shield resonance (attrs 271–274), engine-applied
-    near(s.armor.hp, 2125, 1e-6); // 1700 × 1.25
-    near(s.armor.ehp, 3703.7); // 2125 ÷ (mean(0.5, 0.8, 0.75, 0.65) × 0.85)
-    near(s.hull.hp, 1875, 1e-6); // 1500 × 1.25
-    near(s.hull.ehp, 4664.18); // 1875 ÷ (0.67 × 0.6)
-    near(s.ehp, 10732.41); // sum of the three layers' EHP
-    // The 5 lasers and the armor repairer draw more than the 2000 GJ (1600 × 1.25) capacitor recharges: it runs dry.
-    near(depletesIn('omen'), 90, 1e-4); // engine's capacitor simulation
+    near(s.shield.hp, 1500, 1e-6);
+    near(s.shield.ehp, 2364.53);
+    near(s.armor.hp, 2125, 1e-6);
+    near(s.armor.ehp, 3703.7);
+    near(s.hull.hp, 1875, 1e-6);
+    near(s.hull.ehp, 4664.18);
+    near(s.ehp, 10732.41);
+    near(depletesIn('omen'), 90, 1e-4);
     near(s.capacitorCapacity, 2000, 1e-6);
-    near(s.repair.armor, 40.89); // Medium Armor Repairer II: armor repaired per cycle ÷ cycle (attr 73), skills applied
-    near(s.navigation.maxVelocity, 325, 1e-6); // 260 × 1.25
-    near(align('omen'), 5.2308); // ln4 × (0.43 × 0.675) × 13e6 / 1e6
-    near(s.targeting.maxTargetRange, 68750, 1e-6); // 55000 × 1.25
+    near(s.repair.armor, 40.89);
+    near(s.navigation.maxVelocity, 325, 1e-6);
+    near(align('omen'), 5.2308);
+    near(s.targeting.maxTargetRange, 68750, 1e-6);
   });
 
   it('Vexor: 5 Hobgoblin II', () => {
     const s = stats.vexor;
-    // Ship drone damage output (the engine's synthetic ship attr -14; -12 is the per-drone one): 5 drones × (damage × multiplier ÷ cycle), Drones skills and 2 Drone Damage Amplifier II applied.
     near(s.droneDps, 210.82);
     near(s.offense.dps, 210.82);
-    near(s.offense.volley, 843.3); // 4 × dps: the Hobgoblin II's 4 s cycle (attr 51)
-    // TODO(#5218): applied DPS (the drones' own attr -12, 5 × 42.80) exceeds the ship total (attr -14) by ~1.5%; pinned as it is today.
+    near(s.offense.volley, 843.3);
     near(applied('vexor').full, 213.998);
-    near(s.shield.hp, 1375, 1e-6); // 1100 × 1.25
-    near(s.shield.ehp, 2167.49); // 1375 ÷ mean shield resonance (attrs 271–274), engine-applied
-    near(s.armor.hp, 2500, 1e-6); // 2000 × 1.25
-    near(s.hull.hp, 2500, 1e-6); // 2000 × 1.25
-    near(s.hull.ehp, 6218.91); // 2500 ÷ (0.67 × 0.6)
-    near(s.armor.ehp, 4357.3); // 2500 ÷ (mean(0.5, 0.9, 0.65, 0.65) × 0.85)
-    near(s.ehp, 12743.69); // sum of the three layers' EHP
-    expect(s.capacitor).toEqual({ stable: true, stablePercentage: 100 }); // nothing draws capacitor
-    near(s.capacitorCapacity, 1812.5, 1e-6); // 1450 × 1.25
-    near(s.navigation.maxVelocity, 243.75, 1e-6); // 195 × 1.25
-    near(align('vexor'), 5.8166); // ln4 × (0.56 × 0.675) × 11.1e6 / 1e6
-    near(s.targeting.maxTargetRange, 65625, 1e-6); // 52500 × 1.25
+    near(s.shield.hp, 1375, 1e-6);
+    near(s.shield.ehp, 2167.49);
+    near(s.armor.hp, 2500, 1e-6);
+    near(s.hull.hp, 2500, 1e-6);
+    near(s.hull.ehp, 6218.91);
+    near(s.armor.ehp, 4357.3);
+    near(s.ehp, 12743.69);
+    expect(s.capacitor).toEqual({ stable: true, stablePercentage: 100 });
+    near(s.capacitorCapacity, 1812.5, 1e-6);
+    near(s.navigation.maxVelocity, 243.75, 1e-6);
+    near(align('vexor'), 5.8166);
+    near(s.targeting.maxTargetRange, 65625, 1e-6);
   });
 
   it('Myrmidon: dual armor repairers, cap booster, ancillary armor repairer', () => {
     const s = stats.myrmidon;
-    near(s.repair.armor, 207.32); // 2 × Medium Armor Repairer II + the loaded AAR (94.875), each repair per cycle ÷ cycle
-    near(s.tank.ancillary[0].loaded, 94.875); // AAR with Nanite Repair Paste: its repair per cycle × paste multiplier ÷ cycle (attr 73)
-    near(s.tank.ancillary[0].empty, 31.625); // paste-less: the loaded rate ÷ 3
-    // Cap booster injection, GJ/s (`capacitorBudget`): 400 GJ charge (Cap Booster 400) ÷ 17 s, reload averaged in (`reloadDuty`).
+    near(s.repair.armor, 207.32);
+    near(s.tank.ancillary[0].loaded, 94.875);
+    near(s.tank.ancillary[0].empty, 31.625);
     near(s.capacitorBudget.boosterInjection, 400 / 17, 1e-6);
-    // Three repairers draw more than recharge + booster give: it empties, in the engine's simulation.
     near(depletesIn('myrmidon'), 421.47, 1e-4);
-    near(s.capacitorCapacity, 3625, 1e-6); // 2900 × 1.25
-    near(s.shield.hp, 4375, 1e-6); // 3500 × 1.25
-    near(s.shield.ehp, 6896.55); // 4375 ÷ mean shield resonance (attrs 271–274), engine-applied
-    near(s.armor.hp, 5625, 1e-6); // 4500 × 1.25
-    near(s.armor.ehp, 9803.92); // 5625 ÷ (mean(0.5, 0.9, 0.65, 0.65) × 0.85)
-    near(s.hull.hp, 5937.5, 1e-6); // 4750 × 1.25
-    near(s.hull.ehp, 14769.9); // 5937.5 ÷ (0.67 × 0.6)
-    near(s.ehp, 31470.37); // sum of the three layers' EHP
-    near(s.navigation.maxVelocity, 181.25, 1e-6); // 145 × 1.25
-    near(align('myrmidon'), 8.3188); // ln4 × (0.7 × 0.675) × 12.7e6 / 1e6
-    near(s.targeting.maxTargetRange, 68750, 1e-6); // 55000 × 1.25
+    near(s.capacitorCapacity, 3625, 1e-6);
+    near(s.shield.hp, 4375, 1e-6);
+    near(s.shield.ehp, 6896.55);
+    near(s.armor.hp, 5625, 1e-6);
+    near(s.armor.ehp, 9803.92);
+    near(s.hull.hp, 5937.5, 1e-6);
+    near(s.hull.ehp, 14769.9);
+    near(s.ehp, 31470.37);
+    near(s.navigation.maxVelocity, 181.25, 1e-6);
+    near(align('myrmidon'), 8.3188);
+    near(s.targeting.maxTargetRange, 68750, 1e-6);
   });
 
   it('Hulk: 2 Modulated Strip Miner II with a Type B II crystal', () => {
     const s = stats.hulk;
     const [row] = s.mining.rows;
     expect(row.count).toBe(2);
-    // Cycle = duration (attr 73) 36 s × 0.7225 (0.85², Mining Barge / Exhumer skills, engine-applied) = 26.01 s.
     near(row.cycleSeconds, 26.01, 1e-4);
-    // 2 miners × yield per cycle (attr 77, crystal and Mining Laser Upgrade II applied) × (1 + crit chance × crit bonus) ÷ cycle.
     near(s.mining.perSecond, 52.13);
-    near(s.mining.wastePerSecond, 32.16); // the Type B II crystal's residue share of the yield
-    near(s.shield.hp, 5625, 1e-6); // 4500 × 1.25
-    near(s.shield.ehp, 9698.28); // 5625 ÷ mean shield resonance (attrs 271–274), engine-applied
-    near(s.armor.hp, 3750, 1e-6); // 3000 × 1.25
-    near(s.armor.ehp, 5555.56); // 3750 ÷ mean(0.4, 0.9, 0.75, 0.65): no hardener, no Damage Control
-    near(s.hull.hp, 5625, 1e-6); // 4500 × 1.25
-    near(s.hull.ehp, 8395.52); // 5625 ÷ 0.67
-    near(s.ehp, 23649.35); // sum of the three layers' EHP
-    // Mass: 15e6 hull + 0.5e6 from the 1MN Afterburner II (attr 796); speed 160 × 1.25 × (1 + afterburner boost ÷ mass).
+    near(s.mining.wastePerSecond, 32.16);
+    near(s.shield.hp, 5625, 1e-6);
+    near(s.shield.ehp, 9698.28);
+    near(s.armor.hp, 3750, 1e-6);
+    near(s.armor.ehp, 5555.56);
+    near(s.hull.hp, 5625, 1e-6);
+    near(s.hull.ehp, 8395.52);
+    near(s.ehp, 23649.35);
     near(s.navigation.mass, 15_500_000, 1e-9);
     near(s.navigation.maxVelocity, 232.66);
-    near(align('hulk'), 8.7025); // ln4 × (0.6 × 0.675) × 15.5e6 / 1e6
-    near(s.targeting.maxTargetRange, 68750, 1e-6); // 55000 × 1.25
-    near(s.capacitorCapacity, 781.25, 1e-6); // 625 × 1.25
-    near(stablePct('hulk'), 89.6, 1e-4); // engine's capacitor simulation
+    near(align('hulk'), 8.7025);
+    near(s.targeting.maxTargetRange, 68750, 1e-6);
+    near(s.capacitorCapacity, 781.25, 1e-6);
+    near(stablePct('hulk'), 89.6, 1e-4);
   });
 
   it('Guardian: 3 remote armor repairers and a remote capacitor transmitter', () => {
     const s = stats.guardian;
-    // 3 × Medium Remote Armor Repairer II: each repairs 42.67 HP/s at its cycle (attr 73); engine output per module.
     near(s.support.remoteRepair.armor, 128);
-    near(s.support.capTransfer, 23.4); // Medium Remote Capacitor Transmitter II: GJ moved per cycle ÷ cycle
-    near(s.capacitorBudget.boosterInjection, 400 / 17, 1e-6); // Cap Booster 400: 400 GJ ÷ 17 s, reload averaged in (as the Myrmidon's)
+    near(s.support.capTransfer, 23.4);
+    near(s.capacitorBudget.boosterInjection, 400 / 17, 1e-6);
     expect(s.capacitor).toEqual({ stable: true, stablePercentage: 100 });
-    near(s.capacitorCapacity, 2812.5, 1e-6); // 2250 × 1.25
-    near(s.shield.hp, 1318.75, 1e-6); // 1055 × 1.25
-    near(s.shield.ehp, 2709.47); // 1318.75 ÷ mean shield resonance (attrs 271–274), engine-applied
-    near(s.armor.hp, 2636.25, 1e-6); // 2109 × 1.25
-    near(s.armor.ehp, 7191.82); // 2636.25 ÷ (mean(0.5, 0.2, 0.375, 0.65) × 0.85)
-    near(s.hull.hp, 2505, 1e-6); // 2004 × 1.25
-    near(s.hull.ehp, 6231.34); // 2505 ÷ (0.67 × 0.6)
-    near(s.ehp, 16132.63); // sum of the three layers' EHP
-    near(s.navigation.maxVelocity, 261.25, 1e-6); // 209 × 1.25
-    near(align('guardian'), 6.8383); // ln4 × (0.61 × 0.675) × 11.98e6 / 1e6
-    near(s.targeting.maxTargetRange, 81250, 1e-6); // 65000 × 1.25
+    near(s.capacitorCapacity, 2812.5, 1e-6);
+    near(s.shield.hp, 1318.75, 1e-6);
+    near(s.shield.ehp, 2709.47);
+    near(s.armor.hp, 2636.25, 1e-6);
+    near(s.armor.ehp, 7191.82);
+    near(s.hull.hp, 2505, 1e-6);
+    near(s.hull.ehp, 6231.34);
+    near(s.ehp, 16132.63);
+    near(s.navigation.maxVelocity, 261.25, 1e-6);
+    near(align('guardian'), 6.8383);
+    near(s.targeting.maxTargetRange, 81250, 1e-6);
   });
 
   it('Tengu: 4 Heavy Missile Launcher II with Scourge, four subsystems', () => {
     const s = stats.tengu;
-    near(s.offense.dps, 99.19); // 4 × volley ÷ cycle, skills and subsystem bonuses applied (engine)
-    near(s.offense.sustainedDps, 96.28); // averaged over reloads
-    near(s.offense.volley, 819.5); // 4 × charge damage (attrs 114–118 of Scourge) × launcher damage modifier (attr 64)
-    // A heavy missile's explosion radius/velocity (attrs 654/653) against 125 m / 200 m/s applies ~83% (`appliedDps.ts`).
+    near(s.offense.dps, 99.19);
+    near(s.offense.sustainedDps, 96.28);
+    near(s.offense.volley, 819.5);
     near(applied('tengu').full, 82.18);
     near(applied('tengu').sustained, 79.77);
-    near(s.shield.hp, 9687.5, 1e-6); // 7750 × 1.25: hull 2600 (attr 263) + Large Shield Extender II + subsystem shield bonus; pinned as the engine gives it
-    near(s.shield.ehp, 24428.68); // HP ÷ mean shield resonance (attrs 271–274) after the hardener and subsystems, engine-applied
-    near(s.armor.hp, 2625, 1e-6); // 2100 × 1.25
-    near(s.armor.ehp, 4692.74); // HP ÷ mean armor resonance (attrs 267–270), engine-applied
-    near(s.hull.hp, 2125, 1e-6); // 1700 × 1.25
-    near(s.hull.ehp, 3171.64); // 2125 ÷ 0.67
-    near(s.ehp, 32293.06); // sum of the three layers' EHP
-    near(stablePct('tengu'), 90.82, 1e-4); // engine's capacitor simulation
-    near(s.capacitorCapacity, 1875, 1e-6); // 1875 = 1.25 × 1500: 1400 (attr 482) plus 100 from the subsystems
-    near(s.navigation.maxVelocity, 244.375, 1e-6); // 170 × 1.25 × 1.15 (propulsion subsystem, engine-applied)
-    near(align('tengu'), 4.3793); // ln4 × (0.52 × 0.675 × 0.625) × 14.4e6 / 1e6; the extra 0.625 is the subsystems'
-    near(s.targeting.maxTargetRange, 117187.5, 1e-6); // 75000 × 1.25 × 1.25 (subsystem bonus, engine-applied)
+    near(s.shield.hp, 9687.5, 1e-6);
+    near(s.shield.ehp, 24428.68);
+    near(s.armor.hp, 2625, 1e-6);
+    near(s.armor.ehp, 4692.74);
+    near(s.hull.hp, 2125, 1e-6);
+    near(s.hull.ehp, 3171.64);
+    near(s.ehp, 32293.06);
+    near(stablePct('tengu'), 90.82, 1e-4);
+    near(s.capacitorCapacity, 1875, 1e-6);
+    near(s.navigation.maxVelocity, 244.375, 1e-6);
+    near(align('tengu'), 4.3793);
+    near(s.targeting.maxTargetRange, 117187.5, 1e-6);
   });
 });

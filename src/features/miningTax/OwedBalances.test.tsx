@@ -193,7 +193,6 @@ describe('OwedBalances with payments still to link', () => {
   it('warns on the card and steps Settle up down, so the owed figure is not paid twice', () => {
     renderBalances([balance('a', 9_000_000)], { unlinkedPaymentCount: 1, unlinkedOf });
     expect(screen.getByText(/4,000,000 ISK you already sent isn't linked yet/)).toBeInTheDocument();
-    // `ghost`, not `primary`: still there, no longer the card's loudest control.
     const settle = screen.getByRole('button', { name: 'Settle up' });
     expect(settle.className).toMatch(/bg-transparent/);
     expect(settle.className).not.toMatch(/bg-accent/);
@@ -223,7 +222,6 @@ describe('OwedBalances Conflicts the member has already answered', () => {
     firstResolvesOn: '2026-11-12',
   };
 
-  // The 14-day clock runs whether or not a dispute is open, so this must never disappear.
   it('still shows the bill and its date, but stops reading as a warning', () => {
     renderBalances([balance('a', 0)], { conflicts: waiting });
     expect(screen.queryByText('No moon mining tax outstanding')).not.toBeInTheDocument();
@@ -248,9 +246,8 @@ describe('OwedBalances credit', () => {
     const onOpenLedger = vi.fn();
     renderBalances([balance('a', 0, 500_000), balance('b', 0)], { onOpenLedger });
     expect(screen.getByText('500,000 ISK')).toHaveClass('text-isk-pos');
-    expect(screen.queryByText(/ISK credit/i)).toBeNull(); // colour carries it, never the word
+    expect(screen.queryByText(/ISK credit/i)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Settle up' })).not.toBeInTheDocument();
-    // A settled Payee has no note either: Manage Payees opens its ledger.
     expect(screen.queryByRole('button', { name: 'Open the ledger of Payee b' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Open the ledger of Payee a' }));
     expect(onOpenLedger).toHaveBeenCalledWith(expect.objectContaining({ credit: 500_000 }));
@@ -297,7 +294,6 @@ describe('OwedBalances on a Corp Tax Book card', () => {
       book: { days: 2, oldest: '2026-10-01' },
     } as unknown as PayeeBalance;
     renderBalances([book]);
-    // Marked as the corporation's book, apart from a personal Payee of the same name.
     expect(screen.getAllByText('Corp Tax Book').length).toBeGreaterThan(0);
     expect(screen.getByText(/2 entries/)).toBeInTheDocument();
     expect(screen.queryByText(/0 entries/)).not.toBeInTheDocument();

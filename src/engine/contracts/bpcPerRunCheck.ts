@@ -1,29 +1,15 @@
-/**
- * BPC Sourcing's fairness check: a blueprint copy has no market price, so a
- * listing is held against other copies of the same blueprint, per run. Pure —
- * the caller passes the rows (BPC Sourcing's, or the Public Contract Offers
- * snapshot narrowed to copies).
- *
- * "Similar" means the same blueprint with ME and TE close to this copy's: a
- * ME 10 copy is not priced like a ME 0 one. Per run, not per contract, so a
- * 5-run and a 10-run copy compare on equal footing (`iskPerRun`).
- */
 import { median } from '@/engine/math';
 import { MIN_COMPARABLE_OFFERS } from './belowMarket';
 import { effectivePrice, iskPerRun, type BpcContractRow } from './bpcSearch';
 import { percentDifference } from './contractPriceCheck';
 
-/** How far a copy's ME and TE may sit from this one's and still count as similar. */
 export const SIMILAR_COPY_WINDOW = { me: 2, te: 4 } as const;
 
 export interface BpcPerRunCheck {
-  /** This listing's ISK per run. */
   perRun: number;
   medianPerRun: number;
   cheapestPerRun: number;
-  /** Similar copies behind the median and cheapest. */
   count: number;
-  /** Percent this listing's per-run rate sits from the median. */
   diff: number | null;
 }
 
@@ -31,11 +17,6 @@ function perRunOf(row: BpcContractRow): number | null {
   return iskPerRun(effectivePrice(row), row.runs, row.quantity, row.isMultiType);
 }
 
-/**
- * `null` when this listing has no per-run rate (a bundle, a barter, zero
- * runs), or when fewer than `MIN_COMPARABLE_OFFERS` similar copies exist:
- * the panel then says there is nothing to compare with, not a median of two.
- */
 export function bpcPerRunCheck(
   row: BpcContractRow,
   candidates: readonly BpcContractRow[]
@@ -61,12 +42,6 @@ export function bpcPerRunCheck(
   };
 }
 
-/**
- * `bpcPerRunCheck`'s `diff` for many rows against one pool: the pool is grouped
- * by blueprint once and each row's answer is remembered, so sorting a whole
- * board on it scans a blueprint's copies, not the snapshot, per row. `null`
- * wherever the check is `null` or has no median to be a percent of.
- */
 export function bpcPeerDiffs(
   pool: readonly BpcContractRow[]
 ): (row: BpcContractRow) => number | null {

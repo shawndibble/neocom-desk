@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// Compares sampled baked data against live ESI (#2885). Not a PR gate.
-// Usage: node scripts/sde-verify.mjs [--report <file> [--existing <issue#>]]
-// Exit 1 on mismatches in the pinned set; other differences only print.
-// With --report, writes { mismatches, plan } (plan = driftIssueAction) for the
-// scheduled workflow and always exits 0 so the workflow can act on it.
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -45,7 +40,6 @@ const [skills, types] = await Promise.all([readJson('skills.json'), readJson('ty
 const step = Math.max(1, Math.floor(skills.length / SKILL_SAMPLE));
 
 const samples = [
-  // Skill rank (attribute 275) vs the rank our SP math uses.
   ...skills
     .filter((_, i) => i % step === 0)
     .map((s) => ({
@@ -53,11 +47,9 @@ const samples = [
       fields: { name: s.name },
       attributes: [{ id: 275, name: 'skillTimeConstant', value: s.rank, pinned: true }],
     })),
-  // Attribute ids we read, settled in the EVE Uni validation.
   { typeID: 3520, attributes: [{ id: 620, name: 'optimalSigRadius', pinned: true }] },
   { typeID: 3178, attributes: [{ id: 160, name: 'trackingSpeed', pinned: true }] },
   { typeID: 35836, attributes: [{ id: 2722, pinned: true }] },
-  // Baked type fields; printed only.
   ...ORE_SAMPLE_IDS.filter((id) => types[id]).map((id) => ({
     typeID: id,
     fields: { name: types[id].name, groupID: types[id].groupID, volume: types[id].volume },

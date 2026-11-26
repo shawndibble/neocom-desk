@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// Build-time SDE pipeline: downloads Fuzzwork SDE CSVs, emits slim JSON for the app.
-// Usage: node scripts/build-sde.mjs
-// Fails when Fuzzwork's dump and CCP's export are on different game builds;
-// SDE_ALLOW_BUILD_MISMATCH=1 bakes anyway (local experiments only).
-// Node 24 built-ins, plus fflate (already an app dependency) to read the
-// tables only CCP's own JSONL export carries, or carries at full precision —
-// see lib/ccpStaticData.mjs.
 
 import { runSanityChecks } from './lib/bakeChecks.mjs';
 import { CACHE_DIR, FILES, SHIP_CATEGORY_ID } from './lib/bakeConstants.mjs';
@@ -44,8 +37,6 @@ async function main() {
   const raw = {};
   for (const f of FILES) raw[f] = parseCsv(await download(fuzzwork, f, CACHE_DIR));
 
-  // CCP's own JSONL export: the tables Fuzzwork's CSVs lack or round (see the
-  // bakes below), and the same build's packaged volumes.
   const ccpStaticData = await readCcpStaticDataFiles(
     CACHE_DIR,
     [
@@ -148,9 +139,6 @@ async function main() {
     attributeDictionary,
   } = await bakeMarket({ raw, map, types, packagedVolumeByType, groups, typeMap });
 
-  // --- shipTree.json: the in-game Ship Tree's contents. Pure join logic
-  // lives in `lib/shipTree.mjs` so it's testable without this whole download
-  // pipeline; this just hands it the raw parsed rows it asks for. ---
   const shipTree = buildShipTree({
     invTypes: raw['invTypes.csv'],
     invGroups: raw['invGroups.csv'],
@@ -165,10 +153,6 @@ async function main() {
     dgmAttributeTypes: raw['dgmAttributeTypes.csv'],
   });
 
-  // --- certifiedPlans.json and certificates.json: from CCP's own JSONL
-  // export. Only it carries skillPlans (issue #2392); certificates come from
-  // it too (issue #2390) so their names and group names travel with them,
-  // and faction/group names come from the same build so everything agrees. ---
   const bakedSkillIds = new Set(skills.map((s) => s.typeID));
   const skillPlanRecords = parseJsonl(ccpStaticData['skillPlans.jsonl']);
   const certifiedPlans = bakeCertifiedPlans(
@@ -183,24 +167,20 @@ async function main() {
     bakedSkillIds
   );
 
-  // --- typeInfo shards (issue #3882); see lib/typeInfo.mjs ---
   const typeDogma = parseJsonl(ccpStaticData['typeDogma.jsonl']);
   const typeInfoShards = bakeTypeInfoShards(ccpTypes, typeDogma);
 
-  // --- skillItemUnlocks.json: the items each skill unlocks; see lib/skillItemUnlocks.mjs ---
   const groupCategories = Object.fromEntries([...groups].map(([id, g]) => [id, g.categoryID]));
   const skillItemUnlocks = bakeSkillItemUnlocks(typeInfoShards, typeMap, groupCategories);
   if (!skillItemUnlocks[3329]?.some(([typeId, level]) => typeId === 587 && level === 1)) {
     throw new Error('skillItemUnlocks.json looks wrong: Rifter is not under Minmatar Frigate I');
   }
 
-  // --- typeEffects.json: the types carrying each effect we read; see lib/typeEffects.mjs ---
   const typeEffects = bakeTypeEffects(ccpTypes, typeDogma);
   if (!typeEffects[980].includes(11578)) {
     throw new Error('typeEffects.json looks wrong: Covert Ops Cloaking Device II is not under 980');
   }
 
-  // --- mutaplasmids.json: what each mutaplasmid rolls; see lib/mutaplasmids.mjs ---
   const mutaplasmids = bakeMutaplasmids(
     parseJsonl(ccpStaticData['dynamicItemAttributes.jsonl']),
     dogmaAttributeInfo(parseJsonl(ccpStaticData['dogmaAttributes.jsonl']))
@@ -214,31 +194,25 @@ async function main() {
     );
   }
 
-  // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
   const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
 
-  // --- wormholeMass.json / shipMass.json: Route Safety's mass check (issue #2906) ---
   const wormholeMass = bakeWormholeMass(typeRows, attrsByType);
   const shipMass = bakeShipMass(
     typeRows,
     new Set([...groups].filter(([, g]) => g.categoryID === SHIP_CATEGORY_ID).map(([id]) => id)),
     attrsByType
   );
-  // Agility, speed and warp speed per hull, for the trip time (issue #6282).
   const shipFlight = bakeShipFlight(shipMass, attrsByType);
   if (Object.keys(wormholeMass).length < 80 || wormholeMass.M267?.[0] !== 375_000_000) {
     throw new Error(
       'wormholeMass.json looks wrong: expected 80+ types and M267 at 375 Mt per jump'
     );
   }
-  // --- characterTitles.json: title UUID -> English name (issue #4777) ---
   const characterTitles = bakeCharacterTitles(parseJsonl(ccpStaticData['characterTitles.jsonl']));
   if (Object.keys(characterTitles).length < 30) {
     throw new Error('characterTitles.json looks wrong: expected 30+ titles with English names');
   }
 
-  // --- agents.json and npcCorporations.json: the Contacts standings view's NPC
-  // agents, corporations and factions; see lib/npcAgents.mjs ---
   const agents = bakeAgents(
     parseJsonl(ccpStaticData['npcCharacters.jsonl']),
     parseJsonl(ccpStaticData['npcCorporationDivisions.jsonl'])
@@ -247,8 +221,6 @@ async function main() {
     parseJsonl(ccpStaticData['npcCorporations.jsonl']),
     parseJsonl(ccpStaticData['factions.jsonl'])
   );
-  // --- militaryCampaigns.json: Military Campaigns and their Campaign
-  // Objectives, turn-ins included (issue #6703); see lib/militaryCampaigns.mjs ---
   const militaryCampaigns = bakeMilitaryCampaigns(
     parseJsonl(ccpStaticData['militaryCampaignObjectives.jsonl']),
     parseJsonl(ccpStaticData['militaryCampaigns.jsonl']),

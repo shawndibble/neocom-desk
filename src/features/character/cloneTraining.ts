@@ -7,25 +7,16 @@ import { loadCharacterAttributes } from '@/features/skills/data';
 import { loadImplantTypeBonuses } from '@/features/skills/typeDetail';
 import { loadSkillCatalog, toAttributeBaseline } from '@/features/skills/skillMap';
 
-/** Id of the clone the Character is wearing; jump clones keep their own ids. */
 export const WORN_CLONE_ID = 'worn';
 
-/** Everything `cloneVerdict` needs, read once per load. */
 export interface CloneTrainingData {
   queue: QueueEntryInput[];
   paused: boolean;
   baseAttributes: Attributes;
-  /** The worn clone first (`WORN_CLONE_ID`), then each jump clone by `jump_clone_id`. */
   clones: CloneInput[];
-  /** Skill names for the bar legend, keyed by type id. */
   skillNames: Map<number, string>;
 }
 
-/**
- * The queue's remaining work, in training order. Finished rows are dropped. A
- * row the verdict cannot size (unknown skill, no end SP) makes the whole queue
- * null: a partial queue would give a confidently wrong verdict.
- */
 export function queueEntryInputs(
   queue: readonly SkillQueueEntry[],
   nowMs: number,
@@ -39,7 +30,6 @@ export function queueEntryInputs(
     if (!skill || end === undefined) return null;
     let from = entry.training_start_sp ?? entry.level_start_sp ?? end;
     if (status === 'training' && entry.start_date && entry.finish_date) {
-      // Part-way through the running level: the SP already banked is not left to train.
       const start = Date.parse(entry.start_date);
       const finish = Date.parse(entry.finish_date);
       const window = finish - start;
@@ -58,11 +48,6 @@ export function queueEntryInputs(
   return out;
 }
 
-/**
- * Null when the verdict cannot be built honestly: no readable attribute sheet
- * (or one that no allocation explains), or a skill the SDE does not know.
- * Every clone stays in the comparison, a bare one included.
- */
 export async function loadCloneTrainingData(
   characterId: number,
   nowMs: number,
@@ -82,7 +67,6 @@ export async function loadCloneTrainingData(
   const baseline = toAttributeBaseline(attrs.data, worn);
   const sheet = baselineAttributes(baseline);
   if (!sheet) return null;
-  // A cerebral accelerator rides along in every clone, so it belongs in the base.
   const boost = acceleratorBonusOf(baseline);
   const baseAttributes: Attributes = {
     intelligence: sheet.intelligence + boost,
@@ -92,7 +76,6 @@ export async function loadCloneTrainingData(
     charisma: sheet.charisma + boost,
   };
   const paused = isQueuePaused(input.queue);
-  // A paused queue has no dates to size and is reported as paused, never compared.
   const queue = paused ? [] : queueEntryInputs(input.queue, nowMs, catalog.engineSkills);
   if (!queue) return null;
   const skillNames = new Map<number, string>();

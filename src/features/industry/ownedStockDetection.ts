@@ -1,13 +1,3 @@
-/**
- * The impure half of Build Plan owned-material detection (issue #181): fetch
- * every authenticated Character's assets, then resolve the location names the
- * breakdown shows. `src/engine/industry/ownedStock.ts` does the counting.
- *
- * Detection never writes. What it produces is a suggestion the player either
- * clicks or ignores; the plan's stored `ownedQuantity` stays the single source
- * of truth, so nothing here can change a saved plan's cost.
- */
-
 import {
   consumedByJobs,
   type JobConsumption,
@@ -27,20 +17,9 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import type { Translate } from '@/lib/translate';
 
 export interface OwnedStockSnapshot {
-  /** Engine input: one entry per Character whose assets could be read. */
   sources: OwnedStockSource[];
   characterNames: Map<number, string>;
-  /**
-   * Characters whose asset list was capped, missing pages, or unreadable.
-   * Non-empty means every detected total is a floor, not an exact count -
-   * under-reporting owned stock silently inflates a plan's buy list, so it
-   * must never be presented as exact.
-   */
   incompleteCharacters: string[];
-  /**
-   * What the Characters' manufacturing and reaction jobs installed after their
-   * assets were read consumed (issue #6386): still in `sources`, already gone.
-   */
   jobConsumption?: JobConsumption[];
 }
 
@@ -51,7 +30,6 @@ export const EMPTY_OWNED_STOCK_SNAPSHOT: OwnedStockSnapshot = {
   jobConsumption: [],
 };
 
-/** Cache-first per `loadCharacterAssets`: the common case costs no ESI call at all. */
 export async function loadOwnedStockSnapshot(): Promise<OwnedStockSnapshot> {
   const { entries, skipped } = await loadAllCharactersAssets();
   const characterNames = new Map<number, string>();
@@ -71,24 +49,12 @@ export async function loadOwnedStockSnapshot(): Promise<OwnedStockSnapshot> {
   return { sources, characterNames, incompleteCharacters, jobConsumption };
 }
 
-/**
- * The job's real facility bonuses are not on the job record, so its materials
- * are priced at a neutral facility: a structure bonus makes the true figure at
- * most a few percent lower.
- */
 const NEUTRAL_FACILITY: FacilityContext = {
   facility: FACILITY_PRESETS.npcStation,
   rigFit: EMPTY_RIG_FIT,
   security: 'highsec',
 };
 
-/**
- * Jobs newer than their Character's assets read, as consumed materials. A job
- * record carries no ME: it is read from the Character's blueprint of that item,
- * and a blueprint that cannot be found (a consumed copy, no blueprints scope)
- * counts as ME 10 — the least it could have consumed, so the failure is an
- * unchanged offer. Never throws: this only ever refines the offer.
- */
 async function loadJobConsumption(
   snapshotMsByCharacter: ReadonlyMap<number, number>
 ): Promise<JobConsumption[]> {
@@ -135,7 +101,6 @@ async function loadJobConsumption(
   }
 }
 
-/** A name lookup that fails is a missing label, not a failed detection. */
 async function safeName(load: () => Promise<string | null>): Promise<string | null> {
   try {
     return await load();
@@ -144,17 +109,6 @@ async function safeName(load: () => Promise<string | null>): Promise<string | nu
   }
 }
 
-/**
- * Display names for the locations behind a detection, mirroring the Assets
- * page's own resolution: stations and systems are public, structures are
- * ACL-checked per Character and so must be looked up under the Character whose
- * stock actually sits there. An `item`-typed placement is a parent ESI never
- * returned an asset row for - usually a personal-hangar division inside a
- * player-owned structure, which the structures endpoint still resolves.
- *
- * Only the locations a detection actually surfaced are resolved, not every
- * location in the asset lists.
- */
 export async function resolveStockLocationNames(
   placements: readonly OwnedStockPlacement[]
 ): Promise<Map<number, string>> {
@@ -183,11 +137,6 @@ export async function resolveStockLocationNames(
   };
 
   await Promise.all([
-    // Stations are a snapshot lookup, not a request (issue #655): `stationIds`
-    // holds only `location_type: 'station'` placements, and `stations.json` is
-    // the whole NPC station table. Structures below still need the cap. (An
-    // unreadable snapshot does put a request back behind each station id —
-    // the fallback that keeps names working when the file can't be fetched.)
     ...[...stationIds].map(async (id) => record(id, await safeName(() => loadStationName(id)))),
     ...[...systemIds].map(async (id) => record(id, await safeName(() => loadSystemName(id)))),
     mapWithConcurrencyLimit(
@@ -206,15 +155,6 @@ export async function resolveStockLocationNames(
   return names;
 }
 
-/**
- * One placement's location label. Falls back to the same id-based labels the
- * Assets page uses - a structure name is ACL-checked and can fail to resolve
- * even for a Character with assets sitting in it.
- *
- * Takes only the two fields it reads, not a whole `OwnedStockPlacement` -
- * `OwnedStockScopeControl` (issue #454) labels bare `OwnedStockLocation`s,
- * which carry no `quantity`, and this way it never has to fabricate one.
- */
 export function stockLocationLabel(
   placement: Pick<OwnedStockPlacement, 'locationId' | 'locationType'>,
   names: ReadonlyMap<number, string>,
@@ -232,26 +172,16 @@ export function stockLocationLabel(
   return name ?? t('assets.structureLabel', { id: placement.locationId });
 }
 
-/** Everything `MaterialsTable` needs to render detection, bundled so the table takes one optional prop. */
 export interface OwnedStockDetection {
-  /**
-   * The total "use detected" offers for this material: detected stock
-   * narrowed to the plan's `ownedStockScope` (issue #454) — the galaxy-wide
-   * total when the scope is absent or `everywhere`.
-   */
   scopedQuantityFor: (typeID: number) => number;
-  /** True when any Character's list was incomplete: every total renders as a lower bound. */
   lowerBound: boolean;
   incompleteCharacters: readonly string[];
   characterNameFor: (characterId: number) => string;
-  /** For a corp-owned placement (issue #798's Corp Assets toggle) — labels it by corporation, not the reading Director. */
   corporationNameFor: (corporationId: number) => string;
   locationLabelFor: (placement: Pick<OwnedStockPlacement, 'locationId' | 'locationType'>) => string;
-  /** What jobs installed after the assets read took out of this material's scoped stock (issue #6386); absent or `null` when nothing. */
   reducedFor?: (typeID: number) => JobReduction | null;
 }
 
-/** The note on a reduced offer: how much, and the blueprints of the jobs behind it. */
 export interface JobReduction {
   quantity: number;
   blueprintNames: readonly string[];

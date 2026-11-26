@@ -1,10 +1,3 @@
-/**
- * The app-wide Item Detail (Show info) for `?info=type-<typeId>`, mounted once
- * in `App.tsx` like `SkillDetailModal`: any item name can link to it
- * (`ItemInfoLink`) without its page owning an Item Detail host. The
- * Item Detail chunk loads on first open. Opened from a link the name is
- * staged; from a pasted URL it is looked up off the type.
- */
 import { Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '@/app/lazyNamed';
@@ -25,7 +18,6 @@ export function ItemInfoModal() {
   return open ? <ItemInfoHost /> : null;
 }
 
-/** Mounted only while open: it brings the page-less Item Actions Used-in's menus need. */
 function ItemInfoHost() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);

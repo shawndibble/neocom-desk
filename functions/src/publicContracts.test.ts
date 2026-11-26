@@ -20,8 +20,6 @@ import {
   type PublicCourierContractRow,
 } from './publicContracts.js';
 
-// Column order and sample values verified against a live EVE Ref
-// public-contracts-latest.v2.tar.bz2 pull (2026-09-08) — see ADR 0013.
 const CONTRACTS_HEADER =
   'collateral,contract_id,date_expired,date_issued,days_to_complete,end_location_id,issuer_corporation_id,issuer_id,price,reward,start_location_id,title,type,volume,http_last_modified,region_id,station_id,system_id,constellation_id,for_corporation,buyout';
 
@@ -66,9 +64,6 @@ describe('parseContractsCsv / parseContractItemsCsv', () => {
   });
 });
 
-// The per-row seams the streaming sync drives directly, pinned in isolation;
-// `filterAndCompactPublicContractOffers` below covers the composed join they
-// add up to.
 describe('eligibleContractFrom', () => {
   const [itemExchange, auction, courier, lapsed] = parseContractsCsv(
     contractsCsv([
@@ -146,9 +141,6 @@ describe('compactContractOfferRow', () => {
   });
 
   it('omits ME/TE/runs on a non-blueprint line rather than writing zeros', () => {
-    // Number('') is 0, not NaN: writing these unconditionally would put
-    // `me: 0, te: 0, runs: 0` on every ore stack in New Eden, both inflating
-    // the chunk docs and making an "ME 0" search match all of them.
     const row = compactContractOfferRow(notBlueprint, parent);
     expect(row).not.toHaveProperty('me');
     expect(row).not.toHaveProperty('te');
@@ -174,10 +166,6 @@ describe('compactContractOfferRow', () => {
   });
 
   it('keeps a blueprint original unflagged and runless, but keeps its research', () => {
-    // A BPO carries is_blueprint_copy=false and runs=-1. The flag is about
-    // copy-ness so it stays off, and -1 runs is not a number any search
-    // should be offered — but a researched BPO's ME/TE is real information a
-    // buyer pays for, so it is not thrown away with the -1.
     const row = compactContractOfferRow(blueprintOriginal, parent);
     expect(row).not.toHaveProperty('isBlueprintCopy');
     expect(row).not.toHaveProperty('runs');
@@ -211,11 +199,8 @@ describe('requestedSideByContract', () => {
   it('sums the PLEX quantity a contract asks for, from its requested (not offered) lines', () => {
     const items = parseContractItemsCsv(
       itemsCsv([
-        // offered: a blueprint copy, not PLEX — never counted
         'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
-        // requested: 1000 PLEX
         '"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,1',
-        // requested: another 500 PLEX on the same contract
         '"",false,3,,500,1003,,,44992,2026-09-01T11:31:43Z,1',
       ])
     );
@@ -260,9 +245,6 @@ describe('requestedSideByContract', () => {
   });
 
   it('folds line by line to the same answer whichever line comes first', () => {
-    // The contract-offers job folds contract_items.csv one line at a time as
-    // it streams past; the CSV gives no guarantee a contract's offered line
-    // comes before its requested ones.
     const items = parseContractItemsCsv(
       itemsCsv([
         '"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,1',
@@ -354,29 +336,19 @@ describe('applyLineCounts', () => {
 
 describe('filterAndCompactPublicContractOffers', () => {
   const contracts = contractsCsv([
-    // eligible: item_exchange, not yet expired
     `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Mixed bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
-    // eligible: auction, with a buyout
     `0.0,2,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,1000000.0,0.0,60008494,"Auctioned ship",auction,10.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,9000000.0`,
-    // ineligible type: courier moves nothing a buyer browses by type (issue #909)
     `0.0,3,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,,0.0,60003760,"Courier run",courier,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
-    // already expired by the time this job runs
     `0.0,4,${PAST},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Lapsed",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
   ]);
 
   const items = itemsCsv([
-    // a BPC and a plain item on the same eligible item_exchange contract
     'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
     '"",true,2,,250,1002,,,34,2026-09-01T11:31:43Z,1',
-    // a plain item (a ship hull) on the eligible auction contract
     '"",true,3,,1,1003,,,17738,2026-09-01T11:31:43Z,2',
-    // requested from the buyer rather than offered — excluded
     '"",false,4,,100,1004,,,35,2026-09-01T11:31:43Z,1',
-    // on the courier contract (ineligible contract type) — excluded
     '"",true,5,,1,1005,,,34,2026-09-01T11:31:43Z,3',
-    // on the lapsed contract — excluded
     '"",true,6,,1,1006,,,34,2026-09-01T11:31:43Z,4',
-    // contract_id matches nothing in contracts.csv — excluded
     '"",true,7,,1,1007,,,34,2026-09-01T11:31:43Z,999',
   ]);
 
@@ -422,9 +394,7 @@ describe('filterAndCompactPublicContractOffers', () => {
 
   it('carries a contract-wide requested-PLEX total onto every offer row of that contract', () => {
     const plexItems = itemsCsv([
-      // offered: the blueprint copy from the mixed bundle above
       'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
-      // requested: 1000 PLEX in return, on the same contract
       '"",false,9,,1000,1009,,,44992,2026-09-01T11:31:43Z,1',
     ]);
     const plexRows = filterAndCompactPublicContractOffers(
@@ -505,10 +475,6 @@ describe('sortContractOfferRows', () => {
   });
 
   it('breaks a same-contract, same-type tie rather than leaving CSV order to decide', () => {
-    // One contract listing the same type twice is routine once every item
-    // type is in scope — two ore stacks, or two copies of one blueprint at
-    // different ME. Without a tie-break, EVE Ref re-emitting those two lines
-    // in the other order rewrites the chunk doc with identical data.
     const rows = [
       row({ contractId: 1, typeId: 34, quantity: 500 }),
       row({ contractId: 1, typeId: 34, quantity: 100 }),
@@ -591,10 +557,6 @@ describe('buildContractOfferIndex', () => {
   });
 });
 
-// Courier contracts (issue #909) publish their own row shape to their own
-// snapshot, off this same single archive pass. The `eligibleContractFrom`
-// tests above are what pin the other half: a courier contract is still no
-// part of the offers snapshot.
 describe('courierContractFrom', () => {
   const [
     courier,
@@ -633,9 +595,6 @@ describe('courierContractFrom', () => {
   });
 
   it('rejects a contract type that is not a haul', () => {
-    // Matched on `courier` by equality rather than taken as the complement of
-    // the offers snapshot's type set: `loan` is neither searchable by item nor
-    // a haul, and the complement would have published it as one.
     expect(courierContractFrom(loan, NOW)).toBeNull();
     expect(courierContractFrom(courier, NOW)).not.toBeNull();
   });
@@ -645,10 +604,6 @@ describe('courierContractFrom', () => {
   });
 
   it('rejects a haul missing an endpoint, a reward or a volume', () => {
-    // `Number('')` is 0, not NaN, so an absent column converted
-    // unconditionally would publish a delivery to station 0, a free haul, or
-    // an empty hold — each indistinguishable from a real value, and none of
-    // them a job anyone can take or rank.
     expect(courierContractFrom(noDestination, NOW)).toBeNull();
     expect(courierContractFrom(noReward, NOW)).toBeNull();
     expect(courierContractFrom(noVolume, NOW)).toBeNull();
@@ -661,8 +616,6 @@ describe('courierContractFrom', () => {
   });
 
   it('keeps a real zero collateral, reward or deadline as the value it is', () => {
-    // A favour run genuinely posts no collateral and pays nothing, and that
-    // is not the same fact as the column being blank.
     expect(courierContractFrom(realZeros, NOW)).toMatchObject({
       collateral: 0,
       reward: 0,
@@ -688,10 +641,6 @@ describe('isOutstandingCourierContract', () => {
   });
 
   it('still counts a courier contract that courierContractFrom goes on to drop', () => {
-    // The whole point of the two sharing this gate: the sync logs this count
-    // beside the rows it kept, so a required column going blank shows up as a
-    // gap between them. Contract type and expiry must not be able to open that
-    // gap themselves, or the gap says nothing.
     expect(isOutstandingCourierContract(incomplete, NOW)).toBe(true);
     expect(courierContractFrom(incomplete, NOW)).toBeNull();
   });
@@ -699,13 +648,10 @@ describe('isOutstandingCourierContract', () => {
 
 describe('filterAndCompactPublicCourierContracts', () => {
   const contracts = contractsCsv([
-    // item_exchange: belongs to the offers snapshot, not this one
     `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Mixed bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
-    // auction: likewise
     `0.0,2,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,1000000.0,0.0,60008494,"Auctioned ship",auction,10.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,9000000.0`,
     `5000000.0,20,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Jita to Amarr",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
     `1000000.0,21,${FUTURE},2026-08-11T18:10:34Z,3,60003760,98745702,2120819548,,300000.0,60008494,"Amarr to Jita",courier,5000.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,`,
-    // lapsed courier: excluded
     `1000000.0,22,${PAST},2026-08-11T18:10:34Z,3,60003760,98745702,2120819548,,300000.0,60008494,"Lapsed",courier,5000.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,`,
   ]);
 
@@ -742,8 +688,6 @@ describe('filterAndCompactPublicCourierContracts', () => {
 
 describe('sortCourierContractRows', () => {
   it('orders by contract id, in place, independent of input order', () => {
-    // One row per contract, so the contract id alone is a total order here —
-    // unlike the offers rows, where one contract lists many item lines.
     const rows = [
       { contractId: 3 },
       { contractId: 1 },

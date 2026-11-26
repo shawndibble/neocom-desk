@@ -1,9 +1,3 @@
-/**
- * Shared per-run summary math for the Production Log (issue #525) — used by
- * both `ProductionRunsPanel` (one Build Plan's own runs) and
- * `ProductionLogPanel` (the cross-plan aggregate), so the two views can never
- * disagree about what "sold" or "closed" means for the same run.
- */
 import type {
   ProductionLossRecord,
   ProductionOrderWatchRecord,
@@ -21,39 +15,20 @@ export interface ProductionRunSummary {
   run: ProductionRunRecord;
   saleLinks: ProductionSaleLinkRecord[];
   orderWatches: (ProductionOrderWatchRecord & { filled: number })[];
-  /** This run's Run Loss records (issue #2851). */
   losses: ProductionLossRecord[];
-  /** Units written off across every loss record. */
   quantityLost: number;
   profit: RealizedProfitResult;
   quantitySold: number;
-  /** `run.quantity - quantitySold - quantityLost`, floored at zero. */
   remaining: number;
-  /** `'new'` — nothing sold or lost yet. `'open'` — partly accounted for. `'closed'` — every unit sold or lost. */
   status: ProductionRunStatus;
-  /** Cost-basis value (at this run's own cost/unit) of the units neither sold nor lost. */
   openInventoryValue: number;
 }
 
-/**
- * Summarizes one run against the full set of the character's sale links and
- * order watches — the caller passes every row it has loaded (not
- * pre-filtered to this run) and this does the filtering, so a caller with
- * several runs in view only needs one `useLiveQuery` per table.
- */
 export function summarizeProductionRun(
   run: ProductionRunRecord,
   saleLinks: readonly ProductionSaleLinkRecord[],
   orderWatches: readonly ProductionOrderWatchRecord[],
   skills: SkillLevels,
-  /**
-   * The run owner's standing toward the watched order's station owner
-   * (issue #1238). `ProductionOrderWatchRecord` carries no `location_id` of
-   * its own — only `orderId` — so every caller resolves this against the
-   * run's own Build Plan's configured Trade Hub instead, the same reasonable
-   * fallback `realizedProfit`'s own doc comment anticipates. Absent/0 =
-   * standings assumed 0, today's behaviour.
-   */
   standing?: ResolvedStandings,
   losses: readonly ProductionLossRecord[] = []
 ): ProductionRunSummary {
@@ -105,11 +80,9 @@ export function summarizeProductionRun(
   };
 }
 
-/** What a collapsed Production Runs panel says about its rows. */
 export interface ProductionRunsRollup {
   count: number;
   realizedProfit: number;
-  /** Runs with units still unsold — `'new'` or `'open'`. */
   openCount: number;
 }
 

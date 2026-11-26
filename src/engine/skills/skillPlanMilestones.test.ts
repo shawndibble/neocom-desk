@@ -32,9 +32,6 @@ describe('milestoneStates', () => {
   });
 
   it('survives a reorder — looked up by key, not position', () => {
-    // Simulates a schedule recomputed after other entries moved ahead of the
-    // milestone's anchor: the map's insertion order changed and the anchor's
-    // own cumulativeSeconds grew, but the same StepKey still resolves it.
     const stepByKey = new Map([
       [stepKey({ skillTypeID: 200, level: 1 }), step(200, 1, 1000)],
       [stepKey({ skillTypeID: 100, level: 4 }), step(100, 4, 7200)],

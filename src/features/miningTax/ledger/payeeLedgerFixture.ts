@@ -1,8 +1,3 @@
-/**
- * Sample Payee ledgers for the panel's stories and tests: a Corp Tax Book Payee with history, a
- * personal Payee, one with nothing billed and one in credit. Each Running account is built from
- * the same charges and payments the ledger describes, as a caller would.
- */
 import type { TaxPayment } from '@/engine/corpTaxBook/payments';
 import { MinerRunningAccount } from '@/engine/corpTaxBook/minerRunningAccount';
 import type {
@@ -77,10 +72,6 @@ const mined = (
 const ATHANOR = 'Hakonen - Moon 4 Athanor';
 const TATARA = 'Hakonen - Moon 7 Tatara';
 
-/**
- * A Corp Tax Book Payee: weeks of mining, a credit Adjustment, part payments (the second closes a
- * day within the tolerance), a late notice and an officer's write-off.
- */
 export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('c1', '2026-10-03', 4_120_000, ATHANOR, [
@@ -124,7 +115,6 @@ export const CORP_BOOK_LEDGER: PayeeLedgerSource = sample({
   ],
 });
 
-/** A personal Payee: what the pilot owes another corporation's moon, paid from their own wallet. */
 export const PERSONAL_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('a1', '2026-10-12', 2_150_000, 'Otela VII - Moon 2', [[COESITE, 9_800]]),
@@ -137,10 +127,8 @@ export const PERSONAL_LEDGER: PayeeLedgerSource = sample({
   payments: [{ id: 'm1', amount: 4_000_000, at: '2026-10-26T20:10:00Z' }],
 });
 
-/** A Payee with nothing billed yet. */
 export const EMPTY_LEDGER: PayeeLedgerSource = sample({ charges: [] });
 
-/** A Payee who paid ahead: every day paid and money left over. */
 export const CREDIT_LEDGER: PayeeLedgerSource = sample({
   charges: [
     mined('k1', '2026-11-02', 3_100_000, TATARA, [[BITUMENS, 16_300]]),

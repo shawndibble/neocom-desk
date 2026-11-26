@@ -8,8 +8,6 @@ import { BOOK_CONTEXT, VARRO_ID } from './corpBookFixture';
 import { MinersTab } from './MinersTab';
 import { OverviewTab } from './OverviewTab';
 
-// The Overview and Miners tab printed the read models (#5259). The docs here are deliberately
-// unlike the view, so a tab still reading them would show.
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(), readAudit: vi.fn() }));
 vi.mock('@/features/corpTaxBook/mailQueueStore', () => ({
   listQueue: vi.fn().mockResolvedValue([]),
@@ -38,7 +36,6 @@ function renderTab(ui: React.ReactElement, readModels: unknown = DOCS) {
   );
 }
 
-/** The schedule panel's group headings (the Overview has other h3s, e.g. Overdue by age). */
 const headings = () =>
   within(screen.getByRole('heading', { level: 2, name: 'Moons' }).closest('section')!)
     .getAllByRole('heading', { level: 3 })
@@ -62,8 +59,6 @@ const VARRO_DOCS = {
 };
 
 describe('the Overview and Miners tabs, with read model docs still stored', () => {
-  // The read models counted calendar Statements (decision 20261120-235011): the tabs read every
-  // Miner off their Running account, whatever docs an older server left.
   it("prints a Miner's balance from their Running account, not the miner list doc", () => {
     renderTab(<MinersTab />, VARRO_DOCS);
     expect(screen.queryAllByText(/123,456/)).toHaveLength(0);

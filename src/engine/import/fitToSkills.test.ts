@@ -9,12 +9,12 @@ const TYPE_BY_NAME = new Map([
 ]);
 
 const REQUIRED: Record<number, RequiredSkill[]> = {
-  587: [{ skillTypeID: 3327, level: 1 }], // Spaceship Command
+  587: [{ skillTypeID: 3327, level: 1 }],
   2873: [
-    { skillTypeID: 3300, level: 3 }, // Gunnery
-    { skillTypeID: 3301, level: 1 }, // Small Projectile Turret
+    { skillTypeID: 3300, level: 3 },
+    { skillTypeID: 3301, level: 1 },
   ],
-  2048: [{ skillTypeID: 3300, level: 1 }], // Gunnery (lower level than the gun)
+  2048: [{ skillTypeID: 3300, level: 1 }],
 };
 
 function requiredSkills(typeID: number): RequiredSkill[] {

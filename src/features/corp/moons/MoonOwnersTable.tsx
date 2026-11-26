@@ -28,10 +28,6 @@ const k = (key: string) => `corpTaxBook.moons.moonOwners.${key}`;
 
 const pct = (value: number | undefined) => (value === undefined ? undefined : `${value}%`);
 
-/**
- * The Moon owners tab (List A): header chips and one sortable table, a row per
- * corporation. A row click opens its page. Phone: labelled cards.
- */
 export function MoonOwnersTable({
   rows,
   totals,
@@ -44,18 +40,14 @@ export function MoonOwnersTable({
   rows: readonly MoonOwnerRow[];
   totals: MoonOwnerTotals;
   name: (corporationId: number) => string;
-  /** Epoch ms the ages are read at. */
   now: number;
   onOpen: (row: MoonOwnerRow) => void;
-  /** Pay on a row that is owed. Absent for a viewer who may not record payments. */
   onPay?: (row: MoonOwnerRow) => void;
-  /** Pop Sharing marks by moon owner corporation (#6226). */
   shareMarks?: Readonly<Record<string, PopShareMark>>;
 }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  // The phone list has no sort control (the "Stacked" design); most owed first, as the table's default.
   const mostOwedFirst = useMemo(() => [...rows].sort((x, y) => y.owed - x.owed), [rows]);
   const columns: DataTableColumn<MoonOwnerRow>[] = [
     {
@@ -129,7 +121,6 @@ export function MoonOwnersTable({
       header: t(k('cols.owed')),
       align: 'right',
       className: 'tabular-nums',
-      // Settled otherwise still shows what was owed before the switch (#6209).
       render: (r) =>
         r.owed > 0 ? (
           isk(r.owed)

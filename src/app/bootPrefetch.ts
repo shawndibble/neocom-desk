@@ -1,25 +1,9 @@
-/**
- * When the boot cache warm-up (`prefetch.ts`) runs: after first paint, in the
- * browser's first idle slot, and from its own chunk.
- *
- * `prefetch.ts` imports a loader from nearly every feature, so importing it
- * from the shell put all of them in the startup bundle; and starting it the
- * moment hydration resolved had it queueing ESI reads against the visible
- * route's own. Both waits are cheap — a warm-up only has to land before the
- * user opens a *second* page.
- */
 import { BOOT_IDLE_TIMEOUT_MS, scheduleIdle } from '@/lib/scheduleIdle';
 import type { PrefetchSignal } from './prefetch';
 import { MINUTE_MS } from '@/lib/age';
 
-/** Upper bound on the wait for an idle slot (and the timer fallback's delay). */
 export const BOOT_PREFETCH_IDLE_TIMEOUT_MS = BOOT_IDLE_TIMEOUT_MS;
 
-/**
- * Schedules the warm-up for `characterId` and returns its cancel — call it on
- * Character switch: before the idle slot it never starts, after it the run
- * stops taking new tasks.
- */
 export function scheduleBootPrefetch(characterId: number): () => void {
   const signal: PrefetchSignal = { cancelled: false };
 
@@ -29,8 +13,6 @@ export function scheduleBootPrefetch(characterId: number): () => void {
       .then(({ prefetchCharacterData }) => {
         if (!signal.cancelled) return prefetchCharacterData(characterId, signal);
       })
-      // A failed chunk load (a stale deploy, offline) only loses the warm-up;
-      // every page still loads its own data when opened.
       .catch(() => {});
   };
 
@@ -42,17 +24,8 @@ export function scheduleBootPrefetch(characterId: number): () => void {
   };
 }
 
-/**
- * How long after mount the daily cache prune waits before even asking for an
- * idle slot: past boot, the warm-up and the first route's own reads.
- */
 export const CACHE_PRUNE_DELAY_MS = MINUTE_MS;
 
-/**
- * Schedules the once-a-day `esiCache` prune (`@/esi/cachePrune`) — after
- * `CACHE_PRUNE_DELAY_MS`, then an idle slot, from its own chunk — and returns
- * its cancel. The prune itself decides whether today's run already happened.
- */
 export function scheduleCachePrune(): () => void {
   let cancelled = false;
   let cancelWait = () => {};
@@ -63,7 +36,6 @@ export function scheduleCachePrune(): () => void {
       .then(({ runDailyEsiCachePrune }) => {
         if (!cancelled) return runDailyEsiCachePrune();
       })
-      // Nothing to report: a failed run only leaves old rows for tomorrow.
       .catch(() => {});
   };
 
@@ -82,15 +54,8 @@ export function scheduleCachePrune(): () => void {
   };
 }
 
-/** Past boot, the ESI warm-up, the first route and the cache prune. */
 export const LAZY_SDE_WARM_DELAY_MS = 90_000;
 
-/**
- * Schedules `warmLazySde` (the lazy SDE files + dogma engine, for offline
- * first use) after `LAZY_SDE_WARM_DELAY_MS`, then an idle slot, from its own
- * chunk. Gated on connection inside the warm; returns its cancel. `delayMs`
- * is for a caller that is already past boot (`reconnectRecovery.ts`).
- */
 export function scheduleLazySdeWarm(delayMs: number = LAZY_SDE_WARM_DELAY_MS): () => void {
   const signal = { cancelled: false };
   let cancelWait = () => {};

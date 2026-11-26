@@ -8,7 +8,6 @@ import { RackSlots } from './FittingRackList';
 type RackSlotsProps = ComponentProps<typeof RackSlots>;
 
 interface FittingRackSheetProps {
-  /** The rack (or the drones) whose sheet is open; null while closed. */
   rack: FittingSlotKind | 'drone' | null;
   onClose: () => void;
   fitting: RackSlotsProps['fitting'];
@@ -22,7 +21,6 @@ interface FittingRackSheetProps {
   unusableModuleKeys?: ReadonlySet<string>;
 }
 
-/** Phone Ring: one rack's slots (or the drones) as a bottom sheet. */
 export function FittingRackSheet({
   rack,
   onClose,

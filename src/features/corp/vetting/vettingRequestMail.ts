@@ -1,9 +1,3 @@
-/**
- * The mail the asking officer's client offers to send a member once a review is requested. Sent
- * only on an explicit press, from the officer's own Character, by the paced Officer mail queue
- * (like `vettingDecisionMail.ts`). Its text is fixed: what is read is always said the same way.
- * The builder is pure.
- */
 import type { TFunction } from 'i18next';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
 import {
@@ -21,9 +15,7 @@ export interface VettingRequestMailInput {
   pilot: string;
   role: string;
   corpName: string;
-  /** The asking officer, who signs the mail. */
   officer: string;
-  /** Where the member opens the request. */
   link: string;
 }
 
@@ -50,7 +42,6 @@ export function buildVettingRequestMail(
   };
 }
 
-/** What the mail says, from the review the officer is looking at. Null once the member has shared. */
 export function requestMailInput(
   review: Pick<VettingReview, 'state' | 'role' | 'pilot'>,
   corpName: string,
@@ -61,7 +52,6 @@ export function requestMailInput(
   return { pilot: review.pilot.name, role: review.role ?? '', corpName, officer, link };
 }
 
-/** How long until the mail may go again; null when it may now (never sent, or a day ago). */
 export function requestMailCooldown(
   mail: { sentAt: number } | undefined,
   now: number
@@ -71,18 +61,11 @@ export function requestMailCooldown(
   return remainingMs > 0 ? { remainingMs } : null;
 }
 
-/** A mail run, plus what only a request mail can hit. */
 export interface RequestMailRun extends MailRun {
-  /** The server's record says it was mailed within a day (another tab or device): nothing sent. */
   cooldown?: boolean;
-  /** The mail is queued but the server did not record it, so the queue does not say "Mail sent". */
   unrecorded?: boolean;
 }
 
-/**
- * Whether a request mail may go, judged on the server's copy of the review (the row on screen may
- * be stale: another tab may have mailed it). `previousSentAt` is the slot the queue dedupes on.
- */
 export function mailGate(
   overview: Pick<VettingOverview, 'reviews'>,
   reviewId: string,
@@ -98,10 +81,6 @@ export function mailGate(
   return { ok: true, review, previousSentAt: review.requestMail?.sentAt ?? 0 };
 }
 
-/**
- * Puts the one mail on the Officer mail queue. Never throws. `previousSentAt` makes each resend a
- * new mail, and a double press before the server records it queues once.
- */
 export async function queueVettingRequestMail(
   t: TFunction,
   input: {

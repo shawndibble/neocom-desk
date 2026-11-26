@@ -1,13 +1,3 @@
-/**
- * The Market Trend widgets' price history, read once for every widget.
- *
- * One read per line (item at a Trade Hub), shared by the widgets that draw it:
- * two Market Trend widgets pricing Tritanium at Jita make one request. The
- * request names each widget's items and hubs; this plans their lines, reads
- * the distinct ones through Price History's own cached loader, and hands the
- * builder a table keyed by line. A global-market item (PLEX) is read at its
- * own region whatever the hub.
- */
 import { planTrendSeries, type TrendSeriesRef } from '@/engine/market/trendSeries';
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
 import { DAY_MS } from '@/lib/age';
@@ -15,38 +5,28 @@ import { DAY_MS } from '@/lib/age';
 export interface MarketTrendSeries {
   key: string;
   typeId: number;
-  /** The Trade Hub it is priced at; null for a global-market item. */
   hubId: string | null;
   name: string;
-  /** Daily rows, oldest first; empty for a type with no market. */
   points: MarketHistoryPoint[];
-  /** Where the item's Price History opens. */
   to: string;
   fromCache: boolean;
-  /** The read failed (not a type with no market): the points are empty because nothing loaded. */
   failed: boolean;
 }
 
 export interface MarketTrendFeed {
-  /** The Quickbar entries the widgets that follow it draw from. */
   quickbar: { typeId: number; name: string }[];
-  /** The hub a widget with none of its own prices at. */
   defaultHubId: string;
-  /** Items that trade in one region whatever the hub. */
   globalTypeIds: number[];
   series: Record<string, MarketTrendSeries>;
-  /** The oldest of the reads, so the widget's age is the staleest of its lines. */
   fetchedAt: Date | null;
 }
 
 export interface MarketTrendRequest {
   quickbar: readonly { typeId: number; name: string }[];
   defaultHubId: string;
-  /** One entry per Market Trend widget: the items and hubs it resolved to. */
   sets: readonly { typeIds: readonly number[]; hubIds: readonly string[] }[];
 }
 
-/** Rows kept per line: the longest chart range (a year) plus the base row a 30-day change needs. */
 const KEEP_DAYS = 400;
 
 export async function loadMarketTrend(request: MarketTrendRequest): Promise<MarketTrendFeed> {
@@ -92,7 +72,6 @@ export async function loadMarketTrend(request: MarketTrendRequest): Promise<Mark
         ref.typeId,
         global ? { mode: 'region', regionId: global.regionId } : { mode: 'hub', hubId: hub.id }
       );
-      // A type with no market (ESI 400) is a row of unknowns; any other failure is counted.
       let failed = false;
       const result = await loadPriceHistory(global?.regionId ?? hub.regionId, ref.typeId).catch(
         (err: unknown) => {
@@ -126,7 +105,6 @@ export async function loadMarketTrend(request: MarketTrendRequest): Promise<Mark
       };
     })
   );
-  // Every read failing is a failed widget, not a quiet "no history".
   if (reads.length > 0 && failures === reads.length) throw new Error('Market history unavailable');
   const stamps = reads.map((r) => r.fetchedAt).filter((v): v is number => v !== null);
   return {

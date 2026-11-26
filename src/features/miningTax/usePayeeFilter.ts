@@ -8,19 +8,16 @@ import {
   type PayeeFilter,
 } from './payeeFilter';
 
-/** The Payee filter resolved against the Payees the ledger knows, with the handlers that change it. */
 export function usePayeeFilter(
   payeeFilter: PayeeFilter,
   setPayeeFilter: (next: PayeeFilter) => void,
   filterPayees: readonly PayeeRecord[],
-  /** Payee ids the filter lists under another Payee (see `corpPayeeAliases`). */
   aliases: ReadonlyMap<string, string>
 ) {
   const canon = (payeeId: string) => canonicalPayeeId(aliases, payeeId);
   const resolvedPayeeFilter = useMemo(
     () =>
       resolvePayeeFilter(
-        // A link written before a Payee was merged names its old id.
         canonicalizePayeeFilter(payeeFilter, aliases),
         filterPayees.map((p) => p.id)
       ),

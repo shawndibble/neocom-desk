@@ -1,69 +1,22 @@
-/**
- * Pure search over the shared Public Contract Offers snapshot — every
- * for-sale line of a public item_exchange/auction contract, any item type
- * (issues #906, #908). The general-corpus sibling of `bpcSearch.ts`, which
- * answers the narrower "which blueprint copy should I buy" question and
- * carries ME/TE/runs dimensions that mean nothing to a stack of Tritanium.
- *
- * Kept separate rather than generalizing `bpcSearch.ts`: the two filters
- * share only type/region/price, and folding blueprint-only dimensions into a
- * filter most rows cannot answer is how a shared filter becomes a filter with
- * a mode flag. Sorting is left to `DataTable`'s column sort, same as there —
- * this only narrows the row set.
- */
 import { median } from '../math';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
 export interface ContractOfferFilter {
-  /**
-   * `null`/`undefined` means "no type search active" (every row passes). An
-   * empty-but-present `Set` means a search ran and matched nothing — that
-   * must filter down to zero rows, not be mistaken for "unfiltered". Same
-   * contract `BpcSearchFilter.typeIds` makes.
-   */
   typeIds?: ReadonlySet<number> | null;
   regionId?: number | null;
   maxPrice?: number | null;
-  /** Lets a buyer skip the single-unit listings when they want a stack. */
   minQuantity?: number | null;
-  /** Drops an item-exchange row (an auction stays): the Exclude menu's "Item Exchange". */
   hideExchanges?: boolean | null;
-  /** Drops an auction row — the same exclusion BPC Sourcing's `hideAuctions` makes. */
   hideAuctions?: boolean | null;
-  /** Drops a row whose contract asks for PLEX in return (`requestedPlex`). */
   hidePlexRequests?: boolean | null;
-  /**
-   * ISK per PLEX, for judging `maxPrice` on a contract that asks for PLEX.
-   * `null`/absent while unknown — such a row then passes the ceiling, the
-   * same "unknown, so it passes" stance a no-buyout auction gets.
-   */
   plexPrice?: number | null;
 }
 
-/**
- * A row's `buyout` is only meaningful on an auction. EVE Ref emits `buyout:
- * 0` on plain item_exchange rows, so a reader that took `buyout ?? price`
- * unconditionally would price every fixed-ask contract at zero — which is
- * both the wrong number to show and, as a ceiling, the wrong row to keep.
- */
 export function buyoutOf(row: PublicContractOfferRow): number | null {
   if (!row.isAuction) return null;
-  // `> 0`, not just present: the sync writes whatever the archive's `buyout`
-  // column parses to and only treats a blank as absent, so a zero reaches
-  // here as a real number. Zero is not a price a seller set — read as one it
-  // would show the row as free and let it under every ceiling.
   return row.buyout != null && row.buyout > 0 ? row.buyout : null;
 }
 
-/**
- * What a row costs a buyer, and the single expression every price readout
- * agrees on — the table's price column sorts on this, so a "cheapest" figure
- * computed any other way would name a number the first row beneath it
- * contradicts. For an auction with no buyout the starting bid is the only
- * figure there is. A contract asking for PLEX costs its ISK ask plus that
- * PLEX at `plexPrice` — when no PLEX price is given, `isUnpricedOffer` says so
- * and callers must not read this ISK-only figure as the whole price.
- */
 export function offerAskingPrice(
   row: PublicContractOfferRow,
   plexPrice: number | null = null
@@ -72,33 +25,14 @@ export function offerAskingPrice(
   return row.requestedPlex && plexPrice != null ? isk + row.requestedPlex * plexPrice : isk;
 }
 
-/**
- * True when a row's asking price is zero or negative — a barter contract
- * ("take this blueprint, give me 122 PLEX") has an ISK price of zero, which
- * is not a real price of zero, it is the absence of one (issue #1080). A
- * contract that genuinely gives an item away for nothing is indistinguishable
- * from a barter on this data, so it is treated the same, safer way rather
- * than as the cheapest thing on the page.
- */
 export function isUnpricedOffer(
   row: PublicContractOfferRow,
   plexPrice: number | null = null
 ): boolean {
-  // A PLEX ask with no PLEX price to convert it at: the ISK part alone (often
-  // 0, sometimes a real amount) would understate what the contract costs.
   if (row.requestedPlex && plexPrice == null) return true;
   return offerAskingPrice(row, plexPrice) <= 0;
 }
 
-/**
- * What one unit of a single-type contract costs: the asking price the Price
- * column shows, divided by the stack's quantity. `undefined` when it cannot be
- * known — a bundle (or a row whose `lineCount` was never stamped) has a price
- * that covers several items and is never apportioned to one (decision
- * 20260915-093419), an unpriced offer has no price, and a zero quantity has
- * nothing to divide by. Built on `offerAskingPrice`/`isUnpricedOffer` so the
- * two columns can never disagree.
- */
 export function offerUnitPrice(
   row: PublicContractOfferRow,
   plexPrice: number | null
@@ -108,21 +42,12 @@ export function offerUnitPrice(
   return offerAskingPrice(row, plexPrice) / row.quantity;
 }
 
-/**
- * What a `maxPrice` ceiling judges a row on — deliberately not
- * `offerAskingPrice`, which answers a different question. This one asks
- * "could this row exceed my ceiling": an auction's starting bid says nothing
- * about that, so only a buyout can disqualify it, and an auction with no
- * buyout has an unknowable eventual price and passes rather than being
- * excluded on a number that does not describe it.
- */
 function priceForMaxFilter(row: PublicContractOfferRow, plexPrice: number | null): number | null {
   const isk = row.isAuction ? buyoutOf(row) : row.price;
   if (isk === null || !row.requestedPlex) return isk;
   return plexPrice == null ? null : isk + row.requestedPlex * plexPrice;
 }
 
-/** One row against the filter; `filterContractOffers` and the worker's query share it. */
 export function offerPassesFilter(
   row: PublicContractOfferRow,
   filter: ContractOfferFilter
@@ -147,13 +72,6 @@ export function filterContractOffers(
   return rows.filter((row) => offerPassesFilter(row, filter));
 }
 
-/**
- * `offerAskingPrice`, except an unpriced (barter) row sorts last rather than
- * at its literal 0 (issue #1080) — for the fixed, ascending "cheapest first"
- * default view, a plain `.sort()` this `Infinity` sentinel is safe for.
- * `DataTable`'s own reversible column sort must not use this: `Infinity`
- * would sort *first* the moment a pilot flips the Price header to descending.
- */
 export function sortableOfferPrice(row: PublicContractOfferRow, plexPrice: number | null): number {
   return isUnpricedOffer(row, plexPrice) ? Infinity : offerAskingPrice(row, plexPrice);
 }
@@ -163,14 +81,6 @@ export interface ContractTypeOption {
   name: string;
 }
 
-/**
- * Distinct item types actually present in the loaded rows, named and sorted —
- * the item search's corpus. Deliberately narrower than the whole market
- * catalogue: search only what is actually on contract right now, so a query
- * never offers a type with zero results, and the corpus stays small enough
- * that `rankedSearch`'s result cap is never the reason a real match goes
- * missing.
- */
 export function listedContractTypeOptions(
   rows: readonly { typeId: number }[],
   typeNames: ReadonlyMap<number, string>
@@ -185,27 +95,11 @@ export function listedContractTypeOptions(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * What one item type's listings look like in aggregate, for the search's
- * suggestion rows. An **offer** is one contract line, which is not one unit:
- * a single line can put `quantity: 500` up at one price. Counting lines is
- * what the buyer is choosing between, so that is what this counts.
- */
 export interface ContractOfferStats {
   offerCount: number;
-  /** `null` when every offer of this type is unpriced (issue #1080) — a barter row still counts toward `offerCount`, but never wins cheapest. */
   cheapest: number | null;
 }
 
-/**
- * One pass over the rows, keyed by type. The suggestion list needs a count
- * and a cheapest per candidate on every keystroke; re-filtering the whole
- * snapshot per suggestion is the shape that turns a typeahead into a stutter.
- *
- * Takes an already-narrowed row set rather than reaching for the whole
- * snapshot, so a suggestion reading "40 offers" cannot be followed by a
- * summary reading "2".
- */
 export function contractOfferStats(
   rows: readonly PublicContractOfferRow[],
   plexPrice: number | null = null
@@ -215,7 +109,6 @@ export function contractOfferStats(
   return stats;
 }
 
-/** Folds one row into a per-type tally — the single step `contractOfferStats` and the worker's query share. */
 export function addToOfferStats(
   stats: Map<number, ContractOfferStats>,
   row: PublicContractOfferRow,
@@ -234,28 +127,17 @@ export function addToOfferStats(
   }
 }
 
-/** The headline numbers once the search narrows to a single item type. */
 export interface ContractOfferPriceSummary {
   offerCount: number;
-  /** `null` for no offers — distinct from `0`, which would read as a free item. */
   cheapest: number | null;
   median: number | null;
 }
 
-/**
- * Median rather than mean: a handful of 500-unit stacks among single-unit
- * listings drags an average somewhere no actual contract sits, which is
- * exactly the number a buyer would misread as "the going rate".
- */
 export function contractOfferPriceSummary(
   rows: readonly PublicContractOfferRow[],
   plexPrice: number | null = null
 ): ContractOfferPriceSummary {
   if (rows.length === 0) return { offerCount: 0, cheapest: null, median: null };
-  // A zero/negative-price (barter) row still counts toward `offerCount` — it
-  // is a real, buyable offer — but is excluded before cheapest/median are
-  // computed (issue #1080): its price is not a real one to average or win
-  // "cheapest" with.
   const prices = rows
     .filter((row) => !isUnpricedOffer(row, plexPrice))
     .map((row) => offerAskingPrice(row, plexPrice))

@@ -1,12 +1,3 @@
-/**
- * Assets > Move at 390px (issue #2947): the tab must not
- * scroll sideways and its actions must stay reachable. jsdom has no layout, so
- * only a real browser can check either.
- *
- * Assets are seeded by overriding the `/assets` route before login (the
- * pattern `assetsItemColumns.spec.ts` documents). Jita 4-4 is a real NPC
- * station id, so name resolution never needs a live ESI call.
- */
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -48,7 +39,6 @@ test('Move tab fits a phone and keeps its actions reachable', async ({ page }) =
   const sheetFitsWidth = await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth);
   expect(sheetFitsWidth).toBe(true);
 
-  // The destination and the action bar are on screen without scrolling.
   await expect(dialog.getByRole('button', { name: 'Pick a system' })).toBeInViewport();
   const cancel = dialog.getByRole('button', { name: 'Cancel' });
   await expect(cancel).toBeInViewport();
@@ -58,8 +48,6 @@ test('Move tab fits a phone and keeps its actions reachable', async ({ page }) =
   await expect(dialog).toBeHidden();
 });
 
-// Issue #3240: a pickup card's heading gave the station name the sliver left
-// beside the m³ total, so it broke one word a line.
 test('pickup heading gives the name a row on a phone and stays one row on desktop', async ({
   page,
 }) => {
@@ -111,6 +99,5 @@ test('pickup heading gives the name a row on a phone and stays one row on deskto
 
   await page.setViewportSize({ width: 1024, height: 800 });
   const [dn, dt] = [await box(name), await box(total)];
-  // Same vertical band: the total's top sits inside the name's row.
   expect(dt.y).toBeLessThan(dn.y + dn.height);
 });

@@ -37,7 +37,6 @@ describe('loadConstellationNames', () => {
   });
 
   it('reads a name from esiCache with ESI down', async () => {
-    // Seeded by an earlier session; this id is not in the in-memory session map.
     server.use(
       http.post(`${ESI_BASE_URL}/universe/names`, () =>
         HttpResponse.json([{ id: 20000903, name: 'Mareerieh', category: 'constellation' }])

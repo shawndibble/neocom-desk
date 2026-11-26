@@ -4,29 +4,17 @@ import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import type { DisplayRow } from './groupRows';
 import { oreLinesText } from './oreBreakdown';
 
-/**
- * How the Tax table reads each row — handed in by `TaxTab`, whose own cells
- * use the same functions, so an export cannot disagree with what is on
- * screen (a dismissal's Payee label, a Corp Tax Book state).
- */
 export interface TaxCsvContext {
-  /** An ore type's name, for the Ore column. */
   oreName: (typeId: number) => string;
-  /** The row's system security status; undefined while the system is unread. */
   securityOf: (row: DisplayRow) => number | undefined;
-  /** The row's date. */
   dateLabel: (row: DisplayRow) => string;
   systemName: (row: DisplayRow) => string;
-  /** Null for a row with no Assignment — the table's dash. */
   payeeName: (row: DisplayRow) => string | null;
   estimatedValue: (row: DisplayRow) => number;
-  /** Null for a row with no Assignment — the table's dash, not a zero owed. */
   taxOwed: (row: DisplayRow) => number | null;
-  /** A row's status as the table prints it, when it is not just the personal status (a Corp Tax Book state). */
   statusLabel?: (row: DisplayRow) => string | undefined;
 }
 
-/** Export columns for the Mining Tax table, in its column order (the select and edit columns carry no data). Feed it rows from `expandCombinedRows`. */
 export function taxCsvColumns(
   t: CsvTranslate,
   {
@@ -48,7 +36,6 @@ export function taxCsvColumns(
     { header: t('miningTax.payeeColumn'), value: payeeName },
     { header: t('miningTax.labelColumn'), value: (dr) => dr.assignment?.label ?? null },
     {
-      // Every type with its units, not only the icons the table has room for.
       header: t('miningTax.oreColumn'),
       value: (dr) => oreLinesText(dr.assignment?.oreLines ?? dr.row.unassignedOreLines, oreName),
     },
@@ -59,14 +46,12 @@ export function taxCsvColumns(
       value: (dr) => statusLabel?.(dr) ?? t(`miningTax.status.${STATUS_LABEL_KEY[dr.status]}`),
     },
     {
-      // Joined days share an id; blank on a row that was never joined.
       header: t('miningTax.csvCombinedEntry'),
       value: (dr) => dr.assignment?.groupId ?? null,
     },
     { header: t('miningTax.csvTaxPct'), value: (dr) => dr.assignment?.taxPct ?? null },
     {
       header: t('miningTax.csvNeedsReview'),
-      // Settling ore sits in Open beside the day's bill, but needs nothing from the pilot.
       value: (dr) =>
         exportFlag(
           t,

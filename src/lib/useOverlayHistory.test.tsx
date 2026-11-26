@@ -62,7 +62,6 @@ describe('useOverlayHistory', () => {
     const entries = window.history.length;
     await user.click(screen.getByRole('button', { name: 'Leave page' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/market');
-    // Replaced, not stacked.
     expect(window.history.length).toBe(entries);
     const state = window.history.state as Record<string, unknown>;
     expect(state).not.toHaveProperty('__neocomOverlay');
@@ -114,7 +113,6 @@ describe('stacked overlays', () => {
       </BrowserRouter>
     );
     const top = await screen.findByRole('dialog', { name: 'Layer c' });
-    // The closing layer's own history.back() lands as a popstate after a tick: wait for it.
     const popped = new Promise((resolve) =>
       window.addEventListener('popstate', resolve, { once: true })
     );

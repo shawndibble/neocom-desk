@@ -1,12 +1,5 @@
-/**
- * Where the item menu's "PI Plan" action goes. From anywhere else it opens
- * the planner on that type; on the planner itself it keeps the plan on screen
- * (goals, switched-off colonies) and sets `?type=`, which the route seeds as
- * one more goal — the action adds to the plan instead of replacing it.
- */
 export const PLAN_PATH = '/planetary-industry/plan';
 
-/** Plan's customs rate editor: opens "Make a specific product" with Colonies expanded. */
 export const PLAN_CUSTOMS_HASH = '#customs';
 export const PLAN_CUSTOMS_HREF = `${PLAN_PATH}${PLAN_CUSTOMS_HASH}`;
 
@@ -17,25 +10,16 @@ export function piPlanHref(typeId: number, pathname: string, search: string): st
   return `${PLAN_PATH}?${params.toString()}`;
 }
 
-/** One colony, opened on the Colonies tab (`?colony=`). */
 export function piColonyHref(planetId: number): string {
   return `/planetary-industry/colonies?colony=${planetId}`;
 }
 
-/** The Map tab: where to find a planet for a new colony. */
 export const PI_MAP_HREF = '/planetary-industry/map';
 
-/**
- * `?product=<typeId>`: the product whose drawer the Map tab has open. Every
- * product and item name on the PI tabs links here (DESIGN.md §6c "Entities",
- * Overrides), so the panel is a real URL: new tab, copy link, reload, Back.
- */
 export const PI_PRODUCT_PARAM = 'product';
 
-/** Params a product link drops: a goal seed (Plan), an open colony (Colonies), an open Show info, an open planet drawer. */
 const DROPPED_ON_PRODUCT = ['type', 'colony', 'info', 'planet'] as const;
 
-/** The Map tab with `typeId`'s drawer open, keeping the page's other params (goals, switched-off colonies). */
 export function piProductHref(typeId: number, search: string): string {
   const params = new URLSearchParams(search);
   for (const key of DROPPED_ON_PRODUCT) params.delete(key);
@@ -44,19 +28,12 @@ export function piProductHref(typeId: number, search: string): string {
   return `${PI_MAP_HREF}?${params.toString()}`;
 }
 
-/**
- * `?planet=<planetId>`: the Map drawer for one of the pilot's own colonies,
- * where its richness override is set (issue #2685). The Colonies row links
- * here. A product link drops it, so one drawer is open at a time.
- */
 export const PI_PLANET_PARAM = 'planet';
 
-/** The Map tab with that colony's richness drawer open. */
 export function piPlanetHref(planetId: number): string {
   return `${PI_MAP_HREF}?${PI_PLANET_PARAM}=${planetId}`;
 }
 
-/** The planet a search string opens, or null when absent or not a positive whole id. */
 export function parsePiPlanet(search: string): number | null {
   const raw = new URLSearchParams(search).get(PI_PLANET_PARAM);
   if (raw === null || !/^\d+$/.test(raw)) return null;
@@ -64,12 +41,10 @@ export function parsePiPlanet(search: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-/** The same location without `planet`. */
 export function hrefWithoutPiPlanet(location: UrlLocation): string {
   return hrefWithout(location, [PI_PLANET_PARAM]);
 }
 
-/** The product a search string opens, or null when absent or not a positive whole id. */
 export function parsePiProduct(search: string): number | null {
   const raw = new URLSearchParams(search).get(PI_PRODUCT_PARAM);
   if (raw === null || !/^\d+$/.test(raw)) return null;
@@ -77,7 +52,6 @@ export function parsePiProduct(search: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-/** The same location without `product`. */
 export function hrefWithoutPiProduct(location: UrlLocation): string {
   return hrefWithout(location, [PI_PRODUCT_PARAM]);
 }
@@ -88,7 +62,6 @@ interface UrlLocation {
   hash: string;
 }
 
-/** The same location without `keys`. */
 export function hrefWithout(location: UrlLocation, keys: readonly string[]): string {
   const params = new URLSearchParams(location.search);
   for (const key of keys) params.delete(key);
@@ -96,18 +69,8 @@ export function hrefWithout(location: UrlLocation, keys: readonly string[]): str
   return `${location.pathname}${rest === '' ? '' : `?${rest}`}${location.hash}`;
 }
 
-/**
- * Params only the Map reads (its two drawers). A tab switch keeps the search,
- * so these would reopen a drawer on the way back: they are dropped on leaving.
- */
 export const MAP_ONLY_PARAMS = [PI_PRODUCT_PARAM, PI_PLANET_PARAM] as const;
 
-/**
- * How opening a product navigates from `location`. A first open pushes, so
- * Back closes the drawer (or returns to Plan or Colonies, from there); a second
- * open while one is already open replaces it, so one Back still closes it.
- * Close never goes Back (see `dropProduct`).
- */
 export function productNavigation(location: { pathname: string; search: string; state: unknown }): {
   replace: boolean;
   state: unknown;

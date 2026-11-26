@@ -1,12 +1,3 @@
-/**
- * The engine-adapter step under `resolveBuildPlan.ts` (which every Build Plan
- * view calls — reach for that, not this, to price a saved plan). Wires a
- * Build Plan record + blueprint + market data into a call to
- * src/engine/industry's buildVsBuy: clamps user-entered runs/ME/TE into the
- * engine's valid ranges (a cleared/invalid input field must never blank the
- * results panel), drops facilityTaxPct for NPC stations (their tax is fixed;
- * see FACILITY_PRESETS.npcStation.defaultTaxPct), and never throws.
- */
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { ME_MAX, TE_MAX } from '@/engine/industry/efficiency';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -41,43 +32,25 @@ export interface ComputeBuildPlanInput {
     | 'buildHere'
   >;
   blueprint: IndustryBlueprint;
-  /** Manufacturing system cost index; pass 0 when unavailable (gate display on pricesReady instead). */
   systemCostIndex: number;
-  /** The job system's region's own tax, percent of EIV; a reaction pays none (unmeasured). */
   regionalTaxPct?: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
-  /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   modifiers: CharacterModifiers;
-  /**
-   * The plan owner's standing toward the plan's Trade Hub NPC owner, for the
-   * broker fee and break-even price (issue #1238). Absent/0 = standings
-   * assumed 0, today's behaviour.
-   */
   standing?: ResolvedStandings;
-  /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
-  /** Blueprint Acquisition (issue #838) for any buildable node reached during recursion. */
   acquisitionFor?: (
     productTypeID: number,
     needed: number,
     ctx: SubBuildContext,
     materialPrices: HubPrices
   ) => AcquisitionResolution | null;
-  /** Blueprint Acquisition (issue #838) for the plan's own top-level product. */
   blueprintAcquisition?: {
     blueprintTypeID: number;
     line: AcquisitionResolution['line'];
   };
-  /**
-   * Resolves the tree as if the plan owned nothing (issue #697's Group Owned
-   * Overlay): `plan.materialSourcing`'s `ownedQuantity`s are stripped before
-   * the engine sees them, `overridePrice`s kept. The plan record itself is
-   * never touched — this only shapes what gets passed to `buildVsBuy`.
-   */
   ignoreOwnedStock?: boolean;
-  /** The Reaction Location (issue #698), when Include Reactions is on for this plan. */
   reactionFacility?: ReactionFacilityContext;
 }
 
@@ -104,11 +77,6 @@ export function computeBuildPlan({
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
   const runs = clampInt(plan.runs, 1, MAX_JOB_RUNS);
-  // Reaction formulas have no material/time efficiency — the SDE carries no
-  // research activity for any of them (issue #460 triage; verified against
-  // industryActivity.csv), so they always run at 0/0 regardless of what a
-  // stored plan happens to hold (e.g. a formula picked up in the same
-  // ME/TE fields a manufacturing blueprint uses).
   const isReaction = blueprint.activity === 'reaction';
   const me = isReaction ? 0 : clampInt(plan.me, 0, ME_MAX);
   const te = isReaction ? 0 : clampInt(plan.te, 0, TE_MAX);

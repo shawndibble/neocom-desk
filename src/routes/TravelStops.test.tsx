@@ -53,7 +53,6 @@ vi.mock('@/features/market/useHubJumps', async () =>
 installTravelHarness();
 
 describe('Travel › Route Safety › Stops', () => {
-  /** Uedama ─ Perimeter ─ Jita ─ Niyabainen ─ Muvolailen ─ Sobaseki, and Thera with no gates. */
   const LINE = {
     [UEDAMA]: [PERIMETER],
     [PERIMETER]: [UEDAMA, JITA],
@@ -168,7 +167,6 @@ describe('Travel › Route Safety › Stops', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Uedama' }));
     await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
     expect(stopsInLink()).toBe(String(SOBASEKI));
-    // One stop is the page as it always was.
     expect(await screen.findByRole('table', { name: 'Systems on the route' })).toBeInTheDocument();
   });
 
@@ -186,7 +184,6 @@ describe('Travel › Route Safety › Stops', () => {
       )
     ).toBeInTheDocument();
     expect(legHeader(/^Leg 1 · Jita → Uedama/)).toBeInTheDocument();
-    // The typed order stays in the link and the list.
     expect(stopsInLink()).toBe(`${SOBASEKI},${UEDAMA},${NIYABAINEN}`);
   });
 
@@ -226,10 +223,8 @@ describe('Travel › Route Safety › Stops', () => {
     const lastHour = (row: HTMLElement) => within(row).getAllByRole('cell')[3];
     await waitFor(() => expect(lastHour(body[2])).toHaveTextContent('12'));
 
-    // 12 ship kills is past the red stop; 4 pod kills is red outright.
     expect(within(lastHour(body[2])).getByText('12')).toHaveStyle({ color: '#ff7369' });
     expect(within(lastHour(body[2])).getByText('4')).toHaveClass('text-danger');
-    // A quiet system keeps the default text.
     const quiet = within(lastHour(body[0])).getAllByText('0');
     for (const figure of quiet) {
       expect(figure).not.toHaveClass('text-danger');
@@ -261,7 +256,6 @@ describe('Travel › Route Safety › Stops', () => {
     });
     expect(screen.getByRole('switch', { name: 'Optimize stop order' })).toBeDisabled();
     expect(screen.getByText(/No stargate route reaches one of your stops/)).toBeInTheDocument();
-    // The reachable leg still draws.
     expect(screen.getByRole('table', { name: 'Systems on leg 1' })).toBeInTheDocument();
 
     await user.click(leg);
@@ -271,7 +265,6 @@ describe('Travel › Route Safety › Stops', () => {
 
 describe('Travel › Route Safety › Route rules', () => {
   beforeEach(() => {
-    // The Travel Settings stores outlive a test; make each one read its seeded rows afresh.
     for (const store of ROUTE_RULE_STORES) {
       (store.setState as (partial: { hydrated: boolean }) => void)({ hydrated: false });
     }
@@ -283,7 +276,6 @@ describe('Travel › Route Safety › Route rules', () => {
     clearPodKillsLoad();
   });
 
-  /** Opens a row's ⋮ menu; the menu lists what that system offers. */
   async function openRowMenu(user: ReturnType<typeof userEvent.setup>, name: string) {
     const table = await screen.findByRole('table', { name: 'Systems on the route' });
     await user.click(
@@ -309,7 +301,6 @@ describe('Travel › Route Safety › Route rules', () => {
 
     await waitFor(() => expect(useDefaultRoutePreference.getState().value).toBe('shortest'));
     expect(new URLSearchParams(window.location.search).get('pref')).toBeNull();
-    // Prefer shorter counts jumps only, so the penalty is off — as in Settings.
     expect(screen.getByRole('spinbutton', { name: 'Security penalty' })).toBeDisabled();
   });
 
@@ -423,7 +414,6 @@ describe('Travel › Route Safety › Route rules', () => {
     expect(
       within(dialog).getByText(/jump counts change everywhere in the app/)
     ).toBeInTheDocument();
-    // Previewing saved nothing.
     expect(useAvoidedSystems.getState().value).toEqual([]);
 
     await user.click(within(dialog).getByRole('button', { name: 'Avoid Perimeter' }));
@@ -441,7 +431,6 @@ describe('Travel › Route Safety › Route rules', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Avoid Perimeter?' });
     expect(within(dialog).getByText(/Avoided Systems is switched off/)).toBeInTheDocument();
     await within(dialog).findByText(/The route becomes 2 jumps/);
-    // Each button carries its own outcome.
     const switchOn = within(dialog).getByRole('group', { name: 'Switch on and avoid' });
     expect(within(switchOn).getByText(/The route becomes 2 jumps/)).toBeInTheDocument();
     const listOnly = within(dialog).getByRole('group', { name: 'Add to the list only' });

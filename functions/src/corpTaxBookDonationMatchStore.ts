@@ -1,7 +1,3 @@
-// Firestore side of donation matching (corpTaxBookDonationMatch.ts): what the resolver needs to
-// decide whose money a set of senders' donations are, read from the book. Every donation the
-// server stores goes through it, whichever sync sent it (decision 20261120-235011).
-
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
 import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import {
@@ -14,7 +10,6 @@ import {
 } from './corpTaxBook.js';
 import { isDayCovered, type CoveragePeriod } from './corpTaxBookEngine.js';
 
-/** How many of a sender's stored rows are looked at for one the book bills. */
 const SEEN_ROWS = 50;
 import {
   codesIn,
@@ -25,12 +20,6 @@ import {
 } from './corpTaxBookDonationMatch.js';
 import { dbReader, readNotices } from './corpTaxBookLateNoticeStore.js';
 
-/**
- * The resolver's view of the book for these senders: the groupings, every code (each notice's,
- * and the own code of each Miner the book knows: grouped, with a recorded account, named by a
- * notice, or a sender seen mining), which senders the book has seen mine (`mined` already known,
- * else a stored row the book bills), and the Miners each sender's earlier payments named.
- */
 export async function loadMatchBook(
   db: Firestore,
   corporationId: number,
@@ -57,8 +46,6 @@ export async function loadMatchBook(
   const grouped = new Set(miners.flatMap((m) => m.characterIds));
   const minedCharacterIds = new Set(mined);
   const senders = [...new Set(senderIds)];
-  // A sender grouped already is theirs; one not seen in this read is looked for in the stored
-  // rows the book bills: its own refineries', and a moon owner's on a day its coverage holds.
   const unseen = senders.filter((c) => !grouped.has(c) && !minedCharacterIds.has(c));
   if (unseen.length > 0) {
     const feeders = await book.collection(FEEDERS).get();
@@ -104,8 +91,6 @@ export async function loadMatchBook(
   const ofBook = (recordedMinerIds: string[]) =>
     matchBookOf({ miners, notices, minedCharacterIds, recordedMinerIds, paidBefore });
   const first = ofBook(recorded);
-  // A code none of those names may be a solo Miner's the book bills but holds no record of yet:
-  // only then are the Characters it bills read (their billed-by pointers name the book).
   if (!donations.some((d) => codesIn(d.reason).some((c) => !first.codes.has(c)))) return first;
   const billed = await db
     .collection(BILLED_BY_COLLECTION)

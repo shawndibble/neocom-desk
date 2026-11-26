@@ -37,7 +37,6 @@ describe('useReloadOnRecordedMail', () => {
       await waitFor(() => expect(result.current.recorded).toBe(1));
       await db.corpMailQueue.put(item('other', { logged: true, corporationId: 1 }));
       await db.corpMailQueue.put(item('new'));
-      // Past the settle time: neither the mail recorded before nor another corporation's reloads.
       vi.advanceTimersByTime(5_000);
       expect(reload).not.toHaveBeenCalled();
       await db.corpMailQueue.update('new', { logged: true });

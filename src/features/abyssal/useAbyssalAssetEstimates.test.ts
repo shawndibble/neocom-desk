@@ -69,10 +69,8 @@ describe('useAbyssalAssetEstimates', () => {
     const assets = Array.from({ length: 20 }, (_, i) => neut(i + 1));
     const { result } = renderHook(() => useAbyssalAssetEstimates(assets, characterIdFor));
     await waitFor(() => expect(result.current.estimates.size).toBeGreaterThan(0));
-    // The four workers each finish the lookup they had started, then stop.
     expect(mocks.get.mock.calls.length).toBeLessThanOrEqual(4);
     expect(result.current.values.size).toBe(0);
-    // Nor does a row on screen ask, while MutaMarket can't be reached.
     const calls = mocks.get.mock.calls.length;
     act(() => result.current.request({ itemId: 20, typeId: NEUT }));
     expect(mocks.get).toHaveBeenCalledTimes(calls);
@@ -131,7 +129,6 @@ describe('useAbyssalAssetEstimates', () => {
     );
     await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(ABYSSAL_BACKGROUND_LOOKUPS));
     rerender({ list: [...assets], scope: 'a' });
-    // Its background is set (and any lookup started) right as the cache read answers.
     await waitFor(() => expect(mocks.readCached).toHaveResolvedTimes(2));
     expect(mocks.get).toHaveBeenCalledTimes(ABYSSAL_BACKGROUND_LOOKUPS);
     rerender({ list: [...assets], scope: 'b' });
@@ -147,7 +144,6 @@ describe('useAbyssalAssetEstimates', () => {
     act(() => {
       for (let id = 1; id <= 6; id += 1) result.current.request({ itemId: id, typeId: NEUT });
     });
-    // Four in flight, two queued behind them.
     expect(mocks.get).toHaveBeenCalledTimes(4);
     unmount();
     await act(async () => {

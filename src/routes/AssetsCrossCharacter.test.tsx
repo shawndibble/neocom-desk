@@ -50,9 +50,6 @@ describe('cross-character search (issue #85)', () => {
   const CHAR_ID_2 = 92;
 
   beforeEach(async () => {
-    // The active character (Pilot One) holds only Tritanium in this block;
-    // Pyerite lives exclusively on Pilot Two, so "does the search reach
-    // beyond the active character" is unambiguous.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(assetPage1, { headers: { 'X-Pages': '1' } })
@@ -145,7 +142,6 @@ describe('cross-character search (issue #85)', () => {
 
   it('marks the picker when "All characters" leaves someone out, naming them', async () => {
     await db.characters.put({ characterId: 93, name: 'Pilot Three', ownerHash: 'oh3', addedAt: 3 });
-    // No assets permission: the fan-out skips this Character.
     await db.tokens.put({
       characterId: 93,
       accessToken: 'access-token-3',
@@ -236,7 +232,6 @@ describe('cross-character search (issue #85)', () => {
       expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
       expect(within(panel).getAllByRole('button', { name: 'Rifter' })).toHaveLength(1);
       expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
-      // One character's ships need no Character column.
       expect(within(panel).queryByRole('columnheader', { name: /character/i })).toBeNull();
     });
 
@@ -257,8 +252,6 @@ describe('cross-character search (issue #85)', () => {
     });
 
     it('names no one as missing on Ships while the picker reads This character', async () => {
-      // The active Character's own read is skipped: that is the body's "couldn't load", not a
-      // "Not included" on a filter that never asked for anyone else.
       server.use(
         http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
           HttpResponse.json({ error: 'not found' }, { status: 404 })
@@ -547,7 +540,6 @@ describe('jumps-away distance (issue #87)', () => {
   });
 
   it('shows "-" with a reason tooltip when the destination system cannot be resolved', async () => {
-    // Default handler 403s this structure, so its system id never resolves.
     await db.stationPins.put({
       id: `${CHAR_ID}:1000000000001`,
       characterId: CHAR_ID,
@@ -564,9 +556,6 @@ describe('jumps-away distance (issue #87)', () => {
   });
 
   it('shows "-" with a reason tooltip when the character\'s own location is unavailable', async () => {
-    // A character who hasn't re-consented to esi-location.read_location.v1
-    // yet (the default for every existing user until they next log in) —
-    // this must degrade the badge, not trip the shell-wide re-auth banner.
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
         HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -575,11 +564,9 @@ describe('jumps-away distance (issue #87)', () => {
 
     renderAssetsRoute();
 
-    // Both visible locations degrade the same way — no pin needed for either.
     const badges = await screen.findAllByText('-');
     await userEvent.hover(badges[0]);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Character location unavailable.');
-    // No assets banner; the location note (Character details) is its own business.
     expect(screen.queryByText(/: (log in again|grant Assets)$/)).not.toBeInTheDocument();
   });
 
@@ -603,10 +590,8 @@ describe('jumps-away distance (issue #87)', () => {
     });
 
     renderAssetsRoute();
-    // The Travel default is Prefer safer: the three jumps through high-sec Hed and Far.
     await screen.findByText('3 jumps');
 
-    // Route shows only under the Jumps away sort.
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
     await user.click(await screen.findByRole('option', { name: 'Jumps away' }));
     await user.click(await screen.findByRole('combobox', { name: 'Route' }));
@@ -614,7 +599,6 @@ describe('jumps-away distance (issue #87)', () => {
 
     expect(await screen.findByText('2 jumps')).toBeInTheDocument();
 
-    // Leaving Jumps away hides Route, so its pick stops counting.
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
     await user.click(await screen.findByRole('option', { name: 'Name' }));
     expect(await screen.findByText('3 jumps')).toBeInTheDocument();
@@ -631,11 +615,8 @@ describe('jumps-away distance (issue #87)', () => {
         expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
         const heading = screen.getByRole('heading', { level: 2 });
         const facts = jumps.closest('span.flex-wrap') as HTMLElement;
-        // Name on its own line; the facts line follows it inside the same column.
-        // The heading sits in a row with its rename pencil; the column holds the facts line.
         expect(heading.closest('div.flex-col')).toContainElement(facts);
         expect(facts).not.toContainElement(heading);
-        // One dot between each pair of items, none leading or trailing.
         expect(facts.querySelectorAll('[aria-hidden="true"]')).toHaveLength(
           facts.children.length - 1
         );

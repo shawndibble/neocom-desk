@@ -82,7 +82,6 @@ function feed(structures: BoardStructureSource[], corps: [number, string, string
     structureCount: structures.length,
     needsReauth: false,
     fetchedAt: new Date(now),
-    // EVE read every corporation's structures just now.
     expiresAtByCorp: new Map(corps.map(([id]) => [id, new Date(now + HOUR_MS)])),
     corporations: new Map(corps.map(([id, ticker, name]) => [id, { ticker, name }])),
   });
@@ -101,7 +100,6 @@ async function table() {
   return waitFor(() => screen.getByRole('table', { name: 'Structures' }));
 }
 
-/** Structure names in table order. */
 function names(tableEl: HTMLElement): string[] {
   return within(tableEl)
     .getAllByRole('row')
@@ -184,7 +182,6 @@ describe('CorpStructures', () => {
     renderPage();
     const el = await table();
     expect(columnHeaders(el).some((header) => /Corporation/.test(header))).toBe(false);
-    // The system is its own column, not cut from the name.
     expect(within(el).getAllByText('Efa')).toHaveLength(2);
     expect(within(el).getByText('Alpha')).toBeInTheDocument();
   });
@@ -253,9 +250,7 @@ describe('CorpStructures', () => {
   });
 
   describe('fuel plan', () => {
-    /** One column's cell text, by header, in table order. */
     function column(tableEl: HTMLElement, header: string): string[] {
-      // A header with a tooltip ends in its "?" trigger.
       const index = columnHeaders(tableEl)
         .map((text) => text.replace(/\?$/, ''))
         .indexOf(header);
@@ -357,7 +352,6 @@ describe('CorpStructures', () => {
     });
 
     describe('after a refuel EVE has shown in the fuel time but not yet in the bay', () => {
-      // Alpha: 400 blocks read 20 minutes before its 20 days of fuel were.
       function refuelled() {
         feed([ALPHA], [[10, 'ALP', 'Alpha Corp']]);
         mockedBays.mockResolvedValue(

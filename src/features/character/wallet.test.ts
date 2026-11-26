@@ -265,8 +265,6 @@ describe('loadWalletTransactions', () => {
   });
 
   it('drops a fill repeated in an already-cached list', async () => {
-    // Rows cached before the cursor learned to skip repeats carry the
-    // oldest fill several times; a still-fresh row is served without a fetch.
     const txn = (transaction_id: number) => ({
       transaction_id,
       date: '2026-08-01T00:00:00Z',
@@ -344,7 +342,7 @@ describe('loadWalletTransactionsWithStatus', () => {
         truncated: false,
       });
     await put([txn(9002), txn(9001)]);
-    await loadWalletTransactionsWithStatus(CHAR_ID); // archives both
+    await loadWalletTransactionsWithStatus(CHAR_ID);
     await put([txn(9002)]);
 
     const live = await loadWalletTransactionsWithStatus(CHAR_ID);
@@ -372,7 +370,6 @@ describe('loadAllCharactersWalletBalances', () => {
 
   it('skips a Character without the wallet scope, never calling ESI for it', async () => {
     await db.tokens.bulkPut([tokenWith(CHAR_A, [WALLET_SCOPE]), tokenWith(CHAR_B, [WALLET_SCOPE])]);
-    // CHAR_C has no token at all: never granted anything.
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/wallet`, () => HttpResponse.json(100)),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/wallet`, () => HttpResponse.json(200)),
@@ -423,7 +420,6 @@ describe('loadAllCharactersWalletBalances', () => {
     ]);
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/wallet`, () => HttpResponse.json(100)),
-      // CHAR_B is deliberately the slowest response of the three.
       http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/wallet`, async () => {
         await delay(30);
         return HttpResponse.json(200);

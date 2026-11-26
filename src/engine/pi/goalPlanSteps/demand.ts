@@ -1,7 +1,3 @@
-/**
- * The plan's demand lines and per-goal achievement: the goals as asked, each
- * line saying how much of it the final plan makes and from where.
- */
 import type { PiData } from '@/sde/types';
 import { piTier } from '../chain';
 import type { DemandLine, DemandSource, Goal, GoalPlan } from '../goalTypes';
@@ -11,15 +7,12 @@ import { EPSILON, chainRates, expandInto, factoriesFor, perHour } from './shared
 
 export function demandLines(args: {
   problem: ExtractionProblem;
-  /** Final extraction and consumption, per P1. */
   extracted: ReadonlyMap<number, number>;
   consumption: ReadonlyMap<number, number>;
   budgetGapP1: ReadonlySet<number>;
   bought: ReadonlyMap<number, number>;
-  /** Every chain node the settled host actually makes, per hour. */
   madeHighRates: ReadonlyMap<number, number>;
   triage: GoalTriage;
-  /** Goals that cannot be made, in the order they were ruled out. */
   dead: ReadonlySet<Goal>;
   boughtOutright: ReadonlySet<Goal>;
   pi: PiData;
@@ -29,7 +22,6 @@ export function demandLines(args: {
   const tierOf = (id: number) => piTier(id, pi);
   const { demand } = problem;
   const p1Of = (p0: number) => problem.rowByP0.get(p0)!.p1;
-  // Made means extracted *and used*: overshoot from a whole ECU is surplus, not made.
   const p1Made = (p1: number) => Math.min(extracted.get(p1) ?? 0, consumption.get(p1) ?? 0);
   const lines: DemandLine[] = [...demand].map(([typeId, unitsPerHour]) => {
     const tier = tierOf(typeId);
@@ -59,13 +51,6 @@ export function demandLines(args: {
       madeFraction: unitsPerHour <= EPSILON ? 1 : Math.min(1, made / unitsPerHour),
     };
   });
-  // A goal a type gap blocks keeps its whole chain in the demand, so the plan
-  // still answers "what would it need" — every line 'blocked', made by
-  // nothing, consuming and pricing nothing. A type both a live goal and a
-  // blocked one need gets two lines: (typeId, source) is unique, typeId alone
-  // is not.
-  // Each line names the type-gap P0s blocking the goals it serves, so a
-  // caller can say which planet type each blocked goal is waiting on.
   const blockedDemand = new Map<number, number>();
   const blockedByType = new Map<number, Set<number>>();
   for (const g of triage.blocked) {
@@ -103,9 +88,6 @@ export function demandLines(args: {
       madeFraction: 0,
     });
   }
-  // What the plan buys of a P2+ the goals' chains need: the line says so, and
-  // sizes the type at what is made and bought together. Nothing under it is
-  // demanded unless something else makes it.
   const boughtFull = new Map<number, number>();
   for (const g of problem.plannedHigh) {
     for (const [typeId, units] of chainRates(g, pi).bought) {
@@ -132,7 +114,6 @@ export function demandLines(args: {
   return lines;
 }
 
-/** Each goal at the rate the final plan reaches. */
 export function achievedOf(args: {
   goals: readonly Goal[];
   dead: ReadonlySet<Goal>;
@@ -142,7 +123,6 @@ export function achievedOf(args: {
   pi: PiData;
 }): GoalPlan['achieved'] {
   const { goals, dead, boughtOutright, highFraction, p1GoalReach, pi } = args;
-  // The part of a goal bought outright (a budget gap bought at its own tier).
   const share = (g: Goal) => g.buyShare?.get(g.typeId) ?? 0;
   return goals.map((g) => {
     const target = perHour(g);

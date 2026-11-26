@@ -25,7 +25,7 @@ describe('wormholeSizeForShipGroup', () => {
   });
 
   it('gives no size for a group it does not know, so nothing is prefilled', () => {
-    expect(wormholeSizeForShipGroup(28)).toBeNull(); // Industrial: mass varies by hull
+    expect(wormholeSizeForShipGroup(28)).toBeNull();
     expect(wormholeSizeForShipGroup(-1)).toBeNull();
   });
 

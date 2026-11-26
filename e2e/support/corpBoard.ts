@@ -1,11 +1,3 @@
-/**
- * Signs in a Director and opens the Corp Board against mocked corp ESI.
- * `extra` answers a path first, for a spec that needs more than the defaults
- * (it returns undefined to fall through).
- *
- * `mockEsi.ts`'s own comment invites the override: "A corp spec should
- * override this route" (its `/roles` fixture answers `{}`).
- */
 import type { Page } from '@playwright/test';
 import { expect } from './testBase';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './fixtureData';
@@ -158,14 +150,6 @@ export async function openCorpOverview(
   await expect(page.getByRole('region', { name: 'Corp wallet' })).toBeVisible();
 }
 
-/**
- * The widest elements past the viewport, for a no-horizontal-scroll check.
- *
- * The board grid re-flows a frame or two after a viewport resize, so a read taken
- * straight after `setViewportSize` can still see the previous width's layout.
- * It waits (bounded) for the page to stop overflowing before reading, so a real
- * overflow still fails with its offenders; a transient one does not.
- */
 export async function overflow(page: Page) {
   await page
     .waitForFunction(

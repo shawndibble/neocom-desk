@@ -109,11 +109,6 @@ describe('shouldShowPermissionExplainer', () => {
     expect(shouldShowPermissionExplainer({ ...base, permission: 'unsupported' })).toBe(false);
   });
 
-  // issue #356: iOS Safari outside an installed PWA has no Notification API
-  // at all (permission reads 'unsupported', same as a browser with no Web
-  // Push support whatsoever) — installRequired is what tells the explainer
-  // to show anyway, with the "install first" copy, so AC1 is actually
-  // reachable on the one platform it exists for.
   it('shows with the install-required reason even though permission reads "unsupported"', () => {
     expect(
       shouldShowPermissionExplainer({ ...base, installRequired: true, permission: 'unsupported' })

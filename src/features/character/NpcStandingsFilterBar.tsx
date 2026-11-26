@@ -22,19 +22,15 @@ import { toggleInSet } from '@/lib/sets';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 
 const ANY_LEVEL = 'any';
-/** The agent levels the Access filter offers: level 1 is open to everyone. */
 const FILTER_LEVELS = [2, 3, 4, 5];
 
 interface NpcStandingsFilterBarProps {
   filter: NpcStandingsFilter;
   onChange: (filter: NpcStandingsFilter) => void;
-  /** Rows per kind, for the Type filter's counts. */
   counts: Record<NpcStandingKind, number>;
-  /** The Columns button, at the right end of the row. */
   columnPicker: ReactNode;
 }
 
-/** Every filter, written once for the inline row and the phone's sheet. */
 function FilterControls({
   filter,
   onChange,
@@ -59,7 +55,6 @@ function FilterControls({
           selected={filter.kinds}
           onToggle={(kind) => {
             const kinds = toggleInSet(filter.kinds, kind);
-            // Switching the last type off would show nothing: it means all again.
             onChange({ ...filter, kinds: kinds.size === 0 ? new Set(NPC_STANDING_KINDS) : kinds });
           }}
         />
@@ -101,12 +96,6 @@ function FilterControls({
   );
 }
 
-/**
- * The Standings tab's one filter row: search, the filters, then the Columns
- * button at the right, all at the search box's height. A phone gets the shared
- * `FilterBar` instead: search, Columns and a funnel that opens the filters in
- * a bottom sheet.
- */
 export function NpcStandingsFilterBar({
   filter,
   onChange,

@@ -17,32 +17,17 @@ import {
 export interface TabItem {
   id: string;
   label: string;
-  /**
-   * How many things the tab holds (a Community's Members), in a round badge
-   * after the label (§6c). Part of the tab's name, never a control or a status.
-   */
   count?: number;
-  /**
-   * Tints the count's ring and number: `warning` for work waiting on the pilot,
-   * `danger` for what needs recovering. The number always prints, so the tint
-   * is never the only signal. Only with `count`.
-   */
   countTone?: 'warning' | 'danger';
 }
 
 interface TabPanelProps {
   tabsId: string;
-  /** The selected tab this panel shows. */
   tabId: string;
   className?: string;
   children: ReactNode;
 }
 
-/**
- * The content region for the selected tab of a `Tabs` bar.
- *
- * @summary The panel that holds the selected tab's content; pair it with `Tabs`.
- */
 export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) {
   const { className: ring, ...rest } = useTabPanelProps(tabsId, tabId);
   return (
@@ -53,42 +38,16 @@ export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) 
 }
 
 interface TabsProps {
-  /** Shared id base from `useTabsId`, also given to the tab's panel. */
   tabsId: string;
-  /** @summary The tabs, each with an id and an already-translated label. */
   tabs: TabItem[];
-  /** @summary Id of the selected tab. */
   value: string;
-  /** @summary Called with the id of the tab the user picked. */
   onChange: (id: string) => void;
-  /** @summary Accessible name for the tablist. */
   label: string;
   className?: string;
-  /**
-   * `'manual'`: arrow keys only move focus, Enter/Space selects (native
-   * button behavior). Use wherever `onChange` navigates to another route —
-   * `'automatic'` (default) would unmount this tablist mid-keypress.
-   */
   activation?: 'automatic' | 'manual';
-  /**
-   * Called with a tab's id as the mouse rests on it or keyboard focus reaches
-   * it: start loading what it shows (a lazy tab's chunk), so the switch lands
-   * at once. Not on touch, where the first event is the tap itself.
-   */
   onPreload?: (id: string) => void;
 }
 
-/**
- * Controlled horizontal tab bar. For peer views within a page, not navigation.
- *
- * The bar scrolls sideways rather than squeezing when it outgrows its frame —
- * see `tabScrollerClassName` for why the scroller is the wrapper and not the
- * tablist itself. With a pointer, a vertical wheel over the bar travels it and
- * a chevron appears at whichever end still has tabs beyond it (§6c); on touch
- * the swipe and the edge fade are the cue, so the chevrons are not drawn.
- *
- * @summary Horizontal tab bar for peer views inside one page (Open / History); not for navigation.
- */
 export function Tabs({
   tabsId,
   tabs,
@@ -102,15 +61,10 @@ export function Tabs({
   const { t } = useTranslation();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  // Only consulted in 'manual' mode, where the roving tab stop tracks
-  // keyboard focus rather than `value` — arrowing around must not select
-  // anything until Enter/Space says so.
   const [manualFocusId, setManualFocusId] = useState(value);
   const focusedId = activation === 'manual' ? manualFocusId : value;
   const { edges, pageScroll } = useScrollEdges(scrollerRef, listRef);
 
-  // Native listener, not `onWheel`: React registers wheel passively, and
-  // taking the event over means calling `preventDefault`.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -124,15 +78,6 @@ export function Tabs({
     return () => scroller.removeEventListener('wheel', onWheel);
   }, []);
 
-  /**
-   * Keeps the selected (or, in manual mode, focused) tab on screen when it
-   * changes from outside this component — a deep link that opens a specific
-   * tab, a page selecting one in response to something else. A click or an
-   * arrow key brings its own tab into view (you cannot click what you cannot
-   * see, and `.focus()` scrolls to what it focuses), so this is only for the
-   * case nothing else covers. `revealInScroller` explains why it never uses
-   * `scrollIntoView`.
-   */
   useEffect(() => {
     const scroller = scrollerRef.current;
     const tab = listRef.current?.querySelector(`[data-tab-id="${focusedId}"]`);
@@ -145,7 +90,6 @@ export function Tabs({
     if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return;
     event.preventDefault();
     const index = tabs.findIndex((tab) => tab.id === focusedId);
-    // Arrows wrap; Home/End jump to the ends.
     const next =
       key === 'Home'
         ? tabs[0]
@@ -161,15 +105,9 @@ export function Tabs({
   }
 
   return (
-    // `className` lands on this frame, not the tablist: callers pass spacing
-    // (`mt-3`), and margin on the inner bar would be measured inside the
-    // scrollport. The chevrons sit here too, outside the scroller, because the
-    // scroller's edge-fade mask would fade them out with the tabs.
     <div className={cx('relative', className)}>
       {(['before', 'after'] as const).map((side) =>
         edges[side] ? (
-          // Pointer-only and out of the tab order: arrow keys already travel
-          // the bar, and a screen reader reads every tab in the tablist.
           <button
             key={side}
             type="button"
@@ -205,7 +143,6 @@ export function Tabs({
                 id={tabDomId(tabsId, tab.id)}
                 data-tab-id={tab.id}
                 aria-selected={active}
-                // Only the selected tab has a rendered panel; elsewhere the id would dangle.
                 aria-controls={active ? panelDomId(tabsId, tab.id) : undefined}
                 tabIndex={tab.id === focusedId ? 0 : -1}
                 onClick={() => {
@@ -222,7 +159,6 @@ export function Tabs({
                 )}
               >
                 {tab.label}
-                {/* The space keeps the name "Members 12"; a flex item, it draws nothing. */}
                 {tab.count !== undefined && ' '}
                 {tab.count !== undefined && (
                   <span

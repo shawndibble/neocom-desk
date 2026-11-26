@@ -1,20 +1,3 @@
-/**
- * The Market Browser's selection and location: which item and which
- * region/hub the URL names, the device's persisted Trade Hub/Location Mode
- * preferences, and the Market Group tree's own search/expand state.
- *
- * The selected item and the current location are read from the URL
- * (GLOSSARY.md round 7), not held in component state — the query string is
- * the single source of truth, so a shared link and the browser's own
- * back/forward both just work, and it's why `Market.tsx` reads this hook's
- * output at route level even while another tab is showing (this also backs
- * the page header's hub/region picker, `usesHubPicker`, which applies to the
- * Appraisal tab too — same reason `useAppraisal` is held there). A parsed id
- * that doesn't (yet, or ever) resolve against the loaded catalogue falls back
- * to the default view rather than erroring — the catalogue slices still
- * being null (first load) is treated as "not yet known to be invalid", not
- * "invalid".
- */
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { MARKET_TABS } from '@/app/pageTabs';
@@ -48,28 +31,16 @@ import {
 import type { MarketGroupNode, MarketTypeEntry, MarketRegionEntry } from '@/sde/marketTypes';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
-/** Tree search, in the URL (ADR 0015) scoped to the Browser tab. */
 const BROWSER_SEARCH_KEY = 'browser.q';
 
 const NO_IDS: ReadonlySet<number> = new Set();
 
-/** The selected item's own views: its Order Book, its Variations, its Price History. */
 export type MarketItemTab = 'orders' | 'variations' | 'history';
 
 const ITEM_TAB_PARAM = enumParam<MarketItemTab>(['orders', 'variations', 'history'], 'orders');
 
-/**
- * Price History's compared regions, in pick order (each one's line follows
- * its slot). Kept across item changes — a trader comparing Jita with Amarr
- * is comparing them for the next item too.
- */
 const COMPARE_REGIONS_PARAM = orderedIdListParam();
 
-/**
- * The URL's `hub`/`region`, read exactly as `parseMarketParams` reads them,
- * as the group `useRememberedUrlParams` blends over the device's own Trade
- * Hub / Location Mode. Written only by `navigateTo`, together with `type`.
- */
 const LOCATION_PARAMS = {
   hub: {
     parse: (raw) => parseMarketParams((key) => (key === 'hub' ? raw : null)).hubId,
@@ -82,15 +53,10 @@ const LOCATION_PARAMS = {
 };
 type LocationParams = UrlParamValues<typeof LOCATION_PARAMS>;
 
-/**
- * True when `choice` names All regions or a region in the Market Regions
- * catalogue. A catalogue still loading (null) is not yet known to be invalid.
- */
 function isMarketRegionChoice(
   choice: RegionChoice,
   marketRegions: MarketRegionEntry[] | null
 ): boolean {
-  // All regions needs no catalogue check — it names every region there is.
   return (
     choice === ALL_REGIONS || resolveAgainstCatalogue(choice, marketRegions, (r, id) => r.id === id)
   );
@@ -123,32 +89,19 @@ export interface MarketBrowserController {
   query: string;
   setQuery: (next: string) => void;
   expandedIds: ReadonlySet<number>;
-  /** Search-mode groups flipped away from their default: nested groups default open, top-level categories per `searchCategories`. */
   searchCollapsedIds: ReadonlySet<number>;
-  /** Top-level category counts and default state for the active search; null when not searching. */
   searchCategories: SearchCategorySummary | null;
   filterResult: MarketTreeFilterResult | null;
   handleToggle: (groupId: number) => void;
 
-  /** Order Book / Price History — Order Book by default. */
   itemTab: MarketItemTab;
   setItemTab: (next: MarketItemTab) => void;
-  /** Price History's compared regions, from the URL as written — the panel normalizes them. */
   compareRegionIds: readonly number[];
   setCompareRegionIds: (next: readonly number[]) => void;
 }
 
-/**
- * The last hub the Market put in the URL or adopted from it, for the session
- * (not per mount: Back to a URL the page wrote must not adopt it either). A
- * link's hub is adopted once, when it is new: the adopt check re-runs whenever
- * the stored hub differs from the linked one, so without this a "back to
- * Global" or a Global change under a URL the page wrote would create a Market
- * entry the pilot never asked for.
- */
 const knownLinkedHubRef: { current: string | null } = { current: null };
 
-/** Forgets the hub the Market last linked (tests). */
 export function resetKnownLinkedHub(): void {
   knownLinkedHubRef.current = null;
 }
@@ -161,12 +114,9 @@ export function useMarketBrowser({
 }: UseMarketBrowserArgs): MarketBrowserController {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // The Market page hub, once this device's old Browser hub is folded into it.
   const migrated = useDeviceMarketHubMigrated();
   const { hubId, hydrated: marketHubHydrated } = useHubFor('market');
   const hubHydrated = marketHubHydrated && migrated;
-  // The Appraisal's `?hub=` (a Shared Appraisal's "Open Neocom Desk") is that
-  // tab's override for the visit, never the Market's hub.
   const onAppraisal = useLocation().pathname.startsWith(tabPath(MARKET_TABS, 'appraisal'));
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
@@ -174,24 +124,10 @@ export function useMarketBrowser({
   const locationModeHydrated = useHydratedStore(useLocationMode);
   const setLocationModeValue = useLocationMode((state) => state.setValue);
 
-  // Tree search, in the URL (ADR 0015) scoped to the Browser tab — a reload
-  // or a shared link reopens the same search rather than an empty tree.
-  //
-  // The box is bound to local text and the URL is written once typing pauses.
-  // Written per keystroke, the navigation lags the box: a fast typist's
-  // letters are dropped and the caret jumps to the end. The write lives here
-  // rather than in `useUrlParam`'s own debounce so that `navigateTo` can fold
-  // the text into its navigation and cancel the timer — a timer left running
-  // would write from the pre-navigation location and drop the selected item.
   const urlQuery = searchParams.get(BROWSER_SEARCH_KEY) ?? '';
   const [query, setQueryText] = useState(urlQuery);
   const queryWritten = useRef(urlQuery);
   const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The debounced write below runs from a stale render's closure, and
-  // react-router's functional `setSearchParams` updater hands it that render's
-  // `searchParams` as `prev`. A navigation inside the debounce window (View in
-  // Market from the item menu, which drops `q`) would be overwritten by the
-  // pre-navigation params, losing `type`. Read the latest instead.
   const latestSearchParams = useRef(searchParams);
   useEffect(() => {
     latestSearchParams.current = searchParams;
@@ -203,7 +139,6 @@ export function useMarketBrowser({
   }
   useEffect(() => cancelQueryTimer, []);
 
-  // The URL moved on its own (Back/Forward, a link): adopt it, drop a pending write.
   useEffect(() => {
     if (urlQuery === queryWritten.current) return;
     queryWritten.current = urlQuery;
@@ -224,11 +159,6 @@ export function useMarketBrowser({
     }, TEXT_DEBOUNCE_MS);
   }
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
-  // Groups the user has flipped away from their default while a search is
-  // filtering the tree (see MarketGroupTree's `expanded` calc) — kept apart
-  // from `expandedIds` (the plain-browsing expand state) so clearing the
-  // search returns to whatever the tree looked like before it started. Tagged
-  // with the search text it was made under: a new search starts from defaults.
   const [searchToggles, setSearchToggles] = useState<{
     query: string;
     ids: ReadonlySet<number>;
@@ -245,11 +175,6 @@ export function useMarketBrowser({
     [searchParams]
   );
 
-  // Cross-page item links (MarketItemLink, ItemContextMenu's
-  // "View in Market") land on `/market/browser?type=...` directly
-  // (`engine/market/urlState.ts`'s `marketItemUrl`) — tab is a path segment,
-  // so a click that means "browse this item" carries no "which tab is this?"
-  // ambiguity to resolve.
   const typeIsValid = resolveAgainstCatalogue(
     parsedParams.typeId,
     types,
@@ -266,9 +191,6 @@ export function useMarketBrowser({
         : groupsById.has(parsedParams.groupId);
   const linkedGroupId = groupIdIsValid ? parsedParams.groupId : null;
 
-  // A `?group=` cross-link lands the tree pre-expanded to that category,
-  // additive to whatever's already open, once per incoming id — a ref, not
-  // state, since a manual re-collapse afterwards must not be fought back open.
   const expandedForGroupId = useRef<number | null>(null);
   useEffect(() => {
     if (groups === null || linkedGroupId === null || linkedGroupId === expandedForGroupId.current) {
@@ -280,20 +202,6 @@ export function useMarketBrowser({
     expandedForGroupId.current = linkedGroupId;
   }, [groups, linkedGroupId, groupsById]);
 
-  /**
-   * The Market page hub and the device's Location Mode as the stored default behind the
-   * URL's `hub`/`region`. A linked location that names nothing real (a
-   * region the catalogue lacks, a hub not in `TRADE_HUBS`) reads as absent.
-   *
-   * `adoptLinked` is this page's one exception to decision `20260922-221531`
-   * (see decision `20260926-201312`): a valid linked hub/region is copied
-   * into the stored setting: the hub as the Market page's own entry
-   * (`setPageHubEntry`), so a link never moves the pages on Global. `buildMarketParams` only ever writes one
-   * of `hub`/`region`, so a linked hub is dropped from the query string the
-   * moment the mode toggles to Region — without the copy, toggling back to
-   * Trade Hub would fall back to whatever hub was stored before the link was
-   * opened, silently abandoning what the link pointed at.
-   */
   const rememberedLocation = useMemo(
     () => ({
       values: {
@@ -304,8 +212,6 @@ export function useMarketBrowser({
       adoptLinked: !onAppraisal,
       accepts: (key: keyof LocationParams, value: unknown) => {
         if (value === null) return false;
-        // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
-        // catalogue there's no loading window to be optimistic about.
         if (key === 'hub') return getTradeHub(value as TradeHub['id']) !== undefined;
         return isMarketRegionChoice(value as RegionChoice, marketRegions);
       },
@@ -331,11 +237,6 @@ export function useMarketBrowser({
   );
   const [linkedLocation, , isLinked] = useRememberedUrlParams(LOCATION_PARAMS, rememberedLocation);
 
-  // Whichever of region/hub the URL names wins, falling back to the
-  // device-local Location Mode preference when neither param resolves. A
-  // stored region gets the same catalogue check as a linked one: a region
-  // can drop out of the Market Regions between SDE bakes (#3891), and the
-  // hub's region stands in for it rather than an empty book.
   const fallbackLocation: MarketLocationParam = useMemo(() => {
     if (locationModeValue.mode !== 'region') return { mode: 'hub', hubId: hub.id };
     const stored = locationModeValue.regionId;
@@ -364,10 +265,6 @@ export function useMarketBrowser({
       ? (getTradeHub(effectiveLocation.hubId as TradeHub['id']) ?? hub)
       : hub;
 
-  // All regions (Region mode over every Market Region) fans out only for the
-  // selected item's own book. Everything else that reads one region —
-  // Variations, Compare, Item Detail, Price History — reads the Trade Hub's
-  // region instead, so `chosenRegionId` is always one real region.
   const allRegions =
     effectiveLocation.mode === 'region' && effectiveLocation.regionId === ALL_REGIONS;
   const chosenRegionId =
@@ -375,8 +272,6 @@ export function useMarketBrowser({
       ? effectiveLocation.regionId
       : effectiveHub.regionId;
 
-  // The tree filters off a deferred copy so a keystroke paints in the box
-  // first; the filter and tree render catch up after.
   const deferredQuery = useDeferredValue(query);
   const filterResult = useMemo(
     () => (groups && types ? filterMarketTree(groups, types, deferredQuery) : null),
@@ -406,22 +301,6 @@ export function useMarketBrowser({
     }
   }
 
-  // Every handler that changes the selected item or the location writes the
-  // persisted device setting (unchanged) *and* pushes the new query string,
-  // as its own history entry, so a URL grabbed right after matches what's on
-  // screen and the browser's back/forward walks through prior selections.
-  //
-  // `buildMarketParams` returns the canonical type/hub/region set, and
-  // replacing those wholesale is the point — `group` goes with them (a
-  // one-shot cross-link param, never re-applied once acted on). `browser.station`
-  // goes too: every call here means a new item or location, which is exactly
-  // when the "filter to this station" banner should clear (previously done by
-  // `setStationFilter(null)` in the resetKey effect below — moved here because
-  // that call and this one are two independent `useUrlParams` writers landing
-  // in the very same render, and the second one silently dropped the first's
-  // write, per the "two writers, same tick" hazard `useUrlState.ts` documents).
-  // `browser.q`/`browser.itemTab` survive untouched: the tab lives in the path
-  // now, not here, so there is no longer a `?section=` this needs to carry along.
   function navigateTo(typeId: number | null, next: MarketLocationParam) {
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
@@ -430,7 +309,6 @@ export function useMarketBrowser({
       params.delete('region');
       params.delete('group');
       params.delete('browser.station');
-      // Fold in text still waiting on its debounce, so this navigation is the only write.
       cancelQueryTimer();
       queryWritten.current = query;
       if (query === '') params.delete(BROWSER_SEARCH_KEY);
@@ -444,10 +322,6 @@ export function useMarketBrowser({
 
   function handleModeChange(mode: LocationMode) {
     if (mode === effectiveLocation.mode) return;
-    // Toggling off a URL-supplied location keeps *that* hub/region, not the
-    // device's persisted default — otherwise a shared `?hub=amarr` link
-    // reverts to the visitor's own Jita default the instant they touch the
-    // toggle, which isn't "restores exactly what the sender saw" anymore.
     const regionId = locationModeValue.regionId ?? effectiveHub.regionId;
     void setLocationModeValue({ mode, regionId });
     navigateTo(
@@ -456,9 +330,7 @@ export function useMarketBrowser({
     );
   }
 
-  /** After the header's `HubField` writes the hub: points the URL at it, since a linked hub outranks the stored one. */
   function handleHubChange(id: TradeHub['id']) {
-    // The page's own write: never adopted back as a link.
     knownLinkedHubRef.current = id;
     navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
   }

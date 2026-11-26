@@ -8,11 +8,6 @@ export interface NavBadge {
   attention?: boolean;
 }
 
-/**
- * What waits at each nav destination, read once by the component that builds
- * the entries and spread onto `NavItem`: Communities' count of new Requests
- * (issue #3810), and the corp Moons dot for a book editor (#6208).
- */
 export function useNavBadges(): (path: AppRoutePath) => NavBadge {
   const newRequests = useNewRequestCount();
   const moonsAttention = useMoonsNavAttention();

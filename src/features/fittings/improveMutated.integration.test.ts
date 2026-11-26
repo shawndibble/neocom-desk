@@ -84,7 +84,6 @@ describe('Improve and a rolled Abyssal Damage Control (real engine, #5800)', () 
       computeFittingStats(f, pilot, undefined, undefined, { overheated: false });
     const fitting = fit(true);
     const before = await stats(fitting);
-    // The rolled 20 CPU is in the recalculation, not the base module's 30.
     expect((await stats(fit(false))).cpuUsed - before.cpuUsed).toBe(10);
 
     const search = async (allowMutated: boolean) => {
@@ -129,7 +128,6 @@ describe('Improve and a rolled Abyssal Damage Control (real engine, #5800)', () 
     expect(kept.candidates.length).toBeGreaterThan(0);
     expect(kept.candidates.some((c) => c.fromTypeId === ABYSSAL_DAMAGE_CONTROL)).toBe(false);
 
-    // Before the fix, Improve offered three rows for this slot at Rebalance, Tankier.
     const allowed = await search(true);
     expect(allowed.rows.some((o) => o.candidate.fromTypeId === ABYSSAL_DAMAGE_CONTROL)).toBe(true);
     expect(

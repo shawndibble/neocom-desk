@@ -14,7 +14,6 @@ import type { Contract } from '@/esi/endpoints';
 import { LocationProbe } from '@/test/LocationProbe';
 import { loadSystemName } from './systemSecurity';
 
-// Spied, so a test can wait for a system lookup to settle before asserting what it left out.
 vi.mock('./systemSecurity', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./systemSecurity')>();
   return { ...actual, loadSystemName: vi.fn(actual.loadSystemName) };
@@ -50,7 +49,6 @@ const pricesMock = vi.hoisted(() => {
 });
 vi.mock('@/market/prices', () => pricesMock);
 
-// PLEX trades only on its own market, so no hub lists it.
 vi.mock('@/features/market/plexPrice', () => ({ usePlexPrice: () => 5_000_000 }));
 
 vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
@@ -61,7 +59,6 @@ vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
 const snapshotMock = vi.hoisted(() => ({ loadHubSnapshotRange: vi.fn() }));
 vi.mock('@/features/market/hubSnapshot', () => snapshotMock);
 
-/** The hub station's Open Price for one UTC day, by type id. */
 function openPricesOn(
   date: string,
   prices: Record<number, { buy: number | null; sell: number | null }>
@@ -74,11 +71,6 @@ function openPricesOn(
 
 const CHAR_ID = 91;
 
-/**
- * A station lookup that declines. Tests that don't care about the location answer with this, not a
- * request that never resolves: a pending request stays in the ESI cache's in-flight map, so every
- * later test reading the same station inherited it and waited out the full 1000ms cache settle.
- */
 const NO_STATION = () => new HttpResponse(null, { status: 404 });
 
 const ITEM_EXCHANGE: Contract = {
@@ -131,9 +123,6 @@ const COURIER: Contract = {
   days_to_complete: 3,
 };
 
-/** Reports where the router ended up, so a navigating menu action is assertable. */
-
-/** `MarketItemLink` needs a router context — wrap in a router. */
 function renderModal(props: ContractDetailModalProps) {
   return render(
     <MemoryRouter>
@@ -143,7 +132,6 @@ function renderModal(props: ContractDetailModalProps) {
   );
 }
 
-/** A solar system the System row can name; any other id declines, which hides the row. */
 const SYSTEM_NAMES: Record<string, string> = { '30000142': 'Jita', '30002187': 'Amarr' };
 
 const server = mswServer(
@@ -169,11 +157,6 @@ afterEach(() => {
   configureEsi({ getToken: null });
 });
 
-/**
- * Issue #3525: the own-contract modal is the only place an own contract's
- * place appears, so its system links to Route Safety like the Public and
- * Courier modals' do. The station name links to its Place Info (issue #4455).
- */
 describe('ContractDetailModal System rows', () => {
   const JITA_STATION = 60003760;
   const AMARR_STATION = 60008494;
@@ -296,7 +279,6 @@ describe('ContractDetailModal System rows', () => {
       onClose: () => {},
     });
     expect(await screen.findByText('Somewhere Station')).toBeInTheDocument();
-    // Once the system lookup has settled, the row never appeared.
     await waitFor(() => expect(systemAsked).toBe(true));
     await waitFor(() =>
       expect(vi.mocked(loadSystemName).mock.settledResults.at(-1)?.type).toMatch(
@@ -481,12 +463,6 @@ describe('ContractDetailModal', () => {
     expect(screen.queryByText("Items aren't available for this contract")).not.toBeInTheDocument();
   });
 
-  /*
-   * Two short columns (icon + name, quantity) fit a 390px screen unaided, so
-   * the stacked card layout would only add a "QUANTITY" gutter label to a
-   * one-word value. `.dt-stack` is CSS, so the class is what there is to
-   * assert — same check as `DataTable.test.tsx`'s responsive suite.
-   */
   it('keeps the item tables as real tables on mobile', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>
@@ -562,7 +538,6 @@ describe('ContractDetailModal', () => {
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    // 587 (Rifter), not 638 (the blueprint on the contract).
     expect(screen.getByTestId('location')).toHaveTextContent('/industry/plans?product=587');
   });
 
@@ -668,8 +643,8 @@ describe('ContractDetailModal', () => {
         [34],
         expect.objectContaining({ id: 'jita' })
       );
-      expect(await within(check).findByText('4,000 ISK')).toBeInTheDocument(); // asking
-      expect(within(check).getByText('3,720 ISK')).toBeInTheDocument(); // 744 * 5, buy
+      expect(await within(check).findByText('4,000 ISK')).toBeInTheDocument();
+      expect(within(check).getByText('3,720 ISK')).toBeInTheDocument();
       expect(within(check).getByText('+7.5%')).toBeInTheDocument();
       expect(within(check).getByText('Asking is above buy orders')).toBeInTheDocument();
       expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
@@ -684,7 +659,7 @@ describe('ContractDetailModal', () => {
       await within(check).findByText('3,720 ISK');
       fireEvent.click(within(check).getByRole('button', { name: 'Buy orders' }));
       expect(within(check).getByRole('button', { name: 'Sell orders' })).toBeInTheDocument();
-      expect(within(check).getByText('4,092 ISK')).toBeInTheDocument(); // 744 * 5.5
+      expect(within(check).getByText('4,092 ISK')).toBeInTheDocument();
       expect(within(check).getByText('−2.2%')).toBeInTheDocument();
       expect(within(check).getByText('Asking is below sell orders')).toBeInTheDocument();
     });
@@ -722,7 +697,6 @@ describe('ContractDetailModal', () => {
     });
 
     it("never prices a blueprint copy at the original's hub price", async () => {
-      // 638 trades at the hub as an original; ESI marks a copy with raw_quantity -2.
       pricesMock.getHubPrices.mockResolvedValue(
         new Map([
           [34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }],
@@ -743,7 +717,7 @@ describe('ContractDetailModal', () => {
       open(OUTSTANDING_FOR_4000);
 
       const check = await screen.findByRole('region', { name: /^Is it fair/ });
-      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument();
       expect(within(check).getByText(/\(1 item unpriced\)/)).toBeInTheDocument();
       expect(within(check).queryByText(/900,000,000/)).not.toBeInTheDocument();
     });
@@ -797,9 +771,8 @@ describe('ContractDetailModal', () => {
       open({ ...OUTSTANDING_FOR_4000, price: 12_000_000 });
 
       const check = await screen.findByRole('region', { name: /^Is it fair/ });
-      // PLEX has no buy orders: flip to sell, where its market price applies.
       fireEvent.click(await within(check).findByRole('button', { name: 'Buy orders' }));
-      expect(await within(check).findByText('10,000,000 ISK')).toBeInTheDocument(); // 2 x 5M
+      expect(await within(check).findByText('10,000,000 ISK')).toBeInTheDocument();
       expect(within(check).getByText('+20.0%')).toBeInTheDocument();
     });
 
@@ -811,7 +784,7 @@ describe('ContractDetailModal', () => {
       open({ ...AUCTION_OUTSTANDING, price: 1_000, buyout: 4_000 });
 
       const check = await screen.findByRole('region', { name: /^Is it fair/ });
-      expect(await within(check).findByText('+7.5%')).toBeInTheDocument(); // 4,000 against 3,720
+      expect(await within(check).findByText('+7.5%')).toBeInTheDocument();
       expect(within(check).queryByText('1,000 ISK')).not.toBeInTheDocument();
     });
 
@@ -824,8 +797,8 @@ describe('ContractDetailModal', () => {
       open({ ...ITEM_EXCHANGE, price: undefined });
 
       const check = await screen.findByRole('region', { name: /^Price check/ });
-      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // included, buy
-      expect(within(check).getByText('600.00 ISK')).toBeInTheDocument(); // requested, buy
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument();
+      expect(within(check).getByText('600.00 ISK')).toBeInTheDocument();
       expect(within(check).getByText('+520.0%')).toBeInTheDocument();
       expect(within(check).getByText('Included is above Requested')).toBeInTheDocument();
     });
@@ -853,7 +826,6 @@ describe('ContractDetailModal', () => {
     });
 
     it('keeps an abyssal module out of the figure and says it is not priced, and why', async () => {
-      // Own-contract lines carry no item id, so a module cannot be identified to MutaMarket.
       openPricesOn('2026-08-25', { 34: { buy: 5, sell: 5.5 } });
       serve([
         ...ONE_LINE,
@@ -862,7 +834,7 @@ describe('ContractDetailModal', () => {
       open(FINISHED_FOR_4000);
 
       const check = await screen.findByRole('region', { name: /^Price check/ });
-      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
+      expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument();
       expect(screen.getByText('Abyssal modules')).toBeInTheDocument();
       expect(screen.getByText('Not priced')).toBeInTheDocument();
       expect(screen.getByText(/couldn't be estimated/)).toBeInTheDocument();
@@ -969,7 +941,6 @@ describe('ContractDetailModal', () => {
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
-      // Finished: no countdown, and the date it finished is in the strip.
       expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
       expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
     });
@@ -991,7 +962,6 @@ describe('ContractDetailModal', () => {
         );
         expect(steps.map((li) => li.querySelector('b')?.textContent)).toEqual(['Issued', label]);
         expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
-        // An expiry means nothing to a contract that can no longer be taken.
         expect(screen.queryByText('Expires')).not.toBeInTheDocument();
         expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
         unmount();
@@ -1009,7 +979,7 @@ describe('ContractDetailModal', () => {
         issuerName: 'Mero Otichoda',
         onClose: () => {},
       });
-      expect(screen.getAllByText('Expired')).toHaveLength(2); // headline chip and timeline step
+      expect(screen.getAllByText('Expired')).toHaveLength(2);
       expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
       expect(screen.queryByText('Expires in')).not.toBeInTheDocument();
     });
@@ -1026,7 +996,6 @@ describe('ContractDetailModal', () => {
   });
 });
 
-/** Issue #4780: a contract that is a buyback Quote's names the Request, links to it and flags another price. */
 describe('ContractDetailModal buyback line', () => {
   const BUYBACK = {
     requestId: 'req-9',

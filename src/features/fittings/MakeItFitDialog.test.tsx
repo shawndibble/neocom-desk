@@ -186,7 +186,6 @@ describe('MakeItFitDialog', () => {
       },
       fixes: [
         { typeIds: [GYPSY_CPU], cost: 5_000_000, stats: inBudget },
-        // Under CPU, but now over powergrid: not a fix.
         { typeIds: [GYPSY_CPU + 1], cost: 1, stats: { ...inBudget, powergridUsed: 120 } },
       ],
     };
@@ -197,7 +196,6 @@ describe('MakeItFitDialog', () => {
       onImplantsApplied,
       before: { ...stats(0, 0), cpuUsed: 90, cpuTotal: 90 },
     });
-    // An implant raises what the ship has; it uses no less.
     expect(screen.getByText('Adds 10 tf')).toBeTruthy();
     expect(screen.queryByText(/EE-605/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /EE-603/ }));
@@ -210,7 +208,6 @@ describe('MakeItFitDialog', () => {
     renderDialog([option(0, 1000, [ehpDown, emResist, thermalResist])]);
     expect(screen.getByText('EHP -293')).toBeTruthy();
     expect(screen.getByText('resists lower')).toBeTruthy();
-    // The per-resist numbers are one click away, not gone.
     expect(screen.queryByText('Shield EM resist 50 to 42%, worse')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'All changes' }));
     expect(screen.getByText('Shield EM resist 50 to 42%, worse')).toBeTruthy();

@@ -32,7 +32,6 @@ describe('priceLpOffer', () => {
   it('rounds up to whole redemptions when the quantity does not divide evenly', () => {
     const offer: LpStoreOfferInput = { ...asteroOffer, quantityPerRedemption: 5 };
     const result = priceLpOffer(offer, 6);
-    // 6 units needs 2 redemptions of 5, same "batch forces overproduction" rule as a blueprint run.
     expect(result?.lpCost).toBe(800_000);
     expect(result?.iskCost).toBe(1_700_000);
   });
@@ -57,7 +56,6 @@ describe('priceLpOffer', () => {
   it('never divides by zero on a malformed zero-quantity offer', () => {
     const offer: LpStoreOfferInput = { ...asteroOffer, quantityPerRedemption: 0 };
     const result = priceLpOffer(offer, 3);
-    // Falls back to one unit per redemption rather than Infinity/NaN.
     expect(result?.lpCost).toBe(1_200_000);
   });
 });

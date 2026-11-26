@@ -20,13 +20,9 @@ import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface ReviewMemberDialogProps {
   onClose: () => void;
-  /** The corporation's members; unreadable falls back to the exact-name field. */
   roster: ReviewRosterState;
-  /** Members flagged (waiting review, the officer) before they reach the list. */
   mark: (members: readonly RosterMember[]) => RosterMember[];
-  /** Asks the member for a review; rejects with the server's refusal. Resolves to the new review. */
   onRequest: (memberName: string, role: string) => Promise<VettingReviewSummary | null>;
-  /** Mailing the member the link, offered once the review exists. Absent: the dialog just closes. */
   mail?: {
     officerId: number;
     officerName: string;
@@ -35,10 +31,6 @@ interface ReviewMemberDialogProps {
   };
 }
 
-/**
- * "Review a member…": ask a member for a review before a promotion. The exact in-game name and
- * the role they are up for. Whoever asks cannot sign the review off, which the dialog says.
- */
 export function ReviewMemberDialog({
   onClose,
   roster,

@@ -5,7 +5,6 @@ import '@/i18n';
 import type { Attributes } from '@/engine/types';
 import { RemapMarkerModal } from './RemapMarkerModal';
 
-/** A legal sheet (sums to 99, every value in 17..27) other than BASELINE. */
 const OVERRIDE: Attributes = {
   intelligence: 17,
   memory: 17,
@@ -14,7 +13,6 @@ const OVERRIDE: Attributes = {
   charisma: 17,
 };
 
-/** Another legal sheet, distinct from both OVERRIDE and BASELINE. */
 const COMPUTED: Attributes = {
   intelligence: 19,
   memory: 19,
@@ -53,7 +51,6 @@ describe('RemapMarkerModal', () => {
     renderModal();
     expect(screen.getByLabelText('Intelligence')).toHaveValue(20);
     expect(screen.getByLabelText('Charisma')).toHaveValue(19);
-    // The baseline sheet is already legal (sums to 99), so Save starts enabled.
     expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
   });
 
@@ -84,9 +81,6 @@ describe('RemapMarkerModal', () => {
   });
 
   it('lets a full multi-digit value land while typing, without clamping mid-entry', async () => {
-    // A value already reachable inside range (typing "25" over a field that
-    // started at 20) must not get clamped to the 17 floor after the leading
-    // "2" — that would make "25" unreachable by typing at all.
     const user = userEvent.setup();
     renderModal();
     const field = screen.getByLabelText('Intelligence');
@@ -101,8 +95,6 @@ describe('RemapMarkerModal', () => {
     const intelligence = screen.getByLabelText('Intelligence');
     await user.clear(intelligence);
     await user.type(intelligence, '17');
-    // Baseline int 20 -> 17 is -3 with nothing else changed: 3 points now
-    // unallocated. Still mid-edit, not an error, so this is the warning tone.
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('3 points left to allocate');
     expect(status.className).toContain('text-warning');
@@ -116,7 +108,6 @@ describe('RemapMarkerModal', () => {
     const intelligence = screen.getByLabelText('Intelligence');
     await user.clear(intelligence);
     await user.type(intelligence, '25');
-    // Baseline int 20 -> 25 is +5, so the sheet now totals 104: 5 over budget.
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('5 points over budget');
     expect(status.className).toContain('text-danger');
@@ -124,11 +115,6 @@ describe('RemapMarkerModal', () => {
   });
 
   it('flags an out-of-range value even when the total already balances to 99', () => {
-    // 30/17/17/18/17 sums to 99 but the first value is above the 27 ceiling —
-    // "0 points left to allocate" would misleadingly read as done. Set with
-    // fireEvent (one change event per field, not keystroke-by-keystroke) so
-    // the exact target sheet lands regardless of controlled-input replay
-    // quirks — already covered by the typing-specific tests above.
     renderModal();
     fireEvent.change(screen.getByLabelText('Intelligence'), { target: { value: '30' } });
     fireEvent.change(screen.getByLabelText('Memory'), { target: { value: '17' } });

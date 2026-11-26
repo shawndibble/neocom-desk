@@ -9,14 +9,14 @@ const item = (type: number, flag: number, qty = 1): FitItem => ({
 });
 
 const ITEMS: FitItem[] = [
-  item(1, 27, 1), // high
-  item(1, 28, 1), // high, same type
-  item(2, 19), // mid
-  item(3, 11), // low
-  item(4, 92), // rig
-  item(9, 87, 5), // drone bay
-  item(8, 5, 100), // cargo: never shown
-  item(7, 27, 0), // nothing lost
+  item(1, 27, 1),
+  item(1, 28, 1),
+  item(2, 19),
+  item(3, 11),
+  item(4, 92),
+  item(9, 87, 5),
+  item(8, 5, 100),
+  item(7, 27, 0),
 ];
 
 const off = (extraModules: number[], extraRigs: number[] = []): DoctrineCheckRecord => ({
@@ -46,7 +46,6 @@ describe('fitGroups', () => {
 
   it('marks the modules the diff calls extra as off doctrine, one by one', () => {
     const groups = fitGroups(ITEMS, off([1, 3], [4]));
-    // two of type 1 fitted, one extra: the line splits into one off and one doctrine
     expect(groups[0]!.lines).toEqual([
       { typeId: 1, count: 1, mark: 'off' },
       { typeId: 1, count: 1, mark: 'doctrine' },

@@ -7,7 +7,6 @@ import {
   type IncursionsBoardData,
 } from './incursionsBoard';
 
-/** Echoes the key and its interpolations, as `boardSummary.test.ts` does. */
 function t(key: string, options?: Record<string, unknown>): string {
   if (options === undefined) return key;
   const args = Object.entries(options)
@@ -86,10 +85,8 @@ describe('incursionsSummary', () => {
 });
 
 describe('incursionsSeverity', () => {
-  /* Conditions, never verdicts: an Incursion nearby is nothing the pilot must act on. */
   it('is clear once read, and unknown while reading or unread', () => {
     expect(incursionsSeverity(data({ rows: [row(1, 1)] }))).toBe('clear');
-    // A feed that could not be read must not be the most reassuring line on the board.
     expect(incursionsSeverity(data({ status: 'failed' }))).toBeNull();
     expect(incursionsSeverity(data({ status: 'loading' }))).toBeNull();
     expect(incursionsSeverity(null)).toBeNull();

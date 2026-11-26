@@ -1,5 +1,3 @@
-// SRP Doctrine Fits against the Firestore emulator (issue #4857, ADR 0026). Runs only under the
-// emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -27,9 +25,9 @@ const CORP = 98000001;
 const DAY = 86_400_000;
 const T0 = Date.parse('2026-10-23T12:00:00Z');
 const HASH = 'b'.repeat(40);
-const HULL = 587; // Rifter
-const HIGH = 405; // SDE slot map: a high-slot module
-const MED = 380; // a medium-slot module
+const HULL = 587;
+const HIGH = 405;
+const MED = 380;
 
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
@@ -178,7 +176,7 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
       expect(await reason(save(fit(), ACCOUNTANT))).toBe('role-required');
       expect(await reason(save(fit(), PILOT))).toBe('not-an-officer');
       await save(fit(), CEO);
-      identities.set(DIRECTOR, { corporationId: CORP, ceoId: CEO, roles: [] }); // demoted
+      identities.set(DIRECTOR, { corporationId: CORP, ceoId: CEO, roles: [] });
       expect(await reason(save(fit()))).toBe('not-an-officer');
       expect(await doctrines()).toHaveLength(1);
     });
@@ -217,7 +215,7 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
       for (let i = 0; i < 100; i++) await save(fit({ name: `Fit ${i}` }));
       expect(await reason(save(fit()))).toBe('too-many-doctrines');
       const [first] = await doctrines();
-      await save({ ...fit({ name: 'still ok' }), id: first.id }); // replacing is not adding
+      await save({ ...fit({ name: 'still ok' }), id: first.id });
       expect(await doctrines()).toHaveLength(100);
     });
 
@@ -287,7 +285,7 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
       loss(1001, MATCHING);
       for (let i = 0; i < FETCH_LIMIT; i++) await preview(1001);
       expect(await reason(preview(1001))).toBe('rate-limited');
-      expect(await reason(file(1001))).toBe('rate-limited'); // filing shares the budget
+      expect(await reason(file(1001))).toBe('rate-limited');
       loss(1002, MATCHING, OTHER_PILOT);
       await preview(1002, OTHER_PILOT);
       now += FETCH_WINDOW_MS;
@@ -397,7 +395,6 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
         },
         shareCode: 'Full-Fit_1',
       });
-      // a fit saved before share codes: still listed, without one, and no creator details leak
       expect(fits.find((f) => f.id === b)).toEqual({
         id: b,
         name: 'Old Rifter',
@@ -417,7 +414,7 @@ emulatorSuite('SRP doctrine-fit (emulator)', () => {
     it('refuses a Character of another corporation and a former member', async () => {
       await save(fit({ shareCode: 'Code1' }));
       expect(await reason(list(OUTSIDER))).toBe('wrong-corp');
-      affiliations.set(PILOT, OTHER_CORP); // left the corp since
+      affiliations.set(PILOT, OTHER_CORP);
       expect(await reason(list(PILOT))).toBe('wrong-corp');
     });
 

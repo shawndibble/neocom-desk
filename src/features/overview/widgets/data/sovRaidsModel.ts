@@ -1,15 +1,3 @@
-/**
- * Skyhook raids (issues #4798, #4781), the member tier of the sov widgets:
- * skyhooks raidable now or soon, public data only, cut by the widget's Where
- * setting: the Character's alliance space (a defender's list, an open window is
- * red), or near the Current System within a jumps radius (a hunter's list, an
- * open window is green). Pure, derived at render time. The role tier is the
- * Corp Board's `corpSovereignty`.
- *
- * Copy lives in the lazy `travel.sovRaids` section: the shell locale has no room
- * (`localeSplit.test.ts`). Only title, description and empty line stay under
- * `overview.widgets`.
- */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import { closingSoon, liveRaids, nearRaids, raidState } from '@/engine/corp/sovereignty';
 import { formatCountdown } from '@/lib/duration';
@@ -21,7 +9,6 @@ import type { BuildContext, Feeds, KindView, TableRowModel } from './types';
 
 const TO = '/travel/route';
 
-/** Never claims more precision than the read: under its window reads "under 10m". */
 const untilText =
   (data: SovRaidsWidgetData, t: BuildContext['t']) =>
   (remainingMs: number): string =>
@@ -29,7 +16,6 @@ const untilText =
       ? t('travel.sovRaids.underCacheWindow', { duration: formatCountdown(data.freshForMs / 1000) })
       : formatCountdown(remainingMs / 1000);
 
-/** No alliance, or an alliance holding no sov: the empty state with its reason, never a lock. */
 function nothingToDefend(
   feed: Feeds['sovRaids'],
   data: SovRaidsWidgetData,
@@ -64,7 +50,6 @@ function myAlliance(
 
   const mine = data.skyhooks.filter((hook) => hook.holderId === data.alliance?.id);
   const live = liveRaids(mine, now);
-  // Listed as raidable but with no readable window: unknown, never safe, so kept, last.
   const unread = mine
     .filter((hook) => hook.window === null)
     .sort((a, b) => a.key.localeCompare(b.key));
@@ -72,7 +57,6 @@ function myAlliance(
   const views = [...live, ...unread].map((hook: SovRaidSkyhook) => {
     const { window } = hook;
     const open = window !== null && raidState(window, now) === 'open';
-    // Open: the raid can happen now. Upcoming or unknown: the list only reaches a few hours ahead.
     const tone: DeadlineSeverity = open ? 'critical' : 'warning';
     const name = hook.planetName ?? data.systemNames.get(hook.systemId) ?? UNKNOWN;
     let text = UNKNOWN;
@@ -109,7 +93,6 @@ function myAlliance(
           tone: soonest.open ? ('bad' as const) : ('caution' as const),
         };
 
-  // Next wants clocks still ahead: an open window is already underway.
   const deadlines: BoardDeadline[] = views.flatMap((v) =>
     v.hook.window === null || v.open
       ? []
@@ -123,7 +106,6 @@ function myAlliance(
         ]
   );
 
-  // Nothing reloads on its own: an empty answer from an old read says how old.
   const readAt = data.fetchedAt?.getTime() ?? null;
   const staleEmpty = views.length === 0 && readAt !== null && now - readAt > data.freshForMs;
 
@@ -160,7 +142,6 @@ function myAlliance(
         },
       ],
       rows: views.map((v, i): TableRowModel => {
-        // The planet name still names the place when the system names could not be read.
         const place = data.systemNames.get(v.hook.systemId) ?? v.hook.planetName;
         return {
           key: v.hook.key,
@@ -169,7 +150,6 @@ function myAlliance(
             v.hook.window === null ? UNKNOWN : { text: v.text, tone: v.open ? 'bad' : 'caution' },
             v.jumps === undefined ? UNKNOWN : count(v.jumps),
           ],
-          // Soonest first is the window column's order; the cell text cannot sort.
           sort: [v.name, i, v.jumps],
           tone: v.tone,
           detail: {
@@ -191,7 +171,6 @@ function myAlliance(
   };
 }
 
-/** Near me: any holder's skyhooks within the radius of the Current System, the hunter's list. */
 function nearMe(
   feed: Feeds['sovRaids'],
   data: SovRaidsWidgetData,
@@ -234,7 +213,6 @@ function nearMe(
     };
   });
 
-  // Next wants clocks still ahead, and only the pilot's own space is a deadline: a hunt target is not one.
   const deadlines: BoardDeadline[] = views.flatMap((v) =>
     v.hook.window === null || v.open || !v.yours
       ? []
@@ -250,7 +228,6 @@ function nearMe(
 
   const readAt = data.fetchedAt?.getTime() ?? null;
   const staleEmpty = readAt !== null && now - readAt > data.freshForMs;
-  // Distances need the Current System: with no distance for any listed skyhook, nothing is guessed.
   const locationUnknown = views.length === 0 && data.jumps.size === 0 && data.skyhooks.length > 0;
   const empty = views.length === 0;
   const emptyMessage = !empty
@@ -332,7 +309,6 @@ function nearMe(
           priority: 2,
           sortable: true,
         },
-        // The first column to go on a narrow widget: the holder is the least of what a hunter needs.
         {
           key: 'held',
           label: t('travel.sovRaids.fact.heldBy'),
@@ -344,7 +320,6 @@ function nearMe(
       rows: views.map((v, i): TableRowModel => {
         const place = data.systemNames.get(v.hook.systemId) ?? v.hook.planetName;
         const held = v.yours ? t('travel.sovRaids.near.yourAlliance') : v.holder;
-        // Green is opportunity and only with the words; amber once the theft link would not finish.
         const windowTone =
           v.yours || v.late ? ('caution' as const) : v.open ? ('good' as const) : undefined;
         return {

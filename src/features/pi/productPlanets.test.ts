@@ -25,7 +25,6 @@ describe('productPlanets', () => {
   });
 
   it('a P2 whose inputs live on different planet types can still be one planet', () => {
-    // Coolant is made from Electrolytes + Water; both have a shared host.
     expect(planetsNeeded(idOf('Coolant'), pi)).toBe(1);
   });
 

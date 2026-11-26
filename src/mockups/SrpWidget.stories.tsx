@@ -8,19 +8,6 @@ import { sampleView } from '@/features/overview/widgets/gallerySamples';
 import type { KindView, TableModel } from '@/features/overview/widgets/data/types';
 import type { Widget as WidgetModel } from '@/features/overview/widgets/layout';
 
-/**
- * Corp Board widget kind `corpSrp` (Ship replacement): replaces the "Coming
- * soon" placeholder. The real `Widget` shell draws it from a sample `KindView`
- * (the Gallery's preview path), beside two real sample neighbours, at Medium.
- *
- * Officer-only: a pilot without the SRP officer capability sees no tile at all
- * (hidden, never locked). When SRP is off, an officer's tile is the empty state
- * with a link to SRP settings; Remove lives in the shell's ⋮ menu.
- *
- * New components in this mockup: none. The Number and Table bodies, the empty
- * state and the tile are the Widget shell; only the board frame (header and
- * grid) is a stand-in for the Corp Board route.
- */
 const meta = {
   title: 'mockups/SrpWidget',
   tags: ['!manifest'],
@@ -116,7 +103,6 @@ const TABLE: TableModel = {
   ],
 };
 
-/** Phone: Pilot, Amount, Status. The killmail is one tap away on the claim. */
 function phoneTable(table: TableModel): TableModel {
   const keep = [0, 2, 3];
   return {
@@ -216,26 +202,18 @@ function Srp({ view, widgetView }: { view: KindView; widgetView: WidgetModel['vi
 
 const PHONE = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
-/** @summary Number variant at Medium: open (Pending) claims and the ISK owed (Approved, not yet Paid). */
 export const NumberView: Story = { render: () => <Srp view={srpView()} widgetView="number" /> };
 
-/** @summary Number variant in the phone shell. */
 export const NumberViewPhone: Story = { ...NumberView, globals: PHONE };
 
-/** @summary Table variant at Medium: pilot, killmail, amount and status per claim; a row opens the claim. */
 export const TableView: Story = { render: () => <Srp view={srpView()} widgetView="table" /> };
 
-/** @summary Table variant in the phone shell. */
 export const TableViewPhone: Story = { ...TableView, globals: PHONE };
 
-/** @summary Empty: SRP is on but no claim is open. The shell's own empty state, with Open SRP. */
 export const Empty: Story = { render: () => <Srp view={EMPTY} widgetView="table" /> };
 
-/** @summary Empty in the phone shell. */
 export const EmptyPhone: Story = { ...Empty, globals: PHONE };
 
-/** @summary SRP not turned on, officer's tile: prompt to Set up SRP. A pilot without the capability sees no tile (hidden, never locked). */
 export const NotTurnedOn: Story = { render: () => <Srp view={OFF} widgetView="table" /> };
 
-/** @summary SRP not turned on in the phone shell. */
 export const NotTurnedOnPhone: Story = { ...NotTurnedOn, globals: PHONE };

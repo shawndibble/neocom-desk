@@ -29,7 +29,6 @@ describe('FeederConsent', () => {
         /They also see your refineries' names and systems, and the moon mining notifications/
       )
     ).toBeVisible();
-    // The player-facing copy never uses the dev terms.
     expect(document.body.textContent).not.toMatch(/feeder|collector/i);
   });
 });

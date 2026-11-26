@@ -20,7 +20,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Header tier 3 (§6c): the closed ⋮, at the `IconButton` default size it shares the header row with. */
 export const Closed: Story = {
   args: {
     children: (
@@ -32,7 +31,6 @@ export const Closed: Story = {
   },
 };
 
-/** @summary The open menu: two or more real actions as text items (§6c restraint). */
 export const Open: Story = {
   args: Closed.args,
   play: async ({ canvasElement }) => {

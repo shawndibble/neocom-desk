@@ -1,20 +1,3 @@
-/**
- * "Set waypoint in game" for a row menu on any row that names a station,
- * structure or system: sends that place to the active Character's EVE client
- * as its autopilot destination, through the same `useSetDestination` the
- * order book's "Set destination" button uses.
- *
- * The menu stays open while it sends (`preventDefault` on select) and the
- * item itself reads "Setting waypoint…" and then the outcome. There is no
- * toast to report to once the menu closes, and ESI's commonest refusal —
- * the character isn't logged in to the game — must not fail silently.
- * Selecting the outcome sends again.
- *
- * No Character, or one without the waypoint scope, gets the item inert with
- * the reason on tap (`DisabledMenuItem`), as the button shows it beside
- * itself. Written with the kind-agnostic `MenuItem`, so a row's visible
- * "More actions" dropdown gets it too.
- */
 import { useTranslation } from 'react-i18next';
 import { GrantMissingMenuItem } from '@/app/GrantMissingLink';
 import { DisabledMenuItem, MenuItem } from '@/components/ui';
@@ -27,12 +10,9 @@ export function SetWaypointMenuItem({
   mode = 'set',
   withViewRoute = true,
 }: {
-  /** An NPC station, player structure or solar system id — never an item id (see `useSetDestination`). */
   locationId: number;
   placeName: string;
-  /** `add` adds the place to the end of the route, keeping the client's route; no View route item. */
   mode?: 'set' | 'add';
-  /** `false` when the menu places View route itself (it opens Route Safety, so it is not an in-game item). */
   withViewRoute?: boolean;
 }) {
   const { t } = useTranslation();
@@ -44,7 +24,6 @@ export function SetWaypointMenuItem({
   const add = mode === 'add';
   const showViewRoute = !add && withViewRoute;
   const label = t(add ? 'travel.waypoints.addMenuItem' : 'travel.waypoints.menuItem');
-  // Kept when the connection drops mid-send, so the result is still shown in the blocked branch.
   const content = sending ? (
     t(add ? 'travel.waypoints.addMenuSending' : 'travel.waypoints.menuSending')
   ) : outcome ? (

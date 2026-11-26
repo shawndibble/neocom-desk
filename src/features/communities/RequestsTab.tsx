@@ -79,7 +79,6 @@ const STATUS_ORDER: Record<RequestStatus, number> = {
   expired: 5,
 };
 
-/** The funnel's value: which Requests, and how far away. */
 interface RequestFilterValue {
   filter: RequestFilter;
   jumps: JumpRange;
@@ -91,11 +90,6 @@ const REQUEST_FILTER_KEY: Record<RequestFilter, string> = {
   canFill: 'communities.board.filters.canFill',
 };
 
-/**
- * Open is where the board starts, so it is no pill; Mine or I can fill is.
- * `jumps` is the range the board is applying (`shownJumps`), so a limit it
- * cannot measure never shows as one.
- */
 function activeRequestFilters(
   { filter, jumps }: RequestFilterValue,
   t: Translate
@@ -116,19 +110,6 @@ function activeRequestFilters(
   return active;
 }
 
-/**
- * The Requests tab body (scope decision `20261014-221403-community-requests-...`,
- * ADR 0021): a board of the Community's Requests with Open, Mine and I can fill
- * (a line for a blueprint this Member shares), a distance limit in jumps from
- * the pilot, a search box and the table; a row opens its side panel. Any
- * Member posts a Request from New request.
- *
- * A filter that cannot work says why instead of doing nothing: I can fill is
- * disabled when the shared blueprints could not be read, and the distance
- * select when the pilot's location is not known (no Permission, or ESI gave
- * none). Under a distance limit, Requests whose place cannot be measured (older
- * free text, a place off the stargate map) are left out and counted.
- */
 export function RequestsTab({
   initialRequestId,
   characterId,
@@ -145,26 +126,19 @@ export function RequestsTab({
   onReload,
   refreshPledges,
 }: {
-  /** A Request to open the panel on at first: the link a buyback contract carries. */
   initialRequestId?: string;
   characterId: number;
   communityId: string;
   communityName: string;
   myUid: string;
-  /** The viewer administers this Community: the side panel offers Remove request and Remove per Pledge. */
   isAdmin: boolean;
-  /** Member uid to display name, to name each Pledger in the admin's panel. */
   memberNames: ReadonlyMap<string, string>;
-  /** Null until the first read lands. */
   requests: CommunityRequest[] | null;
-  /** The Pledges under each open Request, from the board's read. */
   pledges: PledgesByRequest;
-  /** The Pledge read failed: the board's progress and statuses are not to be trusted. */
   pledgesFailed: boolean;
   failed: boolean;
   now: number;
   onReload: () => void;
-  /** Re-reads one Request's Pledges after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }) {
   const { t } = useTranslation();
@@ -172,7 +146,6 @@ export function RequestsTab({
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(initialRequestId ?? null);
-  // A removed Request stays hidden until its Undo toast ends and the write lands.
   const pendingRemovals = useDeferredCommits();
   const { hiddenIds: hiddenRequestIds } = pendingRemovals;
   const requests = useMemo(
@@ -182,7 +155,6 @@ export function RequestsTab({
         : allRequests.filter((r) => !hiddenRequestIds.has(r.id)),
     [allRequests, hiddenRequestIds]
   );
-  // A link to a Request (`?request=`) opens its panel, also when the board is already showing.
   const [seenRequestId, setSeenRequestId] = useState(initialRequestId);
   if (initialRequestId !== seenRequestId) {
     setSeenRequestId(initialRequestId);
@@ -194,7 +166,6 @@ export function RequestsTab({
   const [jumps, setJumps] = useState<JumpRange>('any');
   const currentSystem = useCurrentSystem();
   const maxJumps = jumpRangeLimit(jumps);
-  // Who a buyback's contracts may go to: this device's Characters that are in the Community.
   const localCharacters = useLiveQuery(() => db.characters.toArray(), []);
   const buyers = useMemo<BuyerOption[]>(
     () =>
@@ -208,10 +179,7 @@ export function RequestsTab({
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
   const sharedItems = shared.status === 'ready' ? shared.items : undefined;
   const distance = useRequestDistance(characterId, currentSystem, maxJumps !== null);
-  // A limit that can no longer be measured (Permission revoked, location lost) is no limit:
-  // the select then reads "Any distance", never a limit the list is not applying.
   const limit = distance.status === 'unavailable' ? null : maxJumps;
-  // What the funnel shows: a range that cannot be measured reads "Any distance", never a limit the list is not applying.
   const shownJumps: JumpRange = limit === null ? 'any' : jumps;
   const filterValue: RequestFilterValue = { filter, jumps: shownJumps };
 
@@ -284,12 +252,10 @@ export function RequestsTab({
             unit="lines"
           />
         ),
-      // A standing Request has no lines to fill: it sinks, as a missing value does.
       sortValue: ({ progress, request }) =>
         request.standing || progress.lines === 0
           ? undefined
-          : // Delivered lines first, pledged ones break the tie.
-            (progress.deliveredLines + progress.pledgedLines / (progress.lines + 1)) /
+          : (progress.deliveredLines + progress.pledgedLines / (progress.lines + 1)) /
             progress.lines,
     },
     {
@@ -369,7 +335,6 @@ export function RequestsTab({
       buyers={buyers}
       editing={{
         request: editing,
-        // A standing Request's Pledges are quotes, which never pin its buy list.
         linesLocked: !editing.standing && (pledges.get(editing.id) ?? []).length > 0,
       }}
       onClose={() => setEditingId(null)}
@@ -414,13 +379,11 @@ export function RequestsTab({
   const distanceOff = distance.status === 'unavailable';
   const measuring = limit !== null && distance.status === 'loading';
   const myRows = myPledgeRows(requests, pledges, myUid, now);
-  // A Pledge counts as in progress until everything it promised is delivered.
   const inProgress = myRows.filter((row) => row.entry.delivered < row.entry.quantity).length;
   const requestsPart = t('communities.board.summaryRequests', { count: myOpen });
 
   return (
     <div className="space-y-3">
-      {/* The board on screen is the last good read: say the refresh failed rather than pass it off as current. */}
       {failed && <Panel>{reloadFailed}</Panel>}
       <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line px-3 py-2">
         <p className="min-w-0 basis-full text-xs text-text-dim sm:basis-0 sm:flex-1">

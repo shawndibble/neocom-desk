@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 
-/** planId -> its group. Absent means ungrouped, exactly as the list renders it. */
 const GROUPS = new Map([
   ['raven', 'fleet'],
   ['rifter', 'fleet'],
@@ -30,8 +29,6 @@ describe('drop ids', () => {
 
 describe('resolveGroupDrop', () => {
   it('moves an ungrouped plan into the group whose header was dropped on', () => {
-    // The collapsed-group case: a collapsed group renders no member rows, so
-    // its header is the only rect a drop can land on.
     expect(resolveGroupDrop(planDropId('loner'), groupDropId('fleet'), GROUPS)).toEqual({
       planId: 'loner',
       groupId: 'fleet',

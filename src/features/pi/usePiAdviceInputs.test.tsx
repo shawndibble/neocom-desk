@@ -4,8 +4,6 @@ import { db } from '@/db';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import type { PlanPrices } from './planPrices';
 
-// A plain function, not a `vi.fn`: vitest's spy tracks a rejected result on a
-// derived promise that reads as unhandled.
 let pricesRead: () => Promise<PlanPrices> = async () => prices(false);
 vi.mock('./goalPlannerSnapshot', () => ({ loadGoalPlannerPrices: () => pricesRead() }));
 vi.mock('./colonyBudget', () => ({ loadCommandCenterUpgrades: vi.fn(async () => 5) }));
@@ -51,7 +49,6 @@ describe('usePiAdviceInputs', () => {
         release = () => resolve({ kind: 'unknown' });
       });
     const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
-    // The prices are in; only the routes are outstanding.
     await waitFor(() => expect(pricesIn).toHaveResolved());
     expect(result.current.status).toBe('loading');
     release();

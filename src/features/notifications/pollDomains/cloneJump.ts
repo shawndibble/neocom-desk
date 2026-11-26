@@ -12,18 +12,11 @@ import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import { HOUR_MS } from './shared';
 
-/* Clone jump (issue #2316) --------------------------------------------------- */
-
 const isCloneJumpEntrySnapshot = shapeGuard<CloneJumpEntrySnapshot>({
   lastJumpMs: is.number,
   readyAtMs: is.number,
 });
 
-/**
- * The effective Infomorph Synchronizing level, exactly as the Clones route
- * reads it (#1236). Unreadable skills fall back to level 0 — the longest
- * cooldown — so the alert can arrive late, never early.
- */
 async function infomorphSynchronizingLevel(characterId: number, nowMs: number): Promise<number> {
   try {
     const corrected = await loadCorrectedSkills(characterId, nowMs, {
@@ -49,7 +42,6 @@ export const cloneJumpDomain = defineDomain<
     if (result.needsReauth || result.cached === null) return null;
     const last = result.cached.data.last_clone_jump_date;
     const lastJumpMs = last ? Date.parse(last) : NaN;
-    // Never jumped: no cooldown to end, so no entry — and no skills fetch.
     if (!Number.isFinite(lastJumpMs)) return [];
     const level = await infomorphSynchronizingLevel(characterId, Date.now());
     return [{ lastJumpMs, readyAtMs: lastJumpMs + cloneJumpCooldownHours(level) * HOUR_MS }];

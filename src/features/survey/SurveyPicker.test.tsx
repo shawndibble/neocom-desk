@@ -43,7 +43,6 @@ describe('SurveyPicker', () => {
     await noteSurvey(B);
     const onPick = vi.fn();
     render(<SurveyPicker currentId={A} onPick={onPick} />);
-    // The closed trigger shows the survey in view, not "Loading…".
     const trigger = await screen.findByRole('combobox', { name: 'Your surveys' });
     await waitFor(() => expect(trigger.textContent).toContain('Clear Icicle · 0% mined'));
     expect(loadSurvey).toHaveBeenCalledTimes(1);
@@ -53,7 +52,6 @@ describe('SurveyPicker', () => {
     await waitFor(() => expect(loadSurvey).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(options[0].textContent).toContain('Clear Icicle · 0% mined'));
 
-    // Newest first: B, then the one already in view.
     await userEvent.click(options[0]);
     expect(onPick).toHaveBeenCalledWith(B);
   });

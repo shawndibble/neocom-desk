@@ -9,7 +9,6 @@ interface Row {
 }
 
 const HOUR = 3_600_000;
-/** hours: since last seen; null = never seen. Dark from 7 days. */
 function row(characterId: number, name: string, hours: number | null): Row {
   const darkForMs = hours === null ? 400 * 24 * HOUR : hours * HOUR;
   return {
@@ -124,7 +123,6 @@ describe('buildPlayerLines', () => {
       groups: [kestrel, { id: 'solo:5', mainCharacterId: 5, characterIds: [5, 2] }],
     });
     expect(lines.filter((l) => l.characterId === 2)).toHaveLength(1);
-    // The second group is left with one character, so Sora shows as a plain member.
     expect(lines.find((l) => l.characterId === 5)?.kind).toBe('loose');
   });
 
@@ -225,7 +223,6 @@ describe('buildPlayerLines', () => {
 
     it('other columns use the main row value; missing values sort last both ways', () => {
       const sort = (direction: 'asc' | 'desc') => ({ columnId: 'ship', direction });
-      // Kestrel's main is 1 (Zeta); Ravi and Ingrid have no ship value.
       expect(names({ columnValue, sort: sort('asc') }).slice(0, 3)).toEqual([
         'Lena Voss',
         'Sora Tenn',

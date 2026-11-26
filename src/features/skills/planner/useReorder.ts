@@ -10,7 +10,6 @@ import { useScopedState } from './useScopedState';
 import { useState } from 'react';
 
 interface UseReorderArgs {
-  /** The preview reads as null once this scope moves on (plan swapped or edited). */
   planScope: readonly unknown[];
   engineSkills: ReadonlyMap<number, EngineSkill>;
   editable: SkillPlanEditable;
@@ -18,25 +17,20 @@ interface UseReorderArgs {
   priorityMap: ReturnType<typeof schedulePlanWith>['priorityMap'];
   milestones: SkillPlanRecord['milestones'];
   attributes: Attributes;
-  /** The implants in force under the What-If lens. */
   implants: Implants;
   cloneState: CloneState;
   onUpdate: (patch: Partial<SkillPlanRecord>) => void | Promise<void>;
-  /** Costs the suggested order, so the preview can show before/after totals. */
   pricing: PricingContext;
   loadedAtMs: number;
 }
 
-/** A suggested order and what it costs: the plan's own markers stay, only the entries move. */
 export interface ReorderPreview {
   kind: 'attributes' | 'shortest';
   steps: PlanStep[];
-  /** The suggested order as the schedule re-expands it, the "Optimized" side of the compare. */
   order: PlanStep[];
   totalSeconds: number;
 }
 
-/** "Reorder only" and "Shortest first": a suggested order, previewed in a Modal, Accept/Reject. */
 export function useReorder({
   planScope,
   engineSkills,
@@ -59,7 +53,6 @@ export function useReorder({
   const [reorderPreview, setReorderPreview] = useScopedState<ReorderPreview>(planScope);
 
   function previewOf(kind: ReorderPreview['kind'], steps: PlanStep[]): ReorderPreview {
-    // Override: only the reordered entries; the plan's own markers stay, as Accept leaves them.
     const { scheduled: order, totalSeconds } = schedulePlanWith(
       pricing.schedulablePlan,
       pricing.scheduleInputs,
@@ -77,7 +70,6 @@ export function useReorder({
     showReorderConfirm('attributes');
   }
 
-  /** "Shortest first": same preview/Accept-Reject flow as "Reorder only", fastest-ready-step-first instead of attribute-pair grouping. */
   function handleSortShortest() {
     if (scheduled.length === 0) return;
     setReorderPreview(

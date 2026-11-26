@@ -11,10 +11,6 @@ const RESPONSE_KEY: Record<CalendarResponse, string> = {
   not_responded: 'calendar.responseNotResponded',
 };
 
-/**
- * CSV columns for the Coming Up rail: every kind it lists, told apart by Kind. The date is the instant the
- * clock runs out, as an ISO string. Response and Important belong to calendar events and stay blank otherwise.
- */
 export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardItem>[] {
   return [
     { header: t('calendar.csvKind'), value: (item) => t(KIND_LABEL[item.kind]) },
@@ -22,7 +18,6 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardIte
     { header: t('calendar.csvTitle'), value: (item) => item.subject },
     {
       header: t('calendar.csvDetail'),
-      // The wording the rail prints, falling back to the raw detail it has no sentence for.
       value: (item) =>
         item.detail
           ? t(`calendar.detail.${item.kind}.${item.detail}`, { defaultValue: item.detail })
@@ -37,7 +32,6 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardIte
       header: t('calendar.csvImportant'),
       value: (item) => (item.kind === 'calendarEvent' ? exportFlag(t, item.important) : null),
     },
-    // The source's own id: an ESI event id for calendar events, a job or contract id otherwise.
     {
       header: t('calendar.csvId'),
       value: (item) => (/^\d+$/.test(item.sourceId) ? Number(item.sourceId) : item.sourceId),

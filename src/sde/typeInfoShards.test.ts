@@ -3,8 +3,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TYPE_INFO_SHARD_COUNT, typeInfoBucket, type TypeInfoShard } from './typeInfoShard';
 
-// Drift guard: the committed shards (scripts/lib/typeInfo.mjs) are keyed the
-// way the app looks them up (`typeInfoBucket`).
 const dir = join(process.cwd(), 'public', 'data', 'typeInfo');
 const read = (n: number) =>
   JSON.parse(readFileSync(join(dir, `${n}.json`), 'utf-8')) as TypeInfoShard;

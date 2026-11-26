@@ -20,11 +20,6 @@ import { moonChunks } from './data/structureModels';
 import type { BuildContext, Feeds, KindView } from './data/types';
 import type { Widget as WidgetModel } from './layout';
 
-/**
- * Corp Board widgets scoped to All my corporations (#6100): the real builders over sample
- * reads from three corporations, drawn in the real Widget shell. Each row names its
- * corporation (ticker, full name in the tooltip). The wallet reads balances only.
- */
 const meta = {
   title: 'overview/CorpAcrossWidgets',
   parameters: { layout: 'fullscreen' },
@@ -183,27 +178,20 @@ function Tile({ kind, view }: { kind: Kind; view: WidgetModel['view'] }): ReactN
 
 const PHONE = { viewport: { value: 'mobile1', isRotated: false } } as const;
 
-/** @summary Moon extractions across corporations: soonest first, each drill names its corporation. */
 export const MoonExtractionsAll: Story = {
   render: () => <Tile kind="moonChunks" view="table" />,
 };
 
-/** @summary Corp wallet across corporations: master wallet and total per corporation, balances only. */
 export const CorpWalletAll: Story = { render: () => <Tile kind="corpWallet" view="table" /> };
 
-/** @summary Corp wallet across corporations as a Number: the grand total. */
 export const CorpWalletAllNumber: Story = {
   render: () => <Tile kind="corpWallet" view="number" />,
 };
 
-/** @summary Corp industry jobs across corporations: finished first, then running. */
 export const CorpJobsAll: Story = { render: () => <Tile kind="corpJobs" view="table" /> };
 
-/** @summary Corp industry jobs across corporations in the phone shell. */
 export const CorpJobsAllPhone: Story = { ...CorpJobsAll, globals: PHONE };
 
-/** @summary Corp kills across corporations: summed totals, one row per corporation. */
 export const CorpKillsAll: Story = { render: () => <Tile kind="corpKills" view="table" /> };
 
-/** @summary Corp kills across corporations as a Number. */
 export const CorpKillsAllNumber: Story = { render: () => <Tile kind="corpKills" view="number" /> };

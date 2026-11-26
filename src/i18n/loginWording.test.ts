@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import en from './locales/en.json';
 
-/** The app says "log in" / "login" / "logged-in" everywhere; "sign in" is a second name for the same EVE SSO action. */
 const SIGN_IN = /\bsign(ed)?[- ]?in\b|\bsigning in\b/i;
 
 function collectStrings(node: unknown, path: string, out: [string, string][]) {

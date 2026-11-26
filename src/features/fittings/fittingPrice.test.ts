@@ -33,9 +33,7 @@ describe('loadFittingPrice', () => {
       DEFAULT_TRADE_HUB,
       expect.arrayContaining([587, 2456, 12608, 2454])
     );
-    // hull 500000 + module 1000 + charge 10 + 2x drone 40000 = 541010
     expect(appraisal.totals.buy).toBe(541010);
-    // hull 600000 + module 1500 + charge 12 + 2x drone 50000 = 651512
     expect(appraisal.totals.sell).toBe(651512);
     expect(appraisal.totals.unpricedRows).toBe(0);
   });
@@ -50,7 +48,6 @@ describe('loadFittingPrice', () => {
 
     const appraisal = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB, [], 90);
 
-    // (hull 600000 + module 1500) at 90%; the charge and drones have no price here.
     expect(appraisal.totals.sell).toBeCloseTo(541350);
     expect(appraisal.totals.buy).toBeCloseTo(450900);
   });

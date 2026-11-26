@@ -7,7 +7,6 @@ import { formatLocalDate } from '@/lib/localDate';
 import type { OptimizeVerdict } from './optimizeVerdict';
 import { schedulePlanWith, type PlanScheduleInputs, type SchedulablePlan } from './planSchedule';
 
-/** Shared "Added N skill(s)" wording for both import paths that only ever append (clipboard, queue Append). */
 export function appendedCountMessage(
   t: TFunction,
   trainedSkills: ReadonlyMap<number, TrainedSkill>,
@@ -25,11 +24,6 @@ export function yearlyRemapAfterNote(t: TFunction, date: Date, timeZone?: 'UTC')
   return t('plans.optimizeConfirmYearlyAfter', { date: formatLocalDate(date, timeZone) });
 }
 
-// Same beside-the-button confirmation for both Optimize Modes: the savings
-// figure when meaningful, otherwise *why* there is none. A run that placed
-// no remap at all — nothing to spend, or every marker at the plan's end —
-// is a no-op, not a finding about the plan, and saying "no meaningful
-// savings" for it sends the user off fixing the wrong thing.
 export function confirmRemapOutcome(
   t: TFunction,
   verdict: OptimizeVerdict,
@@ -54,34 +48,18 @@ export function confirmRemapOutcome(
   }
 }
 
-/** What `pricedAfterApply` costs a candidate against: the plan's own schedule inputs. */
 export interface PricingContext {
   schedulablePlan: SchedulablePlan;
   scheduleInputs: PlanScheduleInputs;
   loadedAtMs: number;
-  /** The base attributes a fallback "keep current attributes" segment is reported under. */
   attributes: Attributes;
 }
 
-/**
- * What `optimizeAtMarkers` (via `schedulePlan`) actually reports for a
- * candidate `(entries, markers)` pair — the SAME costing Accept's write
- * will show afterwards, redundant-marker drop and entry-snap included.
- * Every optimize-and-preview flow re-prices through this before showing a
- * segment count or a savings figure, so the preview never promises a remap
- * that Accept goes on to drop as redundant. `markers.length === 0` (every
- * proposed remap turned out redundant) reports `schedulePlan`'s own
- * `markersResult: null` as the same "keep current attributes" baseline
- * `placeRemaps` itself falls back to when no remap beats it.
- */
 export function pricedAfterApply(
   { schedulablePlan, scheduleInputs, loadedAtMs, attributes }: PricingContext,
   finalEntries: readonly PlanEntry[],
   finalMarkers: readonly number[]
 ): { order: PlanStep[]; remaps: PlaceRemapsResult } {
-  // Override: candidate entries/markers, and `markerAttributes: []` on purpose —
-  // it matches what `applyOptimizerRemapSegments` writes (skillPlanEdit.ts), so the
-  // preview costs exactly what Accept will leave behind.
   const finalSchedule = schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
     entries: [...finalEntries],
     markers: [...finalMarkers],
@@ -107,7 +85,6 @@ export function pricedAfterApply(
   return { order: finalSchedule.scheduled, remaps };
 }
 
-/** Each segment's first step, by key — see `stepKey`. */
 export function anchorKeysOf(
   stepKeys: readonly StepKey[],
   segments: readonly RemapSegment[]
@@ -115,7 +92,6 @@ export function anchorKeysOf(
   return segments.map((segment) => stepKeys[segment.startIndex]);
 }
 
-/** The toast "Optimize queue" leaves behind for a plan it made. */
 export function optimizeQueueMadeMessage(
   t: TFunction,
   name: string,

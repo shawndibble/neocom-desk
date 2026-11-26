@@ -25,8 +25,6 @@ const loadStructureInfo = vi.hoisted(() =>
 );
 vi.mock('@/features/character/structures', () => ({ loadStructureInfo }));
 
-// The SDE read behind placement is `courierEndpoints.test.ts`'s; here it only
-// has to say the end was placed in the system the lookup returned.
 vi.mock('@/features/contractSearch/courierEndpoints', () => ({
   placeStructureEndpoint: async (
     endpoint: CourierEndpoint,
@@ -55,7 +53,6 @@ vi.mock('@/features/travel/useLawlessSystems', () => ({
   useLawlessSystems: () => lawlessSystems,
 }));
 
-// Hydrated at once, so the modal asks for its route on first render.
 const RULES = { preference: 'prefer-highsec' as const };
 vi.mock('@/features/route/routeRules', () => ({
   useRouteQuery: () => ({ rules: RULES, key: 'k', hydrated: true, podKillsUnavailable: false }),
@@ -128,8 +125,6 @@ function renderModal(
 beforeEach(() => {
   loadStructureInfo.mockReset();
   routeExposure.mockReset();
-  // The route lookup waits for Travel Settings to hydrate, which an earlier
-  // test's render may already have done.
   routeExposure.mockResolvedValue({ kind: 'unknown' });
   lawlessSystems = new Set();
   openInEve.unavailable = false;
@@ -245,7 +240,6 @@ describe('CourierContractDetailModal focus return', () => {
     const fallback = vi.fn(() => null);
     const { unmount } = renderModal({ kind: 'known', count: 2 }, { returnFocusFallback: fallback });
     unmount();
-    // Radix hands focus back on a timer after the panel unmounts.
     await waitFor(() => expect(fallback).toHaveBeenCalled());
   });
 });

@@ -17,7 +17,6 @@ export function Readout({
 }: {
   gauge: RingGauge;
   budget: Budget;
-  /** The side of the ring its gauge is on, so the strip mirrors the rim. */
   align: 'start' | 'end';
 }) {
   const { t } = useTranslation();
@@ -25,7 +24,6 @@ export function Readout({
   const known = used !== null && total !== null;
   const { overBudget, flashKey } = flash;
   const value = budgetValue(t, budget);
-  // Drone bandwidth has no fix to offer: no swap, skill or implant makes room for a drone.
   const fixable = gauge === 'cpu' || gauge === 'powergrid' || gauge === 'calibration';
   return (
     <div className={`min-w-0 text-xs tabular-nums ${align === 'end' ? 'text-right' : ''}`}>
@@ -62,7 +60,6 @@ export function Readout({
   );
 }
 
-/** The four module-state border colours the tiles use, named — touch has no hover to learn them from. */
 export function ModuleStateLegend() {
   const { t } = useTranslation();
   const states: FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -84,7 +81,6 @@ export function ModuleStateLegend() {
   );
 }
 
-/** The ship's own render, falling back to its icon when the image server has none. */
 export function ShipRender({ typeId }: { typeId: number }) {
   const [failed, setFailed] = useState(false);
   const [renderedTypeId, setRenderedTypeId] = useState(typeId);

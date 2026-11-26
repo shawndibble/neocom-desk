@@ -1,11 +1,3 @@
-/**
- * Ships › Tree (scope decision `20260926-135538`): the in-game Ship Tree,
- * one faction at a time, marked with the active Character's progress. A
- * map on a desktop and a ladder on a phone, either switchable, the choice
- * remembered. The faction lives in the URL (`?faction=`, ADR 0015); a hull
- * opens its Ship Info window. The page header and tab bar are the Ships
- * route's.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
@@ -39,13 +31,10 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import './shipTree.css';
 
 const MASTERY_KEYS = MASTERY_TIERS.map(String);
-// One group: a tap that switches faction from a filtered empty state writes
-// both, and two hooks writing in one tick would drop the first (ADR 0015).
 const TREE_PARAMS = {
   faction: intParam(DEFAULT_FACTION_ID, { min: 0 }),
   fly: enumParam(['all', 'canFly', 'cantFly'] as const, 'all'),
   mastery: enumSetParam(MASTERY_KEYS, []),
-  // The hull whose Ship Info window is open: linkable, so the palette can open it.
   ship: optionalIdParam(),
 };
 
@@ -54,7 +43,6 @@ export function ShipTreeTab() {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { source, retry } = useShipTreeData(characterId);
   const online = useOnline();
-  // Retry unmounts while the tree loads, so the always-mounted wrapper holds focus meanwhile.
   const [focusRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
     source === 'failed' ? 'failed' : source ? 'ok' : 'busy',
     characterId
@@ -96,9 +84,6 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(TREE_PARAMS);
   const factionID = resolveFactionID(source.data, params.faction);
-  // Until the Mastery data loads every hull reads tier 0, so a Mastery pick
-  // (from the URL) is set aside rather than emptying the ladder; it stays in
-  // the URL and applies once the data arrives.
   const masteriesLoaded = source.masteriesStatus === 'loaded';
   const filter = useMemo<ShipTreeFilter>(
     () => ({
@@ -124,12 +109,8 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         : (source.data.ships.find((ship) => ship.typeID === params.ship) ?? null),
     [params.ship, source.data.ships]
   );
-  // The hull the map marks once the window closes: the last one opened.
   const [lastOpened, setLastOpened] = useState<number | null>(null);
   if (selected && selected.typeID !== lastOpened) setLastOpened(selected.typeID);
-  // Arrival with `?ship=`: show the faction behind the window; an unknown id
-  // is dropped without a word.
-  // Once per hull: the window is non-modal on a desktop, so a later faction pick stands.
   const shownFor = useRef<number | null>(null);
   useEffect(() => {
     if (params.ship === null) {
@@ -142,7 +123,6 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
       if (selected.factionID !== params.faction) setParams({ faction: selected.factionID });
     }
   }, [params.ship, params.faction, selected, setParams]);
-  // A hull opened while a window is already open replaces; otherwise Back closes it.
   const openShip = useCallback(
     (ship: ShipTreeShip) =>
       setParams(
@@ -151,7 +131,6 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
       ),
     [setParams, params.ship]
   );
-  // Close never goes Back: the tree under the window stays as the pilot left it.
   const closeShip = useCallback(() => setParams({ ship: null }), [setParams]);
 
   const isPhone = useIsPhone();
@@ -186,7 +165,6 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     [view, filter, source.data, source.statuses]
   );
 
-  // Above a phone's map; under the ladder's toolbar, whose filters change its counts.
   const factionBar = (
     <FactionBar
       data={source.data}

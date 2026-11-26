@@ -3,8 +3,6 @@ import type { PaginatedResult } from '../paginated';
 import type { EndpointOptions } from './options';
 import { postChunked } from './postChunked';
 
-// --- GET /characters/{character_id}/assets (esi-assets.read_assets.v1) ---
-
 export interface CharacterAsset {
   item_id: number;
   type_id: number;
@@ -16,19 +14,8 @@ export interface CharacterAsset {
   is_blueprint_copy?: boolean;
 }
 
-/**
- * A character's asset list can run into the tens of thousands of rows
- * (BPO libraries, PI, hangars scattered across many stations). Past this
- * many pages, further fetching costs more in ESI round trips than the view
- * can usefully render — stop and report the cut rather than fetch forever.
- */
 const MAX_ASSET_PAGES = 25;
 
-/**
- * Paginated (X-Pages), capped at MAX_ASSET_PAGES; see fetchAllPagesStatus.
- * `truncated` covers both the cap and a short read, so a partial list never
- * reaches the view looking whole.
- */
 export function getCharacterAssets(
   characterId: number,
   options: EndpointOptions = {}
@@ -41,19 +28,6 @@ export function getCharacterAssets(
   });
 }
 
-// --- GET /corporations/{corporation_id}/assets (esi-assets.read_corporation_assets.v1) ---
-
-/**
- * Structurally identical to `CharacterAsset` in the live schema, down to the
- * optional `is_blueprint_copy` — the difference is entirely in the values.
- * `location_flag` carries `CorpSAG1`..`CorpSAG7` (the seven hangar divisions),
- * `OfficeFolder`, `CorpDeliveries` and `Impounded`, none of which ever appear
- * on a Character's own assets.
- *
- * Kept as its own interface rather than aliased to `CharacterAsset`: they are
- * two endpoints behind two scopes and two gates, and the corp one is the shape
- * a corp-assets surface will read.
- */
 export interface CorporationAsset {
   item_id: number;
   type_id: number;
@@ -65,11 +39,6 @@ export interface CorporationAsset {
   is_blueprint_copy?: boolean;
 }
 
-/**
- * Paginated (X-Pages) and capped at the same `MAX_ASSET_PAGES` as the character
- * list — a corporation's holdings are the larger of the two, so the cap matters
- * more here, and `truncated` reports it exactly as it does there.
- */
 export function getCorporationAssets(
   characterId: number,
   corporationId: number,
@@ -83,19 +52,11 @@ export function getCorporationAssets(
   });
 }
 
-// --- POST /characters/{character_id}/assets/names (esi-assets.read_assets.v1) ---
-
-/** One in-game item name. ESI echoes the type name or `None` for an item the player never named. */
 export interface AssetName {
   item_id: number;
   name: string;
 }
 
-/**
- * The names players gave their assembled ships and containers. Up to 1000 ids
- * per request (more are batched); ESI fails a whole batch on one id it cannot
- * name, so callers send singleton, nameable items only.
- */
 export function postCharacterAssetNames(
   characterId: number,
   itemIds: number[],
@@ -110,9 +71,6 @@ export function postCharacterAssetNames(
   );
 }
 
-// --- POST /corporations/{corporation_id}/assets/names (esi-assets.read_corporation_assets.v1) ---
-
-/** The corp twin of `postCharacterAssetNames`; Director-only like the corp assets read. */
 export function postCorporationAssetNames(
   characterId: number,
   corporationId: number,

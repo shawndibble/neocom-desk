@@ -15,27 +15,17 @@ import { DialogShell, Effect, Label } from './BookDialogs';
 import { useBook } from './useBook';
 import { useMinerChoices } from './useMinerChoices';
 
-/** Everything the group dialog needs, so it runs on the Miner page (the book) and on the roster (no book). */
 export interface GroupSource {
   status: 'loading' | 'ready' | 'failed';
-  /** Every stored group, and every ungrouped character mining since the start date. */
   choices: readonly MinerChoice[];
-  /** The stored groups, which `planRegroup` needs whole. */
   stored: readonly Miner[];
   name: (characterId: number) => string;
   edit: (action: { action: string } & Record<string, unknown>) => Promise<unknown>;
-  /** The officer's Character, who runs the name search. */
   searchAs: number;
 }
 
 type Target = Pick<MinerRow, 'id' | 'mainCharacterId' | 'characterIds'>;
 
-/**
- * Group other Miners' characters, and characters found by name, into this one (D18, issue #4194):
- * an officer picks the Miners to fold in and which character gets the mail. A character added by
- * name, inside or outside the corporation, is an Officer claim: billed with the group, no
- * confirmation, and it reads nothing of it until its owner signs in as it.
- */
 export function GroupMinersView({
   open,
   onClose,
@@ -48,12 +38,7 @@ export function GroupMinersView({
   onClose: () => void;
   miner: Target;
   source: GroupSource;
-  /** `'player'` is the Members page's words (a Player's characters); `'miner'` the Moons page's. */
   wording?: 'miner' | 'player';
-  /**
-   * The corporation roster's character ids. When given, a character is labelled "not in the
-   * corporation" only if the roster lacks it; without it the label follows the choice's standing.
-   */
   rosterIds?: ReadonlySet<number>;
 }) {
   const { t } = useTranslation();
@@ -233,7 +218,6 @@ export function GroupMinersView({
   );
 }
 
-/** The group dialog on a Miner's page, fed by the open book. */
 export function GroupMinersDialog({
   open,
   onClose,

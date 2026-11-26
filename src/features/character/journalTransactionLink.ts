@@ -1,25 +1,6 @@
-/**
- * Ties a wallet journal line to the market fill behind it, so the journal can
- * name the item a `market_transaction` bought or sold.
- *
- * Two keys, both exact: a transaction's `journal_ref_id` names its journal
- * line, and a journal line whose context is a `market_transaction_id` names
- * its transaction. Keyed on the data rather than on a list of ref types, so a
- * line such as `transaction_tax` links when ESI gives it that context and
- * quietly doesn't when it doesn't. Market escrow and broker fees carry no such
- * key, so they stay unlinked rather than guessed at.
- *
- * Transactions are capped at a few pages while the journal is not, so an
- * older journal line simply finds nothing.
- */
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 import type { JournalLine } from '@/engine/journalNetting';
 
-/**
- * Tagged with `characterId`, lines and fills match within their own Character:
- * two Characters' journals can carry the same ref id (a transfer between them
- * is on both).
- */
 export function journalTransactionLinks<
   T extends WalletTransactionCommon & { characterId?: number },
 >(transactions: readonly T[]): (entry: JournalLine) => T | undefined {

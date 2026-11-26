@@ -19,28 +19,16 @@ interface Props {
   onClose: () => void;
   onPaid: () => void;
   book: CorpBookViewBook;
-  /** The book's owed rows on the page (`DisplayRow.corp` of kind `row`): who can pay. */
   rows: readonly DisplayRow[];
-  /** Each of the member's Miners' own Reason code (`minerPayCodes`). */
   codes: readonly MinerPayCode[];
-  /** Opened from one row: paid by that row's Character. A book is paid by amount, never by day. */
   focus?: { rowId: string; characterId: number };
 }
 
-/**
- * Settle up for a Corp Tax Book's Payee: how to send the money, read off the paying Character's
- * Miner's Running account (the book's own, with the member's donations in flight added): what it
- * owes, which days an amount pays oldest first, the Miner's own code as the Reason, and the
- * Account to pick in EVE's transfer window (the corp's own name for the division when a
- * Director's visit stored it, #6161). Nothing is recorded on the member's side: the book credits
- * the donation from its own wallet, and until it does the donation counts as in flight.
- */
 export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Props) {
   const { t } = useTranslation();
   const { copied, copy } = useCopiedField();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const division = primaryDivisionOf(book.loaded.divisions, book.loaded.primaryDivision);
-  // The other divisions it reads: a donation into one of them is credited all the same.
   const otherAccounts = corpPayAccounts(
     divisionsPrimaryFirst(book.loaded.divisions, book.loaded.primaryDivision).slice(1),
     book.loaded.divisionNames,
@@ -58,7 +46,6 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
         ]
       : []
   );
-  // The payer's Miner: a donation pays the account of its sender's Miner.
   const minerOf = (payerId: number | null) => {
     if (payerId === null)
       return book.summary.miners.length === 1 ? book.summary.miners[0] : undefined;
@@ -74,7 +61,6 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
       onPaid={onPaid}
       rows={settleRows}
       {...(payerId !== undefined ? { payerId } : {})}
-      // An open day's estimate is owed now too: paid early, it waits as credit for the bill.
       owedFor={(payer) => {
         const miner = minerOf(payer);
         return (miner?.account.owes?.amount ?? 0) + (miner?.estimate ?? 0);
@@ -87,12 +73,10 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
           minerId: miner.minerId,
           characterId: payer ?? 0,
           amount,
-          // A donation sent now: the book credits it when it reads its wallet.
           at: new Date().toISOString(),
           source: 'donation',
         });
       }}
-      // The Miner's code says whose money it is; the days say what it pays (oldest first).
       reason={(payer, outcome) =>
         buildSettleUpReason(
           suggestedCode(codes, payer ?? undefined)?.code ?? t('miningTax.settleUpReasonPrefix'),
@@ -102,7 +86,6 @@ export function CorpPayDialog({ onClose, onPaid, book, rows, codes, focus }: Pro
       }
       reasonHint={t('miningTax.corpBook.pay.codeInReason')}
       methods={['donation']}
-      // "I sent it": counted as paid until the book reads its wallet and does not find it.
       record={(payment) =>
         linkPayment(
           {

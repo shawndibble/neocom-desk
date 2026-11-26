@@ -51,7 +51,6 @@ const structuresFeed = (list: BoardStructureSource[] | null, needsReauth = false
     fetchedAt: new Date(NOW - HOUR_MS),
   });
 
-/** A moon read: null is unreadable; each extraction arrives at `chunkArrivalMs`. */
 const moonFeed = (extractions: BoardExtractionSource[] | null, needsReauth = false) =>
   ok<MoonChunksBoardData>({
     chunks: extractions === null ? null : [],
@@ -128,7 +127,6 @@ describe('corpDeadlines', () => {
       ]),
     };
     const view = corpDeadlines(feeds, ctx);
-    // fuel in 5h, moon in 8h; a finished job is "Ready to deliver", not a deadline
     expect(view.number.value).toBe('2');
     expect(view.number.unit).toBe('corp.standing.dueSoon');
     expect(view.number.secondary?.text).toContain('Helios');
@@ -176,7 +174,6 @@ describe('corpDeadlines', () => {
           state: 'online',
           reinforcedUntilMs: null,
           unanchorsAtMs: null,
-          // 40 blocks an hour: 6 hours left.
           bay: { fuelBlocks: 240, strontium: 400 },
           bayReadAtMs: NOW,
         },
@@ -205,11 +202,9 @@ describe('corpDeadlines', () => {
       corpJobs: jobsFeed([]),
     };
     const failedTowers: FeedState<CorpStarbasesFeed> = { data: null, error: true, loading: false };
-    // Partial data still drawn, failure flagged.
     const partial = corpDeadlines({ ...base, corpStarbases: failedTowers }, ctx);
     expect(partial.number.value).toBe('1');
     expect(partial.status.error).toBe(true);
-    // Nothing else readable: the failure is the answer.
     const none = corpDeadlines(
       {
         structures: ok({ ...structuresFeed([]).data!, structures: null }),
@@ -283,7 +278,6 @@ describe('corpDeadlines', () => {
       ['X-7OMU IV', 'corp.board.detail.sovRaid.skyhook.upcoming', 'critical'],
       ['Efa VI', 'corp.board.detail.sovRaid.skyhook.upcoming', 'watch'],
     ]);
-    // Both land in the Deadline Strip's fortnight.
     const chart = view.chart;
     if (chart?.kind !== 'bars') throw new Error('expected the day-bar chart');
     expect(chart.values.reduce((a: number, b: number) => a + b, 0)).toBe(2);
@@ -339,7 +333,6 @@ describe('corpDeadlines', () => {
       process.env.TZ = originalTz;
     });
 
-    // 05:00 UTC the next day is 22:00 tonight in Los Angeles: two days on two clocks.
     const feeds = (): Feeds => ({
       structures: structuresFeed([structure({ fuelExpiresMs: NOW + 17 * HOUR_MS })]),
       moonChunks: moonFeed([]),
@@ -501,7 +494,6 @@ describe('corpDeadlines across corporations (All scope)', () => {
     );
     expect(view.table?.rows).toHaveLength(1);
     expect(view.status.error).toBe(true);
-    // Only one corporation answered: no column naming it.
     expect(view.table?.columns.map((column) => column.key)).not.toContain('corp');
   });
 

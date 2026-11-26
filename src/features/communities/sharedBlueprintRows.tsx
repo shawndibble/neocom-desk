@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import type { PlaceLabel } from './useBlueprintPlaces';
 
-/** A place's name, or a fallback while it loads and when it cannot be read. */
 function usePlaceText() {
   const { t } = useTranslation();
   return (label: PlaceLabel | undefined) =>
@@ -11,10 +10,6 @@ function usePlaceText() {
       : (label.name ?? t('communities.blueprints.unknownLocation'));
 }
 
-/**
- * One station or structure: its name, then its system and how many
- * blueprints sit there (left out when the count is not known).
- */
 export function PlaceName({ label, count }: { label: PlaceLabel | undefined; count?: number }) {
   const { t } = useTranslation();
   const text = usePlaceText();
@@ -32,11 +27,6 @@ export function PlaceName({ label, count }: { label: PlaceLabel | undefined; cou
   );
 }
 
-/**
- * A blueprint's name, and under it the shared locations it is shared through:
- * "via Jita IV - Moon 4", or the first one "+N more" with every name in a
- * tooltip, so the Member knows which location to stop.
- */
 export function BlueprintName({
   name,
   via,

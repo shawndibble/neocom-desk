@@ -7,13 +7,6 @@ interface Resolved {
   security: ReadonlyMap<number, number>;
 }
 
-/**
- * The system names and security of the Corp Tax Book rows, merged over the
- * ledger's own (`known`): a book row's system is looked up exactly like a
- * personal row's (`loadSystemNameAndSecurity`), only for the ids the ledger
- * has not resolved already. An id that fails to resolve stays out of the maps,
- * so the row falls back to `#id`.
- */
 export function useBookSystems(
   view: CorpBookView | null,
   known: { names: ReadonlyMap<number, string>; security: ReadonlyMap<number, number> }

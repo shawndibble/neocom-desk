@@ -1,20 +1,5 @@
-// Pure transform behind build-sde.mjs's Ship Tree bake (public/data/shipTree.json).
-// Takes the same {name: rows} shape build-sde.mjs's own `raw` object holds —
-// each value the array-of-arrays `parseCsv` returns (header row first, then
-// data rows, every cell a string) — so this is testable with small hand-made
-// fixtures, no download pipeline needed.
-// Mirrors flattenMarketWideTree.mjs's split: the join logic lives here, the
-// CSV download/cache and output-writing stay in build-sde.mjs.
-//
-// Output shape is `ShipTreeData` (src/sde/types.ts) — read that file before
-// changing anything here; the tree's *shape* (which class hangs off which)
-// is not in the SDE and lives in `engine/shipTree/templates.ts` instead.
-
 const SHIP_CATEGORY_ID = '6';
 
-// Hull stat fields -> the dgmAttributeTypes.attributeName that carries them.
-// Resolved BY NAME against the dump every bake, never hard-coded ids: an
-// attribute's id is only stable for one dump, not a fact worth memorizing.
 const STAT_ATTRIBUTE_NAMES = {
   highSlots: 'hiSlots',
   medSlots: 'medSlots',
@@ -41,7 +26,6 @@ function indexHeader(rows) {
   return idx;
 }
 
-/** Strips HTML tags (invTraits' `<a href=showinfo:…>…</a>`) and tidies whitespace onto one line. */
 function tidyText(s) {
   return (s ?? '')
     .replace(/<[^>]+>/g, '')
@@ -49,12 +33,6 @@ function tidyText(s) {
     .trim();
 }
 
-/**
- * A hull description (invTypes' markup) as plain text that keeps its line
- * breaks: `<br>` and paragraph tags become newlines — stripping them outright
- * glued sentences together ("wreckage.The Noctis") — every other tag goes,
- * runs of spaces and tabs collapse, and never more than one blank line.
- */
 export function tidyDescription(s) {
   return (s ?? '')
     .replace(/\r\n?/g, '\n')
@@ -68,18 +46,11 @@ export function tidyDescription(s) {
     .trim();
 }
 
-/** `res:/UI/Texture/Classes/ShipTree/groupIcons/battleCruiser.png` -> `battlecruiser`. */
 function iconBasename(path) {
   const base = (path ?? '').split('/').pop() ?? '';
   return base.replace(/\.png$/i, '').toLowerCase();
 }
 
-/**
- * Builds `ShipTreeData` from Fuzzwork's ship-tree CSVs, already parsed into
- * row arrays. `csv` keys: invTypes, invGroups, invTraits, eveUnits,
- * chrFactions, shipSkills, shipTreeGroups, shipTreeGroupPreReqSkills,
- * shipTreeFactions, dgmTypeAttributes, dgmAttributeTypes.
- */
 export function buildShipTree(csv) {
   const {
     invTypes: invTypesRows,
@@ -95,8 +66,6 @@ export function buildShipTree(csv) {
     dgmAttributeTypes: dgmAttributeTypesRows,
   } = csv;
 
-  // --- invGroups: groupID -> categoryID (raw strings — the hull filter
-  // below compares them straight from the CSV, no Number() round trip) ---
   const categoryOfGroup = new Map();
   {
     const h = indexHeader(invGroupsRows);
@@ -106,9 +75,6 @@ export function buildShipTree(csv) {
     }
   }
 
-  // --- shipTreeGroups / shipTreeFactions ids, for the hull filter. Junk
-  // rides in invTypes.shipTreeGroupID on non-ship rows, so the category
-  // check above is what actually keeps this filter honest. ---
   const shipTreeGroupIds = new Set();
   {
     const h = indexHeader(shipTreeGroupsRows);
@@ -124,7 +90,6 @@ export function buildShipTree(csv) {
     }
   }
 
-  // --- eveUnits: unitID -> displayName, for trait units ---
   const unitDisplayName = new Map();
   {
     const h = indexHeader(eveUnitsRows);
@@ -134,8 +99,6 @@ export function buildShipTree(csv) {
     }
   }
 
-  // --- hulls: published, category 6 (Ship), a Ship Tree class, a Ship Tree
-  // faction (this is what drops the Capsule — faction 500005 isn't one) ---
   const hulls = [];
   {
     const h = indexHeader(invTypesRows);
@@ -154,9 +117,6 @@ export function buildShipTree(csv) {
         metaLevel: Number(r[h.metaLevel]) || 0,
         required: [],
         traits: [],
-        // A T3 cruiser hull carries none of these dogma attributes at all —
-        // its slots come from fitted subsystems, not the hull — so every
-        // field defaults to 0 rather than some fields being absent.
         stats: { ...ZERO_STATS },
         description: tidyDescription(r[h.description]),
       });
@@ -164,7 +124,6 @@ export function buildShipTree(csv) {
   }
   const hullByTypeId = new Map(hulls.map((s) => [s.typeID, s]));
 
-  // --- required: shipSkills (typeID, skillID, level) ---
   {
     const h = indexHeader(shipSkillsRows);
     for (let i = 1; i < shipSkillsRows.length; i++) {
@@ -175,8 +134,6 @@ export function buildShipTree(csv) {
     }
   }
 
-  // --- traits: invTraits. skillID <= 0 is a role bonus (not per skill
-  // level); bonus '' or 'None' is a bonus with no number. ---
   {
     const h = indexHeader(invTraitsRows);
     for (let i = 1; i < invTraitsRows.length; i++) {
@@ -196,9 +153,6 @@ export function buildShipTree(csv) {
     }
   }
 
-  // --- stats: dgmTypeAttributes, attribute ids resolved BY NAME against
-  // dgmAttributeTypes — never hard-coded, a lesson from the throwaway
-  // prototype. ---
   {
     const attrIdByName = new Map();
     const h = indexHeader(dgmAttributeTypesRows);
@@ -225,9 +179,6 @@ export function buildShipTree(csv) {
     }
   }
 
-  // --- groups: every shipTreeGroups row (not only ones with hulls — the
-  // Ship Tree's class rail always shows every class, empty or not), plus
-  // shipTreeGroupPreReqSkills per faction. ---
   const groups = {};
   {
     const h = indexHeader(shipTreeGroupsRows);
@@ -252,15 +203,11 @@ export function buildShipTree(csv) {
       (group.prereqsByFaction[factionID] ??= []).push({
         skillTypeID: Number(r[h.skillID]),
         level: Number(r[h.level]),
-        // display=0 rows are implicit (e.g. Spaceship Command I on Corvette)
-        // — the game doesn't draw them, but a fitting-check still needs them.
         display: r[h.display] === '1',
       });
     }
   }
 
-  // --- factions: shipTreeFactions (description) + chrFactions (name), only
-  // factions with at least one hull, keeping shipTreeFactions' own row order. ---
   const factionNameById = new Map();
   {
     const h = indexHeader(chrFactionsRows);

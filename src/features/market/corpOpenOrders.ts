@@ -1,13 +1,3 @@
-/**
- * Corporation as a data source of Market's Open orders. The corp read
- * (`loadCorpOrdersFeed`) is mapped into the same page snapshot the Character
- * read yields, so the panel draws it unchanged: one entry per issuer where the
- * Character view has one per Character, so the Character column names who
- * placed each order. What the corporation has none of (cost basis, skills,
- * standings, order history) stays empty, and the panel shows what it shows for
- * any missing value. Undercut and relist advice rest on market prices alone, so
- * they work the same.
- */
 import { buildOpenOrderRows, type OpenOrderRow } from './openOrdersModel';
 import type { CharacterOpenOrders } from './openOrdersData';
 import type { OpenOrdersPageSnapshot } from './openOrdersPageSnapshot';
@@ -17,7 +7,6 @@ import {
   type CorpOrdersFeed,
 } from '@/features/overview/widgets/data/corpFeeds';
 
-/** The Character page snapshot's shape, fed from the corporation's orders. */
 export function corpOrdersSnapshot(feed: CorpOrdersFeed, now: number): OpenOrdersPageSnapshot {
   const fetchedAt = feed.fetchedAt?.getTime() ?? 0;
   const byIssuer = new Map<number, MarketOrder[]>();
@@ -38,7 +27,6 @@ export function corpOrdersSnapshot(feed: CorpOrdersFeed, now: number): OpenOrder
   return {
     openOrders: { entries, skipped: [] },
     typeNames: new Map(feed.typeNames),
-    // The corp read keeps names only; the station's system is not needed here.
     npcStations: new Map([...feed.stationNames].map(([id, name]) => [id, { name, systemId: 0 }])),
     stationsLoaded: feed.stationNames.size > 0,
     stationPrices: new Map(feed.stationPrices),
@@ -52,7 +40,6 @@ export function corpOrdersSnapshot(feed: CorpOrdersFeed, now: number): OpenOrder
   };
 }
 
-/** The corporation's open orders as Open orders rows, judged by the Character undercut rules. */
 export function corpOrderRows(feed: CorpOrdersFeed, now: number): OpenOrderRow[] {
   const snapshot = corpOrdersSnapshot(feed, now);
   return buildOpenOrderRows({
@@ -66,10 +53,6 @@ export function corpOrderRows(feed: CorpOrdersFeed, now: number): OpenOrderRow[]
   });
 }
 
-/**
- * The page's read for the Corporation source: gated on corp access inside the
- * feed. A feed that is neither readable nor a lapsed grant is a failed read.
- */
 export async function loadCorpOpenOrdersSnapshot(
   characterId: number
 ): Promise<OpenOrdersPageSnapshot> {
@@ -78,11 +61,6 @@ export async function loadCorpOpenOrdersSnapshot(
   return corpOrdersSnapshot(feed, Date.now());
 }
 
-/**
- * The Corporation source for a Character whose role reads corp orders but
- * whose grant predates the scope: no read (it would only 403), just the
- * page's corp grant banner over an empty list.
- */
 export async function loadCorpOrdersGrantSnapshot(): Promise<OpenOrdersPageSnapshot> {
   return corpOrdersSnapshot(
     {

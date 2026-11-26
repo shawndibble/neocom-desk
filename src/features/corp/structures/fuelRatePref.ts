@@ -1,10 +1,3 @@
-/**
- * Device-local: the fuel rate last measured for each structure, by structure
- * id, in blocks a day. The Structures page measures a rate only when EVE read
- * the fuel bay and the fuel expiry at the same time (`fuelPlan`); in between,
- * a refuel can make a fresh pair disagree, and this is the rate it falls back
- * to. A structure burns at one rate until its services change.
- */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { isFiniteNumber, isPlainRecord } from '@/engine/guards';
 
@@ -25,13 +18,8 @@ export const useFuelRates = createLocalSetting<FuelRates>({
       : null,
 });
 
-/** Close enough to the stored rate that rewriting it would only churn the setting. */
 const SAME_RATE = 0.5;
 
-/**
- * `rates` with each newly measured rate in, or `rates` itself when none moved
- * by `SAME_RATE` or more, so a caller can skip the write.
- */
 export function withMeasuredRates(
   rates: FuelRates,
   measured: ReadonlyMap<number, number>

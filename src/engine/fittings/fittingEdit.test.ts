@@ -354,7 +354,6 @@ describe('drones', () => {
 });
 
 describe('drone bay volume', () => {
-  // Hobgoblin 5 m3, Hammerhead 10 m3; a 50 m3 bay.
   const VOLUME: Record<number, number> = { 2454: 5, 2185: 10 };
   const volumeOf = (typeId: number) => VOLUME[typeId] ?? 0;
   const bay = (capacity: number): DroneBay => ({ capacity, volumeOf });
@@ -375,7 +374,6 @@ describe('drone bay volume', () => {
   });
 
   it('says how many more of a type fit beside everything else', () => {
-    // 35 of 50 m3 used: three more Hobgoblins, one more Hammerhead.
     expect(droneRoom(fit, 2454, bay(50))).toBe(3);
     expect(droneRoom(fit, 2185, bay(50))).toBe(1);
   });
@@ -404,14 +402,12 @@ describe('addDronesWithinBay', () => {
   it('stops at what the bay holds', () => {
     const full = addDronesWithinBay(empty, 2185, 9, { capacity: 20, volumeOf });
     expect(droneGroups(full)).toEqual([{ typeId: 2185, inSpace: 0, inBay: 2 }]);
-    // Nothing more fits: the same Fitting back, so no empty edit is recorded.
     expect(addDronesWithinBay(full, 2454, 1, { capacity: 20, volumeOf })).toBe(full);
   });
 });
 
 describe('setDronesCarried', () => {
   const volumeOf = (typeId: number) => ({ 2454: 5, 2185: 10 })[typeId] ?? 0;
-  // Three Hobgoblins carried, two of them launched.
   const fit: Fitting = {
     name: 'D',
     shipTypeId: 1,
@@ -462,7 +458,6 @@ describe('setDronesCarried', () => {
 });
 
 describe('setDronesLaunched', () => {
-  // Hobgoblins draw 5 Mbit/s; a 25 Mbit/s hull, five drones at once.
   const launch: DroneLaunchLimits = { bandwidthTotal: 25, maxActive: 5, bandwidthOf: () => 5 };
   const fit: Fitting = {
     name: 'D',
@@ -486,14 +481,12 @@ describe('setDronesLaunched', () => {
   });
 
   it('launches no more than bandwidth, the pilot and the drones carried allow', () => {
-    // 10 of 25 Mbit/s out already: three more Hobgoblins.
     expect(droneLaunchedMax(fit, 2454, launch)).toBe(3);
     expect(droneGroups(setDronesLaunched(fit, 2454, 5, launch))).toContainEqual({
       typeId: 2454,
       inSpace: 3,
       inBay: 3,
     });
-    // Only two carried: two at most, whatever the bandwidth.
     expect(droneLaunchedMax(fit, 2185, { ...launch, bandwidthTotal: 500 })).toBe(2);
   });
 
@@ -597,7 +590,6 @@ describe('launchNewDrone', () => {
       inSpace: 1,
       inBay: 0,
     });
-    // No bandwidth left: it can't launch, though drones are to spare.
     const spent = setDroneCounts(fit, 2185, { inSpace: 2, inBay: 0 });
     const tight = launchLimitsFrom({
       droneBandwidthTotal: 20,
@@ -609,7 +601,6 @@ describe('launchNewDrone', () => {
       inSpace: 0,
       inBay: 1,
     });
-    // Five out already: it can't launch, so it waits in the bay.
     const flight = setDroneCounts(fit, 2185, { inSpace: 5, inBay: 2 });
     expect(droneGroups(launchNewDrone(flight, 2454, room, fresh))).toContainEqual({
       typeId: 2454,
@@ -753,7 +744,6 @@ describe('drone counts on mutated drones', () => {
         { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'active', mutation: rolls(2) },
       ],
     };
-    // The one already out stays out; order on the rack does not change.
     expect(setDroneCounts(secondOut, LIGHT_MUTATED_DRONE, { inSpace: 1, inBay: 1 }).drones).toEqual(
       secondOut.drones
     );
@@ -883,8 +873,6 @@ describe('shownModuleState', () => {
 });
 
 describe('loadChargeIntoCompatible', () => {
-  // Two launcher types (a Heavy and a Heavy Assault launcher) that both take
-  // the same missile, and a web that takes nothing.
   const launchers: Fitting = {
     ...base,
     modules: [
@@ -908,7 +896,6 @@ describe('loadChargeIntoCompatible', () => {
       undefined,
     ]);
     expect(result).toMatchObject({ loaded: 3, newlyLoaded: 3, wanted: 3, ranOut: false });
-    // Not from cargo: the hold is untouched.
     expect(result.fitting.cargo).toEqual(launchers.cargo);
     expect(launchers.modules[0].chargeTypeId).toBeUndefined();
   });
@@ -956,7 +943,6 @@ describe('loadChargeIntoCompatible', () => {
       [24519, 30],
       [undefined, undefined],
     ]);
-    // The 209 the second launcher held never came out of this cargo, so none goes back.
     expect(result.fitting.cargo).toEqual([{ typeId: 24519, quantity: 1000 - 40 - 40 - 30 }]);
   });
 
@@ -977,14 +963,12 @@ describe('loadChargeIntoCompatible', () => {
       chargesPerLoad: perLoad,
       fromCargo: true,
     });
-    // 40 into the first launcher, the last 3 into the second.
     expect(first.fitting.modules.map((m) => m.chargeQuantity)).toEqual([40, 3]);
     const second = loadChargeIntoCompatible(first.fitting, 24519, {
       accepts,
       chargesPerLoad: perLoad,
       fromCargo: true,
     });
-    // 40 and 3 go back — the hold's own 43, never two full loads.
     expect(second.fitting.cargo).toEqual([
       { typeId: 24519, quantity: 20 },
       { typeId: 209, quantity: 43 },
@@ -1016,7 +1000,6 @@ describe('loadChargeIntoCompatible', () => {
     };
     const result = loadChargeIntoCompatible(fit, 24519, { accepts });
     expect(result.fitting.modules.every((m) => m.chargeQuantity === undefined)).toBe(true);
-    // What the module held from cargo goes back, whatever replaces it.
     expect(result.fitting.cargo).toEqual([...fit.cargo, { typeId: 209, quantity: 12 }]);
   });
 
@@ -1027,7 +1010,6 @@ describe('loadChargeIntoCompatible', () => {
       chargesPerLoad: perLoad,
       fromCargo: true,
     });
-    // 40 into the first launcher, the last 10 into the second; none left for the third.
     expect(result.fitting.modules.map((m) => m.chargeTypeId)).toEqual([
       24519,
       24519,
@@ -1035,7 +1017,6 @@ describe('loadChargeIntoCompatible', () => {
       undefined,
     ]);
     expect(result).toMatchObject({ loaded: 2, wanted: 3, ranOut: true });
-    // The 209 the second launcher held wasn't debited from this hold: nothing comes back.
     expect(result.fitting.cargo).toEqual([]);
   });
 
@@ -1067,7 +1048,6 @@ describe('loadChargeIntoCompatible', () => {
       chargesPerLoad: perLoad,
       fromCargo: true,
     });
-    // Three take it; one already held it, so this load put it in two.
     expect(result).toMatchObject({ loaded: 3, newlyLoaded: 2, wanted: 3, ranOut: false });
   });
 
@@ -1161,7 +1141,6 @@ describe('module bulk edits', () => {
     expect(next.modules.filter((m) => m.slot === 'high').map((m) => m.slotIndex)).toEqual([
       0, 1, 2, 3, 4,
     ]);
-    // A fresh one copies a sibling's charge, as addModule does.
     expect(next.modules.find((m) => m.slotIndex === 4)?.chargeTypeId).toBe(186);
     expect(fillRack(three, 'high', 3, 2889)).toBe(three);
   });
@@ -1198,8 +1177,6 @@ describe('launching and recalling one drone type', () => {
 });
 
 describe('chargesPerLoad', () => {
-  // The engine reports a module's capacity as the SDE's float32, so 0.32 m3
-  // arrives as 0.3199999928…; the catalogue's charge volume is decimal.
   const f32 = Math.fround;
 
   it('fills an ancillary armor repairer to its full paste load, float32 capacity and all', () => {
@@ -1209,15 +1186,15 @@ describe('chargesPerLoad', () => {
   });
 
   it('counts every other charge the same as the game does', () => {
-    expect(chargesPerLoad(f32(1.2), 0.03)).toBe(40); // Heavy Missile Launcher II
-    expect(chargesPerLoad(f32(0.99), 0.015)).toBe(66); // Heavy Assault Missile Launcher II
-    expect(chargesPerLoad(f32(1.35), 0.05)).toBe(27); // Cruise Missile Launcher II
-    expect(chargesPerLoad(f32(2), 0.05)).toBe(40); // Torpedo Launcher II
-    expect(chargesPerLoad(f32(0.3), 0.0025)).toBe(120); // 200mm AutoCannon II, Hail S
-    expect(chargesPerLoad(f32(1), 0.0125)).toBe(80); // Heavy Neutron Blaster II, Antimatter M
-    expect(chargesPerLoad(f32(2), 0.025)).toBe(80); // Neutron Blaster Cannon II, Antimatter L
-    expect(chargesPerLoad(f32(40), 12)).toBe(3); // Medium Capacitor Booster II, Navy Cap Booster 400
-    expect(chargesPerLoad(f32(40), 16)).toBe(2); // …and a plain Cap Booster 400
+    expect(chargesPerLoad(f32(1.2), 0.03)).toBe(40);
+    expect(chargesPerLoad(f32(0.99), 0.015)).toBe(66);
+    expect(chargesPerLoad(f32(1.35), 0.05)).toBe(27);
+    expect(chargesPerLoad(f32(2), 0.05)).toBe(40);
+    expect(chargesPerLoad(f32(0.3), 0.0025)).toBe(120);
+    expect(chargesPerLoad(f32(1), 0.0125)).toBe(80);
+    expect(chargesPerLoad(f32(2), 0.025)).toBe(80);
+    expect(chargesPerLoad(f32(40), 12)).toBe(3);
+    expect(chargesPerLoad(f32(40), 16)).toBe(2);
   });
 
   it('is at least one, and one when either figure is unknown', () => {

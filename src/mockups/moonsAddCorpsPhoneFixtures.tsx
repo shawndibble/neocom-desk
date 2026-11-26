@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react';
 import { Pill } from '@/components/ui/Pill';
 
-/** Sample Moon owners rows for the phone redesign; all names invented. */
 export interface PhoneOwner {
   name: string;
   refineries: number;
   status: 'active' | 'cant-read';
   yours?: boolean;
-  /** Short line under the name (sync age or the date the ledger went unreadable). */
   note: string;
   owed?: string;
   mined: string;
@@ -15,7 +13,6 @@ export interface PhoneOwner {
   minerRate: string;
 }
 
-/** Worst case for the phone: a long name and an eleven-digit amount owed. */
 export const STRESS: PhoneOwner[] = [
   {
     name: 'Brinewater Deep Space Extraction and Hauling Collective',

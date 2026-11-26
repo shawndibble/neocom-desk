@@ -3,14 +3,11 @@ import { assertFails, type RulesTestEnvironment } from '@firebase/rules-unit-tes
 import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
-// Shared Pops (issue #6223, ADR 0034): no client reads a published pop directly, not even one
-// in its audience: the audience is checked live by `listSharedPopsCallable`. The publishing
-// inputs and a Community admin's blocks are function-only too.
 let env: RulesTestEnvironment;
 const BOOK = 98000001;
-const OFFICER = 1; // an officer of the book
-const MEMBER = 2; // a corp member: in the Corp audience
-const ADMIN = 3; // the Community's admin
+const OFFICER = 1;
+const MEMBER = 2;
+const ADMIN = 3;
 const POPS = `sharedPops/${BOOK}`;
 const SOURCES = `sharedPopSources/${BOOK}`;
 const BLOCK = `communities/c1/popSharingBlocks/${BOOK}`;

@@ -28,8 +28,6 @@ export function GroupSectionHeader({
   const renameButton = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
 
-  // `returnFocus`: Enter and Escape remove the input, so focus goes back to
-  // the Rename button; a blur means the user already went elsewhere.
   function commitRename(returnFocus: boolean) {
     setRenaming(false);
     if (returnFocus) focusAfterCommit(renameButton);
@@ -50,8 +48,6 @@ export function GroupSectionHeader({
           onBlur={() => commitRename(false)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              // Focus moves to the Rename button below; without this the Enter's own
-              // keypress would land on it and reopen the input.
               e.preventDefault();
               commitRename(true);
             }
@@ -72,11 +68,6 @@ export function GroupSectionHeader({
           {group.name}
         </h2>
       )}
-      {/* Icon actions, like every other editable-row header in the app (the
-          Skill Plan and Build Plan lists): the group name is the row, the
-          actions are the adornment, and four labelled buttons left the name
-          nothing on a phone. Each label names the group so a screen reader
-          hears which one it is on. */}
       <IconButton
         size="sm"
         icon={<Icon.Ascending />}

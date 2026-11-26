@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { CampaignObjectiveEntry } from '@/sde/types';
 import { activeTurnInOffers, turnInOffer, turnInReward, type ObjectiveLive } from './turnIn';
 
-/** Shield Failover Report as the SDE had it on 2026-11-20. */
 const report: CampaignObjectiveEntry = {
   id: 'obj-report',
   campaignId: 'camp-caldari',

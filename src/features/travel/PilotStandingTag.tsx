@@ -1,8 +1,3 @@
-/**
- * A pilot's standing with the active Character as the Contacts page draws it
- * (`StandingIcon`: the client's colour tag). The tooltip says whether the
- * contact is the pilot's own or their corporation's or alliance's.
- */
 import { useTranslation } from 'react-i18next';
 import { StandingIcon } from '@/components/ui/StandingIcon';
 import { standingTier } from '@/components/ui/standingTier';

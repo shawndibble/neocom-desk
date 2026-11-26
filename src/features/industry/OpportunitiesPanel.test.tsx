@@ -20,9 +20,6 @@ vi.mock('./data', async () => {
   return { ...actual, loadCharacterBlueprints };
 });
 
-// `limit` lives in the hoisted object rather than a module-level const so the
-// mock factory below — which vitest hoists above every other statement — and
-// the assertion read the same number.
 const loop = vi.hoisted(() => ({ count: 0, limit: 40 }));
 const stub = vi.hoisted(() => ({
   rows: [] as unknown[],
@@ -32,23 +29,15 @@ const stub = vi.hoisted(() => ({
 
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
-// What the Characters' corporations have open (issue #4786); each case sets its own.
 const corp = vi.hoisted(() => ({ entries: [] as unknown[], loading: false }));
 vi.mock('./corpProjects/useCorpProjects', () => ({ useCorpProjects: () => corp }));
 
-// No market-history reads in this test; each case sets the figures it wants.
 const vs90d = vi.hoisted(() => ({ values: new Map<string, number | null>() }));
 vi.mock('./usePriceVsMedian', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./usePriceVsMedian')>()),
   usePriceVsMedian: () => vs90d,
 }));
 
-// Stubbed out so this test isolates the panel's own blueprint-loading effect
-// — the real hook does a market fetch and holds state of its own, neither of
-// which is what the assertion below is about. The counter doubles as a
-// circuit breaker: an effect whose deps change on every commit spins until
-// the process is killed, so without the throw this test hangs rather than
-// failing.
 vi.mock('./useOpportunities', () => ({
   useOpportunities: () => {
     loop.count += 1;
@@ -75,7 +64,6 @@ const CATALOG: BlueprintCatalog = {
   typesById: {} as unknown as BlueprintCatalog['typesById'],
 };
 
-/** Builds one product (blueprint 100), for cases that need a rankable or buildable entry. */
 const HURRICANE = {
   blueprintTypeID: 100,
   blueprint: {
@@ -127,17 +115,6 @@ beforeEach(async () => {
 });
 
 describe('OpportunitiesPanel', () => {
-  /**
-   * Regression for the production render loop (React error #185): the default
-   * `'current'` filter resolves to a *fresh* `Set` on every render, and that
-   * identity used to reach `characterIds` and through it the dep array of the
-   * blueprint-loading effect — so the effect re-fired on every commit and
-   * render -> effect -> setState never settled.
-   *
-   * Asserted as "settles", not as an exact call count: one redundant load
-   * still happens when `useLiveQuery` swaps its default `[]` for the real
-   * roster, which is a separate, bounded issue this fix does not address.
-   */
   it('settles instead of re-rendering unboundedly', async () => {
     render(
       withItemActions(
@@ -258,12 +235,10 @@ describe('OpportunitiesPanel', () => {
       expect(screen.queryByRole('button', { name: 'Ranked' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'All owned' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Any' })).toBeNull();
-      // The panel itself stays, titled as before.
       expect(screen.getByText('Build')).toBeInTheDocument();
     });
 
     it('keeps the filter rows when no owned blueprint can be ranked', async () => {
-      // Not in the (empty) catalog, so nothing to rank, but All owned still lists it.
       loadCharacterBlueprints.mockResolvedValue({
         cached: { data: [blueprint(46166)], fetchedAt: new Date() },
       });
@@ -403,7 +378,6 @@ describe('OpportunitiesPanel', () => {
       const onStartPlan = vi.fn(() => Promise.resolve(false));
       const { row } = await renderWithRow(1000, { onStartPlan });
       fireEvent.click(within(row).getByText('Widget Alpha'));
-      // Seeded with the row, so the plan opens at what the row was priced with.
       expect(onStartPlan).toHaveBeenCalledWith(
         entry(1000, 'Widget Alpha'),
         expect.objectContaining({
@@ -430,7 +404,6 @@ describe('OpportunitiesPanel', () => {
       const onStartPlan = vi.fn(() => Promise.resolve(false));
       const { row } = await renderWithRow(1000, { onStartPlan });
       fireEvent.click(within(row).getByRole('button', { name: 'Plan' }));
-      // Seeded with the row, so the plan opens at what the row was priced with.
       expect(onStartPlan).toHaveBeenCalledWith(
         entry(1000, 'Widget Alpha'),
         expect.objectContaining({
@@ -606,13 +579,11 @@ describe('OpportunitiesPanel', () => {
 
     it('reads a stale ?opps.view=corp as Ranked once the reads settle empty', async () => {
       renderAt('/?opps.view=corp');
-      // Ranked's own empty state; with nothing owned its filter rows stay hidden (issue #6003).
       expect(await screen.findByText('You own no blueprints yet')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Corp projects' })).toBeNull();
     });
 
     it('does not offer Corp projects when no listed project can be built or contributed to', async () => {
-      // The sample catalog builds nothing, and a capped project has nothing left to give.
       corp.entries = [
         {
           characterId: CHARACTER_ID,

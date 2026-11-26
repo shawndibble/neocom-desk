@@ -3,7 +3,6 @@ import type { PlanPriority } from '@/engine/types';
 import type { AttributePair } from '../attributePairBands';
 import { attributePairLabel, priorityLabelKey } from './rowChrome';
 
-/** A band header's grouping (#115): either mode carries enough to render its label. */
 export type BandInfo =
   { kind: 'priority'; priority: PlanPriority } | ({ kind: 'attributePair' } & AttributePair);
 
@@ -11,7 +10,6 @@ interface BandHeaderProps {
   band: BandInfo;
 }
 
-/** Divider marking where a run of same-priority (#27) or same-attribute-pair (#115) entries begins. */
 export function BandHeader({ band }: BandHeaderProps) {
   const { t } = useTranslation();
   const text =

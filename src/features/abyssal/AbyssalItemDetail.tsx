@@ -1,20 +1,3 @@
-/**
- * Item Detail's section for Abyssal types and Mutaplasmids
- * (GLOSSARY.md **Abyssal type**, **Mutaplasmid**, **Roll**). An abyssal
- * type's baked typeInfo shard carries almost none of the attributes a pilot
- * opens it for, because they come from the base module and the roll, so this
- * section states them from the mutaplasmid data (`mutaplasmidDisplay.ts`)
- * and the base module's own shard:
- *
- * - An abyssal type: which base modules and mutaplasmids make it, and what
- *   each mutaplasmid can roll on a chosen base, in absolute values.
- * - One Mutated module (opened with its item id): its own
- *   rolls against its base, with roll quality.
- * - A mutaplasmid: which modules it applies to, what it makes, and its rolls
- *   as ±% of the base value.
- *
- * Every other type renders nothing here.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
@@ -65,7 +48,6 @@ const PERCENT = createNumberFormat({
 
 type Names = ReadonlyMap<number, string>;
 
-/** Names for `typeIds`, null while loading; a failed load leaves every id on its fallback. */
 function useTypeNames(typeIds: readonly number[]): Names | null {
   const key = typeIds.join(',');
   const [answer, setAnswer] = useState<{ key: string; names: Names } | null>(null);
@@ -87,7 +69,6 @@ function useTypeNames(typeIds: readonly number[]): Names | null {
   return answer?.key === key ? answer.names : null;
 }
 
-/** A type's own attribute values (baked shard, else cached ESI); null while loading. */
 function useBaseAttributes(typeId: number | null): ReadonlyMap<number, number> | null {
   const [state, setState] = useState<{ typeId: number; values: Map<number, number> } | null>(null);
   useEffect(() => {
@@ -111,7 +92,6 @@ function nameOf(names: Names | null, typeId: number): string {
   return names?.get(typeId) ?? `Type #${typeId}`;
 }
 
-/** The pilot's skilled values for this item (`useSkilledAttributes`' ready state). */
 interface SkilledValues {
   values: ReadonlyMap<number, number>;
   sources: ReadonlyMap<number, readonly NamedSkilledSource[]>;
@@ -119,9 +99,7 @@ interface SkilledValues {
 
 export interface AbyssalItemDetailProps {
   typeId: number;
-  /** Set when opened on a Mutated module (`useDynamicItem`). */
   dynamic: DynamicItemState;
-  /** The pilot's raw values and what made them (`useSkilledAttributes`), for the rolls' "With skills" column. */
   skilled?: SkilledValues;
 }
 
@@ -166,7 +144,6 @@ function SectionSpinner() {
   );
 }
 
-/** An inline, wrapping list of Show info links. */
 function TypeLinks({ typeIds, names }: { typeIds: readonly number[]; names: Names | null }) {
   return (
     <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
@@ -202,7 +179,6 @@ function attributeLabel(
   };
 }
 
-/** Attribute cell: name, unit, and which way is the better roll — in words, not colour. */
 function AttributeCell({
   name,
   unit,
@@ -231,18 +207,12 @@ function AttributeCell({
   );
 }
 
-/**
- * One meaning for a roll's colour: where it sits in what the mutaplasmid could
- * roll (DESIGN.md §6c "A Mutated module's roll"), never better or worse than
- * base — so it always agrees with the quality figure printed beside it.
- */
 const ROLL_TONE: Readonly<Record<RollQualityTone, { text: string; bar: ProgressBarTone }>> = {
   good: { text: 'text-success', bar: 'success' },
   fair: { text: 'text-warning', bar: 'warning' },
   poor: { text: 'text-danger', bar: 'danger' },
 };
 
-/** The roll's quality as a short bar and its percentage, in the roll's tone. */
 function RollQuality({ row, name }: { row: RolledAttributeRow; name: string }) {
   const { t } = useTranslation();
   return (
@@ -281,7 +251,6 @@ function RangeText({ range, unit }: { range: DisplayRange | null; unit: string |
   );
 }
 
-/** Both roll tables' leading column: the attribute, sticky. */
 function attributeColumn<R extends { attributeId: number }>(
   t: TFunction,
   dictionary: AttributeDictionary,
@@ -301,7 +270,6 @@ function attributeColumn<R extends { attributeId: number }>(
   };
 }
 
-/** The range table's leading columns: the attribute and the base module's value. */
 function attributeAndBaseColumns<R extends { attributeId: number; base: number }>(
   t: TFunction,
   dictionary: AttributeDictionary,
@@ -320,8 +288,6 @@ function attributeAndBaseColumns<R extends { attributeId: number; base: number }
   ];
 }
 
-/* ----------------------------------------------------------- abyssal type */
-
 function AbyssalTypeSection({
   typeId,
   lookup,
@@ -331,7 +297,6 @@ function AbyssalTypeSection({
   typeId: number;
   lookup: MutaplasmidLookup;
   dictionary: AttributeDictionary;
-  /** Opened on a Mutated module whose rolls couldn't be read: say so above the type's ranges. */
   rollsUnreadable: boolean;
 }) {
   const { t } = useTranslation();
@@ -352,17 +317,14 @@ function AbyssalTypeSection({
     [baseIds, names]
   );
   const [picked, setPicked] = useState<number | null>(null);
-  // Waits for the names: the default base is picked by name.
   const baseTypeId = picked ?? (names ? defaultBaseTypeId(bases) : null);
   const baseAttributes = useBaseAttributes(baseTypeId);
-  // In the game's strain order, as the Fittings mutaplasmid picker lists them.
   const inStrainOrder = (ids: number[]) =>
     groupMutaplasmidsByStrain(ids, (id) => nameOf(names, id)).flatMap((g) => g.typeIds);
   const strainIds =
     baseTypeId === null
       ? []
       : inStrainOrder(mutaplasmidsMaking(lookup, typeId, baseTypeId).map((m) => m.typeId));
-  // Shortened across every maker, not just this base's, so a strain keeps one label whichever base is picked.
   const makerLabels = shortCompareLabels(makers.map((m) => nameOf(names, m.typeId))).labels;
   const labelOf = (typeId: number) =>
     makerLabels[makers.findIndex((m) => m.typeId === typeId)] ?? nameOf(names, typeId);
@@ -422,7 +384,6 @@ function AbyssalTypeSection({
             <p className="mt-2 text-xs text-text-dim">
               {t('market.itemDetail.abyssal.rangesHint', { base: baseName })}
             </p>
-            {/* Own sideways scroller (DESIGN.md §4a), or the whole dialog body scrolls on a phone. */}
             <div className="mt-1 overflow-x-auto">
               <DataTable
                 label={t('market.itemDetail.abyssal.rangesTableLabel', { base: baseName })}
@@ -445,8 +406,6 @@ function AbyssalTypeSection({
     </div>
   );
 }
-
-/* ----------------------------------------------------- one mutated module */
 
 function OwnedRollsSection({
   mutation,
@@ -471,7 +430,6 @@ function OwnedRollsSection({
     ? rolledAttributeRows(mutation, lookup, baseAttributes, (id) => dictionary[id]?.unitId)
     : null;
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
-  /** The pilot's value of a roll, as shown, when it reads differently from the roll itself. */
   const skilledText = (row: RolledAttributeRow): string | null => {
     const raw = skilled?.values.get(row.attributeId);
     if (raw === undefined) return null;
@@ -482,8 +440,6 @@ function OwnedRollsSection({
   };
   const showSkilled = rows?.some((row) => skilledText(row) !== null) ?? false;
 
-  // Base and rolled in columns of their own, not "base → rolled": that arrow
-  // is the fit-change cue (§6c), whose colour means better or worse than before.
   const columns: DataTableColumn<RolledAttributeRow>[] = [
     ...attributeAndBaseColumns<RolledAttributeRow>(
       t,
@@ -568,9 +524,6 @@ function OwnedRollsSection({
       ) : rows.length === 0 ? (
         <p className="mt-2 text-xs text-text-dim">{t('market.itemDetail.abyssal.noRolls')}</p>
       ) : (
-        // Own scroller, as the ranges table: Roll quality sits past a phone's edge.
-        // Sized to its content (w-fit), not the modal: five short columns spread
-        // across it left the figures far from their names.
         <div className="mt-2 w-fit max-w-full overflow-x-auto">
           <DataTable
             label={t('market.itemDetail.abyssal.rollsTitle')}
@@ -585,8 +538,6 @@ function OwnedRollsSection({
     </Section>
   );
 }
-
-/* ------------------------------------------------------------ mutaplasmid */
 
 function MutaplasmidSection({
   mutaplasmid,

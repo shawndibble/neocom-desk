@@ -30,7 +30,6 @@ function Note({ tone, children }: { tone: keyof typeof NOTE_TONE; children: Reac
   );
 }
 
-/** One approval as the player reads it: what it is, and what it is for. */
 function useApprovalText() {
   const { t, i18n } = useTranslation();
   const need = (key: string) => t(`settings.notifications.alertsWhenClosed.need.${key}`);
@@ -41,7 +40,6 @@ function useApprovalText() {
         why: t(k('moon.why'), { corp: item.corporationName }),
       };
     }
-    // What the grant reads, listed before Continue: that listing is the consent (ADR 0030).
     const reads = [
       need('notifications'),
       ...(item.nearby ? [need('location')] : []),
@@ -55,12 +53,6 @@ function useApprovalText() {
   };
 }
 
-/**
- * "Finish setting up {character}" (issue #6103): after a sign-in lands, the
- * Character's remaining approvals at EVE, ticked, with Continue and Not now;
- * then one item at a time across EVE's redirects; then a done screen offering
- * the next character. Presentational: the host owns the chain and the logins.
- */
 export function FinishSetupDialog({
   chain,
   offering,
@@ -71,11 +63,8 @@ export function FinishSetupDialog({
   onAddAnother,
 }: {
   chain: FinishSetupChain;
-  /** Before Continue: the list is ticked choices. After: the chain is running. */
   offering: boolean;
-  /** Starts the chain and leaves for EVE for the first item. A rejection reads as an error line. */
   onContinue: (items: Approval[]) => Promise<void>;
-  /** Leaves for EVE for the current item. A rejection reads as an error line. */
   onApprove: () => Promise<void>;
   onNotNow: () => void;
   onClose: () => void;
@@ -91,7 +80,6 @@ export function FinishSetupDialog({
   const leaveForEve = (action: () => Promise<void>) => {
     setBusy(true);
     setFailed(false);
-    // A login that works leaves the page, so a settled promise means we are still here.
     action()
       .catch(() => setFailed(true))
       .finally(() => setBusy(false));

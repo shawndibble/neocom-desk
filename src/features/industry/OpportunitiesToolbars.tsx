@@ -1,10 +1,3 @@
-/**
- * The Opportunities panel's header controls (issue #4253): the Ranked / Owned
- * view picker, the Character filter, the Manufacturing / Reactions filter
- * (issue #5990) and the "Use my stock" filter. Desktop lays them out as
- * segmented controls beside the title; below `lg` the view picker is the
- * title itself.
- */
 import { useTranslation } from 'react-i18next';
 import {
   SegmentedControl,
@@ -21,12 +14,6 @@ import type { OpportunitiesActivityFilter } from './opportunitiesUrl';
 export type OpportunitiesView = 'ranked' | 'owned' | 'corp';
 export type OpportunitiesStockFilter = 'any' | 'mostly' | 'full';
 
-/**
- * Below `lg` the view picker *is* the panel's title: a bordered select
- * reading "Ranked builds" / "Owned blueprints", so the title, the view, the
- * Character filter and the actions all fit one line on a phone. The panel
- * mounts this only there; desktop keeps the plain title and segmented control.
- */
 export function OpportunitiesViewPicker({
   view,
   onViewChange,
@@ -34,7 +21,6 @@ export function OpportunitiesViewPicker({
 }: {
   view: OpportunitiesView;
   onViewChange: (next: OpportunitiesView) => void;
-  /** The Corp projects view exists for this Character (the hide rule); it is absent otherwise. */
   showCorpProjects: boolean;
 }) {
   const { t } = useTranslation();
@@ -70,8 +56,6 @@ function StockFilterControl({
 }) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  // Full wording in the desktop segmented control and the phone's open list;
-  // the phone's closed select shows the short word so the title row fits one line.
   const stockOptions = [
     {
       value: 'any' as const,
@@ -151,10 +135,6 @@ function ActivityFilterControl({
   );
 }
 
-/**
- * The panel's `meta` slot: view toggle (desktop), activity and stock filters. The
- * Character filter is the Industry page's own, in its `PageHeader`.
- */
 export function OpportunitiesFilterBar({
   view,
   onViewChange,
@@ -171,9 +151,7 @@ export function OpportunitiesFilterBar({
   onStockFilterChange: (next: OpportunitiesStockFilter) => void;
   activityFilter: OpportunitiesActivityFilter;
   onActivityFilterChange: (next: OpportunitiesActivityFilter) => void;
-  /** Ranked holds a reaction formula (or the filter is off its default): with none, the filter would choose nothing. */
   showActivityFilter: boolean;
-  /** The Corp projects view exists for this Character (the hide rule); it is absent otherwise. */
   showCorpProjects: boolean;
 }) {
   const { t } = useTranslation();
@@ -204,7 +182,6 @@ export function OpportunitiesFilterBar({
       {rankedFilters}
     </span>
   ) : (
-    // One row with the view picker and the actions on a phone; none on All owned.
     rankedFilters || null
   );
 }

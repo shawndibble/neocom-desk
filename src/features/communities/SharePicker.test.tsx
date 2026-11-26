@@ -24,7 +24,6 @@ function Harness({ initial = [] as number[] }) {
   return <SharePicker owned={owned} groups={groups} selected={selected} onChange={setSelected} />;
 }
 
-// The worker's first render of the picker pays the cold module load once, here.
 beforeAll(async () => {
   render(<Harness />).unmount();
 }, 30_000);

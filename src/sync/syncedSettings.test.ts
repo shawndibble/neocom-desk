@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAllowedSyncedSettingKey, SYNCED_SETTING_KEYS } from './syncedSettings';
 
-// This literal is the second half of the deliberate two-file edit described in
-// syncedSettings.ts. If you are here because this test broke: you added a key
-// to SYNCED_SETTING_KEYS. Add it here too, and confirm the caller records
-// deletions via deleteSyncedSetting so the tombstone path in merge.ts applies.
 const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.avoidEdencom',
   'sync.avoidPodKills',

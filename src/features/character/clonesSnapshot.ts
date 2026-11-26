@@ -19,34 +19,20 @@ import { loadCloneTrainingData, type CloneTrainingData } from '@/features/charac
 
 export interface Snapshot {
   clonesResult: CachedResult<CharacterClones> | null;
-  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   clonesNeedsReauth: boolean;
-  /** Effective level of Infomorph Synchronizing; 0 when unknown/untrained. */
   infomorphLevel: number;
-  /** Implants of the clone the Character is wearing; the Skills > Trained read, now loaded here too. */
   wornImplants: CachedResult<number[]> | null;
-  /** The read-implants grant is missing (401/403): a banner above the list, never in place of it. */
   implantsNeedsReauth: boolean;
-  /** The active training queue. */
   queueResult: CachedResult<SkillQueueEntry[]> | null;
-  /** What the training verdict needs; null when the attribute sheet can't be read. */
   training: CloneTrainingData | null;
-  /** The Character's current solar system; null when unresolved (missing grant, offline, uncached). */
   characterSystemId: number | null;
-  /** Solar system of each clone location, keyed by `location_id`; null when it can't be resolved. */
   systemIds: Map<number, number | null>;
-  /** Name of the Character's current system; null when unresolved. */
   characterSystemName: string | null;
-  /** Security status of every system above, keyed by solar system id; absent when unresolved. */
   securities: Map<number, number>;
   implantNames: Map<number, string>;
-  /** Absent ids render the bare name. */
   implantDetails: Map<number, ImplantDetail>;
-  /** Jump-clone and home-clone location names, keyed by `location_id`. */
   locationNames: Map<number, string>;
-  /** Total/unallocated SP for the shared Character-overview header. */
   sp: CharacterSpSummary;
-  /** Captured in the loader, not at render: `Date.now()` is impure and React forbids it in render/useMemo. */
   loadedAt: number;
 }
 
@@ -68,15 +54,11 @@ export async function loadClonesSnapshot(
     loadCharacterSolarSystemId(characterId),
   ]);
   const loadedAt = Date.now();
-  // Effective (issue #1236: min of queue-corrected trained and active), not
-  // raw trained_skill_level — the cooldown should never read shorter than
-  // what the character's clone can actually use right now.
   const infomorphLevel = corrected.effective.get(INFOMORPH_SYNCHRONIZING_SKILL_ID) ?? 0;
 
   const clones = clonesResult?.data.jump_clones ?? [];
   const homeLocation = clonesResult?.data.home_location;
 
-  // Already superseded: skip the name resolves, their results would be discarded.
   const implantTypeIds = signal.cancelled
     ? []
     : [...new Set([...clones.flatMap((c) => c.implants), ...(wornImplants?.data ?? [])])];
@@ -85,8 +67,6 @@ export async function loadClonesSnapshot(
     loadImplantDetails(implantTypeIds),
   ]);
 
-  // Ids to resolve for one location type: every jump clone of that type, plus
-  // the home clone's location if it happens to be that type too.
   function idsForType(type: 'station' | 'structure'): number[] {
     if (signal.cancelled) return [];
     return [
@@ -100,9 +80,6 @@ export async function loadClonesSnapshot(
   }
   const stationIds = idsForType('station');
   const structureIds = idsForType('structure');
-  // A station comes out of the SDE snapshot rather than ESI (issue #655) — a
-  // map lookup per id, nothing worth capping. A structure 403 means outside
-  // this character's ACL, not a revoked scope: it renders with an id fallback.
   const places = await Promise.all(
     [
       ...stationIds.map((id) => ({ locationId: id, characterId, kind: 'station' as const })),
@@ -134,7 +111,6 @@ export async function loadClonesSnapshot(
     if (security !== null && security !== undefined) securities.set(id, security);
   });
 
-  // The verdict needs the worn implants and the queue; either missing is its own one-line state.
   const training =
     corrected.queueResult && wornImplants && !signal.cancelled
       ? await loadCloneTrainingData(characterId, loadedAt, {

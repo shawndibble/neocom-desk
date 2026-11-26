@@ -1,10 +1,3 @@
-/**
- * Draws the Production Log's realized-profit-over-time chart with Recharts
- * (issue #711). Statically imports `recharts`, so — same rule as
- * `character/WalletBalanceChart.tsx` and `miningTax/MiningYieldCharts.tsx` —
- * this must only ever be reached through a dynamic `import()`, never
- * imported eagerly.
- */
 import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
@@ -54,7 +47,6 @@ function ProfitTooltip({ active, payload }: TooltipContentProps): React.ReactEle
   );
 }
 
-/** Cumulative realized profit, bucketed by local calendar day — colored by overall trend direction. */
 export default function ProductionProfitChart({ points, trend }: ProductionProfitChartProps) {
   const { t } = useTranslation();
 
@@ -74,9 +66,6 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
     [t]
   );
 
-  // `role="img"` collapses everything inside it into one opaque image for
-  // assistive tech, so the sr-only table below must be a *sibling*, not a
-  // child — nesting it here would make the accessible fallback unreachable.
   return (
     <div>
       <div role="img" aria-label={t('industry.profitHistoryChartLabel')} className="h-64 w-full">
@@ -96,7 +85,6 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
               stroke="var(--color-text-dim)"
               tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               width={scalePx(COMPACT_ISK_Y_AXIS_WIDTH)}
-              // SVG axis tick: IskAmount can't render here (documented exception).
               tickFormatter={(value: number) => formatIskCompact(value)}
             />
             <Tooltip content={(props) => <ProfitTooltip {...props} />} />
@@ -112,7 +100,6 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
           </LineChart>
         </ResponsiveContainer>
       </div>
-      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">
         <DataTable
           columns={columns}

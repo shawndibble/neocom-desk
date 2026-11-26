@@ -23,11 +23,6 @@ describe('groupColoniesIntoBatches', () => {
     expect(groupColoniesIntoBatches<TestColony>([], (c) => c.status, NOW)).toEqual([]);
   });
 
-  /*
-   * The whole reason this exists. A pilot resets every planet in one sitting,
-   * so a colony is never the unit of work — the reset run is. Four rows saying
-   * "3h 12m" four times is four times the reading for one trip.
-   */
   it('folds colonies expiring together into one run', () => {
     const batches = groupColoniesIntoBatches(
       [running('Gehi IV', 3), running('Gehi V', 3), running('Gehi VI', 3)],
@@ -39,8 +34,6 @@ describe('groupColoniesIntoBatches', () => {
   });
 
   it('tolerates the minutes a reset run actually takes', () => {
-    // Installed one after another across a single session, so the expiries are
-    // spread by however long it took to walk the list.
     const batches = groupColoniesIntoBatches(
       [running('a', 3), running('b', 3.2), running('c', 3.4)],
       (c) => c.status,
@@ -60,8 +53,6 @@ describe('groupColoniesIntoBatches', () => {
   });
 
   it('chains through a gradual spread rather than cutting it arbitrarily', () => {
-    // Each within the window of the one before it: still one visit, even
-    // though the first and last are further apart than the window.
     const spread = Array.from({ length: 6 }, (_, i) =>
       running(`p${i}`, 3 + (i * BATCH_WINDOW_MS) / HOUR_MS / 2)
     );
@@ -79,12 +70,6 @@ describe('groupColoniesIntoBatches', () => {
     expect(batches[1].kind).toBe('running');
   });
 
-  /*
-   * One batch, not one per expiry time. An idle colony has already stopped
-   * earning, so *when* it stopped changes nothing about what to do — they are
-   * all the same errand, and splitting them by their stop times would put the
-   * volume back that this whole grouping removes.
-   */
   it('keeps every expired colony together however long ago each stopped', () => {
     const batches = groupColoniesIntoBatches(
       [

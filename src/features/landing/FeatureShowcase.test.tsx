@@ -70,7 +70,6 @@ describe('FeatureShowcase', () => {
       expect(bullets.length).toBeLessThanOrEqual(4);
       const tabs = screen.getAllByRole('tab');
       await user.click(tabs[SHOWCASE_TABS.findIndex((tab) => tab.id === id)]);
-      // i18next prints a missing key as the key itself.
       expect(screen.getByRole('tabpanel').textContent).not.toMatch(/login\.showcase/);
     }
   });

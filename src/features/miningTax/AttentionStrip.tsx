@@ -5,28 +5,16 @@ import { cx } from '@/lib/cx';
 
 export interface AttentionItem {
   id: string;
-  /** `warning` understates or hides money; `info` is worth knowing but changes no figure. */
   tone: 'warning' | 'info';
   title: ReactNode;
   detail?: ReactNode;
-  /** The one control that fixes it, right of the text. */
   action?: ReactNode;
 }
 
-/**
- * Every Tax-tab warning in one collapsible strip (scope decision 20261004,
- * "one attention strip"): re-login, unpriced ore, sell-price fallback,
- * duplicate Assignments and unclassified ore used to stack as five
- * full-width banners above the ledger, pushing what the pilot owes off a
- * phone screen. Each keeps its own row and action here, and a fixed problem
- * simply drops out of the list. Collapsed by default: the header still
- * counts what needs attention, so nothing is hidden silently.
- */
 export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
-  // Warnings first (stable), so the collapsed preview names the most important item.
   const ordered = [...items].sort(
     (a, b) => Number(b.tone === 'warning') - Number(a.tone === 'warning')
   );
@@ -70,7 +58,6 @@ export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
       >
         {ordered.map((item) => (
           <div key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-2.5 py-2">
-            {/* A 16rem basis: on a phone the action wraps under the text, not beside a sliver of it. */}
             <div className="min-w-0 flex-[1_1_16rem] space-y-1">
               <p
                 className={cx(

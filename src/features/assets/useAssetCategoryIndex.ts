@@ -5,10 +5,6 @@ import { loadMarketGroups } from '@/sde/loadMarketSde';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { buildCategoryIndex, type AssetCategoryIndex } from './assetCategoryFilter';
 
-/**
- * The market tree the Category picker and filter read: null while loading or
- * when the catalogue will not load (the filter then stands down, never hides).
- */
 export function useAssetCategoryIndex(enabled: boolean): AssetCategoryIndex | null {
   const { t } = useTranslation();
   const notOnMarket = t('assets.category.notOnMarket');

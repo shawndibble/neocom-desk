@@ -2,9 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FieldError } from './FieldError';
 import { TextInput } from './TextInput';
 
-/**
- * @summary Inline validation message in the danger tone. It is a `role="alert"`, so it is announced when it appears (§6c States, Invalid).
- */
 const meta = {
   title: 'ui/FieldError',
   component: FieldError,
@@ -15,10 +12,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary The message alone. */
 export const Default: Story = {};
 
-/** @summary Wired to its field: `aria-invalid` plus `aria-describedby` pointing at the error's `id`. */
 export const WithField: Story = {
   render: (args) => (
     <div className="flex flex-col gap-1">

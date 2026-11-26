@@ -20,7 +20,6 @@ describe('dateWithYear', () => {
   });
 });
 
-/** Runs `fn` with the host clock in `zone`, the way the viewer's own clock is read. */
 function inHostZone(zone: string, fn: () => void) {
   const was = process.env.TZ;
   process.env.TZ = zone;
@@ -33,7 +32,6 @@ function inHostZone(zone: string, fn: () => void) {
 
 describe('instants follow the Time format clock', () => {
   const now = new Date('2026-10-26T12:00:00Z');
-  // 23:30 EVE time on the 18th is already the 19th in Auckland (UTC+13).
   const late = '2026-10-18T23:30:00Z';
 
   it('reads EVE time when the setting is EVE time', () => {

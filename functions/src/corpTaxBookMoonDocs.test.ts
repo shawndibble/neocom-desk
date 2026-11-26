@@ -7,7 +7,6 @@ import {
   type StoredExtraction,
 } from './corpTaxBookMoonDocs.js';
 
-// Fractured 2 Aug 03:00, 48 h expiry: the pull covers 2-4 Aug.
 const pull = (start: string, over: Partial<StoredExtraction> = {}): StoredExtraction => ({
   structureId: 1000,
   moonId: 7,
@@ -53,7 +52,6 @@ describe('moonDocsToCheck: the nightly pass rebuilds only what can still change'
   });
   const closedId = `1000_${Date.parse(closed.extractionStartTime)}`;
   const openId = `1000_${Date.parse(open.extractionStartTime)}`;
-  // On 18 Nov the lock date is 1 Sep: a pull that ended before it is locked.
   const today = '2026-11-18';
 
   it('skips a closed pull whose doc is current', () => {

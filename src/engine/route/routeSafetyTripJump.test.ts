@@ -7,7 +7,6 @@ import { assembleRouteSafety, planLegAlternatives } from './routeSafetyTrip';
 import { planTrip } from './tripPlan';
 import { waypointSequence } from './waypoints';
 
-// A gate chain of 12 lowsec systems, one ly apart: jumping pays on the way.
 const IDS = Array.from({ length: 12 }, (_, i) => 30000001 + i);
 const GRAPH: JumpGraph = new Map(
   IDS.map((id, i) => [id, [IDS[i - 1], IDS[i + 1]].filter((n) => n !== undefined)])
@@ -83,7 +82,6 @@ describe('jump drive legs in a Route Safety trip', () => {
     expect(result.trip?.driveJumps).toBe(jumps.length);
     expect(result.trip?.jump?.fuel).toBeGreaterThan(0);
     expect(result.legs[0].ways.find((way) => way.inUse)?.kind).toBe('jump');
-    // The client's autopilot cannot fly a jump: waypoints stop at its entrance.
     expect(waypointSequence(result.legs).cutOff?.kind).toBe('jump');
   });
 

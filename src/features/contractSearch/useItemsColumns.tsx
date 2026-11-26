@@ -1,8 +1,3 @@
-/**
- * The Items table's column set and CSV columns, split out of
- * `ContractSearchPanel`. Also hands back the two cell helpers the panel's
- * detail modal and jumps readout share.
- */
 import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,13 +26,6 @@ import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
-/**
- * The Price column's own `sortValue` — `undefined`, not `Infinity`, for an
- * unpriced row: `DataTable.sortRows` appends every `undefined` row after
- * the sorted, valued ones regardless of sort direction, the same
- * "unknowable sorts last either way" rule `BpcSourcingPanel.tsx`'s ISK/run
- * column already follows for its own `undefined`.
- */
 function sortValueForPriceColumn(
   row: PublicContractOfferRow,
   plexPrice: number | null
@@ -52,10 +40,8 @@ interface ItemsColumnsInput {
   jumpRangeFilter: ReturnType<typeof useJumpRangeFilter>;
   plexPrice: number | null;
   visibleItemsColumns: readonly ContractSearchItemsColumnId[];
-  /** The marker before a row's price, or nothing: the flag judgement lives with the caller. */
   priceFlag?: (row: PublicContractOfferRow) => ReactNode;
   flagFor?: (row: PublicContractOfferRow) => ContractFlag | null;
-  /** The detail modal's Saving for the row, in percent, or `null` where the row cannot state it. */
   savingFor?: (row: PublicContractOfferRow) => number | null;
 }
 
@@ -73,14 +59,6 @@ export function useItemsColumns({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
 
-  /**
-   * A row's own distance from the Current System, independent of whether a
-   * Jump Range filter is even active (`jumpRangeFilter.jumps`/`jumpsStatus`
-   * are populated at every range). Pending while *either* the offer's own
-   * location (`offerLocations`) or the distance map is still resolving; a
-   * settled but unplaced offer (a player structure, or nothing this app
-   * could place) is a `value` of `null`, same as an unreachable system.
-   */
   const offerJumps = useCallback(
     (row: PublicContractOfferRow): JumpsCellValue => {
       const location = offerLocations.get(row.locationId);
@@ -92,11 +70,6 @@ export function useItemsColumns({
     [offerLocations, jumpRangeFilter]
   );
 
-  /**
-   * A PLEX ask as the contract states it — "100 PLEX", or "20M ISK + 10 PLEX"
-   * when it wants both — for wherever no PLEX price is in hand to fold it into
-   * one ISK figure.
-   */
   const plexAskLabel = useCallback(
     (row: PublicContractOfferRow): string => {
       const plex = formatCount(row.requestedPlex ?? 0);
@@ -122,8 +95,6 @@ export function useItemsColumns({
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
         render: (row) => formatCount(row.quantity),
-        // The dense phone card has no header row, and a bare "12" beside a
-        // system name says nothing about what it counts.
         stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
       },
       iskPerUnit: {
@@ -133,7 +104,6 @@ export function useItemsColumns({
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortFirst: 'asc',
-        // `undefined` (bundle, unpriced) sorts last either way, as Price does.
         sortValue: (row) => offerUnitPrice(row, plexPrice),
         render: (row) => {
           const unit = offerUnitPrice(row, plexPrice);
@@ -146,7 +116,6 @@ export function useItemsColumns({
         header: t('contractSearch.priceColumn'),
         width: '18ch',
         align: 'right',
-        // The headline figure of the dense phone card, on the title line.
         cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
         sortFirst: 'asc',
@@ -154,26 +123,20 @@ export function useItemsColumns({
         render: (row) => (
           <>
             {row.requestedPlex && plexPrice === null ? (
-              // No PLEX price to convert at yet: state the ask as it stands.
               plexAskLabel(row)
             ) : (
-              // Long press, not tap: the row's own tap opens the offer's detail modal.
               <>
                 {priceFlag?.(row)}
                 <IskAmount value={offerAskingPrice(row, plexPrice)} />
               </>
             )}
             {row.isAuction && (
-              // An auction's number is a starting bid unless the seller set a
-              // buyout, so the figure alone would read as a fixed ask.
               <span className="ml-1 text-[0.6875rem] text-text-dim uppercase">
                 {auctionKindLabel(t, row.buyout)}
               </span>
             )}
             {row.requestedPlex
               ? plexPrice !== null && (
-                  // The figure above already counts the PLEX at market; say so,
-                  // since the contract itself asks for PLEX, not that much ISK.
                   <span className="block text-[0.6875rem] text-text-dim">
                     {t('contractSearch.includesPlex', {
                       plex: formatCount(row.requestedPlex),
@@ -181,9 +144,6 @@ export function useItemsColumns({
                   </span>
                 )
               : isUnpricedOffer(row) && (
-                  // A barter's 0 ISK is real but not a price (issue #1080) — the
-                  // row's own tap already opens the detail modal, which shows
-                  // both sides of the exchange correctly.
                   <span className="block text-[0.6875rem] text-text-dim">
                     {t('contractSearch.unpricedOfferMarker')}
                   </span>
@@ -197,7 +157,6 @@ export function useItemsColumns({
         width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        // Biggest saving first; a row with no figure sinks either way.
         sortFirst: 'desc',
         sortValue: (row) => savingFor?.(row) ?? undefined,
         stackAffix: { after: t('contractSearch.mobile.savingAffix') },
@@ -212,27 +171,17 @@ export function useItemsColumns({
         },
       },
       system: {
-        // The system, with its security, is what a buyer actually weighs —
-        // whether the pickup is a hop from home or a trip into lowsec — and a
-        // region alone cannot say either. After Price so the phone card's
-        // meta line reads "Qty · System · Region · Exp", narrowest place last.
         id: 'system',
         header: t('contractSearch.systemColumn'),
         width: '16ch',
         className: 'whitespace-nowrap',
-        // Unplaced or still resolving sinks in either direction, rather than
-        // sorting as a name — the Price column's "unknowable sorts last" rule.
         sortValue: (row) => offerLocations.get(row.locationId)?.systemName ?? undefined,
         render: (row) => {
           const location = offerLocations.get(row.locationId);
-          // Missing key: the local lookup has not answered yet. Distinct from
-          // a null name, which is a finished answer — a player structure, or
-          // a table that could not be read — and must not read as pending.
           if (location === undefined) return <span className="text-text-dim">…</span>;
           if (location.systemName === null) return <span className="text-text-dim">—</span>;
           return (
             <>
-              {/* Plain: the row opens the contract modal, which carries the system link. */}
               <span>{location.systemName}</span>
               {location.security !== null && (
                 <>
@@ -304,7 +253,6 @@ export function useItemsColumns({
         className: 'truncate',
         sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
         render: (row) => (
-          // Plain: the row opens the contract modal, whose item lines link to Market.
           <span className={entityLinkClassName()}>
             {typeNames.get(row.typeId) ?? `#${row.typeId}`}
           </span>

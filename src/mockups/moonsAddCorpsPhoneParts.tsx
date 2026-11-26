@@ -17,11 +17,6 @@ const Chevron = () => (
   <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0 text-text-dim" />
 );
 
-/**
- * Option 1, "Figures first": one tappable row per moon owner. The name and what
- * they are owed are the two things you scan for; Pay sits under the figure.
- * Mined and the rates live on the detail page the row opens.
- */
 export function OwnersFiguresFirst({ owners }: { owners: PhoneOwner[] }) {
   return (
     <ul className="divide-y divide-line">
@@ -57,11 +52,6 @@ export function OwnersFiguresFirst({ owners }: { owners: PhoneOwner[] }) {
   );
 }
 
-/**
- * Option 2, "Name, then a small figure grid": the row keeps three labelled
- * figures in one aligned line (Owed, Mined, Rates) under the name, and Pay is
- * the row's only control, at the right of the name line.
- */
 export function OwnersFigureGrid({ owners }: { owners: PhoneOwner[] }) {
   return (
     <ul className="divide-y divide-line">
@@ -102,11 +92,6 @@ function Fig({ label, value, strong }: { label: string; value: string; strong?: 
   );
 }
 
-/**
- * Option 1, "Action on the right": each item is a two-column row. Name and state
- * stack on the left, then the hint; the small action sits at the right of the
- * name line, so nothing grows a full-width box under the text.
- */
 export function AttentionActionRight({ items }: { items: PhoneAttention[] }) {
   return (
     <ul className="divide-y divide-line">
@@ -129,11 +114,6 @@ export function AttentionActionRight({ items }: { items: PhoneAttention[] }) {
   );
 }
 
-/**
- * Option 2, "State as a left rule": a coloured left rule carries the state, the
- * pill moves to the right of the name, and the action is a quiet text-weight
- * button at the foot of the item, right-aligned, never full-width.
- */
 export function AttentionLeftRule({ items }: { items: PhoneAttention[] }) {
   return (
     <ul className="space-y-2">
@@ -161,7 +141,6 @@ export function AttentionLeftRule({ items }: { items: PhoneAttention[] }) {
   );
 }
 
-/** The panel both phone sections sit in, with the counts the real ones show. */
 export function PhonePanel({
   title,
   meta,
@@ -178,11 +157,6 @@ export function PhonePanel({
   );
 }
 
-/**
- * Option 1b, "Figures first, stacked": the name gets the full row width, then a
- * second line holds the amount owed on the left and Pay on the right. A long name
- * wraps under itself and an eleven-digit amount has the whole line to itself.
- */
 export function OwnersStacked({ owners }: { owners: PhoneOwner[] }) {
   return (
     <ul className="divide-y divide-line">

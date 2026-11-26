@@ -1,11 +1,3 @@
-/**
- * Corp market orders builder: the corporation's open orders, the ISK held in
- * escrow and how many are undercut. The rows come from the character Orders
- * engine (`buildOpenOrderRows`), so a corp order is judged by the same
- * undercut rules; only the data behind it differs. Pure, derived at render
- * time. ESI caches the list for 1200 s, and the table shows orders by the
- * day, so no countdown finer than that is drawn.
- */
 import { openOrderProblemCounts, notCheckedCount } from '@/features/market/openOrdersModel';
 import { corpOrderRows } from '@/features/market/corpOpenOrders';
 import { formatIskCompact } from '@/lib/isk';
@@ -20,7 +12,6 @@ import {
 import { ordersListed, ordersTable } from './ordersModels';
 
 const C = 'overview.widgets.corpOrders';
-/** The Market orders page's Corp view. */
 const TO = '/market/orders?scope=corp';
 
 export const corpOrders: Builder = (feeds, { t, now, scopeAll }) => {

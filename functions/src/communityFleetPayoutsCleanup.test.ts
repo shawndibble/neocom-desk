@@ -8,25 +8,16 @@ import { sweepFleetPayouts } from './communityFleetPayoutsCleanup.js';
 import { deleteMemberShares } from './communitiesStore.js';
 
 type Doc = Record<string, unknown>;
-/** Path prefix the fake gives a collection-group query. */
 const GROUP = '**/';
 
-/**
- * An in-memory stand-in for the slice of Firestore these functions touch:
- * `communities/{c}` (+ `members/{uid}`), `itemRequests/{r}` and
- * `itemRequests/{r}/pledges/{uid}`, addressed by path. Queries support the
- * single-field `where(<=)`, `where(==)`, `orderBy`, `startAfter` and `limit`.
- */
 function fakeDb(initial: Record<string, Doc>) {
   const docs = new Map<string, Doc>(Object.entries(initial));
   const recursiveDeletes: string[] = [];
   const bulkDeletes: string[] = [];
   const failOn = new Set<string>();
   const hooks: { afterQuery?: () => void } = {};
-  // `missingIndex`: collection-group queries fail as they do before the index is deployed.
   const stats = { queries: 0, listings: 0, missingIndex: false };
 
-  // A snapshot is a copy: it outlives a later delete, as a Firestore one does.
   const snap = (path: string) => {
     const data = docs.get(path);
     return {

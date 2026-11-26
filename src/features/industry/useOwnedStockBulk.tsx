@@ -22,24 +22,11 @@ interface BulkToast {
 }
 
 interface OwnedStockBulkInput {
-  /** The Group Owned Overlay's adapter. */
   write: (changes: readonly OwnedStockChange[]) => void;
   ownedFor: OwnedQuantityFor;
   scopedQuantityFor: ScopedQuantityFor;
 }
 
-/**
- * "Use all" / "Use none" on a materials table, always answered: a toast
- * saying how many rows changed, with Undo, or that there was nothing to do.
- * A click that changed nothing would otherwise look like a dead button, and
- * "Use all" overwrites typed counts, so it needs a way back.
- *
- * Which rows change is the owned-stock offer's rule (`ownedStockOffer.ts`);
- * Undo writes the same changes reversed through the *latest* `write`. A
- * store's write can be built from what it last rendered (the Group Owned
- * Overlay copies its whole ledger), so the click-time one would drop any
- * edit made while the toast was up.
- */
 export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedStockBulkInput): {
   fillAll: (rows: readonly OwnedStockOfferRow[]) => void;
   clearAll: (rows: readonly { typeID: number }[]) => void;

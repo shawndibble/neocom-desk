@@ -1,27 +1,16 @@
 import { describe, it, expect } from 'vitest';
 
-/**
- * Item names open Show info only where the row/card has no primary action of
- * its own (DESIGN.md §6c "A row's primary action beats name links inside it",
- * "Item names"). A new `ItemInfoLink` use must be reviewed against that rule
- * and added here; a row with `onRowClick`/`rowClickable`/`expandableRow`
- * keeps a plain name. Market-context pages use `MarketItemLink` instead.
- */
 const REVIEWED = new Set<string>([
   'src/features/abyssal/AbyssalItemDetail.tsx',
   'src/features/assets/assetBrowserRows.tsx',
   'src/features/character/CloneCard.tsx',
   'src/features/character/ContractDetailModal.tsx',
   'src/features/character/JournalDescriptionCell.tsx',
-  // A show-info link inside a mail body's prose, not a row: no primary action competes.
   'src/features/character/MailBodyView.tsx',
-  // The shared wallet-transaction Item column (personal and corp panels); neither row has a primary action.
   'src/features/character/walletTransactionColumns.tsx',
   'src/features/communities/SharedBlueprintTable.tsx',
   'src/features/contracts/PublicContractDetailModal.tsx',
-  // Corp assets unfolded contents: a loose stack's row has no action of its own, so its name opens Show info; containers keep a plain name (their click unfolds).
   'src/features/corp/CorpAssetContents.tsx',
-  // The roster's Ship cell (shared by the Characters table and Players view). A Player's expandable parent row prints it as plain text (PlayersView); every other row has no primary action.
   'src/features/corp/useRosterColumns.tsx',
   'src/features/fittings/AbyssalRunPlanner.tsx',
   'src/features/fittings/FittingFightersPanel.tsx',
@@ -36,7 +25,6 @@ const REVIEWED = new Set<string>([
   'src/features/market/HaulingItemDetail.tsx',
   'src/features/market/MadeFromSection.tsx',
   'src/features/market/UsedInSection.tsx',
-  // A skill's per-level unlock list: plain name rows with no action of their own.
   'src/features/skills/SkillRequirementsList.tsx',
   'src/features/travel/PilotShips.tsx',
   'src/features/travel/ZkillStatsSection.tsx',

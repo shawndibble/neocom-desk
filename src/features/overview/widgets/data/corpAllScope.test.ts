@@ -1,8 +1,3 @@
-/**
- * The five Gallery corp widgets read across several corporations (All scope, #6101): the
- * merged feed's rows keep each widget's own sort, each names its corporation, totals sum,
- * and one corporation's failed read leaves the others drawn, flagged.
- */
 import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { Contract, CorporationCustomsOffice, CorporationOrder } from '@/esi/endpoints';
@@ -42,7 +37,6 @@ const LABELS = new Map([
   [B, { ticker: 'HOLD2', name: 'Holding Two' }],
 ]);
 
-/** A merged read's base fields: `corporationOf` maps each row key to its corporation. */
 const across = (corporationOf: [string, number][], over: Partial<CorpFeedBase> = {}) => ({
   readable: true,
   needsReauth: false,
@@ -58,8 +52,6 @@ const column = (view: KindView, key: string) => {
   const index = view.table!.columns.findIndex((col) => col.key === key);
   return view.table!.rows.map((row) => text(row.cells[index]));
 };
-
-// --- Customs offices ---------------------------------------------------------------
 
 const office = (id: number, system: number): CorporationCustomsOffice =>
   ({
@@ -128,19 +120,16 @@ describe('Customs offices across corporations', () => {
   it('keeps the others’ rows when one corporation’s read failed, flagged', () => {
     const view = corpCustomsOffices({ corpCustomsAll: ok(customs({ partlyFailed: true })) }, ctx);
     expect(view.table!.rows).toHaveLength(3);
-    // A note, not the Failed state: that would hide the rows that did land.
     expect(view.status.error).toBe(false);
     expect(view.table!.footer).toBe('overview.board.corporationsMissing');
     expect(view.number.notes).toContain('overview.board.corporationsMissing');
   });
 });
 
-// --- Starbases -----------------------------------------------------------------------
-
 const tower = (id: number, fuelBlocks: number): CorpStarbaseRow => ({
   starbaseId: id,
   systemId: 30,
-  typeId: 12235, // Amarr Control Tower: 40 blocks an hour
+  typeId: 12235,
   state: 'online',
   reinforcedUntilMs: null,
   unanchorsAtMs: null,
@@ -164,8 +153,6 @@ describe('Starbases across corporations', () => {
     expect(column(view, 'corp')).toEqual(['HOLD2', 'HOLD1']);
   });
 });
-
-// --- Sovereignty ---------------------------------------------------------------------
 
 const skyhook = (id: number, opensInHours: number): CorpSovereigntyRow => ({
   key: `skyhook:${id}`,
@@ -206,15 +193,12 @@ describe('Sovereignty across corporations', () => {
     const view = corpSovereignty({ corpSovereigntyAll: ok(feed) }, ctx);
     expect(view.table!.rows.map((row) => row.key)).toEqual(['skyhook:2', 'skyhook:1']);
     expect(column(view, 'corp')).toEqual(['HOLD2', 'HOLD1']);
-    // The next window (corporation B's skyhook) and B's hub running dry in 10 h, together.
     expect(view.deadlines.map((deadline) => deadline.at)).toEqual([
       NOW + 3 * HOUR_MS,
       NOW + 10 * HOUR_MS,
     ]);
   });
 });
-
-// --- Contracts -----------------------------------------------------------------------
 
 const contract = (id: number, expiresInHours: number, collateral?: number): Contract => ({
   contract_id: id,
@@ -244,14 +228,11 @@ describe('Corp contracts across corporations', () => {
     };
     const view = corpContracts({ corpContractsAll: ok(feed) }, ctx);
     expect(view.number.value).toBe('3');
-    // Collateral at stake: both corporations' couriers.
     expect(view.number.notes?.[0]).toContain('300');
     expect(view.table!.rows.map((row) => row.key)).toEqual(['3', '1', '2']);
     expect(column(view, 'corp')).toEqual(['HOLD2', 'HOLD1', 'HOLD1']);
   });
 });
-
-// --- Market orders -------------------------------------------------------------------
 
 const STATION = 60003760;
 const order = (id: number, escrow: number): CorporationOrder => ({

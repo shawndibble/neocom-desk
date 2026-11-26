@@ -4,12 +4,6 @@ import { cloneOwnName, readCloneNicknames } from '@/features/character/cloneNick
 import { loadImplantTypeBonuses } from '../typeDetail';
 import type { JumpCloneImplantSet } from './whatIfImplants';
 
-/**
- * Each jump clone that carries at least one attribute implant, with its
- * bonuses summed. Clones with none (skill/ship implants only) are dropped —
- * they would be a preset identical to "None". An unreadable clone list is
- * "no clones": the What-If picker just shows its usual presets.
- */
 export async function loadJumpCloneImplantSets(
   characterId: number
 ): Promise<JumpCloneImplantSet[]> {
@@ -30,7 +24,6 @@ export async function loadJumpCloneImplantSets(
 
 const NO_SETS: JumpCloneImplantSet[] = [];
 
-/** The character's jump-clone presets; empty until (and unless) they load. */
 export function useJumpCloneImplantSets(characterId: number): JumpCloneImplantSet[] {
   const [loaded, setLoaded] = useState<{ characterId: number; sets: JumpCloneImplantSet[] } | null>(
     null
@@ -47,6 +40,5 @@ export function useJumpCloneImplantSets(characterId: number): JumpCloneImplantSe
       cancelled = true;
     };
   }, [characterId]);
-  // Another character's clones are never shown while this one's are loading.
   return loaded?.characterId === characterId ? loaded.sets : NO_SETS;
 }

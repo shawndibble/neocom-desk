@@ -80,7 +80,6 @@ describe('combineProfit', () => {
         points: [
           { at: ago(0.2), profit: -4 },
           { at: ago(6.5), profit: 7 },
-          // Older than the first bucket: left out.
           { at: ago(8), profit: 1000 },
         ],
       }),

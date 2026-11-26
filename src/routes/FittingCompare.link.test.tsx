@@ -12,7 +12,6 @@ vi.mock('@/features/fittings/dogmaFittingEngine', () => ({
   subscribeDogmaEngine: () => () => {},
   computeFittingStats: () => Promise.reject(new Error('no dogma engine in tests')),
 }));
-// Stable references, as the real hook's cache keeps them.
 const cache = vi.hoisted(() => new Map<string, readonly unknown[]>());
 vi.mock('@/features/fittings/useCompareFittings', () => ({
   useCompareFittings: (codes: readonly string[]) => {

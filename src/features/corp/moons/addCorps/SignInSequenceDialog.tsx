@@ -19,7 +19,6 @@ const NOTE_TONE = {
   warning: 'border-warning/40 text-warning',
 } as const;
 
-/** One outcome line above the log-in card: what the last return from EVE did. */
 function OutcomeNote({ tone, children }: { tone: keyof typeof NOTE_TONE; children: ReactNode }) {
   return (
     <p
@@ -33,7 +32,6 @@ function OutcomeNote({ tone, children }: { tone: keyof typeof NOTE_TONE; childre
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.signIn.${key}`;
 
-/** The character to pick on EVE's login page. */
 function CeoCard({ corp }: { corp: AddCorpsCandidate }) {
   const { t } = useTranslation();
   return (
@@ -48,7 +46,6 @@ function CeoCard({ corp }: { corp: AddCorpsCandidate }) {
   );
 }
 
-/** A settled promise means the login never left the page: show the failure line. */
 function useLeave(action: () => Promise<void>) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -62,11 +59,6 @@ function useLeave(action: () => Promise<void>) {
   return { busy, failed, go };
 }
 
-/**
- * Step 3: the guided sign-in sequence, one corporation at a time. The run lives
- * in the browser, so EVE's redirect back reopens this dialog on the next corp
- * (or on the same one after a wrong character).
- */
 export function SignInSequenceDialog({
   run,
   showOutcome,
@@ -77,13 +69,9 @@ export function SignInSequenceDialog({
   onClose,
 }: {
   run: AddCorpsRun;
-  /** Show what happened on the last return from EVE (false when the player reopened it later). */
   showOutcome: boolean;
-  /** Leaves for EVE's login as the current corporation's CEO. A rejection reads as an error line. */
   onSignIn: () => Promise<void>;
-  /** Leaves for EVE to approve closed-app alerts as the CEO just connected (issue #6103). */
   onApproveAlerts?: () => Promise<void>;
-  /** Moves past the alerts approval for this corp without it. */
   onSkipAlerts?: () => void;
   onStop: () => void;
   onClose: () => void;

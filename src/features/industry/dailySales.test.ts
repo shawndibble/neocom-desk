@@ -19,7 +19,6 @@ beforeEach(() => {
   vi.mocked(loadPriceHistory).mockReset();
   vi.mocked(loadLpStoreVolume).mockReset();
   resetRegionVolumes();
-  // No volume object by default: the ESI fallback path.
   vi.mocked(loadLpStoreVolume).mockResolvedValue(null);
 });
 

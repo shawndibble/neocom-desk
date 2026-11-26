@@ -1,11 +1,3 @@
-/**
- * Which input drove the last interaction, as `data-input` on `<html>`.
- *
- * The active option of a menu or picker draws its accent outline only while
- * this reads `keyboard` (`activeOptionClassName`, controlStyles.ts), so a
- * pointer hovering an option never shows a ring that looks like a bug. Set
- * here and nowhere else.
- */
 const NAVIGATION_KEYS = new Set([
   'ArrowUp',
   'ArrowDown',

@@ -23,7 +23,6 @@ const readJson = async <T>(path: string): Promise<T> =>
 
 const GRAVID = 47831;
 const GREMLIN_NEUT = 16475;
-// attributes: capacitorNeed 6, power 30, maxRange 54, energyNeutralizerAmount 97
 const rolled = (power: number): ItemMutation => ({
   baseTypeId: GREMLIN_NEUT,
   mutaplasmidTypeId: GRAVID,
@@ -55,7 +54,6 @@ beforeAll(async () => {
   const pilot = pilotOf(skills);
   const stats = (f: Fitting) =>
     computeFittingStats(f, pilot, undefined, undefined, { overheated: false });
-  // The real engine, on the calling thread: the worker is the same calculation.
   variants = {
     fitting,
     compare: async (variant: Fitting) => ({
@@ -75,8 +73,6 @@ const item = (itemId: number, power: number, quality: number): OwnedItem => ({
 
 describe('ranking owned abyssal modules through the real engine', () => {
   it('orders two modules of one type by what each does to the fit, not by quality', async () => {
-    // Same type, different rolls: the lighter powergrid roll is the better fit
-    // even though the heavier one has the higher quality.
     const heavy = item(1, 2000, 0.9);
     const light = item(2, 1400, 0.3);
     const effects = await evaluateOwned({

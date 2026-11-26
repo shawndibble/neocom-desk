@@ -1,10 +1,3 @@
-/**
- * Fetch + cache layer for the corporation's skyhooks and sovereignty hubs
- * (issue #4775): a list read, then one detail read per structure for its
- * raid window and reagents. Corp-keyed through `corpRead.ts`; the details fan
- * out under `ESI_FANOUT_CONCURRENCY`. A structure whose detail cannot be read
- * is unknown, never safe.
- */
 import { conditionalFetch, type StatusResult } from '@/esi/cache';
 import type { EsiResult } from '@/esi/client';
 import {
@@ -45,7 +38,6 @@ export function loadCorporationSovereigntyHubs(
   });
 }
 
-/** Detail for each id, concurrency-capped; keyed by structure id. */
 async function loadDetails<T>(
   ids: readonly number[],
   keyOf: (id: number) => string,

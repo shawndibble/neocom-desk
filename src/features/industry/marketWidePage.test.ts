@@ -7,7 +7,6 @@ interface Row {
   buildCost: number;
 }
 
-/** Row `i` earns `1000 - i` ISK/h, so the ISK/h ranking is id order. */
 const rows: Row[] = Array.from({ length: 450 }, (_, i) => ({
   id: i,
   iskPerHour: 1000 - i,
@@ -29,7 +28,6 @@ describe('topRows', () => {
   });
 
   it('cuts after sorting, so a re-sort reaches past the first page', () => {
-    // #250 is outside the ISK/h top 200 but the cheapest build of all.
     expect(topRows(rows, byIskPerHour, 'desc', 200).map((r) => r.id)).not.toContain(250);
     expect(topRows(rows, byBuildCost, 'asc', 200)[0]?.id).toBe(250);
   });

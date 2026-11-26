@@ -43,7 +43,6 @@ describe('realizedMargins', () => {
       unitPrice: 300,
     });
     const margins = realizedMargins([sale, second, first], new Map([[sale.transactionId, 0]]));
-    // 2 @ 100 + 2 @ 200 = 600 over 4 units.
     expect(margins.get(sale.transactionId)?.unitCost).toBe(150);
   });
 
@@ -80,7 +79,6 @@ describe('realizedMargins', () => {
   });
 
   it('gives no sale of an item a margin once one sale of it outran the wallet buys', () => {
-    // That sale proves stock the wallet never saw; under FIFO it could have gone into any of them.
     const buyA = trade({ quantity: 5, unitPrice: 100, date: '2026-01-01T00:00:00Z' });
     const covered = trade({ isBuy: false, quantity: 5, date: '2026-01-02T00:00:00Z' });
     const outran = trade({ isBuy: false, quantity: 5, date: '2026-01-03T00:00:00Z' });

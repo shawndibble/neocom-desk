@@ -8,13 +8,6 @@ import type { PlanJobKind, PlanScheduleResult, PlanStage } from './planJobSlots'
 
 const KIND_ORDER: readonly PlanJobKind[] = ['reaction', 'part', 'final'];
 
-/**
- * "Uses 6 slots · done by Thu 14:20" and a Show plan button for a plan's (or a
- * group's) job tree on its character's slots. Show plan opens a popover with
- * the stage order: "Now: 4 reactions · Wed 09:00: 6 parts · Thu 02:00: final item". When
- * the jobs are shared across Characters, Show plan also lists a lane per
- * Character: "Alice: Now: 2 parts · Thu 02:00: final item".
- */
 export function PlanScheduleLine({ plan }: { plan: PlanScheduleResult }) {
   const { t } = useTranslation();
   const names = useCharacterNames();
@@ -39,9 +32,6 @@ export function PlanScheduleLine({ plan }: { plan: PlanScheduleResult }) {
           time: eveWhen(schedule.finishMs, nowMs),
         })}
       </span>
-      {/* §6c: a bordered button ending in a caret opens a read-only popover
-          (as the Ship Tree's Legend does), so the stage order does not push
-          the hero's verdict down when it is opened. */}
       <Popover>
         <PopoverTrigger asChild>
           <Button size="sm">

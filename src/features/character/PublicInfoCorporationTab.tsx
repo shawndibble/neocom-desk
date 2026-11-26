@@ -1,19 +1,3 @@
-/**
- * Corporation tab body for `PublicInfoModal`: who the corporation is (logo,
- * ticker, alliance, founding, CEO and founder, home station, its own
- * description), how it fights (zKillboard's Snuggly↔Dangerous and Solo↔Gang
- * meters first — the question a reader opening a corp mostly came with — then
- * one line of figures and its most-flown hulls), and the alliances it has
- * been in. Lazy-loaded, like the Employment tab.
- *
- * The corp record itself is loaded by the modal, which owns the tab's
- * loading/error state; the parts that hang off it — stats, alliance history,
- * station and faction names — load here, each on its own, so one slow or
- * failed lookup never blanks the rest of the tab.
- *
- * An NPC corporation (CCP's id block) never reaches this tab: `PublicInfoModal`
- * gives it the standings view (`features/standings/modal`) instead.
- */
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatCount } from '@/lib/formatCount';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -51,7 +35,6 @@ const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 export interface PublicInfoCorporationTabProps {
   data: PublicCorporationInfo;
-  /** The alliance to show: a character's live one, else the corp record's. Null for none. */
   allianceId: number | null;
   allianceName?: string;
   onOpenAlliance?: () => void;
@@ -66,7 +49,6 @@ export default function PublicInfoCorporationTab({
   const { t } = useTranslation();
   const corporationId = data.corporation_id;
   const [now] = useState(() => new Date());
-  // A player corporation enlisted in Faction Warfare carries the faction it fights for.
   const factionName = useEntityName(data.faction_id);
 
   const key = String(corporationId);
@@ -89,7 +71,6 @@ export default function PublicInfoCorporationTab({
   const age = corporationAge(data.date_founded, now);
   const website = websiteUrl(data.url);
   const description = data.description?.trim() ?? '';
-  // When it joined its current alliance: the newest stint, if that is this alliance.
   const current = history?.rows[0];
   const allianceSince =
     allianceId !== null && current?.allianceId === allianceId ? current.startDate : null;
@@ -97,8 +78,6 @@ export default function PublicInfoCorporationTab({
   const taxPercent = corporationTaxPercent(data);
   const ready = stats?.kind === 'stats' ? stats.stats : null;
   const figures = killFigures(t, ready);
-  // One line: who it is (members, age, tax), then how it fights. Tax only when
-  // ESI states it.
   const facts: StatTileItem[] = [
     { label: t('publicInfo.memberCount'), value: formatCount(data.member_count) },
     {

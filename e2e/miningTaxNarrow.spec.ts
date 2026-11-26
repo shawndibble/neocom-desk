@@ -1,26 +1,10 @@
-/**
- * Mining Tax tab on narrow viewports: touch targets and layout checks that need a real browser,
- * since jsdom has no layout engine. (The Payee name on a card is plain text now, so the old
- * Payee filter button touch-target check of issue #1055 went with it.)
- *
- * A Payee balance is seeded directly into IndexedDB (payee + assignment +
- * a cached raw ESI mining-ledger row + a cached solar-system name/security
- * row) rather than driven through the ledger/assign UI flow — same
- * raw-`indexedDB` precedent `industryRecordsNarrow.spec.ts` and
- * `support/login.ts`'s `expireCachedEsiRows` use, run only after
- * `loginAndSelectCharacter` so the app's own Dexie schema has already opened
- * the stores. `esiCache` rows are written with a fresh `fetchedAt` so
- * `esi/cache.ts` serves them without ever attempting a live ESI call.
- */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { pressCardAction } from './support/taxBook/payeeCard';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
-/** Real moon ore typeId (Zeolites) already in `public/data/moonOreTypes.json` and `public/data/types.json`, so grouping and name resolution both succeed with no ESI/network call. */
 const ORE_TYPE_ID = 45490;
-/** Jita — a real solar system id, whose name/security row is pre-seeded below so `loadSystemNameAndSecurity` never has to fetch it live. */
 const SOLAR_SYSTEM_ID = 30000142;
 const ENTRY_DATE = '2026-01-01';
 const PAYEE_ID = 'e2e-payee-1';
@@ -29,26 +13,18 @@ const ASSIGNMENT_ID = 'e2e-assignment-1';
 const ORE_QUANTITY = 1000;
 const TAX_OWED = 100_000;
 
-/** A second Mining Ledger Entry, deliberately left with no Assignment so it reads as Unassigned — the only status `dismissableRows` will bulk-dismiss. Same system, a different date, so `groupMiningLedger` keeps it a row of its own. */
 const UNASSIGNED_DATE = '2026-01-02';
-/** Four days after the entry it settles: inside `withinLinkWindow`'s asymmetric `[-1, +14]` day window, and after the mining, which is the direction a pilot actually pays in. */
 const PAYMENT_DATE = '2026-01-05T12:00:00Z';
 const JOURNAL_REF_ID = 7_000_001;
 
 interface SeedOptions {
-  /** Also seed `UNASSIGNED_DATE`'s entry — what Bulk Dismiss needs something to dismiss. */
   withUnassignedEntry?: boolean;
-  /** Also seed a wallet-journal payment `suggestLink` will offer — what Link Payment needs a suggestion to show. */
   withMadePayment?: boolean;
-  /** Skip the Assignment (the Payee stays, so the tab isn't the first-Payee empty state): every entry is Unassigned and nothing is owed. */
   nothingOwed?: boolean;
-  /** Seed the Assignment with a zero value and zero tax, so its row has nothing to show in the value and tax columns. */
   withZeroValue?: boolean;
-  /** Seed the Assignment as `needs-review` (its entry grew after it was settled) instead of `outstanding`. */
   needsReview?: boolean;
 }
 
-/** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
 const GLOBAL_CACHE_CHARACTER_ID = 0;
 
 async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<void> {
@@ -102,9 +78,6 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
               ]
             : []),
         ];
-        // Raw ESI mining-ledger row (`getCharacterMining`'s shape), grouped by
-        // `groupMiningLedger` into one Mining Ledger Entry for this (date,
-        // system) pair.
         tx.objectStore('esiCache').put({
           characterId,
           key: 'miningTax:ledger',
@@ -112,12 +85,6 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           fetchedAt: now,
           truncated: false,
         });
-        // One outgoing wallet-journal payment for exactly the balance below,
-        // which is all `suggestLink` needs to offer a link at its weakest
-        // `amount` tier. `second_party_id` is deliberately omitted: with no
-        // counterparty there is no `resolveNames` lookup (and so nothing for
-        // `testBase`'s escaped-network guard to catch), and `identityKind`
-        // returns null, so the suggestion rests on the figure alone.
         if (withMadePayment) {
           tx.objectStore('esiCache').put({
             characterId,
@@ -126,7 +93,6 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
               {
                 id: journalRefId,
                 ref_type: 'player_donation',
-                // Negative: `fromJournal` only counts ISK *leaving* the wallet.
                 amount: -taxOwed,
                 date: paymentDate,
               },
@@ -135,15 +101,12 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
             truncated: false,
           });
         }
-        // Solar-system name/security, cached under the shared public-lookup
-        // sentinel so `resolveRowNames` never calls `/universe/systems/{id}`.
         tx.objectStore('esiCache').put({
           characterId: globalCacheCharacterId,
           key: `system:${solarSystemId}`,
           value: { system_id: solarSystemId, name: 'Jita', security_status: 0.9 },
           fetchedAt: now,
         });
-        // A Payee is someone in EVE: linked, so the Tax tab asks ESI nothing about it.
         tx.objectStore('payees').put({
           id: payeeId,
           characterId,
@@ -152,9 +115,6 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           entityId: 98000777,
           updatedAt: now,
         });
-        // Outstanding Assignment covering the whole entry, so `computePayeeBalances`
-        // counts its `taxOwed` toward this Payee's balance (`owed > 0`), which is
-        // what makes the card show by default without toggling "show settled".
         if (!nothingOwed)
           tx.objectStore('miningTaxAssignments').put({
             id: assignmentId,
@@ -204,8 +164,6 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
   );
 }
 
-// Re-seeds the same fixture with `options.payeeName` in place of the module's
-// `PAYEE_NAME`, since `seedPayeeBalance` closes over the constant directly.
 async function seedPayeeBalanceNamed(page: Page, payeeName: string): Promise<void> {
   await seedPayeeBalance(page);
   await page.evaluate(
@@ -231,31 +189,13 @@ async function seedPayeeBalanceNamed(page: Page, payeeName: string): Promise<voi
   );
 }
 
-/**
- * Mining Tax dialog rows — touch target (issue #1144): a `<label>` that is a list row's whole tap
- * target must reach the 36px floor on a phone (docs/DESIGN.md §3) through `tappableRowClassName`
- * (`min-h-9 md:min-h-7`, `controlStyles.ts`), and revert to its old height above `md`. jsdom has
- * no layout engine, so only a real browser can tell 36 from 28 — hence a Playwright spec.
- *
- * The rows: Bulk Dismiss's itemized entries, and since every Payee is paid oldest first
- * (decision 20261120-235011) the payment lists of Link a payment you already made, opened from the
- * Payee card's Link payment or the "Payments to link" card's Review (its
- * suggestions). Settle up and the link dialog no longer list entries, so those rows are gone.
- *
- * Rows are ticked through the table's real checkbox column and the real selection toolbar rather
- * than by poking state, because "can this even be opened at 390px?" is half of what the fix has
- * to survive.
- */
 test.describe('Mining Tax dialog rows — touch target', () => {
   const INCLUDE_LABEL = (date: string) => `Include ${date}`;
 
-  /** The tap target is the `<label>` around the control the accessible name hangs off. */
   const labelHeight = (control: Locator): Promise<number> =>
     control.evaluate((el) => el.closest('label')!.getBoundingClientRect().height);
 
   async function openReview(page: Page): Promise<Locator> {
-    // The card appears only once `loadMadePayments` resolves — it is loaded
-    // after the ledger on purpose, so this waits rather than clicking blind.
     const review = page.getByRole('button', { name: 'Review' });
     await expect(review).toBeVisible();
     await review.click();
@@ -272,12 +212,6 @@ test.describe('Mining Tax dialog rows — touch target', () => {
   }
 
   async function openBulkDismiss(page: Page): Promise<Locator> {
-    // Ticking both selectable rows is deliberate: only the Unassigned one is
-    // dismissable, so the count in the button is itself the check that
-    // `dismissableRows` narrowed the selection the way the toolbar claims.
-    // `.all()` resolves against whatever is in the DOM right now and never
-    // waits, so the count — one Outstanding row plus one Unassigned — is what
-    // holds until the table has actually rendered.
     const boxes = page.getByRole('checkbox', { name: /^Select / });
     await expect(boxes).toHaveCount(2);
     for (const box of await boxes.all()) await box.check();
@@ -296,7 +230,6 @@ test.describe('Mining Tax dialog rows — touch target', () => {
     await page.goto('./mining/tax');
 
     const dialog = await openLinkWallet(page);
-    // One row component serves the suggested matches and the hand-picked list.
     expect(await labelHeight(dialog.getByRole('radio').first())).toBeGreaterThanOrEqual(36);
   });
 
@@ -328,9 +261,6 @@ test.describe('Mining Tax dialog rows — touch target', () => {
     await seedPayeeBalance(page, { withUnassignedEntry: true });
     await page.goto('./mining/tax');
 
-    // One line of `text-xs` (16px) inside `py-1.5` (2 x 6px) is 28px — what
-    // `md:min-h-7` reverts to exactly. Pinned as a range rather than asserted
-    // "under 36" so a row that quietly grew for some other reason still fails.
     const bulkDismiss = await openBulkDismiss(page);
     const height = await labelHeight(bulkDismiss.getByLabel(INCLUDE_LABEL(UNASSIGNED_DATE)));
     expect(height).toBeGreaterThan(24);
@@ -338,15 +268,6 @@ test.describe('Mining Tax dialog rows — touch target', () => {
   });
 });
 
-/**
- * Ledger table phone sort picker (issue #2148): `DataTable` defaults to
- * `responsive="stack"` below `sm`, which hides the `<thead>` and its sort
- * buttons entirely — the same bug class already fixed for Industry (#1627),
- * Market (#1628) and Contacts (#1978). The Tax tab renders `DataTableSortPicker`
- * in its filter row on a phone (every column already carries `sortValue`),
- * so this only needs to prove the picker renders on phone, is absent on
- * desktop, and actually reorders the stacked cards.
- */
 test.describe('Tax ledger — phone sort picker', () => {
   test('reorders the stacked cards at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
@@ -361,8 +282,6 @@ test.describe('Tax ledger — phone sort picker', () => {
         .locator('tbody tr[data-row-key]')
         .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')));
 
-    // Default sort is date desc, so the newer Unassigned row (2026-01-02)
-    // leads the older Outstanding row (2026-01-01).
     const unassignedKey = `${CHARACTER_ID}:${UNASSIGNED_DATE}:${SOLAR_SYSTEM_ID}:unassigned`;
     await expect.poll(keysOf).toEqual([unassignedKey, ASSIGNMENT_ID]);
 
@@ -383,24 +302,7 @@ test.describe('Tax ledger — phone sort picker', () => {
   });
 });
 
-/**
- * `SelectionToolbar`'s bulk "Settle Up" touch target (issue #1175): the
- * bar's one primary, decision-committing action for the whole checked
- * selection rendered at `size="sm"` (36px) like its four ordinary secondary
- * siblings (Select All, Clear, Combine, Dismiss) — under this app's `md`
- * touch tier (36px), the accepted size for a page's sole primary control. Only Settle Up moves; the
- * other four stay `sm` at every width, since widening them too would grow
- * four already-conventional secondary actions on desktop pointer for no
- * phone-specific reason (RUBRIC.md's "the desktop layout is the control").
- *
- * A row is ticked through the table's real checkbox column, not by poking
- * state — the toolbar itself only renders once something is checked, so
- * "does the bar even reach 36px once it's actually showing on a phone?" is
- * the property under test, the same reasoning the dialog-row spec above
- * gives for driving its own checkboxes for real.
- */
 test.describe('Mining Tax bulk Settle Up — touch target', () => {
-  /** Lands on the Tax tab with exactly one row checked, so the toolbar is showing and its Settle Up/Clear heights are ready to measure. */
   async function openToolbarWithOneRowChecked(
     page: Page,
     viewport: { width: number; height: number }
@@ -427,8 +329,6 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     const heights = await openToolbarWithOneRowChecked(page, PHONE);
     expect(await heights.settleUpHeight()).toBeGreaterThanOrEqual(36);
 
-    // Select All/Clear stay at the ordinary `sm` size — widening them too
-    // isn't this ticket's fix.
     expect(await heights.clearHeight()).toBeLessThan(40);
   });
 
@@ -436,15 +336,11 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     page,
   }) => {
     const heights = await openToolbarWithOneRowChecked(page, DESKTOP);
-    // `md` tier's own pointer-width value (`h-9`), not the 36px touch value —
-    // this is the one accepted pointer-size change the ticket calls for.
     expect(await heights.settleUpHeight()).toBeCloseTo(36, 0);
-    // Clear's own `sm` pointer value is untouched.
     expect(await heights.clearHeight()).toBeCloseTo(28, 0);
   });
 });
 
-/** Left/top/right/bottom of a cell's text (not the cell's padded box), by the cell's class. */
 async function textRect(row: Locator, cellSelector: string) {
   return row
     .locator(cellSelector)
@@ -458,7 +354,6 @@ async function textRect(row: Locator, cellSelector: string) {
 }
 
 test.describe('Mining Tax phone card — tick box on the date line (#2983)', () => {
-  // A coarse pointer grows the tick box's label to 36px (`touch:size-9`).
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
   test('tick box shares the date line, line two starts under it, nothing overflows', async ({
@@ -477,21 +372,16 @@ test.describe('Mining Tax phone card — tick box on the date line (#2983)', () 
     const lineTwo = await textRect(row, 'td.dt-meta-first');
     const status = await textRect(row, 'td.dt-edge-end');
 
-    // Date and box on one line, a small gap between them.
     const boxMid = boxRect.y + boxRect.height / 2;
     expect(Math.abs(boxMid - (date.top + date.bottom) / 2)).toBeLessThanOrEqual(6);
     const gap = date.left - (boxRect.x + boxRect.width);
     expect(gap).toBeGreaterThanOrEqual(4);
     expect(gap).toBeLessThanOrEqual(12);
-    // Line two sits under the box, at the card's left edge, not indented to the date.
     expect(lineTwo.top).toBeGreaterThanOrEqual(date.bottom - 2);
     expect(Math.abs(lineTwo.left - boxRect.x)).toBeLessThanOrEqual(2);
-    // The status joins line two when it fits.
     expect(Math.abs(status.top - lineTwo.top)).toBeLessThanOrEqual(6);
-    // The touch target still meets the floor, without the box's own cell carrying it.
     expect(labelRect.width).toBeGreaterThanOrEqual(36);
     expect(labelRect.height).toBeGreaterThanOrEqual(36);
-    // And nothing pushes the page sideways.
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
@@ -515,7 +405,6 @@ test.describe('Mining Tax table row — tick box clears the date (#2983)', () =>
       const rowRect = (await row.boundingBox())!;
 
       expect(date.left - (boxRect.x + boxRect.width)).toBeGreaterThanOrEqual(8);
-      // Little room left of the box.
       expect(boxRect.x - rowRect.x).toBeLessThanOrEqual(12);
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -525,16 +414,6 @@ test.describe('Mining Tax table row — tick box clears the date (#2983)', () =>
   }
 });
 
-/**
- * Ledger table Payee column — long name overflow (issue #2147): a Payee name
- * long enough to fill the column was pushing Status and the row's edit
- * affordance off-screen at 1024px, the narrowest width the table's `md:`
- * layout (not the phone stacked-card) has to support. The fix truncates the
- * `payee` column (the one flexible column of a fixed-layout table, so it
- * takes what the others leave and truncates past that) with an ellipsis, same shape as
- * Market's `location` column/`LocationCell`, so the full name stays
- * discoverable via the app's `Tooltip` rather than being lost outright.
- */
 test.describe('Mining Tax ledger — long Payee name overflow', () => {
   const LONG_PAYEE_NAME = 'A Very Long Corporation Holding Name Ltd';
   const NARROW_DESKTOP = { width: 1024, height: 768 };
@@ -610,8 +489,6 @@ test.describe('Mining Tax attention strip — collapsed header stays one line', 
         });
       await expect(header.first()).toBeVisible();
       const label = header.first().locator('span').first();
-      // The row is one line when the preview truncates rather than wraps:
-      // the button is no taller than its 36px touch floor plus padding slack.
       const box = (await header.first().boundingBox())!;
       expect(box.height).toBeLessThanOrEqual(36);
       const lineHeight = await label.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
@@ -625,11 +502,6 @@ test.describe('Mining Tax attention strip — collapsed header stays one line', 
   }
 });
 
-/**
- * Nothing owed, entries Unassigned (#3120): the prompt is a slim row, not a
- * half-width tile, so the Assign button stays on screen and the ledger starts
- * above the fold. Invariants only — no pixel thresholds.
- */
 test.describe('Tax tab Unassigned prompt — nothing owed (#3120)', () => {
   for (const viewport of [PHONE, { width: 1024, height: 800 }, DESKTOP]) {
     test(`slim row, no overflow at ${viewport.width}px`, async ({ page }) => {
@@ -787,13 +659,7 @@ test.describe('Mining Tax ledger — checkbox names and toolbar clearance (#3391
   }
 });
 
-/**
- * Split dialog collector radios — touch target (#3674): the "further ore goes
- * to" radios were bare 16px `text-xs` rows. Each label is now a
- * `tappableRowClassName` row: 36px on phone, compact on a fine-pointer desktop.
- */
 const SECOND_PAYEE_ID = 'e2e-payee-2';
-/** 40 characters: must wrap inside the label, not overflow the page. */
 const SECOND_PAYEE_NAME = 'Second Payee With A Very Long Name Indeed';
 
 async function seedSecondPayee(page: Page): Promise<void> {
@@ -808,7 +674,6 @@ async function seedSecondPayee(page: Page): Promise<void> {
         const tx = database.transaction('payees', 'readwrite');
         tx.objectStore('payees').put({
           id: payeeId,
-          // A different recipient: the same entity would merge it into the first Payee.
           characterId,
           name: payeeName,
           defaultTaxPct: 10,
@@ -829,7 +694,6 @@ async function openSplitWithSecondPayee(page: Page): Promise<Locator> {
   await seedPayeeBalance(page, { needsReview: true });
   await seedSecondPayee(page);
   await page.goto('./mining/tax');
-  // The status pill is a focusable hint trigger and swallows the row click.
   await page.getByRole('cell', { name: ENTRY_DATE }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Give new ore to another Payee' }).click();
@@ -876,8 +740,6 @@ test.describe('Split dialog collector radios — touch target (#3674)', () => {
 });
 
 test.describe('Mining Tax table — the ⋮ column stays inside the table', () => {
-  // The column kept the header's `w-0` under `table-fixed`, so the 28px button
-  // overflowed the table's right edge and made it scroll sideways.
   for (const width of [1440, 1024]) {
     test(`at ${width}px the ⋮ is inside the table and nothing scrolls sideways`, async ({
       page,

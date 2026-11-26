@@ -11,7 +11,6 @@ import type { CorpStanding } from '@/features/corp/corpStanding';
 import { rolesText } from '@/features/corp/roles';
 import type { AlertsRowState } from '@/features/notifications/alertsGrant';
 
-/** The slice of a Characters-table row the export reads (the route's `CharacterRow` satisfies it). */
 export interface CharacterCsvRow {
   character: { characterId: number; name: string };
   corporationName: string | undefined;
@@ -24,16 +23,13 @@ export interface CharacterCsvRow {
   alertCount: number;
   starred: boolean;
   spFarm: boolean;
-  /** Docked place and hull; undefined until read (the read only runs while its columns show). */
   whereabouts: CharacterWhereabouts | undefined;
-  /** Undefined until read (the read only runs while a corp column shows). */
   corpStanding: CorpStanding | undefined;
   alertsWhenClosed: AlertsRowState;
 }
 
 const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = ['manufacturing', 'science', 'reaction'];
 
-/** The Docked at cell's reading of a Character's place: undefined until it is read. */
 function placeLabelOf(row: CharacterCsvRow) {
   const place = row.whereabouts?.place;
   return place ? placeLabel(place) : undefined;
@@ -43,13 +39,6 @@ function isoOrUndefined(ms: number | null | undefined): string | undefined {
   return ms == null ? undefined : new Date(ms).toISOString();
 }
 
-/**
- * Export columns for the Characters table — every data column, whatever the
- * Columns picker currently shows (the file is data, not a screenshot), minus
- * the Remove button. Where the table shows a countdown (training, PI) the
- * file carries the state label plus the moment itself as a separate date
- * column, since a countdown is stale the second it's written.
- */
 export function charactersCsvColumns(
   t: CsvTranslate,
   {
@@ -64,19 +53,13 @@ export function charactersCsvColumns(
     now = Date.now,
   }: {
     groupNameById: ReadonlyMap<string, string>;
-    /** The SP-ready column only exists while SP-extraction monitoring is on, as in the table. */
     spExtractionEnabled: boolean;
     spExtractionThresholdSp: number;
-    /** Net ISK per extractor at the hub; null when unpriced. */
     extractionNet: number | null;
     achievements: AchievementLookup;
-    /** The route's one "how stale is this character" rule, shared with its card and table. */
     lastSynced: (row: CharacterCsvRow) => Date | undefined;
-    /** Corporation roles and access: only while one shows, since only then are roles read. */
     corpColumns?: boolean;
-    /** Alerts when closed: only with a sync backend, as in the table. */
     alertsWhenClosedColumn?: boolean;
-    /** The clock PI expiry is read against, at export time. Injected for tests. */
     now?: () => number;
   }
 ): CsvColumn<CharacterCsvRow>[] {
@@ -107,8 +90,6 @@ export function charactersCsvColumns(
     },
     { header: t('characters.csvSystem'), value: (row) => row.whereabouts?.place?.systemName },
     {
-      // The screen's wording: a named station or structure needs no word; an unnamed
-      // structure reads "structure", an item in space "in space".
       header: t('characters.csvPlaceKind'),
       value: (row) => {
         const label = placeLabelOf(row);
@@ -140,7 +121,6 @@ export function charactersCsvColumns(
       value: (row) => {
         const attention = row.attention?.piAttention;
         if (attention === undefined) return undefined;
-        // An expiry already passed reads as stopped, as the table shows it.
         if (isPiExpired(row.attention?.piSoonestExpiryMs, now())) return t('pi.attention.idle');
         return t(`pi.attention.${attention}`);
       },

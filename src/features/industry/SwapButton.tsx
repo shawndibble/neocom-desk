@@ -10,15 +10,6 @@ import { SkillGateMarker } from './SkillGateMarker';
 import { linkClassName } from './materialsTableStyle';
 import type { MaterialTableRow } from './subBuildPlan';
 
-/**
- * Switches one material between buying and building it here. Shown on every
- * material something here can produce, the way the hammer was: green, with
- * what it saves, when the make-or-buy advice says building is cheaper; quiet
- * otherwise, so it never reads as a recommendation it isn't.
- *
- * The savings sit beside the button rather than inside it, so the button's
- * visible text stays a prefix of its accessible name (WCAG 2.5.3).
- */
 export function SwapButton({
   material,
   name,
@@ -31,10 +22,8 @@ export function SwapButton({
 }: {
   material: MaterialTableRow;
   name: string;
-  /** What a click does: start building it, or go back to buying it. */
   kind: 'build' | 'buy';
   advice: MakeOrBuy | undefined;
-  /** When gated, a lock-only marker follows a Build instead button: no skill text. */
   skillGate?: SkillGateVerdict;
   nameForCharacter?: (characterId: number) => string;
   nameForSkill?: (typeID: number) => string;

@@ -1,8 +1,3 @@
-// The moon owner's view callables' logic (issue #4512, spec #4504): the access check, a rate
-// request and dismissing the after-leaving view; its payee is corpTaxBookPayee.ts (#4653). The
-// caller is the moon owner's own officer (CEO, Director or Accountant, read live from ESI); the view itself is in
-// corpTaxBookFeederView.ts. Failures carry a stable `reason`; no player-facing text lives here.
-
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { fail, type Caller } from './actorAuth.js';
@@ -29,7 +24,6 @@ import { refreshSharedPops } from './sharedPopsStore.js';
 
 export { parseFeederCall };
 
-/** The book deps a moon owner's call writes with. */
 export const feederBookDeps = (deps: CorpSyncDeps): BookDeps => ({
   db: deps.db,
   now: deps.now,
@@ -40,7 +34,6 @@ export const feederBookDeps = (deps: CorpSyncDeps): BookDeps => ({
 });
 
 export interface RequestFeederRateInput extends FeederCall {
-  /** What the moon owner asks to be paid (0-100). */
   pct: number;
 }
 
@@ -49,10 +42,6 @@ export function parseRequestFeederRateInput(data: unknown): RequestFeederRateInp
   return { ...call, pct: pctField(record(data).pct, 'pct') };
 }
 
-/**
- * Live role check, then the 24h access record the rules read. Rebuilds the view when there
- * is none yet. Works after leaving (the `FeederPrevious` pointer), for the after-leaving view.
- */
 export async function getFeederViewAccess(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -88,11 +77,6 @@ export async function getFeederViewAccess(
   };
 }
 
-/**
- * The moon owner asks for a rate. Recorded as a `requested` entry dated today; a rate the
- * accounting corporation already agreed keeps winning, so this only moves the effective
- * rate while none is agreed.
- */
 export async function requestFeederRate(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -126,7 +110,6 @@ export async function requestFeederRate(
 
 export interface DisputeFeederPayoutInput extends FeederCall {
   payoutId: string;
-  /** True flags the payment as disputed; false withdraws the flag. */
   disputed: boolean;
 }
 
@@ -139,11 +122,6 @@ export function parseDisputeFeederPayoutInput(data: unknown): DisputeFeederPayou
   return { ...call, payoutId: boundedString(d.payoutId, 'payoutId', 64), disputed: d.disputed };
 }
 
-/**
- * The moon owner flags a payment it disputes (#6209), or withdraws the flag: the accounting
- * corporation's officers see it on the payment. Only a payment that counts can be disputed; the
- * flag changes no figure.
- */
 export async function disputeFeederPayout(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -185,7 +163,6 @@ export async function disputeFeederPayout(
 }
 
 export interface SetFeederPopSharingInput extends FeederCall {
-  /** True lets the accounting corporation share this moon owner's pop schedule (the default). */
   share: boolean;
 }
 
@@ -198,11 +175,6 @@ export function parseSetFeederPopSharingInput(data: unknown): SetFeederPopSharin
   return { ...call, share: d.share };
 }
 
-/**
- * The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons, on by default.
- * Off stops its pops at once; the book's settings for those moons are kept and apply again
- * when it opts back in. Audited in the book's history.
- */
 export async function setFeederPopSharing(
   deps: CorpSyncDeps,
   caller: Caller,
@@ -237,7 +209,6 @@ export async function setFeederPopSharing(
       ctx.collectorCorporationId,
       input.corporationId
     );
-    // An opt-out takes the moon owner's pops away at once; opting back in returns them (#6223).
     await refreshSharedPops(feederBookDeps(deps), ctx.collectorCorporationId);
   }
   return { ok: true };
@@ -245,7 +216,6 @@ export async function setFeederPopSharing(
 
 const ENDED: readonly FeederRecord['status'][] = ['left', 'removed', 'disconnected'];
 
-/** The moon owner's officers dismiss the after-leaving view; it stays dismissed. */
 export async function dismissFeederHistory(
   deps: CorpSyncDeps,
   caller: Caller,

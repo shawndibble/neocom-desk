@@ -7,27 +7,12 @@ import type { UndercutScope } from '@/engine/market/undercut';
 import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
 import { CELL, scopeLabelText, type ScopeState } from './orderScopeState';
 
-/** Scope pill colours: the same station/system/region ladder the row badges use. */
 const SCOPE_PILL: Record<UndercutScope, string> = {
   station: 'bg-danger/15 text-danger',
   system: 'bg-warning/15 text-warning',
   region: 'bg-accent/15 text-accent',
 };
 
-/**
- * One scope's line in the "Who is cheaper" table.
- *
- * The seller cell carries the station, the ISK gap and the distance, because
- * the three scopes routinely carry the SAME rival — one seller at your own
- * station is, by construction, also the cheapest in your system and can be
- * the cheapest in the region too. Three identical ISK figures on three bare
- * rows read as a bug; the same three beside where they sit, the gap, and the
- * distance read as what they are.
- *
- * A state that isn't a rival (not checked, clear, structure) has nothing to
- * put in the seller and price columns, so it spans them rather than printing
- * dashes.
- */
 export function ScopeRow({
   scope,
   state,
@@ -37,9 +22,7 @@ export function ScopeRow({
 }: {
   scope: UndercutScope;
   state: ScopeState;
-  /** Where the rival sits, when this app resolved that location. */
   stationName?: string | null;
-  /** Fixed distance wording for a scope whose answer is structural (station, system). */
   distance?: string;
   jumps?: JumpsAwayResult;
 }) {
@@ -78,9 +61,6 @@ export function ScopeRow({
   }
 
   const { rival } = state;
-  // The station tier is a Fuzzwork aggregate: a price, never an order count.
-  // `stationScopeState` fills those fields with 0, so they are only ever read
-  // when the deep book actually supplied them.
   const countsKnown = rival.ordersBeatingMe > 0;
   const distanceText = jumps ? (
     <JumpsAwayText result={jumps} t={t} locationId={rival.locationId} />
@@ -100,11 +80,6 @@ export function ScopeRow({
       <span role="cell" className={cx(CELL, 'flex flex-col gap-0.5')}>
         <span>{stationName ?? t('market.unknownStructure')}</span>
         <span className="text-[0.6875rem] text-text-dim">{whoText}</span>
-        {/*
-          The gap and distance ride under the seller as labelled words: the
-          dialog is narrow at every width, and a bare red number under no
-          column header says nothing.
-        */}
         <span className="text-[0.6875rem] text-text-dim">
           {t('market.orders.scopeOverBy')}:{' '}
           <span className="text-danger tabular-nums">

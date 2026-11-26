@@ -19,8 +19,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
-  // Sorts ahead of the Rifter in "Used in": the list reads by product name,
-  // not by blueprint id.
   '691': {
     name: 'Breacher Blueprint',
     time: 1200,
@@ -32,9 +30,6 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
-  // A reaction formula (issue #460): must surface through the same catalog
-  // as a manufacturing blueprint, not a separate lookup, for the picker to
-  // find it by product name and the facility filter to key off its activity.
   '46157': {
     name: 'Methanofullerene Reaction Formula',
     time: 10800,
@@ -88,8 +83,6 @@ function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
 
 describe('loadBlueprintCatalog', () => {
   it('hands back the same catalog while the SDE files it is built from are unchanged', async () => {
-    // Pages hold it in state: a rebuilt copy re-renders and re-prices an open
-    // plan even though nothing in it changed.
     expect(await loadBlueprintCatalog()).toBe(await loadBlueprintCatalog());
   });
 

@@ -1,19 +1,3 @@
-/**
- * Edits the implant/booster set a Fitting carries.
- *
- * Adds by exact (case-insensitive) item name via the same `loadItemNameMap`
- * the EFT loader resolves names through, from one box: the implant catalog
- * (`loadImplantCatalog`) says which slot the item takes, and it goes there
- * (`placeInSet`), replacing whatever held that slot, as Find by goal does.
- *
- * Given the open Fitting and pilot (`finder`), it opens on "Find by goal"
- * (`ImplantFinder`) instead, with this list under "Your set".
- *
- * It's a planner: on "My clone" with no set of the Fitting's own, it starts
- * from the clone's implants, and the first change saves that plan to the
- * Fitting — which is what puts the page on it — while opening it alone
- * changes nothing. "Use my clone" drops the set again.
- */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   lazy,
@@ -74,37 +58,25 @@ interface ImplantSetPickerProps {
   onClose: () => void;
   implantSet: FittingImplantSet | undefined;
   onChange: (implantSet: FittingImplantSet | undefined) => void;
-  /** The open Fitting and pilot: turns on "Find by goal". */
   finder?: {
     fitting: Fitting;
     profile: PilotProfile;
     basis: ImplantBasis;
   };
-  /** Drops the Fitting's own set, so the stats go back to the clone; absent: no clone to go back to. */
   onUseClone?: () => void;
 }
 
-/** Stable identity: a fresh `{implants: [], boosters: []}` every render would
- * re-fire the name-resolve effect below every render whenever no set is
- * carried yet — the common case for a freshly-loaded Fitting. */
 const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 
 interface SlotListProps {
   heading: string;
   typeIds: readonly number[];
   names: Map<number, string>;
-  /** By position, not type id — a set may legally carry the same id twice. */
   onRemove: (index: number) => void;
-  /** Opens an entry's details (Show Info), from the row's ⓘ; the name goes to Market. */
   onInfo: (typeId: number) => void;
-  /** Under an entry: its own controls (a booster's side effects). */
   renderDetail?: (typeId: number) => ReactNode;
 }
 
-/**
- * A booster's side effects, each a switch: off by default (a booster is
- * assumed to roll none), on to see the fit with it.
- */
 function SideEffectSwitches({
   boosterTypeId,
   switchedOn,
@@ -144,21 +116,12 @@ const NO_ENTRIES: readonly ImplantEntry[] = [];
 const loadSuggestionEntries = () =>
   loadImplantMarketEntries().then((loaded) => [...loaded.implants, ...loaded.boosters]);
 
-/** Suggestions shown under the box while typing. */
 const SUGGESTION_LIMIT = 8;
 
-/**
- * One box for both lists: the item itself decides where it goes. Typing lists
- * the matching implants and boosters (a combobox, arrow keys and Enter or a
- * click to pick); picking one adds it at once, and typing a full name and
- * pressing Add still works.
- */
 function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: string | null }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  /** False once the list is dismissed (Escape, a pick, leaving the box); typing opens it again. */
   const [listOpen, setListOpen] = useState(true);
-  // No suggestions on failure; a typed full name still adds.
   const entries = useAsyncLoad(loadSuggestionEntries).data ?? NO_ENTRIES;
   const matches = useMemo(
     () => rankedSearch(entries, query, { primary: (entry) => entry.name, limit: SUGGESTION_LIMIT }),
@@ -177,11 +140,9 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
     if (!open) return;
     if (combo.handleNavKey(event)) return;
     if (event.key === 'Enter') {
-      // The top match when none is highlighted, so a part-typed name needs no arrow key.
       event.preventDefault();
       choose(matches[combo.highlight ?? 0]!.name);
     } else if (event.key === 'Escape') {
-      // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
       setListOpen(false);
@@ -260,10 +221,7 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
           {typeIds.map((typeId, index) => {
             const name = names.get(typeId) ?? t('fittings.implants.unknownType', { typeId });
             return (
-              <li
-                key={`${typeId}-${index}`} // ids may repeat — see onRemove's own doc
-                className="rounded-xs bg-panel-2 p-1.5"
-              >
+              <li key={`${typeId}-${index}`} className="rounded-xs bg-panel-2 p-1.5">
                 <div className="flex items-center gap-2">
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
                   <ItemInfoLink
@@ -317,12 +275,10 @@ export function ImplantSetPicker({
   const fitting = finder?.fitting;
   const basis = finder?.basis;
   const cloneImplants = finder?.profile.implantTypeIds;
-  /** The clone's implants, as the plan to start from — see this file's own doc. */
   const seed = useMemo(
     () => (basis ? cloneSeedSet(basis, implantSet, cloneImplants) : undefined),
     [basis, implantSet, cloneImplants]
   );
-  // Stable per Fitting and seed: the finder re-screens every family whenever this changes.
   const plannedFitting = useMemo(
     () => (fitting && seed ? { ...fitting, implantSet: seed } : fitting),
     [fitting, seed]
@@ -336,7 +292,7 @@ export function ImplantSetPicker({
   useEffect(() => {
     if (!open) return;
     void loadItemNameMap().then(setNameMap);
-    void loadImplantCatalog().catch(() => undefined); // warm, so an add sorts at once
+    void loadImplantCatalog().catch(() => undefined);
   }, [open]);
 
   useEffect(() => {
@@ -360,7 +316,6 @@ export function ImplantSetPicker({
       return;
     }
     setAddError(null);
-    // The set as of now, not as of the submit: another add may have landed meanwhile.
     const next = placeInSet(latestSet.current, catalog.slotOf, entry.typeID);
     latestSet.current = next;
     onChange(next);
@@ -368,7 +323,6 @@ export function ImplantSetPicker({
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
     const remaining = set[kind].filter((_, i) => i !== index);
-    // A side effect whose booster is gone goes with it.
     onChange(kind === 'boosters' ? withBoosters(set, remaining) : { ...set, implants: remaining });
   }
 
@@ -421,7 +375,6 @@ export function ImplantSetPicker({
     </div>
   );
 
-  // What the stats are on now, and the way back to the clone from a set.
   const inUse = (
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-dim">
       <p>

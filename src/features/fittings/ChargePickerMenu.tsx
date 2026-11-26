@@ -17,14 +17,6 @@ import type { FittingItemActions } from './fittingItemActions';
 import { formatIskExact } from './chargeFormat';
 import { useChargeChoices } from './useChargeChoices';
 
-/**
- * "Change charge" as the Charge Picker, sized for a menu (a Ring tile,
- * a List row, an Offense row): the quick picks, then one submenu per type —
- * long range down to most damage — holding its Tech I and faction versions
- * with damage and price. Each loads into `at` only, out of the cargo when it
- * holds some. Falls back to `fallback` (the plain list) for a module whose
- * charges don't shoot, or before the figures are ready.
- */
 export function ChargePickerMenuItems({
   actions,
   module,
@@ -129,7 +121,6 @@ export function ChargePickerMenuItems({
                 return (
                   <MenuItem
                     key={c.typeId}
-                    // Focusable so the skill tag on the row can be read; selecting does nothing.
                     aria-disabled={c.skillMissing || undefined}
                     onSelect={(event) => {
                       if (c.skillMissing) event.preventDefault();

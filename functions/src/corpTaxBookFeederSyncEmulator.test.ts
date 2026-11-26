@@ -1,5 +1,3 @@
-// The scheduled feeder pass against the Firestore emulator (issue #4509, spec #4504).
-// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { beforeEach, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { SsoRefreshError } from './alertGrant.js';
@@ -21,9 +19,7 @@ const KEY = Buffer.alloc(32, 7);
 
 let now = T0;
 const dead = new Set<string>();
-/** SSO hands back the next token (`rt-H-n` → `rt-H-n+1`) instead of the same one. */
 let rotate = false;
-/** Runs while SSO is redeeming a token: a re-grant or a concurrent run landing mid-refresh. */
 let duringRefresh: (() => Promise<void>) | undefined;
 let duringDead: (() => Promise<void>) | undefined;
 const revokedAtSso: string[] = [];
@@ -37,13 +33,9 @@ const ok = <T>(data: T): EsiRead<T> => ({
 });
 
 interface FakeEsi {
-  /** Per feeder corporation: how its ledger answers. Default `ok`. */
   mode: Map<number, 'ok' | 'forbidden' | 'throw' | 'unavailable'>;
-  /** Per structure id: how its `/universe/structures` lookup answers. Default a name. */
   structure: Map<number, StructureLookup>;
-  /** Per feeder corporation: how its Extractions answer. Default none listed. */
   extractions: Map<number, EsiRead<EsiExtractionLike[]>>;
-  /** Feeder corporations ESI lists no observer for: nobody has mined there yet. */
   noObservers: Set<number>;
   calls: string[];
 }
@@ -236,7 +228,6 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     expect(rec?.refineryStructures).toEqual({
       '980000020': { name: 'Refinery 980000020', solarSystemId: 30004000, checkedAt: T0 },
     });
-    // The view carries both (no prices reader here, so its build is covered by buildFeederView's tests).
   });
 
   it('looks a refinery up only when needed: not again within the week, again after it (#4654)', async () => {
@@ -323,10 +314,8 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     expect(rec).toMatchObject({ status: 'active', lastReadWellAt: T0 });
     expect(rec?.staleSince).toBeUndefined();
     expect(rec?.extractionsRefusedAt).toBeUndefined();
-    // Like its rows, a moon owner's Extraction is not the book's own sync.
     expect((await collectorBook().get()).get('lastSync')).toEqual({ at: T0 - 3_600_000, gaps: [] });
 
-    // The same Extraction on the next run writes nothing again.
     const written = stored.docs[0]!.updateTime.toMillis();
     now += 6 * 3_600_000;
     await run();
@@ -348,7 +337,6 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
       ok([chunk(7001, '2026-10-10T00:00:00Z'), chunk(7002, '2026-10-24T00:00:00Z')])
     );
     await run();
-    // ESI lists neither now: 7001's chunk arrived before T0, 7002's was still coming.
     esiState.extractions.delete(98000002);
     now += 6 * 3_600_000;
     await run();
@@ -393,12 +381,10 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     expect(await observedRows()).toHaveLength(1);
     expect(asked()).toBe(1);
 
-    // Within the week: the ledger is read, Extractions are not asked for.
     now += 6 * DAY;
     expect((await run()).feeders).toMatchObject({ read: 1, stale: 0 });
     expect(asked()).toBe(1);
 
-    // After it, with the role granted: asked again, and the refusal is forgotten.
     esiState.extractions.delete(98000002);
     now += 2 * DAY;
     await run();
@@ -449,7 +435,6 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
       staleSince: T0,
       lastSyncResult: { outcome: 'stale', reason: 'token-revoked' },
     });
-    // SSO's own words are what tell a revoked app from a used-up rotated token.
     expect(logged).toContainEqual({
       message: 'SSO refused a stored token',
       data: {
@@ -464,7 +449,6 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
   it('an invalid_grant that a concurrent refresh caused keeps the grant and reads on', async () => {
     const token = await addFeeder(98000002);
     dead.add(token);
-    // The refresh that won the race has rotated the token and written it back meanwhile.
     duringDead = async () => {
       await db
         .collection(CORP_SYNC_GRANTS_COLLECTION)
@@ -604,7 +588,6 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
         });
     };
     await run();
-    // The rotated token is live at SSO and stored nowhere: it goes.
     expect(revokedAtSso).toEqual(['rt-98001002-1']);
   });
 
@@ -636,14 +619,12 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     await run();
     expect((await coverage.get()).exists).toBe(true);
 
-    // A skip moves nothing the view shows.
     await coverage.delete();
     esiState.mode.set(98000002, 'unavailable');
     now += 6 * 3_600_000;
     await run();
     expect((await coverage.get()).exists).toBe(false);
 
-    // The first refusal starts a stale spell: rebuilt. The next one in the same spell: not.
     esiState.mode.set(98000002, 'forbidden');
     now += 6 * 3_600_000;
     await run();

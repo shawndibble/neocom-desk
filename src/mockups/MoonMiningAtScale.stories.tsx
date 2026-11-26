@@ -61,33 +61,6 @@ import {
   type PopRow,
 } from './moonScaleFixtures';
 
-/**
- * Moon mining at scale: the officer's pages for a corp whose heaviest miner
- * mined on 68 of 79 days across 20 moons and 57 pops. Built for two
- * reviews, a CEO's day-to-day jobs and a UI/UX pass.
- *
- * One idea carries the whole thing: **the pop is the unit.** Every figure
- * (mined, tax, paid, owed) is the same sum of the same lines, so the Miner
- * page, the Miner x pop page and the pop's own page always agree, and each
- * names the next page as a link instead of repeating it.
- *
- * - **Miner** (step 1): chips for the whole position; one table of pops,
- *   folded by month with each month's Late notice and what is owed in its
- *   header; Payments say which pops they cleared.
- * - **Miner x pop** (step 2): a side panel over the Miner or pop page (it is
- *   four lines and two payments, not a page): the days of one pop and its payments.
- * - **Pop** (step 3): who mined it and what each still owes, the moon's other
- *   pops with their outstanding, and the moon's rate going forward.
- * - **Dialogs** (steps 4 to 6): change this pop's tax, dismiss it, change a
- *   moon's rate from a date.
- * - **Miners** (step 7): filter to who gets a Late notice, who is overdue, who
- *   is below the minimum.
- *
- * Proposed new component: a percent field (the % sits inside the input's
- * edge, so nobody types it). Everything else ships today: Panel, DataTable
- * (month `groupBy`, dense phone cards), StatChips, FilterBar, SlideOver,
- * Fields, TableActionsMenu and Modal.
- */
 const meta = {
   title: 'mockups/Moon mining at scale',
   tags: ['!manifest'],
@@ -104,16 +77,13 @@ function Page({ children }: { children: ReactNode }) {
 
 const num = 'tabular-nums';
 
-/** Columns an accountant reads on a desktop and a phone card has no room for. */
 const PHONE_DROPPED = new Set(['paid-on', 'reminder', 'overdue']);
 
-/** A phone card is already a tap target, and a trailing caret would print as one more value on its meta line. */
 function cardColumns<T>(columns: DataTableColumn<T>[], phone: boolean): DataTableColumn<T>[] {
   if (!phone) return columns;
   return columns
     .filter((c) => c.id !== 'go' && !PHONE_DROPPED.has(c.id))
     .map((c) =>
-      // "Paid —" on a card says nothing; leave it out until something was paid.
       c.id === 'paid' ? { ...c, render: (r: T) => (c.render(r) === '—' ? null : c.render(r)) } : c
     );
 }
@@ -123,9 +93,6 @@ function More({ label }: { label: string }) {
   return <IconButton icon={<Icon.More />} label={label} />;
 }
 
-// ---------------------------------------------------------------- shared parts
-
-/** One line that proves the page: what the tax was, where it went. */
 function Footing({ children }: { children: ReactNode }) {
   return (
     <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">{children}</p>
@@ -140,7 +107,6 @@ interface ActivityLine {
   reverse?: boolean;
 }
 
-/** Who did what and why, newest first; the book's full log is one click away. */
 function ActivityPanel({ lines }: { lines: ActivityLine[] }) {
   return (
     <Panel
@@ -175,13 +141,6 @@ function ActivityPanel({ lines }: { lines: ActivityLine[] }) {
   );
 }
 
-// ---------------------------------------------------------------- 1 Miner
-
-/**
- * What the pop's name line adds beyond the columns: only the exceptions. A
- * pop that is simply owed, paid or waiting says nothing here; its month's
- * header already names the Late notice.
- */
 function PopTags({ row }: { row: PopRow }) {
   return (
     <span className="block text-xs text-text-dim">
@@ -195,7 +154,6 @@ function PopTags({ row }: { row: PopRow }) {
   );
 }
 
-/** Phone cards for a pop: the name line, Owed in the corner, the rest as one labelled line. */
 const popColumns: DataTableColumn<PopRow>[] = [
   {
     id: 'pop',
@@ -322,7 +280,6 @@ const paymentColumns: DataTableColumn<Payment>[] = [
   },
 ];
 
-/** The shape of every page's title-bar buttons: one height, matching the bell and ⋮ beside them. */
 function HeaderActions({ children }: { children: ReactNode }) {
   return <span className="flex items-center gap-2">{children}</span>;
 }
@@ -335,7 +292,6 @@ function MinerAtScale({
 }: {
   initial?: PopFilter;
   payment?: number | null;
-  /** The Miner x pop side panel, open over the page. */
   slide?: boolean;
   adjust?: boolean;
 }) {
@@ -398,7 +354,6 @@ function MinerAtScale({
           <FilterBar<PopFilter>
             value={filter}
             onChange={setFilter}
-            // The picked payment is not a pill: its own line under the row says it and clears it.
             active={
               filter === 'all'
                 ? []
@@ -520,13 +475,6 @@ function MinerAtScale({
   );
 }
 
-// ---------------------------------------------------------------- 2 Miner x pop
-
-/**
- * One Miner's days on one pop. A side panel, not a page: it is four lines and
- * two payments, it is opened from a row on the Miner page or the pop's page,
- * and closing it leaves the reader exactly where they were.
- */
 function MinerPopSlide({
   open,
   onClose,
@@ -667,8 +615,6 @@ function MinerPopSlide({
     </>
   );
 }
-
-// ---------------------------------------------------------------- 3 Pop (moon) page
 
 const minerColumns: DataTableColumn<PopMiner>[] = [
   {
@@ -977,8 +923,6 @@ function PopPage({
   );
 }
 
-// ---------------------------------------------------------------- Dialogs
-
 function Before({
   label,
   from,
@@ -1003,11 +947,9 @@ function Before({
   );
 }
 
-/** Who an adjustment applies to: everyone, everyone but some Miners, or one Miner (by character). */
 type Who = 'all' | 'except' | 'one';
 const LEFT_OUT = ['Juno Rask', 'Marek Dols'];
 
-/** What halving the pop's tax does to the Miners it applies to: those who paid the full 10% are overpaid. */
 function halved(who: Who) {
   const affected = FOCUS_MINERS.filter((m) =>
     who === 'one'
@@ -1031,12 +973,6 @@ function halved(who: Who) {
   };
 }
 
-/**
- * A percent the officer types: the % rides inside the field's right edge, so
- * the value is just a number and the unit is never typed. Proposed as a
- * shared primitive; there is none yet.
- */
-/** The dialogs' footer: on a phone Cancel and the action share the row equally. */
 function Footer(props: ComponentProps<typeof BaseFooter>) {
   return (
     <div className="max-sm:[&>div]:grid max-sm:[&>div]:grid-cols-2">
@@ -1315,11 +1251,8 @@ function MoonRateDialog({
   );
 }
 
-// ---------------------------------------------------------------- 7 Miners
-
 type MinerFilter = 'bill' | 'overdue' | 'below' | 'all';
 
-/** One label per Miners view: its chip, and its pill while it is on. */
 const MINER_FILTER_LABEL: Record<MinerFilter, string> = {
   bill: 'Gets a Late notice',
   overdue: 'Overdue',
@@ -1407,7 +1340,6 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
       .slice(0, ticked)
       .map((m) => m.main)
   );
-  // A tick belongs to the filter it was made in (§6c Bulk selection).
   const pick = (name: string) =>
     setPicked((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name]));
   const bulk = filter === 'bill' || filter === 'overdue';
@@ -1548,8 +1480,6 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
   );
 }
 
-// ---------------------------------------------------------------- Stories
-
 const corp = (render: () => ReactElement, phone = false): Story => ({
   render,
   parameters: MOONS_PARAMS,
@@ -1557,47 +1487,25 @@ const corp = (render: () => ReactElement, phone = false): Story => ({
 });
 void MINING_PARAMS;
 
-/** @summary 1 · Miner: chips for the whole position, one table of pops folded by month (Late notice and owed in each header), Payments say what they cleared. */
 export const Miner = corp(() => <MinerAtScale />);
-/** @summary 1 · Miner, phone. */
 export const MinerPhone = corp(() => <MinerAtScale />, true);
-/** @summary 1b · Miner filtered to Owed. */
 export const MinerOwed = corp(() => <MinerAtScale initial="owed" />);
-/** @summary 1c · Miner with a payment selected: the pop table shows only the pops it cleared. */
 export const MinerPaymentSelected = corp(() => <MinerAtScale payment={4} />);
-/** @summary 2 · Miner x pop: a side panel over the Miner page, with the days of one pop and the payments that cleared it. */
 export const MinerOnPop = corp(() => <MinerAtScale slide />);
-/** @summary 2 · Miner x pop, phone. */
 export const MinerOnPopPhone = corp(() => <MinerAtScale slide />, true);
-/** @summary 3 · Pop: who mined it and owes what, the moon's other pops with outstanding, the moon's rate. */
 export const Pop = corp(() => <PopPage />);
-/** @summary 3 · Pop, phone. */
 export const PopPhone = corp(() => <PopPage />, true);
-/** @summary 3b · Pop with a rate change already scheduled, and Reverse. */
 export const PopScheduledRate = corp(() => <PopPage scheduled />);
-/** @summary 4b · Adjust a pop for everyone except chosen Miners; the effect counts only who is affected. */
 export const ChangePopTaxExcept = corp(() => <PopPage dialog="except" />);
-/** @summary 4c · Adjust a pop for one Miner, by character, from the Miner x pop page. */
 export const AdjustForOneMiner = corp(() => <MinerAtScale slide adjust />);
-/** @summary 4 · Change this pop's tax: a rate or none, with the effect on owed. */
 export const ChangePopTax = corp(() => <PopPage dialog="change" />);
-/** @summary 4 · Change this pop's tax, phone. */
 export const ChangePopTaxPhone = corp(() => <PopPage dialog="change" />, true);
-/** @summary 5 · Dismiss a whole pop's tax. */
 export const DismissPop = corp(() => <PopPage dialog="dismiss" />);
-/** @summary 6 · Change a moon's rate going forward, from a date. */
 export const ChangeMoonRate = corp(() => <PopPage dialog="rate" />);
-/** @summary 6b · Change the rate for all moons. */
 export const ChangeAllMoonsRate = corp(() => <PopPage dialog="rate-all" />);
-/** @summary 6c · A start date in the past is refused: taxes cannot be backdated. */
 export const ChangeMoonRateBackdated = corp(() => <PopPage dialog="rate-backdated" />);
-/** @summary 6 · Change a moon's rate going forward, phone. */
 export const ChangeMoonRatePhone = corp(() => <PopPage dialog="rate" />, true);
-/** @summary 7 · Miners: filtered to who gets the next Late notice. */
 export const MinersNeedStatements = corp(() => <MinersList />);
-/** @summary 7b · Miners with three ticked: the count-labelled Send Late notices button appears. */
 export const MinersBulkSelected = corp(() => <MinersList ticked={3} />);
-/** @summary 7c · Overdue filter with Send reminders. */
 export const MinersOverdueReminders = corp(() => <MinersList initial="overdue" ticked={4} />);
-/** @summary 7 · Miners, phone. */
 export const MinersNeedStatementsPhone = corp(() => <MinersList />, true);

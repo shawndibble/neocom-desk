@@ -1,8 +1,3 @@
-/**
- * Corp SRP builder: the open SRP Claims for an officer. Number is the
- * Pending count with the ISK owed (Approved, not yet Paid); Table lists the open claims. Same
- * contract as `models.ts`: pure, derived at render time.
- */
 import { formatIsk } from '@/lib/isk';
 import { formatNumber } from '@/lib/numberLocale';
 import { blank, corpUnreadable, statusOf, UNKNOWN, type Builder } from './builderKit';
@@ -10,7 +5,6 @@ import type { CorpSrpFeed, SrpClaimRow } from './corpFeeds';
 import type { TableCell, TableRowModel } from './types';
 
 const C = 'overview.widgets.corpSrp';
-/** The SRP page (ships in its own ticket) and its settings, where a Director turns SRP on. */
 const SRP_PATH = '/corp/srp';
 const SETTINGS_PATH = '/corp/srp';
 
@@ -21,7 +15,6 @@ const RANK: Record<SrpClaimRow['state'], number> = {
   rejected: 3,
 };
 
-/** Pending first (the queue an officer works), then Approved awaiting payment; oldest first in each. */
 const ordered = (claims: readonly SrpClaimRow[]): SrpClaimRow[] =>
   [...claims].sort((a, b) => RANK[a.state] - RANK[b.state] || a.filedAt - b.filedAt);
 

@@ -60,19 +60,15 @@ const PARAMS = {
   q: textParam(),
   members: boolParam(true),
   guests: boolParam(true),
-  // Set by the totals' links and the Overview's Overdue by age (`minersBalancePath`).
   balance: optionalEnumParam(MINER_BALANCES),
 };
 
-/** The Balance select's "no narrowing" item; Radix Select cannot hold an empty value. */
 const ANY_BALANCE = 'any';
 
-/** Standings in the order the Standing column sorts them. */
 const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
 
 const DEFAULT_SORT: DataTableSort = { columnId: 'overdue', direction: 'desc' };
 
-/** What the funnel edits: which standings and balances the table lists. Search sits in the row, outside it. */
 interface MinersFilter {
   members: boolean;
   guests: boolean;
@@ -111,7 +107,6 @@ export function MinersTab() {
   const [closedOpen, setClosedOpen] = useState(false);
   const nameOf = (m: MinerRow) => names.character(m.mainCharacterId);
 
-  // A closed account is written off: it leaves the table and waits under Closed accounts.
   const closedAtById = useMemo(
     () => new Map(view.input.miners.flatMap((m) => (m.closedAt ? [[m.id, m.closedAt]] : []))),
     [view.input.miners]
@@ -145,7 +140,6 @@ export function MinersTab() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
   }, [openMiners, params, names]);
-  // What the Non-members chip being off keeps out of the table.
   const hiddenGuests = params.guests ? [] : openMiners.filter((m) => m.standing === 'guest');
   const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
 
@@ -176,7 +170,6 @@ export function MinersTab() {
       id: 'standing',
       header: t('corpTaxBook.moons.cols.inCorp'),
       render: (m) => <StandingWord standing={m.standing} />,
-      // Members first, then guests, then those who left: the order the standing chips list them.
       sortValue: (m) => STANDING_RANK.indexOf(m.standing),
       sortFirst: 'asc',
     },
@@ -192,7 +185,6 @@ export function MinersTab() {
     {
       id: 'overdue',
       header: t('corpTaxBook.moons.cols.overdue'),
-      // Nothing overdue is nothing to say on the phone card.
       render: (m) =>
         m.overdueDays === null && !m.paused ? (
           <span data-dense-omit>
@@ -203,7 +195,6 @@ export function MinersTab() {
         ),
       sortValue: (m) => m.overdueDays ?? -1,
     },
-    // The Running account bills every day as it closes (#6294): where each Miner stands.
     {
       id: 'account',
       header: t('corpTaxBook.moons.cols.account'),
@@ -216,7 +207,6 @@ export function MinersTab() {
       header: t('corpTaxBook.moons.cols.credit'),
       align: 'right',
       className: 'tabular-nums',
-      // isk() rounds: a sub-ISK remainder is no credit, not a green 0.
       render: (m) =>
         Math.round(m.credit) > 0 ? <span className="text-isk-pos">{isk(m.credit)}</span> : '—',
       sortValue: (m) => m.credit,
@@ -235,9 +225,6 @@ export function MinersTab() {
   const columns = allColumns.filter(
     (c) => c.id === 'miner' || columnVisibility.isVisible(c.id as MinersColumnId)
   );
-  // In the URL (ADR 0015) as `?sort=`, validated against every column, so a sort on a hidden one
-  // survives. The table can only sort by a column it shows: while the sorted one is unticked, sort
-  // the rows here.
   const { sort, onSortChange } = useUrlSort(
     'sort',
     DEFAULT_SORT,

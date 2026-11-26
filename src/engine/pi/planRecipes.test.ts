@@ -10,7 +10,6 @@ const row = (
   m3PerDay = 10
 ): RecipeRow => ({ typeId, name, tier, planetType, iskPerDay, m3PerDay });
 
-// Lava hosts Silicon (P1) and Coolant (P2); Barren hosts Silicon, Water and Rocket Fuel.
 const ROWS: RecipeRow[] = [
   row(10, 'Silicon', 1, 'lava', 100_000),
   row(10, 'Silicon', 1, 'barren', 90_000),

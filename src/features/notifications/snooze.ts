@@ -1,13 +1,3 @@
-/**
- * Snooze for an alert type: hide a group for an hour on this device.
- *
- * Device-local on purpose (`createLocalSetting`, no feed field, nothing
- * synced): a snooze is "not now, here", and the entries stay in the feed
- * untouched so it ends by the clock alone. Only price alerts offer it
- * (`dangerAlert.isSnoozable`).
- *
- * The map is keyed by `alertGroupKey` and holds the epoch ms the snooze ends.
- */
 import { HOUR_MS } from '@/lib/age';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { alertGroupKey } from './alertGroups';
@@ -35,7 +25,6 @@ export function pruneExpired(map: SnoozeMap, now: number): SnoozeMap {
   return Object.fromEntries(Object.entries(map).filter(([, until]) => now < until));
 }
 
-/** The entries whose type is not currently snoozed. */
 export function withoutSnoozed<T extends Pick<NotificationFeedRecord, 'eventId' | 'eveType'>>(
   entries: readonly T[],
   map: SnoozeMap,

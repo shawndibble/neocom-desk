@@ -98,7 +98,6 @@ describe('queryContractOffers', () => {
   it('prices PLEX asks at the filter plexPrice in the sort and the stats', () => {
     const rows = [offer({ price: 100, requestedPlex: 2 }), offer({ price: 150, typeId: 35 })];
     const { indices, stats } = queryContractOffers(rows, query({ filter: { plexPrice: 30 } }));
-    // 100 + 2 × 30 = 160 > 150
     expect([...indices]).toEqual([1, 0]);
     expect(stats.get(34)?.cheapest).toBe(160);
     expect(sortableOfferPrice(rows[0], 30)).toBe(160);
@@ -106,10 +105,10 @@ describe('queryContractOffers', () => {
 
   describe('jump range', () => {
     const rows = [
-      offer({ locationId: 1, price: 1 }), // in range
-      offer({ locationId: 2, price: 2 }), // placed, out of range
-      offer({ locationId: 3, price: 3 }), // placed in no system (structure)
-      offer({ locationId: 4, price: 4 }), // still resolving
+      offer({ locationId: 1, price: 1 }),
+      offer({ locationId: 2, price: 2 }),
+      offer({ locationId: 3, price: 3 }),
+      offer({ locationId: 4, price: 4 }),
     ];
     const locationSystems = new Map<number, number | null>([
       [1, 100],

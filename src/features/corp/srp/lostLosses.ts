@@ -1,7 +1,3 @@
-/**
- * The pilot's own losses: the recent-killmails list mixes kills and losses as bare id + hash, so each
- * is read and filtered. Killmails never change, so reads are kept for the session.
- */
 import { loadWithCache } from '@/esi/cache';
 import { isCredentialFailure } from '@/esi/client';
 import {
@@ -15,7 +11,6 @@ import { loadTypes } from '@/sde/loadSde';
 import type { LostLoss } from './srpMemberModel';
 import { MINUTE_MS } from '@/lib/age';
 
-/** ESI serves 50 a page; this bounds the detail reads one visit costs, newest first. */
 const MAX_PAGES = 3;
 const REFS_KEY = 'killmailsRecent';
 const REFS_STALE_MS = MINUTE_MS;
@@ -28,7 +23,6 @@ export interface CollectLossesInput {
   groupOf: (typeId: number) => number;
 }
 
-/** The refs that are this Character's losses in this corporation, newest first. */
 export async function collectLosses(input: CollectLossesInput): Promise<LostLoss[]> {
   const found: LostLoss[] = [];
   let failed = 0;
@@ -37,7 +31,7 @@ export async function collectLosses(input: CollectLossesInput): Promise<LostLoss
     try {
       km = await input.readKillmail(ref.killmail_id, ref.killmail_hash);
     } catch {
-      failed += 1; // one unreadable killmail must not hide the rest
+      failed += 1;
       return;
     }
     if (!km?.victim) return;
@@ -55,7 +49,6 @@ export async function collectLosses(input: CollectLossesInput): Promise<LostLoss
       killedAt,
     });
   });
-  // Every read failing is an outage, not a pilot with no losses: the page shows Retry.
   if (input.refs.length > 0 && failed === input.refs.length) {
     throw new Error('every killmail read failed');
   }
@@ -68,17 +61,12 @@ function readKillmailOnce(id: number, hash: string): Promise<Killmail | null> {
   let read = killmailReads.get(id);
   if (!read) {
     read = getKillmail(id, hash).then((r) => r.data);
-    // A failed read is retried on the next visit rather than remembered.
     read.catch(() => killmailReads.delete(id));
     killmailReads.set(id, read);
   }
   return read;
 }
 
-/**
- * The Character's losses in `corporationId`. Needs the opt-in `killmails` Permission: ESI answers a
- * 403 without it, which the caller avoids by asking `useEndpointsGranted` first.
- */
 export async function loadLostLosses(
   characterId: number,
   corporationId: number
@@ -87,10 +75,8 @@ export async function loadLostLosses(
     characterId,
     REFS_KEY,
     async () => (await getCharacterKillmailsRecent(characterId, { maxPages: MAX_PAGES })).items,
-    // Short, so a visit after a fresh loss is not answered by an old list.
     { detectAuthFailure: isCredentialFailure, staleAfterMs: REFS_STALE_MS }
   );
-  // Nothing live and nothing cached is a failed read, not an empty list.
   if (cached === null) throw new Error('killmails recent unavailable');
   const types = await loadTypes();
   return collectLosses({

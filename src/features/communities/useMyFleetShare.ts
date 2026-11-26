@@ -6,7 +6,6 @@ import { loadMyFleetShare } from './fleetPayoutStore';
 export type MyFleetShare =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; share: FleetShare | null };
 
-/** The viewer's own Share in one Fleet Payout (the rules deny a non-boss the rest). */
 export function useMyFleetShare(
   characterId: number,
   communityId: string,

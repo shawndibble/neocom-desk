@@ -1,9 +1,3 @@
-/**
- * "What to train"'s Tech II section: each fitted Tech I module the pilot is a
- * few skills short of upgrading (`useModuleUpgrades`), with what the swap and
- * those skills together do to the Fitting, the time to train them (their
- * prerequisites listed on click) and "Add to plan" for the skills it needs.
- */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -20,18 +14,15 @@ import type { ModuleUpgradeRow } from './useModuleUpgrades';
 import { STAT_DETAIL, joinDetail, statRowClassName } from './statKit';
 
 export interface ModuleUpgradeListProps {
-  /** Ranked; null while working out. */
   rows: readonly ModuleUpgradeRow[] | null;
   typeName: (typeId: number) => string;
   skills: ReadonlyMap<number, EngineSkill> | undefined;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  /** The target Skill Plan; null when the Character has none yet, undefined while plans load. */
   plan: SkillPlanRecord | null | undefined;
   plannedLevels: ReadonlyMap<number, number>;
   onAdd: (entries: readonly PlanEntry[]) => Promise<void>;
 }
 
-/** Nothing at all once worked out and empty: most fits have no Tech II a pilot is short of. */
 export function ModuleUpgradeList({ rows, ...item }: ModuleUpgradeListProps) {
   const { t } = useTranslation();
   const headingId = useId();
@@ -74,7 +65,6 @@ export function ModuleUpgradeItem({
     row.scheduled,
     row.required.map((entry) => entry.skillTypeID)
   );
-  // The changes below are the swap with these trained, so the row says so.
   const needs = t('fittings.whatToTrain.upgrades.withTrained', {
     skills: row.required
       .map(

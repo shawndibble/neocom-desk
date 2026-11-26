@@ -59,7 +59,6 @@ describe('corpWallet', () => {
     expect(view.fromCache).toBe(true);
     const rows = view.table!.rows;
     expect(rows.map((r) => r.to)).toEqual(['/corp/wallet?division=1', '/corp/wallet?division=2']);
-    // Unnamed division falls back like the vitals rail.
     expect(rows[1]!.cells[0]).toBe('corp.vitals.division{"division":2}');
     expect(rows[0]!.cells[1]).toMatchObject({ iskAmount: 750 });
     expect(rows[0]!.cells[2]).toMatchObject({ text: '75%', bar: 0.75 });
@@ -114,7 +113,6 @@ describe('corpCashFlow', () => {
       ctx(7)
     );
     expect(view.number.iskAmount).toBe(-400);
-    // Spending 500 in 30 days: 500/30 per day; balance 750 -> 45 days.
     expect(view.number.secondary?.text).toBe('overview.widgets.corpCashFlow.runway{"count":45}');
     const rows = view.table!.rows;
     expect(rows).toHaveLength(7);
@@ -131,12 +129,10 @@ describe('corpCashFlow', () => {
       'overview.widgets.corpCashFlow.netPositive{"count":30}'
     );
     expect(view.number.secondary?.tone).toBeUndefined();
-    // No runway line is shown, so no note explaining its window either.
     expect(view.number.notes).toBeUndefined();
   });
 
   it('keeps the 30-day net-positive sentence off a range it does not describe', () => {
-    // 7 days: net -400 though the 30-day window nets +200.
     const view = corpCashFlow(feed({ journal: [line(1, -400), line(20, 600)] }), ctx(7));
     expect(view.number.iskAmount).toBe(-400);
     expect(view.number.secondary).toBeUndefined();

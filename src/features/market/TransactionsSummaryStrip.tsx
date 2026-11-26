@@ -13,14 +13,11 @@ import type { TradingSummary } from './tradingSummary';
 
 interface TransactionsSummaryStripProps {
   transactions: readonly WalletTransaction[];
-  /** Margin, matched count and broker fees over the same fills; omitted while they can't be worked out. */
   trading?: TradingSummary;
-  /** The filter's start/end days (YYYY-MM-DD); the range line shows only while one is set. */
   range?: { startDate: string | null; endDate: string | null };
   className?: string;
 }
 
-/** The Sold / Bought / Net card over the fills shown, above Market History's table. */
 export function TransactionsSummaryStrip({
   transactions,
   trading,
@@ -30,7 +27,6 @@ export function TransactionsSummaryStrip({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const summary = useMemo(() => summarizeTransactions(transactions), [transactions]);
-  // Filter days and fill dates are both UTC days (the row filter compares `date.slice(0, 10)`).
   const rangeBound = (filterDay: string | null | undefined, fallback: string | null) => {
     const iso = filterDay ?? fallback?.slice(0, 10);
     return iso ? formatDateOnly(new Date(`${iso}T00:00:00Z`), 'UTC') : null;

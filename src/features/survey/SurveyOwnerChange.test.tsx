@@ -32,7 +32,6 @@ describe('SurveyOwnerChange', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'New Pilot' }));
     expect(setSurveyOwner).not.toHaveBeenCalled();
     expect(screen.getByText(/may need to log into Neocom Desk/)).toBeTruthy();
-    // The dialog's submit button follows the footer's trigger of the same name.
     fireEvent.click(screen.getAllByRole('button', { name: 'Change owner' }).at(-1)!);
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(setSurveyOwner).toHaveBeenCalledWith({

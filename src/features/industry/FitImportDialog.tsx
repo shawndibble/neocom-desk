@@ -1,13 +1,3 @@
-/**
- * Paste an EFT fit, see exactly what it will create, then create it
- * (issue #626, "Fit Import" in GLOSSARY.md).
- *
- * Modelled on the Skill Planner's `ImportClipboardDialog`: textarea → Parse →
- * a preview split into what will be built, what will not, and what could not
- * be read → Apply. Preview-then-apply rather than import-then-tell, because a
- * routine fit has a fifth of its lines unbuildable and the pilot needs to see
- * that before twelve plans appear in their list.
- */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { InlineError } from '@/components/ui/InlineError';
 import { useState } from 'react';
@@ -20,18 +10,8 @@ import { previewFitImport } from './fitImport';
 
 interface FitImportDialogProps {
   catalog: BlueprintCatalog;
-  /** Creates the group and its plans. Receives the preview the pilot approved. */
   onApply: (preview: FitToBuildPlansResult) => void;
   onClose: () => void;
-  /**
-   * EFT text arriving already in hand — a Fitting's Export menu, "Manufacture
-   * Plan" — pre-filled and parsed as if the pilot had pasted and pressed
-   * Parse themselves. Absent for the ordinary paste-your-own-fit open. Read
-   * only at mount (via `useState`'s lazy initialiser): the dialog mounts
-   * fresh each time it opens (see the `open` comment below), so there is no
-   * later value to react to, and re-parsing on some later render would blow
-   * away a pilot's in-progress edit to the pre-filled text.
-   */
   initialText?: string;
 }
 
@@ -58,9 +38,6 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
     setPreview(previewFitImport(text, catalog, { includeCharges: nextIncludeCharges }));
   }
 
-  // Toggling charges re-parses in place rather than clearing the preview: the
-  // checkbox exists to answer "what changes if I include them", and making the
-  // pilot press Parse again to find out hides the answer behind a second step.
   function toggleCharges(next: boolean) {
     setIncludeCharges(next);
     if (preview) parse(next);
@@ -69,8 +46,6 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
   const planCount = preview ? preview.items.length + (preview.hull ? 1 : 0) : 0;
 
   return (
-    // `open` is literal: the list mounts this component only while the import
-    // is open, so mounting is the open signal.
     <Modal open onClose={onClose} title={t('industry.fitImportTitle')}>
       <div className="space-y-3">
         <label className="block text-xs text-text-dim" htmlFor="fit-import-text">
@@ -141,8 +116,6 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
                       </span>
                       <span className="shrink-0 tabular-nums text-text-dim">
                         {t('industry.fitImportRuns', { count: row.runs })}
-                        {/* Only when the blueprint's batch size forces
-                            overproduction — silence means it came out even. */}
                         {row.spare > 0
                           ? ` · ${t('industry.fitImportSpare', { count: row.spare })}`
                           : ''}

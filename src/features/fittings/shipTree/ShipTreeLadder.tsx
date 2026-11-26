@@ -1,16 +1,3 @@
-/**
- * The Ship Tree read top to bottom (phone default): one section per main-
- * and industry-line class, specialised classes nested and collapsible under
- * their parent. Carries the map's marks — lit/dim class icon, skill bars,
- * Ω, tech corners, tone, Mastery badge — at list size. A tap on a hull
- * opens the Ship Info window (the caller's).
- *
- * The toolbar: view switch, the tree's search over every faction (the map's),
- * and beside it the funnel holding the filters for picking what to train —
- * fly state and Mastery. The filter is the caller's (it lives in the URL and
- * also feeds the faction bar's counts), and the faction bar sits under the
- * toolbar because those filters change its counts.
- */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -76,11 +63,8 @@ interface LadderProps {
   tree: FactionTree;
   filter: ShipTreeFilter;
   onFilter: (next: ShipTreeFilter) => void;
-  /** Hulls per faction that pass `filter`; absent when nothing is filtered. */
   factionMatches: ReadonlyMap<number, number> | undefined;
-  /** The faction picker, placed under the toolbar. */
   factionBar: ReactNode;
-  /** The hull whose Ship Info window is open: marked, and shown even if filtered out. */
   selectedTypeID: number | null;
   onFaction: (factionID: number) => void;
   onOpenShip: (ship: ShipTreeShip) => void;
@@ -102,7 +86,6 @@ export function ShipTreeLadder({
   const { t } = useTranslation();
   const { data, statuses } = source;
   const narrow = useIsNarrow();
-  // The Ship Info window's own test for a bottom sheet rather than a side panel.
   const sheetWindow = useIsPhone();
   const filtered = isShipTreeFiltered(filter);
 
@@ -119,15 +102,10 @@ export function ShipTreeLadder({
   const flyCounts = flyStateCounts(factionShips, statuses);
   const tierCounts = masteryCounts(factionShips, statuses);
 
-  // The reader's open sections, for this faction and filter. Each new pair
-  // starts over: top level open, or every section while filtered so a match
-  // in a sub-class can't hide — however the filter changed, Back included.
   const openKey = `${tree.factionID}|${filter.fly}|${[...filter.mastery].sort().join(',')}`;
   const startOpen = (): ReadonlySet<number> =>
     new Set(filtered ? sectionIds : sections.map((s) => s.def.id));
   const [openState, setOpenState] = useState(() => ({ key: openKey, ids: startOpen() }));
-  // Reset during render (React's "adjust state on a prop change"), so going
-  // back to an earlier filter starts open again rather than restoring it.
   if (openState.key !== openKey) setOpenState({ key: openKey, ids: startOpen() });
   const userOpen: ReadonlySet<number> = openState.key === openKey ? openState.ids : startOpen();
   const setUserOpen = (ids: ReadonlySet<number>) => setOpenState({ key: openKey, ids });
@@ -136,17 +114,11 @@ export function ShipTreeLadder({
     s.typeID === selectedTypeID || hullMatches(statuses.get(s.typeID), filter);
   const shown = sections.filter((section) => hasVisible(section, tree, visible));
 
-  // A search pick goes to the hull: its faction's tree, its section and the
-  // ones above it opened, its row scrolled to — then its window opens beside.
   const [goTo, setGoTo] = useState<ShipTreeShip | null>(null);
   const goToHere = goTo !== null && goTo.factionID === tree.factionID;
   const goToPath = goToHere ? sectionPath(sections, goTo.treeGroupID) : [];
-  // Opened during render (after any faction-switch reset above), so the row
-  // exists by the time its ref below scrolls to it.
   if (goToPath.some((id) => !userOpen.has(id)))
     setOpenState({ key: openKey, ids: new Set([...userOpen, ...goToPath]) });
-  // A jump lives only while its hull's window is open, and a hull the ladder
-  // has no row for has nowhere to go: either way, drop it.
   if (
     goTo &&
     (goTo.typeID !== selectedTypeID ||
@@ -158,7 +130,6 @@ export function ShipTreeLadder({
   const scrollToTypeID = goToHere && goToPath.every((id) => userOpen.has(id)) ? goTo.typeID : null;
   const scrollToRow = (row: HTMLElement | null) => {
     if (!row) return;
-    // A phone's window is a bottom sheet, so the row goes to the top, above it.
     row.scrollIntoView({ block: sheetWindow ? 'start' : 'center' });
     setGoTo(null);
   };
@@ -177,7 +148,6 @@ export function ShipTreeLadder({
   );
   const expandCollapse = (
     <>
-      {/* `md`, not `sm`: these share the search box's line (Skills does the same). */}
       <IconButton
         icon={<Icon.ExpandAll />}
         label={t('ships.tree.expandAll')}
@@ -278,7 +248,6 @@ export function ShipTreeLadder({
   );
 }
 
-/** The tree's key, one press away instead of always taking toolbar room. */
 function LegendPopover() {
   const { t } = useTranslation();
   return (
@@ -296,13 +265,6 @@ function LegendPopover() {
   );
 }
 
-/**
- * The funnel's controls. Fly state: every hull, the flyable ones, the gaps,
- * each with the faction's own count. Mastery None–V, any number at once, each
- * with how many of this faction's hulls it would show; off under Can't fly
- * (Mastery is a can-fly property) and while the Mastery data hasn't loaded
- * (every tier would read None).
- */
 function TreeFilterFields({
   draft,
   setDraft,
@@ -368,7 +330,6 @@ function TreeFilterFields({
   );
 }
 
-/** A chip that jumps to another faction's tree: a plain button, not a toggle. */
 const jumpChipClassName = cx(
   'flex min-h-7 items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 text-xs hover:border-line-bright hover:bg-panel-2 active:bg-panel',
   interactiveClassName,
@@ -427,7 +388,6 @@ function hasVisible(
   );
 }
 
-/** "Mastery III" once a tier is trained, else "Can fly" or the time to fly. */
 function rowLabel(t: TFunction, status: ShipTreeHullStatus | undefined): string {
   return status?.canFly && status.mastery > 0
     ? t('ships.tree.rowMastery', { level: romanLevel(status.mastery) })
@@ -456,7 +416,6 @@ function LadderClass({
   setUserOpen: (ids: ReadonlySet<number>) => void;
   filter: ShipTreeFilter;
   selectedTypeID: number | null;
-  /** The row a search pick is going to, and the ref that scrolls to it. */
   scrollToTypeID: number | null;
   scrollToRow: (row: HTMLElement | null) => void;
   visible: (s: ShipTreeShip) => boolean;
@@ -483,8 +442,6 @@ function LadderClass({
 
   return (
     <details
-      // Controlled, so Expand all and a filter change reach a section the
-      // reader collapsed — React only writes the attribute when the prop changes.
       open={isOpen}
       onToggle={(e) => {
         const open = e.currentTarget.open;
@@ -507,7 +464,6 @@ function LadderClass({
       >
         <Caret expanded={isOpen} />
         {omegaChips.has(id) && (
-          // A tap in a <summary> toggles the section, so no tap-to-reveal: hold shows these.
           <Tooltip content={t('ships.tree.omega')}>
             <span tabIndex={0} className="isis-omega-chip" data-omega="true">
               <span>Ω</span>
@@ -586,7 +542,6 @@ function LadderClass({
                 aria-current={s.typeID === selectedTypeID ? 'true' : undefined}
                 onClick={() => onOpenShip(s)}
                 className={cx(
-                  // A transparent border, so the selected row's accent one doesn't shift it.
                   'group flex w-full scroll-mt-4 items-center gap-2 border-l-2 border-l-transparent px-1 py-1 text-left text-sm',
                   rowInteractiveClassName,
                   focusRingInsetClassName,
@@ -594,11 +549,9 @@ function LadderClass({
                 )}
               >
                 <IsisThumb ship={s} status={status} />
-                {/* The accent name is the cue that the row opens Ship Info. */}
                 <span
                   className={cx(
                     'min-w-0 flex-1 truncate text-accent',
-                    // Underline follows the whole row (group), unlike entityLinkClassName's own hover.
                     'underline decoration-transparent underline-offset-2 group-hover:decoration-current group-focus-visible:decoration-current',
                     !status?.canFly && 'opacity-70'
                   )}

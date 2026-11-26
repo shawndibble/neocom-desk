@@ -1,10 +1,3 @@
-/**
- * "Find by goal": the pilot says what they want better — CPU, missiles,
- * speed — and every implant and booster that moves it on this Fitting is
- * listed with what each grade does and where to get it: a Trade Hub, or an
- * LP Store with the pilot's LP and tags checked. When the Fitting is over
- * CPU or powergrid, the cheapest ways back under budget come first.
- */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, SearchInput, Spinner, TypeIcon } from '@/components/ui';
@@ -65,7 +58,6 @@ interface ImplantFinderProps {
   open: boolean;
   fitting: Fitting;
   profile: PilotProfile;
-  /** Which implants the page's own numbers use; the finder always works on the Fitting's set. */
   basis: ImplantBasis;
   implantSet: FittingImplantSet | undefined;
   onChange: (implantSet: FittingImplantSet | undefined) => void;
@@ -84,14 +76,11 @@ export function ImplantFinder({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const { selected: target } = useTargetProfiles();
   const [goalParam, setGoalParam] = useUrlParam(IMPLANT_GOAL_PARAM, GOAL_PARAM);
-  // The open goal rides in the URL, so Back from the market lands on the same list.
   const goalId = IMPLANT_GOALS.some((g) => g.id === goalParam)
     ? (goalParam as ImplantGoalId)
     : null;
   const setGoalId = (id: ImplantGoalId | null) => setGoalParam(id);
-  /** The slot picked on the strip (`slotKey`): goals and results narrow to what goes in it. */
   const [slotParam, setSlot] = useUrlParam('implantSlot', SLOT_PARAM);
-  // A hand-edited or stale key means no slot picked, not "Slot NaN".
   const slot =
     slotParam !== null && Number.isInteger(parseSlotKey(slotParam).slot) ? slotParam : null;
   const [query, setQuery] = useUrlParam('implantQuery', QUERY_PARAM);
@@ -109,7 +98,6 @@ export function ImplantFinder({
   const { baseline, catalog } = finder;
   const set = implantSet ?? EMPTY_SET;
 
-  /** What an item would displace from the set right now; null when its slot is empty or it's already in. */
   const replacesOf = (id: number): number | null => {
     const at = catalog?.slotOf(id);
     if (!at) return null;
@@ -119,7 +107,6 @@ export function ImplantFinder({
 
   const label = (id: ImplantGoalId) => t(`fittings.implantFinder.goals.${id}`);
 
-  /** Every item's full name with its grade, for fix options, the set strip and button labels. */
   const names = useMemo(() => implantNames(catalog?.families ?? []), [catalog]);
   const nameOf = (id: number) => names.get(id)?.full ?? `#${id}`;
 
@@ -141,10 +128,8 @@ export function ImplantFinder({
   const visible = finder.goals.filter(
     ({ goal, slots }) =>
       (!q || label(goal.id).toLowerCase().includes(q)) &&
-      // The open goal stays put, so picking a slot never pulls it out from under the pilot.
       (slot === null || slots.has(slot) || goal.id === goalId)
   );
-  /** How far over budget a goal is; 0 for one that fits or isn't a budget. */
   const overBy = (g: ImplantGoal) =>
     baseline && g.kind === 'budget' ? shortfall(g.read(baseline)) : 0;
   const problems = visible.filter(({ goal }) => overBy(goal) > 0);
@@ -153,7 +138,6 @@ export function ImplantFinder({
   const goal = goalId ? goalById(goalId) : null;
   const goalIsOff = finder.goals.some((g) => g.goal.id === goalId && !g.used);
 
-  /** Slots an item that helps the selected goal could go in, for the set strip. */
   const helpfulSlots = useMemo(() => {
     const slots = new Set<string>();
     for (const r of finder.results ?? []) slots.add(slotKey(r.family.kind, r.family.slot));
@@ -162,7 +146,6 @@ export function ImplantFinder({
 
   const inSlot = (kind: ImplantKind, at: number) => slot === null || slotKey(kind, at) === slot;
   const slotResults = finder.results?.filter((r) => inSlot(r.family.kind, r.family.slot)) ?? null;
-  // A fix for another slot isn't what the pilot is looking at here.
   const slotFixes = finder.fixes.filter((fix) =>
     fix.typeIds.some((id) => {
       const at = catalog?.slotOf(id);
@@ -345,11 +328,6 @@ export function ImplantFinder({
   );
 }
 
-/**
- * The slot picked on the strip: what's in it, in full, with its details and
- * Remove — and the way back to every slot. Kept outside the strip so it stays
- * in view on a phone, where the strip folds away.
- */
 function SlotBar({
   label,
   occupant,
@@ -451,7 +429,6 @@ function Toolbar({
   );
 }
 
-/** On a phone, where the budget's live status scrolls away with the list. */
 function BudgetDock({
   goal,
   stats,

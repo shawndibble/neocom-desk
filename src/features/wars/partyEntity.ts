@@ -1,6 +1,5 @@
 import type { WarParty } from '@/engine/wars';
 
-/** The one id that names a war party: ESI gives a party an alliance or a corporation, not both. */
 export function partyEntity(
   party: Pick<WarParty, 'corporationId' | 'allianceId'>
 ): { kind: 'alliance' | 'corporation'; id: number } | null {

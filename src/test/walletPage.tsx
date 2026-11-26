@@ -13,10 +13,6 @@ import { Wallet } from '@/routes/Wallet';
 import { LoyaltyStore } from '@/routes/LoyaltyStore';
 import { renderPageRoutes } from '@/test/renderPage';
 
-// Shared harness for the Wallet route tests (src/routes/Wallet*.test.tsx), one file
-// per concern so CI runs them in parallel. The `vi.mock` calls stay in each test
-// file (vitest hoists them per file).
-
 export const CHAR_ID = 91;
 
 export const journalPage1 = [
@@ -42,7 +38,7 @@ export const journalPage2 = [
 
 export const loyaltyPayload = [
   { corporation_id: 1000167, loyalty_points: 5000 },
-  { corporation_id: 1000419, loyalty_points: 250 }, // Paragon — EverMarks
+  { corporation_id: 1000419, loyalty_points: 250 },
 ];
 
 export const server = mswServer(
@@ -89,12 +85,6 @@ export async function seed() {
   window.history.pushState({}, '', '/wallet');
 }
 
-/**
- * Renders the Wallet route and its LP Store tab's own route on their own (their
- * TabRoute and info modals, no App boot or shell) at the current
- * `window.location`. The few tests that prove the App wiring — the URL, legacy
- * paths, the shell — render `<App />` (Wallet.test.tsx).
- */
 export function renderWalletRoute() {
   return renderPageRoutes([
     ['/wallet', <Wallet />],
@@ -105,21 +95,14 @@ export function renderWalletRoute() {
 
 export function installWalletHarness({ warmApp = false }: { warmApp?: boolean } = {}): void {
   beforeAll(async () => {
-    // One throwaway render, so no test pays for the first one. A worker's first
-    // render (compiling the route chunks, warming jsdom and React) took seconds
-    // under parallel load and landed on whichever test ran first, tipping it
-    // past its findBy / test timeout. Done here under the hook's own budget.
     await Promise.all([
       routeChunks.loadWallet(),
       routeChunks.loadLoyaltyStore(),
       ...(warmApp ? [routeChunks.loadLayout()] : []),
     ]);
     await seed();
-    // App is imported only here, so a file without App-level tests never loads its graph.
     const App = warmApp ? (await import('@/app/App')).App : null;
     const { unmount } = App ? render(<App />) : renderWalletRoute();
-    // Wait for real content, not just the shell: the first data load (Dexie, MSW,
-    // the ESI cache) is part of the cold cost too.
     await screen.findByText('EverMarks', {}, { timeout: 25_000 });
     unmount();
     server.resetHandlers();

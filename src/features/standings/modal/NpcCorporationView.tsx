@@ -1,9 +1,3 @@
-/**
- * The Corporation tab of the shared info modal for an NPC corporation (CCP's
- * id block): who it is, then the standings view (`NpcInfoView`). A corporation
- * no player runs has no CEO worth showing, no killboard and no alliance, so
- * this replaces the player-corporation tab. Lazy-loaded by the modal.
- */
 import { useTranslation } from 'react-i18next';
 import { EveMarkupText } from '@/components/EveMarkupText';
 import { ExternalLink } from '@/components/ui/ExternalLink';

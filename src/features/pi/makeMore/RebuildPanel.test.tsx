@@ -29,7 +29,6 @@ function renderRebuilds(reason: string) {
       <RebuildPanel view={view} ticks={NO_TICKS} reveal={NO_REVEAL} />
     </MemoryRouter>
   );
-  // A colony with nothing to change folds under "with no rebuild".
   fireEvent.click(screen.getByRole('button', { name: /with no rebuild/ }));
 }
 
@@ -101,7 +100,6 @@ describe('RebuildPanel, colonies that keep their setup', () => {
     const { rerender } = render(panel('first'));
     expect(document.getElementById(anchor)).not.toBeNull();
 
-    // Folded by the pilot, then the same link followed again: it opens once more.
     fireEvent.click(screen.getByRole('button', { name: /1 planet with no rebuild/ }));
     expect(document.getElementById(anchor)).toBeNull();
     rerender(panel('second'));

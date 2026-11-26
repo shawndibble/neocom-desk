@@ -40,8 +40,6 @@ describe('AlertCharacterSwitch', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Switched to Alt Indy')
     );
     expect(useActiveCharacter.getState().activeCharacterId).toBe(2);
-    // Anchored: the unstripped URL also *contains* '/industry?highlight=9', so
-    // a substring match passed before the param was gone (a CI flake).
     await waitFor(() =>
       expect(screen.getByTestId('where')).toHaveTextContent(/^\/industry\?highlight=9$/)
     );

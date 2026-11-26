@@ -63,7 +63,6 @@ describe('loadAllCharactersOpenOrders', () => {
 
   it('skips a Character without the orders scope, never calling ESI for it', async () => {
     await db.tokens.bulkPut([tokenWith(CHAR_A, [ORDERS_SCOPE]), tokenWith(CHAR_B, [ORDERS_SCOPE])]);
-    // CHAR_C has no token at all: never granted anything.
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/orders`, () =>
         HttpResponse.json([order(CHAR_A)])
@@ -126,7 +125,6 @@ describe('loadAllCharactersOpenOrders', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/orders`, () =>
         HttpResponse.json([order(CHAR_A)])
       ),
-      // CHAR_B is deliberately the slowest response of the three.
       http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/orders`, async () => {
         await delay(30);
         return HttpResponse.json([order(CHAR_B)]);

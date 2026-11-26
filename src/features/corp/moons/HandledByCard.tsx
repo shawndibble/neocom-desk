@@ -6,11 +6,6 @@ import type { FeederViewSummary } from '../taxBook/feederViewClient';
 import { isSettledAfterLeaving } from '../taxBook/feederViewModel';
 import { addDays, atDate, isk, shortDate } from './moonsFormat';
 
-/**
- * "Previously handled by <accounting corporation>" on a moon owner's Moons page
- * after it left (or was removed). While money is still owed it states the balance;
- * once settled it folds to one line, which stays until the officers dismiss it.
- */
 export function HandledByCard({
   summary,
   name,

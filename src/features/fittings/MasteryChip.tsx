@@ -37,11 +37,6 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 interface MasteryChipProps {
-  /**
-   * `badge` (default): the header's icon button opening a popover. `dialog`:
-   * no button of its own — the phone header's ⋮ menu opens it, as a sheet,
-   * through `open`; `onAvailable` says whether this hull has anything to show.
-   */
   presentation?: 'badge' | 'dialog';
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -51,15 +46,6 @@ interface MasteryChipProps {
   characterId: number;
 }
 
-/**
- * "Mastery" — what skills a hull's Mastery tiers ask for and how long they
- * take at the active Character's attributes and implants, no fit required.
- * The tier picker shows the union of tiers I..N deduped by skill; Add All puts
- * exactly the untrained rows on screen into a Skill Plan. Renders nothing for
- * a hull `masteries.json` carries no data for; until that is known, and
- * while the skill catalogue loads, it holds the badge's place with an empty
- * slot so the header doesn't reflow when it lands (issue #2255).
- */
 export function MasteryChip({
   presentation = 'badge',
   open: dialogOpen = false,
@@ -75,7 +61,6 @@ export function MasteryChip({
   const masteryState = useMasteries();
   const masteries = masteryState.status === 'loaded' ? masteryState.masteries : null;
   const unavailable = masteryState.status === 'unavailable';
-  // Retry stays mounted while it runs; the result takes focus when it replaces the panel.
   const [focusRef, armFocus] = useRetryFocus<HTMLDivElement>(
     unavailable ? 'failed' : masteryState.status === 'loaded' ? 'ok' : 'busy',
     hullTypeId
@@ -95,7 +80,6 @@ export function MasteryChip({
 
   const tiers = masteries?.[String(hullTypeId)];
   const hasData = tiers !== undefined && tiers.some((bundle) => bundle.length > 0);
-  // Unavailable still offers the entry point, so it can say why there is nothing to show.
   const offered = hasData || unavailable;
   useEffect(() => {
     onAvailable?.(offered);
@@ -112,7 +96,6 @@ export function MasteryChip({
       cloneState,
     });
     const built = buildFitCheckRows(merged.entries, catalog.engineSkills, trainedSkills, scheduled);
-    // Grouped by the tier that first asks for the skill, quickest first inside a tier.
     return sortRows(
       tagUnifiedRows(built, merged.highestMasteryTier, merged.fromFit),
       { sortValue: masteryRowSortValue },

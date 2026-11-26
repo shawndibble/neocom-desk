@@ -1,10 +1,3 @@
-/**
- * Which skill modifies a specific item attribute value, and by how much.
- * `SkillAttributeModifierMap` names only which skill *could* modify an
- * attribute (`scripts/build-sde.mjs`); this narrows that to the skills that
- * actually apply to one item (its own required skills gate applicability)
- * and computes the PostPercent magnitude at a trained level. Pure.
- */
 import type { SkillAttributeModifier, SkillAttributeModifierMap } from '@/sde/types';
 
 export interface ModifyingSkillEffect {
@@ -12,11 +5,6 @@ export interface ModifyingSkillEffect {
   perLevelValue: number;
 }
 
-/**
- * Skills that modify `attributeId` on an item requiring `itemRequiredSkillTypeIds`
- * (a candidate applies only when the item requires its `gatingSkillTypeID` —
- * see `SkillAttributeModifier`). De-duplicates by owning skill.
- */
 export function findModifyingSkills(
   attributeId: number,
   itemRequiredSkillTypeIds: ReadonlySet<number>,
@@ -37,7 +25,6 @@ export function findModifyingSkills(
   return result;
 }
 
-/** A PostPercent bonus's total magnitude at a trained level. Zero at level 0. */
 export function postPercentMagnitude(perLevelValue: number, trainedLevel: number): number {
   return perLevelValue * trainedLevel;
 }
@@ -47,14 +34,6 @@ export interface NextLevelValue {
   value: number;
 }
 
-/**
- * What `current` (the figure as shown, with the skill at `trainedLevel`) reads
- * once the skill reaches each of the next `count` levels, capped at V. A
- * PostPercent bonus multiplies the attribute by `1 + perLevelValue% × level`,
- * so a level's value is `current` scaled by that factor's change. `shownLevel`
- * is the level `current` already includes: the trained level for a skilled
- * figure, 0 for a base one (default `trainedLevel`).
- */
 export function nextLevelValues(
   current: number,
   perLevelValue: number,

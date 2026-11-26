@@ -1,11 +1,3 @@
-/**
- * Sweep test (issue #1308): every tab path and every notification-generated
- * URL must resolve to a real route, never fall through to the `*` NotFound
- * catch-all. Built from the same tables the app itself renders from
- * (`ROUTE_REQUIREMENTS`, `PAGE_TABS`, `NOTIFICATION_ROUTES`/`SUBJECT_URLS`)
- * rather than a hand-copied path list, so a route renamed on one side shows
- * up here without the test itself needing an edit.
- */
 import { describe, it, expect } from 'vitest';
 import { matchPath } from 'react-router-dom';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
@@ -19,7 +11,6 @@ import {
   notificationUrlForSubject,
 } from '@/features/notifications/notificationOptions';
 
-// The routes App.tsx mounts outside FEATURE_ROUTES/RequireCharacter.
 const STATIC_ROUTES = [
   '/',
   '/login',

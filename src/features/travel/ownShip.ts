@@ -4,10 +4,8 @@ import { db } from '@/db';
 import { SHIP_CATEGORY_ID } from '@/sde/categories';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 
-/** Device-local (no `sync.` prefix): the ship you fly never reaches Firestore. */
 const OWN_SHIP_KEY = 'dscan.ownShip';
 
-/** Capsules and shuttles: not hulls anyone fits a danger read around. */
 const EXCLUDED_GROUP_IDS: ReadonlySet<number> = new Set([29, 31]);
 
 export interface ShipType {
@@ -18,7 +16,6 @@ export interface ShipType {
 
 let shipsPromise: Promise<ShipType[]> | null = null;
 
-/** Every flyable ship hull in the SDE, by name. Loaded once, then memoised. */
 export function listShipTypes(): Promise<ShipType[]> {
   shipsPromise ??= (async () => {
     const [types, categories] = await Promise.all([loadTypes(), loadGroupCategories()]);
@@ -36,7 +33,6 @@ export function listShipTypes(): Promise<ShipType[]> {
   return shipsPromise;
 }
 
-/** Lower-cased, punctuation turned to spaces, runs of spaces collapsed. */
 function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -45,7 +41,6 @@ function normalize(text: string): string {
     .trim();
 }
 
-/** Ships whose name starts with the query, then ones that contain it; empty query gives []. */
 export function searchShips(ships: readonly ShipType[], query: string, limit = 8): ShipType[] {
   const q = normalize(query);
   if (!q) return [];
@@ -59,7 +54,6 @@ export function searchShips(ships: readonly ShipType[], query: string, limit = 8
   return [...prefix, ...substring].slice(0, limit);
 }
 
-/** The hull the user typed in by hand, remembered on this device. */
 export function useManualShip(): { typeId: number | null; setTypeId: (id: number | null) => void } {
   const stored = useLiveQuery(async () => (await db.settings.get(OWN_SHIP_KEY))?.value, []);
   const setTypeId = useCallback((id: number | null) => {

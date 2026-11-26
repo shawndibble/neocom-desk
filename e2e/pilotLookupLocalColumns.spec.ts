@@ -1,10 +1,3 @@
-/**
- * Pilot Lookup's pasted Local list (issue #3321): each group is its own table,
- * so the Standing and kill-count columns must be pinned or every table sizes
- * them to its own content and the counts start at a different x down the page.
- * Two groups with very different content lengths (a long corporation name and
- * a 30-character pilot name against a short one) must still line up.
- */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -34,7 +27,6 @@ function json(body: unknown) {
 }
 
 async function mockLocalList(page: Page) {
-  // The long-named pilot killed lately; the short-named one did not.
   const kill = {
     killmail_id: 130000009,
     killmail_time: new Date(Date.now() - 3_600_000).toISOString(),
@@ -49,7 +41,6 @@ async function mockLocalList(page: Page) {
       path.startsWith('/api/kills/characterID/') && path.includes(`/${LONG_ID}/`) ? [kill] : [];
     return route.fulfill(json(body));
   });
-  // Typing a name asks for suggestions; none needed here.
   await page.route(
     (url) => url.hostname === 'esi.evetech.net' && url.pathname.endsWith('/search'),
     (route) => route.fulfill(json({}))
@@ -128,7 +119,6 @@ test.describe('Pilot Lookup Local list columns', () => {
         expect(Math.round(first.width), `${name} width`).toBe(Math.round(second.width));
       }
 
-      // A 30-character name wraps rather than being clipped.
       const name = page.getByText(LONG_NAME, { exact: true });
       await expect(name).toBeVisible();
       const clipped = await name.evaluate((el) => el.scrollWidth > el.clientWidth);

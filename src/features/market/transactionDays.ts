@@ -1,10 +1,3 @@
-/**
- * The phone Transactions list's Sold / Bought / Net strip.
- *
- * Pure: no fetch, no DOM. The day a fill falls on depends on the zone it is
- * read in, so the caller passes the viewer's Time format zone
- * (`useTimeZone`) — `undefined` is the host's own zone.
- */
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 
 type DayRow = Pick<
@@ -13,12 +6,9 @@ type DayRow = Pick<
 >;
 
 export interface TransactionSummary {
-  /** ISK taken in by sells. Positive. */
   sold: number;
-  /** ISK paid out by buys. Positive — the sign lives in `net`. */
   bought: number;
   net: number;
-  /** The span the figures cover — ESI only returns recent fills, so this is never a lifetime. */
   oldest: string | null;
   newest: string | null;
 }

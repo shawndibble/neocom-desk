@@ -22,7 +22,6 @@ describe('notOwedPlan', () => {
     expect(notOwedPlan(undefined)).toBeUndefined();
   });
 
-  // A kept bill whose figures now agree still lets the member say the same thing again.
   it('says a kept dispute again from its own claim when the figures no longer show it', () => {
     const kept = (flagged: object) => row({ flagged: { state: 'rejected', at: 'x', ...flagged } });
     expect(notOwedPlan(kept({ kind: 'quantity', lines: [{ typeId: 1, quantity: 4 }] }))).toEqual({
@@ -54,15 +53,11 @@ describe('outcomesFor (resolving in the app)', () => {
     });
   });
 
-  // A preselected outcome whose button is disabled would greet the member with a dead dialog.
   it('does not preselect sending the proof when there is no Late notice to send it on', () => {
     const p: ResolveProblem = { ...base, kind: 'uncredited', amount: 40, row: row() };
     expect(outcomesFor(p)).toMatchObject({ preselected: 'pay', noNotice: true });
   });
 
-  // The book holds these donations already: the member says they were tax, with or without a
-  // Late notice to declare on (a claim of their own donation needs none); paying again is no answer.
-  // "Not paying" ISK the book already holds would say it still bills it: only counting them fits.
   it('offers only counting them, for donations the book holds for review', () => {
     const p: ResolveProblem = {
       ...base,
@@ -99,7 +94,6 @@ describe('outcomesFor (resolving in the app)', () => {
     });
   });
 
-  // The member may say it again: the hold does not renew, but the answer can change.
   it('after an officer kept the bill, offers paying, hiding, and saying it again', () => {
     const dispute: ResolveProblem = {
       ...base,
@@ -115,7 +109,6 @@ describe('outcomesFor (resolving in the app)', () => {
     expect(outcomesFor(dispute)).toMatchObject({
       outcomes: ['pay', 'notPaying', 'notOwed'],
       preselected: 'pay',
-      // The server refuses a second dispute of a day an officer answered.
       tellWhy: false,
     });
     const declaration: ResolveProblem = {
@@ -126,7 +119,6 @@ describe('outcomesFor (resolving in the app)', () => {
       noticeId: 's1',
     };
     expect(outcomesFor(declaration).outcomes).toEqual(['pay', 'notPaying', 'paid']);
-    // A kept declaration disputed nothing: "Not paying" may tell the corporation why.
     expect(outcomesFor(declaration).tellWhy).toBe(true);
   });
 

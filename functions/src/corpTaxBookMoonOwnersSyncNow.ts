@@ -1,8 +1,3 @@
-// Sync now for moon owners (issue #6117): an editor of a Collector book reads every moon owner
-// at once instead of waiting for the next scheduled run. Each read is the scheduled pass's own
-// `syncOneFeeder`, so health, Extractions, refinery names and the views move exactly as they do
-// on every scheduled run. Rested per book so a repeated press cannot spend the shared ESI error budget.
-
 import type { Firestore } from 'firebase-admin/firestore';
 import type { Caller } from './actorAuth.js';
 import { BOOKS_COLLECTION, FEEDERS, parseBookCall, type BookCall } from './corpTaxBook.js';
@@ -13,13 +8,10 @@ import { requireToken } from './corpTaxBookOwnFeeder.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import { authorizeOfficer } from './corpTaxBookStore.js';
 
-/** One manual read per book in this long. */
 export const MOON_OWNERS_SYNC_NOW_REST_MS = 10 * 60_000;
 
-/** Server-only (no rule opens it): when each book last pressed Sync now for its moon owners. */
 export const MOON_OWNERS_SYNC_NOW_COLLECTION = 'corpTaxBookMoonOwnersSyncNow';
 
-/** No pull starts after this long into the call, well inside the router's 120 s limit. */
 const START_BUDGET_MS = 90_000;
 
 export type SyncMoonOwnersNowResult =
@@ -32,7 +24,6 @@ export function parseSyncMoonOwnersNowInput(data: unknown): BookCall {
   return call;
 }
 
-/** Takes the book's slot, or says when the next one opens. */
 async function claimSlot(
   db: Firestore,
   corporationId: number,

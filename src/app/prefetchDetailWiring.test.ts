@@ -90,10 +90,10 @@ describe('prefetchRosterDetails', () => {
     vi.stubGlobal('navigator', { onLine: true });
     await db.tokens.clear();
     await db.tokens.bulkPut([
-      token(1, [MAIL, CALENDAR]), // the active Character: its own tasks cover it
+      token(1, [MAIL, CALENDAR]),
       token(2, [MAIL, CALENDAR]),
-      token(3, [MAIL]), // no calendar grant
-      token(4, []), // nothing granted: no list may be asked for
+      token(3, [MAIL]),
+      token(4, []),
     ]);
     mocks.loadMailHeaders.mockImplementation(async () => live([{ mail_id: 1 }]));
     mocks.loadCalendarEvents.mockImplementation(async () => live([{ event_id: 1 }]));
@@ -103,8 +103,6 @@ describe('prefetchRosterDetails', () => {
   it('prefetches calendar details for every other Character that holds the scope, and never mail', async () => {
     await prefetchRosterDetails(1);
 
-    // Mail bodies are the active Character's alone (decision 20261102): an alt's mail
-    // is read from ESI when it is opened.
     expect(mocks.prefetchMailBodies).not.toHaveBeenCalled();
     expect(mocks.loadMailHeaders).not.toHaveBeenCalled();
     expect(mocks.prefetchCalendarEventDetails.mock.calls.map((call) => call[0])).toEqual([2]);

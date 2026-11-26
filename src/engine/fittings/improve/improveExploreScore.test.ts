@@ -47,7 +47,6 @@ describe('Explore better scores hacking by analyzer', () => {
   });
 
   it('a lost analyzer still counts -1', () => {
-    // Each of its three figures counts -1; hacking and mobility are the two families.
     expect(score(before, fit([data]))).toBeCloseTo(-1.5);
     expect(score(before, fit([data, relic]))).toBe(0);
   });

@@ -1,12 +1,3 @@
-/**
- * The page side of a request/reply Worker: one lazily spawned worker, a
- * request id per call, and the failure paths every service shares (no Worker,
- * a spawn or post that throws, `onerror`). A service keeps what it has already
- * sent (`reset` forgets it when the worker is lost) and how a reply settles.
- *
- * `spawn` stays at the call site so Vite sees the `new URL(..., import.meta.url)`
- * literal inside `new Worker(...)` and bundles the worker.
- */
 export interface Waiting<Out> {
   resolve: (out: Out) => void;
   reject: (reason: Error) => void;
@@ -14,20 +5,14 @@ export interface Waiting<Out> {
 
 export interface WorkerClientOptions<Reply extends { id: number }, Out> {
   spawn: () => Worker;
-  /** Turns one reply into the answer (or a rejection) for the request it carries. */
   settle: (reply: Reply, waiting: Waiting<Out>) => void;
-  /** The error for a worker that cannot take or answer a request. */
   unavailable: (message: string) => Error;
-  /** The worker was lost or a post failed: forget what it had been sent. */
   reset?: () => void;
-  /** The message that withdraws a queued request, for an aborted `send`. */
   cancel?: (id: number) => unknown;
 }
 
 export interface WorkerClient<Out> {
-  /** Whether requests can go to a worker; false once it has failed. */
   available: () => boolean;
-  /** Posts via `post` under a fresh id; an abort withdraws the request and rejects with an `AbortError`. */
   send: (post: (target: Worker, id: number) => void, signal?: AbortSignal) => Promise<Out>;
 }
 
@@ -84,16 +69,13 @@ export function createWorkerClient<Reply extends { id: number }, Out>(
           reject(abortError());
           try {
             if (options.cancel) target.postMessage(options.cancel(id));
-          } catch {
-            // The request is already unwanted; a lost cancel only costs the worker one run.
-          }
+          } catch {}
         },
         { once: true }
       );
       try {
         post(target, id);
       } catch (error) {
-        // Cloning the input can fail (memory, an unclonable value).
         pending.delete(id);
         options.reset?.();
         reject(options.unavailable(error instanceof Error ? error.message : 'post failed'));

@@ -1,11 +1,3 @@
-/**
- * The Fittings the library offers — the active Character's saved ones (My
- * Fittings, Dexie), their In-game ones (ESI), their Active Fit (the ship they
- * fly, read off their assets), the ones shared into their Communities and
- * their corporation's Doctrine Fits (`corpDoctrineFittings.ts`) —
- * read once here so the tabbed panels and the Start screen's single
- * searchable list show the same rows.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { typeNameOr } from '@/lib/typeNameOr';
@@ -36,34 +28,24 @@ import { loadCharacterShip } from '@/features/character/ship';
 import { loadCharacterAssets } from '@/features/assets/assets';
 import { shipItemsToFitting } from './assetShipLocation';
 
-/** One row of the Start screen's list: a saved, In-game, Active, shared or Doctrine Fitting. */
 export type LibraryRow = MyFittingRow &
   (
     | { source: 'saved'; record: FittingRecord }
     | { source: 'inGame'; inGame: CharacterFitting }
-    /** The ship the Character is flying; its modules lag the game by up to an hour. */
     | { source: 'active'; fitting: Fitting }
     | {
         source: 'shared';
         shared: SharedFittingRow;
-        /** Who shared it (their Character's name), or null when no longer a Member. */
         sharer: string | null;
         communityNames: string[];
       }
-    /**
-     * One of the active Character's corp Doctrine Fits (#6202), opened read-only like a shared
-     * one. `legacy`: saved before the corp kept the whole fit, so `code` holds only its hull,
-     * modules, rigs and subsystems.
-     */
     | { source: 'doctrine'; code: string; legacy: boolean }
   );
 
-/** A saved Fitting's row, for callers that only list those. */
 export type SavedRow = Extract<LibraryRow, { source: 'saved' }>;
 
 const NO_HULLS: Map<string, string | null> = new Map();
 
-/** Each saved code's hull name; null when the code no longer decodes. */
 function useHullNames(records: readonly FittingRecord[] | undefined): Map<string, string | null> {
   const { t } = useTranslation();
   const load = useCallback(async () => {
@@ -80,18 +62,15 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
     }
     return next;
   }, [records, t]);
-  // Same key: a new list refreshes behind the names already showing.
   return useKeyedLoad(records ? 'hulls' : null, load).data ?? NO_HULLS;
 }
 
-/** The Character's saved Fittings and each one's hull name (absent while it decodes). */
 export function useSavedFittings(characterId: number | null) {
   const records = useSavedFittingRecords(characterId);
   const hulls = useHullNames(records);
   return { records, hulls };
 }
 
-/** Saved Fittings as list rows; one whose hull is still decoding is left out rather than flashed under "Unknown hull". */
 export function savedRows(
   records: readonly FittingRecord[] | undefined,
   hulls: ReadonlyMap<string, string | null>
@@ -107,7 +86,6 @@ export function savedRows(
     }));
 }
 
-/** The Character's In-game Fittings: fetch, grant, refresh. Nothing loads until the endpoint is granted. */
 export function useInGameFittings(characterId: number | null) {
   const { t } = useTranslation();
   const granted = useEndpointsGranted(['getCharacterFittings']);
@@ -116,8 +94,6 @@ export function useInGameFittings(characterId: number | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  // Guards a Character switch mid-fetch: a stale response landing after a
-  // newer request started must not overwrite what that newer request set.
   const requestIdRef = useRef(0);
 
   async function refresh() {
@@ -159,7 +135,6 @@ export function useInGameFittings(characterId: number | null) {
   return { granted, result, hullNames, loading, error, refresh };
 }
 
-/** In-game Fittings as list rows. */
 export function inGameRows(
   fittings: readonly CharacterFitting[],
   hullNames: ReadonlyMap<number, string>,
@@ -174,7 +149,6 @@ export function inGameRows(
   }));
 }
 
-/** The Communities a Character is in and the Fittings shared into them (issue #3605). Nothing loads without sync. */
 export function useCommunityFittings(characterId: number | null) {
   const [state, setState] = useState<{
     forCharacter: number;
@@ -183,7 +157,6 @@ export function useCommunityFittings(characterId: number | null) {
     sharerNames: ReadonlyMap<string, string>;
   } | null>(null);
   const requestIdRef = useRef(0);
-  /** The Character whose read last finished, landed or failed: its rows are final. */
   const [settledFor, setSettledFor] = useState<number | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
@@ -198,7 +171,6 @@ export function useCommunityFittings(characterId: number | null) {
       const loaded = await loadSharedFittings(characterId);
       if (requestId === requestIdRef.current) setState({ forCharacter: characterId, ...loaded });
     } catch {
-      // Offline or signed out of sync: the library just lists its own Fittings.
       if (requestId === requestIdRef.current) setState(null);
     }
     if (requestId === requestIdRef.current) setSettledFor(characterId);
@@ -210,7 +182,6 @@ export function useCommunityFittings(characterId: number | null) {
   }, [refresh]);
 
   const uid = characterId === null ? null : uidForCharacter(characterId);
-  // A previous Character's load is not this one's until its own lands.
   const current = state?.forCharacter === characterId ? state : null;
   const rows = useMemo(
     () =>
@@ -219,7 +190,6 @@ export function useCommunityFittings(characterId: number | null) {
         : [],
     [current, uid]
   );
-  /** `shareMarker`s of the Fittings this Character already shared. */
   const mine = useMemo(
     () =>
       new Set(
@@ -237,12 +207,10 @@ export function useCommunityFittings(characterId: number | null) {
     rows,
     mine,
     refresh,
-    /** This Character's Shared rows have loaded, or will not. */
     settled: settledFor === characterId,
   };
 }
 
-/** Shared Fittings as list rows: not the viewer's own, one row per Fitting. */
 export function sharedRows(
   fittings: readonly SharedFitting[],
   viewerUid: string,
@@ -261,23 +229,19 @@ export function sharedRows(
   }));
 }
 
-/** The Fitting Share Code a saved, shared or Doctrine row carries; null for one that holds its Fitting. */
 export function libraryRowCode(row: LibraryRow): string | null {
   if (row.source === 'saved') return row.record.code;
   if (row.source === 'shared') return row.shared.code;
   return row.source === 'doctrine' ? row.code : null;
 }
 
-/** The Fitting an In-game or Active Fit row carries itself; null for a row that only has a code. */
 export function heldFitting(row: LibraryRow): Fitting | null {
   if (row.source === 'active') return row.fitting;
   return row.source === 'inGame' ? esiFittingToFitting(row.inGame).fitting : null;
 }
 
-/** The Active Fit's row (never grouped by hull: it leads the list). */
 export type ActiveRow = Extract<LibraryRow, { source: 'active' }>;
 
-/** The Character's Active Fit: the flown ship with the assets inside it. Null without both grants. */
 export function useActiveFitting(characterId: number | null) {
   const { t } = useTranslation();
   const granted = useEndpointsGranted(['getCharacterShip', 'getCharacterAssets']);
@@ -287,7 +251,6 @@ export function useActiveFitting(characterId: number | null) {
   const refresh = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     if (characterId === null || granted !== true) {
-      // A dropped grant takes the row with it.
       setState(null);
       return;
     }
@@ -299,7 +262,6 @@ export function useActiveFitting(characterId: number | null) {
         loadCharacterAssets(characterId),
       ]);
       const hull = ship ? types[String(ship.ship_type_id)] : undefined;
-      // A pod has nothing to fit; an unread asset list is not an empty ship, so no row rather than a bare hull.
       if (ship && !isCapsuleGroup(hull?.groupID) && assets.cached && !assets.needsReauth) {
         const hullName = typeNameOr(t, hull?.name, ship.ship_type_id);
         const name = ship.ship_name.trim() || hullName;
@@ -315,9 +277,7 @@ export function useActiveFitting(characterId: number | null) {
           fitting,
         };
       }
-    } catch {
-      // Offline or a failed read: no Active Fit, the rest of the list stands.
-    }
+    } catch {}
     if (requestId === requestIdRef.current) setState({ forCharacter: characterId, row });
   }, [characterId, granted, t]);
 
@@ -326,9 +286,7 @@ export function useActiveFitting(characterId: number | null) {
     void refresh();
   }, [refresh]);
 
-  // A previous Character's ship is not this one's until its own lands.
   const current = state?.forCharacter === characterId ? state : null;
-  /** Until this Character's read lands, the list waits: the row arriving late would move the pick and every row under a tap. */
   const pending =
     characterId !== null && (granted === undefined || (granted === true && current === null));
   return { row: current?.row ?? null, pending, refresh };

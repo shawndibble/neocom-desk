@@ -2,16 +2,6 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Source guards for DESIGN.md §6c (interaction grammar): one cue per intent,
- * so a primitive owns each pattern and feature code composes it. Same shape as
- * `inlineLinkClassName.test.ts`: scan source, list offenders.
- *
- * Excluded everywhere: `src/components/ui` (the primitives own the patterns),
- * `src/features/pi` and `src/routes/PlanetaryIndustry*` (pending its own
- * overhaul), and test files.
- */
-
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -33,9 +23,7 @@ interface Tag {
   attrs: string;
 }
 
-/** Every lowercase-named (HTML) JSX opening tag, with its raw attribute text. */
 function htmlTags(raw: string): Tag[] {
-  // Blank block comments (same length) so prose like "<button> — ..." isn't a tag.
   const src = raw.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
   const tags: Tag[] = [];
   const open = /(^|[\s(>{&|?:,])<([a-z][a-z0-9]*)(?=[\s/>])/g;
@@ -62,7 +50,6 @@ function htmlTags(raw: string): Tag[] {
   return tags;
 }
 
-/** The top-level statement starting at `from`: up to the next column-0 declaration. */
 function statementAt(src: string, from: number): string {
   const next = src
     .slice(from + 1)
@@ -70,11 +57,6 @@ function statementAt(src: string, from: number): string {
   return next < 0 ? src.slice(from) : src.slice(from, from + 1 + next);
 }
 
-/**
- * True when a className expression reaches one of `recipe`'s names or
- * patterns: inline, as a shared export, or through a same-file constant or
- * function (followed a few levels).
- */
 function reachesRecipe(src: string, attrs: string, recipes: Recipes, depth = 0): boolean {
   if (recipes.pattern.test(attrs)) return true;
   for (const name of new Set(attrs.match(/\b[A-Za-z_]\w*\b/g) ?? [])) {
@@ -92,7 +74,6 @@ interface Recipes {
   names: Set<string>;
 }
 
-/** Recipes = every export in src whose own statement matches `pattern`. */
 function recipesMatching(pattern: RegExp, seed: string[]): Recipes {
   const names = new Set(seed);
   for (const f of sourceFiles('src')) {
@@ -148,28 +129,15 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
   });
 
   it('puts no native title= on an HTML element (use Tooltip / HintText)', () => {
-    // Component props (Panel, Modal, PageHeader `title=`) are capitalised and
-    // never match: only lowercase HTML tags are checked. SVG <title> is a child
-    // element, not an attribute.
     expect(tagOffenders((t) => /(^|\s)title=/.test(t.attrs))).toEqual([]);
   });
 
   it('places <RowMoreActions> only in audited files (DESIGN.md §6c restraint)', () => {
-    // A ⋮ needs at least two real actions reachable nowhere else, one trailing
-    // cluster at the row's right edge. Whether a given row meets that is a
-    // judgement, so every file that hand-places a <RowMoreActions> is listed
-    // here after review; a new file fails until someone makes that call. Delete
-    // entries as menus are removed. (`DataTable`'s `rowMoreActions` column lives
-    // in src/components/ui and is not scanned.)
     const audited = [
       'src/features/assets/assetBrowserRows.tsx',
-      // Corp assets unfolded contents rows: the by-item view's holdings menu (Show info, View in Market, Set stock target); a container's click only unfolds.
       'src/features/corp/CorpAssetContents.tsx',
-      // My ships rows: Show info, Show fitting, Plan route, Open location assets; the row click holds only Show info.
       'src/features/assets/MyShipsView.tsx',
-      // Admin's Member rows: Make admin… and Remove, reachable nowhere else.
       'src/features/communities/CommunityMemberList.tsx',
-      // Contract item lines: View in Market, Add to Compare, Copy name, Build Plan; the row holds only the name link.
       'src/features/contracts/PublicContractDetailModal.tsx',
       'src/features/fittings/AddCargoTab.tsx',
       'src/features/fittings/AddChargesTab.tsx',
@@ -181,78 +149,52 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/industry/BuildGroupHeader.tsx',
       'src/features/industry/BuildPlanRow.tsx',
       'src/features/market/ItemContextMenu.tsx',
-      // Item Detail's header below md: Open in EVE and View in Market, the modal's own actions.
       'src/features/market/ItemDetailModal.tsx',
-      // Quickbar rows: Show info and Remove (owner-approved in #5332: the row click selects, no other route to either).
       'src/features/market/QuickbarList.tsx',
       'src/features/market/OpenOrdersList.tsx',
       'src/features/market/UsedInSection.tsx',
       'src/features/skills/planner/entryList/EntryRow.tsx',
-      // Overview widget header: the settings menu (Show, View, Range, Rename, Remove …), the same list as the card's right-click menu.
       'src/features/overview/widgets/Widget.tsx',
-      // Alerts panel group row: Stop these alerts and Notification settings, plus
-      // Snooze on a price alert — none of them reachable from the row, whose click
-      // is View or expand. Dismiss is deliberately NOT in here: it is the visible ×
-      // beside it, spaced clear of the ⋮ under the mis-tap rule. A danger row gets
-      // no menu at all, because Acknowledge is visible and the one remaining item
-      // would be under the two-action minimum.
       'src/features/notifications/AlertGroupRow.tsx',
-      // Mining Tax payee ledger rows: actions with no other route from the row.
       'src/features/miningTax/OwedBalances.tsx',
-      // Stops row menu: Remove, replacing the duplicate ✕ (#6557).
       'src/features/travel/StopsPanel.tsx',
-      // Character card: the row's trailing ⋮ (hints off), placed in #6565.
       'src/features/character/CharacterCard.tsx',
-      // Route Safety rows: note, avoid, set waypoint and zKillboard, with no other route from the row (#6710).
       'src/features/travel/RouteSystemsTable.tsx',
     ];
-    // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');
     const placing = offendersOf((src) => /<RowMoreActions\b/.test(stripComments(src)));
     expect(placing.filter((f) => !audited.includes(f))).toEqual([]);
   });
 
   it('composes a focus-visible recipe on every raw <button>', () => {
-    // A bare <button> must reach a focus-visible style: inline, via a shared
-    // recipe, or via a same-file constant/function its className uses.
-    // Exceptions, by file: styled by a stylesheet rule, not utilities.
     const exceptions = [
-      'src/features/skills/planner/entryList/cells.tsx', // PriorityPill: ring drawn on the child via group-focus-visible
-      'src/features/skills/planner/entryList/MarkerRow.tsx', // moved with EntryList's exception: same file-level carve-out
-      'src/features/character/CharacterCard.tsx', // avatar: pointer-only (tabIndex -1, aria-hidden); the name button carries the ring
-      'src/features/fittings/shipTree/FactionGrid.tsx', // .isis-faction (shipTree.css :focus-visible)
-      'src/features/fittings/shipTree/IsisTile.tsx', // .isis-tile (shipTree.css :focus-visible)
-      'src/features/fittings/shipTree/ShipTreeMap.tsx', // .isis-emblem (shipTree.css :focus-visible)
+      'src/features/skills/planner/entryList/cells.tsx',
+      'src/features/skills/planner/entryList/MarkerRow.tsx',
+      'src/features/character/CharacterCard.tsx',
+      'src/features/fittings/shipTree/FactionGrid.tsx',
+      'src/features/fittings/shipTree/IsisTile.tsx',
+      'src/features/fittings/shipTree/ShipTreeMap.tsx',
     ];
     expect(offendersOf((src, f) => !exceptions.includes(f) && hasUnfocusedButton(src))).toEqual([]);
   });
 
   it('uses no hover:bg-panel / hover:bg-line fill (rows use rowInteractiveClassName)', () => {
-    // The `-2`, `-bright` etc. variants (hover:bg-panel-2, hover:bg-line-bright)
-    // are deliberately allowed: only the bare tokens are the retired fills.
     expect(
       offendersOf((src) => /hover:bg-panel(?![-\w])|hover:bg-line(?![-\w])/.test(src))
     ).toEqual([]);
   });
 
   it('draws no ▸ / ▾ dingbat carets and no rotate-180 caret (use Disclosure Caret)', () => {
-    // rotate-180 stays banned: a flipped CaretDown is the retired expand cue;
-    // the sweep checklists replaced it with Disclosure's rotating Caret.
     expect(offendersOf((src) => /[▸▾]|\brotate-180\b/.test(src))).toEqual([]);
   });
 
   it('spells no touch-tier row height by hand (use tappableRowClassName)', () => {
-    // `min-h-9 md:min-h-7` is `tappableRowClassName` in controlStyles.ts.
     expect(
       offendersOf((src) => /min-h-9[^'"`]*md:min-h-7|md:min-h-7[^'"`]*min-h-9/.test(src))
     ).toEqual([]);
   });
 
   it('puts every <Checkbox> in a label with a 36px touch target', () => {
-    // The 16px native box can't carry its own touch target, so the wrapping
-    // <label> must compose `tappableRowClassName` (a row) or
-    // `touchCheckboxLabelClassName` (a lone box), or pin its own touch height.
-    // Exceptions, by file: none.
     const exceptions: string[] = [];
     const offenders = files.flatMap((f) => {
       if (exceptions.includes(f)) return [];

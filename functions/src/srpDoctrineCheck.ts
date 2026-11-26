@@ -1,7 +1,3 @@
-// SRP doctrine-fit: runs the pure match engine on a server-fetched killmail.
-// No Firestore, no fetch. A Hull Rule's `doctrineIds` are hull-scope only: a doctrine is for one
-// hull, and a class rule has no single hull to compare against.
-
 import { FITTING_RACKS, MUTAPLASMID_BASES } from './data/srpDoctrineData.js';
 import {
   basesOfFromData,
@@ -34,14 +30,9 @@ export function fittedFromKillmail(victim: EsiKillmail['victim']): FittedSet {
   return killmailFittedSet({ ship_type_id: victim.shipTypeId, items }, rackOf);
 }
 
-/** The hull's own rule: the only kind that carries doctrines. */
 export const hullRuleOf = (rules: readonly HullRule[], hullTypeId: number): HullRule | undefined =>
   rules.find((r) => r.scope === 'hull' && r.id === hullTypeId);
 
-/**
- * `doctrines` holds the corp's fits that still exist; a listed id that was deleted is skipped.
- * No rule, no ids or none surviving: not-checked.
- */
 export function checkDoctrine(
   victim: EsiKillmail['victim'],
   rule: HullRule | undefined,

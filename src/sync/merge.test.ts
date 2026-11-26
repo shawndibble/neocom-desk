@@ -180,12 +180,6 @@ describe('mergeRecords', () => {
 });
 
 describe('mergeRecords: account-wide tombstones (#436)', () => {
-  // A Character added after an account-wide delete has no per-Character
-  // tombstone naming its cloned row (accountWideBackfill.ts's cloneOnto keeps
-  // the source row's own updatedAt), so `l && !r` would otherwise push it as
-  // a brand-new remote doc nothing can out-rank. `accountWide` lets a caller
-  // supply a second, shared-key-only deletion signal that catches this
-  // regardless of which id the row was copied onto.
   const sharedKey = (record: SkillPlanRecord) => String(record.characterId);
 
   it('drops a stale row instead of pushing it when the account-wide tombstone postdates it', () => {
@@ -382,9 +376,6 @@ describe('mergeSettings', () => {
   });
 
   it('does not clear a local tombstone just because remote already carries its own', () => {
-    // The remote tombstone is only good for TOMBSTONE_TTL_MS. If the local
-    // tombstone were cleared here, nothing would defend this device once the
-    // remote copy is purged and a stale device re-pushes its pre-delete value.
     const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 1000 };
     const result = mergeSettings(
       [],
@@ -397,10 +388,6 @@ describe('mergeSettings', () => {
   });
 
   it('reasserts the delete against a stale re-push after the remote tombstone was purged', () => {
-    // Device A deleted sync.a and its remote tombstone has since aged out
-    // (purged by some sync). Device B was offline the whole time and re-pushes
-    // its pre-deletion copy as a live doc, older than the delete. Device A's
-    // local tombstone (never cleared, per the two tests above) must win.
     const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 1000 };
     const result = mergeSettings(
       [],
@@ -415,7 +402,6 @@ describe('mergeSettings', () => {
 });
 
 describe('mergeSettings: incremental pull (#5045)', () => {
-  // The cursor: the previous pass reconciled everything stamped at or below it.
   const SINCE = NOW - 10_000;
   const EMPTY_RESULT = {
     push: [],
@@ -428,7 +414,6 @@ describe('mergeSettings: incremental pull (#5045)', () => {
 
   describe('key absent from the window', () => {
     it('leaves a local value stamped at or below the cursor alone', () => {
-      // Full read: absence = never pushed, so push. Windowed: already in sync.
       const local = [{ key: 'sync.a', value: 1, updatedAt: SINCE }];
       expect(mergeSettings(local, [], [], NOW).push).toEqual(local);
       expect(mergeSettings(local, [], [], NOW, SINCE)).toEqual(EMPTY_RESULT);
@@ -440,18 +425,12 @@ describe('mergeSettings: incremental pull (#5045)', () => {
     });
 
     it('never pushes an unstamped local value from a window', () => {
-      // `updatedAt: 0` means "any remote copy wins" (useSyncedSetting's seed).
-      // A window cannot show whether one exists, so pushing — stamped `now` —
-      // could overwrite it. The sync pass forces a full read instead.
       const local = [{ key: 'sync.a', value: 1, updatedAt: 0 }];
       expect(mergeSettings(local, [], [], NOW).push).toEqual(local);
       expect(mergeSettings(local, [], [], NOW, SINCE)).toEqual(EMPTY_RESULT);
     });
 
     it('does not re-push a local tombstone recorded at or below the cursor', () => {
-      // Settings tombstones never expire. On a full read with no remote doc
-      // they are reasserted; repeated on every windowed pass that would be one
-      // write per deleted key per pass, forever.
       const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: SINCE };
       expect(mergeSettings([], [tombstone], [], NOW).pushTombstones).toEqual([tombstone]);
       expect(mergeSettings([], [tombstone], [], NOW, SINCE)).toEqual(EMPTY_RESULT);
@@ -517,9 +496,6 @@ describe('mergeSettings: incremental pull (#5045)', () => {
     });
 
     it('reasserts the delete over a stale remote write in the window, however old the delete', () => {
-      // The doc is in the window (it was written since the cursor) but its
-      // stamp predates the delete: a stale re-push. The tombstone wins even
-      // though the delete itself is below the cursor.
       const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: SINCE - 40 };
       const result = mergeSettings(
         [],
@@ -573,12 +549,6 @@ function remoteFeedRow(overrides: Partial<RemoteFeedDoc> = {}): RemoteFeedDoc {
   return { id: 'occ-1', firedAt: NOW - 1000, ownerHash: HASH, ...overrides };
 }
 
-/**
- * Every case below is this device, at `NOW`, on the standard synced window —
- * `now` and `windowMs` (issue #582) never vary between them, so only the
- * inputs that do stay in the call. What a case is saying about the retention
- * cutoff it says through the row's `firedAt` instead.
- */
 function mergeFeedNow<L extends LocalFeedRow, R extends RemoteFeedDoc>(
   local: readonly L[],
   pushEligible: ReadonlySet<string>,
@@ -597,8 +567,6 @@ describe('mergeFeed', () => {
   });
 
   it('does not push a local-only row outside the push window', () => {
-    // An old row still in the local archive (cap 300) but past the 30-day/100-row
-    // sync window (GLOSSARY.md round 45) is left alone, not pushed.
     const result = mergeFeedNow([feedRow()], new Set(), []);
     expect(result.pushCreate).toEqual([]);
   });
@@ -661,8 +629,6 @@ describe('mergeFeed', () => {
   });
 
   it('pulls a newer remote dismissal first, rather than overwrite it with an earlier local date', () => {
-    // The pull merges both (earlier date, later dismissal) locally; the next
-    // pass pushes the date back up with the dismissals already agreeing.
     const result = mergeFeedNow([feedRow({ firedAt: NOW - 50_000 })], new Set(), [
       remoteFeedRow({ firedAt: NOW - 1000, dismissedAt: NOW - 10 }),
     ]);
@@ -689,17 +655,12 @@ describe('mergeFeed', () => {
   });
 
   it('pushes a dismissal even when the row has aged out of the create-push window', () => {
-    // The push window only gates whether a *new* row starts syncing (pushCreate);
-    // once the remote side already has the row, a dismissal correction must
-    // still reach it regardless of whether the row is still push-eligible today.
     const result = mergeFeedNow([feedRow({ dismissedAt: NOW - 10 })], new Set(), [remoteFeedRow()]);
     expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pullDismiss).toEqual([]);
   });
 
   it('pulls a dismissal newer than the local copy, regardless of the local push window', () => {
-    // The row has aged out of this device's push window but a dismissal from
-    // another device must still win — see mergeFeed's doc comment.
     const result = mergeFeedNow([feedRow()], new Set(), [remoteFeedRow({ dismissedAt: NOW - 10 })]);
     expect(result.pullDismiss.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pushDismiss).toEqual([]);
@@ -728,8 +689,6 @@ describe('mergeFeed', () => {
   });
 });
 
-// Issue #582: pins the retention rule that bounds the remote collection on the
-// window the push side already used.
 describe('mergeFeed: remote retention purge', () => {
   const CUTOFF = NOW - FEED_SYNC_WINDOW_MS;
 
@@ -741,12 +700,6 @@ describe('mergeFeed: remote retention purge', () => {
   });
 
   it('leaves a remote row exactly on the cutoff alone, and still push-eligible (AC2, AC4)', () => {
-    // rowsWithinSyncWindow keeps firedAt >= cutoff (feed.test.ts pins that),
-    // so the boundary row is inside the window on both sides of the rule. If
-    // purge used <= here, one pass would delete a row the same pass re-created.
-    // Both sides hold it, so it is a purge candidate and push-eligible at
-    // once: under <= the same pass would delete the remote doc and re-create
-    // it from the local one.
     const boundary = { id: 'occ-1', firedAt: CUTOFF };
     const result = mergeFeedNow([boundary], new Set(['occ-1']), [
       remoteFeedRow({ firedAt: CUTOFF }),
@@ -762,8 +715,6 @@ describe('mergeFeed: remote retention purge', () => {
   });
 
   it('purges rather than reconciling a dismissal, when both sides hold an aged row', () => {
-    // Never both in one pass: a row old enough to purge is old enough that its
-    // dismissal no longer matters.
     const firedAt = CUTOFF - 1;
     const result = mergeFeedNow([feedRow({ firedAt, dismissedAt: NOW - 10 })], new Set(), [
       remoteFeedRow({ firedAt }),
@@ -782,8 +733,6 @@ describe('mergeFeed: remote retention purge', () => {
   });
 
   it('never purges on the strength of a local row alone (AC3)', () => {
-    // The local archive keeps 300 rows well past the 30-day window; purge is a
-    // statement about the remote copy, and there is no remote copy here.
     const result = mergeFeedNow([feedRow({ firedAt: CUTOFF - 1 })], new Set(), []);
     expect(result.purgeRemote).toEqual([]);
     expect(result.pushCreate).toEqual([]);
@@ -797,10 +746,6 @@ describe('mergeFeed: remote retention purge', () => {
   });
 });
 
-// Issue #581: an incremental pull hands the merge only the docs newer than the
-// cursor, so the two decisions that used to read remote *absence* have to be
-// re-derived from the local side. Everything above this block is the full-read
-// behaviour, unchanged.
 describe('mergeRecords: incremental pull', () => {
   it('leaves an unchanged local row alone when the cursor already covers it', () => {
     const since = NOW - 500;
@@ -812,8 +757,6 @@ describe('mergeRecords: incremental pull', () => {
       undefined,
       since
     );
-    // Absence below the cursor means "reconciled last pass", not "never seen" —
-    // pushing here would re-upload every untouched row on every pass.
     expect(result.pushUpserts).toEqual([]);
   });
 
@@ -834,8 +777,6 @@ describe('mergeRecords: incremental pull', () => {
       undefined,
       NOW - 500
     );
-    // A live remote copy at or below the cursor is simply not in `remote`;
-    // clearing on that would let the next pass pull the row back.
     expect(result.pushTombstones).toEqual([tombstone]);
     expect(result.clearLocalTombstones).toEqual([]);
   });
@@ -872,45 +813,30 @@ describe('mergeFeed: incremental pull', () => {
   });
 
   it('does not re-push a row this device has already uploaded', () => {
-    // The read amplification the cursor gate was added to prevent: an
-    // incremental window returns nothing for an unchanged row, and that
-    // absence must not be read as "never seen".
     const row = feedLocal({ syncedAt: NOW - 500 });
     const result = mergeFeedNow([row], new Set(['occ-1']), []);
     expect(result.pushCreate).toEqual([]);
   });
 
   it('pushes a row the remote side has never held, however far back it is dated', () => {
-    // issue #1207. `occurrenceFiredAt` dates a skill completion by its
-    // `finish_date` and a wallet change by the journal entry's `date`, so a
-    // row written seconds ago can carry a `firedAt` ten days old. It has
-    // never been uploaded, and being old is not evidence that it has.
     const row = feedLocal({ firedAt: NOW - 10 * 24 * 60 * 60 * 1000 });
     const result = mergeFeedNow([row], new Set(['occ-1']), []);
     expect(result.pushCreate).toEqual([row]);
   });
 
   it('pushes again when the row was dismissed after it was uploaded', () => {
-    // The remote doc is replaced wholesale, so a dismissal recorded after the
-    // upload travels as a push-CREATE rather than a push-DISMISS: the remote
-    // copy is not in this incremental window to compare against.
     const row = feedLocal({ syncedAt: NOW - 500, dismissedAt: NOW - 100 });
     const result = mergeFeedNow([row], new Set(['occ-1']), []);
     expect(result.pushCreate).toEqual([row]);
   });
 
   it('pushes a dismissal for an uploaded row that is no longer push-eligible', () => {
-    // The cap bounds what a device *introduces* to sync, not whether a row the
-    // remote side already holds can have its dismissal corrected. Without this
-    // the other devices' copy stays live and a new device pulls it as unread.
     const row = feedLocal({ syncedAt: NOW - 500, dismissedAt: NOW - 100 });
     const result = mergeFeedNow([row], new Set(), []);
     expect(result.pushCreate).toEqual([row]);
   });
 
   it('does not push a post-upload dismissal for a row past the age bound', () => {
-    // The remote copy is purged at this age, not corrected: pushing would
-    // re-create what the purge deletes on the next pass.
     const row = feedLocal({
       firedAt: NOW - FEED_SYNC_WINDOW_MS - 1,
       syncedAt: NOW - 500,
@@ -920,7 +846,6 @@ describe('mergeFeed: incremental pull', () => {
   });
 
   it('pushes a post-upload dismissal for a row exactly on the age bound', () => {
-    // `purgeRemote` is strictly-older, so a row on the cutoff is not purged.
     const row = feedLocal({
       firedAt: NOW - FEED_SYNC_WINDOW_MS,
       syncedAt: NOW - 500,
@@ -941,9 +866,6 @@ describe('mergeFeed: incremental pull', () => {
   });
 
   it('still refuses to introduce a row outside the push window, uploaded or not', () => {
-    // #582 AC4: a row purged remotely for its age must not come straight back
-    // up. `syncedAt` decides whether the remote side knows the row;
-    // `pushEligible` decides whether it is allowed to learn.
     const aged = { firedAt: NOW - FEED_SYNC_WINDOW_MS - 1 };
     expect(mergeFeedNow([feedLocal(aged)], new Set(), []).pushCreate).toEqual([]);
     expect(

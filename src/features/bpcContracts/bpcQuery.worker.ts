@@ -1,12 +1,4 @@
 /// <reference lib="webworker" />
-/**
- * BPC Sourcing's prepare / rank over the whole snapshot, off the main thread
- * (`bpcQueryService`). The page sends the contract rows once, the smaller
- * source data when it changes, and then a small query per change; the answer
- * carries indices for the contract lists, never those row objects. Stage 1's
- * result is kept per `prepareVersion`, so a keystroke reruns only stage 2.
- * Only the newest of a burst of queries is worked out.
- */
 import {
   compactBpcRankParts,
   indexBpcRows,
@@ -20,7 +12,6 @@ import {
   type PreparedBpcOffers,
 } from './searchBpcOffers';
 
-/** Everything in `BpcSourceData` that is not the (large) contract row arrays. */
 export type BpcRestData = Omit<BpcSourceData, 'contractRows' | 'originals'>;
 
 export type BpcQueryRequest =
@@ -34,7 +25,6 @@ export type BpcQueryRequest =
       kind: 'query';
       id: number;
       prepareVersion: number;
-      /** Only when the version is new to the worker. */
       prepareInput?: BpcPrepareInput;
       query: BpcQuery;
     };
@@ -64,7 +54,6 @@ export function emptyBpcQueryState(): BpcQueryState {
   };
 }
 
-/** Applies a load; new data drops what was worked out from the old. */
 export function loadBpcQueryData(
   state: BpcQueryState,
   request: Exclude<BpcQueryRequest, { kind: 'query' }>
@@ -78,10 +67,6 @@ export function loadBpcQueryData(
   state.prepared = null;
 }
 
-/**
- * Keeps a query's stage-1 input. Called on arrival, not on answer: a superseded
- * query is never answered, and the newer one may rely on the input it carried.
- */
 export function acceptBpcPrepareInput(
   state: BpcQueryState,
   request: Extract<BpcQueryRequest, { kind: 'query' }>
@@ -92,7 +77,6 @@ export function acceptBpcPrepareInput(
   state.prepared = null;
 }
 
-/** One query against the loaded data; a query before the data is an error, not a guess. */
 export function answerBpcQuery(
   state: BpcQueryState,
   request: Extract<BpcQueryRequest, { kind: 'query' }>
@@ -110,7 +94,6 @@ export function answerBpcQuery(
   return { id: request.id, parts: compactBpcRankParts(parts, state.index) };
 }
 
-// Only in a worker: the module is also imported by tests, where there is no `self` to listen on.
 if (typeof WorkerGlobalScope !== 'undefined') {
   const state = emptyBpcQueryState();
   let waiting: Extract<BpcQueryRequest, { kind: 'query' }> | null = null;
@@ -138,7 +121,6 @@ if (typeof WorkerGlobalScope !== 'undefined') {
       return;
     }
     acceptBpcPrepareInput(state, request);
-    // A query still waiting its turn is already out of date.
     if (waiting !== null) self.postMessage({ id: waiting.id, superseded: true });
     else setTimeout(run, 0);
     waiting = request;

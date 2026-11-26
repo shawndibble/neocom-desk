@@ -1,14 +1,3 @@
-/**
- * What Route Safety's route area holds before a route exists: the heading,
- * its one-line hint, and ghost rows in the shape of the itinerary that will
- * take their place. The ghosts are decoration (`aria-hidden`); the heading and
- * hint carry the message.
- *
- * DESIGN.md §6a prefers a spinner to a skeleton for something loading. This is
- * not loading: nothing is coming until a destination is picked, so it shows
- * what the page will hold. See decision "Route Safety shows an empty route as
- * ghost rows".
- */
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 

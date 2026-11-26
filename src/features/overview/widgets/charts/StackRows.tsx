@@ -1,11 +1,6 @@
 import { CHART_COLOR } from './palette';
 import type { StackRowsChartModel } from './types';
 
-/**
- * One full-width bar per row, each split into its parts by that row's own
- * total, with the figure at the end and one legend of the parts' totals. Drawn
- * aria-hidden; the model's summary carries the figures.
- */
 export function StackRows({ model, maxRows }: { model: StackRowsChartModel; maxRows: number }) {
   return (
     <div aria-hidden="true" className="grid gap-2">
@@ -25,7 +20,7 @@ export function StackRows({ model, maxRows }: { model: StackRowsChartModel; maxR
                       key={part.key}
                       className="block h-full"
                       style={{
-                        width: `${((part.value / total) * 100).toFixed(1)}%`, // fixed format: CSS width
+                        width: `${((part.value / total) * 100).toFixed(1)}%`,
                         backgroundColor: CHART_COLOR[part.color],
                       }}
                     />

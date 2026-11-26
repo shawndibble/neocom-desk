@@ -11,15 +11,6 @@ import { confirmPendingInCorporation, declineByVerifyLink } from './groupingApi'
 
 type Answer = 'confirmed' | 'declined';
 
-/**
- * The verify page's grouping question (D26b, issue #4210): an officer put a
- * character in this Miner's group, and that character has not agreed yet.
- *
- * The link alone proves the mail reached the main, not that the added
- * character is theirs, so it can only decline. Confirming needs that
- * character's own EVE sign-in: the button logs in as it (returning here) and,
- * once it is signed in on this device, confirms as it.
- */
 export function GroupingQuestions({
   token,
   corporationId,

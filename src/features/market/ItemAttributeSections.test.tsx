@@ -39,7 +39,6 @@ function sections(): AttributeSection[] {
             skilledValue: 213.75,
           },
           { attributeId: 482, name: 'Capacitor Capacity', unit: 'GJ', value: 1500 },
-          // Different, but the same once formatted: no arrow.
           {
             attributeId: 6,
             name: 'Activation Cost',
@@ -128,7 +127,6 @@ describe('ItemAttributeSections', () => {
     render(<ItemAttributeSections sections={[changed, ...rest]} />);
     expect(screen.getByText('2,250 HP, 2,812.5 HP with your skills')).toBeInTheDocument();
     expect(screen.getByText('50%, 55% with your skills')).toBeInTheDocument();
-    // Unchanged resists keep one figure.
     expect(screen.getByText('35%')).toBeInTheDocument();
   });
 

@@ -100,7 +100,6 @@ describe('ApplyPage', () => {
   it('adds a second character to the draft it already holds', async () => {
     setup({ application: 'none' }, { login: loginAs(tamsin) });
     await screen.findByText('Read');
-    // A return visit: the handle is in storage, and the next login adds to the same draft.
     setVettingBackendOverride(fixture);
     render(<ApplyPage corporationId={CORP} login={loginAs(mira)} onSignIn={vi.fn()} />);
     expect(await screen.findAllByText('Mira Vell')).not.toHaveLength(0);
@@ -111,7 +110,6 @@ describe('ApplyPage', () => {
     const { onSignIn } = setup({ application: 'draft' });
     expect(await screen.findByText('Part missing')).toBeInTheDocument();
     expect(screen.getByText('Mail not shared. That check will not run.')).toBeInTheDocument();
-    // Goes to EVE's login, so a Button; Remove beside it acts in place and stays a text action.
     const again = screen.getByRole('button', { name: 'Log in again as Mira Vell' });
     const remove = screen.getByRole('button', { name: 'Remove Mira Vell' });
     const textAction = textActionClassName().split(' ');
@@ -146,7 +144,6 @@ describe('ApplyPage', () => {
     await userEvent.type(timezone, 'EU evenings');
     await userEvent.type(screen.getByRole('textbox', { name: /Note to the recruiters/ }), 'Hi');
     await userEvent.click(screen.getByRole('checkbox', { name: /These are all my characters/ }));
-    // Leaves for EVE: the page is gone until the login comes back.
     await userEvent.click(screen.getByRole('button', { name: 'Log in again as Mira Vell' }));
     first.unmount();
 
@@ -157,7 +154,6 @@ describe('ApplyPage', () => {
     ).toHaveValue('EU evenings');
     expect(screen.getByRole('textbox', { name: /Note to the recruiters/ })).toHaveValue('Hi');
     expect(screen.getByRole('checkbox', { name: /These are all my characters/ })).toBeChecked();
-    // In this tab only, and never a token.
     expect(JSON.stringify({ ...localStorage })).not.toContain('EU evenings');
     expect(JSON.stringify({ ...sessionStorage })).not.toContain('fixture:');
   });
@@ -197,7 +193,6 @@ describe('ApplyPage', () => {
   it('shows who opened a sent report, and withdraws only after a confirm', async () => {
     setup({ application: 'opened' });
     expect(await screen.findByText('Kestrel Vane')).toBeInTheDocument();
-    // Opens a confirm, so a Button, not a text action.
     const withdraw = screen.getByRole('button', { name: 'Withdraw and delete the report' });
     expect(withdraw).not.toHaveClass(...textActionClassName().split(' '));
     await userEvent.click(withdraw);

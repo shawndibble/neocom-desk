@@ -22,7 +22,7 @@ describe('formatEveDateTime', () => {
   });
 });
 
-const NOW = Date.UTC(2026, 9, 15, 12, 0); // Thu 12:00
+const NOW = Date.UTC(2026, 9, 15, 12, 0);
 
 describe('eveWhen', () => {
   it('reads a weekday and EVE time inside the coming week', () => {

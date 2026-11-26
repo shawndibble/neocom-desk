@@ -50,7 +50,6 @@ describe('diffSharedMoonPop', () => {
         thresholdMs: 0,
       },
     ]);
-    // The next poll is past it on both sides: nothing more.
     expect(diffSharedMoonPop(7, next, { entries: [pop], nowMs: NOW + 15 * MINUTE_MS })).toEqual([]);
   });
 
@@ -86,7 +85,6 @@ describe('diffSharedMoonPop', () => {
         { entries: [pop], nowMs: NOW + MINUTE_MS }
       )
     ).toEqual([]);
-    // A device opened a day later is not told the pop "is now".
     expect(
       diffSharedMoonPop(
         7,
@@ -98,7 +96,6 @@ describe('diffSharedMoonPop', () => {
 });
 
 describe('diffSharedMoonPop: a chunk fractured early', () => {
-  // Synced hours after the laser fired: the Pop Time moved back past both polls.
   const before = entry({ popTime: 'auto-fracture', popAtMs: NOW + 3 * HOUR_MS });
   const after = entry({ popTime: 'auto-fracture', popAtMs: NOW - 2 * HOUR_MS });
 

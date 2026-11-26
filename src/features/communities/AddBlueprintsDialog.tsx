@@ -11,23 +11,11 @@ import type { PlaceLabel } from './useBlueprintPlaces';
 
 type Section = 'locations' | 'blueprints';
 
-/**
- * Where the Character's blueprints are, for the Locations section: loading,
- * unavailable (no cached assets, so a location rule could not publish
- * anything), or every place with how many blueprints sit there.
- */
 export type DialogPlaces =
   | { status: 'loading' }
   | { status: 'unavailable' }
   | { status: 'ready'; counts: ReadonlyMap<number, number> };
 
-/**
- * Where a Member adds to what they share with a Community: a station or
- * structure (a standing rule, every blueprint there now and later) or one
- * blueprint type at a time. Each Share acts at once; the tab behind is the
- * list of what is shared. Under share-all only blueprints that were stopped
- * can be added, so there is no Locations section and no switch.
- */
 export function AddBlueprintsDialog({
   open,
   onClose,
@@ -133,7 +121,6 @@ function LocationList({
       ) : (
         <ul className="divide-y divide-line">
           {rows.map(([placeId, count]) => {
-            // The button stays and swaps its label, so focus stays on it.
             const shared = sharedLocations.has(placeId);
             return (
               <li key={placeId} className="flex items-center gap-2 py-1 text-xs">
@@ -166,8 +153,6 @@ function BlueprintList({
   const search = useRef<HTMLInputElement>(null);
   const shareButtons = useRef(new Map<number, HTMLButtonElement>());
   const focusAfterCommit = useFocusAfterCommit();
-  // Every type the by-type choice leaves out, including one some of whose
-  // copies a shared location already covers: its copies elsewhere need a way in.
   const candidates = useMemo(
     () => types.filter((type) => !status.get(type.typeId)?.direct),
     [types, status]
@@ -205,7 +190,6 @@ function BlueprintList({
                   else shareButtons.current.delete(type.typeId);
                 }}
                 onClick={() => {
-                  // Sharing removes this row: focus moves to a neighbour, else the search.
                   const near = [rows[index + 1], rows[index - 1]].map(
                     (other) => () => (other ? shareButtons.current.get(other.typeId) : null)
                   );

@@ -108,11 +108,6 @@ async function addRun(overrides: Partial<Parameters<typeof db.productionRuns.add
   });
 }
 
-/**
- * Unfolds "All production runs" if still folded, then returns the table.
- * Idempotent across repeat calls in one test: once expanded the caret reads
- * "Hide…", so a later call is a no-op rather than re-folding it.
- */
 async function runsTable() {
   const toggle = await screen.findByRole('button', { name: /^(show|hide) all production runs$/i });
   if (toggle.getAttribute('aria-label')?.startsWith('Show')) {
@@ -121,11 +116,6 @@ async function runsTable() {
   return screen.findByRole('table', { name: 'All production runs' });
 }
 
-/**
- * `FilterBar` always renders the funnel trigger, at every width — the date
- * range filter sits behind it rather than inline. Opens it so a test can
- * reach the "From"/"To" fields.
- */
 async function openFilters() {
   await userEvent.click(await screen.findByRole('button', { name: /^filters/i }));
 }
@@ -173,7 +163,6 @@ describe('ProductionLogPanel', () => {
       { wrapper: Wrapper }
     );
 
-    // Total cost logged across both runs.
     expect(await screen.findByText(/770,000|770000/)).toBeInTheDocument();
   });
 
@@ -190,9 +179,8 @@ describe('ProductionLogPanel', () => {
     const byItemTable = await screen.findByRole('table', { name: 'By item' });
     const rifterRow = within(byItemTable).getByText('Rifter').closest('tr');
     expect(rifterRow).not.toBeNull();
-    // Two runs of 10 units each rolled into one Rifter row.
-    expect(rifterRow?.textContent).toContain('2'); // runs logged
-    expect(rifterRow?.textContent).toContain('20'); // units produced
+    expect(rifterRow?.textContent).toContain('2');
+    expect(rifterRow?.textContent).toContain('20');
 
     expect(within(byItemTable).getByText('Raven')).toBeInTheDocument();
     expect(within(byItemTable).getByRole('link', { name: 'Rifter' })).toBeInTheDocument();
@@ -241,7 +229,6 @@ describe('ProductionLogPanel', () => {
     );
 
     const table = await runsTable();
-    // Header + 2 data rows.
     expect(within(table).getAllByRole('row')).toHaveLength(3);
     expect(within(table).getByText('Rifter')).toBeInTheDocument();
     expect(within(table).getByText('Raven')).toBeInTheDocument();
@@ -287,7 +274,6 @@ describe('ProductionLogPanel', () => {
       <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
       { wrapper: Wrapper }
     );
-    // Both present before filtering.
     const table = await runsTable();
     expect(within(table).getByText('7')).toBeInTheDocument();
     expect(within(table).getByText('42')).toBeInTheDocument();

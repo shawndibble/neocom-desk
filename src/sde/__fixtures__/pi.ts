@@ -1,18 +1,3 @@
-/**
- * A `PiData` stub for tests that only care about the recipe graph.
- *
- * `PiData` also carries the colony's CPU/Powergrid budget and the planet-type
- * map, which a test about (say) an item's recipe row has no opinion about.
- * Rather than have every such fixture restate a pin-cost table it will never
- * read — or have the shape go optional and force a `?.` at every real call
- * site — this fills those blocks in with the shipped values and lets a test
- * override whatever it does care about.
- *
- * A test that is *about* the budget numbers should not use this: see
- * `engine/pi/pinBudget.test.ts`, which asserts the real payload against the
- * researched figures directly.
- */
-
 import type { PiData, PiInfrastructure } from '../types';
 
 const INFRASTRUCTURE: PiInfrastructure = {
@@ -24,7 +9,6 @@ const INFRASTRUCTURE: PiInfrastructure = {
     storage: { cpu: 500, powergrid: 700, capacity: 12_000 },
     launchpad: { cpu: 3_600, powergrid: 700, capacity: 10_000 },
   },
-  // The Temperate variant of each pin, enough for a fixture to name one.
   pinKindByTypeId: {
     3068: 'extractorControlUnit',
     2481: 'basic',
@@ -33,7 +17,6 @@ const INFRASTRUCTURE: PiInfrastructure = {
     2562: 'storage',
     2256: 'launchpad',
   },
-  // Temperate and Barren; the real payload carries all eight.
   commandCenterTypeIds: [2254, 2524],
   extractorHead: { cpu: 110, powergrid: 550 },
   link: {

@@ -1,8 +1,3 @@
-/**
- * The Market page's Quickbar and Compare Set actions that offer an Undo: the
- * Remove-with-Undo toast, reorder, the Variations "Compare" merge with its
- * own Undo toast, and each pinned item's hub price against what was paid.
- */
 import { useMemo, useState } from 'react';
 import type { QuickbarItem } from '@/db';
 import type { TradeHub } from '@/market/hubs';
@@ -22,7 +17,6 @@ export interface UseMarketQuickbarArgs {
   effectiveHub: TradeHub;
   selectedTypeId: number | null;
   selectedItem: MarketTypeEntry | null;
-  /** The Variations table's rows, which "Compare" merges into the Compare Set. */
   variationRows: readonly { typeId: number; name: string }[] | null;
 }
 
@@ -35,7 +29,6 @@ export function useMarketQuickbar({
   selectedItem,
   variationRows,
 }: UseMarketQuickbarArgs) {
-  // Remove keeps the row and its slot so the Undo toast can put it back.
   const [quickbarUndo, setQuickbarUndo] = useState<{
     item: QuickbarItem;
     index: number;
@@ -58,15 +51,9 @@ export function useMarketQuickbar({
     void writeQuickbar(reorderQuickbarItems(quickbarItems, activeTypeId, overTypeId));
   }
 
-  // Variations "Compare" (issue #146, folded into the Compare drawer's
-  // Attributes view by #1425): adds every row currently shown in the
-  // Variations table, plus the selected item itself, to the Compare Set and
-  // opens the drawer on Attributes — see CompareAttributesMatrix.
   const addManyToCompare = useCompareSet((state) => state.addMany);
   const removeManyFromCompare = useCompareSet((state) => state.removeMany);
   const openCompareIn = useCompareSet((state) => state.openIn);
-  // Issue #1746: the merge can add ~19 rows with no cheap way back out, so
-  // the add is followed by an Undo toast that removes exactly those rows.
   const [compareUndo, setCompareUndo] = useState<{
     typeIds: number[];
     count: number;
@@ -89,7 +76,6 @@ export function useMarketQuickbar({
     setCompareUndo(null);
   }
 
-  // Issue #5333: each pinned item's hub price against what the wallet says was paid.
   const quickbarTypeIds = useMemo(() => quickbarItems.map((i) => i.typeId), [quickbarItems]);
   const quickbarVsPaid = useQuickbarVsPaid(activeCharacterId, quickbarTypeIds, effectiveHub);
 

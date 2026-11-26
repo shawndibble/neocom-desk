@@ -1,7 +1,3 @@
-/**
- * The device-local Ansiblex list (issue #2478): what a character's structure
- * search finds, and what the pilot pastes, merged into one list.
- */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';

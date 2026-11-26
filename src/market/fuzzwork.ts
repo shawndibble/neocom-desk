@@ -1,29 +1,13 @@
-/**
- * Fuzzwork market aggregates client — primary price source (ADR 0002).
- * https://market.fuzzwork.co.uk/aggregates/?station={id}&types={csv}
- *
- * Response values arrive as JSON strings and must be parsed. A type with no
- * orders on a side still gets a key back, but with orderCount 0 — that side's
- * price is reported as null, never coerced to 0.
- */
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import { chunk } from '@/lib/chunk';
 
 export const FUZZWORK_AGGREGATES_URL = 'https://market.fuzzwork.co.uk/aggregates/';
 
-/** Fuzzwork batches queries poorly past this many type IDs per request. */
 const MAX_TYPES_PER_REQUEST = 200;
-/**
- * Batches in flight at once. A batch takes about a second, so thousands of
- * types (Below market prices every listed item) took most of a minute one at a
- * time; a few at once stays polite to a community-run server.
- */
 const BATCH_CONCURRENCY = 4;
 
 export interface HubAggregate {
-  /** Lowest sell order price, or null when the station has no sell orders. */
   sellMin: number | null;
-  /** Highest buy order price, or null when the station has no buy orders. */
   buyMax: number | null;
   sellVolume: number;
   buyVolume: number;
@@ -48,12 +32,6 @@ function toNumber(value: string | number | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/**
- * No orders on this side (missing entry or orderCount 0) reports as null,
- * not 0. Same for a malformed/missing price field even when orderCount is
- * positive (BUG #5) — a bad price must never silently coerce to 0 and flow
- * into build-vs-buy as "free."
- */
 function parseSide(
   side: RawSide | undefined,
   priceField: 'min' | 'max'
@@ -66,7 +44,6 @@ function parseSide(
   };
 }
 
-/** Whether `locationId` is one station or a whole region — Fuzzwork aggregates either. */
 export type AggregateScope = 'station' | 'region';
 
 async function fetchBatch(
@@ -85,11 +62,6 @@ async function fetchBatch(
   return (await response.json()) as RawAggregatesResponse;
 }
 
-/**
- * Fetches per-station sell/buy aggregates for a batch of type IDs, chunking
- * requests past MAX_TYPES_PER_REQUEST. Every requested type ID is present in
- * the returned map, even when Fuzzwork has no data for it.
- */
 export async function fetchAggregates(
   locationId: number,
   typeIds: number[],
@@ -127,7 +99,6 @@ export async function fetchAggregates(
   return result;
 }
 
-/** How crowded one station's market is for a type right now: open orders and the units they hold. */
 export interface HubOrderCounts {
   buyOrders: number;
   sellOrders: number;
@@ -135,12 +106,6 @@ export interface HubOrderCounts {
   sellVolume: number;
 }
 
-/**
- * Open buy/sell order counts at one station, per type. Unlike `fetchAggregates`
- * this keeps the counts themselves (ESI's market history only counts traded
- * orders, and per region — never per hub). A type with no orders, or no entry,
- * reads as zero rather than unknown: Fuzzwork answers for every type it was asked.
- */
 export async function fetchOrderCounts(
   stationId: number,
   typeIds: number[]

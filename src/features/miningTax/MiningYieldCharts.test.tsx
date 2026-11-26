@@ -3,16 +3,6 @@ import { render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import MiningYieldCharts, { RateTooltip } from './MiningYieldCharts';
 
-/*
- * `ResponsiveContainer` measures its parent and jsdom reports every box as
- * 0×0 (same caveat as `PriceHistoryChart.test.tsx`), so the bars themselves
- * never draw here. What's plain DOM and worth asserting on is the chart
- * title and the "refining hidden" note (issue #1281), and — for the chart
- * metric select (issue #2160) — that volume/count never draw a refined
- * series or Legend regardless of `showRefining`, and that each chart's
- * sr-only table matches whichever metric is on screen.
- */
-
 const typeComparison = [{ typeId: 1230, typeName: 'Veldspar', rawValue: 1000, refineValue: 1200 }];
 const typeVolumeComparison = [{ typeId: 1230, typeName: 'Veldspar', value: 500 }];
 const typeCountComparison = [{ typeId: 1230, typeName: 'Veldspar', value: 5000 }];

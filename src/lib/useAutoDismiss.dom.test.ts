@@ -53,14 +53,12 @@ describe('useAutoDismiss', () => {
     act(() => result.current.show('first'));
     act(() => vi.advanceTimersByTime(1000));
     act(() => result.current.show('second'));
-    // The first call's timer would have fired at 2000ms; it must not clear
-    // the second call's value early.
     act(() => vi.advanceTimersByTime(1000));
     expect(setValue).not.toHaveBeenCalledWith(null);
 
     act(() => vi.advanceTimersByTime(1000));
     expect(setValue).toHaveBeenCalledWith(null);
-    expect(setValue).toHaveBeenCalledTimes(3); // first, second, null
+    expect(setValue).toHaveBeenCalledTimes(3);
   });
 
   it('cancel() clears a pending dismiss without setting offValue (the import-Undo case)', () => {

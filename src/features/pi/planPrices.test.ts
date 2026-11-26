@@ -26,7 +26,6 @@ describe('loadPlanPrices', () => {
     expect(loadMarketSnapshot).toHaveBeenCalledTimes(1);
     const [hub, typeIds] = loadMarketSnapshot.mock.calls[0] as [unknown, number[]];
     expect(hub).toBe(TRADE_HUBS[0]);
-    // De-duplicated: a chain names the same tier from several parents.
     expect([...typeIds].sort((a, b) => a - b)).toEqual([2389, 2867]);
     expect(result.prices).toEqual({ 2867: 1_900_000, 2389: 760 });
   });

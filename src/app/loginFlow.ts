@@ -1,4 +1,3 @@
-// Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
 import {
   startAlertsLogin,
   startCorpSyncLogin,
@@ -20,40 +19,10 @@ import { currentRouterPath, isOnRoute } from './routerPath';
 import { loadGrantedScopes } from './grantedScopes';
 
 export interface EveLoginOptions {
-  /**
-   * The Character this login is *for*. Defaults to the active one, which is
-   * what the shell-level entry points mean: the `AuthFailureNotice`, a
-   * `ScopeGate` — both pressed while looking at the active Character's data.
-   * Per-page Grant CTAs go through `grantAction.ts`'s `beginGrant`, which
-   * always names the Character, since in a multi-Character view it is often
-   * not the active one.
-   */
   characterId?: number;
-  /** Permissions to ask for even if unticked in Customize, e.g. the one a banner names. */
   groups?: readonly ScopeGroup[];
 }
 
-/**
- * The scope set to ask SSO for.
- *
- * With no known Character (`characterId === null`, i.e. Add Character), the
- * returning identity is unknowable until EVE sends them back, so this asks
- * for the whole `SCOPES` (Base Grant) and nothing else — the decision doc's
- * "plain login still asks for the whole Base Grant" rule.
- *
- * With a known Character, this is a re-login for someone already looking at
- * their own data — a `ReauthBanner`, a `ScopeGate`, a Grant button. One trip
- * fills every gap (#6102): the `CORE_GRANT`, any named `groups`, the
- * Character's own stored grant, and every default-on Permission it lacks —
- * except one the player unticked in Customize permissions, so a re-login never
- * re-requests what they declined (#1520). A player with many Characters on
- * many EVE accounts otherwise paid a sign-out-and-in per missing Permission.
- * A named group is asked for even if unticked there: they just pressed for it.
- *
- * Unioning *stored* scopes is what keeps a re-login from narrowing: EVE issues
- * a token carrying exactly what was requested. Every added scope is one the
- * app is registered for, so SSO cannot reject the request.
- */
 async function requestedScopes(
   characterId: number | null,
   groups: readonly ScopeGroup[]
@@ -64,18 +33,10 @@ async function requestedScopes(
   try {
     return [...new Set([...named, ...fill, ...(await loadGrantedScopes(characterId))])];
   } catch {
-    // A broken Dexie may cost the user their cache; it must never cost them
-    // their way back in — nor turn a Grant press into a plain re-auth, which
-    // is why the requested group is already in `named`.
     return [...new Set([...named, ...fill])];
   }
 }
 
-/**
- * The scopes of every default-on Permission the player left ticked in
- * Customize permissions. Empty when that choice cannot be read: without it a
- * fill could re-request a Permission the player declined.
- */
 async function defaultOnFill(): Promise<string[]> {
   try {
     const chosen = new Set(await readCustomizeSelection());
@@ -87,44 +48,12 @@ async function defaultOnFill(): Promise<string[]> {
   }
 }
 
-/**
- * Re-auth, or grant a scope group, **for a known Character** — the second of
- * the two branches incremental auth splits login into (issue #295).
- *
- * Every caller is pressed from a Character context: a page's Grant CTA
- * (`grantAction.ts`'s `beginGrant`), the `AuthFailureNotice`, a `ScopeGate`,
- * the Settings Permissions rows, the corp grant prompt. So the request unions with that Character's stored grant, and
- * asking for less would quietly throw away a grant they already made — EVE
- * issues a token carrying exactly what was requested, so the loss is real.
- * Here `previous vs granted` stays meaningful and a genuine revocation is
- * still detected.
- *
- * The Character defaults to the active one, because that is what "re-authorize"
- * means at the shell-level call sites (`AuthFailureNotice`, `ScopeGate`);
- * `beginGrant` always names it instead. With no active Character there is
- * nothing to union with and this is the base set — the same conservative answer
- * as an unreadable Dexie.
- *
- * Every caller is pressed while looking at a page, so the callback returns to
- * it rather than to `/characters`.
- */
 export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void> {
   const characterId = options.characterId ?? useActiveCharacter.getState().activeCharacterId;
   rememberThisPage();
   assignLocation(await startLogin(await requestedScopes(characterId, options.groups ?? [])));
 }
 
-/**
- * One EVE sign-in for a Character's Alerts Grant (ADR 0020), returning to the
- * page it was pressed on. `wanted` names the optional scopes the player agreed
- * to on the permission listing (issue #5156); SSO issues a token with exactly
- * what was requested, so a scope the Character's grant already holds is always
- * kept. A scope is asked for only once the deployed server has said it takes it
- * (ADR 0028, 0029). Called without `wanted` (the first-run offer, which says so
- * in its own copy) it asks for the location when supported and never for new mail.
- * The callback never stores its token on this device; see
- * `features/notifications/alertsGrant.ts`.
- */
 export async function beginAlertsLogin(
   characterId: number,
   { nearby = true, mail = false }: { nearby?: boolean; mail?: boolean } = {}
@@ -142,12 +71,6 @@ export async function beginAlertsLogin(
   );
 }
 
-/**
- * Turn on the Corp Tax Book's Automatic sync for one book editor (ADR 0025): a
- * separate SSO round trip for the grant's scopes alone, returning to the page it
- * was pressed on. The callback never stores its token on this device; see
- * `features/corp/taxBook/syncGrant.ts`.
- */
 export async function beginCorpSyncLogin(
   characterId: number,
   corporationId: number
@@ -156,22 +79,11 @@ export async function beginCorpSyncLogin(
   assignLocation(await startCorpSyncLogin(characterId, corporationId));
 }
 
-/**
- * One EVE sign-in for a Vetting report: exactly `VETTING_SCOPES`, for whichever character the
- * pilot picks on EVE's page, returning to the page it was pressed on (`/apply/<corp>` or
- * `/vetting`). The callback keeps the access token in memory only and discards the refresh
- * token; see `auth/session.ts` `completeVettingLogin`.
- */
 export async function beginVettingLogin(corporationId: number, reviewId?: string): Promise<void> {
   rememberThisPage();
   assignLocation(await startVettingLogin(corporationId, reviewId));
 }
 
-/**
- * Grant a moon owner's ledger to an accounting corporation (ADR 0025 amendment):
- * a separate SSO round trip where the player picks the Accountant Character on
- * EVE's login screen, returning to the page it was pressed on.
- */
 export async function beginFeederGrantLogin(
   characterId: number,
   inviteCode: string,
@@ -181,11 +93,6 @@ export async function beginFeederGrantLogin(
   assignLocation(await startFeederGrantLogin(characterId, inviteCode, requestedRatePct));
 }
 
-/**
- * Connect one of the player's own CEO corporations as a moon owner: a separate
- * SSO round trip signed in as that corporation's CEO, returning to the page it
- * was pressed on.
- */
 export async function beginOwnCorpGrantLogin(
   intent: Parameters<typeof startOwnCorpGrantLogin>[0]
 ): Promise<void> {
@@ -193,35 +100,12 @@ export async function beginOwnCorpGrantLogin(
   assignLocation(await startOwnCorpGrantLogin(intent));
 }
 
-/**
- * Stash the current page as the post-login landing. `/callback` is never
- * remembered: its query is the spent code, and its error panel restarts
- * through `retryLastLogin`, which keeps the failed login's own landing. A
- * protocol-relative `//host` path is refused rather than handed to the router.
- */
 function rememberThisPage(): void {
   const here = currentRouterPath();
   if (here.startsWith('//') || isOnRoute(here, '/callback')) return;
   setLoginReturnTo(here);
 }
 
-/**
- * Add Character lands where it ordinarily does, so a landing a grant left
- * behind (pressed, then abandoned on EVE's page) must not steer it. Two pages
- * keep the stash: `/login`, where a Fitting Share Code's "Open in Neocom Desk"
- * (#1544) sent the visitor with its landing already stashed, `/callback`,
- * whose Retry fallback restarts the very login that landing belongs to, and
- * `/s` and `/share` (the old spelling), whose "Log in" stashes the shared page
- * before it starts (#3075), and `/communities/join`, whose invite page does the
- * same so a visitor lands back on the invite after EVE's login, and
- * `/corp-tax-book/verify`, where a guest signs in as the character they are
- * confirming into a grouping and returns to the late notice (#4210), and
- * `/corp-tax-book/remove-now`, where a payee signs in and returns to the link (#4520).
- *
- * `/apply` is deliberately absent: its vetting sign-ins stash the page themselves
- * (`beginVettingLogin`), and its "Open Neocom Desk" button is an ordinary Add Character that
- * must not land back on the application after an abandoned sign-in left a stash.
- */
 const LANDING_KEEPING_ROUTES = [
   '/login',
   '/callback',
@@ -237,36 +121,11 @@ function forgetStrayLanding(): void {
   if (!LANDING_KEEPING_ROUTES.some((route) => isOnRoute(here, route))) clearLoginReturnTo();
 }
 
-/**
- * Add a Character — the first branch, and the one where the returning identity
- * is genuinely unknowable: the user picks the character on EVE's side, *after*
- * this redirect. So it asks for the base `SCOPES` and nothing else, unioning
- * with no one.
- *
- * #293 unioned across every stored Character instead, because it could not
- * under-ask without tripping the cache purge. That is safe but over-asks: an
- * alt would be shown a write scope only a main ever granted. What makes asking for less safe now
- * is that `auth/session` judges revocation as **requested vs granted** — a
- * scope the app did not ask for going missing from the JWT is not evidence the
- * Character revoked it, so it purges nothing.
- *
- * Deliberately not `beginEveLogin()` with the default: an active Character is
- * usually signed in when this is pressed, and unioning with *their* grant is
- * precisely the over-ask, aimed at somebody else.
- */
 export async function beginAddCharacterLogin(): Promise<void> {
   forgetStrayLanding();
   assignLocation(await startLogin(await requestedScopes(null, [])));
 }
 
-/**
- * Add a Character with a hand-picked set of Permissions — the Customize
- * permissions dialog's own submit (issue #1522). Same "nobody to union with"
- * reasoning as `beginAddCharacterLogin`: the returning identity is unknowable
- * until EVE sends them back. Unlike that base request, `groups` here may omit
- * a default-on Permission (an unchecked box) or include a Write to EVE one —
- * Customize offers every Permission either way.
- */
 export async function beginCustomizedAddCharacterLogin(
   groups: readonly ScopeGroup[]
 ): Promise<void> {
@@ -275,17 +134,6 @@ export async function beginCustomizedAddCharacterLogin(
   assignLocation(await startLogin(scopes));
 }
 
-/**
- * Restart whatever login this tab last began, asking for the same scopes.
- *
- * `false` when this tab has no record of one, which is the honest answer: the
- * callback route cannot tell an Add Character from a corp grant, and guessing
- * would retry a scope grant as a plain re-auth — succeeding while silently not
- * granting what was asked for.
- *
- * The retry is a fresh Pending Login, so the landing's clock restarts with it;
- * otherwise a slow first attempt could expire the landing mid-retry.
- */
 export async function retryLastLogin(): Promise<boolean> {
   const scopes = scopesForRetry();
   if (!scopes) return false;
@@ -295,7 +143,6 @@ export async function retryLastLogin(): Promise<boolean> {
   return true;
 }
 
-/** `retryLastLogin`, but only while the automatic-restart budget allows it. */
 export async function retryLastLoginOnce(): Promise<boolean> {
   return takeRetryBudget() ? retryLastLogin() : false;
 }

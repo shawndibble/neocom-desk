@@ -15,11 +15,6 @@ export interface FittingStatsDelta {
   count: number;
 }
 
-/**
- * Capacitor is a discriminated union, not a plain number, so it sits outside
- * `NUMERIC_FIELDS`. `before`/`after` hold a negated depletion time on the
- * unstable side so it never collides with a stable percentage's positive range.
- */
 export function capacitorChange(before: FittingStats, after: FittingStats): StatChange | null {
   const metric = (capacitor: FittingStats['capacitor']) =>
     capacitor.stable ? capacitor.stablePercentage : -capacitor.depletesInSeconds;
@@ -32,7 +27,6 @@ export function capacitorChange(before: FittingStats, after: FittingStats): Stat
   return b === a ? null : { key: 'capacitor', before: b, after: a };
 }
 
-/** Every stat that differs, at the same rounding `FittingStatsSections` displays it at, so the count always matches what's on screen. */
 export function diffFittingStats(before: FittingStats, after: FittingStats): FittingStatsDelta {
   const changes: StatChange[] = [];
   for (const field of NUMERIC_FIELDS) {

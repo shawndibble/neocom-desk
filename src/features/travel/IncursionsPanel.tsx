@@ -1,13 +1,3 @@
-/**
- * Route Safety's "Incursions near you" (issue #3540): every active Incursion
- * from ESI's public feed, nearest first, counted from the pilot's Current
- * System with their own route rules — the same jump basis Route Safety draws
- * its route with. "Route" adds the staging system as a stop.
- *
- * Conditions, never verdicts: the row says the state, influence and distance,
- * never whether a site is worth running. Folded by default and remembered per
- * device; folded, it still names the nearest one.
- */
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -22,7 +12,6 @@ import { useIncursionsPanelOpen } from './incursionsData';
 import { INCURSION_STATE_TONE } from './incursionStateTone';
 import { useIncursions } from './useIncursions';
 
-/** What Route can do for a staging system: add it, or why not (already on the trip, stops full). */
 export type RouteAction = 'add' | 'on-route' | 'full';
 
 export function IncursionsPanel({
@@ -39,7 +28,6 @@ export function IncursionsPanel({
   useHydratedStore(useIncursionsPanelOpen);
   const systems = useSolarSystemIndex();
   const { feed, rows, constellationNames: names, jumpsStatus, retry } = useIncursions(current);
-  // Retry unmounts into "reading…": focus waits on the panel body, never `<body>` (§7).
   const [bodyRef, , holdRetryFocus] = useRetryFocus(
     feed === undefined ? 'busy' : feed === null ? 'failed' : 'ok',
     'incursions'
@@ -50,7 +38,6 @@ export function IncursionsPanel({
   const jumpsText = (row: IncursionRow) => {
     if (row.jumps !== null) return t('travel.incursions.jumps', { count: row.jumps });
     if (jumpsStatus === 'ready') return t('travel.incursions.noRoute');
-    // Each row says why it has no distance, rather than leaving it blank.
     if (jumpsStatus === 'no-origin') return t('travel.incursions.noOriginRow');
     if (jumpsStatus === 'unknown') return t('travel.incursions.unknownRow');
     return null;

@@ -1,5 +1,3 @@
-// Groups, types, skill/ship ids, dogma attributes, masteries, skill modifiers and skills.json.
-// Extracted from scripts/build-sde.mjs; see lib/bakeConstants.mjs for the shared bands.
 import {
   CHAR_ATTR_NAMES,
   MASTERY_TIER_COUNT,
@@ -18,7 +16,6 @@ import { GENERIC_DECRYPTOR_GROUP_ID } from './invention.mjs';
 import { WORMHOLE_GROUP_ID } from './jumpMass.mjs';
 
 export function bakeSkills({ raw }) {
-  // --- invGroups: groupID -> {name, categoryID} ---
   const groups = new Map();
   {
     const rows = raw['invGroups.csv'];
@@ -32,7 +29,6 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- invTypes: typeID -> {name, groupID, volume, published} ---
   const types = new Map();
   {
     const rows = raw['invTypes.csv'];
@@ -45,15 +41,8 @@ export function bakeSkills({ raw }) {
         groupID: Number(r[h.groupID]),
         volume: num(r[h.volume]) ?? 0,
         mass: num(r[h.mass]) ?? 0,
-        // Units that must be reprocessed together. `invTypeMaterials`
-        // quantities are per portion, not per unit, so nothing can price a
-        // refine without this (issue #537).
         portionSize: num(r[h.portionSize]) ?? 1,
-        // What the type holds, not what it takes up: a Launchpad's 10,000 m3
-        // and a Storage Facility's 12,000 are the colony's whole buffer.
         capacity: num(r[h.capacity]) ?? 0,
-        // A skillbook's fixed NPC sell price, where NPCs seed it: NPC orders
-        // for Upwell Hauler across The Forge all sit at exactly its 2,000,000.
         basePrice: num(r[h.basePrice]) ?? 0,
         published: r[h.published] === '1',
         marketGroupID: r[h.marketGroupID] === '' ? null : Number(r[h.marketGroupID]),
@@ -61,7 +50,6 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- Skill type IDs: published types whose group is in category 16 ---
   const skillTypeIds = new Set();
   for (const [typeID, t] of types) {
     if (!t.published) continue;
@@ -69,7 +57,6 @@ export function bakeSkills({ raw }) {
     if (g && g.categoryID === SKILL_CATEGORY_ID) skillTypeIds.add(typeID);
   }
 
-  // --- Ship type IDs: published types whose group is in category 6 ---
   const shipTypeIds = new Set();
   for (const [typeID, t] of types) {
     if (!t.published) continue;
@@ -77,16 +64,11 @@ export function bakeSkills({ raw }) {
     if (g && g.categoryID === SHIP_CATEGORY_ID) shipTypeIds.add(typeID);
   }
 
-  // --- Planetary pin type IDs: published types in the six pin groups ---
   const piPinTypeIds = new Set();
   for (const [typeID, t] of types) {
     if (t.published && PI_PIN_GROUPS[t.groupID]) piPinTypeIds.add(typeID);
   }
 
-  // --- Refinable type IDs: `isRefinable`, the same predicate reprocessing.json's
-  // own build uses below — computed here, ahead of the reprocessing.json pass
-  // itself, purely so the dgmTypeAttributes pass right below knows which
-  // types to keep attribute 790 for (issue #1058).
   const refinableTypeIds = new Set();
   {
     const rows = raw['invTypeMaterials.csv'];
@@ -97,8 +79,7 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- dgmTypeAttributes: attrs for skill types, planetary pins, and refinable types ---
-  const attrsByType = new Map(); // typeID -> Map(attrID -> value)
+  const attrsByType = new Map();
   {
     const rows = raw['dgmTypeAttributes.csv'];
     const h = indexHeader(rows);
@@ -129,9 +110,6 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- Alpha skill caps: typeID -> highest level an Alpha clone can train ---
-  // One clone grade per starter race; they have matched since CCP let Alphas
-  // train every race's skills, so any disagreement is surfaced, not guessed at.
   const alphaMaxLevel = new Map();
   let alphaGradesDisagree = false;
   {
@@ -156,8 +134,6 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- masteries.json: shipTypeID -> 5 tiers -> [{skillTypeID, level}] ---
-  // certSkills: certID+certLevelInt -> [{skillTypeID, level}]
   const certSkillsByCert = new Map();
   {
     const rows = raw['certSkills.csv'];
@@ -175,7 +151,6 @@ export function bakeSkills({ raw }) {
       list.push({ skillTypeID, level });
     }
   }
-  // certMasteries: shipTypeID -> masteryLevel (0-4) -> [certID]
   const masteries = {};
   {
     const rows = raw['certMasteries.csv'];
@@ -192,9 +167,6 @@ export function bakeSkills({ raw }) {
       const bundle = certSkillsByCert.get(`${certID}:${certLevelInt}`) ?? [];
       let tiers = masteries[typeID];
       if (!tiers) tiers = masteries[typeID] = Array.from({ length: MASTERY_TIER_COUNT }, () => []);
-      // A tier can draw from more than one cert; the max level wins where
-      // the same skill appears twice, same rule fitToSkills.ts uses for a
-      // fit's hull + items disagreeing on a skill's required level.
       const bySkill = new Map(tiers[masteryLevel].map((e) => [e.skillTypeID, e.level]));
       for (const { skillTypeID, level } of bundle) {
         bySkill.set(skillTypeID, Math.max(bySkill.get(skillTypeID) ?? 0, level));
@@ -203,18 +175,7 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- skillAttributeModifiers.json: modifiedAttributeID -> skill bonuses affecting it ---
-  // A skill-gated modifier row's own `skillTypeID` only *gates* the bonus (an
-  // item must require that skill for it to apply) — the bonus's actual
-  // source is whichever type the effect is attached to (dgmTypeEffects),
-  // which is usually NOT a skill at all: implants, ship set bonuses and
-  // subsystems reuse this exact mechanism. Filtering to effects owned by an
-  // actual skill type turns ~2300 candidate rows into the couple hundred
-  // genuinely skill-driven ones. `perLevelValue` is the owning skill's own
-  // static per-level design value (e.g. Sharpshooter's own attribute 294 =
-  // 5, "5% per level") — baked in here rather than fetched at runtime, since
-  // it's already static SDE data this build already has in hand.
-  const effectModifierInfo = new Map(); // effectID -> parsed modifierInfo array
+  const effectModifierInfo = new Map();
   {
     const rows = raw['dgmEffects.csv'];
     const h = indexHeader(rows);
@@ -227,12 +188,12 @@ export function bakeSkills({ raw }) {
       try {
         parsed = JSON.parse(cell);
       } catch {
-        continue; // malformed JSON in this one cell isn't fatal to the build
+        continue;
       }
       if (Array.isArray(parsed)) effectModifierInfo.set(Number(r[h.effectID]), parsed);
     }
   }
-  const effectOwnerTypes = new Map(); // effectID -> [typeID, ...]
+  const effectOwnerTypes = new Map();
   {
     const rows = raw['dgmTypeEffects.csv'];
     const h = indexHeader(rows);
@@ -274,7 +235,6 @@ export function bakeSkills({ raw }) {
     }
   }
 
-  // --- skills.json ---
   const skills = [];
   for (const typeID of [...skillTypeIds].sort((a, b) => a - b)) {
     const t = types.get(typeID);
@@ -300,7 +260,6 @@ export function bakeSkills({ raw }) {
       secondaryAttr: CHAR_ATTR_NAMES[attrs.get(SECONDARY_ATTR)] ?? null,
       prereqs,
       ...(t.basePrice > 0 ? { basePrice: t.basePrice } : {}),
-      // Omitted for Omega-only skills (most of them), which the app reads as 0.
       ...(alphaMaxLevel.get(typeID) > 0 ? { alphaMaxLevel: alphaMaxLevel.get(typeID) } : {}),
     });
   }

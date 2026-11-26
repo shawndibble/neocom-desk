@@ -18,7 +18,6 @@ let useRouteJump: typeof import('./routeJumpSettings').useRouteJump;
 beforeEach(async () => {
   sde.positions.mockReset();
   sde.systems.mockReset();
-  // The module memoises the system map for the session, so each test gets its own copy.
   vi.resetModules();
   const settings = await import('./routeJumpSettings');
   useRouteJump = settings.useRouteJump;
@@ -57,7 +56,6 @@ describe('useRouteJump', () => {
   });
 
   it('recovers on reconnect when only the systems read came back empty', async () => {
-    // Positions load, but the systems index resolves null (its own failed read).
     sde.positions.mockResolvedValue([30000142, 0, 0, 0]);
     sde.systems.mockResolvedValueOnce(null);
     const { result } = renderHook(() => useRouteJump());

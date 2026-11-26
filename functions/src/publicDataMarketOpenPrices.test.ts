@@ -19,7 +19,6 @@ const final = async () => ({
   snapshot: { url: 'https://example.test/orders.csv.bz2', fileTime: `${DATE}T23:45:00Z` },
 });
 
-/** Folds one Jita type, plus `perRegion` priced types in every tracked region. */
 const fold =
   (perRegion: number): typeof foldSnapshotUrl =>
   async (_url, f, _ua, stations) => {

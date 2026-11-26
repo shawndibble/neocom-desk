@@ -40,91 +40,42 @@ interface FittingStatsSectionsProps {
   stats: FittingStats | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
-  /** What failed, when `statsError`: the pilot's skills, or the ship data / calculation. */
   statsErrorReason?: StatsErrorReason;
-  /** False when the pilot's skills could not be read, so the figures assume none. Default true. */
   skillsKnown?: boolean;
-  /** Tries the failed load again; without it the error has no retry. */
   onRetry?: () => void;
   price: Appraisal | null;
-  /** Names an Offense row's weapon, charge or drone. */
   typeName: (typeId: number) => string;
   damageProfiles: DamageProfiles;
   targetProfiles: TargetProfiles;
-  /** A saved Fitting to overlay on the applied-DPS graphs; absent without a Character. */
   overlay?: OverlayFitting;
-  /**
-   * Who flies it, for the Pilot trigger and panel. Absent: no Character, so
-   * the trigger reads the skills basis alone (All skills V).
-   */
   pilot?: {
-    /** Null while it loads. */
     characterName: string | null;
-    /** Skills the Character lacks for the fit: "· N missing" on the trigger. */
     missingSkills?: number;
-    /** The fit's skill requirements could not be read. */
     skillsUnknown?: boolean;
-    /** Top of the Pilot panel: the skills-unknown note. */
     notes?: ReactNode;
-    /** Just above What to train: the missing-skills chip, whose skills that list also names. */
     missingSkillsChip?: ReactNode;
   };
-  /**
-   * The Abyssal weather the figures on screen were worked out in, for the
-   * Situation trigger: it lags a new pick until they land. Absent: the
-   * session weather.
-   */
   statsWeatherTypeId?: number | null;
-  /** The Tactical mode picker, top of the Situation panel — absent where the hull has no modes. */
   tacticalMode?: ReactNode;
-  /**
-   * The Abyssal section — the session weather and a run planned in it
-   * (`AbyssalRunPlanner`). Its body mounts only while open, which is what keeps
-   * the weather's delta from being worked out while it is shut.
-   */
   abyssal?: {
     hullGroupId: number | undefined;
     compare: WeatherCompare | null;
-    /** The open fit's cargo, which offsets the planner's filament cost. */
     cargo: readonly FittingCargoItem[];
   };
-  /** The implants button, beside the skills select in the Pilot panel — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
-  /** A note under the implant and skills controls (the clone assumes no implants). */
   implantsNote?: ReactNode;
-  /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
   whatToTrain?: ReactNode;
-  /** "Your Characters": every Character's gap to this Fitting. Absent with fewer than two Characters. */
   yourCharacters?: readonly GapCharacter[];
-  /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
-  /**
-   * The open Fitting, and its modules' results when they line up with it:
-   * with the editor's item actions, each Offense weapon row gets the item
-   * menu for its group (change charge, state, show info).
-   */
   fitting?: Fitting | null;
   moduleResults?: FittingModuleResult[] | null;
-  /** A change to preview in place (`current → after`), from Improve's ticked or hovered rows; absent or null: none. */
   preview?: FittingStatsDelta | null;
-  /** What the previewed change adds to the price (`current → after`); absent or null: the plain price. */
   previewIsk?: number | null;
-  /** One sentence per fitting rule the fit breaks; empty or absent for a legal fit. */
   ruleBreaks?: readonly string[];
-  /** Open the Pilot panel with What to train expanded and in view; `onWhatToTrainShown` is called once it has. */
   whatToTrainRequested?: boolean;
   onWhatToTrainShown?: () => void;
 }
 
-/**
- * The stats column (scope decision `20260924-215855`, mockup A): one panel
- * of collapsible sections, each row carrying its headline number, laid out
- * like the game's fitting window. Only the ship's numbers sit in it, under
- * Damage & Tank and Ship labels; who flies it and what it flies in sit behind
- * the Pilot and Situation triggers on top, in side panels (#3978). Every section keeps what its ticket put
- * there — per-weapon offense and heat (#1548), damage profiles and the
- * adapted RAH (#1545), target profiles and applied-DPS graphs (#1546).
- */
 export function FittingStatsSections({
   stats,
   statsProgress,
@@ -155,17 +106,13 @@ export function FittingStatsSections({
   previewIsk = null,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
-  // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
   const shipDataNeedsConnection = useShipDataNeedsConnection();
   const profileName = useDamageProfileName()(damageProfiles.selected);
   const { section, group } = useSectionBuilder();
   const projectedShips = useProjectedSources((state) =>
     state.sources.reduce((sum, source) => sum + source.count, 0)
   );
-  // One panel at a time: both slide over the same edge.
   const [panel, setPanel] = useState<'pilot' | 'situation' | null>(null);
-  // The panel last opened: what the closing panel shows, and whose trigger
-  // takes focus back when the opener is gone (a phone/desktop swap mid-open).
   const [shownPanel, setShownPanel] = useState<'pilot' | 'situation'>('pilot');
   const openPanel = (which: 'pilot' | 'situation') => {
     setShownPanel(which);
@@ -173,7 +120,6 @@ export function FittingStatsSections({
   };
   const closePanel = () => setPanel(null);
   if (whatToTrainRequested && panel !== 'pilot') openPanel('pilot');
-  // Not tied to a change in the request: a phone mounts this column only once its Stats tab shows.
   const scrollToTrain = useRef(false);
   const trainRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -181,7 +127,6 @@ export function FittingStatsSections({
     scrollToTrain.current = true;
     onWhatToTrainShown?.();
   }, [whatToTrainRequested, onWhatToTrainShown]);
-  // After every commit until the list is on screen: the panel and its stats may mount later than the request.
   useEffect(() => {
     const el = trainRef.current;
     if (!scrollToTrain.current || !el) return;
@@ -195,7 +140,6 @@ export function FittingStatsSections({
   const weatherName = useWeatherName(
     statsWeatherTypeId === undefined ? sessionWeather : statsWeatherTypeId
   );
-  // A Fitting in its hull's default mode carries no `mode` (TacticalModePicker's `withMode`).
   const mode =
     fitting?.mode !== undefined &&
     tacticalModesFor(fitting.shipTypeId).includes(fitting.mode) &&
@@ -203,10 +147,6 @@ export function FittingStatsSections({
       ? tacticalModeKind(fitting.mode)
       : undefined;
 
-  // What each trigger carries with its panel shut: skill gaps only (the
-  // Character and skills basis read in the Pilot panel, so the trigger fits
-  // one line on a phone); the weather, a non-default Tactical mode,
-  // projected ships and overheat.
   const pilotWarnings = [
     pilot?.missingSkills && t('fittings.stats.pilot.missing', { count: pilot.missingSkills }),
     (pilot?.skillsUnknown || (stats && !skillsKnown)) && t('fittings.stats.pilot.skillsUnknown'),
@@ -235,7 +175,6 @@ export function FittingStatsSections({
       ? Math.round((statsProgress.loadedBytes / statsProgress.totalBytes) * 100)
       : null;
 
-  // The error is said once, above the sections; each section just says it has nothing.
   const placeholder = statsError ? (
     <StatNote>{t('fittings.stats.unavailable')}</StatNote>
   ) : (
@@ -325,9 +264,6 @@ export function FittingStatsSections({
         {group('damageTank', [...damage, ...tank])}
         {group('ship', ship)}
 
-        {/* One panel, its content switched by `panel`: swapping two open
-        panels would remount it, sending focus back to the first trigger and
-        leaving its history entry behind. */}
         <StatsScopePanel
           open={panel !== null}
           onClose={closePanel}
@@ -353,11 +289,9 @@ export function FittingStatsSections({
               {pilot?.notes && (
                 <div className="space-y-2 border-b border-line px-3 py-2">{pilot.notes}</div>
               )}
-              {/* Its sections wait on the stats: say why the panel is bare meanwhile. */}
               {!stats && <div className="px-3 py-2 text-xs">{placeholder}</div>}
               {stats && (
                 <div className="space-y-2 border-b border-line px-3 py-2">
-                  {/* One line: both controls carry their label inside. */}
                   <div className="flex items-center gap-2 text-xs">
                     {implants}
                     <SkillOverridesControl />
@@ -370,7 +304,6 @@ export function FittingStatsSections({
               )}
               {stats && whatToTrain && (
                 <PanelSection id="whatToTrain" title={t('fittings.stats.section.whatToTrain')}>
-                  {/* Scrolled to once there is something to scroll to: Improve's "What to train" link. */}
                   <div ref={trainRef}>{whatToTrain}</div>
                 </PanelSection>
               )}

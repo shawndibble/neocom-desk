@@ -17,9 +17,6 @@ describe('getLastKnownSpSummary / rememberSpSummary', () => {
   });
 
   it('keeps the last good value rather than overwriting it with an all-null read', () => {
-    // Simulates a tab whose own load can't reach /skills (no grant, offline,
-    // whatever) mounting after another tab already found real numbers — it
-    // must not blank what the previous tab already established.
     rememberSpSummary(3, { totalSp: 8_000_000, unallocatedSp: 3_000 });
 
     rememberSpSummary(3, NO_SP_SUMMARY);

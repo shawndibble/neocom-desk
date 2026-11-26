@@ -53,53 +53,22 @@ interface PayeeManagerDialogProps {
   open: boolean;
   onClose: () => void;
   characters: readonly TrackedCharacter[];
-  /** Every tracked character's current Payees, already loaded by the parent route's snapshot — the initial list here is seeded from this rather than a fresh Dexie read. */
   payeesByCharacter: ReadonlyMap<number, PayeeRecord[]>;
-  /**
-   * Which character a newly-created Payee is stored under — a Payee row still
-   * belongs to one character in Dexie, even though a corp's landlord list is
-   * the same regardless of which alt is looking. Usually whichever character
-   * the "Manage Payees" action was pressed from.
-   */
   initialCharacterId: number;
   onChanged: () => void;
-  /**
-   * What each Payee is still owed — outstanding Assignments only — keyed by
-   * Payee id. Drives the row's balance and the delete
-   * confirmation's "move them first" offer; absent reads as nothing owed.
-   */
   owedByPayee?: ReadonlyMap<string, PayeeOwed>;
-  /** The systems each Payee has been mined for, learned from Assignments (`suggestPayeeForSystem`'s `systemsByPayee`). */
   systemsByPayee?: ReadonlyMap<string, ReadonlySet<number>>;
-  /** Display names for the ids in `systemsByPayee`; an id without one is left out of the row. */
   systemNames?: ReadonlyMap<number, string>;
-  /**
-   * The corporations whose Corp Tax Book the member can see. A Payee named for
-   * one is offered the link to it (#6205): the book counts a Payee linked to its
-   * corporation as its own (`payeesOfBookCorporation`).
-   */
   bookCorporations?: readonly BookCorporation[];
-  /** Each personal Payee's Running account, by any of its record ids: its credit, and its ledger. */
   accountOf?: (payeeId: string) => PayeeRunningAccount | undefined;
-  /** Opens a Payee's ledger: each row's balance is the way in, owed, in credit or settled. */
   onOpenLedger?: (payeeId: string) => void;
-  /** Whether the pilot archived this Payee and it still reads archived (`isArchivedPayee`). */
   isArchived?: (payeeId: string) => boolean;
-  /**
-   * The name of the Corp Tax Book corporation this Payee is, when a book the pilot is in answers
-   * for it: the Payee shows no figures, only its old history.
-   */
   bookOwnerOf?: (payeeId: string) => string | undefined;
 }
 
 export interface PayeeOwed {
   amount: number;
-  /** How many owed entries make up `amount`. */
   count: number;
-  /**
-   * How many entries "Move and delete" takes — `count` plus the other days of
-   * any Combined Entry those are in (`assignmentsMovedWithPayee`).
-   */
   moving: number;
 }
 
@@ -107,26 +76,13 @@ interface DraftPayee {
   id: string | null;
   name: string;
   defaultTaxPct: string;
-  /**
-   * Always a concrete hub, never absent — the *stored* field is optional, and
-   * the default hub's own id is what "stored nothing" round-trips through.
-   * That keeps one option in the picker meaning Jita, rather than a "default"
-   * entry and a "Jita" entry that a pilot would have to be told are the same.
-   */
   hubId: TradeHub['id'];
-  /** The systems this Payee is the default for (`PayeeRecord.defaultSystems`); the start day of each is kept by `updatePayee`. */
   defaultSystemIds: number[];
-  /**
-   * The EVE entity this Payee is: set by picking a suggestion, or carried from
-   * the stored Payee (a payment may have taught it the id without a kind).
-   */
   entityId?: number;
   entityKind?: PayeeEntityKind;
-  /** The name the entity was verified under; editing away from it clears the verification. */
   verifiedName?: string;
 }
 
-/** Which Payee already has the system the pilot tried to add. */
 function DefaultSystemTaken({ systemId, holderName }: { systemId: number; holderName: string }) {
   const { t } = useTranslation();
   const system = useSystemName(systemId) ?? `#${systemId}`;
@@ -137,7 +93,6 @@ function DefaultSystemTaken({ systemId, holderName }: { systemId: number; holder
   );
 }
 
-/** A Corp Tax Book's corporation, with the ISK the member has paid it beyond every open day. */
 export interface BookCorporation extends NamedCorporation {
   credit?: number;
 }
@@ -152,20 +107,6 @@ const EMPTY_DRAFT: DraftPayee = {
   defaultSystemIds: [],
 };
 
-/**
- * Manage Payees (decision doc): create/edit/remove the corps and people a
- * character owes a moon-rental tax to. Payees are shared across every
- * tracked character — a landlord doesn't change depending on which alt is
- * looking — so this lists the union of all of them rather than gating on one
- * character at a time. Name, default tax %, and the trade hub the Payee's ore
- * is valued at, and its Default Systems (GLOSSARY.md), which only this form edits.
- *
- * The hub belongs to the Payee rather than to this device because the figure
- * it produces is a bill one player sends another: a device-local pick would
- * have two corpmates computing different amounts owed for the same ore. It is
- * deliberately not the Market Browser's `marketHub`, which is one pilot's
- * viewing preference.
- */
 export function PayeeManagerDialog({
   open,
   onClose,
@@ -186,27 +127,17 @@ export function PayeeManagerDialog({
   const formId = useId();
   const [payeesByCharacterState, setPayeesByCharacterState] = useState(payeesByCharacter);
   const [draft, setDraft] = useState<DraftPayee>(EMPTY_DRAFT);
-  // The add/edit form stays out of the way until asked for — the list is what
-  // the dialog is for. An empty list shows it regardless (see `showForm`).
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Bumped whenever the form starts over or its name changes: a lookup answered after that
-  // belongs to an older draft and is dropped.
   const draftGeneration = useRef(0);
-  // Several corporations/characters answer to the typed name: the pilot picks one.
   const [choices, setChoices] = useState<{ name: string; matches: PayeeEntityMatch[] } | null>(
     null
   );
-  // A Default System another of the Character's Payees already holds: shown above Save.
   const [taken, setTaken] = useState<{ systemId: number; holderName: string } | null>(null);
-  // Shown above the list: the add/edit form (and its own error line) may be closed.
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingPayee, setDeletingPayee] = useState<PayeeRecord | null>(null);
   const [moveTargetId, setMoveTargetId] = useState<string>('');
 
-  // Deduped by id: the same corp Payee, however it's stored per-character
-  // under the hood, must not show up twice just because two alts happen to
-  // owe it.
   const payees = useMemo(() => {
     const seen = new Map<string, PayeeRecord>();
     for (const list of payeesByCharacterState.values()) {
@@ -215,7 +146,6 @@ export function PayeeManagerDialog({
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [payeesByCharacterState]);
 
-  // One row per corporation or player: a pilot's alts each hold a record of the same recipient.
   const groups = useMemo(() => groupPayees(payees), [payees]);
   const groupOf = (payeeId: string) => groups.find((g) => g.members.some((m) => m.id === payeeId));
 
@@ -223,18 +153,12 @@ export function PayeeManagerDialog({
     characters.find((c) => c.characterId === characterId)?.characterName ?? `#${characterId}`;
 
   const showForm = formOpen || payees.length === 0;
-  // A name matching a Corp Tax Book's corporation the draft is not yet linked to.
   const namedBook = corporationNamed(draft.name, bookCorporations);
   const suggestedBook =
     namedBook && !(draft.entityKind === 'corporation' && draft.entityId === namedBook.corporationId)
       ? namedBook
       : undefined;
 
-  // A genuinely fresh read after a mutation, since the parent's snapshot map
-  // is a point-in-time seed and won't reflect this dialog's own edit until
-  // its next full refresh. Reloads every tracked character since a mutation
-  // could touch any of them (an edit keeps its Payee's existing owner; a new
-  // Payee is created under `initialCharacterId`).
   async function refresh() {
     const entries = await Promise.all(
       characters.map(async (c) => [c.characterId, await loadPayees(c.characterId)] as const)
@@ -265,14 +189,10 @@ export function PayeeManagerDialog({
       id: payee.id,
       name: payee.name,
       defaultTaxPct: String(payee.defaultTaxPct),
-      // A stored hub this build doesn't know reads as Jita here exactly as it
-      // does when pricing — the picker never opens on a blank selection.
       hubId: hubForPayee(payee.hubId).id,
       defaultSystemIds: payee.defaultSystems?.map((s) => s.systemId) ?? [],
       entityId: payee.entityId,
       entityKind: payee.entityKind,
-      // Any link is tied to the name it was made under: renaming asks EVE again, so a Payee is
-      // never saved under one name while pointing at someone else.
       verifiedName: payee.entityId !== undefined ? payee.name : undefined,
     });
     setError(null);
@@ -291,22 +211,15 @@ export function PayeeManagerDialog({
       setError(t('miningTax.payeeTaxPctInvalid'));
       return;
     }
-    // A Payee is someone in EVE (scope decision 20261117-005150): a name typed
-    // without picking a suggestion gets one exact-name lookup, and only a single
-    // corporation or character saves. None, several (the pilot picks) or a failed
-    // lookup save nothing. A linked Payee whose name is unchanged asks nothing.
     let { entityId, entityKind } = current;
     let savedName = name;
     setChoices(null);
-    // An old unlinked Payee kept under its own name may still have its rate, hub or systems
-    // changed: it stays flagged until the pilot picks who it is, but is never locked.
     const existingUnlinked = payees.find(
       (p) => p.id === current.id && p.entityId === undefined && p.name.trim() === name
     );
     if (entityId === undefined) {
       const generation = draftGeneration.current;
       const lookup = await lookupPayeeName(name);
-      // The pilot moved on (another Payee, a new name, the form closed): not this draft's answer.
       if (generation !== draftGeneration.current) return;
       if (lookup.status === 'found') {
         entityId = lookup.match.id;
@@ -330,17 +243,12 @@ export function PayeeManagerDialog({
         }
         return;
       }
-      // Otherwise an old unlinked Payee saved as it was: still unlinked, still flagged.
     }
-    // The default hub is stored as *no* hub, which is what every Payee
-    // predating this field already means — so "Jita" never becomes a second
-    // way of saying the same thing that only some records carry.
     const input = {
       name: savedName,
       defaultTaxPct: pct,
       defaultSystemIds: current.defaultSystemIds,
       entityId,
-      // An id with no kind (learned from a payment) keeps whatever the record has.
       entityKind,
       ...(current.hubId === DEFAULT_TRADE_HUB.id ? {} : { hubId: current.hubId }),
     };
@@ -348,13 +256,11 @@ export function PayeeManagerDialog({
     try {
       if (existing) {
         const saved = await updatePayee(existing, input);
-        // A Payee is one recipient whatever the Character: its other records bill the same.
         await applyPayeeTerms(saved, groupOf(existing.id)?.members ?? []);
       } else {
         await createPayee(initialCharacterId, input);
       }
     } catch (cause) {
-      // One Default Payee per system: say who has it instead of saving.
       if (cause instanceof DefaultSystemTakenError) {
         setTaken({ systemId: cause.systemId, holderName: cause.holderName });
         return;
@@ -369,7 +275,6 @@ export function PayeeManagerDialog({
   function handleNameChange(name: string) {
     draftGeneration.current += 1;
     setChoices(null);
-    // Editing the name after verifying clears the verification.
     const stale = draft.verifiedName !== undefined && name !== draft.verifiedName;
     setDraft({
       ...draft,
@@ -395,7 +300,6 @@ export function PayeeManagerDialog({
     setDraft(picked(match));
   }
 
-  /** One of several of the same name, picked after Save asked: saves it straight away. */
   function handleChoose(match: PayeeEntityMatch) {
     const next = picked(match);
     setDraft(next);
@@ -403,7 +307,6 @@ export function PayeeManagerDialog({
   }
 
   async function handleDelete(payee: PayeeRecord, moveToPayeeId?: string) {
-    // One transaction: a failure leaves the Payee and every entry's label intact.
     setDeleteError(null);
     const members = groupOf(payee.id)?.members ?? [payee];
     for (const member of members) {
@@ -432,7 +335,6 @@ export function PayeeManagerDialog({
     void handleDelete(payee, moveAndDelete && owed && moveTargetId ? moveTargetId : undefined);
   }
 
-  /** What a group is owed: its records' Assignments summed. */
   function owedOfGroup(group: PayeeGroup | undefined): PayeeOwed | undefined {
     const parts = group?.members.flatMap((m) => owedByPayee?.get(m.id) ?? []) ?? [];
     if (parts.length === 0) return undefined;
@@ -443,10 +345,6 @@ export function PayeeManagerDialog({
     }));
   }
 
-  /**
-   * What the member has paid a group beyond what it bills: its Running account's credit, and
-   * that of a Corp Tax Book it is linked to.
-   */
   function creditOfGroup(group: PayeeGroup): number {
     const ids = new Set(group.members.map((m) => m.id));
     const own = accountOf?.(group.primary.id)?.credit ?? 0;
@@ -459,11 +357,6 @@ export function PayeeManagerDialog({
     );
   }
 
-  /**
-   * A row's balance is the readout of the Payee's ledger, so it opens it (DESIGN §6c, as on the
-   * Payee card): the way into the ledger of a Payee that owes nothing and so has no card. Always,
-   * "Settled" too: a Payee nothing was ever billed to opens an empty ledger rather than plain text.
-   */
   function balanceReadout(payee: PayeeRecord, readout: ReactNode) {
     if (!readout || !onOpenLedger) return readout;
     return (
@@ -478,14 +371,12 @@ export function PayeeManagerDialog({
     );
   }
 
-  /** Archives a Payee (it owes nothing: the row offers it only then) or brings it back. */
   async function archive(group: PayeeGroup, archived: boolean) {
     await setPayeesArchived(group.members, archived);
     await refresh();
     onChanged();
   }
 
-  /** The pilot's pick of which terms a merged Payee's records all bill with. */
   async function applyVariant(group: PayeeGroup, variant: PayeeVariant) {
     await applyPayeeTerms(variant.members[0], group.members);
     await refresh();
@@ -563,7 +454,6 @@ export function PayeeManagerDialog({
               ) : payee.entityId !== undefined ? (
                 t('miningTax.payees.verify.linkedShort')
               ) : (
-                // The row's Edit carries the fix: pick who this is there.
                 <span className="text-warning">{t('miningTax.payees.verify.notFoundShort')}</span>
               )}
             </span>

@@ -5,8 +5,6 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadSystemName, loadSystemNameAndSecurity, loadSystemSecurity } from './systemSecurity';
 
-// The bundled solar-system table: by default it cannot be read, so the ESI
-// path is what the cases below exercise; the local-table cases set it.
 const lookupSolarSystem = vi.hoisted(() => vi.fn());
 vi.mock('@/sde/solarSystems', () => ({ lookupSolarSystem }));
 

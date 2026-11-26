@@ -23,73 +23,26 @@ export type ModalPlacement =
   'center' | 'top' | 'sheet' | 'sheet-full' | 'medium' | 'detail' | 'wide' | 'page' | 'media';
 
 interface ModalProps {
-  /** Parent owns the state; the modal never closes itself. */
   open: boolean;
-  /** Id on the `<dialog>` itself, for a trigger's `aria-controls`. */
   id?: string;
-  /** Requested close — Escape, backdrop click, or the header close button. */
   onClose: () => void;
-  /** Visible heading and the dialog's accessible name. Usually a string; a node is for a title that needs inline styling (e.g. a colored value), since `aria-labelledby` reads whatever text content renders. */
   title: ReactNode;
-  /**
-   * Rendered beside the title, outside the `<h2>` `aria-labelledby` points
-   * to — a "More actions" button here (issue #1498) must not fold its own
-   * `aria-label` into the dialog's accessible name the way an element
-   * inside `title` would.
-   */
   titleActions?: ReactNode;
   children: ReactNode;
-  /**
-   * @summary Action bar at the dialog's foot (Apply / Cancel, Copy), pinned below the scrolling body.
-   * Never a sticky div inside `children`. On a sheet it takes the safe-area inset in place of the body.
-   */
   footer?: ReactNode;
-  /**
-   * Where focus lands on open instead of the dialog body — the one field a
-   * dialog exists to fill (a quantity), so the user can type straight away.
-   */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** `center` for dialogs, `top` for one a phone keyboard would cover (anchored to the top edge, centred from `md`), `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `detail` (40rem) for Item Detail's name/value rows, `page` for a whole page's worth of content as a layer over another (full screen on a phone, content-area wide and tall from `md`), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
-  /**
-   * Whether the modal owns a history entry so Back closes it (default). Pass
-   * `false` only for a modal already backed by a URL (the `info` search
-   * param), whose own history entry would otherwise be pushed twice.
-   */
   closeOnBack?: boolean;
-  /**
-   * Whether a click on the backdrop closes the modal (default). Pass `false`
-   * for a form whose typed input a stray click outside would throw away;
-   * Escape, Back, the close button and the form's own Cancel still close it.
-   */
   dismissOnOutsidePress?: boolean;
-  /**
-   * The body holds typed input not yet saved. Every dismissal that is not the
-   * form's own Cancel or Save (Escape, Back, the close button, a swipe, the
-   * backdrop) then asks before discarding it, and "Keep editing" returns to the form.
-   */
   dirty?: boolean;
-  /**
-   * Where focus goes on close when nothing on the page held it as the modal
-   * opened (a sheet a URL opened), or that element is gone.
-   */
   returnFocusFallback?: () => HTMLElement | null;
 }
 
-/**
- * Per placement: the dialog's own box (with how it arrives, `index.css`
- * "Overlay motion"), and the height cap that box and its inner column share —
- * one entry, so the two can never disagree. A sheet rises from the bottom
- * edge, a centred dialog fades, scales and rises, and `page` does the first on a
- * phone (where it fills the screen) and the second from `md`.
- */
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
   center: {
     dialogClass: 'motion-dialog m-auto w-full max-w-lg',
     heightClass: 'h-fit max-h-[85dvh]',
   },
-  // Top-anchored on a phone, where the on-screen keyboard covers a centred box
-  // (the command palette); centred from `md`.
   top: {
     dialogClass:
       'motion-dialog mx-auto mt-[max(1rem,env(safe-area-inset-top))] mb-auto w-full max-w-lg md:m-auto',
@@ -107,8 +60,6 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
     dialogClass: 'motion-dialog m-auto w-full max-w-3xl',
     heightClass: 'h-fit max-h-[85dvh]',
   },
-  // Item Detail (Show info): name/value rows that read across, so a name
-  // stays close to its value.
   detail: {
     dialogClass: 'motion-dialog m-auto w-full max-w-[40rem]',
     heightClass: 'h-fit max-h-[85dvh]',
@@ -128,23 +79,6 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
   },
 };
 
-/**
- * Modal on the native `<dialog>` (`showModal()`), which supplies what a
- * `role="dialog" aria-modal="true"` div only *claims* to have: top-layer
- * placement, an inert background, focus moved in on open, Escape firing
- * `cancel`. No hand-rolled focus trap — platform inertness is correct and free.
- *
- * Dismissal is uniform across every call site: Escape closes, backdrop click
- * closes. The `<dialog>` *is* the surface (docs/DESIGN.md §5 sanctions shadows
- * for modals), and stays content-sized rather than viewport-filling — otherwise
- * it would cover its own `::backdrop`.
- *
- * It animates in, never out: children render only while `open`, many callers
- * unmount the whole Modal on close, and focus return runs in the close
- * effect, so holding the dialog up for an exit would mean an empty shell or a
- * late focus move. A swiped sheet is the exception: the gesture itself
- * slides it off (`useSheetSwipe`).
- */
 export function Modal({
   open,
   id,
@@ -164,31 +98,16 @@ export function Modal({
   const [askingDiscard, setAskingDiscard] = useState(false);
   const requestClose = () => (dirty ? setAskingDiscard(true) : onClose());
   const dialogRef = useRef<HTMLDialogElement>(null);
-  // Whether the current press began inside the dialog. It can end outside once
-  // the content reflows under it; that is not a dismissal.
   const pressBeganInside = useRef(false);
   const isSheet = placement.startsWith('sheet');
   useOverlayHistory(open, requestClose, closeOnBack);
   const swipe = useSheetSwipe(dialogRef, requestClose, isSheet, open);
   const titleId = useId();
-  // State, not a ref: a Radix portal needs to re-render once the node exists,
-  // and a ref assignment alone would not schedule that render.
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
-  // Read at close, so a new callback each render never reopens the dialog.
   const fallbackRef = useRef(returnFocusFallback);
   useEffect(() => {
     fallbackRef.current = returnFocusFallback;
   });
-  // `showModal()` focuses the first focusable element — the header's close
-  // `IconButton` — and its Radix tooltip arms on focus: a stray "Close"
-  // bubble floated over every freshly opened dialog, and the first Escape
-  // press dismissed the bubble instead of the dialog. Moving focus away
-  // *after* `showModal()` is too late (the tooltip opens on a zero-delay
-  // timer, after the blur it would have needed), so the body carries the
-  // `autofocus` attribute instead: the dialog focusing steps then land on
-  // it directly and the close button never receives focus on open. Set as a
-  // DOM attribute because React's `autoFocus` prop is a mount-time
-  // `.focus()` call, which does nothing inside a not-yet-shown dialog.
   const bodyRef = useCallback((element: HTMLDivElement | null) => {
     setPortalContainer(element);
     element?.setAttribute('autofocus', '');
@@ -198,14 +117,8 @@ export function Modal({
     const dialog = dialogRef.current;
     if (!dialog || !open) return;
 
-    // Native `<dialog>` restores focus on close, but only to the element
-    // focused at showModal() time; capture it so the guarantee holds under
-    // unmount-while-open too.
     const trigger = document.activeElement;
     if (!dialog.open) dialog.showModal();
-    // After showModal(), whose own focusing steps land on the body: a child's
-    // mount-time focus() would run first (child effects fire before this one)
-    // and be overridden.
     initialFocusRef?.current?.focus();
 
     return () => {
@@ -216,17 +129,13 @@ export function Modal({
           : null;
       const fallback = kept ? null : (fallbackRef.current?.() ?? null);
       if (kept) kept.focus();
-      // The fallback may sit off screen (a page heading): moving focus must not scroll there.
       else if (fallback?.isConnected) fallback.focus({ preventScroll: true });
       else if (trigger instanceof HTMLElement) trigger.focus();
     };
   }, [open, initialFocusRef]);
 
   const { dialogClass, heightClass } = PLACEMENT_CLASSES[placement];
-  // Booleans and '' too, so a `cond && <Bar />` footer that is off renders no empty bar.
   const hasFooter = footer != null && typeof footer !== 'boolean' && footer !== '';
-  // A footer sits below the scroller and takes the safe-area inset itself: the
-  // body drops its inset and scroll padding (one inset, never two).
   const bodyBottomClass =
     isSheet && !hasFooter ? ' scroll-pb-20 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]' : '';
 
@@ -237,12 +146,7 @@ export function Modal({
         id={id}
         aria-labelledby={titleId}
         onCancel={(event) => {
-          // preventDefault so the browser never closes behind React's back:
-          // every close path routes through `onClose` and the parent's `open`,
-          // which the effect turns into dialog.close().
           event.preventDefault();
-          // React carries `cancel` up its own tree: a Modal opened from inside
-          // another (a confirm over Settings) must close only itself.
           event.stopPropagation();
           requestClose();
         }}
@@ -250,10 +154,6 @@ export function Modal({
           pressBeganInside.current = event.target !== dialogRef.current;
         }}
         onClick={(event) => {
-          // With `p-0`, the only clicks whose target is the dialog element are
-          // ones that landed on its ::backdrop. The press must not have begun
-          // inside: a press on content that reflows away lands its release on the
-          // backdrop, and the click then targets the dialog (their common ancestor).
           if (
             dismissOnOutsidePress &&
             event.target === dialogRef.current &&
@@ -265,19 +165,10 @@ export function Modal({
         className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
       >
         {open && (
-          // The provider spans the header too, not just the body: a title can
-          // carry its own overlay (e.g. an item name's right-click menu), and
-          // one portaled to `document.body` would
-          // land behind the top layer — see `portalContainer.ts`.
           <PortalContainerProvider value={portalContainer}>
             <div className={`flex ${heightClass} flex-col`}>
-              {/* The drag zone for swipe-down-to-dismiss: grabber plus header,
-              never the scrolled body. `touch-none` keeps the browser from
-              taking the vertical pan for itself. */}
               <div {...swipe} className={isSheet ? 'touch-none bg-panel-2' : undefined}>
                 {isSheet && (
-                  // Decorative: Escape, Back and the close button are the
-                  // accessible ways out, so it is neither focusable nor read.
                   <div aria-hidden="true" className="flex justify-center pt-2">
                     <span className={grabberClassName} />
                   </div>
@@ -287,12 +178,6 @@ export function Modal({
                     {title}
                   </h2>
                   {titleActions}
-                  {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
-                this replaced: DESIGN.md's icon rules require an icon-only
-                control to be an `IconButton` and forbid a dingbat character
-                standing in for one, and the mobile "More" sheet's close
-                control was flagged at 23×28px — under the documented 36px
-                touch tier every other icon action in the header now gets. */}
                   <IconButton
                     variant="plain"
                     icon={<Icon.Close />}
@@ -301,12 +186,6 @@ export function Modal({
                   />
                 </header>
               </div>
-              {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
-              index.css: a native dialog does not lock the page behind it, so
-              on a phone a scroll that starts over the sheet would otherwise
-              chain straight into the page underneath. */}
-              {/* No footer: scroll padding keeps a control focused near a
-              sheet's bottom clear of sticky content (WCAG 2.4.11). */}
               <RowTappableContext.Provider value={false}>
                 <div
                   ref={bodyRef}

@@ -11,7 +11,6 @@ import type {
   OwnedBlueprintPool,
 } from '@/engine/industry/blueprintAcquisition';
 
-/** Material cost doubles per ME point lost, floors at 100 for ME10 — enough spread to make tier choice matter without a real formula. */
 function costAtMe(me: number): number | null {
   return 100 + (10 - me) * 20;
 }
@@ -109,7 +108,6 @@ describe('selectBlueprintTier', () => {
       extraOffers: [{ me: 3, te: 2, runs: 12, quantity: 1, price: 800_000, invented: true }],
       assumedMeForUnowned: 0,
     });
-    // One 12-run invented copy beats two 10-run contract copies.
     expect(result).toMatchObject({
       me: 3,
       te: 2,
@@ -122,7 +120,6 @@ describe('selectBlueprintTier', () => {
     const result = selectBlueprintTier({
       ownedCopies: owned,
       neededRuns: 5,
-      // ME0 material cost is 300; a single 1-ISK BPC copy at ME10 (100) beats it.
       materialCostAtMe: costAtMe,
       bpcOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 1 }],
       bpoSellPrice: null,
@@ -150,14 +147,11 @@ describe('selectBlueprintTier', () => {
   });
 
   it('buys whole copies to cover a shortfall at an owned BPC tier, never a fractional price', () => {
-    // Owns 2 runs at ME6, needs 5 — a 3-run shortfall. Only a matching-tier
-    // offer (ME6/TE12) can extend that tier; the cheapest one has 2 runs at 10
-    // ISK, so covering a 3-run shortfall needs 2 copies (ceil(3/2)) at 10 ISK each.
     const owned: OwnedBlueprintCopy[] = [{ me: 6, te: 12, runs: 2 }];
     const result = selectBlueprintTier({
       ownedCopies: owned,
       neededRuns: 5,
-      materialCostAtMe: () => 100, // flat, so the shortfall math is the only variable
+      materialCostAtMe: () => 100,
       bpcOffers: [{ me: 6, te: 12, runs: 2, quantity: 1, price: 10 }],
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
@@ -176,8 +170,8 @@ describe('selectBlueprintTier', () => {
       ownedCopies: owned,
       neededRuns: 5,
       materialCostAtMe: () => 100,
-      bpcOffers: [], // no ME6 offer to extend the owned tier, and no other offer either
-      bpoSellPrice: 30, // ME0 fallback is still priceable
+      bpcOffers: [],
+      bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
     expect(result).toEqual({
@@ -214,7 +208,6 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
-    // 5 runs needed, this offer covers 1 run per copy at 5 ISK: 5 copies at 5 ISK each.
     expect(result).toEqual({
       me: 0,
       te: 0,
@@ -232,7 +225,6 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    // The zero-runs offer is unusable; falls through to the BPO sell price.
     expect(result).toEqual({
       me: 0,
       te: 0,
@@ -280,7 +272,6 @@ describe('selectBlueprintTier', () => {
       ownedCopies: [],
       neededRuns: 5,
       materialCostAtMe: () => 100,
-      // A far cheaper offer than the BPO, but it's a bundle — must not win.
       bpcOffers: [{ me: 0, te: 0, runs: 5, quantity: 1, price: 1, isMultiType: true }],
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
@@ -299,13 +290,10 @@ describe('selectBlueprintTier', () => {
       ownedCopies: owned,
       neededRuns: 5,
       materialCostAtMe: () => 100,
-      // Matches the owned tier exactly, but is a bundle — must not top it up.
       bpcOffers: [{ me: 6, te: 12, runs: 2, quantity: 1, price: 1, isMultiType: true }],
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
     });
-    // Falls straight to the ME0 BPO price — the owned ME6 tier has no usable
-    // extension, same as "unmatched shortfall" above.
     expect(result).toEqual({
       me: 0,
       te: 0,
@@ -319,7 +307,6 @@ describe('selectBlueprintTier', () => {
       ownedCopies: [],
       neededRuns: 5,
       materialCostAtMe: () => 100,
-      // A supercarrier-cheap "free" offer — must not win over the real BPO price.
       bpcOffers: [{ me: 10, te: 18, runs: 5, quantity: 1, price: 0 }],
       bpoSellPrice: 30,
       assumedMeForUnowned: 0,
@@ -351,11 +338,6 @@ describe('selectBlueprintTier', () => {
   });
 
   it("nets a multi-copy listing's whole bundle, not one copy, against the shortfall", () => {
-    // One contract lists 3 copies of a 2-run BPC for 10 ISK total (issue
-    // #838 spec: "the total is the real ISK that would leave the wallet" —
-    // buying this one contract nets 3 x 2 = 6 runs for 10 ISK, covering a
-    // 5-run shortfall in a single purchase, not the 3 copies x 10 ISK a
-    // per-copy read would charge.
     const result = selectBlueprintTier({
       ownedCopies: [],
       neededRuns: 5,
@@ -388,9 +370,6 @@ describe('tierOptions', () => {
       assumedMeForUnowned: 0,
     });
 
-    // Each cost is the tier's total plan cost — material cost at that ME plus
-    // whatever covering its shortfall costs (0 for the ME6 tier, which is
-    // fully owned; 1 for the ME10 tier, bought outright).
     expect(options).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ me: 0, te: 0, ownedRuns: Infinity, cost: 300 }),
@@ -465,7 +444,6 @@ describe('pooledOwnedCopies / claimBlueprintTier (issue #860)', () => {
     const pool: OwnedBlueprintPool = new Map();
     const owned: OwnedBlueprintCopy[] = [{ me: 6, te: 12, runs: 5 }];
 
-    // Branch A needs 5 runs, fully covered by the owned tier.
     const copiesForA = pooledOwnedCopies(owned, pool);
     const resolvedA = selectBlueprintTier({
       ownedCopies: copiesForA,
@@ -478,8 +456,6 @@ describe('pooledOwnedCopies / claimBlueprintTier (issue #860)', () => {
     expect(resolvedA).toEqual({ me: 6, te: 12, line: { unitPrice: 0, owned: true } });
     claimBlueprintTier(pool, resolvedA, 5);
 
-    // Branch B needs the same blueprint type — the tier is now fully claimed,
-    // so it must not also see 5 free owned runs.
     const copiesForB = pooledOwnedCopies(owned, pool);
     expect(copiesForB).toEqual([{ me: 6, te: 12, runs: 0 }]);
     const resolvedB = selectBlueprintTier({
@@ -621,7 +597,6 @@ describe('claimBlueprintTier — purchases join the pool (a blueprint is bought 
   it('tops up an owned tier with the runs bought to extend it', () => {
     const pool: OwnedBlueprintPool = new Map();
     pooledOwnedCopies([{ me: 6, te: 12, runs: 2 }], pool);
-    // 2 owned + 4 bought (two 2-run copies) against 5 needed leaves 1.
     claimBlueprintTier(
       pool,
       { me: 6, te: 12, line: { unitPrice: 20, owned: false }, purchasedRuns: 4 },
@@ -655,7 +630,6 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
   });
 
   it('prices each tier by the offer that covers the need cheapest, not the lowest sticker price', () => {
-    // Five 1-run copies at 1,000 each (5,000) lose to one 3,000 original at the same tier.
     const result = selectBlueprintTier({
       ...base,
       bpcOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1_000 }],
@@ -665,7 +639,6 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
   });
 
   it('still lets a pricier higher-ME tier win when it makes the whole build cheaper', () => {
-    // ME0: 300 materials + 10 = 310. ME10: 100 materials + 150 = 250.
     const result = selectBlueprintTier({
       ...base,
       extraOffers: [
@@ -677,7 +650,6 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
   });
 
   it('weighs the hub BPO sell price alongside listed copies rather than only when none are listed', () => {
-    // Copy covers 5 runs at ME0 for 5 × 100 = 500; the BPO is 200.
     const result = selectBlueprintTier({
       ...base,
       bpcOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 100 }],
@@ -737,7 +709,6 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
   );
 
   it('prices a genuinely free extra offer at 0 — an LP redemption with no ISK side at LP Value 0', () => {
-    // Unlike a zero-ISK contract (a barter), an LP offer's 0 is its real price.
     const result = selectBlueprintTier({
       ...base,
       extraOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 0 }],

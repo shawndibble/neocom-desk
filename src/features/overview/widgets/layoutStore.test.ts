@@ -94,7 +94,6 @@ describe('parseLayout', () => {
   });
 
   it('keeps a stored view even when the kind now defaults to another', () => {
-    // Orders defaults to Table now; a pilot who chose Number keeps it.
     const out = parseLayout(wrap(good({ view: 'number' })));
     expect(out!.widgets[0].view).toBe('number');
   });
@@ -154,7 +153,6 @@ describe('parseLayout', () => {
     expect('raidsWhere' in raids({ raidsWhere: 'everywhere' })).toBe(false);
     expect('raidsRadius' in raids({ raidsRadius: 7 })).toBe(false);
     expect('raidsRadius' in raids({ raidsRadius: 8 })).toBe(false);
-    // An old layout with neither field loads unchanged.
     const old = raids({});
     expect('raidsWhere' in old || 'raidsRadius' in old).toBe(false);
     expect('raidsWhere' in parseLayout(wrap(good({ raidsWhere: 'near' })))!.widgets[0]).toBe(false);
@@ -167,7 +165,6 @@ describe('parseLayout', () => {
     expect('show' in structures({ show: 'all' })).toBe(false);
     expect('show' in structures({ show: 'broken' })).toBe(false);
     expect('show' in parseLayout(wrap(good({ show: 'problems' })))!.widgets[0]).toBe(false);
-    // Saved under its own field before the Show setting was shared: read as the shared one.
     const old = structures({ structuresShow: 'problems' });
     expect(old.show).toBe('problems');
     expect(old).not.toHaveProperty('structuresShow');

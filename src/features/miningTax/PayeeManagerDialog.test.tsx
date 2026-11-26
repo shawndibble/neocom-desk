@@ -93,14 +93,11 @@ async function pickHub(name: string) {
   await userEvent.click(screen.getByRole('option', { name }));
 }
 
-/** The id the default lookup gives any typed name: one EVE corporation of that name. */
 const LOOKED_UP_ID = 98_000_100;
 
 beforeEach(async () => {
   vi.clearAllMocks();
   searchMock.searchPayeeEntities.mockResolvedValue([]);
-  // A Payee must be someone in EVE: unless a test says otherwise, every typed
-  // name is exactly one corporation.
   searchMock.resolvePayeeName.mockImplementation(async (name: string) => [
     { id: LOOKED_UP_ID, name: name.trim(), kind: 'corporation' },
   ]);
@@ -131,8 +128,6 @@ describe('PayeeManagerDialog — trade hub', () => {
     await waitFor(async () => {
       expect((await loadPayees(CHAR)).length).toBe(1);
     });
-    // Absent, not `hubId: 'jita'` — one way of saying Jita, the same one every
-    // Payee predating this field already says.
     const [payee] = await loadPayees(CHAR);
     expect('hubId' in payee).toBe(false);
   });
@@ -186,7 +181,6 @@ describe('PayeeManagerDialog — trade hub', () => {
     await waitFor(async () => {
       expect((await loadPayees(CHAR))[0]?.hubId).toBe('hek');
     });
-    // Still defaulted, and still from the day it was added.
     expect((await loadPayees(CHAR))[0]?.defaultSystems).toEqual([
       { systemId: SYSTEM, from: '2026-10-01' },
     ]);
@@ -372,7 +366,6 @@ describe('PayeeManagerDialog — list rows', () => {
       screen.getByRole('button', { name: `Open the ledger of ${bureau.name}` })
     );
     expect(onOpenLedger).toHaveBeenCalledWith('p1');
-    // Nothing ever billed: no account, and "Settled" still opens its (empty) ledger.
     await userEvent.click(
       screen.getByRole('button', { name: `Open the ledger of ${police.name}` })
     );
@@ -442,7 +435,6 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
     defaultTaxPct: 8,
     updatedAt: 1,
   };
-  // Two owed days, one of them in a Combined Entry with a paid day.
   const owedByPayee = new Map([['p1', { amount: 4_309_281, count: 2, moving: 3 }]]);
 
   beforeEach(async () => {
@@ -555,10 +547,6 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     });
   });
 
-  // Replaces "saves a moon label with no match as an unverified free-text
-  // Payee": an unlinked Payee on one device made a member's Corp Tax Book days
-  // read as Conflicts, and a Payee is who the ISK goes to, so it must be someone
-  // in game. A moon or place name no longer saves.
   it('saves nothing for a name no corporation or character has, and says what to do', async () => {
     searchMock.resolvePayeeName.mockResolvedValue([]);
     renderDialog();
@@ -610,7 +598,6 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     });
   });
 
-  // An answer for an earlier draft must never fill the choices of the one now open.
   it('drops a lookup that answers after the pilot changed the name', async () => {
     let answer: (m: unknown[]) => void = () => {};
     searchMock.resolvePayeeName.mockImplementationOnce(
@@ -630,7 +617,6 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     expect(await loadPayees(CHAR)).toEqual([]);
   });
 
-  // Picking a suggestion is a new draft too: a lookup still pending for the typed name is dropped.
   it('drops a lookup that answers after the pilot picked a suggestion', async () => {
     let answer: (m: unknown[]) => void = () => {};
     searchMock.resolvePayeeName.mockImplementationOnce(
@@ -741,7 +727,6 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     });
   });
 
-  // Never locked: an old label EVE doesn't know keeps working; its rate still changes.
   it('saves an old unlinked Payee under its own name even when EVE knows no such name', async () => {
     const stored: PayeeRecord = {
       id: 'p1',
@@ -766,7 +751,6 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     expect('entityId' in (await loadPayees(CHAR))[0]).toBe(false);
   });
 
-  // A link learned from a payment (an id, no kind) is tied to its name too.
   it('asks EVE again when a Payee linked from a payment is renamed', async () => {
     const stored: PayeeRecord = {
       id: 'p1',

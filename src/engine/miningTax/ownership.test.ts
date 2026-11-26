@@ -263,8 +263,6 @@ describe('computeOwnership — a paid Assignment never grows (paid stays paid, A
 });
 
 describe('computeOwnership — a kept side claiming ore ESI has not reported yet', () => {
-  // Corp A is owed 130 of A (the client's figure); ESI reports 100 so far.
-  // Corp B moved nothing yet but collects later ore.
   const split = [covering('a', [{ typeId: A, quantity: 130 }]), covering('b', [], true)];
 
   it('gives the collector nothing until ESI reports past the claim', () => {

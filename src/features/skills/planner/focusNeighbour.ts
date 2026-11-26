@@ -1,9 +1,7 @@
 import type { FocusCandidate } from '@/lib/useFocusAfterCommit';
 
-/** Marks a plan row's drag-handle button, so focus can find any row's handle (entry, prereq or marker). */
 export const PLAN_HANDLE_ATTR = 'data-plan-handle';
 
-/** The drag-handle button of the row with this merged-row id, if it is mounted. */
 export function planRowHandle(rowId: string): HTMLElement | null {
   const handles = document.querySelectorAll<HTMLElement>(`[${PLAN_HANDLE_ATTR}]`);
   for (const handle of handles) {
@@ -12,13 +10,6 @@ export function planRowHandle(rowId: string): HTMLElement | null {
   return null;
 }
 
-/**
- * Where focus goes when a row is removed: each row after it, then each row
- * before it (nearest first), then `fallback` (the "Your entries" heading).
- * Getters, so a row that goes in the same update is skipped at focus time.
- * Prereq rows are skipped (the removed entry's own go with it), and so are
- * other markers when a marker goes (their ids shift as the list reindexes).
- */
 export function neighbourFocusCandidates(
   rows: readonly { id: string; kind?: string }[],
   rowId: string,

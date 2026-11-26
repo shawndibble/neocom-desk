@@ -1,17 +1,8 @@
-// Communities (issue #3596, ADR 0018): the pure half of the callables that
-// create, join, leave and administer a Community. Rules can't express the
-// 100-Member and 10-Communities caps or delete-on-leave, so those writes go
-// through the admin SDK (communitiesStore.ts); the decisions live here, with
-// no Firestore, so they are unit testable. The wiring is in index.ts.
-
 import { randomBytes } from 'node:crypto';
 import { HttpsError } from 'firebase-functions/v2/https';
 
-/** Members per Community, the admin included. */
 export const MAX_COMMUNITY_MEMBERS = 100;
-/** Communities one Character can belong to. */
 export const MAX_COMMUNITIES_PER_CHARACTER = 10;
-/** Mail invites one admin may send per UTC day (issue #3604). */
 export const MAX_MAIL_INVITES_PER_DAY = 20;
 export const MAX_COMMUNITY_NAME_LENGTH = 60;
 export const MAX_CHARACTER_NAME_LENGTH = 100;
@@ -19,7 +10,6 @@ const MAX_INVITE_CODE_LENGTH = 64;
 
 export const COMMUNITIES_COLLECTION = 'communities';
 export const COMMUNITY_MEMBERS_COLLECTION = 'members';
-/** `characters/{uid}/communities/{communityId}`: a Character's membership index. */
 export const CHARACTER_COMMUNITIES_COLLECTION = 'communities';
 
 export interface CreateCommunityInput {
@@ -59,8 +49,6 @@ export function boundedString(value: unknown, field: string, max: number): strin
   return text;
 }
 
-// A Firestore doc id built from client input: no '/' (a path escape) and
-// nothing outside the ids this module and the client mint.
 export function docId(value: unknown, field: string): string {
   const text = boundedString(value, field, 128);
   if (!/^[A-Za-z0-9_:-]+$/.test(text)) {
@@ -97,7 +85,6 @@ export function parsePreviewInput(data: unknown): PreviewInviteInput {
 
 export interface MailInviteInput extends CommunityIdInput {
   targetCharacterId: number;
-  /** Display only: the looked-up name, for the admin's "Sent" list. */
   targetName: string;
 }
 
@@ -114,26 +101,16 @@ export function parseMailInviteInput(data: unknown): MailInviteInput {
   };
 }
 
-/** The UTC day a mail invite counts against, `YYYY-MM-DD`. */
 export function utcDayKey(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10);
 }
 
-/**
- * A reservation is made before the client sends the mail, and the server can't
- * see whether the mail went out. So a release only refunds a reservation that is
- * still fresh, and only a few a day: otherwise reserve, send, skip confirm,
- * release would be an unlimited-mail loop.
- */
 export const MAIL_RELEASE_WINDOW_MS = 2 * 60_000;
 export const MAIL_RELEASE_BUDGET_PER_DAY = 3;
-/** An unconfirmed reservation older than this (a crashed tab) may be taken again, without charging. */
 export const MAIL_RESERVATION_STALE_MS = 10 * 60_000;
-/** Reservations ever made for one target in one Community, retakes included. */
 export const MAIL_MAX_ATTEMPTS_PER_TARGET = 3;
 
 export interface MailInviteRecord {
-  /** Epoch ms the mail was confirmed sent, or null while only reserved. */
   sentAt: number | null;
   reservedAt: number;
   attempts: number;
@@ -141,7 +118,6 @@ export interface MailInviteRecord {
 
 export type MailInviteDecision = 'ok' | 'retake' | 'already-invited' | 'daily-cap';
 
-/** One mail per target Character per Community comes first, so a repeat never reads as a cap. */
 export function decideMailInvite(state: {
   dailyCount: number;
   existing: MailInviteRecord | null;
@@ -210,7 +186,6 @@ export function parseTransferAdminInput(data: unknown): TransferAdminInput {
   return parseRemoveMemberInput(data);
 }
 
-/** 128 random bits, URL-safe: the invite link is the only gate to a Community. */
 export function newInviteCode(): string {
   return randomBytes(16).toString('base64url');
 }
@@ -229,12 +204,6 @@ export type JoinDecision =
   | 'community-full'
   | 'too-many-communities';
 
-/**
- * A join by link. When the Community approves new Members the join waits for
- * the admin, unless the admin mailed that Character an invite (`preApproved`).
- * The caps are checked first, so nobody queues into a Community that could not
- * take them.
- */
 export function decideJoin(state: {
   inviteMatches: boolean;
   alreadyMember: boolean;
@@ -251,12 +220,6 @@ export function decideJoin(state: {
   return 'ok';
 }
 
-/**
- * Whether a mailed invite lets a Character past "Approve new Members". It must
- * have gone out (not just been reserved), come from the Community's current
- * admin, and not been used to join already, so a Member who was removed or
- * left cannot come back on it.
- */
 export function isPreApproved(
   invite: { adminUid: string; sentAt: number | null; consumedAt: number | null } | null,
   currentAdminUid: string
@@ -271,7 +234,6 @@ export function isPreApproved(
 
 export type AdmitDecision = 'ok' | 'already-member' | 'community-full' | 'too-many-communities';
 
-/** The admin accepted a waiting request: the same caps as a join, no invite to match. */
 export function decideAdmit(state: {
   alreadyMember: boolean;
   memberCount: number;
@@ -285,7 +247,6 @@ export function decideAdmit(state: {
 
 export type LeaveDecision = 'ok' | 'not-a-member' | 'admin-cannot-leave';
 
-/** The admin deletes the Community instead: there is no co-admin to hand it to (v1). */
 export function decideLeave(state: {
   adminUid: string;
   callerUid: string;
@@ -310,7 +271,6 @@ export function decideRemoveMember(state: {
 
 export type TransferAdminDecision = 'ok' | 'not-admin' | 'already-admin' | 'not-a-member';
 
-/** The new admin must already be a Member (a Member doc exists for them). */
 export function decideTransferAdmin(state: {
   adminUid: string;
   callerUid: string;

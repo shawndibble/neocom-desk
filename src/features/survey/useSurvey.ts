@@ -1,12 +1,3 @@
-/**
- * Keeps one shared Survey's scans fresh: loads it, then re-reads every
- * `SURVEY_POLL_MS` while the tab is visible, because other people may be
- * adding scans (the Firestore lite SDK has no live listener). Once no new scan
- * has come in for `SURVEY_IDLE_AFTER_MS` it slows to `SURVEY_IDLE_POLL_MS`:
- * every poll is billed, and a page left open beside a finished field would
- * otherwise read all day. Coming back to the tab or window re-reads at once: a
- * hidden tab skips its ticks, and the page often sits beside the game client.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SurveyScan } from '@/engine/survey/series';
 import {
@@ -18,16 +9,12 @@ import {
 import { MINUTE_MS } from '@/lib/age';
 
 export const SURVEY_POLL_MS = 30_000;
-/** The slower poll once the field has gone quiet. */
 export const SURVEY_IDLE_POLL_MS = 120_000;
-/** How long without a new scan before the poll slows down. */
 export const SURVEY_IDLE_AFTER_MS = 5 * MINUTE_MS;
 
-/** The wait before the next poll, given how long ago the last new scan came in. */
 export function surveyPollDelay(sinceNewScanMs: number): number {
   return sinceNewScanMs >= SURVEY_IDLE_AFTER_MS ? SURVEY_IDLE_POLL_MS : SURVEY_POLL_MS;
 }
-/** A return to the tab re-reads unless one just did. */
 const RETURN_MIN_GAP_MS = 5_000;
 
 export type SurveyLoadState =
@@ -47,12 +34,6 @@ export type SurveyLoadState =
 
 type Loaded = { id: string; result: LoadSurveyResult } | null;
 
-/**
- * What a poll should leave on screen. A poll that finds nothing new, or that
- * fails for a moment, keeps the very same state, so the page isn't re-rendered
- * (or swapped for an error and back) on every poll. Scans only ever get
- * appended, so a matching count and times, and the same ignored set, mean nothing changed.
- */
 function settle(prev: Loaded, id: string, result: LoadSurveyResult): Loaded {
   const before = prev?.id === id ? prev.result : null;
   if (before?.ok) {
@@ -82,12 +63,10 @@ export function useSurvey(id: string | null): {
   refresh: () => Promise<void>;
 } {
   const [loaded, setLoaded] = useState<Loaded>(null);
-  // How many scans the last load of this survey saw, and when that count last changed: the poll's pace.
   const activity = useRef({ id, count: -1, at: 0 });
 
   const applyResult = useCallback((forId: string, result: LoadSurveyResult) => {
     const seen = activity.current;
-    // A late answer for the survey switched away from doesn't set this one's pace.
     if (result.ok && seen.id === forId && result.scans.length !== seen.count) {
       activity.current = { id: forId, count: result.scans.length, at: Date.now() };
     }
@@ -106,17 +85,13 @@ export function useSurvey(id: string | null): {
     activity.current = { id, count: -1, at: Date.now() };
     const run = () => {
       lastRunAt = Date.now();
-      return (
-        loadSurvey(id)
-          .then((result) => {
-            if (!cancelled) applyResult(id, result);
-          })
-          // loadSurvey answers its own failures; this only keeps the poll chain alive.
-          .catch(() => undefined)
-      );
+      return loadSurvey(id)
+        .then((result) => {
+          if (!cancelled) applyResult(id, result);
+        })
+        .catch(() => undefined);
     };
     let timer = 0;
-    // Each wait starts once the last poll has answered, so a scan it found speeds up the next.
     const schedule = () => {
       if (cancelled) return;
       timer = window.setTimeout(
@@ -145,7 +120,6 @@ export function useSurvey(id: string | null): {
 
   const state = useMemo<SurveyLoadState>(() => {
     if (id === null) return { status: 'none' };
-    // A result for another id (the pilot switched surveys) is stale.
     const result = loaded?.id === id ? loaded.result : null;
     if (result === null) return { status: 'loading' };
     if (result.ok) {

@@ -1,18 +1,3 @@
-/**
- * Setup for the `dom` project only — everything here needs a real `document`.
- *
- * Split out of `vitest.setup.ts`, which ran for all 644 test files.
- * `@testing-library/jest-dom/vitest` alone is ~67ms of import each time, and
- * the 462 files in the `node` project call none of its matchers — checked for
- * `toBeInTheDocument`, `toHaveClass`, `toHaveAttribute`, `toBeVisible` and
- * nine more across every `.test.ts` outside the `*.dom.test.ts` set, zero hits. They
- * were paying about half that project's total runtime for a DOM matcher
- * library they never use. Measured: the node project's setup bucket went from
- * 30.6s to 12.4s.
- *
- * The jsdom polyfills below move for the same reason. Each is guarded on a
- * global that only exists under jsdom, so in `node` they were pure parse cost.
- */
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, expect } from 'vitest';
@@ -21,86 +6,35 @@ import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
 import { restoreRealTimers, unmountAtTestEnd } from '@/test/teardown';
 import { fakeMediaQueryList } from '@/test/viewport';
 
-/**
- * A one-time hint is a Popover with `role="dialog"`; opened over a test that
- * asserts on a bare dialog it breaks it. Each test starts with every hint
- * type's session slot already taken. A test of a hint calls
- * `resetSessionHints()` itself. A new hint type goes in this list.
- */
 beforeEach(() => {
   resetSessionHints();
   for (const hint of ['rowHint', 'columnPickerHint', 'goTo'])
     claimSessionHint(`${hint}:test-setup`);
 });
 
-/**
- * Default is 1000ms. Under the CPU contention of several `/next-ticket`
- * worktrees running `vitest` in parallel on one machine, that's tight enough
- * that a real (already-fired) state update can lose the race against the
- * timeout — a different `findBy*`/`waitFor` call flakes each run depending on
- * which test happened to be mid-wait when the scheduler starved it. Widening
- * the budget doesn't mask a hung update (those still fail, just slower); it
- * only buys back time lost to scheduling, not to a broken assertion.
- */
 configure({ asyncUtilTimeout: 5000 });
 
-/**
- * A read still running when its test ends writes into `esiCache` after the next
- * test's `resetSession()` cleared it, and that test reads the stale row as fresh
- * without ever calling its own MSW handler. Real timers back first (the settle
- * waits on `setTimeout`), then unmount (so nothing new starts) and wait for
- * every cache load to finish — the runner already aborted the test's requests
- * (`src/test/teardown.ts`). A load that won't settle is reported here, naming its key.
- * `vitest.setup.ts`'s `afterEach` then runs and drains IndexedDB.
- * Don't hand-roll drains in a test file (`waitFor(esiInFlight)`, extra ticks).
- */
 unmountAtTestEnd(cleanup);
 afterEach(async () => {
   restoreRealTimers();
-  // Already unmounted by the runner step; this catches a render from a hook.
   cleanup();
   try {
     await settleEsiCacheLoads(1000);
   } catch (error) {
-    // Warn rather than fail: the requests are already aborted, so a load still
-    // pending here is waiting on something other than the network. Failing
-    // the test would blame it for that; the message names the key, so a real
-    // late writer is findable.
     const reason = error instanceof Error ? error.message : String(error);
     console.warn(`[esi settle] ${expect.getState().currentTestName}: ${reason}`);
   }
 });
 
-/**
- * Radix's FocusScope unmounts by scheduling a `setTimeout(0)` that dispatches
- * a focus event on its container. After a file's last test, Testing Library's
- * cleanup unmounts an open menu, and if vitest tears jsdom down before that
- * timer fires, it dispatches into a dead environment: "Failed to execute
- * 'dispatchEvent' on 'EventTarget': parameter 1 is not of type 'Event'". The
- * tests all pass, but the unhandled error fails the run (TableExport.test.tsx
- * did on CI). One macrotask after the file's final cleanup lets it land while
- * jsdom is still alive.
- */
 afterAll(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
-/**
- * jsdom 30 ships the `HTMLDialogElement` interface but none of its behaviour, so
- * a component built on the native `<dialog>` cannot be tested at all without
- * this. Only what component code can observe is emulated — `open` state, the
- * initial focus move, and Escape firing a *cancelable* `cancel`; there is no top
- * layer, `::backdrop` or inertness here, as there is none in jsdom.
- *
- * Cancelable is the point: `Modal` preventDefaults it, and a polyfill that
- * closed unconditionally on Escape would let that path pass untested.
- */
 if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
   const FOCUSABLE =
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   const escapeHandlers = new WeakMap<HTMLDialogElement, (event: KeyboardEvent) => void>();
-  /** Open modal dialogs, oldest first: Escape cancels only the topmost, as in a browser. */
   const modalStack: HTMLDialogElement[] = [];
 
   function open(dialog: HTMLDialogElement, modal: boolean): void {
@@ -116,10 +50,6 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !dialog.open) return;
       if (modalStack.at(-1) !== dialog) return;
-      // A browser skips the close request when the keydown was already
-      // cancelled — as a Radix menu or select open inside the dialog does when
-      // Escape dismisses it — so the one Escape closes that layer, not the
-      // dialog under it too.
       if (event.defaultPrevented) return;
       event.preventDefault();
       const cancelled = !dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
@@ -157,11 +87,6 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
   };
 }
 
-/**
- * jsdom has no pointer-capture or scroll implementation, so Radix's menu and
- * select primitives — which capture the pointer during open/drag-select and
- * scroll the highlighted option into view — throw the moment a test opens one.
- */
 if (typeof Element !== 'undefined') {
   if (!Element.prototype.hasPointerCapture) {
     Element.prototype.hasPointerCapture = () => false;
@@ -175,24 +100,9 @@ if (typeof Element !== 'undefined') {
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
   }
-  // jsdom defines `window.scrollTo` as a stub that logs "Not implemented" on
-  // every call; swap it for a silent no-op. Tests that assert on scrolling
-  // spy on it, which still works on an own property.
   window.scrollTo = () => {};
 }
 
-/**
- * jsdom does no layout, so every element's `offsetHeight`/`offsetWidth` is 0 —
- * `@tanstack/react-virtual` reads those (not `getBoundingClientRect`) to size
- * its scroll container, and a 0 viewport makes it compute an empty visible
- * range, hiding every row from the DOM regardless of what a test scrolls to.
- * The getter itself installs on the whole prototype (there's no way to patch
- * just one instance ahead of its creation), but the *value* it returns stays
- * 0 — jsdom's real default — for every element except ones marked
- * `data-virtual-scroll-root` by the component owning the scroll container, so
- * this can't skew unrelated layout reads elsewhere (e.g. Radix menu
- * positioning) even though the property descriptor itself is global.
- */
 if (typeof HTMLElement !== 'undefined') {
   const VIRTUAL_SCROLL_SIZE = 600;
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
@@ -209,12 +119,6 @@ if (typeof HTMLElement !== 'undefined') {
   });
 }
 
-/**
- * jsdom has no `ResizeObserver`. `@tanstack/react-virtual` itself tolerates
- * that fine (its internal observer lazily no-ops when the constructor is
- * missing), but other libraries assume it exists unconditionally — this stub
- * is cheap insurance for whichever one hits that path next.
- */
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
     observe() {}
@@ -223,13 +127,6 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   } as unknown as typeof ResizeObserver;
 }
 
-/**
- * jsdom implements no CSS media queries, so `window.matchMedia` is absent and
- * anything subscribing to a breakpoint throws on mount. The never-matching
- * default is load-bearing, not incidental: `Layout` reads a non-matching
- * `(min-width: 48rem)` as mobile, which is what makes every "mobile More sheet"
- * test see a mobile viewport and get the sheet at all.
- */
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = (media: string): MediaQueryList => fakeMediaQueryList(media, false);
 }

@@ -9,7 +9,6 @@ import {
   type HullSlotCounts,
 } from './fitCurrency';
 
-/** The game's names don't matter to a test that leaves none unread; with them unknown, an unread item is removed. */
 const NO_GAME_NAMES = () => false;
 
 const VEXOR: HullSlotCounts = { high: 4, medium: 4, low: 5, rig: 3 };
@@ -62,8 +61,6 @@ describe('classifyFitCurrency', () => {
   });
 
   describe('an item the game still has, though the loader did not resolve it', () => {
-    // Real names the Workbench flagged as removed: Abyssal filaments and Agency
-    // boosters (cargo, booster section) and a mutated module (fitted in a rack).
     const STILL_IN_GAME = [
       'Fierce Exotic Filament',
       'Cataclysmic Electrical Filament',
@@ -197,8 +194,6 @@ describe('classifyFitCurrency', () => {
   });
 
   it('never reads CPU, powergrid or calibration: an overloaded fit that fits its racks is current', () => {
-    // Ten Large Shield Extenders' worth of powergrid in four mid slots is still
-    // four modules in four slots — skills and implants decide the budget.
     const fit = parts(modules('medium', 4, 3841));
     expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
   });
@@ -209,7 +204,6 @@ describe('classifyFitCurrency', () => {
     ]);
     expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
 
-    // A missing header leaves no hull name to call removed.
     const headerless: LoadParts = {
       hullTypeId: null,
       unresolved: [
@@ -236,7 +230,6 @@ describe('classifyFitCurrency', () => {
       ...modules('rig', 3),
     ]);
     expect(classifyFitCurrency(fit, t3, NO_GAME_NAMES)).toEqual({ current: true });
-    // Its rigs still are.
     expect(
       classifyFitCurrency(parts([...modules('high', 6), ...modules('rig', 4)]), t3, NO_GAME_NAMES)
     ).toEqual({

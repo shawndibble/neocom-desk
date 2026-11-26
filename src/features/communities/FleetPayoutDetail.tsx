@@ -22,7 +22,6 @@ import { loadFleetShares, removeFleetPayout, setFleetShareDone } from './fleetPa
 import { formatLeft, formatShortAge } from './requestFormat';
 import { useMyFleetShare } from './useMyFleetShare';
 
-/** A Member's view of their own Share: ISK, paid state, who the boss is. */
 function MemberView({
   payout,
   characterId,
@@ -57,12 +56,6 @@ function MemberView({
   );
 }
 
-/**
- * One Fleet Payout's side panel. The boss gets every Share with a paid toggle,
- * the progress and Remove payout; a listed Member gets their own Share and
- * the boss's name. The server enforces who may read and write; this only
- * decides what to show.
- */
 export function FleetPayoutDetail({
   payout,
   mine,
@@ -74,15 +67,12 @@ export function FleetPayoutDetail({
   onRemove,
 }: {
   payout: FleetPayout;
-  /** The viewer is the boss. */
   mine: boolean;
   now: number;
   characterId: number;
   communityId: string;
   onClose: () => void;
-  /** A Share's paid flag changed: refetch the list's counts. */
   onChanged: () => void;
-  /** The boss removed this payout: the list hides it and writes after its Undo toast. */
   onRemove: (removal: { message: string; commit: () => Promise<void> }) => void;
 }) {
   const { t } = useTranslation();

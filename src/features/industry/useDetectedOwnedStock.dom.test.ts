@@ -61,9 +61,6 @@ describe('useDetectedOwnedStock', () => {
   });
 
   it('does not recount while the material set holds still', async () => {
-    // Asset lists run to tens of thousands of rows per Character, and this hook
-    // lives in a panel that re-renders on every runs/ME/TE keystroke — so the
-    // caller passing a stable array has to be enough to avoid re-aggregating.
     const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(SNAPSHOT, ids), {
       initialProps: { ids: TYPE_IDS },
     });
@@ -89,9 +86,6 @@ describe('useDetectedOwnedStock', () => {
   });
 
   it('does not recount when the snapshot reference is unchanged, even across a remount boundary', () => {
-    // The whole point of hoisting: passing the same snapshot object in (as
-    // Industry.tsx does across a plan switch) must not force a reload — there
-    // is nothing here to reload, since fetching moved to useOwnedStockSnapshot.
     const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(SNAPSHOT, ids), {
       initialProps: { ids: TYPE_IDS },
     });

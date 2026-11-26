@@ -30,7 +30,6 @@ const ALL: CorpCapabilities = {
   canViewTaxBook: true,
 };
 
-/** What a Character with `caps` sees of the default layout. */
 const drawnFor = (caps: CorpCapabilities) => {
   const board = corpWidgetBoard(caps);
   return corpDefaultLayout()
@@ -52,7 +51,6 @@ describe('the Corp Board default layout', () => {
       ['moonChunks', null, 'all'],
       ['corpJobs', null, 'all'],
       ['corpWallet', null, 'all'],
-      // Cash flow reads one corporation's journal.
       ['corpWallet', 'flow', 'header'],
       ['corpMembers', null, 'header'],
     ]);
@@ -82,7 +80,6 @@ describe('the Corp Board default layout', () => {
       'corpWallet',
       'corpWallet',
     ]);
-    // Divisions, then Flow and Sources, opened as Cash flow and Income by source were.
     const money = corpDefaultLayout().widgets.filter((w) => w.kind === 'corpWallet');
     expect(money.map((w) => [w.show, w.view])).toEqual([
       [undefined, 'table'],
@@ -117,7 +114,6 @@ describe('the Corp Board board', () => {
     expect(board.kinds.every((k) => k.boards.corp !== undefined)).toBe(true);
     expect(board.canDraw(getKind('corpWallet')!)).toBe(true);
     expect(board.canDraw(getKind('structures')!)).toBe(false);
-    // Coming-soon kinds carry no gate, so the Gallery lists them for everyone.
     expect(board.canDraw(getKind('corpKills')!)).toBe(true);
   });
 
@@ -127,11 +123,9 @@ describe('the Corp Board board', () => {
     expect(counted(1).allScopeOffered('corpDeadlines')).toBe(false);
     expect(readScope(counted(1), { kind: 'structures', scope: 'all' })).toBe('header');
     expect(readScope(counted(2), { kind: 'structures', scope: 'all' })).toBe('all');
-    // Counted over the kind's own capabilities.
     const asked: (readonly string[])[] = [];
     corpWidgetBoard(ALL, (caps) => (asked.push(caps), 2)).allScopeOffered('structures');
     expect(asked).toEqual([['canReadStructures', 'canReadStarbases']]);
-    // Not yet known: the header scope is read, so one corporation never fans out.
     expect(corpWidgetBoard(ALL).allScopeOffered('structures')).toBe(false);
     expect(corpWidgetBoard(ALL).opensOnAll).toEqual(
       new Set([

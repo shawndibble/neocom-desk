@@ -10,7 +10,6 @@ vi.mock('./shortStartLink', async (importOriginal) => ({
   makeShortLink,
 }));
 
-/** The help starts folded; open it the way a pilot does, by pressing its header. */
 function render(ui: Parameters<typeof renderBare>[0]) {
   const result = renderBare(ui);
   fireEvent.click(screen.getByText('How to make a start link'));
@@ -37,7 +36,6 @@ describe('StartLinkHelp', () => {
     expect(await screen.findByText('https://neocomdesk.test/s/xk3p9q')).toBeTruthy();
     expect(makeShortLink).toHaveBeenCalledWith('/survey?placeId=7&rate=5');
     expect(screen.queryByRole('button', { name: 'Make short link' })).toBeNull();
-    // A change to the details makes the short link stale: the long link is back.
     rerender(<StartLinkHelp path="/survey?placeId=7&rate=6" />);
     expect(screen.getByRole('button', { name: 'Make short link' })).toBeTruthy();
   });

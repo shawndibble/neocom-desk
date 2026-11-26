@@ -15,12 +15,6 @@ import type { BoardGroup, BoardSkill } from './skillBoard';
 import { skillGroupIcon } from './skillGroupIcon';
 import { formatNumber } from '@/lib/numberLocale';
 
-/**
- * One skill group on the Trained board: its icon, a bar split trained / queued
- * and "trained / total". A button that expands the group's skills in place.
- * While a search is active `matchCount` replaces the total and the tile stops
- * toggling (the search already expands what matches).
- */
 export function GroupTile({
   group,
   expanded,
@@ -31,22 +25,17 @@ export function GroupTile({
   group: BoardGroup;
   expanded: boolean;
   matchCount?: number;
-  /** The training chip, when the skill in training is in this group. */
   trailing?: ReactNode;
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
   const trainedShare = group.total === 0 ? 0 : (group.trained / group.total) * 100;
-  // A trained skill with a higher level queued is in both counts; the queued
-  // segment only ever fills the untrained remainder, so the bar never overshoots.
   const queuedShare =
     group.total === 0 ? 0 : Math.min((group.queued / group.total) * 100, 100 - trainedShare);
   return (
     <button
       type="button"
       aria-expanded={expanded}
-      // Not `disabled`: that would drop the tile from the tab order while a
-      // search is open. The search already expands what matches, so a toggle is a no-op.
       aria-disabled={matchCount !== undefined || undefined}
       onClick={onToggle}
       className={cx(
@@ -81,7 +70,6 @@ export function GroupTile({
   );
 }
 
-/** "Need book": the skill is not in the character's skills, so its book is still to buy and inject. */
 function NeedBookMarker() {
   const { t } = useTranslation();
   return (
@@ -91,14 +79,12 @@ function NeedBookMarker() {
   );
 }
 
-/** One skill row: name links to the skill Show info, rest of the row opens it too. Siblings, not a link inside a button. */
 export function SkillBoardRow({
   skill,
   plannedLevel,
   trainingChip,
 }: {
   skill: BoardSkill;
-  /** A Skill Plan's target for this skill; the queued level wins when higher. */
   plannedLevel: number | null;
   trainingChip?: ReactNode;
 }) {
@@ -117,7 +103,6 @@ export function SkillBoardRow({
   );
   return (
     <li className="flex items-center gap-2 text-xs">
-      {/* Below `sm` the chip drops under the name rather than squeezing it. */}
       <span className="flex min-w-0 flex-col items-start gap-0.5 py-1.5 sm:flex-row sm:items-center sm:gap-2">
         {skill.description ? <Tooltip content={skill.description}>{name}</Tooltip> : name}
         {trainingChip}

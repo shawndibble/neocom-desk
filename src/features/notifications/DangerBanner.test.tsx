@@ -10,7 +10,6 @@ import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './
 import { useSnoozeStore } from './snooze';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
 
-/** The feed the banner reads, counted: once it shows the seeded entry, the banner's read has answered. */
 function FeedProbe() {
   return <output data-testid="feed">{useVisibleAlertEntries().length}</output>;
 }

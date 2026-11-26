@@ -182,7 +182,6 @@ describe('reconnectCoverageFrom', () => {
   });
 
   it('never reaches before the day it last joined: a spell never read left no period', () => {
-    // Left on 10-01, rejoined 10-10, never read well: the 10-10 period was dropped at disconnect.
     const periods = [{ from: '2026-09-01', to: '2026-10-01' }];
     expect(reconnectCoverageFrom(periods, TODAY, '2026-10-10')).toBe('2026-10-10');
     expect(reconnectCoverageFrom(periods, TODAY, '2026-09-15')).toBe('2026-10-02');

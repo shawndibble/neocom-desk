@@ -1,15 +1,3 @@
-/**
- * Data for a pasted Local list (issues #2863, and the intel rework that put
- * kills by space and contact standing on every row): a batched name -> id
- * lookup (`POST /universe/ids`, exact match only), every found pilot's current
- * corporation and alliance, the viewer's own contacts and affiliation, and one
- * zKillboard kill list per non-friendly pilot among the first
- * `MAX_LIST_PILOTS` names (issue #5668: the rest are placed by organization).
- *
- * Rows are reported as they settle so the table fills in while zKillboard
- * answers. zKillboard calls are made a few at a time, not all 40 at once, with
- * unknown and neutral pilots ahead of red and orange contacts.
- */
 import { postUniverseIds } from '@/esi/endpoints';
 import { resolveAffiliations } from '@/features/character/affiliations';
 import { loadContacts } from '@/features/character/contacts';
@@ -34,12 +22,9 @@ import {
 } from './pilotHistoryStore';
 import { fetchPilotKillHistory, fetchPilotKillmails, fetchPilotStats } from '@/lib/zkillboard';
 
-/** zKillboard is a volunteer-run service: keep the fan-out well under ESI's. */
 const ZKILL_CONCURRENCY = 4;
 
-/** Who the list is being read for: their contacts, and the corporation and alliance they are in. */
 export interface ViewerContext {
-  /** Contact id (a pilot, corporation or alliance) -> standing. */
   contacts: ReadonlyMap<number, number>;
   corporationId: number | null;
   allianceId: number | null;
@@ -51,10 +36,6 @@ export const NO_VIEWER: ViewerContext = {
   allianceId: null,
 };
 
-/**
- * The viewer's contacts and affiliation. Never throws: both only decorate the
- * list, so a missing scope or a failed request is the same as having none.
- */
 export async function loadViewerContext(characterId: number | null): Promise<ViewerContext> {
   if (characterId === null) return NO_VIEWER;
   const [contacts, affiliations] = await Promise.all([
@@ -73,30 +54,16 @@ export async function loadViewerContext(characterId: number | null): Promise<Vie
 
 export type PilotKillsState =
   | { kind: 'loading' }
-  /** Not looked up: not a pilot, or in your own corporation or alliance, or a blue contact. */
   | { kind: 'skipped' }
-  /** zKillboard could not be reached. */
   | { kind: 'unreachable' }
-  /** Past the first `MAX_LIST_PILOTS` names: placed by organization only. */
   | { kind: 'notLookedUp' }
   | {
       kind: 'ready';
       kills: KillRecord[];
       summary: KillSummary;
-      /**
-       * Set while these kills come from an earlier paste, older than the fresh
-       * window, and a refresh is still to land (or failed): when they were read.
-       */
       staleSinceMs?: number;
     };
 
-/**
- * What the Threat verdict needs beyond the kills, looked up only for a pilot
- * it can change the level of: the two ratios for one with enough recent kills
- * to be dangerous (`needsDangerRatio`), the dates of their newest losses for
- * one with no recent kill, who is "inactive" unless they lost a ship lately
- * (`needsLossHistory`). Most rows stay `idle`.
- */
 export type PilotThreatExtras =
   | { kind: 'idle' }
   | { kind: 'loading' }
@@ -104,22 +71,18 @@ export type PilotThreatExtras =
       kind: 'ready';
       dangerRatio: number | null;
       killerRatio: number | null;
-      /** null when the losses were not looked up or could not be read. */
       lossTimesMs: number[] | null;
     };
 
 export interface PilotListRow {
-  /** The name as pasted: also the row's key, so it never changes while the row loads. */
   name: string;
   characterId: number | null;
-  /** ESI has no pilot by exactly this name. */
   notFound: boolean;
   corporationId: number | null;
   allianceId: number | null;
   corporationName: string | null;
   allianceName: string | null;
   standing: ContactStanding | null;
-  /** Set when the pilot is in the viewer's own corporation or alliance. */
   ownOrganization: 'corporation' | 'alliance' | null;
   kills: PilotKillsState;
   extras: PilotThreatExtras;
@@ -127,9 +90,7 @@ export interface PilotListRow {
 
 export interface LoadPilotListOptions {
   signal?: AbortSignal;
-  /** Called with the full row list each time a row changes. */
   onRows: (rows: PilotListRow[]) => void;
-  /** Resolves to the viewer's contacts and affiliation; waited on once the names are known. */
   viewer?: Promise<ViewerContext>;
 }
 
@@ -137,7 +98,6 @@ function extrasNeeded(kills: KillRecord[], now: number): boolean {
   return needsDangerRatio(kills, now) || needsLossHistory(kills, now);
 }
 
-/** Whether stored extras hold what the verdict needs for these kills (nothing needed counts). */
 function extrasCover(kills: KillRecord[], extras: StoredExtras | null, now: number): boolean {
   if (needsDangerRatio(kills, now)) return extras !== null && extras.dangerRatio !== null;
   if (needsLossHistory(kills, now)) return extras !== null && extras.lossTimesMs !== null;
@@ -167,7 +127,6 @@ export async function loadPilotList(
   }));
   onRows(rows);
 
-  // A name answered in the last day is not asked again (issue #5812).
   const knownIds = await readStoredCharacterIds(names, Date.now()).catch(
     () => new Map<string, PilotNameId>()
   );
@@ -185,7 +144,6 @@ export async function loadPilotList(
   if (signal?.aborted) return;
   onRows(rows);
 
-  // A 2,000-name Local takes ~80 updates: patch one slot, not a scan of every row.
   const indexOf = new Map(rows.map((row, i) => [row.characterId, i]));
   function update(characterId: number, patch: Partial<PilotListRow>) {
     if (signal?.aborted) return;
@@ -198,8 +156,6 @@ export async function loadPilotList(
 
   const characterIds = rows.flatMap((row) => (row.characterId === null ? [] : [row.characterId]));
 
-  // Corporation and alliance, and the viewer's contacts, place a row before any
-  // kill list arrives. A failure of either leaves the row as an unknown pilot.
   const [affiliations, viewerContext] = await Promise.all([
     resolveAffiliations(characterIds).catch(() => new Map()),
     viewer.catch(() => NO_VIEWER),
@@ -231,7 +187,6 @@ export async function loadPilotList(
   });
   onRows(rows);
 
-  // Names are context, not the answer: a failure leaves the cells empty.
   const orgIds = [...new Set(rows.flatMap((r) => [r.corporationId, r.allianceId]))].filter(
     (id): id is number => id !== null
   );
@@ -247,9 +202,6 @@ export async function loadPilotList(
     })
     .catch(() => undefined);
 
-  // Kill histories come from the last paste when they are recent enough
-  // (issue #5812): fresh ones are used as they are, up-to-a-day-old ones are
-  // shown at once, marked stale, and asked for again behind the list.
   const lookUp = rows.flatMap((row) =>
     row.characterId !== null && row.kills.kind === 'loading' ? [row.characterId] : []
   );
@@ -260,12 +212,9 @@ export async function loadPilotList(
   const readAt = Date.now();
   interface Job {
     characterId: number;
-    /** 'fetch': nothing usable stored. 'refresh': stale copy shown. 'extras': fresh copy, only the verdict's extras missing. */
     mode: 'fetch' | 'refresh' | 'extras';
-    /** A red or orange contact: asked about last. */
     bad: boolean;
     kills?: KillRecord[];
-    /** When the stored kills were read: extras fetched for them are stored under it. */
     fetchedAt?: number;
   }
   const badIds = new Set(
@@ -281,7 +230,6 @@ export async function loadPilotList(
       jobs.push({ characterId, mode: 'fetch', bad });
       continue;
     }
-    // Stored extras that cover what the verdict needs make a fresh copy free of requests.
     const covered = extrasCover(copy.kills, copy.extras, readAt);
     const needed = extrasNeeded(copy.kills, readAt);
     if (age === 'stale') {
@@ -317,8 +265,6 @@ export async function loadPilotList(
     onRows(rows);
   }
 
-  // The threat verdict's extra reads (ratios, loss dates) for a pilot it can change,
-  // kept with the stored kills they were read for.
   async function runExtras(characterId: number, kills: KillRecord[], fetchedAt: number) {
     const now = Date.now();
     const wantsRatios = needsDangerRatio(kills, now);
@@ -327,7 +273,6 @@ export async function loadPilotList(
       update(characterId, { extras: { kind: 'idle' } });
       return;
     }
-    // The same slot reads what the verdict still needs, so a pilot never doubles the fan-out.
     let extras: StoredExtras;
     let answered: boolean;
     if (wantsRatios) {
@@ -357,10 +302,6 @@ export async function loadPilotList(
     if (answered) await storeKillHistory(characterId, kills, fetchedAt, extras);
   }
 
-  // Pilots with nothing usable first, then stale ones, then fresh ones that
-  // only need their extras. Red and orange contacts go last within each: the
-  // viewer already knows they are bad news, so the unknowns and neutrals are
-  // the ones worth waiting on. Array sort is stable, so each keeps pasted order.
   const MODE_ORDER = { fetch: 0, refresh: 1, extras: 2 } as const;
   const queue = jobs.sort(
     (a, b) => Number(a.bad) - Number(b.bad) || MODE_ORDER[a.mode] - MODE_ORDER[b.mode]
@@ -387,7 +328,6 @@ export async function loadPilotList(
         update(characterId, { kills: { kind: 'unreachable' } });
         return;
       }
-      // A failed refresh keeps the stale copy and its mark: never "unreachable" while a copy exists.
     }
     if (kills !== undefined && fetchedAt !== undefined && !signal?.aborted) {
       await runExtras(characterId, kills, fetchedAt);

@@ -83,7 +83,6 @@ const correction: Adjustment = {
 function running(overrides: Partial<BookViewInput> = {}) {
   return buildBookView(
     input({
-      // The day is 200,000; 199,000 paid is within the book's tolerance.
       payments: [
         {
           id: 'p1',
@@ -165,7 +164,6 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
     fireEvent.contextMenu(rowOf(/^Shortfall forgiven/));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Charge this shortfall' }));
     await vi.waitFor(() => expect(calls).toEqual(['charge:2026-08-11']));
-    // The struck-through original and its reversal carry no menu.
     expect(screen.getByText('reversed')).toBeInTheDocument();
     fireEvent.contextMenu(rowOf(/^Reversal/));
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
@@ -237,7 +235,6 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
   });
 
   it('gives a row dated before the lock date no menu: locked history is read-only', () => {
-    // On 18 Nov the lock date is 1 Sep: the August correction and payment are locked.
     renderLedger(running({ adjustments: [correction], now: '2026-11-18T14:00:00Z' }));
     fireEvent.contextMenu(rowOf(/^Adjustment/));
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
@@ -272,7 +269,6 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
         'Locked before 1 Sep · fix with a correction dated 1 Sep or later'
       );
       const tr = divider()[0]!.closest('tr')!;
-      // Newest first: the October row is above it, the August rows below.
       expect(tr.previousElementSibling).toHaveTextContent('2026-10-20');
       expect(tr.nextElementSibling).toHaveTextContent('2026-08');
     });

@@ -1,12 +1,5 @@
-/** Longest a slice runs before yielding to the browser, in ms. */
 export const SLICE_MS = 30;
 
-/**
- * Works through `todo` in slices of at most `SLICE_MS` between frames, so a
- * run of solver calls never blocks the page. `step` returns false when an item
- * gave nothing new to show; `onSlice` runs after each slice with whether
- * anything did, and whether the work is done. Returns the cancel.
- */
 export function runSliced<T>(
   todo: readonly T[],
   step: (item: T) => boolean | void,

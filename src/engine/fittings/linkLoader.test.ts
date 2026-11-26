@@ -193,14 +193,14 @@ describe('killmailVictimToLoadResult', () => {
     ship_type_id: 587,
     items: [
       { item_type_id: 100, flag: 27, quantity_destroyed: 1, singleton: 0 },
-      { item_type_id: 9000, flag: 27, quantity_dropped: 40, singleton: 0 }, // its charge
+      { item_type_id: 9000, flag: 27, quantity_dropped: 40, singleton: 0 },
       { item_type_id: 200, flag: 20, quantity_dropped: 1, singleton: 0 },
       { item_type_id: 300, flag: 11, quantity_destroyed: 1, singleton: 0 },
       { item_type_id: 400, flag: 92, quantity_destroyed: 1, singleton: 0 },
       { item_type_id: 500, flag: 87, quantity_destroyed: 2, quantity_dropped: 1, singleton: 0 },
       { item_type_id: 999, flag: 5, quantity_dropped: 7, singleton: 0 },
       { item_type_id: 998, flag: 5, quantity_destroyed: 1, singleton: 0 },
-      { item_type_id: 997, flag: 5, singleton: 0 }, // nothing lost or dropped
+      { item_type_id: 997, flag: 5, singleton: 0 },
     ],
   };
 

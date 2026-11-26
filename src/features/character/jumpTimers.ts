@@ -1,12 +1,3 @@
-/**
- * The Overview's Jump timers widget reads: the clone jump cooldown (from the
- * clones read and the Infomorph Synchronizing level, via `engine/cloneJump`)
- * and jump fatigue (`esi-characters.read_fatigue.v1`, an opt-in Permission).
- *
- * Each grant is checked against the stored token before any call, so a missing
- * scope is a "needs permission" read, never a live 403 that would raise the
- * app-wide re-auth banner. Reached from the Overview through `import()`.
- */
 import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/clone/cloneJump';
 import { fatigueEndsAt } from '@/engine/clone/jumpTimers';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
@@ -16,10 +7,7 @@ import { loadCharacterClones } from '@/features/character/clones';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadGrantedScopes } from '@/app/grantedScopes';
 
-export type JumpTimerRead =
-  | { state: 'needsPermission' }
-  /** `endsAt` is when it clears, ms since the epoch; null when nothing is running. */
-  | { state: 'read'; endsAt: number | null };
+export type JumpTimerRead = { state: 'needsPermission' } | { state: 'read'; endsAt: number | null };
 
 export interface JumpTimersWidgetData {
   clone: JumpTimerRead;
@@ -39,7 +27,6 @@ function loadCharacterFatigue(characterId: number): Promise<StatusResult<Charact
   });
 }
 
-/** A read that found nothing and had nothing to fall back on throws, so the widget keeps its last value and offers Retry. */
 export async function loadJumpTimersWidget(characterId: number): Promise<JumpTimersWidgetData> {
   const scopes = await loadGrantedScopes(characterId);
   const cloneGranted = scopes.has(ESI_REGISTRY.getCharacterClones.scope);

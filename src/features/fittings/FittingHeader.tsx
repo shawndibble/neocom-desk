@@ -30,10 +30,8 @@ import type { EditorShare } from './useEditorShare';
 import { useFittingExport } from './useFittingExport';
 import { FittingNameModal } from './SavedFittingModals';
 
-/** What the Fittings menu opens: the hull search, Import, or the list of saved and In-game Fittings. */
 export type LibraryAction = 'new' | 'import' | 'open';
 
-/** What the header's Alpha/Omega and Mastery badges show; null `mastery` is no logged-in Character, absent `alpha` is a badge shown elsewhere (the phone's tab row). */
 interface HeaderBadges {
   alpha?: {
     blockers: readonly AlphaBlocker[] | null;
@@ -44,37 +42,21 @@ interface HeaderBadges {
 
 interface FittingHeaderProps {
   fitting: Fitting;
-  /** Under the name: the hull (when the name isn't just the hull) and whether it's saved. */
   subtitle: string;
   onLibrary: (action: LibraryAction) => void;
-  /** Opens Fitting vs Fitting compare (#1547) for this Fitting. */
   onCompare: () => void;
-  /** Opens Improve in the ⋮ menu; absent where the Fitting cannot be edited. */
   onImprove?: () => void;
-  /** The pilot can't fly a fitted module: Improve opens on fixing it first, so the entry says Fix Fit. */
   unflyable?: boolean;
-  /** Renames the open Fitting, independent of Save. */
   onRename: (name: string) => void;
-  /** The Fitting's price at the Fittings hub, for Export; null while it loads. */
   price: Appraisal | null;
-  /** The pilot's active clone, left off Export's multibuy list. */
   cloneImplants?: readonly number[];
-  /** Icon badges about the fit itself — Alpha/Omega, Mastery. What its numbers assume (implants, missing skills) lives in the stats panel. */
   badges?: HeaderBadges;
-  /** The open Fitting's stats, for Copy stats; null while they load. */
   stats?: FittingStats | null;
-  /** "Share to Community" in Export, for a saved Fitting (`useEditorShare`). */
   share?: EditorShare;
   save: ReactNode;
-  /**
-   * Below desktop, or while the Add slide-out narrows the page: one row — the
-   * identity, Save and one ⋮ menu (the Fittings menu, Export and the badges
-   * folded together) at the end.
-   */
   compact?: boolean;
 }
 
-/** "Copy stats": the headline numbers as text, with the brief notice it leaves. */
 function useCopyStats(stats: FittingStats | null) {
   const { t } = useTranslation();
   const [notice, setNotice] = useState<string | null>(null);
@@ -91,7 +73,6 @@ function useCopyStats(stats: FittingStats | null) {
   return { notice, copy, canCopy: stats !== null };
 }
 
-/** "Copy stats" in a menu; while the stats load it stays focusable and says why it does nothing. */
 function CopyStatsMenuItem({ copyStats }: { copyStats: ReturnType<typeof useCopyStats> }) {
   const { t } = useTranslation();
   if (!copyStats.canCopy) {
@@ -110,11 +91,6 @@ function CopyStatsMenuItem({ copyStats }: { copyStats: ReturnType<typeof useCopy
   );
 }
 
-/**
- * Below desktop: one row — the identity, then Save and one ⋮ menu holding the
- * Fittings menu's items, the view, Export's and the badges (text, since a
- * menu has no hover to carry what an icon badge's tooltip says).
- */
 function CompactFittingHeader({
   fitting,
   price,
@@ -130,7 +106,6 @@ function CompactFittingHeader({
   onMenuCloseAutoFocus,
 }: {
   improveItem: ReactNode;
-  /** The ⋮ menu's close hook, so an item opened after it closes (Improve) gets focus right. */
   onMenuCloseAutoFocus: (event: Event) => void;
   share?: EditorShare;
   onRename: () => void;
@@ -151,9 +126,7 @@ function CompactFittingHeader({
   const mastery = badges?.mastery ?? null;
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel/85 p-2 backdrop-blur-sm">
-      {/* The name takes what Save and ⋮ leave, down to a basis that wraps them under it rather than squeeze it away. */}
       {identity}
-      {/* The copy notices sit before Save and ⋮, so the header doesn't grow and shrink with them. */}
       <div className="ml-auto flex items-center gap-2">
         <FittingExportNotice
           notice={exportActions.notice ?? copyStats.notice ?? share?.notice ?? null}
@@ -190,7 +163,6 @@ function CompactFittingHeader({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Outside the menu, which unmounts its contents when it closes: the Mastery sheet outlives the tap that opened it. */}
         {mastery && (
           <MasteryChip
             presentation="dialog"
@@ -200,19 +172,12 @@ function CompactFittingHeader({
             {...mastery}
           />
         )}
-        {/* This header stands in for `PageHeader`, which carries the bell elsewhere. */}
         <AlertsBell />
       </div>
     </div>
   );
 }
 
-/**
- * The open Fitting's header, one row (scope decisions `20260924-215855`,
- * then `20260926-155124`): what the Fitting is with its icon badges, then
- * its controls — a Fittings menu for opening a different one (new from a
- * hull, Import, My Fittings, In-game), the view, Export and Save.
- */
 export function FittingHeader({
   fitting,
   subtitle,
@@ -250,7 +215,6 @@ export function FittingHeader({
           >
             {fitting.name}
           </h1>
-          {/* The one-row phone header gives the name this room; Rename is in its ⋮ menu instead. */}
           {!compact && (
             <IconButton
               variant="plain"
@@ -284,8 +248,6 @@ export function FittingHeader({
   const compareItem = (
     <DropdownMenuItem onSelect={onCompare}>{t('fittings.compare.entryButton')}</DropdownMenuItem>
   );
-  // Opened once the menu has closed and put focus back on its button, so Improve's
-  // column takes focus from there and gives it back on close.
   const improveMenu = useOpenAfterMenu();
   const improveItem = onImprove && (
     <DropdownMenuItem onSelect={() => improveMenu.run(onImprove)}>

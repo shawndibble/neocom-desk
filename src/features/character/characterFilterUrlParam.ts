@@ -1,17 +1,3 @@
-/**
- * `CharacterFilterValue` as a URL query parameter: `current` or `all`. Goes
- * through the same stored form Dexie and Firestore use
- * (`toStoredCharacterFilterValue`), so there is one serialisation of the
- * value, not a second one for URLs. A comma-separated id list still parses —
- * a bookmarked or shared link from before the value narrowed to `current`/
- * `all` — and reads back as `'all'`, same as the stored legacy shape does.
- *
- * The default is the caller's — typically the synced
- * `sync.defaultCharacterFilter`, which loads asynchronously — so build the
- * codec in a `useMemo` keyed on it. The URL overrides that default for this
- * view only; nothing read here is ever written back to the setting (scope
- * decision "persisted view preferences stay out of the URL").
- */
 import type { UrlParamCodec } from '@/lib/urlState';
 import {
   fromStoredCharacterFilterValue,

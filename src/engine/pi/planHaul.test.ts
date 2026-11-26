@@ -41,13 +41,11 @@ describe('haulFit', () => {
 
 describe('routeExposure', () => {
   it('does not count the system the route starts in', () => {
-    // Home is lowsec; only the two systems after it are flown into.
     const result = routeExposure([sys(1, 0.3), sys(2, 0.4), sys(3, 0.9), sys(4, 1)]);
     expect(result).toEqual({ jumps: 3, lowsec: 1, nullsec: 0 });
   });
 
   it('counts lowsec and nullsec apart, on the security as the game shows it', () => {
-    // 0.45 shows as 0.5 (highsec); 0.05 shows as 0.1 (lowsec); -0.2 is nullsec.
     const result = routeExposure([sys(1, 0.9), sys(2, 0.45), sys(3, 0.05), sys(4, -0.2)]);
     expect(result).toEqual({ jumps: 3, lowsec: 1, nullsec: 1 });
   });

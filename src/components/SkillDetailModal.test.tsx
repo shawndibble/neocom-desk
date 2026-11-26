@@ -67,7 +67,6 @@ const FIXTURE_SKILLS: SkillType[] = [
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => FIXTURE_SKILLS),
-  // Frigate (2) unlocks a ship at level 1; Small Hybrid Turret (1) a module at level 2.
   loadSkillItemUnlocks: vi.fn(async () => ({
     2: [[587, 1]],
     1: [
@@ -154,7 +153,6 @@ describe('SkillDetailModal', () => {
     expect(level2).not.toHaveAccessibleName(/Trained/);
     expect(level2).toHaveAccessibleName(/1 module/);
     expect(within(dialog).getByText('150mm Railgun I')).toBeInTheDocument();
-    // Level 3 unlocks the Frigate skill.
     expect(within(dialog).getByRole('button', { name: /Level 3/ })).toHaveAccessibleName(/1 skill/);
   });
 

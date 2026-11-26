@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { claimCorpTaxBookPayment } from '@/features/miningTax/corpBook/corpBookStore';
 
-/** A player claims their own Unmatched donation: audited and uid-authorised server side. */
 export function useClaimDonation(reloadCorpBooks: () => void) {
-  // The claim of an Unmatched donation.
   const [claiming, setClaiming] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
 

@@ -13,14 +13,12 @@ vi.mock('./sendTaxQuestionMail', () => ({
   sendTaxQuestionMail: vi.fn(async () => ({ status: 'no-scope' })),
 }));
 
-// #6206: what reaches the corporation is a router action; stubbed here.
 vi.mock('./corpBookStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./corpBookStore')>()),
   declareCorpTaxBookPayment: vi.fn(async () => ({ declarationId: 'x1' })),
   disputeCorpTaxBookConflict: vi.fn(async () => ({ disputeId: 'd1' })),
 }));
 
-// Releasing ore re-prices what is left; the market read is stubbed.
 vi.mock('../pricing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../pricing')>()),
   loadUnitPricesOnDate: vi.fn(async () => ({
@@ -222,7 +220,6 @@ describe('CorpOverlapNotice on a Conflict day', () => {
       'Also in conflict on this day: Ashfall Prospecting (120,000 ISK).'
     );
     await userEvent.click(screen.getByRole('button', { name: 'Let each corp bill its share' }));
-    // 43,050 for this book and 5,000 for the other come off the 50,000 entry.
     expect(screen.getByText(/Ashfall: 50,000 Zeolites → 1,950 Zeolites/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Take it off my list' }));
     await waitFor(() => expect(changed).toBe(1));
@@ -394,7 +391,6 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
         }
         corpName="Brass Meridian"
         recordedAt="Efa"
-        // The book stands in for the Assignment, so it is not among the tab's own rows.
         everyAssignment={[]}
         payeeById={new Map([['p1', payee]])}
         typeNames={new Map([[ZEO, 'Zeolites']])}

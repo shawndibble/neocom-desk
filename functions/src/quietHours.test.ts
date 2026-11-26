@@ -27,18 +27,14 @@ describe('isQuiet', () => {
 
   it('reads the clock in the device zone', () => {
     const w = win('22:00', '07:00', 'America/New_York');
-    // 03:00Z in March (EDT, UTC-4) is 23:00 local: quiet.
     expect(isQuiet(at('2026-03-10T03:00:00Z'), w)).toBe(true);
-    // 12:00Z is 08:00 local: awake.
     expect(isQuiet(at('2026-03-10T12:00:00Z'), w)).toBe(false);
   });
 
   it('follows DST: the same UTC hour is a different local hour either side of the change', () => {
     const w = win('02:30', '04:00', 'America/New_York');
-    // 2026-03-08 spring forward: 06:45Z is 01:45 EST, 07:45Z is 03:45 EDT.
     expect(isQuiet(at('2026-03-08T06:45:00Z'), w)).toBe(false);
     expect(isQuiet(at('2026-03-08T07:45:00Z'), w)).toBe(true);
-    // 2026-11-01 fall back: 06:45Z is 01:45 EST, 07:45Z is 02:45 EST... check 02:30 start.
     expect(isQuiet(at('2026-11-01T07:45:00Z'), w)).toBe(true);
     expect(isQuiet(at('2026-11-01T05:45:00Z'), w)).toBe(false);
   });

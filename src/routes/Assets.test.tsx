@@ -64,7 +64,6 @@ describe('Assets', () => {
 
     await user.click(tools);
     expect(await screen.findByRole('menuitem', { name: /^Refresh/ })).toBeEnabled();
-    // My ships and Plan a move are the Ships and Move tabs now, not menu items.
     expect(screen.queryByRole('menuitem', { name: /^My ships/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /^Plan a move/ })).not.toBeInTheDocument();
   });
@@ -89,7 +88,6 @@ describe('Assets', () => {
     await user.click(screen.getByRole('tab', { name: 'Move' }));
     expect(window.location.pathname).toBe('/assets/move');
     expect(await screen.findByRole('region', { name: 'Plan a move' })).toBeVisible();
-    // Item-only controls and the Tools menu stay on the Items tab.
     expect(screen.queryByRole('searchbox', { name: /search items/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Tools' })).not.toBeInTheDocument();
   });
@@ -312,9 +310,6 @@ describe('Assets', () => {
           { headers: { 'X-Pages': '1' } }
         )
       ),
-      // The missing parent isn't a real structure either — the best-effort
-      // structure lookup 403s, same as any other structure the character
-      // can't see into, and the group stays a genuine orphan.
       http.get('https://esi.evetech.net/universe/structures/999999999', () =>
         HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
       )
@@ -362,9 +357,6 @@ describe('Assets', () => {
     renderAssetsRoute();
     await screen.findByText(JITA);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
-    // Search is debounced (issue #415) — wait it out rather than reading
-    // results synchronously right after typing, same convention as
-    // SkillPicker.test.tsx.
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
@@ -377,9 +369,6 @@ describe('Assets', () => {
     const search = screen.getByPlaceholderText(/search items/i);
     const pinButton = new RegExp(`More actions for ${escapeRegExp(JITA)}`);
     await user.type(search, 'tritanium');
-    // A search result links to its location too, so its own text legitimately
-    // includes "Jita IV…" — the root list's pin button is what only the root
-    // list renders, so its absence is the real signal here.
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: pinButton })).not.toBeInTheDocument();
 
@@ -419,8 +408,6 @@ describe('Assets', () => {
     );
     const user = userEvent.setup({ delay: null });
     renderAssetsRoute();
-    // The grant holds the scope, so EVE refused it: a re-login, not a Permission.
-    // One note for the Character (it speaks for the page's other banner too), the data under it.
     expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -485,8 +472,6 @@ describe('Assets', () => {
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     const note = (await screen.findByText('Jumps away unavailable')).closest('div');
     expect(note).not.toBeNull();
-    // The standings scope is missing too, so the shell's GrantNote for this
-    // Character folds into this one banner, which names the Permission once.
     expect(
       within(note as HTMLElement).getByText('Pilot One: grant Character details')
     ).toBeInTheDocument();
@@ -531,8 +516,6 @@ describe('Assets', () => {
     const user = userEvent.setup({ delay: null });
     renderAssetsRoute();
     await screen.findByText(/only the first 25 assets loaded/i);
-    // The notice shows with the rows, before names and values finish; the
-    // button is disabled until that load settles.
     const retry = screen.getByRole('button', { name: 'Try again' });
     await waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled'));
     const requestsBeforeRetry = requestCount;
@@ -560,9 +543,6 @@ describe('Assets', () => {
     const user = userEvent.setup({ delay: null });
     renderAssetsRoute();
     await openLocation(user, JITA);
-    // The jsdom scroll-container shim reports a fixed ~600px viewport at ~48px/row —
-    // nowhere near the 2000 rows that exist, proving the virtualizer is windowing
-    // rather than rendering everything.
     const rendered = await screen.findAllByText('Tritanium');
     expect(rendered.length).toBeLessThan(100);
   });
@@ -589,8 +569,8 @@ describe('Assets', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
           [
-            { ...assetPage1[0], item_id: 1, type_id: 34 }, // Tritanium
-            { ...assetPage1[0], item_id: 2, type_id: 35 }, // Pyerite
+            { ...assetPage1[0], item_id: 1, type_id: 34 },
+            { ...assetPage1[0], item_id: 2, type_id: 35 },
           ],
           { headers: { 'X-Pages': '1' } }
         )
@@ -610,10 +590,10 @@ describe('Assets', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
           [
-            { ...row, item_id: 1, type_id: 34, quantity: 5 }, // Tritanium
-            { ...row, item_id: 2, type_id: 35, quantity: 50 }, // Pyerite
-            { ...row, item_id: 10, type_id: 650, quantity: 1, is_singleton: true }, // Drake
-            { ...row, item_id: 11, type_id: 36, location_id: 10, location_type: 'item' as const }, // in the Drake
+            { ...row, item_id: 1, type_id: 34, quantity: 5 },
+            { ...row, item_id: 2, type_id: 35, quantity: 50 },
+            { ...row, item_id: 10, type_id: 650, quantity: 1, is_singleton: true },
+            { ...row, item_id: 11, type_id: 36, location_id: 10, location_type: 'item' as const },
           ],
           { headers: { 'X-Pages': '1' } }
         )
@@ -627,9 +607,8 @@ describe('Assets', () => {
       screen
         .getAllByText(/^(Ships and containers|Items|Drake|Tritanium|Pyerite)$/)
         .map((el) => el.textContent)
-        .slice(-5); // the tab strip also says Items
+        .slice(-5);
     expect(order()).toEqual(['Ships and containers', 'Drake', 'Items', 'Pyerite', 'Tritanium']);
-    // A first click on a number starts high to low; a second flips it.
     await user.click(screen.getByRole('button', { name: 'Sort by Qty' }));
     expect(order()).toEqual(['Ships and containers', 'Drake', 'Items', 'Pyerite', 'Tritanium']);
     await user.click(screen.getByRole('button', { name: 'Qty, sorted descending' }));
@@ -717,10 +696,7 @@ describe('Assets', () => {
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
-    // The ship row's menu offers where it sits (Set waypoint), its name, and Open in Fittings.
     await user.click(screen.getByRole('button', { name: 'More actions for Drake' }));
-    // The menu re-renders once its station lookup lands, so each assertion
-    // re-queries instead of holding an item the re-render may have replaced.
     await waitFor(() => {
       expect(screen.getByRole('menuitem', { name: /set waypoint/i })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
@@ -736,28 +712,23 @@ describe('Assets', () => {
 
     await openLocation(user, 'Cargo Hold');
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    // A bay is not a ship: no shortcut there.
     expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
-    // Back walks up exactly one level per press: Cargo Hold -> Drake -> the
-    // station's own contents -> the root list.
-    await goBack(user); // now at Drake: its row is Cargo Hold
+    await goBack(user);
     expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
-    await goBack(user); // now at the station: its row is Drake
+    await goBack(user);
     expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
 
-    await goBack(user); // now at the root list
+    await goBack(user);
     expect(
       await screen.findByRole('link', { name: new RegExp(escapeRegExp(JITA)) })
     ).toBeInTheDocument();
   });
 
   it('reports an unresolved bookmark rather than silently landing on the root', async () => {
-    // A stale bookmark into a container that no longer has that item —
-    // navigated straight to, not reached via in-app links.
     window.history.pushState({}, '', '/assets/items/60003760/i:999');
     const user = userEvent.setup({ delay: null });
     renderAssetsRoute();
@@ -815,7 +786,6 @@ describe('abyssal modules', () => {
   });
 });
 
-/** Opens a location row's ⋮ menu and picks its pin item (the pin lives in the row menu). */
 async function pinViaMenu(user: ReturnType<typeof userEvent.setup>, place: string, item: RegExp) {
   await user.click(
     await screen.findByRole('button', {
@@ -947,9 +917,6 @@ describe('item name and blueprint badge', () => {
   });
 });
 
-// Every test above renders the page on its own route (`renderAssetsRoute`).
-// These few prove the App wiring that leaves out: the route mounts at /assets
-// inside the signed-in shell, and the app's scope gate stands in for it.
 describe('Assets in the App', () => {
   it('opens /assets inside the signed-in shell, its rail link current', async () => {
     render(<App />);

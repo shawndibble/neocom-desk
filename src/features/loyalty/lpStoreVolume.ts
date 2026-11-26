@@ -1,23 +1,13 @@
-/**
- * Reads a Trade Hub region's units-per-day object (issue #5127), published daily
- * next to the LP offers snapshot by the `public-data-lp-store` GitHub Actions job
- * (`lp-store-volume/<regionId>.json` in R2; `functions/src/marketHistoryVolume.ts`).
- * One small object per hub region, read whole, so opening a store costs one
- * cached request, never a history call per row. `null` means unavailable.
- */
 import { useCallback } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import { HOUR_MS } from '@/lib/age';
 
-/** The backend republishes once a day. */
 const STALE_AFTER_MS = 12 * HOUR_MS;
 
-/** Units per day by type id; a type that never traded in the window is absent. */
 export type LpStoreVolume = Readonly<Record<number, number>>;
 
-/** The object as `functions/src/r2DailySnapshots.ts` writes it, or `null` when it is not that shape. */
 export function parseLpStoreVolume(raw: unknown): LpStoreVolume | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { lastSyncedAt, perDay } = raw as Record<string, unknown>;
@@ -55,11 +45,6 @@ export async function loadLpStoreVolume(regionId: number): Promise<LpStoreVolume
   }
 }
 
-/**
- * A hub region's volume, never another region's. `regionId` null loads
- * nothing. `settled` once this region's read is done; `volume` null for good
- * when it failed or is unavailable.
- */
 export function useLpStoreVolume(regionId: number | null): {
   volume: LpStoreVolume | null;
   settled: boolean;

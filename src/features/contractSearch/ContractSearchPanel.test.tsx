@@ -35,8 +35,6 @@ vi.mock('@/features/contractSearch/publicContractOffers', () => ({
   loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
 }));
 
-// The offer index and its per-type reads (issue #4270): `cachedSnapshot`
-// publishes the rows it is given through these; the default is "none published".
 const loadOfferIndex = vi.fn();
 const loadOffersForTypes = vi.fn();
 vi.mock('@/features/contractSearch/publicContractOfferIndex', async (importOriginal) => ({
@@ -45,18 +43,15 @@ vi.mock('@/features/contractSearch/publicContractOfferIndex', async (importOrigi
   loadOffersForTypes: (...args: unknown[]) => loadOffersForTypes(...args),
 }));
 
-// PLEX trades on its own global market; the panel reads one price for it.
 const usePlexPrice = vi.fn<() => number | null>(() => null);
 vi.mock('@/features/market/plexPrice', () => ({
   usePlexPrice: () => usePlexPrice(),
 }));
 
-// Below market (#3989) prices at the hub; no test reaches Fuzzwork.
 const NO_HUB_PRICES = { prices: new Map(), unreachable: false };
 const getHubPricesWithStatus = vi.fn<(...args: unknown[]) => Promise<typeof NO_HUB_PRICES>>(
   async () => NO_HUB_PRICES
 );
-// Blueprint originals are priced region-wide for the row flags (#4773).
 const getRegionSellPrices = vi.fn<(...args: unknown[]) => Promise<Map<number, number | null>>>(
   async () => new Map()
 );
@@ -98,8 +93,6 @@ vi.mock('@/features/bpcContracts/publicContractItems', () => ({
   loadPublicContractItems: (...args: unknown[]) => loadPublicContractItems(...args),
 }));
 
-// 48098 stands in for a type on contract that the market catalogue never
-// lists (an unmarketable blueprint copy), so only this lookup can name it.
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(
     async () =>
@@ -110,15 +103,11 @@ vi.mock('@/features/character/typeNames', () => ({
   ),
 }));
 
-/** The Jump Range filter's origin (`features/route/currentSystem.ts`), mocked so a test can set it without ESI. */
 const loadCharacterSolarSystemId = vi.fn<(characterId: number) => Promise<number | null>>();
 vi.mock('@/features/character/location', () => ({
   loadCharacterSolarSystemId: (characterId: number) => loadCharacterSolarSystemId(characterId),
 }));
 
-// The whole SDE for these tests: one blueprint (638) printing one product
-// (587), so the real `plannableProductTypeID` resolves both menu readings —
-// a blueprint row to what it makes, a 587 row to itself.
 vi.mock('@/sde/loadSde', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/sde/loadSde')>();
   return {
@@ -141,30 +130,14 @@ const CATALOG: MarketTypeEntry[] = [
 ];
 const JITA = 60003760;
 const AMARR = 60008494;
-/** Jita's own solar system, for the Jump Range filter's origin (system ids, not station ids). */
 const JITA_SYSTEM = 30000142;
-/** A player structure: `stations.json` does not hold it, so nothing local names it. */
 const UNKNOWN_STRUCTURE = 1035466617946;
-/** A 0.3 system joining the two hubs directly — two jumps instead of four. */
 const LOWSEC_SHORTCUT = 30000200;
 
-/**
- * One station per band the app can actually produce, so the route cell and the
- * Destination space filter run through the real `classifySpace` rather than
- * only at engine level (issue #939).
- *
- * There is deliberately no wormhole station here. Endpoints are named out of
- * `stations.json`, which holds NPC stations only, and none of its 5,210 sits in
- * a J-named system — wormhole hauls end at player structures, which nothing
- * local places at all. A J-named NPC station in this fixture would be a shape
- * the SDE build cannot emit, and a test built on one proves nothing about
- * production.
- */
 const RANCER = 60011740;
 const RANCER_SYSTEM = 30002809;
 const NULL_STATION = 60014437;
 const NULL_SYSTEM = 30001161;
-/** The single most dangerous system in highsec, and a 0.5 like hundreds of others. */
 const UEDAMA_STATION = 60011866;
 const UEDAMA_SYSTEM = 30002768;
 
@@ -178,27 +151,15 @@ const STATIONS: NpcStationEntry[] = [
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
   { id: 30002187, name: 'Amarr', security: 1, regionId: 10000043 },
-  // Three highsec hops between them, so a route has a length to report.
   { id: 30000144, name: 'Perimeter', security: 0.9, regionId: 10000002 },
   { id: 30000146, name: 'Urlen', security: 0.9, regionId: 10000002 },
   { id: 30002186, name: 'Niarja', security: 0.5, regionId: 10000043 },
-  // And one lowsec hop that halves the trip, which is what makes the three
-  // route preferences give three different answers rather than one.
   { id: LOWSEC_SHORTCUT, name: 'Ohide', security: 0.3, regionId: 10000043 },
   { id: RANCER_SYSTEM, name: 'Rancer', security: 0.4, regionId: 10000043 },
-  // Exactly 0.0, which is a real nullsec value and a falsy one — a truthiness
-  // guard anywhere on the security field would call this unknown.
   { id: NULL_SYSTEM, name: 'Vale', security: 0.0, regionId: 10000043 },
-  // Its real security, which rounds to 0.5 — the point being that the band
-  // alone says nothing and the name is what carries the warning.
   { id: UEDAMA_SYSTEM, name: 'Uedama', security: 0.50544, regionId: 10000033 },
 ];
 
-/**
- * Jita and Amarr, four jumps apart down a single chain — enough for the
- * courier table's distance and ISK/jump columns to have a real answer, and
- * for the structure-ended haul beside them to have none.
- */
 const JUMPS = {
   30000142: [30000144, LOWSEC_SHORTCUT],
   30000144: [30000142, 30000146],
@@ -208,7 +169,6 @@ const JUMPS = {
   [LOWSEC_SHORTCUT]: [30000142, 30002187],
 };
 
-/** What `regions.json` ships: the whole k-space table, so nothing asks ESI. */
 const REGIONS = [
   { id: 10000002, name: 'The Forge' },
   { id: 10000043, name: 'Domain' },
@@ -222,7 +182,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystemJumps: vi.fn(async () => JUMPS),
 }));
 
-/** Column order: route, reward, collateral, jumps, ISK/jump, ISK/m³, expires. */
 const COLLATERAL_CELL = 2;
 const JUMPS_CELL = 3;
 const ISK_PER_JUMP_CELL = 4;
@@ -271,7 +230,6 @@ function courierRow(overrides: Partial<PublicCourierContractRow> = {}): PublicCo
 }
 
 const JITA_TO_AMARR = courierRow();
-/** Pays better, asks for no collateral and states no deadline — and ends somewhere nothing local names. */
 const AMARR_TO_STRUCTURE = courierRow({
   contractId: 501,
   regionId: 10000043,
@@ -282,11 +240,6 @@ const AMARR_TO_STRUCTURE = courierRow({
   daysToComplete: undefined,
 });
 
-/**
- * What `loadR2Snapshot` hands back: the cached rows, plus whether a newer
- * read is running behind them (#963). `revalidating` is false here — the
- * stale-serve path has its own coverage in `r2Snapshot.test.ts`.
- */
 function snapshotRead<TRow>(rows: TRow[], overrides: Partial<CachedResult<never>> = {}) {
   return {
     cached: {
@@ -306,11 +259,6 @@ function cachedCourierSnapshot(
   return snapshotRead(rows);
 }
 
-/**
- * Publishes `rows` the way R2 does (issue #4270): the index lists their types
- * and regions, and a search reads their rows per type. The offers read itself
- * carries only freshness, never rows.
- */
 function cachedSnapshot(
   rows: PublicContractOfferRow[],
   overrides: Partial<CachedResult<never>> = {}
@@ -329,7 +277,6 @@ function cachedSnapshot(
     regionIds: [...new Set(rows.map((row) => row.regionId))],
     r2: {},
   });
-  // `null` asks for every type (Below market, a search naming none).
   loadOffersForTypes.mockImplementation(async (_index: unknown, ids: ReadonlySet<number> | null) =>
     rows.filter((row) => ids === null || ids.has(row.typeId))
   );
@@ -337,8 +284,6 @@ function cachedSnapshot(
 }
 
 beforeEach(async () => {
-  // The jump graph memoizes its index for the session, so without this a
-  // later test inherits whichever snapshot an earlier one happened to load.
   clearJumpGraphIndex();
   clearMarketTypeIndex();
   await db.settings.clear();
@@ -346,8 +291,6 @@ beforeEach(async () => {
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
-  // Same reset, same reason: a Courier filter one case sets (issue #1719)
-  // must not leak into the next as a remembered default.
   useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
   loadOfferIndex.mockReset();
   loadOfferIndex.mockResolvedValue(null);
@@ -361,9 +304,6 @@ beforeEach(async () => {
   loadPublicCourierContracts.mockResolvedValue(
     cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE])
   );
-  // Restored per case: one progressive-loading test below holds this pending
-  // on purpose, and a leaked never-settling lookup would strand every later
-  // case's Region column on its id placeholder.
   loadRegionName.mockReset();
   loadRegionName.mockImplementation(async (regionId: number) =>
     regionId === 10000002 ? 'The Forge' : 'Domain'
@@ -382,36 +322,18 @@ beforeEach(async () => {
     fromCache: false,
     truncated: false,
   });
-  // Restored per case: the jump-graph failure case below rejects persistently,
-  // and a leaked rejection would strand every later case with no distances.
   vi.mocked(loadSolarSystemJumps).mockImplementation(async () => JUMPS);
-  // Both SDE indexes memoize per session, so without this a case that swaps
-  // the snapshot reads the previous case's map.
   clearNpcStationIndex();
   clearSolarSystemIndex();
 });
 
 async function bodyRows() {
   const table = await screen.findByRole('table');
-  // The name lookups commit a render *after* the rows now (issue #963): the
-  // boards no longer wait on the market catalogue, the endpoint resolution or
-  // the region names before showing anything. So waiting for the table alone
-  // races them, and a cell read straight afterwards can still hold the `#34`
-  // placeholder the column honestly shows until its name lands. An empty
-  // `waitFor` yields a macrotask inside `act`, which is enough for every
-  // already-settled lookup to flush.
   await waitFor(() => {});
   const [, ...rest] = within(table).getAllByRole('rowgroup');
   return within(rest[0]).getAllByRole('row');
 }
 
-/**
- * The panel no longer draws its own Refresh: it reports freshness and the
- * reload upward, and `routes/Contracts.tsx` renders both in the page header.
- * This stands in for that header, so a test can still click Refresh without
- * mounting the whole route — and for the route's Item search / Courier tabs,
- * as an "Items" and a "Courier" button.
- */
 function SearchTabHarness() {
   const [status, setStatus] = useState<ContractSearchStatus | null>(null);
   const [mode, setMode] = useState<ContractMode>('items');
@@ -435,18 +357,8 @@ function SearchTabHarness() {
   );
 }
 
-/**
- * The Items board asks for a search before it shows a table (issue #2921), and
- * any control off its default counts as one. A minimum quantity of 0 is a
- * search that excludes nothing, so the suites that read the table render it.
- */
 const SEARCHING = '/?items.minQty=0';
 
-/**
- * Always inside a Router: every item row is a Build Plan context-menu trigger
- * (#931), as is each detail-modal line, and both call `useNavigate`. Matches
- * production — the panel only ever renders under `/contracts`.
- */
 function renderWithRouter(initialEntries: string[] = [SEARCHING]) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
@@ -467,7 +379,6 @@ describe('ContractSearchPanel', () => {
       renderWithRouter();
 
       const rows = await bodyRows();
-      // 100 PLEX at 5,000 ISK is 500k — cheaper than the 1M ISK offer.
       expect(within(rows[0]).getByText('incl. 100 PLEX')).toBeInTheDocument();
     });
 
@@ -496,8 +407,6 @@ describe('ContractSearchPanel', () => {
 
     const rows = await bodyRows();
     expect(rows).toHaveLength(3);
-    // Default sort is price ascending, and an auction is judged on its buyout
-    // (2M) rather than its 1 ISK starting bid.
     expect(rows.map((r) => within(r).getAllByRole('cell')[0].textContent)).toEqual([
       'Tritanium',
       'Tritanium',
@@ -506,7 +415,6 @@ describe('ContractSearchPanel', () => {
   });
 
   it('sorts every offer cheapest-first and windows them, with no cap to lift (issue #1777)', async () => {
-    // Snapshot order is contract-then-type, so the cheapest row can sit last.
     const dear = Array.from({ length: 60 }, (_, i) =>
       row({ contractId: 100 + i, price: 10_000_000 - i, quantity: 1 })
     );
@@ -515,11 +423,9 @@ describe('ContractSearchPanel', () => {
     renderWithRouter();
 
     const rows = await bodyRows();
-    // Only a window is mounted, but it is the head of the whole sorted set.
     expect(rows.length).toBeLessThan(61);
     expect(within(rows[0]).getByText('7')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument();
-    // The phone sort bar's count names every match, not the rows mounted.
     expect(screen.getByText('61 offers')).toBeInTheDocument();
   });
 
@@ -537,8 +443,6 @@ describe('ContractSearchPanel', () => {
       const rows = await bodyRows();
       expect(within(rows[0]).getByText('Jita')).toBeInTheDocument();
       expect(within(rows[0]).getByText('0.9')).toBeInTheDocument();
-      // A player structure is a finished answer, not a pending one — for the
-      // System cell and (no resolvable system) the Jumps cell beside it.
       const systemCell = rows[1].querySelector('[data-label="System"]');
       expect(systemCell).not.toBeNull();
       expect(within(systemCell as HTMLElement).getByText('—')).toBeInTheDocument();
@@ -546,8 +450,6 @@ describe('ContractSearchPanel', () => {
   });
 
   it('narrows to offers within the chosen jump range of the current system', async () => {
-    // Jita itself (0 jumps) and Amarr (4 jumps, per the `JUMPS` fixture) —
-    // "Current system" keeps the first and drops the second.
     loadPublicContractOffers.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, price: 1, locationId: JITA }),
@@ -580,20 +482,14 @@ describe('ContractSearchPanel', () => {
       const rows = await bodyRows();
       const jumpsCell = (index: number) => rows[index].querySelector('[data-label="Jumps"]');
       expect(within(jumpsCell(0) as HTMLElement).getByText('0')).toBeInTheDocument();
-      // 4, the highsec-only way: distance is counted under the pilot's Travel
-      // default (Prefer safer), not by `JUMPS`'s 2-jump lowsec shortcut.
       expect(within(jumpsCell(1) as HTMLElement).getByText('4')).toBeInTheDocument();
     });
   });
 
   it('explains an unfiltered range with no current system even with the filter funnel closed', async () => {
-    // A range set from a pasted link (or a prior session) must still explain
-    // itself with the sheet/row shut — a closed funnel unmounts the bar's own
-    // controls, so this note cannot live inside them.
     loadCharacterSolarSystemId.mockResolvedValue(null);
     renderWithRouter(['/?items.jumps=3']);
 
-    // The notice is visible and announced: its text sits in a LiveNote twice.
     await waitFor(() =>
       expect(screen.getAllByText('Set your current system to filter by distance.')).toHaveLength(2)
     );
@@ -703,7 +599,6 @@ describe('ContractSearchPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
-    // Reset clears every control, which leaves nothing to search for.
     expect(await screen.findByText('Search to see contract offers')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toHaveValue('');
   });
@@ -732,7 +627,6 @@ describe('ContractSearchPanel', () => {
     await user.click(screen.getByRole('button', { name: /filters/i }));
     await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1.5m');
 
-    // The auction is judged on its 2M buyout, so only the two Tritanium asks remain.
     await waitFor(async () => expect(await bodyRows()).toHaveLength(2));
   });
 
@@ -768,7 +662,6 @@ describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () 
 
     const rows = await bodyRows();
     expect(rows).toHaveLength(2);
-    // Priced row first even though it costs more than the barter's literal 0.
     expect(within(rows[0]).getAllByRole('cell')[0].textContent).toBe('Pyerite');
     expect(within(rows[1]).getAllByRole('cell')[0].textContent).toBe('Tritanium');
   });
@@ -781,7 +674,6 @@ describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () 
 
     const rows = await bodyRows();
     expect(within(rows[0]).getByText('Asking for goods')).toBeInTheDocument();
-    // The real (0) figure is still shown, not hidden.
     expect(within(rows[0]).getByText('0.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
@@ -795,10 +687,6 @@ describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () 
   });
 
   it('keeps a zero-price row last even when the Price column is sorted descending, not first', async () => {
-    // `sortValue` must return `undefined` for an unpriced row, not a numeric
-    // sentinel like `Infinity` — a numeric sentinel sorts *first* the moment
-    // the column's own sort direction flips to descending, reintroducing the
-    // bug from the other direction.
     const barter = row({ contractId: 900, typeId: 34, price: 0, quantity: 1 });
     const priced = row({ contractId: 901, typeId: 35, price: 500_000, quantity: 1 });
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([barter, priced]));
@@ -806,8 +694,6 @@ describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () 
     renderWithRouter();
     await bodyRows();
 
-    // The column starts sorted ascending by default (`defaultSort`), so one
-    // click flips it straight to descending.
     const header = screen.getByRole('columnheader', { name: 'Price' });
     expect(header).toHaveAttribute('aria-sort', 'ascending');
     await user.click(screen.getByRole('button', { name: 'Price' }));
@@ -827,9 +713,6 @@ describe('ContractSearchPanel — contract detail modal', () => {
     const rows = await bodyRows();
     await user.click(rows[0]);
 
-    // rows[0] is Domain-region Tritanium (cheapest-first sort): the modal
-    // title is the item name, and its region reflects the clicked row, not
-    // whichever row rendered first in the snapshot.
     expect(await screen.findByText('Everything on this contract')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toHaveTextContent('Domain');
     expect(loadPublicContractItems).toHaveBeenCalledWith(TRIT_DOMAIN.contractId);
@@ -846,14 +729,12 @@ describe('ContractSearchPanel — contract detail modal', () => {
     const rows = await bodyRows();
     await user.click(rows[0]);
 
-    // 100 Tritanium at 6,000 sell = 600,000 against a 500,000 ask.
     const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
     expect(await within(check).findByText('600,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('+16.7%')).toBeInTheDocument();
   });
 
   it("holds a blueprint copy per run against similar copies, never against the original's hub price", async () => {
-    // 638 trades at the hub as an original (a copy never does): its book must not stand in.
     getHubPricesWithStatus.mockResolvedValue({
       prices: new Map([[638, { sellMin: 1_135_000_000, buyMax: 1_000_000_000 }]]),
       unreachable: false,
@@ -872,10 +753,10 @@ describe('ContractSearchPanel — contract detail modal', () => {
       });
     loadPublicContractOffers.mockResolvedValue(
       cachedSnapshot([
-        copy(21, 4_000_000), // 800,000 a run: the cheapest, so the first row
-        copy(22, 5_000_000), // 1,000,000
-        copy(23, 5_500_000), // 1,100,000
-        copy(24, 6_000_000, { me: 9 }), // 1,200,000
+        copy(21, 4_000_000),
+        copy(22, 5_000_000),
+        copy(23, 5_500_000),
+        copy(24, 6_000_000, { me: 9 }),
       ])
     );
     const user = userEvent.setup();
@@ -886,8 +767,8 @@ describe('ContractSearchPanel — contract detail modal', () => {
     const check = await screen.findByRole('region', {
       name: 'Is it fair? · 3 similar copies for sale now',
     });
-    expect(within(check).getByText('800,000 ISK')).toBeInTheDocument(); // this copy
-    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // the median of the rest
+    expect(within(check).getByText('800,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument();
     expect(screen.queryByText('1,135,000,000 ISK')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sell orders' })).not.toBeInTheDocument();
   });
@@ -940,19 +821,12 @@ describe('ContractSearchPanel — Courier mode', () => {
       return found;
     });
     const [measurable] = rows;
-    // The system, not the station it sits in: the full station name belongs
-    // to the detail modal, which still shows it.
     expect(within(measurable).getByText(/Jita/)).toBeInTheDocument();
     expect(within(measurable).queryByText(/Jita IV - Moon 4/)).not.toBeInTheDocument();
-    // Region names come from the same lookup the item results use.
     expect(within(measurable).getAllByText('The Forge').length).toBeGreaterThan(0);
   });
 
   it('ranks by ISK per jump, so a haul with no measurable distance sorts last', async () => {
-    // The cost of a haul is the trip, and the trip is jumps. A haul with no
-    // measurable distance has no rate, and "we cannot say" sorts below every
-    // real figure rather than above it — which under the old reward sort is
-    // exactly where the richer-looking structure-ended haul did not sit.
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -967,8 +841,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('re-measures every haul when the route preference changes', async () => {
-    // Four jumps the safe way, two through lowsec — and the whole filtered
-    // set is re-ranked on the change, not just the visible page.
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -991,11 +863,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('ranks by reward and says so when the jump graph cannot be read', async () => {
-    // A board that cannot measure distance must not report every haul as
-    // having no route; it falls back to reward and states why.
-    // Persistent, not `...Once`: the graph is read by the endpoint resolution
-    // as well as by the distance pass, and a single rejection would leave the
-    // second read succeeding and the board measuring distances after all.
     vi.mocked(loadSolarSystemJumps).mockRejectedValue(new Error('offline'));
     clearJumpGraphIndex();
     await showCourier();
@@ -1004,9 +871,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('shows what a haul pays per cubic metre, beside the rate it ranks on', async () => {
-    // The secondary figure: a hauler filling one hold from several contracts
-    // is short of space, not distance. It sits beside ISK/jump rather than
-    // replacing it as the sort.
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -1017,14 +881,10 @@ describe('ContractSearchPanel — Courier mode', () => {
     const cells = within(rows[0])
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
-    // 12,000,000 ISK over 60,000 m³.
     expect(cells[ISK_PER_VOLUME_CELL]).toBe('200');
   });
 
   it('has no rate per cubic metre for a haul that states no cargo', async () => {
-    // A stated zero survives ingestion — the publisher's parser rejects only
-    // an empty column — so this row genuinely reaches the client. It must
-    // read as unavailable, never as an infinite rate.
     loadPublicCourierContracts.mockResolvedValue(
       cachedCourierSnapshot([courierRow({ contractId: 700, volume: 0 })])
     );
@@ -1042,9 +902,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('says no collateral was asked for, rather than reporting a ratio of zero', async () => {
-    // "0x" is arithmetically true and reads as a measured ratio, which is the
-    // opposite of what an absent collateral means — so the figure says "none
-    // asked for" in words under its dash.
     loadPublicCourierContracts.mockResolvedValue(
       cachedCourierSnapshot([courierRow({ contractId: 701, collateral: undefined })])
     );
@@ -1065,9 +922,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('has no collateral ratio against a haul that pays nothing', async () => {
-    // A free haul carrying collateral is exactly the shape worth showing, so
-    // it must render rather than being dropped — but the ratio is unknowable,
-    // not infinite.
     loadPublicCourierContracts.mockResolvedValue(
       cachedCourierSnapshot([courierRow({ contractId: 702, reward: 0 })])
     );
@@ -1081,8 +935,6 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(rows[0]);
 
     const dialog = await screen.findByRole('dialog');
-    // The collateral itself still shows; only the ratio against the reward is
-    // unknowable, so that line is absent rather than infinite.
     const collateral = within(dialog).getByText('Collateral').parentElement;
     expect(collateral).toHaveTextContent('900M');
     expect(collateral).not.toHaveTextContent('Infinity');
@@ -1094,7 +946,6 @@ describe('ContractSearchPanel — Courier mode', () => {
     await waitFor(async () => {
       expect(await bodyRows()).toHaveLength(2);
     });
-    // The header a table sorts by is the one carrying aria-sort.
     const sorted = screen
       .getAllByRole('columnheader')
       .find((header) => header.getAttribute('aria-sort') === 'descending');
@@ -1115,15 +966,12 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(withCollateral);
 
     const dialog = await screen.findByRole('dialog');
-    // 900,000,000 ISK put up against a 12,000,000 ISK reward.
     expect(within(dialog).getByText('Collateral').parentElement).toHaveTextContent(
       '75× the reward'
     );
   });
 
   it('shows a location nothing local names as its id rather than inventing one', async () => {
-    // Resolving a player structure costs one ESI call per id against an ACL
-    // that usually refuses, so the panel does not try — see courierEndpoints.ts.
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -1149,18 +997,12 @@ describe('ContractSearchPanel — Courier mode', () => {
       candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
     )!;
     const withCollateral = rows.find((candidate) => candidate !== withoutCollateral)!;
-    // Asserted by position rather than by counting dashes: the collateral
-    // cell specifically must not render "0.00 ISK", which a count would let
-    // through as long as some other cell happened to be a dash.
     const cells = within(withoutCollateral)
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
     expect(cells[COLLATERAL_CELL]).toBe('—');
-    // This haul also ends in a player structure, so it has no distance and no
-    // rate — two more dashes, for a different reason.
     expect(cells[JUMPS_CELL]).toBe('—');
     expect(cells[ISK_PER_JUMP_CELL]).toBe('—');
-    // The haul that states a collateral shows a figure, not a dash.
     const stated = within(withCollateral)
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
@@ -1168,9 +1010,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('leads the detail with the rate the board itself ranks on', async () => {
-    // ISK/jump was missing from this modal entirely: a hauler could sort the
-    // table on it and then lose it on the one screen where the haul is
-    // actually judged.
     await showCourier();
     const rows = await waitFor(async () => {
       const found = await bodyRows();
@@ -1184,19 +1023,13 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(jitaToAmarr);
 
     const dialog = await screen.findByRole('dialog');
-    // 12,000,000 ISK over the four jumps Jita → Amarr takes.
     expect(within(dialog).getByText('Per jump').parentElement).toHaveTextContent('3M');
-    // The exact rate sits under the compact one: compact notation rounds to a
-    // single fraction digit, and this is the figure hauls are compared on.
     expect(within(dialog).getByText('Per jump').parentElement).toHaveTextContent(
       '3,000,000 ISK over 4 jumps'
     );
   });
 
   it('states a free haul as paying nothing per jump, not as having no rate', async () => {
-    // 0 is what this haul pays over its four jumps — a fact, unlike the dash
-    // an unmeasurable route earns. Only the rate that ranks the board is
-    // accented, so the zero reads as quiet rather than as a headline.
     loadPublicCourierContracts.mockResolvedValue(
       cachedCourierSnapshot([courierRow({ contractId: 703, reward: 0 })])
     );
@@ -1216,9 +1049,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('quotes no rate per jump when no gate route reaches an end', async () => {
-    // "No distance" must never render as a rate: the haul to an unplaced
-    // structure has no route to measure, and a fabricated denominator would
-    // rank it against hauls that do.
     await showCourier();
     const rows = await waitFor(async () => {
       const found = await bodyRows();
@@ -1238,8 +1068,6 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it("keeps both ends' region in the detail rather than clipping it off", async () => {
-    // The region is the one fact the route column could not already show, and
-    // it was exactly what the old truncated single line dropped.
     await showCourier();
     const rows = await waitFor(async () => {
       const found = await bodyRows();
@@ -1271,17 +1099,13 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(jitaToAmarr);
 
     const dialog = await screen.findByRole('dialog');
-    // Named, because the body carries section headings of its own.
     expect(
       within(dialog).getByRole('heading', { name: 'Courier · Jita → Amarr' })
     ).toBeInTheDocument();
-    // The station itself is still in the body, said once.
     expect(within(dialog).getAllByText(/Caldari Navy Assembly Plant/)).toHaveLength(1);
   });
 
   it('states an absent deadline as unstated in the detail, which is where it lives', async () => {
-    // A deadline is a constraint checked once on a haul under consideration,
-    // so it is a filter and a detail figure rather than a column.
     await showCourier();
     const rows = await waitFor(async () => {
       const found = await bodyRows();
@@ -1337,7 +1161,6 @@ describe('ContractSearchPanel — Courier mode', () => {
     await showCourier();
 
     expect(await screen.findByText('No public courier contracts synced yet')).toBeInTheDocument();
-    // Not the offers corpus's empty state: that one is not empty.
     expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
   });
 
@@ -1360,11 +1183,8 @@ describe('ContractSearchPanel — Courier mode', () => {
 
     await user.click(rows[0]);
 
-    // rows[0] is the best-paying haul (Amarr -> the unnamed structure).
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Amarr VIII (Oris)');
-    // No "Everything on this contract" section, and no fetch for one: a
-    // courier haul has no item list, unlike the Items-mode modal.
     expect(screen.queryByText('Everything on this contract')).not.toBeInTheDocument();
     expect(loadPublicContractItems).not.toHaveBeenCalled();
   });
@@ -1386,8 +1206,6 @@ describe('ContractSearchPanel — Courier mode', () => {
 });
 
 describe('ContractSearchPanel — Build Plan from an item row', () => {
-  /** Reads where the menu navigated to; `MemoryRouter` never touches `window.location`. */
-
   function renderWithProbe() {
     return render(
       <MemoryRouter initialEntries={[SEARCHING]}>
@@ -1431,8 +1249,6 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     fireEvent.contextMenu(rows[0]);
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    // 587 (Rifter), not 638 (its blueprint): `/industry?product=` takes the
-    // product, so handing it the blueprint's own typeID creates nothing.
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
         '/industry/plans?product=587&me=10&te=20&runs=5'
@@ -1441,9 +1257,6 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
   });
 
   it('plans a plain item row as itself, unseeded', async () => {
-    // 587 is directly producible, so the plan targets the row's own item. The
-    // regex is anchored on purpose: a non-copy row must carry no me/te/runs,
-    // and a substring match would pass with fabricated zeroes appended.
     loadPublicContractOffers.mockResolvedValue(
       cachedSnapshot([row({ contractId: 8, typeId: 587 })])
     );
@@ -1459,9 +1272,6 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
   });
 
   it('offers nothing on a row no blueprint builds', async () => {
-    // Asserted by label, not by `aria-disabled`: the transient "checking…"
-    // state is disabled too, so the attribute alone passes before the index
-    // loads — and Tritanium is neither a blueprint nor a blueprint's product.
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([TRIT_FORGE]));
     renderWithProbe();
 
@@ -1475,15 +1285,9 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
   });
 });
 
-/**
- * Endpoint space, never route space (issue #939). The band describes the two
- * ends a haul is posted between; nothing here claims the trip between them is
- * safe, and there is deliberately no control that would.
- */
 describe('ContractSearchPanel — Courier endpoint space', () => {
   const TO_LOWSEC = courierRow({ contractId: 601, destinationLocationId: RANCER });
   const TO_NULL = courierRow({ contractId: 602, destinationLocationId: NULL_STATION });
-  /** A player structure: `stations.json` does not hold it, so it has no band. */
   const TO_STRUCTURE = courierRow({ contractId: 604, destinationLocationId: UNKNOWN_STRUCTURE });
 
   async function showCourierWith(rows: PublicCourierContractRow[]) {
@@ -1496,11 +1300,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     return user;
   }
 
-  /**
-   * Opens the funnel, which every `FilterBar` hides its controls behind. At
-   * pointer width — which is what jsdom reports — that shows the controls on
-   * a line below the search box and each one commits as it is touched.
-   */
   async function openFilters(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'Filters' }));
   }
@@ -1522,10 +1321,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
       (r) => within(r).getAllByRole('cell')[0].textContent ?? ''
     );
 
-    // The number sits right after the system name — jsdom's `textContent`
-    // has no layout spacing, so "Jita0.9" is that adjacency. Origin is Jita
-    // on all three, so every cell opens with a 0.9 pickup; the band word the
-    // number replaced appears nowhere (the Space filter still uses it).
     expect(cells.every((cell) => cell.includes('Jita0.9'))).toBe(true);
     expect(cells.some((cell) => cell.includes('Rancer0.4'))).toBe(true);
     expect(cells.some((cell) => cell.includes('Vale0.0'))).toBe(true);
@@ -1538,15 +1333,11 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
     const [, destination] = (route.textContent ?? '').split('→');
     expect(destination).toBeDefined();
-    // No number and no stand-in word: the bare id and the Structure marker
-    // already say this end is unplaced.
     expect(destination).not.toMatch(/\d\.\d/);
     expect(route).not.toHaveTextContent('Unknown space');
   });
 
   it('offers only the bands these hauls actually end in', async () => {
-    // A chip for a band no row carries can never match, and deselecting it
-    // would read as a no-op while silently dropping every unplaced destination.
     const user = await showCourierWith([JITA_TO_AMARR, TO_LOWSEC]);
     await openFilters(user);
 
@@ -1557,9 +1348,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
   });
 
   it('hides the band filter entirely when no haul on the board carries one', async () => {
-    // A label with no chips under it is what the endpoints-still-resolving
-    // state looks like, and the permanent state if the station snapshot cannot
-    // be read at all. Neither is worth a control.
     const user = await showCourierWith([TO_STRUCTURE]);
     await openFilters(user);
 
@@ -1580,7 +1368,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
   });
 
   it('keeps an unplaceable destination while every offered band is selected', async () => {
-    // The control the hauler never narrowed must not exclude anything.
     await showCourierWith([JITA_TO_AMARR, TO_STRUCTURE]);
 
     expect(await courierRows()).toHaveLength(2);
@@ -1590,9 +1377,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     const user = await showCourierWith([JITA_TO_AMARR]);
     await openFilters(user);
 
-    // The band describes two endpoints. A highsec pickup and a highsec
-    // delivery can still route through lowsec, and this app cannot know — so
-    // the control is named for the end it filters on.
     expect(spaceGroup()).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /route/i })).not.toBeInTheDocument();
   });
@@ -1603,8 +1387,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
 
     await user.click(within(spaceGroup()).getByRole('button', { name: 'Lowsec' }));
 
-    // Not the generic "nothing matched": the board excluded these itself, and
-    // must say so rather than presenting its own exclusion as an absence.
     expect(await screen.findByText(/can't locate/i)).toBeInTheDocument();
   });
 
@@ -1612,8 +1394,6 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     const user = await showCourierWith([TO_LOWSEC, TO_STRUCTURE]);
     await openFilters(user);
 
-    // Narrow a band *and* set a reward floor nothing clears. The band filter is
-    // not why the table is empty, so it must not be offered as the reason.
     await user.click(within(spaceGroup()).getByRole('button', { name: 'Lowsec' }));
     await user.type(screen.getByLabelText('Min reward'), '999999999999');
 
@@ -1627,16 +1407,9 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
   });
 });
 
-/**
- * A courier contract is accepted by putting up collateral, so a haul that
- * cannot be delivered costs real ISK (issue #944). None of these flags claims
- * to know whether this player has access — only what the condition is and what
- * it would cost.
- */
 describe('ContractSearchPanel — Courier completion risk', () => {
   const TO_STRUCTURE = courierRow({ contractId: 701, destinationLocationId: UNKNOWN_STRUCTURE });
   const FROM_STRUCTURE = courierRow({ contractId: 702, originLocationId: UNKNOWN_STRUCTURE });
-  /** Posted in a J-space region, which is the one local fact a structure pickup leaves. */
   const OUT_OF_WORMHOLE = courierRow({
     contractId: 703,
     regionId: 11000031,
@@ -1668,10 +1441,6 @@ describe('ContractSearchPanel — Courier completion risk', () => {
   });
 
   it('does not flag a pickup from a player structure', async () => {
-    // The ticket scopes the flag to the delivery point. An inaccessible pickup
-    // is arguably the same trap — the contract is accepted remotely and the
-    // collateral taken then — but widening it is a follow-up, not a silent
-    // change here.
     await showCourierWith([FROM_STRUCTURE]);
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
@@ -1679,8 +1448,6 @@ describe('ContractSearchPanel — Courier completion risk', () => {
   });
 
   it('never reads an unreadable station table as a board full of player structures', async () => {
-    // The worst possible failure direction for a safety feature: one failed
-    // file read marking every haul on the board as a likely scam.
     const { loadNpcStations } = await import('@/sde/loadMarketSde');
     vi.mocked(loadNpcStations).mockRejectedValue(new Error('offline'));
     clearNpcStationIndex();
@@ -1691,7 +1458,6 @@ describe('ContractSearchPanel — Courier completion risk', () => {
   });
 
   it('says a wormhole haul has no gate route, not an unknown distance', async () => {
-    // Structural, not a gap in our data: J-space has no stargates at all.
     await showCourierWith([OUT_OF_WORMHOLE]);
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
@@ -1699,8 +1465,6 @@ describe('ContractSearchPanel — Courier completion risk', () => {
   });
 
   it('marks nullsec informationally, with no warning marker of its own', async () => {
-    // The security number already says it (0.0), which is a note. A second
-    // marker in a warning colour would turn that note into an alarm.
     await showCourierWith([TO_NULLSEC]);
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
@@ -1716,8 +1480,6 @@ describe('ContractSearchPanel — Courier completion risk', () => {
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     await user.click(screen.getByRole('button', { name: 'Hide risky routes' }));
 
-    // Nullsec stays: hiding legitimate nullsec work behind a safety control
-    // would quietly remove a real market rather than protect anyone.
     const remaining = await courierRows();
     expect(remaining).toHaveLength(2);
     const routes = remaining.map((r) => within(r).getAllByRole('cell')[0].textContent ?? '');
@@ -1732,24 +1494,12 @@ describe('ContractSearchPanel — Courier completion risk', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/keeps your collateral/)).toBeInTheDocument();
-    // States the condition, never a verdict about this player's own access.
     expect(within(dialog).queryByText(/you do not have access/i)).not.toBeInTheDocument();
-    // The collateral the note is about sits in the same dialog.
     expect(within(dialog).getByText('Collateral')).toBeInTheDocument();
   });
 });
 
-/**
- * Over-payment is the documented bait in courier scams, so the rate comparison
- * is the strongest signal available — and it is provable arithmetic rather than
- * an accusation (issue #946). Nothing here may call a contract a scam.
- */
 describe('ContractSearchPanel — Courier going rate', () => {
-  /**
-   * Twenty ordinary hauls, which is the floor a median needs before it means
-   * anything, plus one that pays far above them. All Jita→Amarr, so every row
-   * has the same distance and the rate differences are the rewards alone.
-   */
   function corpus(count: number, reward: number, volume = 45_000) {
     return Array.from({ length: count }, (_, i) =>
       courierRow({ contractId: 800 + i, reward, volume })
@@ -1777,14 +1527,12 @@ describe('ContractSearchPanel — Courier going rate', () => {
   it('shows every haul as a multiple of the market going rate', async () => {
     await showCourierWith([...ORDINARY, BAIT]);
 
-    // Ranked by ISK/jump, so the one paying 60x the others leads.
     const first = await waitFor(async () => {
       const found = (await courierRows())[0];
       expect(found.textContent).toMatch(/going rate/);
       return found;
     });
     expect(first.textContent).toMatch(/60x going rate/);
-    // And the ordinary hauls are the benchmark, so they sit at 1x.
     const rest = (await courierRows()).slice(1);
     expect(rest.every((r) => (r.textContent ?? '').includes('1x going rate'))).toBe(true);
   });
@@ -1797,14 +1545,10 @@ describe('ContractSearchPanel — Courier going rate', () => {
       expect(within(found).getByText(/60x going rate/)).toBeInTheDocument();
       return found;
     });
-    // Marked, not merely stated: the outlier is styled as one.
     expect(within(flagged).getByText(/60x going rate/).className).toMatch(/warning/);
   });
 
   it('shows no multiple at all for a corpus too small to have a median', async () => {
-    // A median over three rows is arithmetically fine and statistically
-    // meaningless, and this one decides whether a contract is called an
-    // outlier. The whole comparison degrades to silence.
     await showCourierWith([JITA_TO_AMARR, AMARR_TO_STRUCTURE]);
 
     const rows = await courierRows();
@@ -1812,8 +1556,6 @@ describe('ContractSearchPanel — Courier going rate', () => {
   });
 
   it('states no rate for a haul with no measurable distance', async () => {
-    // An unplaced endpoint has no jump count, and a rate computed without
-    // distance is not the rate this compares.
     await showCourierWith([...ORDINARY, AMARR_TO_STRUCTURE]);
 
     const unmeasurable = await waitFor(async () => {
@@ -1840,14 +1582,10 @@ describe('ContractSearchPanel — Courier going rate', () => {
   });
 
   it('names a delivery into a system haulers are most often killed in', async () => {
-    // Being a chokepoint is about traffic, not security: Uedama reads 0.5 like
-    // hundreds of other systems, so the band on the row says nothing and only
-    // the name carries the warning.
     await showCourierWith([courierRow({ contractId: 950, destinationLocationId: UEDAMA_STATION })]);
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
     expect(within(route).getByText('Gank gate')).toBeInTheDocument();
-    // And the security still reads as the ordinary 0.5 highsec it is.
     expect(route).toHaveTextContent('Uedama0.5');
   });
 
@@ -1859,22 +1597,17 @@ describe('ContractSearchPanel — Courier going rate', () => {
     await user.click((await courierRows())[0]);
 
     const dialog = await screen.findByRole('dialog');
-    // The benchmark is named, not merely applied; the reasoning is in its tooltip.
     expect(within(dialog).getByText('Pay vs going rate')).toBeInTheDocument();
     expect(
       within(dialog).getByRole('button', { name: 'About Pay vs going rate' })
     ).toBeInTheDocument();
-    // The community floor, where collateral and distance are both known.
     expect(within(dialog).getByText('Community minimum')).toBeInTheDocument();
     expect(within(dialog).getByText('Expires')).toBeInTheDocument();
-    // The bound the whole design rests on.
     expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/fraud|bad faith|dishonest/i)).not.toBeInTheDocument();
   });
 
   it('flags collateral far above the reward in the detail, and only there', async () => {
-    // 50B put up against 45M: the forfeit-bait shape (issue #1720). Stated as
-    // a ratio, and kept off the row per decision 20260912-172628.
     const user = await showCourierWith([
       courierRow({ contractId: 960, reward: 45_000_000, collateral: 50_000_000_000 }),
     ]);
@@ -1886,13 +1619,11 @@ describe('ContractSearchPanel — Courier going rate', () => {
     expect(within(dialog).getByText('High collateral')).toBeInTheDocument();
     expect(within(dialog).getByText(/Collateral is 1,111\.1× the reward/)).toBeInTheDocument();
     expect(within(dialog).getByText('Before you accept')).toBeInTheDocument();
-    // Short of the floor, it says by how much: 45M of a 200M floor.
     expect(within(dialog).getByText(/paying 22\.5% of it/)).toBeInTheDocument();
     expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
   });
 
   it('leaves ordinary high-value freight unflagged', async () => {
-    // 1B against 25M is 40x — expensive cargo, not an outlier.
     const user = await showCourierWith([
       courierRow({ contractId: 961, reward: 25_000_000, collateral: 1_000_000_000 }),
     ]);
@@ -1904,16 +1635,8 @@ describe('ContractSearchPanel — Courier going rate', () => {
   });
 });
 
-/**
- * The two corpora used to arrive out of one loader, so neither board rendered
- * until both had landed — a hauler waited on ~370k item-offer rows to be shown
- * ~620 hauls (issue #963). These cases hold each board's independence, and
- * hold the line that a board mid-load must not read as a finished one.
- */
 describe('ContractSearchPanel — Courier reverse lane', () => {
-  /** The outbound haul under test: The Forge → Domain, both ends named. */
   const OUTBOUND = courierRow({ contractId: 599, reward: 12_000_000, collateral: 1_000_000 });
-  /** Domain → The Forge: the return leg, asking a collateral a ceiling can cut. */
   const RETURN_LEG = courierRow({
     contractId: 600,
     regionId: 10000043,
@@ -1933,13 +1656,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
     return user;
   }
 
-  /**
-   * Opens one haul by its contract id and proves which one opened. Both
-   * directions of a lane name the same two systems, so picking a row by its
-   * text alone would silently open the return leg and assert against the wrong
-   * haul — the fixture-does-not-match-the-subject failure this feature has
-   * already shipped three times.
-   */
   async function openHaul(user: ReturnType<typeof userEvent.setup>, contractId: number) {
     const rows = await waitFor(async () => {
       const found = await bodyRows();
@@ -1973,8 +1689,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
     await user.click(within(dialog).getByRole('button', { name: '1 haul runs the reverse lane' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // Only the return leg is left: the outbound haul this started from no
-    // longer matches its own swapped regions.
     const remaining = await waitFor(async () => {
       const found = await bodyRows();
       expect(found).toHaveLength(1);
@@ -1984,7 +1698,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
   });
 
   it('says a haul with no matching return leg has none, and offers no dead link', async () => {
-    // Nothing runs Domain → The Forge in this corpus.
     const user = await showCourierWith([OUTBOUND]);
 
     const dialog = await openHaul(user, OUTBOUND.contractId);
@@ -1995,12 +1708,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
     expect(within(dialog).queryByRole('button', { name: /reverse lane/ })).not.toBeInTheDocument();
   });
 
-  /**
-   * The lane is matched region to region, and only a *pickup* falls back to the
-   * contract's own region column — so a return haul delivering to a player
-   * structure can never be matched into the count. Said out loud, because a
-   * bare zero beside it would read as "nobody is hauling back".
-   */
   it('says how many return hauls it could not place, rather than leaving them out silently', async () => {
     const user = await showCourierWith([OUTBOUND, AMARR_TO_STRUCTURE]);
 
@@ -2011,9 +1718,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
         "No known haul runs the reverse lane. 1 leaves Domain for a drop-off we can't locate."
       )
     ).toBeInTheDocument();
-    // One sentence, not two. "No outstanding haul runs the reverse lane."
-    // followed by "1 *more* leaves…" is more than none, and shipped green once
-    // because the test asserted only the second line.
     expect(
       within(dialog).queryByText('No outstanding haul runs the reverse lane.')
     ).not.toBeInTheDocument();
@@ -2040,15 +1744,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
     ).toBeInTheDocument();
   });
 
-  /**
-   * The count and the board it opens must narrow by the same stages. The
-   * over-rate filter needs the jump counts, so it was left out of the count at
-   * first — which let the link promise a haul the board then filtered away, the
-   * exact dead link the zero case is written to avoid.
-   */
   it('counts only the return hauls the board it opens will actually show', async () => {
-    // Twenty ordinary hauls, which is the floor a median needs, plus one paying
-    // far above them — and one ordinary haul running the lane back.
     const ordinary = Array.from({ length: 20 }, (_, i) =>
       courierRow({ contractId: 810 + i, reward: 15_000_000, volume: 45_000, collateral: 1_000_000 })
     );
@@ -2075,8 +1771,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     const dialog = await openHaul(user, bait.contractId);
 
-    // The way home pays the going rate, so this board is not showing it — and
-    // the count must not offer it either.
     expect(within(dialog).queryByRole('button', { name: /reverse lane/ })).not.toBeInTheDocument();
     expect(
       within(dialog).getByText('No outstanding haul runs the reverse lane.')
@@ -2093,14 +1787,12 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
         "We can't locate one end of this haul, so we can't look for a return haul."
       )
     ).toBeInTheDocument();
-    // Not a count of zero, which would read as an answer.
     expect(
       within(dialog).queryByText('No outstanding haul runs the reverse lane.')
     ).not.toBeInTheDocument();
   });
 
   it('keeps the other filters the hauler set when it swaps the two regions', async () => {
-    // Both run Domain → The Forge; only one sits under a 50M collateral ceiling.
     const affordable = courierRow({
       contractId: 601,
       regionId: 10000043,
@@ -2116,8 +1808,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     const dialog = await openHaul(user, OUTBOUND.contractId);
 
-    // RETURN_LEG asks 900M, so the ceiling rules it out of the way home just
-    // as it already has on the board itself.
     expect(
       within(dialog).getByRole('button', { name: '1 haul runs the reverse lane' })
     ).toBeInTheDocument();
@@ -2261,7 +1951,6 @@ describe('ContractSearchPanel — progressive loading', () => {
     const table = await screen.findByRole('table');
     const [, ...rest] = within(table).getAllByRole('rowgroup');
     expect(within(rest[0]).getAllByRole('row')).toHaveLength(2);
-    // Still pending — the hauls above did not wait for it.
     offers.resolve(cachedSnapshot([TRIT_FORGE]));
   });
 
@@ -2288,8 +1977,6 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('never claims an empty corpus while that corpus is still loading', async () => {
-    // The whole point: "no contracts have synced" and "they have not arrived
-    // yet" are different answers, and the second must not be given as the first.
     const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     loadOfferIndex.mockResolvedValue(null);
@@ -2305,9 +1992,6 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('names regions out of the local SDE, not one ESI call per region', async () => {
-    // `public/data/market/regions.json` is 78 entries and 2.7 KB; the ESI
-    // lookup it replaces was a round-trip per distinct region on a cold cache,
-    // and the only network-bound name stage of the whole load.
     renderWithRouter();
 
     const rows = await bodyRows();
@@ -2316,8 +2000,6 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('falls back to ESI for a region the local table does not carry', async () => {
-    // `regions.json` is the k-space table; a contract posted somewhere outside
-    // it must still get a name rather than be reported as unnameable.
     const WORMHOLE_REGION = 11000031;
     vi.mocked(loadRegionName).mockResolvedValue('Thera');
     loadPublicContractOffers.mockResolvedValue(
@@ -2334,9 +2016,6 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('does not call a typed query unmatched while the item names are still loading', async () => {
-    // The rows land before the 1.45 MB catalogue does, so every item reads
-    // `#34` and a typed query ranks nothing. "No contracts match your filters"
-    // would be a complete answer given mid-load.
     const catalog = deferred<MarketTypeEntry[]>();
     vi.mocked(loadMarketTypes).mockReturnValue(catalog.promise);
     const user = userEvent.setup();
@@ -2349,7 +2028,6 @@ describe('ContractSearchPanel — progressive loading', () => {
     expect(screen.queryByText('No contracts match your filters')).not.toBeInTheDocument();
 
     catalog.resolve(CATALOG);
-    // Named at last, and now the query has something to rank against.
     expect(await screen.findAllByText('Tritanium')).not.toHaveLength(0);
   });
 
@@ -2391,7 +2069,6 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     quantity: 10,
     requestsItems: true,
   });
-  /** No hub market: valued only from three other single-type contracts' asks. */
   const NO_MARKET = 99_999;
   const BLUEPRINTY = [
     row({ contractId: 20, typeId: 34, price: 1_000, quantity: 1 }),
@@ -2407,7 +2084,6 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
 
   beforeEach(() => {
     useBelowMarketSide.setState({ value: 'sell', hydrated: false });
-    // Tritanium 8,000 and Pyerite 300,000 on both sides of the book, no fees.
     getHubPricesWithStatus.mockResolvedValue({
       prices: new Map([
         [34, book(8_000)],
@@ -2426,8 +2102,6 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     await waitFor(() => {});
     const [, body] = within(table).getAllByRole('rowgroup');
     const rows = within(body).getAllByRole('row');
-    // Pyerite: 10 × 300k − 2M buyout = 1M. Tritanium in Domain: 100 × 8k −
-    // 500k = 300k. The Forge's 1M ask and the contract that wants items are left out.
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Pyerite');
     expect(rows[0]).toHaveTextContent('1,000,000');
@@ -2451,7 +2125,6 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     await user.click(screen.getByRole('combobox', { name: 'Value at' }));
     await user.click(await screen.findByRole('option', { name: 'Buy orders' }));
-    // Tritanium in Domain falls to 100 × 4k − 500k < 0 and drops out.
     await waitFor(() => {
       const table = screen.getByRole('table', { name: 'Below-market contracts' });
       expect(within(table).queryByText(/Tritanium/)).not.toBeInTheDocument();
@@ -2467,8 +2140,6 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     });
 
     it('hides a contract profitable only through other contracts, and lists it when asked', async () => {
-      // Contract 20: market 8,000 against an ask of 2,000 is already positive, so
-      // raise the ask to make only Other (10 × 10k = 100k) carry it.
       loadPublicContractOffers.mockResolvedValue(
         cachedSnapshot([
           row({ contractId: 20, typeId: 34, price: 50_000, quantity: 1 }),
@@ -2488,7 +2159,6 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
       const table = await screen.findByRole('table', { name: 'Below-market contracts' });
       const [, body] = within(table).getAllByRole('rowgroup');
       const [only] = within(body).getAllByRole('row');
-      // Value is market only, Other is the 100k estimate, Profit adds it.
       expect(only).toHaveTextContent('8,000');
       expect(only).toHaveTextContent('100,000');
       expect(only).toHaveTextContent('1 of 2 priced');
@@ -2535,19 +2205,14 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     expect(
       await screen.findByRole('table', { name: 'Below-market contracts' })
     ).toBeInTheDocument();
-    // The column picker acts on the offer table, which this view replaces.
     expect(screen.queryByRole('button', { name: /columns/i })).not.toBeInTheDocument();
   });
 });
 
 describe('ContractSearchPanel — overpriced flags (#4773)', () => {
-  // Tritanium sells at 8,000 at the hub; 100 units are worth 800,000.
   const FAIR = row({ contractId: 11, price: 900_000, lineCount: 1 });
   const TRAP = row({ contractId: 12, price: 9_000_000, lineCount: 1 });
-  /** The same ask inside a five-type bundle: its price pays for every line. */
   const BUNDLE = row({ contractId: 13, price: 9_500_000, lineCount: 5 });
-  /** Published before the line count existed: unknown, never single-type. */
-  /** Two stacks of Tritanium on one contract: the one price pays for both. */
   const STACK_A = row({ contractId: 15, price: 9_900_000, lineCount: 2 });
   const STACK_B = row({ contractId: 15, price: 9_900_000, quantity: 50, lineCount: 2 });
   const OLD_PUBLISH = row({ contractId: 14, price: 8_800_000 });
@@ -2570,7 +2235,6 @@ describe('ContractSearchPanel — overpriced flags (#4773)', () => {
     const flag = await screen.findByRole('img', FLAG);
     expect(screen.getAllByRole('img', FLAG)).toHaveLength(1);
     expect(flag.closest('tr')).toHaveTextContent('9M');
-    // 4 offers, one marker: the bundle and the unknown-count row stay unflagged.
     expect(await bodyRows()).toHaveLength(4);
   });
 

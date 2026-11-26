@@ -178,7 +178,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   `vitest-timing-shard-N`. The list never fails a run: runner speed swings
   by half between runs, so one run proves little. A test that stays on the
   list across runs gets a faster rewrite (a smaller render, a pure test, a
-  shared warm-up) or a comment above it saying why it is slow. Do not run the
+  shared warm-up). Do not run the
   whole suite locally to measure; read the artifact. Vitest in worker threads
   (`pool: 'threads'`) was tried and fails the tests that set `process.env.TZ`.
 - **Bumping the dogma engine or SDE: run the reference fits.** Bump

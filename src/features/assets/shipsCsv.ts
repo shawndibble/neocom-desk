@@ -2,24 +2,17 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
 import type { ShipRow } from '@/engine/myShips';
 
-/** What a ship row's cells are read from: the page's own lookups, evaluated when an export runs. */
 export interface ShipsCsvLookups {
   shipName: (row: ShipRow) => string;
-  /** The in-game name of an assembled ship; blank when it has none. */
   gameName: (row: ShipRow) => string;
-  /** The SDE group (the ship class); blank until it is read. */
   shipClass: (row: ShipRow) => string;
   characterName: (row: ShipRow) => string;
-  /** The station, structure or system the ship sits in; blank until it resolves. */
   location: (row: ShipRow) => string;
-  /** The assets holding the ship, outermost first; blank for a free-standing ship. */
   heldInside: (row: ShipRow) => string;
   security: (row: ShipRow) => number | null;
-  /** Null while the route is unread or unknown; 0 is "here". */
   jumps: (row: ShipRow) => number | null;
 }
 
-/** Every column the Ships tab shows, plus the ids; the Character column stays even when one Character is listed. */
 export function shipsCsvColumns(t: CsvTranslate, lookups: ShipsCsvLookups): CsvColumn<ShipRow>[] {
   return [
     { header: t('assets.myShips.columns.ship'), value: lookups.shipName },

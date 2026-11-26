@@ -1,10 +1,8 @@
-/** Formatting, story parameters and small helpers shared by the Corp Tax Book mockups (#4056). */
 import { formatIsk } from '@/lib/isk';
 import type { QueueItem } from './corpTaxBookFixtures';
 
 export const PHONE_GLOBALS = { viewport: { value: 'mobile1', isRotated: false } };
 
-/** The shell's default scopes plus standings, so its broker-fee notice stays out of the picture. */
 const SHELL_SCOPES = [
   'esi-wallet.read_character_wallet.v1',
   'esi-characters.read_loyalty.v1',

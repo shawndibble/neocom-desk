@@ -1,8 +1,3 @@
-/**
- * Registry invariants: facts that used to live in separate hand-kept lists
- * (catalogue, scope set, source switch, view key) must agree because they are
- * read from one declaration each. A drift here fails a test, not a widget.
- */
 import { describe, expect, it } from 'vitest';
 import type { TFunction } from 'i18next';
 import { WIDGET_KINDS, getKind, isAddable, type WidgetKindDef } from '../kinds';
@@ -146,7 +141,6 @@ const ALT: Record<keyof typeof VIEW_SETTINGS, Variant[]> = {
     { kind: '', scopeAll: false, profitSource: 'trading' },
     { kind: '', scopeAll: false, profitSource: 'both' },
   ],
-  // Each kind's own second Show: the options differ by kind.
   show: [(k) => ({ kind: '', scopeAll: false, show: k.shows[1] })],
   layers: [{ kind: '', scopeAll: false, hiddenLayers: ['assets'] }],
   campaignFaction: [
@@ -202,7 +196,6 @@ describe('view key', () => {
     expect(viewKey({ kind: 'sovRaids', scopeAll: false })).toBe(
       viewKey({ kind: 'sovRaids', scopeAll: false, raidsRadius: 15 })
     );
-    // A Profit widget saved before the Source setting is a Builds one.
     expect(viewKey({ kind: 'profit', scopeAll: false })).toBe(
       viewKey({ kind: 'profit', scopeAll: false, profitSource: 'builds' })
     );

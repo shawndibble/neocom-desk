@@ -1,9 +1,3 @@
-/**
- * The kept rows of one review's source, loaded a page at a time and held for the session, so
- * switching back to a source does not read it again. A review's rows never change after the read.
- * The store lives outside React so a page that arrives after its tab was left still lands in the
- * right place, and a second visit never starts a second load of the same cursor.
- */
 import { MINUTE_MS } from '@/lib/age';
 import type {
   VettingParty,
@@ -12,18 +6,14 @@ import type {
   VettingRawSource,
 } from '@/engine/vetting';
 
-/** How long kept rows are served from memory: a role lost or a review deleted is re-checked after. */
 export const VETTING_CACHE_TTL_MS = 10 * MINUTE_MS;
 
 export interface RawEntry {
-  /** When the entry was made: past the TTL it is dropped and read again. */
   at: number;
   rows: readonly VettingRawRow[];
   parties: ReadonlyMap<number, VettingParty>;
-  /** The cursor of the next page: undefined before the first, null after the last. */
   next: string | null | undefined;
   running: boolean;
-  /** The last page failed; what loaded is kept. */
   error: boolean;
   listeners: Set<() => void>;
 }
@@ -62,7 +52,6 @@ export function rawEntry(key: string): RawEntry {
   return entry;
 }
 
-/** Loads every remaining page, in sequence. Does nothing while a load runs or after the last page. */
 export function loadRawPages(
   entry: RawEntry,
   fetchPage: (cursor: string | undefined) => Promise<VettingRawPage>
@@ -74,7 +63,6 @@ export function loadRawPages(
   notify();
   void (async () => {
     try {
-      // A cursor seen twice would loop forever: treat it as the end.
       const seen = new Set<string>();
       do {
         const page = await fetchPage(entry.next ?? undefined);

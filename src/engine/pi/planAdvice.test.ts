@@ -92,8 +92,8 @@ describe('quick wins', () => {
   });
 
   it('orders by ISK per minute, so a quick small job can lead a slow big one', () => {
-    const big = restart(1, 10_000, 9); // 10 min -> 1,000 a minute
-    const small = restart(2, 3_000, 1); // 2 min -> 1,500 a minute
+    const big = restart(1, 10_000, 9);
+    const small = restart(2, 3_000, 1);
     expect(orderQuickWins([big, small]).map((w) => w.planetId)).toEqual([2, 1]);
   });
 
@@ -127,7 +127,6 @@ describe('quick wins', () => {
       minutes: 5,
       unpriced: 0,
     });
-    // A saving with no figure is not an unpriced addition either.
     expect(
       totalQuickWins([quickWin(4, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, null)])
         .unpriced
@@ -328,11 +327,7 @@ describe('pickRebuild', () => {
   });
 
   it('re-picks the recipe that hauls least when asked to, among the ones worth running', () => {
-    const candidates = [
-      cand(10, 1, 150_000, 80), // most ISK, most hauling
-      cand(20, 2, 120_000, 20), // least hauling worth running
-      cand(30, 2, 20_000, 1), // barely any hauling, but earns almost nothing
-    ];
+    const candidates = [cand(10, 1, 150_000, 80), cand(20, 2, 120_000, 20), cand(30, 2, 20_000, 1)];
     const isk = pickRebuild(facts(candidates), 90_000, 'isk');
     const haul = pickRebuild(facts(candidates), 90_000, 'haul');
     expect(isk.status === 'change' && isk.pick.typeId).toBe(10);

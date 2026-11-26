@@ -1,9 +1,3 @@
-/**
- * "N characters haven't granted Mail." with a link to Settings > Permissions,
- * which already asks for one Permission per Character. Shown on a row's face,
- * not behind its expander, so a row that looks normal still says some
- * Characters are missing out.
- */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';

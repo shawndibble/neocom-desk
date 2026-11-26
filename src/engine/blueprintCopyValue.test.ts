@@ -122,8 +122,6 @@ describe('blueprintCopyValues', () => {
   });
 
   it('divides a same-blueprint bundle by every copy it sells', () => {
-    // One line of 3 copies, and one contract split over two lines of the same
-    // blueprint: each row carries the whole contract's price.
     const values = blueprintCopyValues(
       [copy({ runs: 10 })],
       [
@@ -132,7 +130,6 @@ describe('blueprintCopyValues', () => {
         offer({ contractId: 901, quantity: 1, runs: 10, price: 20_000_000 }),
       ]
     );
-    // Contract 900: 1M/run; contract 901: 20M over 20 runs = 1M/run.
     expect(values.get(1)).toBe(10_000_000);
   });
 
@@ -144,7 +141,6 @@ describe('blueprintCopyValues', () => {
         offer({ contractId: 902, me: 0, te: 0, runs: 1, price: 50_000_000 }),
       ]
     );
-    // 50M over the 2 runs it sells, times the copy's own 2 runs.
     expect(values.get(1)).toBe(50_000_000);
   });
 

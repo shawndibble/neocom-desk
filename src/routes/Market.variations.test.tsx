@@ -55,16 +55,11 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(await within(table).findByText('Kestrel')).toBeInTheDocument();
     expect(within(table).getByText('1,500,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
 
-    // Corax has a buy order but no sell order — the Sell cell says so
-    // plainly rather than showing a fabricated zero, and the Buy cell still
-    // shows its own real price.
     const coraxRow = within(table).getByText('Corax').closest('tr');
     if (!coraxRow) throw new Error('expected a Corax row');
     expect(within(coraxRow).getByText('No sell orders')).toBeInTheDocument();
     expect(within(coraxRow).getByText('700,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
 
-    // Cormorant has no orders on either side — each cell independently says
-    // so, never conflated with Corax's buy-only state.
     const cormorantRow = within(table).getByText('Cormorant').closest('tr');
     if (!cormorantRow) throw new Error('expected a Cormorant row');
     expect(within(cormorantRow).getAllByText('No orders')).toHaveLength(2);
@@ -87,9 +82,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await screen.findByRole('table', { name: 'Sell Orders' });
 
     const table = await openVariationsTab(user);
-    // Kestrel is Merlin's Tech II variant, not a Market Group sibling here —
-    // Corax and Cormorant (Market Group siblings, no variation entry) are
-    // excluded once the variation group resolves.
     const kestrelRow = await within(table)
       .findByText('Kestrel')
       .then((el) => el.closest('tr'));
@@ -131,13 +123,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(
       within(region).getByRole('button', { name: 'Attributes', pressed: true })
     ).toBeInTheDocument();
-    // A column per row the table is showing, plus the selected item itself
-    // (owner decision #2). Each name repeats once per attribute category,
-    // since the matrix is one DataTable per category (#1128).
     expect(await within(region).findAllByText('Merlin')).not.toHaveLength(0);
     expect(within(region).getAllByText('Kestrel')).not.toHaveLength(0);
     expect(within(region).getAllByText('Corax')).not.toHaveLength(0);
-    // Estimated Price leads, then the dogma rows fetched for the matrix.
     expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
     expect(within(region).getByText('1,200 HP')).toBeInTheDocument();
   });
@@ -176,7 +164,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     kestrelRow.focus();
     fireEvent.contextMenu(kestrelRow);
 
-    // Quickbar, price alert and stock target fold into one submenu.
     expect(screen.getByRole('menuitem', { name: 'Track' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
@@ -236,8 +223,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     fireEvent.contextMenu(kestrelRow);
 
     await screen.findByRole('menuitem', { name: 'Show info' });
-    // Menu open: Radix marks the rest of the page aria-hidden, so the
-    // heading check below has to wait until Escape closes it again.
     await user.keyboard('{Escape}');
 
     expect(screen.getByRole('heading', { name: 'Merlin', level: 2 })).toBeInTheDocument();
@@ -252,11 +237,8 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
 
-    // The order book — unrelated to variations.json — still renders fine.
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('900,000')).toBeInTheDocument();
-    // The Variations table degrades to the sibling fallback rather than
-    // going empty or taking the whole route down with it.
     const table = await openVariationsTab(user);
     expect(within(table).getByText('Kestrel')).toBeInTheDocument();
   });
@@ -272,8 +254,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     await user.click(await within(before).findByText('Kestrel'));
 
-    // Re-anchored: Merlin, the previously-selected item, is now a row. The
-    // Variations tab stays open across the selection, like Price History.
     const table = await screen.findByRole('table', { name: 'Variations' });
     expect(await within(table).findByText('Merlin')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Order Book' }));
@@ -290,7 +270,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Merlin'));
     const table = await openVariationsTab(user);
 
-    // Click the row itself, not the Name cell.
     const kestrelRow = within(table).getByText('Kestrel').closest('tr');
     if (!kestrelRow) throw new Error('expected a Kestrel row');
     await user.click(kestrelRow);
@@ -325,7 +304,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    await user.click(screen.getByRole('button', { name: 'Region' })); // reveal Merlin's second, out-of-hub order
+    await user.click(screen.getByRole('button', { name: 'Region' }));
 
     expect(
       within(await screen.findByRole('table', { name: 'Sell Orders' })).getByText('850,000')
@@ -333,7 +312,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const unfiltered = await openVariationsTab(user);
     expect(
       await within(unfiltered).findByText('1,500,000 ISK', { selector: '.sr-only' })
-    ).toBeInTheDocument(); // Kestrel, unfiltered
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Order Book' }));
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
@@ -345,8 +324,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByRole('menuitem', { name: 'Filter to this station' }));
     await screen.findByText(/^Filtered to/);
 
-    // Kestrel and Corax have no orders at all at that location — the table
-    // degrades exactly as the on-screen tables do under the same filter.
     const table = await openVariationsTab(user);
     await waitFor(() => {
       expect(
@@ -365,8 +342,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
 
-    // The tab stays (a tab that comes and goes per item moves the others),
-    // but it carries no count and opens on a plain empty state.
     await user.click(screen.getByRole('tab', { name: 'Variations' }));
     expect(await screen.findByText('No variations for this item')).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Variations' })).not.toBeInTheDocument();
@@ -404,7 +379,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Selected Widget'));
 
     const table = await openVariationsTab(user);
-    expect(within(table).getAllByRole('row')).toHaveLength(26); // header + all 25 siblings, uncapped
+    expect(within(table).getAllByRole('row')).toHaveLength(26);
   });
 
   it('fetches variation row prices a few at a time, never as one simultaneous burst (Sentry N+1 API Call)', async () => {
@@ -446,23 +421,11 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
     await user.click(await screen.findByText('Selected Widget'));
 
-    // The selected item's own book plus every one of its 25 siblings' —
-    // fetching is uncapped, same as rendering (#1217's cap was on
-    // concurrency, never on row count; the render-side row cap this number
-    // used to match was removed separately, and this count went stale
-    // instead of following it — see "renders every sibling of a large
-    // Market Group, uncapped" above).
     await waitFor(() => expect(fetchedTypeIds.size).toBe(26), { timeout: 3000 });
-    // The main order book runs alongside the variation workers.
     expect(maxInFlight).toBeLessThanOrEqual(ORDER_BOOK_FANOUT_CONCURRENCY + 1);
   });
 });
 
-/**
- * Selects Rifter from the tree, then pins it through the item header's price
- * alert bell (the tree leaf has no menu; the bell's Save pins and sets the
- * target in one step).
- */
 describe('Market Browser tree leaf (issue #6)', () => {
   beforeEach(async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });

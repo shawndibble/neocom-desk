@@ -1,10 +1,3 @@
-/**
- * Fetches each Compare Set item's full dogma attributes, for the drawer's
- * Attributes view (moved out of the old `VariationsCompareModal`, issue
- * #1425). Only fetches while `enabled` — a closed drawer, or one open on
- * Prices, must not fire N type reads for attributes nobody is looking at,
- * mirroring `useCompareRows.ts`'s own enabled gate.
- */
 import { useEffect, useRef, useState } from 'react';
 import type { CompareSetItem } from './compareSet';
 import type {
@@ -37,10 +30,6 @@ export function useCompareAttributes(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  // A fresh `items` array reference can land on every render; the fetch
-  // effect keys on a value-stable typeId signature instead (same pattern as
-  // `useCompareRows.ts` and the modal this replaced) so an unrelated
-  // re-render doesn't restart every ESI fetch.
   const itemsRef = useRef(items);
   useEffect(() => {
     itemsRef.current = items;
@@ -63,15 +52,10 @@ export function useCompareAttributes(
       try {
         const types = new Array<TypeDetail | null>(currentItems.length);
         const [, dictionary] = await Promise.all([
-          // A large variation group (up to `VARIATIONS_LIMIT`) fanning out
-          // unbounded risks ESI's rate limit, same reasoning as
-          // `useCompareSkills`'s own per-item fetch for the same "N items in
-          // a compare table" shape.
           mapWithConcurrencyLimit(
             currentItems.map((item, index) => ({ item, index })),
             ESI_FANOUT_CONCURRENCY,
             async ({ item, index }) => {
-              // A superseded run stops spending ESI budget on columns nobody will see.
               if (cancelled) return;
               types[index] = await loadTypeDetail(item.typeId);
             }
@@ -83,8 +67,6 @@ export function useCompareAttributes(
         const dogmaByTypeId = new Map(
           currentItems.map((item, index) => [item.typeId, types[index]?.dogma_attributes])
         );
-        // One resolve for the whole matrix: ids repeat hard across
-        // variations, so every column shares the lookups the first paid for.
         const names = await loadAttributeReferenceNames([...dogmaByTypeId.values()], dictionary);
         if (cancelled) return;
         setData({ dogmaByTypeId, dictionary, names });

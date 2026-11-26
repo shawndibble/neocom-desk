@@ -1,11 +1,3 @@
-/**
- * Profit's Trading source (issue #3995; once the Trading profit widget): what
- * the market sales in the last 7, 30 or 90 days made, priced against the
- * wallet buys they used up,
- * with the broker fees paid over the same days beside it (never taken off).
- * Header Character, or every Character pooled so an alt's buys price a main's
- * sales. Pure, like every builder.
- */
 import { sumBrokerFees, sumMargins, marginsByItem } from '@/engine/market/tradingProfit';
 import { pooledTransactionMargins, transactionMargins } from '@/features/market/transactionMargins';
 import type { WalletTransaction } from '@/esi/endpoints';
@@ -23,14 +15,10 @@ import type { Translate } from '@/lib/translate';
 
 const D = 'overview.widgets.data.tradingProfit';
 const C = 'overview.widgets.chart.tradingProfit';
-/** The chart strings every bar chart shares. */
 const CS = 'overview.widgets.chart';
-/** Profit's Trading strings (table columns, the empty line). */
 const W = 'overview.widgets.profit.trading';
-/** The Market's History tab, where the sales behind the figure live. */
 const HISTORY_PATH = '/market/history';
 
-/** The sales in the window priced against the buys behind them, for the Characters in scope; null when none is held. */
 export function readTrading(
   data: TradingProfitWidgetData,
   {
@@ -46,7 +34,6 @@ export function readTrading(
     : data.characters.filter((c) => c.characterId === activeCharacterId);
   if (characters.length === 0) return null;
 
-  // Priced over every fill held, not just the window: a sale's cost sits in older buys.
   let fills: readonly WalletTransaction[];
   let margins: ReturnType<typeof transactionMargins>;
   if (everyone && characters.length > 1) {
@@ -79,7 +66,6 @@ export function readTrading(
   return { everyone, fills, margins, sales, total, brokerFees, nameOf, items };
 }
 
-/** The notes the Number view carries: broker fees, how many sales were priced, and what was not read. */
 export function tradingNotes(
   t: Translate,
   data: TradingProfitWidgetData,
@@ -93,10 +79,6 @@ export function tradingNotes(
   ].filter(Boolean);
 }
 
-/**
- * The Trading side of Profit on Both. Only priced sales count; the window
- * before is null with none priced there, as there is nothing to compare with.
- */
 export function tradingSource(
   read: NonNullable<ReturnType<typeof readTrading>>,
   now: number,
@@ -121,7 +103,6 @@ export function tradingSource(
   };
 }
 
-/** Profit on Trading: what the market sales made against the buys they used up. */
 export const tradingProfit: Builder = (feeds, ctx) => {
   const { t, now, range } = ctx;
   const feed = feeds.tradingProfit;
@@ -167,7 +148,6 @@ export const tradingProfit: Builder = (feeds, ctx) => {
         String(item.sales),
         item.matched === 0 ? UNKNOWN : signedCell(formatIskCompactSigned(item.margin), item.margin),
       ],
-      // History's `?highlight=` reads an item id and flashes that item's newest sale.
       to: highlightHref(HISTORY_PATH, item.typeId),
     })),
     footer: t(`${D}.fees`, { amount: formatIskCompact(brokerFees) }),

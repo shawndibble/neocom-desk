@@ -12,10 +12,9 @@ import {
   type ResolvedLocation,
 } from './recentKills';
 
-// Type ids from the SDE (`public/data/types.json`), with the group each sits in.
-const SABRE = 22456; // Interdictor
-const ONYX = 11995; // Heavy Interdiction Cruiser
-const LARGE_EMP_SMARTBOMB_II = 3995; // Smart Bomb
+const SABRE = 22456;
+const ONYX = 11995;
+const LARGE_EMP_SMARTBOMB_II = 3995;
 const HURRICANE = 24702;
 const TORNADO = 4310;
 const HEAVY_NEUTRON_BLASTER = 2921;
@@ -330,8 +329,8 @@ describe('groupVictimKills', () => {
 
   it("puts a pilot's ship and the pod that followed it in one group, ship first", () => {
     const groups = groupVictimKills([
-      view(2, '2026-09-30T05:20:30Z', 7), // the pod
-      view(1, '2026-09-30T05:20:00Z', 7), // the ship
+      view(2, '2026-09-30T05:20:30Z', 7),
+      view(1, '2026-09-30T05:20:00Z', 7),
       view(3, '2026-09-30T05:10:00Z', 8),
     ]);
     expect(groups.map((group) => group.map((k) => k.killmailId))).toEqual([[1, 2], [3]]);

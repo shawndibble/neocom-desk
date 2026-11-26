@@ -1,10 +1,3 @@
-/**
- * The plan edit that picking a build location makes.
- *
- * Its own module, and pure, because it is the one place the app decides what a
- * chosen station or structure *is* — including the two values it settles by
- * being an NPC station rather than by anyone typing them.
- */
 import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildLocationOption } from './buildLocations';
@@ -21,15 +14,8 @@ export function buildLocationPatch(option: BuildLocationOption): BuildLocationPa
     security: option.security,
     buildSystemId: option.systemId,
     buildSystemName: option.systemName,
-    // Dropped rather than replaced when ESI withheld the name: the stand-in
-    // label belongs to i18next, so only the id is data here.
     buildLocationId: option.structureId,
     buildLocationName: option.name ?? undefined,
-    // An NPC station has no rig slots, and a tax CCP fixes at 0.25% — which
-    // `jobFee` already applies from `FACILITY_PRESETS.npcStation.defaultTaxPct`
-    // the moment the facility is one. Clearing both here is what stops a rig
-    // and a tax the pilot set for some structure from silently returning when
-    // they pick a structure again later.
     ...(FACILITY_PRESETS[option.facility].structure
       ? {}
       : { rigFit: EMPTY_RIG_FIT, facilityTaxPct: undefined }),
@@ -47,7 +33,6 @@ type ReactionBuildLocationPatch = Pick<
     >
   >;
 
-/** @see buildLocationPatch — the same write, for the Reaction Location (issue #698). Both refinery kinds are always a structure, so there is no non-structure clearing case here. */
 export function reactionBuildLocationPatch(
   option: BuildLocationOption
 ): ReactionBuildLocationPatch {

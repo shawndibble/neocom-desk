@@ -1,12 +1,3 @@
-/**
- * Make Flyable's implant alternative: for a fix that ran the fit out of CPU or
- * powergrid, the cheapest implants that bring it back under, found by the
- * Implant Finder on the Fitting as the fix leaves it. It sits beside the
- * module and rig swaps that pay for the same fix, so the pilot picks the
- * cheaper or easier to get. Only a set within the pilot's budget is offered;
- * a click makes the fix and puts the implants in the Fitting's set, together.
- * Calibration is not moved by any implant, so a fix over only that has none.
- */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Spinner } from '@/components/ui';
@@ -28,20 +19,16 @@ const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 const FIX_LIMIT = 2;
 
 interface Props {
-  /** The fix as it overran: its fitting is the one the implants are found for. */
   fix: RejectedOption;
-  /** The fix's own name, for the row. */
   label: string;
   open: boolean;
   implants: MakeItFitImplantsInput;
   iskBudget: number | null;
   fitTotal: number | null;
-  /** Makes the fix and sets the implants, as one edit. */
   onApply: (fix: RejectedOption, implantSet: FittingImplantSet) => void;
 }
 
 export function ImproveFlyableImplants(props: Props) {
-  // Implants move CPU and powergrid, never calibration.
   const goalId: ImplantGoalId | null =
     overageOf(props.fix.after, 'cpu') > 0
       ? 'cpu'
@@ -71,7 +58,6 @@ function Implants({
     () => cloneSeedSet(basis, fix.fitting.implantSet, profile.implantTypeIds),
     [basis, fix.fitting.implantSet, profile.implantTypeIds]
   );
-  // Stable per fix and seed: the finder re-screens every family whenever this changes.
   const planned = useMemo(
     () => (seed ? { ...fix.fitting, implantSet: seed } : fix.fitting),
     [fix.fitting, seed]
@@ -86,7 +72,6 @@ function Implants({
     target,
   });
   const names = useMemo(() => implantNames(finder.catalog?.families ?? []), [finder.catalog]);
-  // The implants are bought on top of the fix, so the budget covers both.
   const fixes = finder.fixes
     .filter((found) => fitsResourceBudget(found.stats))
     .filter((found) => !overIskBudget(iskBudget, fitTotal, fix.iskDelta, found.cost))

@@ -1,7 +1,3 @@
-/**
- * Corp money builders: Corp wallet, Cash flow and Income by source.
- * Same contract as `models.ts`: pure, derived at render time.
- */
 import { DAY_MS } from '@/lib/age';
 import { dailyOutgoings, runwayDays, VITALS_WINDOW_DAYS } from '@/engine/corp/vitals';
 import { humanizeRefType } from '@/features/character/format';
@@ -30,7 +26,6 @@ const TO = '/corp/wallet';
 const W = 'overview.widgets';
 const RUNWAY_WARNING_DAYS = 30;
 
-/** The view for a feed that is loading, failed, or unreadable; null when there is data to build from. */
 function notReady(
   feed: FeedState<CorpWalletFeed> | undefined,
   t: Translate
@@ -47,16 +42,13 @@ function withFeed(view: KindView, data: CorpWalletFeed): KindView {
 
 const iskCell = (value: number): TableCell => ({ text: formatIskCompact(value), iskAmount: value });
 
-/** A column that only runs one way: ISK in is good, ISK out is bad; zero is plain. */
 function directionCell(value: number, tone: 'good' | 'bad'): TableCell {
   const text = formatIskCompact(value);
   return value > 0 ? { text, tone } : text;
 }
 
-/** How many whole days back the journal's oldest line reaches; 0 for none. */
 function coveredDays(journal: readonly CorpJournalLine[], now: number): number {
   if (journal.length === 0) return 0;
-  // A reduce: a big corp's journal is too many arguments for Math.min.
   const oldest = journal.reduce((min, entry) => Math.min(min, entry.atMs), Infinity);
   return Math.max(1, Math.ceil((now - oldest) / DAY_MS));
 }
@@ -64,9 +56,6 @@ function coveredDays(journal: readonly CorpJournalLine[], now: number): number {
 const inRange = (journal: readonly CorpJournalLine[], now: number, range: number) =>
   journal.filter((entry) => entry.atMs > now - range * DAY_MS && entry.atMs <= now);
 
-// --- Corp wallet ------------------------------------------------------------------
-
-/** One corporation's divisions: the header scope, or All with one readable corporation. */
 function divisionsView(feed: FeedState<CorpWalletFeed> | undefined, t: Translate): KindView {
   const ready = notReady(feed, t);
   if ('view' in ready) return ready.view;
@@ -77,7 +66,6 @@ function divisionsView(feed: FeedState<CorpWalletFeed> | undefined, t: Translate
     ...d,
     label: d.name ?? t('corp.vitals.division', { division: d.division }),
   }));
-  // An unnamed, empty division is noise: one dim line says how many.
   const named = all.filter((d) => d.name || d.balance !== 0);
   const unused = all.length - named.length;
   const biggest = [...named].sort((a, b) => b.balance - a.balance)[0];
@@ -140,11 +128,6 @@ function divisionsView(feed: FeedState<CorpWalletFeed> | undefined, t: Translate
   );
 }
 
-/**
- * Every readable corporation's balances (All scope): one row per corporation with its master
- * wallet and its total across the divisions read, then the grand total. Balances only: Cash
- * flow, Income and runway read one corporation's journal.
- */
 function walletAcross(feeds: Feeds, { t }: Pick<BuildContext, 't'>): KindView {
   const K = `${W}.corpWallet`;
   const across = corpReads(feeds.corpWalletAll, TO, t, (feed) => divisionsView(feed, t));
@@ -170,7 +153,6 @@ function walletAcross(feeds: Feeds, { t }: Pick<BuildContext, 't'>): KindView {
       to: TO,
       cells: [corpCell(label(row.corporationId)), iskCell(row.master), iskCell(row.total)],
     })),
-    // The grand total, under the corporations' rows.
     footer: t(`${K}.balancesOnly`, { isk: formatIskCompact(total) }),
   };
   return flagPartlyFailed(
@@ -220,8 +202,6 @@ function walletAcross(feeds: Feeds, { t }: Pick<BuildContext, 't'>): KindView {
 export const corpWallet: Builder = (feeds, ctx) =>
   ctx.scopeAll ? walletAcross(feeds, ctx) : divisionsView(feeds.corpWallet, ctx.t);
 
-// --- Cash flow --------------------------------------------------------------------
-
 function cashFlowChart(
   t: Translate,
   income: number[],
@@ -258,11 +238,9 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   const ready = notReady(feeds.corpWallet, t);
   if ('view' in ready) return ready.view;
   const { data } = ready;
-  // Copy under the retired kind's name on purpose (now the corp wallet's Flow): renaming would churn copy and tests.
   const K = `${W}.corpCashFlow`;
   const base = blank(TO, statusOf(feeds.corpWallet));
 
-  // Unknown is not zero: the balances read fine but the journal did not.
   if (data.journal === null) {
     return withFeed(
       {
@@ -285,15 +263,12 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   const totalIn = income.reduce((a, b) => a + b, 0);
   const totalOut = spending.reduce((a, b) => a + b, 0);
 
-  // The runway rides the vitals window and the master wallet's own balance, whatever the range.
   const balance = data.divisions.find((d) => d.division === data.journalDivision)?.balance ?? 0;
   const runway = runwayDays(balance, dailyOutgoings(data.journal, now));
   const runwayDaysWhole = runway === null ? null : Math.floor(runway);
-  // Runway only means something while the wallet is burning.
   const netPositive =
     inRange(data.journal, now, VITALS_WINDOW_DAYS).reduce((sum, l) => sum + l.amount, 0) > 0;
 
-  // The sentence speaks for the vitals window, so it only sits beside a headline of that range.
   const showNetPositive = netPositive && range === VITALS_WINDOW_DAYS;
   const notes: string[] = [];
   if (range !== VITALS_WINDOW_DAYS && !netPositive) {
@@ -358,12 +333,6 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   );
 };
 
-// --- Income by source -------------------------------------------------------------
-
-/**
- * The common corp income types have their own words; any other is the raw type, de-snaked.
- * Under `corpIncome` on purpose: the retired kind's name, kept to avoid churning copy.
- */
 function sourceLabel(t: Translate, refType: string): string {
   return t(`${W}.corpIncome.refType.${refType}`, { defaultValue: humanizeRefType(refType) });
 }
@@ -372,7 +341,6 @@ export const corpIncome: Builder = (feeds, { t, now, range }) => {
   const ready = notReady(feeds.corpWallet, t);
   if ('view' in ready) return ready.view;
   const { data } = ready;
-  // Copy under the retired kind's name on purpose (now the corp wallet's Sources): renaming would churn copy and tests.
   const K = `${W}.corpIncome`;
 
   if (data.journal === null) {

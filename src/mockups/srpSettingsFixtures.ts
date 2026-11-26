@@ -1,10 +1,7 @@
-/** Sample data for the SRP settings mockup. Not shared with any other fixture. */
-
 export type RuleKind = 'none' | 'fixed' | 'percent' | 'notCovered' | 'officer';
 
 export interface HullRule {
   kind: RuleKind;
-  /** Plain digit string for `fixed`; blank is invalid. */
   isk: string;
 }
 
@@ -31,7 +28,6 @@ export const CLASSES: HullClass[] = [
   { id: 'capital', name: 'Capital ships' },
 ];
 
-/** Hulls that already carry a Hull Rule (the rest of the game's hulls come from the add-hull search). */
 export const HULLS: Hull[] = [
   { id: 'thorax', name: 'Thorax', classId: 'cruiser' },
   { id: 'vni', name: 'Vexor Navy Issue', classId: 'cruiser' },

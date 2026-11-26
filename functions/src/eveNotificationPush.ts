@@ -1,19 +1,9 @@
-// Push payloads for server-polled EVE notifications (issue #3756, ADR 0020).
-// Pure. The raw notification goes out (id, type, timestamp, size-capped text);
-// no rendered copy beyond a generic title/body, because this package has no SDE
-// or i18n catalog. The generic title/body keep today's service worker
-// (`pushHandler.ts`'s `parsePushPayload`, which requires both) working until it
-// renders the raw fields itself.
-
 import type { EsiNotification } from './eveNotificationSelection.js';
 
-/** More pushable notifications than this for one device and Character collapse into one summary push. */
 export const SUMMARY_THRESHOLD = 3;
 
-/** FCM caps a data message at 4096 UTF-8 bytes; the rest of the payload needs ~600. */
 export const MAX_TEXT_BYTES = 2500;
 
-/** Cuts to `maxBytes` of UTF-8 on a code-point boundary. */
 export function capUtf8(text: string, maxBytes: number): string {
   let bytes = 0;
   let out = '';
@@ -27,15 +17,9 @@ export function capUtf8(text: string, maxBytes: number): string {
 
 export interface PushMessage {
   data: Record<string, string>;
-  /** Web Push `Topic`: a newer push with the same topic replaces an undelivered older one. */
   collapseKey?: string;
 }
 
-/**
- * The Occurrence Key the Foreground Poller derives for the same notification
- * (`src/engine/occurrenceKey.ts`: `[characterId, 'eveNotification',
- * notificationId].join(':')`). A test pins the two together.
- */
 export function eveNotificationOccurrenceKey(characterId: number, notificationId: number): string {
   return `${characterId}:eveNotification:${notificationId}`;
 }
@@ -75,7 +59,6 @@ function summaryPush(characterId: number, list: readonly EsiNotification[]): Pus
   };
 }
 
-/** One push each, or one summary push when there are more than `SUMMARY_THRESHOLD`. */
 export function buildPushes(characterId: number, list: readonly EsiNotification[]): PushMessage[] {
   if (list.length === 0) return [];
   if (list.length > SUMMARY_THRESHOLD) return [summaryPush(characterId, list)];

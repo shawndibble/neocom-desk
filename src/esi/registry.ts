@@ -1,58 +1,12 @@
-/**
- * Single source of truth for every ESI endpoint Neocom Desk calls: the OAuth
- * scope it needs, or an explicit "public".
- *
- * Three consumers derive from it rather than restate it — `esi/scopes.ts` for
- * the login request, `app/routeScopes.ts` for each gated route,
- * `esi/endpointRoutes.ts` for the runtime route-template lookup — so none can
- * drift from the endpoints the app actually calls.
- *
- * Pure static data, importing nothing at runtime (`endpoints/` is referenced
- * type-only), so `e2e/support` fixtures can import it without dragging in
- * Dexie or fetch. Must never grow auth state (docs/ARCHITECTURE.md §2) and
- * must never be imported by `src/engine` (CLAUDE.md).
- */
 import type * as endpoints from './endpoints';
 
-/**
- * Explicit marker, so "no scope" is a declaration rather than a missing field.
- * Public endpoints are the ones a character can never revoke, so the purge
- * skips them.
- */
 export const PUBLIC = 'public';
 export type PublicAccess = typeof PUBLIC;
 
-/**
- * Shape check only — catches a malformed scope string, not a misspelled one.
- * The spelling backstop is the hand-written literal list in `scopes.test.ts`.
- * Two shapes: the classic `esi-<area>.<verb>.v<n>`, and the newer
- * `esi.<area>.<owner>:<verb>` CCP uses from the 2026 routes on (Military
- * Campaigns' `esi.activity.char:read`).
- */
 export type EsiScopeName = `esi-${string}.v${number}` | `esi.${string}:${string}`;
 
 export type ScopeRequirement = EsiScopeName | PublicAccess;
 
-/**
- * Every named Scope Group (user-facing: **Permission**) a scope outside the
- * **Core Grant** can belong to. Every read Permission is default-on — granted
- * at sign-in along with the Core Grant, together forming the **Base Grant** —
- * and a player who wants less unticks it in Customize permissions. Only the
- * six **Write to EVE** Permissions (`mailSend`, `mailOrganize`,
- * `calendarRespond`, `fittingsWrite`, `autopilot`, `openWindow`, marked
- * `section: 'write'`) are opt-in: one per write feature, asked for the first
- * time a Character tries it.
- *
- * `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails` and
- * `mercenaryDens` were opt-in until #6102: each cost a separate trip to EVE's
- * login, and a player with many Characters on many accounts paid that trip
- * over and over. Holding a scope never makes a call on its own — role and
- * capability gates (`features/corp/corpScopes.ts`, `useCorpAccess`) still
- * decide every corp read, so a line member's token never draws a 403.
- *
- * See `docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md`
- * for the Core/Permission split, and the #6102 decision for the default.
- */
 export const SCOPE_GROUPS = [
   'wallet',
   'marketOrders',
@@ -83,27 +37,13 @@ export const SCOPE_GROUPS = [
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
-/** A Permission's i18n keys and whether it's part of the Base Grant. */
 export interface PermissionMeta {
-  /** i18n key for the user-facing checkbox label (`en.json`). */
   readonly labelKey: string;
-  /** i18n key for the one-line "unlocks" caption under the label (`en.json`). */
   readonly captionKey: string;
-  /** Whether this Permission is part of the Base Grant (on by default). */
   readonly defaultOn: boolean;
-  /**
-   * `'write'` marks a Permission that changes something in EVE (or opens a
-   * window in the client): the surfaces list those under a "Write to EVE"
-   * heading, derived from this field, never hand-listed.
-   */
   readonly section?: 'write';
 }
 
-/**
- * Every Permission's metadata, readable from one place — the source the
- * Customize permissions dialog and re-login banners (#1520+) read from,
- * rather than each hand-listing labels and captions of their own.
- */
 export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   wallet: {
     labelKey: 'permissions.wallet.label',
@@ -244,45 +184,16 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
 };
 
 export interface EsiEndpointSpec {
-  /** ESI route with `{snake_case}` placeholders — never an interpolated URL. */
   readonly route: string;
   readonly scope: ScopeRequirement;
-  /**
-   * The Permission (Scope Group) this endpoint's scope belongs to. **Absent
-   * means the Core Grant** — the handful of scopes every Character is asked
-   * for at sign-in and which belong to no Permission (skills, skill queue,
-   * structure lookup and search) — so leaving it off is the rare case,
-   * reserved for those.
-   *
-   * Every other endpoint declares one of the 26 `SCOPE_GROUPS`: the twenty
-   * default-on (read) ones together with the Core Grant make up the **Base
-   * Grant** (`SCOPES` in `scopes.ts`), and the six Write to EVE ones stay opt-in.
-   *
-   * Declared per endpoint rather than per scope, which is why
-   * `scopes.test.ts` asserts a scope repeated across endpoints always
-   * resolves to the same group: one endpoint declaring a scope inconsistently
-   * would quietly split it across two Permissions (or into and out of the
-   * Core Grant).
-   */
   readonly group?: ScopeGroup;
 }
 
-/**
- * Every exported wrapper in `endpoints/`, computed by the compiler rather
- * than hand-listed, so the `Record<EndpointName, ...>` below makes both a
- * missing entry and a stale one a build error.
- */
 type EndpointFn = (...args: never[]) => Promise<unknown>;
 type EndpointName = {
   [K in keyof typeof endpoints]: (typeof endpoints)[K] extends EndpointFn ? K : never;
 }[keyof typeof endpoints];
 
-/**
- * Transcribed from the `// --- METHOD /route (scope) ---` markers in
- * `endpoints/`, verified against https://esi.evetech.net/meta/openapi.json;
- * `registry.test.ts` re-parses those markers and asserts they still agree.
- * Covers every wrapper — nothing else calls ESI directly today.
- */
 export const ESI_REGISTRY = {
   getCharacterSkills: {
     route: '/characters/{character_id}/skills',
@@ -351,16 +262,12 @@ export const ESI_REGISTRY = {
     scope: 'esi-mail.read_mail.v1',
     group: 'mail',
   },
-  // Also the entry for `DELETE` of the same route (sent by `deleteMailOnEsi`):
-  // one route template, one scope, one Permission, and route templates are unique here.
   putCharacterMail: {
     route: '/characters/{character_id}/mail/{mail_id}/',
     scope: 'esi-mail.organize_mail.v1',
     group: 'mailOrganize',
   },
 
-  // Write to EVE, off by default: a Permission of its own (`mailSend`), asked
-  // for the first time a Character tries to send.
   postCharacterMail: {
     route: '/characters/{character_id}/mail/',
     scope: 'esi-mail.send_mail.v1',
@@ -405,10 +312,6 @@ export const ESI_REGISTRY = {
     scope: 'esi-markets.read_character_orders.v1',
     group: 'marketOrders',
   },
-  /**
-   * The corporation's open market orders. In-game role Accountant or Trader;
-   * the scope is additive (`corpScopes.ts`).
-   */
   getCorporationOrders: {
     route: '/corporations/{corporation_id}/orders',
     scope: 'esi-markets.read_corporation_orders.v1',
@@ -424,48 +327,22 @@ export const ESI_REGISTRY = {
     scope: 'esi-industry.read_character_jobs.v1',
     group: 'industry',
   },
-  /**
-   * Base grant, like every other single-route D3 view (mail, calendar,
-   * contracts, clones, contacts, loyalty) — declaring its own group is what
-   * lets `permissionsForRoute` derive the right Permission for `ScopeGate`'s
-   * re-login banner (issue #1520), rather than the banner over-asking for
-   * every Permission. The `corp` group's own grant flow (`CorpGrantPrompt`)
-   * exists because a corp role is discoverable and this isn't — nothing here
-   * can tell a renter needs this scope before they visit the page and ask
-   * for it themselves.
-   */
   getCharacterMining: {
     route: '/characters/{character_id}/mining/',
     scope: 'esi-industry.read_character_mining.v1',
     group: 'mining',
   },
 
-  /**
-   * Base grant (issue #1539, scope decision `20260924-150509`): In-game
-   * Fittings are read through the ESI cache, same as any other single-route
-   * D3 view. `postCharacterFitting`'s write scope joins the Base Grant here
-   * too — the third write exception to the read-only-by-design scope list,
-   * after mail organizing and calendar RSVP — but the wrapper itself isn't
-   * called by any feature until Save to EVE (#1540).
-   */
   getCharacterFittings: {
     route: '/characters/{character_id}/fittings',
     scope: 'esi-fittings.read_fittings.v1',
     group: 'fittings',
   },
-  // Trailing slash to stay a distinct route template from the GET above
-  // (registry.test.ts requires unique routes) — same disambiguator
-  // `postCharacterMail`/`getCharacterMailHeaders` already use for ESI's own
-  // shared GET+POST `/mail` path.
   postCharacterFitting: {
     route: '/characters/{character_id}/fittings/',
     scope: 'esi-fittings.write_fittings.v1',
     group: 'fittingsWrite',
   },
-  // A {fitting_id} segment keeps this route distinct from the two above
-  // (registry.test.ts requires unique routes). Save to EVE (#1540) calls
-  // this only after the replacement POST already succeeded, so a failed
-  // recreate never leaves the pilot without their original.
   deleteCharacterFitting: {
     route: '/characters/{character_id}/fittings/{fitting_id}/',
     scope: 'esi-fittings.write_fittings.v1',
@@ -488,16 +365,6 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/corporationhistory',
     scope: PUBLIC,
   },
-  /**
-   * In the `corp` group (default-on since #6102): reading this needs its own
-   * scope regardless of the others, so a Character who unticked Corporation in
-   * Customize, or signed in before #6102, cannot know their corp role. That costs the "you just made Director, grant now"
-   * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
-   * before — `useCorpAccess` answers `not-granted` instead, and Settings'
-   * Corporation Permission row is the only way in. A Character who already held this
-   * scope from the old Base Grant keeps it (`app/loginFlow.ts` unions with
-   * the stored grant), so nothing changes for them.
-   */
   getCharacterRoles: {
     route: '/characters/{character_id}/roles',
     scope: 'esi-characters.read_corporation_roles.v1',
@@ -522,11 +389,6 @@ export const ESI_REGISTRY = {
     scope: 'esi-planets.manage_planets.v1',
     group: 'planets',
   },
-  /**
-   * Mercenary Dens (issue #4791). Character routes only: ESI has no corp den
-   * list and no role. Their own `mercenaryDens` Permission (issue #5153), not
-   * the `planets` one, so a player can untick it alone; default-on since #6102.
-   */
   getCharacterMercenaryDens: {
     route: '/characters/{character_id}/structures/mercenary-dens',
     scope: 'esi-structures.read_character.v1',
@@ -589,12 +451,6 @@ export const ESI_REGISTRY = {
     scope: 'esi-location.read_location.v1',
     group: 'characterDetails',
   },
-  /**
-   * Base grant, in a Permission of its own (scope decision `20261009-*`): the
-   * D-Scan danger read defaults "Your ship" to the hull the active Character is
-   * flying. Not folded into `characterDetails`, so a Character that signed in
-   * before it reads as lacking only this.
-   */
   getCharacterShip: {
     route: '/characters/{character_id}/ship',
     scope: 'esi-location.read_ship_type.v1',
@@ -604,23 +460,11 @@ export const ESI_REGISTRY = {
     route: '/route/{origin_system_id}/{destination_system_id}',
     scope: PUBLIC,
   },
-  /**
-   * Write to EVE, off by default: Route Safety's Set waypoints in game, used
-   * only when the pilot presses it (issue #2479). A Permission of its own, so
-   * a Character that signed in before it reads as lacking only this, not
-   * Character details.
-   */
   postAutopilotWaypoint: {
     route: '/ui/autopilot/waypoint',
     scope: 'esi-ui.write_waypoint.v1',
     group: 'autopilot',
   },
-  /**
-   * Write to EVE, off by default: Open in EVE, used only when the pilot
-   * presses it. Each opens a window in the Character's EVE client and changes
-   * nothing in the game. A Permission of its own, so a Character that signed
-   * in before it reads as lacking only this.
-   */
   postOpenWindowInformation: {
     route: '/ui/openwindow/information',
     scope: 'esi-ui.open_window.v1',
@@ -661,11 +505,6 @@ export const ESI_REGISTRY = {
     route: '/killmails/{killmail_id}/{killmail_hash}',
     scope: PUBLIC,
   },
-  /**
-   * The SRP page's lost-ships list. A Permission of its own (default-on since
-   * #6102): only a pilot filing a claim by pick needs it, and pasting a link works without it
-   * (docs/context/decisions/20261023-125348-srp-pilots-file-officers-approve-corp-set-rules.md).
-   */
   getCharacterKillmailsRecent: {
     route: '/characters/{character_id}/killmails/recent',
     scope: 'esi-killmails.read_killmails.v1',
@@ -699,7 +538,6 @@ export const ESI_REGISTRY = {
     route: '/universe/systems/{system_id}',
     scope: PUBLIC,
   },
-  // The Standings modal's faction facts: description, capital, size, station counts.
   getUniverseFactions: {
     route: '/universe/factions',
     scope: PUBLIC,
@@ -733,10 +571,6 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
 
-  // Its own Permission (issue #538; default-on since #6102): the region order book above never includes a player
-  // structure's own orders, so this is the only way to check one. ACL-gated
-  // per structure, same as `getUniverseStructure` — a 403 is a normal "not on
-  // this structure's ACL" outcome, never a reauth trigger.
   getStructureMarketOrders: {
     route: '/markets/structures/{structure_id}',
     scope: 'esi-markets.structure_markets.v1',
@@ -746,23 +580,18 @@ export const ESI_REGISTRY = {
     route: '/industry/systems',
     scope: PUBLIC,
   },
-  // Which systems have an NPC station that runs industry jobs (Build there hint).
   getIndustryFacilities: {
     route: '/industry/facilities',
     scope: PUBLIC,
   },
-  // Route Safety's "Incursions near you" (issue #3540): one call lists them all.
   getIncursions: {
     route: '/incursions',
     scope: PUBLIC,
   },
-  // Skyhook raids (issue #4798): kept to the Character's alliance space by the caller.
   getRaidableSkyhooks: {
     route: '/skyhooks/raidable',
     scope: PUBLIC,
   },
-  // Route Safety (issue #2328): one call each answers the whole universe, so a
-  // route of any length costs two requests, never one per system.
   getUniverseSystemKills: {
     route: '/universe/system_kills',
     scope: PUBLIC,
@@ -771,29 +600,16 @@ export const ESI_REGISTRY = {
     route: '/universe/system_jumps',
     scope: PUBLIC,
   },
-  // Route Safety's zKillboard column (issue #2329): names the stargate a kill
-  // happened at, and where it leads. Read once per gate per session.
   getUniverseStargate: {
     route: '/universe/stargates/{stargate_id}',
     scope: PUBLIC,
   },
 
-  // Base grant, deliberately: the Build Plan's build-location search is a plain
-  // feature of a route every Character can open, and it pairs with
-  // `getUniverseStructure`'s `esi-universe.read_structures.v1`, which is
-  // already asked for at sign-in. `/industry` stays UNGATED in `routeScopes.ts`
-  // — a Character who signed in before this scope existed keeps the whole route
-  // and is offered the re-auth by the picker itself.
   getCharacterSearch: {
     route: '/characters/{character_id}/search',
     scope: 'esi-search.search_structures.v1',
   },
 
-  // --- The `corp` group (issue #295) ---
-  //
-  // Every entry below is corp-owned data behind a server-side role gate, so
-  // none of it reaches the base consent screen. `engine/corpRoles.ts` holds
-  // which in-game role opens which of these; the scope is only half the gate.
   getCorporationStructures: {
     route: '/corporations/{corporation_id}/structures',
     scope: 'esi-corporations.read_structures.v1',
@@ -809,22 +625,11 @@ export const ESI_REGISTRY = {
     scope: 'esi-wallet.read_corporation_wallets.v1',
     group: 'corp',
   },
-  /**
-   * No new scope, and therefore no re-grant: ESI secures the corp wallet's
-   * transactions with the same `read_corporation_wallets` scope as the two
-   * entries above, already in the `corp` group and already claimed by
-   * `canReadWallet` (issue #570).
-   */
   getCorporationWalletTransactions: {
     route: '/corporations/{corporation_id}/wallets/{division}/transactions',
     scope: 'esi-wallet.read_corporation_wallets.v1',
     group: 'corp',
   },
-  /**
-   * A scope of its own, deliberately: without it the wallet and hangar
-   * divisions render as "Division 3" rather than the names the corp gave them
-   * ("SRP"), which is most of what makes a corp wallet readable.
-   */
   getCorporationDivisions: {
     route: '/corporations/{corporation_id}/divisions',
     scope: 'esi-corporations.read_divisions.v1',
@@ -845,20 +650,11 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.track_members.v1',
     group: 'corp',
   },
-  /**
-   * Singular `/corporation/` — CCP's own inconsistency in the live spec, not a
-   * typo here. Every other corp route in this table is plural.
-   */
   getCorporationMiningExtractions: {
     route: '/corporation/{corporation_id}/mining/extractions',
     scope: 'esi-industry.read_corporation_mining.v1',
     group: 'corp',
   },
-  /**
-   * The refinery mining ledger (issue #4058): the same scope as the
-   * extractions above, but `x-required-roles` is Accountant, not
-   * Station_Manager — `canReadMiningLedger` in `engine/corpRoles.ts`.
-   */
   getCorporationMiningObservers: {
     route: '/corporation/{corporation_id}/mining/observers',
     scope: 'esi-industry.read_corporation_mining.v1',
@@ -874,37 +670,21 @@ export const ESI_REGISTRY = {
     scope: 'esi-industry.read_corporation_jobs.v1',
     group: 'corp',
   },
-  /**
-   * The corp assets list #295 meant to register and did not (issue #327). Its
-   * scope is the corp twin of the Base Grant's `esi-assets.read_assets.v1` and
-   * still belongs in the group: a line member can no more read their corp's
-   * hangars than its wallet.
-   */
   getCorporationAssets: {
     route: '/corporations/{corporation_id}/assets',
     scope: 'esi-assets.read_corporation_assets.v1',
     group: 'corp',
   },
-  /** In-game names of a corp's singleton assets; same Director gate as `getCorporationAssets`. */
   postCorporationAssetNames: {
     route: '/corporations/{corporation_id}/assets/names',
     scope: 'esi-assets.read_corporation_assets.v1',
     group: 'corp',
   },
-  /**
-   * The corp twin of `getCharacterBlueprints` (issue #839) — the
-   * corporation's own BPOs/BPCs, Director-only per `x-required-roles`
-   * (`engine/corpRoles.ts`'s `canReadBlueprints`).
-   */
   getCorporationBlueprints: {
     route: '/corporations/{corporation_id}/blueprints',
     scope: 'esi-corporations.read_blueprints.v1',
     group: 'corp',
   },
-  /**
-   * The corp's starbases (POS) and one tower's detail (issue #4610): Director
-   * per `x-required-roles` (`canReadStarbases` in `engine/corpRoles.ts`).
-   */
   getCorporationStarbases: {
     route: '/corporations/{corporation_id}/starbases',
     scope: 'esi-corporations.read_starbases.v1',
@@ -915,36 +695,21 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.read_starbases.v1',
     group: 'corp',
   },
-  /**
-   * Contracts issued by or assigned to the corporation. No in-game role is
-   * required (`x-required-roles` is absent), so `canReadContracts` is open to
-   * every member; the scope is additive (`corpScopes.ts`).
-   */
   getCorporationContracts: {
     route: '/corporations/{corporation_id}/contracts',
     scope: 'esi-contracts.read_corporation_contracts.v1',
     group: 'corp',
   },
-  /** One corp contract's items, read when a row is opened; same scope as the list. */
   getCorporationContractItems: {
     route: '/corporations/{corporation_id}/contracts/{contract_id}/items',
     scope: 'esi-contracts.read_corporation_contracts.v1',
     group: 'corp',
   },
-  /**
-   * Customs offices (issue #4611): Director-only per `x-required-roles`
-   * (`canReadCustomsOffices`); the scope is additive (`corpScopes.ts`).
-   */
   getCorporationCustomsOffices: {
     route: '/corporations/{corporation_id}/customs_offices',
     scope: 'esi-planets.read_customs_offices.v1',
     group: 'corp',
   },
-  /**
-   * Role audit (issue #4613): Director-only per `x-required-roles`
-   * (`canReadRoleAudit`). History rides the membership scope; titles need
-   * `read_titles`, the additive one (`corpScopes.ts`).
-   */
   getCorporationRoleHistory: {
     route: '/corporations/{corporation_id}/roles/history',
     scope: 'esi-corporations.read_corporation_membership.v1',
@@ -960,12 +725,6 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.read_titles.v1',
     group: 'corp',
   },
-  /**
-   * Skyhooks and sovereignty hubs (issue #4775). The corp reads sit behind
-   * `esi-structures.read_corporation.v1`, a different scope from the older
-   * `esi-corporations.read_structures.v1`; `x-required-roles` is Station_Manager
-   * on every route but the hub list (`canReadSkyhooks`). The systems list is public.
-   */
   getCorporationSkyhooks: {
     route: '/corporations/{corporation_id}/structures/skyhooks',
     scope: 'esi-structures.read_corporation.v1',
@@ -986,12 +745,6 @@ export const ESI_REGISTRY = {
     scope: 'esi-structures.read_corporation.v1',
     group: 'corp',
   },
-  /**
-   * Corporation Projects (issue #4786). A Permission of their own
-   * rather than part of `corp`: the reads need no corp role, and widening `corp`
-   * would move every already-granted corp Character to `roles-without-grant`
-   * (docs/features/corp.md). All three share the `corp-project` rate group.
-   */
   getCorporationProjects: {
     route: '/corporations/{corporation_id}/projects',
     scope: 'esi-corporations.read_projects.v1',
@@ -1011,12 +764,6 @@ export const ESI_REGISTRY = {
     route: '/sovereignty/systems',
     scope: PUBLIC,
   },
-  /**
-   * Military Campaigns (issue #6703): live campaign and objective state, and
-   * which objectives a Character pressed Participate on. A Permission of its
-   * own, in the Base Grant; a Character that signed in before it shipped is
-   * never prompted for it — reads answer "unknown" until it is granted.
-   */
   getMilitaryCampaigns: {
     route: '/military-campaigns',
     scope: PUBLIC,
@@ -1034,27 +781,16 @@ export const ESI_REGISTRY = {
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;
 
-/** Union of the scopes the app actually needs, derived from the table above. */
 export type Scope = Exclude<(typeof ESI_REGISTRY)[EsiEndpointId]['scope'], PublicAccess>;
 
-/** Narrows a declared requirement to a real scope, dropping the PUBLIC marker. */
 export function isScopeRequired(requirement: ScopeRequirement): requirement is Scope {
   return requirement !== PUBLIC;
 }
 
-/** The endpoints a panel needs to send a mail from the active Character. */
 export const SEND_MAIL_ENDPOINTS = [
   'postCharacterMail',
 ] as const satisfies readonly EsiEndpointId[];
 
-/**
- * Distinct Permissions the given endpoints belong to, in declaration order.
- * An endpoint declaring no `group` (Core Grant) contributes nothing — a
- * banner or gate whose endpoints are all Core Grant has no Permission to ask
- * for, which is exactly the re-login banner's "no identifiable Permission"
- * case (issue #1520): it should ask for the Core Grant plus the Character's
- * stored grant, never the whole Base Grant.
- */
 export function permissionsForEndpoints(ids: readonly EsiEndpointId[]): readonly ScopeGroup[] {
   return [
     ...new Set(
@@ -1065,19 +801,12 @@ export function permissionsForEndpoints(ids: readonly EsiEndpointId[]): readonly
   ];
 }
 
-/**
- * Distinct scopes the given endpoints require, in declaration order. Mirrors
- * `routeScopes.ts`'s `requiredScopesForRoute`, but keyed off an endpoint list
- * directly — for a panel-level grant check that has no route of its own to
- * ask `routeScopes.ts` about (e.g. "is this one figure's fallback in play").
- */
 export function requiredScopesForEndpoints(ids: readonly EsiEndpointId[]): readonly Scope[] {
   return [...new Set(ids.map((id) => (ESI_REGISTRY[id] as EsiEndpointSpec).scope))].filter(
     isScopeRequired
   );
 }
 
-/** The Permissions of the "Write to EVE" section, in catalogue order. */
 export const WRITE_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
   (group) => PERMISSIONS[group].section === 'write'
 );

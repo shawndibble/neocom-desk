@@ -32,7 +32,6 @@ function jwt(characterId: number): string {
   return `${b64url(JSON.stringify({ alg: 'RS256' }))}.${b64url(JSON.stringify(payload))}.sig`;
 }
 
-// Minted once: `exp` is in whole seconds, so two calls can differ across a tick.
 const ACCESS = jwt(333);
 
 mswServer(
