@@ -114,15 +114,14 @@ test('D7-b2: log it, sell it, realized profit', async ({ page }) => {
   await page.keyboard.press('Control+A');
   await page.keyboard.type('2', { delay: 70 });
   await hold(2000);
-  await glide(page.getByRole('dialog').getByText('None', { exact: true }).first(), 1000);
   await hold(4000);
-  marks.mark('lost-filled', '2 units lost, cost written off, payout None');
+  marks.mark('lost-filled', '2 units lost, cost written off');
   await press(page.getByRole('dialog').getByRole('button', { name: 'Mark as lost' }).last(), 1000);
   await hold(4500);
   marks.mark('lost-saved', 'Run shows "2 lost"');
 
   // 6. Realized profit and its breakdown
-  const profitCell = page.getByRole('row').filter({ hasText: '11/25/2026' }).first();
+  const profitCell = page.getByRole('row').filter({ hasText: /2 lost/ }).first();
   marks.mark('realized-profit', 'Realized profit in the run row');
   await glide(profitCell, 1000);
   await hold(3500);
