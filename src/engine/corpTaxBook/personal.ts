@@ -54,7 +54,7 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { HOUR_MS } from '@/lib/age';
 
 /**
  * `settling`: ore the member listed for the corporation's own Payee beyond what the book recorded,
@@ -856,14 +856,20 @@ export function previewTakeover(
 }
 
 /**
+ * How long after a day closes (its grace included) ore the book lacks may still be the refinery
+ * log catching up (decision 20261125-184957).
+ */
+const SETTLE_MS = 6 * HOUR_MS;
+
+/**
  * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really
  * missing: the book holds the miner's ore on a later day at every refinery they mined at in that
- * system that day (the excess can't be tied to one), or a day has passed since the day ended. A
- * sync soon after the day closes can predate the log's last writes.
+ * system that day (the excess can't be tied to one), or `SETTLE_MS` has passed since the day
+ * closed. A sync soon after the day closes can predate the log's last writes.
  */
 function isSettled(book: PersonalBook, charge: PreparedCharge, now: string): boolean {
   const { characterId, solarSystemId, date } = charge.observed;
-  if (Date.parse(now) >= Date.parse(dayClosesAt(date, 0)) + DAY_MS) return true;
+  if (Date.parse(now) >= Date.parse(dayClosesAt(date, book.graceHours)) + SETTLE_MS) return true;
   const mine = book.observed.filter((o) => o.characterId === characterId);
   const refineries = new Set(
     mine

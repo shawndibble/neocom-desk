@@ -177,11 +177,12 @@ export class PayeeRunningAccounts {
 
   /**
    * The Payee records a new Assignment may be offered, suggested or pre-filled with (the picker, the
-   * last-used and Default System suggestions): never a Payee a book is the authority for, nor an
-   * archived one.
+   * last-used and Default System suggestions): never an archived one. A Payee a book is the
+   * authority for is offered: giving it ore is how the member says the day is that corporation's,
+   * which its book then bills (decision 20261125-184957).
    */
   assignable<P extends Pick<PayeeRecord, 'id'>>(payees: readonly P[]): P[] {
-    return payees.filter((p) => !this.isBookOwned(p.id) && !this.isArchived(p.id));
+    return payees.filter((p) => !this.isArchived(p.id));
   }
 
   /** The newest day a Payee has nothing owed on or before; null while none is paid. */

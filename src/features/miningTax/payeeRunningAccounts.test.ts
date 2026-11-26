@@ -186,13 +186,13 @@ describe('PayeeRunningAccounts', () => {
       ).toBe('needs-review');
     });
 
-    it('are never offered to a new Assignment: neither suggested, pre-filled nor listed', () => {
+    it("are offered to a new Assignment: giving one ore is how the day becomes its book's", () => {
       const payees = [payee('p1', 1, 98000001), payee('q', 1, 5)];
       expect(
         build()
           .assignable(payees)
           .map((p) => p.id)
-      ).toEqual(['q']);
+      ).toEqual(['p1', 'q']);
     });
 
     it('stay Outstanding to the safeguards, which never read a paid day as unpaid or the reverse', () => {

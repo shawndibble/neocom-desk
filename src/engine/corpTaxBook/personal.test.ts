@@ -1746,6 +1746,18 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
     });
 
     describe('while the refinery log may still be catching up on the day', () => {
+      // A sync soon after the day closed, read before the settling window ran out: the sync must
+      // not be later than `now`, or the day would look closed by a sync that has not happened.
+      const early = (
+        entries: PersonalEntry[],
+        books: PersonalBook[],
+        now = '2026-10-18T03:00:00Z'
+      ) =>
+        overlay(
+          entries,
+          books.map((b) => ({ ...b, lastSyncedAt: '2026-10-18T01:00:00Z' })),
+          now
+        );
       const overListed = () =>
         allGiven(50_000, [
           alloc({ id: 'a-bmw', payeeId: 'bmw', oreLines: [{ typeId: ZEO, quantity: 50_000 }] }),
@@ -1762,7 +1774,7 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         out.rows.filter((r) => r.state !== 'billed').map((r) => r.state);
 
       it('shows the excess as Settling: no Conflict, no overlap, nothing billed', () => {
-        const out = overlay([overListed()], [book({ ownPayeeIds: ['bmw'] })]);
+        const out = early([overListed()], [book({ ownPayeeIds: ['bmw'] })]);
         const settling = out.rows.filter((r) => r.state === 'settling');
         expect(settling).toHaveLength(1);
         expect(settling[0]).toMatchObject({
@@ -1782,7 +1794,7 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
           ownPayeeIds: ['bmw'],
           observed: [...book().observed, later(1000)],
         });
-        expect(statesOf(overlay([overListed()], [b]))).toEqual(['conflict']);
+        expect(statesOf(early([overListed()], [b]))).toEqual(['conflict']);
       });
 
       it("keeps Settling on later ore at another refinery, or another miner's", () => {
@@ -1790,27 +1802,25 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
           ownPayeeIds: ['bmw'],
           observed: [...book().observed, later(1001), later(1000, ME + 1)],
         });
-        expect(statesOf(overlay([overListed()], [b]))).toEqual(['settling']);
+        expect(statesOf(early([overListed()], [b]))).toEqual(['settling']);
       });
 
       it('keeps Settling until every refinery the miner used that day has later ore', () => {
         const other = { ...book().observed[0], structureId: 1001, oreLines: [] };
         const b = (observed: PersonalBook['observed']) =>
           book({ ownPayeeIds: ['bmw'], observed: [...book().observed, other, ...observed] });
-        expect(statesOf(overlay([overListed()], [b([later(1000)])]))).toEqual(['settling']);
-        expect(statesOf(overlay([overListed()], [b([later(1000), later(1001)])]))).toEqual([
+        expect(statesOf(early([overListed()], [b([later(1000)])]))).toEqual(['settling']);
+        expect(statesOf(early([overListed()], [b([later(1000), later(1001)])]))).toEqual([
           'conflict',
         ]);
       });
 
-      it('settles a day after the day ended, with no later ore', () => {
+      it('settles six hours after the day closed, with no later ore', () => {
         expect(
-          statesOf(
-            overlay([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T23:59:59Z')
-          )
+          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T06:29:59Z'))
         ).toEqual(['settling']);
         expect(
-          statesOf(overlay([overListed()], [book({ ownPayeeIds: ['bmw'] })], SETTLED))
+          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T06:30:00Z'))
         ).toEqual(['conflict']);
       });
     });
