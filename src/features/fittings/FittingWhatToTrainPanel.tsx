@@ -287,7 +287,7 @@ function WhatToTrainRanking({
         <StatNote>{t('fittings.whatToTrain.none')}</StatNote>
       )}
       {improves.length > 0 && (
-        <div className={cx('space-y-1', hasFixes && 'mt-3')}>
+        <div className={cx('space-y-1', hasFixes && 'mt-4 border-t border-line pt-5')}>
           {hasFixes && <p className={STAT_EYEBROW_TYPE}>{t('fittings.whatToTrain.improvesFit')}</p>}
           <ul
             aria-label={t('fittings.stats.section.whatToTrain')}
