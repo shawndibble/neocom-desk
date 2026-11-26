@@ -20,6 +20,8 @@ export const TOUR_VIDEOS = {
   undock: { youtubeId: 'TrZTghXJmkA', duration: '3:23' },
   industry: { youtubeId: 'rOPpdivF4nI', duration: '3:27' },
   corp: { youtubeId: 'vKHBrUn08vE', duration: '2:58' },
+  skills: { youtubeId: 'U9C_DQLyamw', duration: '5:14' },
+  alerts: { youtubeId: 'ZxhoqlwiyLs', duration: '3:34' },
 } as const satisfies Record<string, { youtubeId: string; duration: string }>;
 
 export type TourVideoId = keyof typeof TOUR_VIDEOS;

@@ -1,10 +1,9 @@
 import { PROMO_VIDEO_ANCHOR } from './promoVideoConfig';
 
 export const LANDING_ANCHORS: { id: string; key: string }[] = [
-  { id: 'login-overview', key: 'overview' },
-  { id: 'login-answers', key: 'answers' },
+  { id: 'login-areas', key: 'areas' },
+  { id: 'login-away', key: 'away' },
   { id: PROMO_VIDEO_ANCHOR, key: 'tour' },
-  { id: 'login-features', key: 'features' },
   { id: 'login-trust', key: 'trust' },
   { id: 'login-community', key: 'community' },
   { id: 'login-faq', key: 'faq' },

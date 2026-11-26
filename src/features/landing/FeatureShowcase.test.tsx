@@ -6,50 +6,44 @@ import { FeatureShowcase } from './FeatureShowcase';
 import { SHOWCASE_TABS } from './showcaseTabs';
 
 describe('FeatureShowcase', () => {
-  it('opens on the first area with its screenshot and what it does', () => {
+  it('opens on Trade with its screenshot, three questions and its pages', () => {
     render(<FeatureShowcase />);
-    expect(
-      screen.getByRole('tab', { name: 'Market & orders', selected: true })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Trade', selected: true })).toBeInTheDocument();
     const panel = within(screen.getByRole('tabpanel'));
-    expect(panel.getByRole('img', { name: /the wallet journal/i })).toHaveAttribute(
+    expect(panel.getByRole('img', { name: /the market page/i })).toHaveAttribute(
       'src',
-      '/screenshots/desktop-wallet-journal.webp'
+      '/screenshots/desktop-market.webp'
     );
+    expect(panel.getAllByRole('heading', { level: 3 })).toHaveLength(3);
+    expect(
+      panel.getByRole('heading', { name: /cheapest one without crossing lowsec/i })
+    ).toBeInTheDocument();
+    for (const page of ['Market', 'Open Orders', 'Wallet', 'Assets', 'Contracts']) {
+      expect(panel.getByText(page)).toBeInTheDocument();
+    }
   });
 
-  it('switches the screenshot and the bullets with the tab', async () => {
+  it('switches the screenshot, the questions and the pages with the tab', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: 'Corporation' }));
+    await user.click(screen.getByRole('tab', { name: 'Run a corp' }));
     const panel = within(screen.getByRole('tabpanel'));
     expect(panel.getByRole('img', { name: /Corp Board/i })).toHaveAttribute(
       'src',
       '/screenshots/desktop-corporation.webp'
     );
-    expect(panel.getByText(/a board of widgets you pick and size/i)).toBeInTheDocument();
-    expect(panel.queryByRole('img', { name: /running and finished jobs/i })).toBeNull();
-    expect(panel.queryByText(/costs materials, job cost and taxes/i)).toBeNull();
-  });
-
-  it('lists only what a tab adds under "Also includes", never its own name', async () => {
-    render(<FeatureShowcase />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: 'Industry' }));
-    expect(screen.queryByText('Also includes')).toBeNull();
-    await user.click(screen.getByRole('tab', { name: 'Alerts' }));
-    const panel = within(screen.getByRole('tabpanel'));
-    expect(panel.getByText('Also includes')).toBeInTheDocument();
-    expect(panel.getByText('Notifications')).toBeInTheDocument();
-    expect(panel.queryByText('Alerts')).toBeNull();
+    expect(panel.getByRole('heading', { name: /who owes moon tax/i })).toBeInTheDocument();
+    expect(panel.getByText('Corp Tax Book')).toBeInTheDocument();
+    expect(panel.getByText('Communities')).toBeInTheDocument();
+    expect(panel.queryByRole('heading', { name: /cheapest one/i })).toBeNull();
   });
 
   it('enlarges a screenshot in a dialog and closes it again', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /enlarge: the wallet journal/i }));
+    await user.click(screen.getByRole('button', { name: /enlarge: the market page/i }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('img', { name: /the wallet journal/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole('img', { name: /the market page/i })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -57,39 +51,51 @@ describe('FeatureShowcase', () => {
   it('moves between tabs with the arrow keys', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    screen.getByRole('tab', { name: 'Market & orders' }).focus();
+    screen.getByRole('tab', { name: 'Trade' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('tab', { name: 'Industry', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Build', selected: true })).toBeInTheDocument();
   });
 
-  it('gives every tab at least three bullets with real copy', async () => {
+  it('gives every tab three questions with real copy', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    for (const { id, bullets } of SHOWCASE_TABS) {
-      expect(bullets.length).toBeGreaterThanOrEqual(3);
-      expect(bullets.length).toBeLessThanOrEqual(4);
-      const tabs = screen.getAllByRole('tab');
-      await user.click(tabs[SHOWCASE_TABS.findIndex((tab) => tab.id === id)]);
+    for (const [index, { items }] of SHOWCASE_TABS.entries()) {
+      expect(items).toHaveLength(3);
+      await user.click(screen.getAllByRole('tab')[index]);
       expect(screen.getByRole('tabpanel').textContent).not.toMatch(/login\.showcase/);
     }
   });
 });
 
 describe('FeatureShowcase tour videos', () => {
-  it('offers the industry and corporation videos on their tabs only', async () => {
+  it('puts each walkthrough on the area it explains, under its short label', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    expect(screen.queryByRole('button', { name: /^Watch:/ })).toBeNull();
-    await user.click(screen.getByRole('tab', { name: 'Industry' }));
+    const watch: Record<string, string[]> = {
+      Trade: ['Watch a full evening'],
+      Build: ['Watch an industry build, start to sale'],
+      Fly: ['Watch a skill queue get optimised', 'Watch a fit go from paste to undock'],
+      'Run a corp': ['Watch the officer pages'],
+      'Stay in touch': [],
+    };
+    for (const [tab, labels] of Object.entries(watch)) {
+      await user.click(screen.getByRole('tab', { name: tab }));
+      const panel = within(screen.getByRole('tabpanel'));
+      expect(panel.queryAllByRole('button', { name: /^Watch/ })).toHaveLength(labels.length);
+      for (const label of labels) {
+        expect(panel.getByRole('button', { name: label })).toBeInTheDocument();
+      }
+    }
+  });
+
+  it('plays a walkthrough in a dialog titled with the full video name', async () => {
+    render(<FeatureShowcase />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Fly' }));
+    await user.click(screen.getByRole('button', { name: 'Watch a skill queue get optimised' }));
     expect(
-      within(screen.getByRole('tabpanel')).getByRole('button', {
-        name: 'Watch: build it, sell it, see the profit (3:27)',
-      })
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Corporation' }));
-    expect(
-      within(screen.getByRole('tabpanel')).getByRole('button', {
-        name: "Watch: running a corp, the officer's side (2:58)",
+      await screen.findByRole('dialog', {
+        name: 'Plan Your EVE Online Skills: A Faster Queue, Remaps, Accelerators and Masteries',
       })
     ).toBeInTheDocument();
   });

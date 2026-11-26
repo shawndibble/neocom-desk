@@ -20,15 +20,7 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
     .toBe(true);
 
   await expect(page.getByRole('button', { name: 'Log in with EVE Online' }).first()).toBeVisible();
-  const hasChunk = (name: string) =>
-    page.evaluate(
-      (pattern) =>
-        performance
-          .getEntriesByType('resource')
-          .some((entry) => new RegExp(pattern).test(entry.name)),
-      `/assets/${name}-[^/]+\\.js$`
-    );
-  await expect.poll(() => hasChunk('DemoBoard'), { timeout: 15_000 }).toBe(true);
+  await expect(page.getByRole('contentinfo')).toBeVisible({ timeout: 15_000 });
   await page.waitForLoadState('networkidle');
   const pageChunks = await page.evaluate(() =>
     performance

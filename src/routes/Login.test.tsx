@@ -6,7 +6,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
-import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL } from '@/lib/links';
+import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL, YOUTUBE_CHANNEL_URL } from '@/lib/links';
 import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { LANDING_SHELL_ATTR, LANDING_SHELL_ID } from '@/app/landingShell';
 import { takeLoginReturnTo } from '@/auth/loginReturnTo';
@@ -182,83 +182,65 @@ describe('Login', () => {
     );
   });
 
-  it('leads with the questions the app answers', async () => {
+  it('leads with the areas of the app, each question under its job', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /questions you'd alt-tab for/i })
+      await screen.findByRole('heading', { name: /one desk for every job you do in eve/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /which order is quietly losing isk/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /is this blueprint worth building/i })
+      screen.getByRole('heading', { name: /cheapest one without crossing lowsec/i })
     ).toBeInTheDocument();
   });
 
-  it('pairs every question with a screenshot, each with alt text, lazily loaded', async () => {
+  it('gives the screenshot alt text and loads it lazily', async () => {
     renderLogin();
-    const grid = within(
-      await screen.findByRole('region', { name: /questions you'd alt-tab for/i })
+    const areas = within(
+      await screen.findByRole('region', { name: /one desk for every job you do in eve/i })
     );
-    const images = grid.getAllByRole('img');
-    expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
-    expect(images).toHaveLength(9);
-    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(9);
-    for (const image of images) {
-      expect(image.getAttribute('alt')).toBeTruthy();
-      expect(image).toHaveAttribute('loading', 'lazy');
-      expect(image.getAttribute('src')).toMatch(/^\/screenshots\/[a-z-]+\.webp$/);
-    }
+    const image = within(areas.getByRole('tabpanel')).getByRole('img');
+    expect(image.getAttribute('alt')).toBeTruthy();
+    expect(image).toHaveAttribute('loading', 'lazy');
+    expect(image.getAttribute('src')).toMatch(/^\/screenshots\/[a-z-]+\.webp$/);
   });
 
   it('enlarges a screenshot in a dialog when it is clicked', async () => {
     const user = userEvent.setup();
     renderLogin();
-    const grid = within(
-      await screen.findByRole('region', { name: /questions you'd alt-tab for/i })
+    const areas = within(
+      await screen.findByRole('region', { name: /one desk for every job you do in eve/i })
     );
-    await user.click(grid.getByRole('button', { name: /enlarge: a build plan for an orca/i }));
-    const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
+    await user.click(areas.getByRole('button', { name: /enlarge: the market page/i }));
+    const dialog = await screen.findByRole('dialog', { name: /a live order book/i });
     expect(within(dialog).getByRole('img')).toHaveAttribute(
       'src',
-      '/screenshots/desktop-build-plan.webp'
+      '/screenshots/desktop-market.webp'
     );
   });
 
-  it('tabs the feature catalog by area and names every surface that ships today', async () => {
+  it('tabs the feature catalog by job and names every surface that ships today', async () => {
     renderLogin();
-    const section = within(await screen.findByRole('region', { name: /every tool, by area/i }));
+    const section = within(
+      await screen.findByRole('region', { name: /one desk for every job you do in eve/i })
+    );
     const user = userEvent.setup();
 
     const covered: Record<string, string[]> = {
-      Industry: [],
-      'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
-      Skills: ['Ships', 'Clones', 'Travel'],
-      'Planetary & mining': ['Planetary Industry', 'Mining'],
-      Corporation: ['Corp Tax Book', 'SRP'],
-      Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings', 'Communities'],
-      Alerts: ['Notifications'],
+      Trade: ['Market', 'Open Orders', 'Wallet', 'Assets', 'Contracts'],
+      Build: ['Industry', 'Mining', 'Planetary Industry'],
+      Fly: ['Skills', 'Ships', 'Clones', 'Travel'],
+      'Run a corp': ['Corporation', 'Corp Tax Book', 'SRP', 'Communities'],
+      'Stay in touch': ['Mail & Calendar', 'Contacts & Standings'],
     };
-    const seen: string[] = [];
-    for (const [tab, features] of Object.entries(covered)) {
+    for (const [tab, pages] of Object.entries(covered)) {
       await user.click(section.getByRole('tab', { name: tab }));
       const panel = within(section.getByRole('tabpanel'));
-      for (const feature of features) {
-        expect(panel.getByText(feature)).toBeInTheDocument();
-        seen.push(feature);
-      }
-      if (features.length === 0) expect(panel.queryByText('Also includes')).toBeNull();
-      else expect(panel.getByText('Also includes')).toBeInTheDocument();
-      expect(panel.queryByRole('listitem', { name: tab })).toBeNull();
-      seen.push(tab);
+      for (const page of pages) expect(panel.getByText(page)).toBeInTheDocument();
     }
-    expect(seen.filter((name) => !(name in covered))).toHaveLength(16);
-    for (const row of ['Industry', 'Corporation', 'Alerts', 'Skills']) expect(seen).toContain(row);
   });
 
   it('has no How it works section or header link any more', async () => {
     renderLogin();
-    await screen.findByRole('region', { name: /questions you'd alt-tab for/i });
+    await screen.findByRole('region', { name: /one desk for every job you do in eve/i });
     expect(screen.queryByRole('region', { name: /how it works/i })).toBeNull();
     expect(
       within(screen.getByRole('navigation', { name: /page sections/i })).queryByRole('link', {
@@ -267,49 +249,47 @@ describe('Login', () => {
     ).toBeNull();
   });
 
-  it("previews the Overview widget grid using the widgets' own labels", async () => {
+  it('numbers the sections as the header lists them, Areas first', async () => {
     renderLogin();
-    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
-
-    expect(preview.getByText('Next')).toBeInTheDocument();
-    expect(preview.getByText('Customize')).toBeInTheDocument();
-    expect(preview.getByRole('button', { name: /alerts, 5 waiting/i })).toBeInTheDocument();
-
-    for (const title of [
-      'Hauling',
-      'Below-market contracts',
-      'Price watch',
-      'Planetary',
-      'Wallet',
-      'Profit',
-      'Training',
-      'Open orders',
-    ]) {
-      expect(await preview.findByRole('region', { name: title })).toBeInTheDocument();
-    }
-    expect(preview.getByText('48M')).toBeInTheDocument();
-    expect(preview.getByRole('button', { name: /data updated/i })).toBeInTheDocument();
-
-    expect(preview.queryByText('Training now')).not.toBeInTheDocument();
-    expect(preview.queryByText('13 unread')).not.toBeInTheDocument();
+    await screen.findByRole('contentinfo');
+    const nav = within(screen.getByRole('navigation', { name: /page sections/i }));
+    expect(nav.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Areas',
+      'Away',
+      'Tour',
+      'Trust',
+      'Community',
+      'FAQ',
+    ]);
+    expect(screen.getByText('01 · Areas')).toBeInTheDocument();
+    expect(screen.getByText('06 · FAQ')).toBeInTheDocument();
   });
 
-  it('opens sample alerts from the demo bell, and the demo links nowhere', async () => {
-    const user = userEvent.setup();
+  it('sells the whole app in the hero and under it', async () => {
     renderLogin();
-    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
+    await screen.findByRole('contentinfo');
+    expect(screen.getByText(/one desk beside the game for every character you fly/i)).toBeVisible();
+    expect(screen.getByRole('list', { name: 'At a glance' })).toBeInTheDocument();
+    expect(screen.getByText('Industry · PI · Corp')).toBeInTheDocument();
+    expect(screen.getByText('Alerts · game closed')).toBeInTheDocument();
+  });
 
-    await user.click(preview.getByRole('button', { name: /alerts, 5 waiting/i }));
-    const panel = await screen.findByRole('dialog');
-    expect(within(panel).getByText('Order undercut')).toBeInTheDocument();
-    expect(within(panel).getAllByRole('listitem')).toHaveLength(5);
-
-    expect(preview.queryAllByRole('link')).toHaveLength(0);
+  it('shows the alerts section and the tour with its more-videos link', async () => {
+    renderLogin();
+    expect(
+      await screen.findByRole('heading', { name: /it keeps watching while eve is closed/i })
+    ).toBeInTheDocument();
+    const tour = within(screen.getByRole('region', { name: /watch it work/i }));
+    expect(tour.getByRole('button', { name: /watch the full tour \(5:40\)/i })).toBeInTheDocument();
+    expect(tour.getByRole('link', { name: /more walkthroughs on youtube/i })).toHaveAttribute(
+      'href',
+      YOUTUBE_CHANNEL_URL
+    );
   });
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /logged-in view/i });
+    await screen.findByRole('contentinfo');
 
     const leaked = (container.textContent ?? '').match(
       /(?:overview|login|skills|notifications|common|nav|settings|market|industry)\.[a-zA-Z][\w.]*/g
@@ -418,7 +398,7 @@ describe('Login', () => {
 
   it('never calls the app read-only, since the Base Grant carries write scopes', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /logged-in view/i });
+    await screen.findByRole('contentinfo');
     expect(container.textContent ?? '').not.toMatch(
       /read-only access|it never writes|read-only, and/i
     );
