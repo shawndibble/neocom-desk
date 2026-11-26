@@ -36,6 +36,29 @@ export function payOldestFirst<D extends { date: string; owed: number }>(
   return { unpaid, paid };
 }
 
+function paymentsSinceRecord(recorded: Data, payments: readonly Data[]): number[] {
+  let counted = Number(recorded.paid) || 0;
+  return [...payments]
+    .sort((a, b) => String(a.at ?? '').localeCompare(String(b.at ?? '')))
+    .flatMap((p) => {
+      const net = netPayment(p);
+      const skip = Math.min(counted, net);
+      counted -= skip;
+      return net - skip > 0 ? [net - skip] : [];
+    });
+}
+
+function payEachInTurn<D extends { date: string; owed: number }>(
+  days: readonly D[],
+  amounts: readonly number[],
+  tolerance: (day: D) => number
+): D[] {
+  return amounts.reduce<D[]>(
+    (unpaid, amount) => payOldestFirst(unpaid, amount, tolerance).unpaid,
+    [...days]
+  );
+}
+
 export function liveRunningAccount(
   recorded: Data,
   payments: readonly Data[],
@@ -57,7 +80,9 @@ export function liveRunningAccount(
     : undefined;
   const unpaidDays =
     recordedDays &&
-    payOldestFirst(recordedDays, since, (d) => daySettleTolerance(d.tax, tolerancePct)).unpaid;
+    payEachInTurn(recordedDays, paymentsSinceRecord(recorded, payments), (d) =>
+      daySettleTolerance(d.tax, tolerancePct)
+    );
   const recordedCount = Number(recorded.days) || 0;
   const days = recordedDays
     ? Math.max(0, recordedCount - (recordedDays.length - unpaidDays!.length))

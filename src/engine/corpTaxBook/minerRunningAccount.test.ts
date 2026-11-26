@@ -790,6 +790,35 @@ describe('MinerRunningAccount: a day closed within the tolerance stays closed', 
     expect(outcome).toMatchObject({ owedBefore: 3_500_000, owedAfter: 0, creditAdded: 0 });
   });
 
+  it('pays a day from credit as soon as it is billed, before the next payment', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1_000_000)],
+      payments: [
+        payment('early', 996_000, '2026-11-01T12:00:00Z'),
+        payment('late', 1_000_000, '2026-11-05T12:00:00Z'),
+      ],
+    });
+    expect(account.day('2026-11-02')).toMatchObject({ settled: true, writtenOff: 4_000 });
+    expect(account.credit).toBe(1_000_000);
+    expect(account.applications.payments).toEqual([
+      { paymentId: 'early', days: [{ date: '2026-11-02', amount: 996_000 }], credit: 0 },
+      { paymentId: 'late', days: [], credit: 1_000_000 },
+    ]);
+  });
+
+  it('closes a day paid on the day it mined once it is billed, and keeps the next payment for the next day', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1_000_000), day('2026-11-03', 1_000_000)],
+      payments: [
+        payment('a', 996_000, '2026-11-02T12:00:00Z'),
+        payment('b', 1_004_000, '2026-11-03T12:00:00Z'),
+      ],
+    });
+    expect(account.day('2026-11-02')).toMatchObject({ settled: true, writtenOff: 4_000 });
+    expect(account.day('2026-11-03')).toMatchObject({ settled: true, writtenOff: 0 });
+    expect(account.credit).toBe(4_000);
+  });
+
   it('carries money past a closed day into credit', () => {
     const extra = payment('p25', 3_600_000, '2026-11-25T12:00:00Z');
     const account = MinerRunningAccount.build({ days, payments: [...paid, extra] });

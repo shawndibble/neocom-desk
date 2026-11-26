@@ -136,12 +136,16 @@ export class MinerRunningAccount {
       { ...input, heldDays, days },
       {
         payments: [
-          ...(opening > 0 && cp
-            ? [{ paymentId: OPENING_CREDIT, left: opening, through: cp.through }]
+          ...(cp && opening > 0
+            ? [{ paymentId: OPENING_CREDIT, left: opening, billedThrough: cp.through }]
             : []),
           ...counted
             .filter((p) => netPayment(p) > 0)
-            .map((p) => ({ paymentId: p.id, left: netPayment(p), through: utcDayOf(p.at) })),
+            .map((p) => ({
+              paymentId: p.id,
+              left: netPayment(p),
+              billedThrough: shiftUtcDate(utcDayOf(p.at), -1),
+            })),
         ],
         writeOffPool: (input.writeOffs ?? [])
           .filter((w) => after(utcDayOf(w.at)))
@@ -392,7 +396,7 @@ export function runningDaysFromLines(
 }
 
 interface DayPools {
-  payments: readonly { paymentId: string; left: number; through: string }[];
+  payments: readonly { paymentId: string; left: number; billedThrough: string }[];
   writeOffPool: number;
 }
 
@@ -478,10 +482,10 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   const pay = (
     available: number,
     kind: 'payment' | 'correction' | 'writeOff',
-    through?: string
+    billedThrough?: string
   ): number => {
     for (const d of days) {
-      if (available <= 0 || (through !== undefined && d.date > through)) break;
+      if (available <= 0 || (billedThrough !== undefined && d.date > billedThrough)) break;
       const st = state.get(d.date)!;
       if (isHeld(d) || st.tax <= 0 || isDone(st)) continue;
       const take = Math.min(available, st.tax - st.credited);
@@ -501,13 +505,15 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   };
 
   const corrections = days.reduce((sum, d) => sum + Math.max(0, -d.tax), 0);
-  const unused = pay(corrections, 'correction');
-  let carried = 0;
+  const correctionLeft = pay(corrections, 'correction');
+  const payNewlyBilled = (credit: number, billedThrough?: string) =>
+    pay(credit, 'payment', billedThrough);
+  let paymentCredit = 0;
   for (const p of pools.payments) {
-    carried = pay(carried, 'payment', p.through);
-    carried = pay(carried + p.left, 'payment', p.through);
+    const left = payNewlyBilled(paymentCredit, p.billedThrough);
+    paymentCredit = pay(left + p.left, 'payment', p.billedThrough);
   }
-  const credit = unused + pay(carried, 'payment');
+  const credit = correctionLeft + payNewlyBilled(paymentCredit);
   pay(pools.writeOffPool, 'writeOff');
 
   const byDay = new Map<string, DaySettlement>();

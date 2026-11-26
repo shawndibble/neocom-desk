@@ -84,6 +84,29 @@ describe('liveRunningAccount with the days still owed', () => {
     expect(liveRunningAccount(recorded, [{ amount: 989_999 }], 1).days).toBe(2);
   });
 
+  it('keeps a day one payment closed within the tolerance closed when the next payment arrives', () => {
+    const tight = {
+      owed: 11_000,
+      paid: 0,
+      days: 2,
+      oldest: '2026-11-08',
+      at: '2026-11-19T10:00:00.000Z',
+      unpaidDays: [
+        { date: '2026-11-08', owed: 10_000, tax: 10_000 },
+        { date: '2026-11-09', owed: 1_000, tax: 1_000 },
+      ],
+    };
+    const payments = [
+      { amount: 1_000, at: '2026-11-21T10:00:00.000Z' },
+      { amount: 9_960, at: '2026-11-20T10:00:00.000Z' },
+    ];
+    expect(liveRunningAccount(tight, payments).unpaidDays).toEqual([]);
+    expect(liveRunningAccount({ ...tight, paid: 9_960 }, payments).unpaidDays).toEqual([
+      { date: '2026-11-08', owed: 9_000, tax: 10_000 },
+      { date: '2026-11-09', owed: 1_000, tax: 1_000 },
+    ]);
+  });
+
   it('pays the oldest day first, part of the next, and moves the oldest date on', () => {
     expect(liveRunningAccount(recorded, [{ amount: 1_500_000 }])).toMatchObject({
       owed: 5_500_000,
