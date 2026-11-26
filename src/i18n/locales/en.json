@@ -4829,7 +4829,7 @@
         },
         "calendar": {
           "question": "Answer an invite",
-          "answer": "Calendar replies go straight to EVE, for any character."
+          "answer": "Calendar replies go straight to EVE."
         },
         "contacts": {
           "question": "See who likes you, and who does not",
@@ -4995,7 +4995,7 @@
     "areasHeading": "One desk for every job you do in EVE",
     "areasLead": "Pick what you are doing tonight. Each area is a full set of pages, filled with sample data here and tied together by the same characters, route rules and prices.",
     "awayHeading": "It keeps watching while EVE is closed",
-    "awayLead": "Turn alerts on once. The desk tells you when an order is undercut, a job finishes, a skill completes or a colony is about to run dry. It is opt-in, and it is the one thing that needs a small server-side token.",
+    "awayLead": "Turn alerts on once. The desk tells you when an order is undercut, a job finishes, a skill completes or a colony is about to run dry. It is opt-in, and it keeps a small token on our server while it is on.",
     "away": {
       "feedTitle": "Alerts, 6 new",
       "markAll": "Mark all read",
