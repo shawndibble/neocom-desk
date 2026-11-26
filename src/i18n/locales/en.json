@@ -4629,10 +4629,9 @@
     "permissionsHint": "Here is everything logging in grants, by area: what Neocom Desk reads, and the few things it can write. Open an area to see each permission and why it's needed.",
     "header": {
       "nav": "Page sections",
-      "overview": "Overview",
-      "answers": "Answers",
+      "areas": "Areas",
+      "away": "Away",
       "tour": "Tour",
-      "features": "Features",
       "trust": "Trust",
       "community": "Community",
       "faq": "FAQ",
@@ -4642,7 +4641,7 @@
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Everything you do outside the client.",
     "headingAccent": "In one place.",
-    "tagline": "Search every region's market by jumps, using your own route rules. See what to change in your fit and what to train next. Keep industry, orders, PI and corp tax in view, with alerts even when the game is closed. Every character in one place.",
+    "tagline": "One desk beside the game for every character you fly. Skills and fits, industry and PI, orders and contracts, corp tax and mail, with alerts when EVE is closed.",
     "trustLine": {
       "device": "Login stays on this device",
       "writes": "Writes to EVE only when you act",
@@ -4659,126 +4658,76 @@
         "title": "Improve fit",
         "line1": "Swaps that fix your fit",
         "line2": "What to train next"
-      }
-    },
-    "overviewHeading": "Everything that needs you, on one screen",
-    "overviewLead": "The first screen after you log in, with sample data: hauls worth flying, contracts under market, the prices you watch and colonies about to run dry.",
-    "previewLabel": "Example — logged-in view",
-    "previewCorp": "Deep Space Transport",
-    "demo": {
+      },
+      "industry": {
+        "title": "Industry · PI · Corp",
+        "line1": "Jobs, colonies, moon tax",
+        "line2": "Across every character"
+      },
       "alerts": {
-        "ago": "{{duration}} ago",
-        "undercut": {
-          "title": "Order undercut",
-          "detail": "Superconductors ×570 at Amarr VIII"
-        },
-        "jobReady": {
-          "title": "Industry job ready",
-          "detail": "Medium Capacitor Booster II ×10 is ready to deliver"
-        },
-        "skillDone": {
-          "title": "Skill finished",
-          "detail": "Mining Exploitation IV is done, the next skill starts"
-        },
-        "extractor": {
-          "title": "Extractor ending soon",
-          "detail": "Efa IV runs out in 2d 21h"
-        },
-        "mail": {
-          "title": "New mail",
-          "detail": "From the corp recruiter: Welcome aboard"
-        }
+        "title": "Alerts · game closed",
+        "line1": "Undercut, job done,",
+        "line2": "colony about to run dry"
       }
     },
     "video": {
-      "heading": "Take the tour",
-      "lead": "A {{duration}} narrated tour with sample data: market search by jumps, fit upgrades, skill plans and alerts while the game is closed.",
+      "heading": "Watch it work",
+      "lead": "Start with the {{duration}} overview. Then pick the walkthrough for the area you care about, each one following a real job from start to finish.",
       "play": "Play the {{duration}} tour video",
       "playerTitle": "Neocom Desk tour video",
-      "heroLink": "Watch the tour ({{duration}})"
+      "heroLink": "Watch the tour ({{duration}})",
+      "points": {
+        "market": {
+          "lead": "Market search by jumps",
+          "rest": "on your own route rules"
+        },
+        "fit": {
+          "lead": "Fit upgrades",
+          "rest": "and what to train next"
+        },
+        "plans": {
+          "lead": "Skill plans, industry and orders",
+          "rest": "across characters"
+        },
+        "alerts": {
+          "lead": "Alerts",
+          "rest": "while the game is closed"
+        }
+      },
+      "moreLink": "More walkthroughs on YouTube"
     },
     "tourVideos": {
       "evening": {
-        "title": "An evening in EVE",
-        "link": "Watch the full tour ({{duration}})"
+        "title": "An Evening in EVE Online: Sell Loot, Fit a Ship and Fly a Safer Route",
+        "link": "Watch a full evening",
+        "fullTour": "Watch the full tour ({{duration}})"
       },
       "undock": {
-        "title": "From a fit to undocking",
-        "link": "Watch: from a fit to undocking ({{duration}})"
+        "title": "From a Fit to Undocking in EVE Online: Skills, Price and a Safe Route",
+        "link": "Watch a fit go from paste to undock"
       },
       "industry": {
-        "title": "Build it, sell it, see the profit",
-        "link": "Watch: build it, sell it, see the profit ({{duration}})"
+        "title": "Plan, build, sell and track real industry profit in EVE Online",
+        "link": "Watch an industry build, start to sale"
       },
       "corp": {
-        "title": "Running a corp: the officer's side",
-        "link": "Watch: running a corp, the officer's side ({{duration}})"
-      }
-    },
-    "answersHeading": "Questions you'd alt-tab for",
-    "answersPhoneEyebrow": "On your phone",
-    "answersLead": "Each of these is a screen from the app, filled with sample data. Open any screenshot to see it full size.",
-    "answers": {
-      "marketRange": {
-        "eyebrow": "Market & route",
-        "question": "Where's the cheapest one without crossing lowsec?",
-        "answer": "Market searches every region and counts each order’s jumps from the system you pick, using your own route rules, such as avoiding lowsec. The same rules set every jump count in the app."
+        "title": "Run your EVE Online corp: fuel, SRP, vetting and mining tax",
+        "link": "Watch the officer pages"
       },
-      "orders": {
-        "eyebrow": "Orders",
-        "question": "Which order is quietly losing ISK?",
-        "answer": "Open Orders puts every order, across every character, under its worst problem, worst first. Open one to see what each option (undercut, hold, dump, haul) nets after fees."
+      "skills": {
+        "title": "Plan Your EVE Online Skills: A Faster Queue, Remaps, Accelerators and Masteries",
+        "link": "Watch a skill queue get optimised"
       },
-      "build": {
-        "eyebrow": "Industry",
-        "question": "Is this blueprint worth building?",
-        "answer": "A Build Plan adds up materials, job cost and taxes at live hub prices, then tells you whether building beats buying and still turns a profit."
-      },
-      "marketJumps": {
-        "question": "What is for sale within 15 jumps?",
-        "answer": "The same market search on your phone: every order with its jumps from you, so you know what a trip is worth before you undock."
-      },
-      "routeSafety": {
-        "question": "Is this route safe right now?",
-        "answer": "Route Safety checks the route between two systems and flags the chokepoints on the way."
-      },
-      "pilot": {
-        "question": "Who is this pilot?",
-        "answer": "Pilot Lookup reads a character’s killboard history: a threat rating, kill and loss ratios, and kills per month."
-      },
-      "fitting": {
-        "eyebrow": "Fitting",
-        "question": "How do I make this fit better?",
-        "answer": "Build a fit and see its damage, resists, EHP and local tank. Improve Fit suggests swaps, and What to train lists the skills you still need."
-      },
-      "courier": {
-        "eyebrow": "Contracts",
-        "question": "Which haul pays best per jump?",
-        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route rules, and flags any that pays far above the going rate."
-      },
-      "assets": {
-        "eyebrow": "Assets",
-        "question": "Where did I leave that ship?",
-        "answer": "Assets lists every ship on every character, nearest first, with its station, even ones packed in a container."
+      "alerts": {
+        "title": "Alerts That Matter in EVE Online: Skills, Orders, Attacks and Push to Your Phone",
+        "link": "Watch how alerts work"
       }
     },
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
-      "orderDetail": {
-        "alt": "An open sell order: undercut to a price that still pays, its rank and how fast it sells, and every other way out (hold, undercut, dump to a buy order, reprocess, haul to another hub) with what each nets a unit after fees.",
-        "caption": "Every order says what to do, and what each exit nets"
-      },
-      "buildPlan": {
-        "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
-        "caption": "Build plans with profit after fees"
-      },
       "fitting": {
         "alt": "A ship fitting on the ring: modules, rigs and drones around a Caracal, with its missile and drone DPS, shield, armor and hull resists and EHP, local tank, calibration, powergrid and CPU.",
         "caption": "Fittings with damage and tank"
-      },
-      "walletJournal": {
-        "alt": "The wallet journal with links from each line to its contract and the item that was traded.",
-        "caption": "Every journal line links to its contract or item"
       },
       "phoneMarketJumps": {
         "alt": "The market order book on a phone, limited to stations within 15 jumps of Jita, with the jump count and security of each order.",
@@ -4792,14 +4741,6 @@
         "alt": "Pilot Lookup on a phone: a pilot’s corporation, threat reading, danger and fleet-size ratios and kills per month by kind of space.",
         "caption": "Pilot lookup"
       },
-      "planetaryColonies": {
-        "alt": "Planetary Industry’s Colonies tab: the next thing to do and when to log in next, then every colony ranked by what needs attention first, with its extractor timer and a next step.",
-        "caption": "Colonies ranked by what needs you first"
-      },
-      "overviewAlerts": {
-        "alt": "The Overview with the alerts bell open: an undercut order, a finished skill, an industry job ready, an extractor about to run out and a new mail, each with View and Dismiss.",
-        "caption": "Alerts for everything that needs you"
-      },
       "corporation": {
         "alt": "The Corp Board as widgets: deadlines due soon, structure fuel, moon extractions, raidable skyhooks, the corp wallet by division, 30-day cash flow, corp industry jobs and open SRP claims.",
         "caption": "A corp board of the widgets you choose"
@@ -4812,86 +4753,94 @@
         "alt": "The Market page with Tritanium open: the best sell and buy prices, the spread and the sell order book with each station, quantity, jumps and expiry.",
         "caption": "A live order book with jumps from you"
       },
-      "skills": {
-        "alt": "The Skills page: the skill in training with its time left, the queue grouped by month, the active Skill Plan with its finish date, and the character’s attributes with Optimize queue.",
-        "caption": "A training queue you can read at a glance"
-      },
       "mail": {
         "alt": "Mail in two panes: the inbox on the left with unread mail in bold, the open mail on the right with reply and forward buttons.",
         "caption": "A two-pane mail client"
-      },
-      "courier": {
-        "alt": "The Courier board: public courier contracts between trade hubs ranked by ISK per jump, each with reward, collateral, jumps, ISK per m³ and its multiple of the going rate, the top one flagged over rate.",
-        "caption": "Courier contracts ranked by ISK per jump"
-      },
-      "assets": {
-        "alt": "Assets › Ships across two characters: each ship with its owner, station, security and jumps from you, nearest first, two of them packed in a station container.",
-        "caption": "Every character’s assets, down to the container"
       }
     },
-    "featuresHeading": "Every tool, by area",
     "showcase": {
       "label": "Areas of the app",
-      "covers": "Also includes",
-      "industry": {
-        "tab": "Industry",
-        "costs": "A Build Plan costs materials, job cost and taxes at live hub prices.",
-        "verdict": "It says whether building beats buying, and whether it still profits after fees.",
-        "setup": "Blueprint search and facility presets set the assumptions; sub-builds roll up into the plan.",
-        "jobs": "Your active industry jobs sit on the same page."
+      "covers": "Pages",
+      "trade": {
+        "tab": "Trade",
+        "cheapest": {
+          "question": "Where's the cheapest one without crossing lowsec?",
+          "answer": "Market searches every region and counts each order's jumps on your own route rules."
+        },
+        "orders": {
+          "question": "Which order is quietly losing ISK?",
+          "answer": "Open Orders ranks every order, across every character, by its worst problem first."
+        },
+        "courier": {
+          "question": "Which haul pays best per jump?",
+          "answer": "The Courier board ranks public courier contracts by ISK per jump."
+        }
       },
-      "market": {
-        "tab": "Market & orders",
-        "orders": "Open Orders puts every order, across every character, under its worst problem, worst first.",
-        "market": "Market searches every region and sorts each order by jumps from you, on desktop or phone.",
-        "wallet": "Each Wallet journal line links to the contract or item behind it.",
-        "assets": "Assets searches every character's items, down to stations, ships and containers."
+      "build": {
+        "tab": "Build",
+        "blueprint": {
+          "question": "Is this blueprint worth building?",
+          "answer": "A Build Plan adds up materials, job cost and taxes at live hub prices, then says whether building beats buying."
+        },
+        "jobs": {
+          "question": "What is running, and when does it finish?",
+          "answer": "Industry lists your jobs across every character with the time each one is ready."
+        },
+        "colony": {
+          "question": "Which colony runs dry first?",
+          "answer": "Planetary Industry shows every colony and when it needs you, and plans a build for planets you have not set up."
+        }
       },
-      "skills": {
-        "tab": "Skills",
-        "queue": "Your skill queue shows what finishes when, and when it runs dry.",
-        "plans": "Skill Plans work out when a plan finishes and how to get there faster.",
-        "tree": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers.",
-        "clones": "Clones shows where each jump clone is and when the next jump is allowed."
-      },
-      "planetary": {
-        "tab": "Planetary & mining",
-        "colonies": "Colonies leads with the next thing to do and ranks every colony by what needs you first.",
-        "logIn": "Log in next says when you need to be back, so one login covers everything due.",
-        "plan": "Plan sets goals per day over your colonies and lists the shortfalls and the changes that close them.",
-        "mining": "Mining tracks what you mined and what it is worth; the Tax ledger shows who you owe rent to and what is paid, and Survey says when a belt will be mined out."
+      "fly": {
+        "tab": "Fly",
+        "fit": {
+          "question": "How do I make this fit better?",
+          "answer": "Build a fit and see its damage, resists, EHP and local tank. Improve Fit suggests swaps, and What to train lists the skills you still need."
+        },
+        "route": {
+          "question": "Is this route safe right now?",
+          "answer": "Route Safety checks the route between two systems and flags the chokepoints on the way."
+        },
+        "pilot": {
+          "question": "Who is this pilot?",
+          "answer": "Pilot Lookup reads killboard history: a threat rating, kill and loss ratios, and kills per month."
+        }
       },
       "corp": {
-        "tab": "Corporation",
-        "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
-        "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
-        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, the late notices sent to them, and what is paid.",
-        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is read only for the roles you hold."
+        "tab": "Run a corp",
+        "board": {
+          "question": "What does the corporation need from me?",
+          "answer": "Corporation pages gather the work in one board, read only as far as your in-game roles allow."
+        },
+        "tax": {
+          "question": "Who owes moon tax?",
+          "answer": "The Corp Tax Book tracks moon mining and what each miner owes, and SRP keeps ship replacement requests in the same place."
+        },
+        "share": {
+          "question": "How do I share without handing over my account?",
+          "answer": "A Community is a named group under one admin. Members share only what they pick: blueprints, Fittings and Skill Plans."
+        }
       },
-      "comms": {
-        "tab": "Mail",
-        "mail": "Mail is a two-pane client: read what came in, then reply or forward.",
-        "calendar": "Calendar lists every clock a character can read in one deadline-ordered list beside a map of days, and sends your response to an invite.",
-        "contracts": "Contracts searches public offers for an item, lists courier jobs and keeps your history.",
-        "contacts": "Contacts mirrors your in-game contact list, compares your characters’ standings, and shows the NPC standings that set broker fees."
+      "social": {
+        "tab": "Stay in touch",
+        "mail": {
+          "question": "Read and write mail without logging in to the game",
+          "answer": "Write with formatting in the editor. Opening a mail marks it read in EVE."
+        },
+        "calendar": {
+          "question": "Answer an invite",
+          "answer": "Calendar replies go straight to EVE, for any character."
+        },
+        "contacts": {
+          "question": "See who likes you, and who does not",
+          "answer": "Contacts and Standings sit beside mail, so a name in a message is never a mystery."
+        }
       },
-      "alerts": {
-        "tab": "Alerts",
-        "bell": "The bell collects what fired: undercut orders, finished jobs and skills, extractors running out, new mail.",
-        "record": "Alerts keeps the record of everything that fired, for every character, grouped by type.",
-        "choose": "Notifications lets you pick which events fire, for which character, as a device pop-up or in the in-app list.",
-        "closed": "Alerts when closed is opt-in per character, and is how an alert reaches you with the app shut."
-      }
+      "watch": "Watch"
     },
     "features": {
       "corp": {
         "name": "Corporation"
-      },
-      "alerts": {
-        "name": "Alerts"
-      },
-      "notifications": {
-        "name": "Notifications"
       },
       "skills": {
         "name": "Skills"
@@ -4947,19 +4896,31 @@
     },
     "trustHeading": "What it can touch, and what it can't",
     "trust": {
-      "readOnly": {
-        "name": "It writes only when you act",
-        "desc": "Opening a mail flags it as read in EVE. Answering a calendar invite sends your response. Mail you send goes out through your account. Saving a Fitting to EVE recreates it on the game's side. Setting waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else writes to EVE."
+      "reads": {
+        "eyebrow": "Reads",
+        "name": "Your characters, as far as you allow",
+        "desc": "Skills, wallet, assets, orders, contracts, industry, planets, mail and location. Corporation data only as far as your in-game corporation roles allow."
       },
-      "token": {
+      "writes": {
+        "eyebrow": "Writes",
+        "name": "It writes only when you act",
+        "items": {
+          "mail": "Opening a mail flags it as read in EVE.",
+          "calendar": "Answering a calendar invite sends your response.",
+          "send": "Mail you send goes out through your account.",
+          "fitting": "Saving a Fitting to EVE recreates it on the game's side.",
+          "waypoints": "Setting waypoints replaces your autopilot waypoints in the client.",
+          "window": "Open in EVE opens a window in the client."
+        },
+        "note": "Nothing else writes to EVE. It cannot move ISK."
+      },
+      "stays": {
+        "eyebrow": "Stays",
         "name": "Your login stays on this device",
         "desc": "Your login's refresh token lives in this device's own storage, never on our server or in a log. Remove a character and it goes with it. Two opt-in features keep their own narrow token on our server, only while they are on: Alerts when closed and a Corp Tax Book's Automatic sync. The FAQ below has the details."
       },
-      "offline": {
-        "name": "Install it, open it offline",
-        "desc": "Install it like an app. Your characters and skill plans open from this device without a connection, marked as cached, and your plans sync across your devices. Live market and killboard data need a connection."
-      },
-      "openSource": {
+      "costs": {
+        "eyebrow": "Costs",
         "name": "Free and open source",
         "desc": "No account to create, no ads, no subscription, no paid tier. Read the source before you decide to trust it."
       }
@@ -5022,7 +4983,65 @@
     "footerDataCredit": "Data credit",
     "footerDiscord": "Discord",
     "permissionsPrivacy": "How your data is stored and deleted:",
-    "failed": "Couldn’t start the login. Check your connection and try again."
+    "failed": "Couldn’t start the login. Check your connection and try again.",
+    "proofStrip": {
+      "label": "At a glance",
+      "characters": "Every character on one desk",
+      "alerts": "Alerts when the game is closed",
+      "offline": "Installs and opens offline",
+      "free": "No account, ads or subscription",
+      "openSource": "Open source"
+    },
+    "areasHeading": "One desk for every job you do in EVE",
+    "areasLead": "Pick what you are doing tonight. Each area is a full set of pages, filled with sample data here and tied together by the same characters, route rules and prices.",
+    "awayHeading": "It keeps watching while EVE is closed",
+    "awayLead": "Turn alerts on once. The desk tells you when an order is undercut, a job finishes, a skill completes or a colony is about to run dry. It is opt-in, and it is the one thing that needs a small server-side token.",
+    "away": {
+      "feedTitle": "Alerts, 6 new",
+      "markAll": "Mark all read",
+      "filtersLabel": "Alert types",
+      "feedLabel": "Example alerts",
+      "filters": {
+        "all": "All",
+        "market": "Market",
+        "industry": "Industry",
+        "mail": "Mail",
+        "skills": "Skills"
+      },
+      "alerts": {
+        "undercut": {
+          "title": "Market Order Undercut",
+          "detail": "Hammerhead II at Jita IV - Moon 4 is undercut",
+          "ago": "5m ago"
+        },
+        "extractor": {
+          "title": "Planetary Extractor Expiring",
+          "detail": "Efa IV runs out in 2d 21h",
+          "ago": "2h ago"
+        },
+        "job": {
+          "title": "Industry Job Complete",
+          "detail": "Medium Capacitor Booster II x6 is ready to deliver",
+          "ago": "22m ago"
+        },
+        "skill": {
+          "title": "Skill Level Complete",
+          "detail": "Mining Exploitation IV is done, the next skill starts",
+          "ago": "1h ago"
+        },
+        "mail": {
+          "title": "New Mail",
+          "detail": "From Mara Venn: Welcome aboard, pilot",
+          "ago": "3h ago"
+        },
+        "filled": {
+          "title": "Sell Order Filled",
+          "detail": "Scourge Fury Heavy Missile sold 600 of 1,500",
+          "ago": "40m ago"
+        }
+      },
+      "phoneCaption": "On your phone it is the same app with a bottom bar: every order with its jumps from you, route safety and pilot lookup, for the moments you are away from the desk."
+    }
   },
   "callback": {
     "completing": "Completing login…",

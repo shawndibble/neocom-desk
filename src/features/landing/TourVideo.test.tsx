@@ -9,13 +9,21 @@ import { TOUR_VIDEOS, promoEmbedUrl, type TourVideoId } from './promoVideoConfig
 const IDS = Object.keys(TOUR_VIDEOS) as TourVideoId[];
 
 describe('TourVideoLink', () => {
-  it.each(IDS)('names the %s video and its length, and loads nothing before the press', (id) => {
-    const { container } = render(<TourVideoLink video={id} />);
-    const link = screen.getByRole('button', {
-      name: new RegExp(`\\(${TOUR_VIDEOS[id].duration}\\)$`),
-    });
-    expect(link).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(container.querySelector('iframe')).toBeNull();
+  it.each(IDS)(
+    'labels the %s video with its short name and loads nothing before the press',
+    (id) => {
+      const { container } = render(<TourVideoLink video={id} />);
+      const link = screen.getByRole('button', { name: en.login.tourVideos[id].link });
+      expect(link).toHaveAttribute('aria-haspopup', 'dialog');
+      expect(container.querySelector('iframe')).toBeNull();
+    }
+  );
+
+  it('can label the evening video as the full tour, with its length', () => {
+    render(<TourVideoLink video="evening" labelKey="fullTour" />);
+    expect(
+      screen.getByRole('button', { name: `Watch the full tour (${TOUR_VIDEOS.evening.duration})` })
+    ).toBeInTheDocument();
   });
 
   it.each(IDS)('plays the %s video in a dialog and unloads it on close', async (id) => {

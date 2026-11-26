@@ -11,7 +11,7 @@ describe('LandingSection', () => {
       </LandingSection>
     );
     expect(screen.getByRole('region', { name: 'Hello' })).toBeInTheDocument();
-    expect(screen.getByText('07 · FAQ')).toBeInTheDocument();
+    expect(screen.getByText('06 · FAQ')).toBeInTheDocument();
     expect(screen.getByText('Lead text')).toBeInTheDocument();
     expect(container.querySelector('.lp-layer')).toBeNull();
     expect(container.querySelector('img')).toBeNull();

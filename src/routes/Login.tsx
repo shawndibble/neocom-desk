@@ -9,6 +9,7 @@ import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/u
 import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { InlineError } from '@/components/ui/InlineError';
 import { CommunitySection } from '@/features/landing/CommunitySection';
+import { AwaySection } from '@/features/landing/AwaySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
 import { LandingFaq } from '@/features/landing/LandingFaq';
 import { LandingBackdrop, LandingSection } from '@/features/landing/LandingSection';
@@ -17,16 +18,15 @@ import { useBelowFold } from '@/features/landing/useBelowFold';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { HeroReticle } from '@/features/landing/HeroReticle';
 import { hudLabelClassName } from '@/features/landing/hudLabel';
-import { OverviewDemo } from '@/features/landing/OverviewDemo';
+import { ProofStrip } from '@/features/landing/ProofStrip';
 import { Reveal } from '@/features/landing/Reveal';
-import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { PromoVideo } from '@/features/landing/PromoVideo';
 import { TourVideoLink } from '@/features/landing/TourVideo';
 import { PROMO_VIDEO, PROMO_VIDEO_ANCHOR } from '@/features/landing/promoVideoConfig';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { DISCORD_URL, REPO_URL } from '@/lib/links';
+import { DISCORD_URL, REPO_URL, YOUTUBE_CHANNEL_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 import { setLoginReturnTo, usableLoginReturnTo } from '@/auth/loginReturnTo';
@@ -143,41 +143,59 @@ export function Login() {
           </div>
         </section>
 
+        <ProofStrip />
+
         <LandingSection
-          id="login-overview"
-          heading={t('login.overviewHeading')}
-          lead={t('login.overviewLead')}
+          id="login-areas"
+          heading={t('login.areasHeading')}
+          lead={t('login.areasLead')}
+          ship={{ ship: 'hulk', side: 'right' }}
         >
-          <OverviewDemo />
+          <FeatureShowcase />
         </LandingSection>
 
         {belowFold && (
           <>
             <LandingSection
-              id="login-answers"
-              heading={t('login.answersHeading')}
-              lead={t('login.answersLead')}
-              ship={{ ship: 'venture', side: 'right' }}
+              id="login-away"
+              heading={t('login.awayHeading')}
+              lead={t('login.awayLead')}
+              tone="panel"
             >
-              <QuestionGrid />
+              <AwaySection />
             </LandingSection>
-            <LandingSection
-              id={PROMO_VIDEO_ANCHOR}
-              heading={t('login.video.heading')}
-              lead={t('login.video.lead', { duration: PROMO_VIDEO.duration })}
-              tone="space"
-            >
-              <PromoVideo plays={promoPlays} onPlay={playPromo} />
-              <div className="mt-4 flex justify-center">
-                <TourVideoLink video="evening" />
+            <LandingSection id={PROMO_VIDEO_ANCHOR} heading={t('login.video.heading')} tone="space">
+              <div className="mt-8 grid items-center gap-8 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] lg:gap-14">
+                <div>
+                  <p className="max-w-md text-text-dim">
+                    {t('login.video.lead', { duration: PROMO_VIDEO.duration })}
+                  </p>
+                  <ul className="mt-5 space-y-3.5 text-text-dim">
+                    {(['market', 'fit', 'plans', 'alerts'] as const).map((point) => (
+                      <li key={point} className="flex gap-2.5">
+                        <span aria-hidden="true" className="pt-1 text-xs text-accent">
+                          ◆
+                        </span>
+                        <span>
+                          <b className="font-semibold text-text">
+                            {t(`login.video.points.${point}.lead`)}
+                          </b>{' '}
+                          {t(`login.video.points.${point}.rest`)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <PromoVideo plays={promoPlays} onPlay={playPromo} />
+                  <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+                    <TourVideoLink video="evening" labelKey="fullTour" />
+                    <ExternalLink href={YOUTUBE_CHANNEL_URL} className="text-sm">
+                      {t('login.video.moreLink')}
+                    </ExternalLink>
+                  </div>
+                </div>
               </div>
-            </LandingSection>
-            <LandingSection
-              id="login-features"
-              heading={t('login.featuresHeading')}
-              ship={{ ship: 'hulk', side: 'left' }}
-            >
-              <FeatureShowcase />
             </LandingSection>
             <LandingSection id="login-trust" heading={t('login.trustHeading')} tone="panel">
               <TrustSection />
@@ -217,7 +235,6 @@ export function Login() {
                   <TrustLine />
                   <CustomizeLink onClick={() => setCustomizing(true)} />
                 </div>
-                <TourVideoLink video="undock" className="mt-8" />
               </Reveal>
             </section>
           </>

@@ -1,5 +1,7 @@
 export const REPO_URL = 'https://github.com/shawndibble/neocom-desk';
 
+export const YOUTUBE_CHANNEL_URL = 'https://www.youtube.com/channel/UCJRi7Ep1ivGnp2Mgd1srJfQ';
+
 export const DISCORD_URL = 'https://discord.gg/Jr7WRMCBPE';
 
 export const AUTHORIZED_APPS_URL = 'https://developers.eveonline.com/authorized-apps';

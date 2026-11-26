@@ -12,10 +12,8 @@ import {
   NavCorpMoons,
   NavCorpSrp,
   NavTravel,
-  Notifications,
   Orders,
   Planetary,
-  ScheduledPush,
   Ships,
   Skills,
   Social,
@@ -33,81 +31,70 @@ export interface Feature {
 export interface ShowcaseTab {
   id: string;
   shot: Screenshot;
-  bullets: string[];
+  items: string[];
   features: Feature[];
-  video?: TourVideoId;
+  videos: TourVideoId[];
 }
 
 const desktop = (file: string, key: string): Screenshot => ({ file, key, size: DESKTOP_SIZE });
 
 export const SHOWCASE_TABS: ShowcaseTab[] = [
   {
-    id: 'market',
-    shot: desktop('desktop-wallet-journal', 'walletJournal'),
-    bullets: ['orders', 'market', 'wallet', 'assets'],
+    id: 'trade',
+    shot: desktop('desktop-market', 'market'),
+    items: ['cheapest', 'orders', 'courier'],
     features: [
       { icon: Market, key: 'market' },
       { icon: Orders, key: 'orders' },
       { icon: Wallet, key: 'walletOrders' },
       { icon: Container, key: 'assets' },
+      { icon: Contracts, key: 'contracts' },
     ],
+    videos: ['evening'],
   },
   {
-    id: 'industry',
+    id: 'build',
     shot: desktop('desktop-industry-jobs', 'industryJobs'),
-    bullets: ['costs', 'verdict', 'setup', 'jobs'],
-    features: [{ icon: Industry, key: 'industry' }],
-    video: 'industry',
+    items: ['blueprint', 'jobs', 'colony'],
+    features: [
+      { icon: Industry, key: 'industry' },
+      { icon: MoonMining, key: 'miningTax' },
+      { icon: Planetary, key: 'planetary' },
+    ],
+    videos: ['industry'],
   },
   {
-    id: 'skills',
-    shot: desktop('desktop-skills', 'skills'),
-    bullets: ['queue', 'plans', 'tree', 'clones'],
+    id: 'fly',
+    shot: desktop('desktop-fitting', 'fitting'),
+    items: ['fit', 'route', 'pilot'],
     features: [
       { icon: Skills, key: 'skills' },
       { icon: Ships, key: 'ships' },
       { icon: Clones, key: 'clones' },
       { icon: NavTravel, key: 'travel' },
     ],
-  },
-  {
-    id: 'planetary',
-    shot: desktop('desktop-planetary-colonies', 'planetaryColonies'),
-    bullets: ['colonies', 'logIn', 'plan', 'mining'],
-    features: [
-      { icon: Planetary, key: 'planetary' },
-      { icon: MoonMining, key: 'miningTax' },
-    ],
+    videos: ['skills', 'undock'],
   },
   {
     id: 'corp',
     shot: desktop('desktop-corporation', 'corporation'),
-    bullets: ['board', 'pages', 'moons', 'access'],
+    items: ['board', 'tax', 'share'],
     features: [
       { icon: Corporation, key: 'corp' },
       { icon: NavCorpMoons, key: 'corpTaxBook' },
       { icon: NavCorpSrp, key: 'srp' },
-    ],
-    video: 'corp',
-  },
-  {
-    id: 'comms',
-    shot: desktop('desktop-mail', 'mail'),
-    bullets: ['mail', 'calendar', 'contracts', 'contacts'],
-    features: [
-      { icon: MailInbox, key: 'social' },
-      { icon: Contracts, key: 'contracts' },
-      { icon: Social, key: 'contacts' },
       { icon: NavCommunities, key: 'communities' },
     ],
+    videos: ['corp'],
   },
   {
-    id: 'alerts',
-    shot: desktop('desktop-overview-alerts', 'overviewAlerts'),
-    bullets: ['bell', 'record', 'choose', 'closed'],
+    id: 'social',
+    shot: desktop('desktop-mail', 'mail'),
+    items: ['mail', 'calendar', 'contacts'],
     features: [
-      { icon: Notifications, key: 'alerts' },
-      { icon: ScheduledPush, key: 'notifications' },
+      { icon: MailInbox, key: 'social' },
+      { icon: Social, key: 'contacts' },
     ],
+    videos: [],
   },
 ];

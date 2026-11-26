@@ -1811,22 +1811,6 @@
     opacity: 0.55;
     pointer-events: none;
   }
-
-  /* The demo frame drifts up to 12px as the page scrolls (--lp-float set by OverviewDemo). */
-  .lp-float {
-    transform: translateY(var(--lp-float, 0px));
-    will-change: transform;
-  }
-
-  @keyframes lp-badge-pulse {
-    40% {
-      transform: scale(1.5);
-      box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 35%, transparent);
-    }
-  }
-  .lp-badge-pulse {
-    animation: lp-badge-pulse 700ms ease-out;
-  }
 }
 
 /*

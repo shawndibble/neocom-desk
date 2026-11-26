@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { ICON_SIZE, PlayVideo } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -11,7 +12,17 @@ import {
   type TourVideoId,
 } from './promoVideoConfig';
 
-export function TourVideoLink({ video, className }: { video: TourVideoId; className?: string }) {
+export function TourVideoLink({
+  video,
+  labelKey = 'link',
+  variant = 'link',
+  className,
+}: {
+  video: TourVideoId;
+  labelKey?: 'link' | 'fullTour';
+  variant?: 'link' | 'button';
+  className?: string;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { youtubeId, duration } = TOUR_VIDEOS[video];
@@ -22,10 +33,15 @@ export function TourVideoLink({ video, className }: { video: TourVideoId; classN
         type="button"
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
-        className={cx(inlineLinkClassName, 'inline-flex items-center gap-1.5 text-sm', className)}
+        className={cx(
+          variant === 'button'
+            ? buttonClassName({ variant: 'accent', align: 'start' })
+            : cx(inlineLinkClassName, 'inline-flex items-center gap-1.5 text-sm'),
+          className
+        )}
       >
         <PlayVideo size={ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-        {t(`login.tourVideos.${video}.link`, { duration })}
+        {t(`login.tourVideos.${video}.${labelKey}`, { duration })}
       </button>
       <Modal open={open} onClose={() => setOpen(false)} title={title} placement="wide">
         <div className="mx-auto aspect-video w-full max-w-[calc((85dvh-5rem)*16/9)] bg-bg">
