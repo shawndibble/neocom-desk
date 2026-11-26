@@ -54,7 +54,7 @@ import type { ObservedMiningEntry } from './types';
 import type { HeldPayment } from './docShapes';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { HOUR_MS } from '@/lib/age';
+import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 
 /**
  * `settling`: ore the member listed for the corporation's own Payee beyond what the book recorded,
@@ -859,7 +859,7 @@ export function previewTakeover(
  * How long after a day closes (its grace included) ore the book lacks may still be the refinery
  * log catching up (decision 20261125-184957).
  */
-const SETTLE_MS = 6 * HOUR_MS;
+const SETTLE_MS = 20 * MINUTE_MS;
 
 /**
  * Whether the refinery log has caught up on a charge's day, so ore the book lacks is really

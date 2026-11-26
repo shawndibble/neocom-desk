@@ -8413,6 +8413,7 @@
         "bookAndYou": "{{book}} (corp) · {{you}} (you)",
         "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
         "bookTitle": "Corp Tax Book",
+        "estimateOwn": "Not billed yet. Until {{corp}} bills this day, it is your own entry: edit it, or split off ore that was another Payee's.",
         "lockedShort": "{{corp}} keeps these figures, so they can't be edited here.",
         "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. Resolve it to send {{corp}} that transfer from your wallet journal.",
         "factBilling": "Billing",

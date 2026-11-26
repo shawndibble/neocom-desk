@@ -107,6 +107,20 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /unassign/i })).not.toBeInTheDocument();
   });
 
+  it("offers Edit, and Split under its menu, on an open day's estimate", async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    const onSplit = vi.fn();
+    const estimate = { ...corp, view: { ...corp.view, state: 'estimate' as const } };
+    renderModal({ corp: estimate, onEdit, onSplit });
+    expect(screen.getByText(/it is your own entry: edit it, or split off ore/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^edit/i }));
+    expect(onEdit).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: /more/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /split/i }));
+    expect(onSplit).toHaveBeenCalledOnce();
+  });
+
   it('opens the book diff as its own dialog from "Compare with the book", not inline', async () => {
     const user = userEvent.setup();
     renderModal();

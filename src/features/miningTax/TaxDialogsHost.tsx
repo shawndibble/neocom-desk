@@ -17,7 +17,7 @@ import type { ResolveTarget } from '@/features/miningTax/corpBook/resolve/target
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
-import { isCorpPayeeId } from '@/features/miningTax/corpBook/corpRows';
+import { isCorpPayeeId, ownEntryRowOf } from '@/features/miningTax/corpBook/corpRows';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { minerPayCodes } from '@/features/miningTax/corpBook/minerPayCodes';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
@@ -123,6 +123,8 @@ export interface TaxDialogsHostProps {
   /** A `useContinuations` write is running; with a dialog's own action it makes the dialogs `busy`. */
   continuing: boolean;
   allDisplayRows: readonly DisplayRow[];
+  /** The ledger's entries as the tab reads them: an open day's own entry, hidden behind its estimate, is found here. */
+  entries: readonly MoonMiningTaxRow[];
   characterFiltered: readonly DisplayRow[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   /** Every personal Payee's Running account: what Settle up, the ledger and Paid read. */
@@ -184,6 +186,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     loading,
     continuing,
     allDisplayRows,
+    entries,
     characterFiltered,
     everyAssignment,
     accounts,
@@ -507,8 +510,20 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
+  /** An open day's estimate row: the member's own entry it stands in for, else undefined. */
+  function estimateOwnRow(dr: DisplayRow | null): DisplayRow | undefined {
+    if (dr?.corp?.kind !== 'row' || dr.corp.view.state !== 'estimate' || !corpView)
+      return undefined;
+    return ownEntryRowOf(entries, corpView.overlay, dr.corp.view);
+  }
+
   /** The row menu's actions: View details opens the modal, the rest do what its buttons do. */
-  function runMenuAction(action: RowMenuAction, dr: DisplayRow) {
+  function runMenuAction(action: RowMenuAction, row: DisplayRow) {
+    // An open day's estimate edits and splits the member's own entry it stands in for.
+    const dr =
+      (action.id === 'edit' || action.id === 'split') && estimateOwnRow(row)
+        ? estimateOwnRow(row)!
+        : row;
     const grouped = dr.groupMembers !== undefined;
     switch (action.id) {
       case 'view':
@@ -713,6 +728,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
   // The member's own entry for a book day, when one lines up: "Fix my records" opens it to edit.
+  const estimateOwn = estimateOwnRow(detailTarget);
   const ownEntry = corpDetail
     ? allDisplayRows.find(
         (dr) =>
@@ -794,6 +810,14 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             onResolve(target);
           }}
           {...(ownEntry ? { onFixRecords: () => actions.openDetail(ownEntry) } : {})}
+          {...(estimateOwn
+            ? {
+                onEdit: () => actions.editFromDetail(estimateOwn),
+                ...(estimateOwn.assignment && !estimateOwn.assignment.groupId
+                  ? { onSplit: () => actions.splitFromDetail(estimateOwn) }
+                  : {}),
+              }
+            : {})}
           onOpenLedger={() => {
             actions.openDetail(null);
             actions.openLedger({

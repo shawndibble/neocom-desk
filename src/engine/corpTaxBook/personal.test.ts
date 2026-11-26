@@ -1751,11 +1751,11 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
       const early = (
         entries: PersonalEntry[],
         books: PersonalBook[],
-        now = '2026-10-18T03:00:00Z'
+        now = '2026-10-18T00:40:00Z'
       ) =>
         overlay(
           entries,
-          books.map((b) => ({ ...b, lastSyncedAt: '2026-10-18T01:00:00Z' })),
+          books.map((b) => ({ ...b, lastSyncedAt: '2026-10-18T00:35:00Z' })),
           now
         );
       const overListed = () =>
@@ -1815,12 +1815,12 @@ describe('overlayCorpBooks: a book takes the miner own Assignments by quantity (
         ]);
       });
 
-      it('settles six hours after the day closed, with no later ore', () => {
+      it('settles twenty minutes after the day closed, with no later ore', () => {
         expect(
-          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T06:29:59Z'))
+          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T00:49:59Z'))
         ).toEqual(['settling']);
         expect(
-          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T06:30:00Z'))
+          statesOf(early([overListed()], [book({ ownPayeeIds: ['bmw'] })], '2026-10-18T00:50:00Z'))
         ).toEqual(['conflict']);
       });
     });

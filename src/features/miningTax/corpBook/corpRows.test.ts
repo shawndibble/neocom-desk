@@ -15,6 +15,7 @@ import {
   corpPayeeId,
   corporationOfPayee,
   isBookRow,
+  ownEntryRowOf,
   isCorpPayeeId,
   personalEntriesOf,
 } from './corpRows';
@@ -434,5 +435,31 @@ describe('ore a Corp Tax Book took off an entry (releasedTypeIds)', () => {
     expect(out.takenFromFree.get(`${ME}:2026-10-17:${SYSTEM}`)).toEqual([
       { typeId: ZEO, quantity: 51189 },
     ]);
+  });
+});
+
+describe('ownEntryRowOf', () => {
+  const key = `${ME}:2026-10-18:30003838`;
+  const estimate = { characterId: ME, date: '2026-10-18', solarSystemId: 30003838 } as BookRowView;
+
+  it("is the member's own row an open day's estimate stands in for, to edit or split", () => {
+    const row = {
+      ...mined('2026-10-18'),
+      unassignedOreLines: [],
+      assignments: [
+        { ...assigned('bmw'), id: 'a1', date: '2026-10-18' },
+        { ...assigned('ashfall'), id: 'a2', date: '2026-10-18' },
+      ],
+    };
+    const out = ownEntryRowOf(
+      [row],
+      overlay({ absorbed: new Map([[key, new Set(['a1'])]]) }),
+      estimate
+    );
+    expect(out?.assignment?.id).toBe('a1');
+  });
+
+  it('is none when the book took no Assignment of that day', () => {
+    expect(ownEntryRowOf([mined('2026-10-18')], overlay({}), estimate)).toBeUndefined();
   });
 });
