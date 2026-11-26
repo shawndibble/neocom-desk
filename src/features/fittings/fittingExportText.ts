@@ -1,8 +1,13 @@
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
-import { fittingToEft, fittingToEveXml, fittingToMultibuy } from '@/engine/fittings/fittingExport';
+import {
+  fittingItemCounts,
+  fittingToEft,
+  fittingToEveXml,
+  fittingToMultibuy,
+} from '@/engine/fittings/fittingExport';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
-import { loadTypes } from '@/sde/loadSde';
+import { loadTypeNames } from '@/features/character/typeNames';
 import { FITTINGS_PATH } from './fittingRoutes';
 import { eftAttributeNamesFor } from '@/features/abyssal/mutaplasmidData';
 
@@ -36,8 +41,8 @@ export async function exportFitting(
     return code === null ? null : fittingShareUrl(code);
   }
 
-  const types = await loadTypes();
-  const nameFor = (typeId: number) => types[String(typeId)]?.name ?? `Type ${typeId}`;
+  const names = await loadTypeNames([...fittingItemCounts(fitting, cloneImplants).keys()]);
+  const nameFor = (typeId: number) => names.get(typeId) ?? `Type ${typeId}`;
   if (kind === 'eveXml') return fittingToEveXml(fitting, nameFor);
   return kind === 'eft'
     ? fittingToEft(fitting, nameFor, { attributeName: await eftAttributeNamesFor(fitting) })

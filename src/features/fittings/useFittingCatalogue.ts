@@ -17,8 +17,12 @@ export interface FittingCatalogue {
   variations: VariationData;
 }
 
+export function unnamedTypeName(typeId: number): string {
+  return `#${typeId}`;
+}
+
 export function catalogueTypeName(catalogue: FittingCatalogue | null, typeId: number): string {
-  return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
+  return catalogue?.types[String(typeId)]?.name ?? unnamedTypeName(typeId);
 }
 
 export function catalogueVolume(catalogue: FittingCatalogue | null, typeId: number): number {

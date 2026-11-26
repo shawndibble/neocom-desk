@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
@@ -27,6 +27,7 @@ import type { OverlayFitting } from './useOverlayFitting';
 import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
 import { useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { StatPreviewProvider } from './statPreview';
+import { useResolvedTypeName } from './useResolvedTypeName';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { StatsHeadingLabel } from './StatsHeadingLabel';
 import { StatsScopePanel, StatsScopeTrigger } from './StatsScopePanels';
@@ -186,6 +187,8 @@ export function FittingStatsSections({
   );
 
   const figure = makeFigure(stats);
+  const priceTypeIds = useMemo(() => price?.rows.map((row) => row.typeId) ?? [], [price]);
+  const priceTypeName = useResolvedTypeName(typeName, priceTypeIds);
   const column = { t, section, figure, stats, placeholder, typeName };
   const damage = damageSections({
     ...column,
@@ -196,7 +199,7 @@ export function FittingStatsSections({
     moduleResults,
   });
   const tank = tankSections({ ...column, damageProfiles, profileName });
-  const ship = shipSections({ ...column, price, previewIsk });
+  const ship = shipSections({ ...column, typeName: priceTypeName, price, previewIsk });
 
   return (
     <StatPreviewProvider delta={preview}>
