@@ -74,3 +74,23 @@ describe('FeatureShowcase', () => {
     }
   });
 });
+
+describe('FeatureShowcase tour videos', () => {
+  it('offers the industry and corporation videos on their tabs only', async () => {
+    render(<FeatureShowcase />);
+    const user = userEvent.setup();
+    expect(screen.queryByRole('button', { name: /^Watch:/ })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Industry' }));
+    expect(
+      within(screen.getByRole('tabpanel')).getByRole('button', {
+        name: 'Watch: build it, sell it, see the profit (3:27)',
+      })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Corporation' }));
+    expect(
+      within(screen.getByRole('tabpanel')).getByRole('button', {
+        name: "Watch: running a corp, the officer's side (2:58)",
+      })
+    ).toBeInTheDocument();
+  });
+});

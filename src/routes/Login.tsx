@@ -21,6 +21,7 @@ import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { PromoVideo } from '@/features/landing/PromoVideo';
+import { TourVideoLink } from '@/features/landing/TourVideo';
 import { PROMO_VIDEO, PROMO_VIDEO_ANCHOR } from '@/features/landing/promoVideoConfig';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -167,6 +168,9 @@ export function Login() {
               tone="space"
             >
               <PromoVideo plays={promoPlays} onPlay={playPromo} />
+              <div className="mt-4 flex justify-center">
+                <TourVideoLink video="evening" />
+              </div>
             </LandingSection>
             <LandingSection
               id="login-features"
@@ -213,6 +217,7 @@ export function Login() {
                   <TrustLine />
                   <CustomizeLink onClick={() => setCustomizing(true)} />
                 </div>
+                <TourVideoLink video="undock" className="mt-8" />
               </Reveal>
             </section>
           </>

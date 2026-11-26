@@ -8,6 +8,7 @@ import { cx } from '@/lib/cx';
 import { screenshotSrc, screenshotSrcSet, type Screenshot } from './screenshots';
 import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 import { SHOWCASE_TABS, type ShowcaseTab } from './showcaseTabs';
+import { TourVideoLink } from './TourVideo';
 
 export function FeatureShowcase() {
   const { t } = useTranslation();
@@ -40,6 +41,7 @@ export function FeatureShowcase() {
                 </li>
               ))}
             </ul>
+            {tab.video && <TourVideoLink video={tab.video} className="mt-5" />}
             {alsoIncludes.length > 0 && (
               <>
                 <p className={cx(eyebrowClassName, 'mt-6')}>{t('login.showcase.covers')}</p>
