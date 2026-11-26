@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Discord, Github, ICON_SIZE } from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { LANDING_QUOTES, type Quote } from './landingQuotes';
 
@@ -36,7 +38,11 @@ function CommunityLink({
     <ExternalLink
       href={href}
       variant="bare"
-      className="flex items-center gap-3.5 border border-line bg-bg/90 px-4 py-3.5 hover:border-accent/60"
+      className={cx(
+        'flex items-center gap-3.5 border border-line bg-bg/90 px-4 py-3.5 hover:border-accent/60',
+        interactiveClassName,
+        focusRingClassName
+      )}
     >
       <span className="shrink-0 text-accent">{icon}</span>
       <span className="min-w-0">

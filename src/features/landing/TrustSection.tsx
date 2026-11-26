@@ -70,25 +70,23 @@ export function TrustSection() {
           {t(listOpen ? 'login.permissionsClose' : 'login.permissionsOpen')}
         </button>
       </div>
-      {listOpen && (
-        <div id={listId} className="mt-6 grid gap-8 lg:grid-cols-2 lg:gap-10">
-          <ScopesAccordion />
-          <div className="space-y-3 text-sm text-text-dim lg:border-l lg:border-line lg:pl-10">
-            <p>{t('login.scopes.planetsNote')}</p>
-            <p>{t('login.scopes.oneLoginNote')}</p>
-            <p>
-              {t('login.permissionsPrivacy')}{' '}
-              <a href="/privacy.html" className={inlineLinkClassName}>
-                {t('login.footerPrivacy')}
-              </a>
-            </p>
-            <p>
-              {t('login.scopes.revoke')}{' '}
-              <ExternalLink href={AUTHORIZED_APPS_URL}>{t('login.scopes.revokeLink')}</ExternalLink>
-            </p>
-          </div>
+      <div id={listId} hidden={!listOpen} className="mt-6 grid gap-8 lg:grid-cols-2 lg:gap-10">
+        <ScopesAccordion />
+        <div className="space-y-3 text-sm text-text-dim lg:border-l lg:border-line lg:pl-10">
+          <p>{t('login.scopes.planetsNote')}</p>
+          <p>{t('login.scopes.oneLoginNote')}</p>
+          <p>
+            {t('login.permissionsPrivacy')}{' '}
+            <a href="/privacy.html" className={inlineLinkClassName}>
+              {t('login.footerPrivacy')}
+            </a>
+          </p>
+          <p>
+            {t('login.scopes.revoke')}{' '}
+            <ExternalLink href={AUTHORIZED_APPS_URL}>{t('login.scopes.revokeLink')}</ExternalLink>
+          </p>
         </div>
-      )}
+      </div>
     </>
   );
 }

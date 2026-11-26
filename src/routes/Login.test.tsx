@@ -418,7 +418,7 @@ describe('Login', () => {
     renderLogin();
     await screen.findByRole('heading', { name: /only when you act/i });
 
-    const permissions = screen.getByText(/every permission, by area/i);
+    const permissions = screen.getByText(/skills, wallet, assets, orders/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
       expect(permissions).not.toHaveTextContent(phrase);
       expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();
