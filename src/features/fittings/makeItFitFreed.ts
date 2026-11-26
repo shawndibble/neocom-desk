@@ -41,7 +41,11 @@ export function budgetChangeLabel(
   after: FittingStats,
   t: Translate
 ): string | null {
-  const parts = overBudgets(before).map(({ resource, used, total }) =>
+  const changed = overBudgets(before).filter(
+    ({ resource, used, total }) =>
+      usedOf(after, resource) !== used || totalOf(after, resource) !== total
+  );
+  const parts = changed.map(({ resource, used, total }) =>
     t('fittings.skillFixes.budgetChange', {
       resource: t(`fittings.makeItFit.resourceName.${resource}`),
       beforeUsed: roundedAmount(used),

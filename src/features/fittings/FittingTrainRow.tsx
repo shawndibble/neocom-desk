@@ -14,7 +14,7 @@ export function TrainRow({ title, detail, status, time, prerequisites, action }:
   const hasSecondLine = Boolean(detail || status);
   const timing = (
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap tabular-nums">
-      {time}
+      <span className={hasSecondLine ? undefined : 'min-w-[4.5rem] text-right'}>{time}</span>
       {prerequisites}
     </div>
   );

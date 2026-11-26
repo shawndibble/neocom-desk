@@ -592,6 +592,56 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     expect(await screen.findByText('CPU 412 / 380 → 371 / 380 tf')).toBeInTheDocument();
   });
 
+  it('names only the resources a budget fix actually changes', async () => {
+    skillGainsState.overBudget = true;
+    const budget = (cpuUsed: number, cpuTotal: number) => ({
+      cpuUsed,
+      cpuTotal,
+      powergridUsed: 800,
+      powergridTotal: 760,
+      calibrationUsed: 0,
+      calibrationTotal: 400,
+    });
+    skillFixesState.fixes = [
+      {
+        entries: [{ skillTypeID: 3300, targetLevel: 3 }],
+        before: budget(412, 380),
+        after: budget(371, 400),
+      },
+    ];
+    renderPanel();
+    expect(await screen.findByText('CPU 412 / 380 → 371 / 400 tf')).toBeInTheDocument();
+    expect(screen.queryByText(/Powergrid/)).toBeNull();
+  });
+
+  it('hides the group Add all once every needed skill is in the plan', async () => {
+    await db.skillPlans.put({
+      ...newPlan(CHARACTER_ID, 'Frigates'),
+      entries: [
+        { skillTypeID: 3436, targetLevel: 4 },
+        { skillTypeID: 3300, targetLevel: 2 },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[
+            { skillTypeID: 3436, targetLevel: 4 },
+            { skillTypeID: 3300, targetLevel: 2 },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findAllByText(/^In Frigates$/)).toHaveLength(2);
+    expect(
+      screen.queryByRole('button', { name: 'Add to plan: every skill this fit needs' })
+    ).toBeNull();
+  });
+
   it('lists the missing skills while the ranking is still working out', async () => {
     render(
       <MemoryRouter>

@@ -16,7 +16,11 @@ import { STAT_DETAIL } from './statKit';
 import { budgetChangeLabel } from './makeItFitFreed';
 import type { ScheduleEntries } from './useModuleUpgrades';
 
-type FixInput = Pick<SkillFix, 'entries'> & Partial<Pick<SkillFix, 'before' | 'after'>>;
+type FixInput = Pick<SkillFix, 'entries'> | SkillFix;
+
+function isPlanned(entries: readonly PlanEntry[], plannedLevels: ReadonlyMap<number, number>) {
+  return entries.every((e) => (plannedLevels.get(e.skillTypeID) ?? 0) >= e.targetLevel);
+}
 
 interface Props {
   fixes: readonly FixInput[];
@@ -79,13 +83,11 @@ export function SkillFixList({
         const label = fix.entries
           .map((e) => `${skillName(e.skillTypeID)} ${romanLevel(e.targetLevel)}`)
           .join(', ');
-        const planned = fix.entries.every(
-          (e) => (plannedLevels.get(e.skillTypeID) ?? 0) >= e.targetLevel
-        );
+        const planned = isPlanned(fix.entries, plannedLevels);
         return (
           <TrainRow
             key={label}
-            detail={fix.before && fix.after ? budgetChangeLabel(fix.before, fix.after, t) : null}
+            detail={'before' in fix ? budgetChangeLabel(fix.before, fix.after, t) : null}
             title={
               <p className="font-semibold">
                 {fix.entries.map((e) => (
@@ -153,10 +155,11 @@ interface GroupProps extends Props {
 export function SkillFixGroup({ reason, addAll = false, className, ...list }: GroupProps) {
   const { t } = useTranslation();
   const entries = list.fixes.flatMap((fix) => fix.entries);
-  const allPlanned = entries.every(
-    (e) => (list.plannedLevels.get(e.skillTypeID) ?? 0) >= e.targetLevel
-  );
-  const showAddAll = addAll && list.fixes.length > 1 && list.plan !== undefined && !allPlanned;
+  const showAddAll =
+    addAll &&
+    list.fixes.length > 1 &&
+    list.plan !== undefined &&
+    !isPlanned(entries, list.plannedLevels);
   return (
     <>
       <div className={cx('flex items-center justify-between gap-3', className)}>
