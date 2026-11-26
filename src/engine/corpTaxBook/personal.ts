@@ -14,7 +14,7 @@ import {
   matchesStatedTransfer,
 } from '../../../functions/src/corpTaxBookTransferMatch';
 import {
-  DAY_SETTLE_TOLERANCE_PCT,
+  daySettleTolerance,
   MinerRunningAccount,
   RESIDUE_ISK,
   type RunningAccountOwes,
@@ -1142,9 +1142,9 @@ export function overlayCorpBooks(input: {
       if (have < RESIDUE_ISK || tax <= 0) continue;
       const pay = Math.min(have, tax);
       credit.set(minerId, have - pay);
-      const tolerance = ((p.book.dayTolerancePct ?? DAY_SETTLE_TOLERANCE_PCT) * tax) / 100;
+      const tolerance = daySettleTolerance(tax, p.book.dayTolerancePct);
       if (tax - pay <= Math.max(RESIDUE_ISK, tolerance)) {
-        Object.assign(row, { state: 'paid', taxOwed: 0 });
+        Object.assign(row, { state: 'paid', taxOwed: 0, billed: pay });
         continue;
       }
       const share = pay / tax;
