@@ -27,6 +27,7 @@ import type { TargetProfiles } from './targetProfiles';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { hullOf, useImprove } from './useImprove';
 import { useImproveSettings } from './useImproveSettings';
+import { LOOKUP_DEBOUNCE_MS, useDebouncedValue } from '@/lib/useDebouncedValue';
 import { isPerFit, type ImproveChoices, type PerFitField } from './improveSettings';
 import { hasImproveResults } from './improveHasResults';
 import type { FittingWorkspace } from './useFittingWorkspace';
@@ -128,13 +129,14 @@ export function useImproveDrawer({
   const unloaded = fitting && chargeGroups ? unloadedWeapons(fitting, chargeGroups) : null;
   const chargeSteps = fitting && chargeGroups ? loadBestCharges(fitting, chargeGroups) : [];
 
+  const [searchBudget] = useDebouncedValue(rememberedConfig.iskBudget, LOOKUP_DEBOUNCE_MS);
   const search = useImprove(
     workspace.variants,
     catalogue,
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
     isOpen && remembered.ready,
-    { ...rememberedConfig, ...perFit },
+    { ...rememberedConfig, iskBudget: searchBudget, ...perFit },
     chargeSteps
   );
 
@@ -216,7 +218,7 @@ export function useImproveDrawer({
                   basis: workspace.implantBasis,
                   onChange: workspace.setImplantSet,
                 }}
-                iskBudget={choices.iskBudget}
+                iskBudget={searchBudget}
                 fitTotal={search.state.status === 'done' ? search.state.fitTotal : null}
                 onApply={applyWithImplants}
               />
