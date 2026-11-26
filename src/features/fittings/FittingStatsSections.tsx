@@ -27,6 +27,7 @@ import type { OverlayFitting } from './useOverlayFitting';
 import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
 import { useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { StatPreviewProvider } from './statPreview';
+import { useResolvedTypeName } from './useResolvedTypeName';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { StatsHeadingLabel } from './StatsHeadingLabel';
 import { StatsScopePanel, StatsScopeTrigger } from './StatsScopePanels';
@@ -186,6 +187,7 @@ export function FittingStatsSections({
   );
 
   const figure = makeFigure(stats);
+  const priceTypeName = useResolvedTypeName(typeName, price?.rows.map((row) => row.typeId) ?? []);
   const column = { t, section, figure, stats, placeholder, typeName };
   const damage = damageSections({
     ...column,
@@ -196,7 +198,7 @@ export function FittingStatsSections({
     moduleResults,
   });
   const tank = tankSections({ ...column, damageProfiles, profileName });
-  const ship = shipSections({ ...column, price, previewIsk });
+  const ship = shipSections({ ...column, typeName: priceTypeName, price, previewIsk });
 
   return (
     <StatPreviewProvider delta={preview}>

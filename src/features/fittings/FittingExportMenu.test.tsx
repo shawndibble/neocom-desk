@@ -24,11 +24,22 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
 const download = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/download', () => ({ downloadTextFile: download }));
 
+const NAMES: Record<number, string> = {
+  587: 'Rifter',
+  1: '200mm AutoCannon II',
+  10: 'AIR Booster',
+};
+
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: async () => ({
     '587': { name: 'Rifter' },
     '1': { name: '200mm AutoCannon II' },
   }),
+}));
+
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: async (ids: number[]) =>
+    new Map(ids.map((id) => [id, NAMES[id] ?? `Type #${id}`] as const)),
 }));
 
 const FITTING: Fitting = {
@@ -119,7 +130,7 @@ describe('FittingExportMenu', () => {
     });
 
     const lines = ((await exportFitting('multibuy', seeded, clone)) ?? '').split('\n');
-    expect(lines).toEqual(['Rifter\t1', '200mm AutoCannon II\t1', 'Type 11\t1', 'Type 10\t1']);
+    expect(lines).toEqual(['Rifter\t1', '200mm AutoCannon II\t1', 'Type #11\t1', 'AIR Booster\t1']);
   });
 
   it('copies a short Share Link storing the Fitting Share Code', async () => {
