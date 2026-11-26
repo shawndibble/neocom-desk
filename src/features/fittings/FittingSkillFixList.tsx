@@ -114,7 +114,7 @@ export function SkillFixList({
             action={
               plan !== undefined &&
               (plan && planned ? (
-                <span className="text-[0.6875rem] text-text-dim">
+                <span className="max-w-32 truncate text-[0.6875rem] text-text-dim">
                   {t('fittings.skillFixes.inPlan', { plan: plan.name })}
                 </span>
               ) : (

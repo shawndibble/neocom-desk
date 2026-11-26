@@ -391,26 +391,23 @@ export function WhatToTrainItem({
           </SkillLink>
         </span>
       }
-      detail={
-        <>
-          {joinDetail([
-            row.fromLevel > 0
-              ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
-              : t('fittings.whatToTrain.notTrained'),
-            ...changes,
-          ])}
-          {plan && plannedSpan !== null && (
-            <span className="block">
-              <Trans
-                i18nKey="fittings.whatToTrain.plannedLevels"
-                values={{ levels: plannedSpan, plan: plan.name }}
-                components={{
-                  plan: <Link to={`/skills/plans/${plan.id}`} className={inlineLinkClassName} />,
-                }}
-              />
-            </span>
-          )}
-        </>
+      detail={joinDetail([
+        row.fromLevel > 0
+          ? t('fittings.whatToTrain.trained', { level: romanLevel(row.fromLevel) })
+          : t('fittings.whatToTrain.notTrained'),
+        ...changes,
+      ])}
+      status={
+        plan &&
+        plannedSpan !== null && (
+          <Trans
+            i18nKey="fittings.whatToTrain.plannedLevels"
+            values={{ levels: plannedSpan, plan: plan.name }}
+            components={{
+              plan: <Link to={`/skills/plans/${plan.id}`} className={inlineLinkClassName} />,
+            }}
+          />
+        )
       }
       time={
         time === null ? (
