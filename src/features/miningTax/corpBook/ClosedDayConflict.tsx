@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import { InlineError } from '@/components/ui/InlineError';
 import {
   closedDayDifferences,
   type ClosedDayPlan,
@@ -9,30 +8,17 @@ import {
 } from '@/engine/corpTaxBook/closedDayFix';
 import type { OreLine } from '@/engine/miningTax/types';
 import { formatCount } from '@/lib/formatCount';
+import { closedConflictCorps, type ConflictNames } from './closedConflicts';
 import { typeLabel } from './typeLabel';
 
 const k = (key: string) => `miningTax.corpBook.closedConflict.${key}`;
 
-export interface ConflictNames {
-  payee: (payeeId: string) => string;
-  corp: (corporationId: number) => string;
-  typeNames: ReadonlyMap<number, string>;
-}
-
-function useOre(names: ConflictNames) {
-  return (lines: readonly OreLine[]) =>
-    lines
-      .map((l) => `${formatCount(l.quantity)} ${typeLabel(names.typeNames, l.typeId)}`)
-      .join(', ');
-}
-
-function closedConflictCorps(plan: ClosedDayPlan, names: ConflictNames): string {
-  return plan.books.map((b) => names.corp(b.corporationId)).join(', ');
-}
+const oreText = (names: ConflictNames) => (lines: readonly OreLine[]) =>
+  lines.map((l) => `${formatCount(l.quantity)} ${typeLabel(names.typeNames, l.typeId)}`).join(', ');
 
 export function ClosedDayFacts({ plan, names }: { plan: ClosedDayPlan; names: ConflictNames }) {
   const { t } = useTranslation();
-  const ore = useOre(names);
+  const ore = oreText(names);
   const allCorps = closedConflictCorps(plan, names);
   const corpsOf = (ids: readonly number[]) =>
     ids.length > 0 ? ids.map(names.corp).join(', ') : allCorps;
@@ -91,7 +77,7 @@ export function ClosedDayFixPreview({
   names: ConflictNames;
 }) {
   const { t } = useTranslation();
-  const ore = useOre(names);
+  const ore = oreText(names);
   const terms = (x: FixTerms | null) =>
     x === null || x.oreLines.length === 0
       ? t(k('nothing'))
@@ -118,22 +104,18 @@ interface NoticeProps {
   plan: ClosedDayPlan;
   names: ConflictNames;
   countsFrom?: string;
-  busy?: boolean;
-  error?: string | null;
   onFix: () => void;
   onResolve?: () => void;
-  tell?: ReactNode;
+  disputeAction?: ReactNode;
 }
 
 export function ClosedDayConflictNotice({
   plan,
   names,
   countsFrom,
-  busy,
-  error,
   onFix,
   onResolve,
-  tell,
+  disputeAction,
 }: NoticeProps) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
@@ -152,12 +134,12 @@ export function ClosedDayConflictNotice({
       <div className="flex flex-wrap gap-2">
         {confirming ? (
           <>
-            <Button size="sm" variant="primary" aria-disabled={busy || undefined} onClick={onFix}>
+            <Button size="sm" variant="primary" onClick={onFix}>
               {t(k('fix'))}
             </Button>
             <Button
               size="sm"
-              aria-disabled={busy || undefined}
+
               onClick={() => setConfirming(false)}
             >
               {t('common.cancel')}
@@ -168,7 +150,7 @@ export function ClosedDayConflictNotice({
             <Button
               size="sm"
               variant="warning"
-              aria-disabled={busy || undefined}
+
               onClick={() => setConfirming(true)}
             >
               {t(k('fix'))}
@@ -181,13 +163,12 @@ export function ClosedDayConflictNotice({
           </>
         )}
       </div>
-      {tell && (
+      {disputeAction && (
         <div className="space-y-1">
           <p>{t(k('disagree'), { corp })}</p>
-          {tell}
+          {disputeAction}
         </div>
       )}
-      {error && <InlineError>{error}</InlineError>}
     </div>
   );
 }

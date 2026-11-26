@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { combineOverlaps, type BookRowView } from '@/engine/corpTaxBook/personal';
@@ -38,16 +39,9 @@ export function CorpOverlapNotice({
 }: Props) {
   const { t } = useTranslation();
   const conflict = view.state === 'conflict';
-  const [acked, setAcked] = useState<Set<string> | null>(null);
+  const stored = useAsyncLoad(readOverlapAcks).data;
+  const [ackedNow, setAckedNow] = useState<string | null>(null);
   const key = overlapAckKey(view.corporationId, view.characterId, view.date, view.solarSystemId);
-
-  useEffect(() => {
-    let cancelled = false;
-    void readOverlapAcks().then((held) => !cancelled && setAcked(held));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const overlap = useMemo(
     () =>
@@ -116,16 +110,15 @@ export function CorpOverlapNotice({
     (view.state === 'billed' || view.declaration !== undefined) ? (
       <CorpDeclareSlot view={view} onResolve={onResolve} />
     ) : undefined;
-  if (!overlap || acked === null || (!declare && acked.has(key))) return null;
+  if (!overlap || stored === undefined || (!declare && (ackedNow === key || stored.has(key))))
+    return null;
 
   return (
     <OverlapNotice
       corpName={corpName}
       payeeNames={overlap.payeeIds.map(nameOf)}
       paid={overlap.paid}
-      onPaidAnotherWay={() =>
-        void acknowledgeOverlap(key).then(() => setAcked((held) => new Set(held).add(key)))
-      }
+      onPaidAnotherWay={() => void acknowledgeOverlap(key).then(() => setAckedNow(key))}
       {...(declare ? { paidAnotherWay: declare } : {})}
     />
   );

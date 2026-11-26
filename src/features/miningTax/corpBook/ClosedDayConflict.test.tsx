@@ -3,7 +3,8 @@ import '@/i18n';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { planClosedDayFix, type ClosedDay } from '@/engine/corpTaxBook/closedDayFix';
-import { ClosedDayConflictNotice, type ConflictNames } from './ClosedDayConflict';
+import { ClosedDayConflictNotice } from './ClosedDayConflict';
+import type { ConflictNames } from './closedConflicts';
 
 const ZEO = 45490;
 const CORP = 98000001;

@@ -293,12 +293,6 @@ async function putBack(records: readonly MiningTaxAssignmentRecord[]): Promise<v
   await putAssignments(records.map((r) => ({ ...r, updatedAt: now })));
 }
 
-export function restoreAssignments(
-  records: readonly MiningTaxAssignmentRecord[]
-): Promise<LedgerActionResult> {
-  return commit(charactersOf(records), () => putBack(records));
-}
-
 export function split(
   original: MiningTaxAssignmentRecord,
   input: SplitInput,
@@ -409,7 +403,24 @@ export type ClosedDayFixReason = Extract<AssignmentChangeReason, 'autoFix' | 'fi
 export interface ClosedDayFixOutcome {
   change: AssignmentRecordChange | null;
   stale: boolean;
-  originals?: MiningTaxAssignmentRecord[];
+  originals: MiningTaxAssignmentRecord[];
+}
+
+type ClosedDayWrite = {
+  change: AssignmentRecordChange | null;
+  originals: MiningTaxAssignmentRecord[];
+};
+
+function closedDayOutcome(
+  result: LedgerActionResult<ClosedDayWrite | null>
+): LedgerActionResult<ClosedDayFixOutcome> {
+  if (!result.ok) return result;
+  return {
+    ok: true,
+    value: result.value
+      ? { ...result.value, stale: false }
+      : { change: null, stale: true, originals: [] },
+  };
 }
 
 const termsOf = (a: MiningTaxAssignmentRecord): AssignmentTerms => ({
@@ -454,8 +465,9 @@ export async function fixClosedDay(
   reason: ClosedDayFixReason,
   at: string = new Date().toISOString()
 ): Promise<LedgerActionResult<ClosedDayFixOutcome>> {
-  const stale = { ok: true as const, value: { change: null, stale: true } };
-  if (plan.fixes.length === 0) return { ok: true, value: { change: null, stale: false } };
+  const stale = closedDayOutcome({ ok: true, value: null });
+  if (plan.fixes.length === 0)
+    return { ok: true, value: { change: null, stale: false, originals: [] } };
   const bookPrices = (fix: AssignmentFix): ReleasePrices | undefined => {
     const book = plan.books.find((b) => b.corporationId === fix.corporationId);
     return book
@@ -477,7 +489,7 @@ export async function fixClosedDay(
   } catch (cause) {
     return failure(cause);
   }
-  const result = await commit([plan.characterId], async () => {
+  const result = await commit([plan.characterId], async (): Promise<ClosedDayWrite | null> => {
     const held = stillPlanned(plan, await entryRecords(plan));
     if (!held) return null;
     const changes: AssignmentChange[] = [];
@@ -535,8 +547,7 @@ export async function fixClosedDay(
     if (change) await saveRecordChanges([{ characterId: plan.characterId, change }]);
     return { change, originals: [...held.values()] };
   });
-  if (!result.ok) return result;
-  return result.value ? { ok: true, value: { ...result.value, stale: false } } : stale;
+  return closedDayOutcome(result);
 }
 
 export async function undoClosedDayFix(
@@ -545,7 +556,7 @@ export async function undoClosedDayFix(
   originals: readonly MiningTaxAssignmentRecord[],
   at: string = new Date().toISOString()
 ): Promise<LedgerActionResult<ClosedDayFixOutcome>> {
-  const result = await commit([characterId], async () => {
+  const result = await commit([characterId], async (): Promise<ClosedDayWrite | null> => {
     const current = await db.miningTaxAssignments.bulkGet(
       change.assignments.map((a) => a.assignmentId)
     );
@@ -558,7 +569,8 @@ export async function undoClosedDayFix(
       a.before === null && current[i] ? [current[i]!] : []
     );
     await deleteAssignments(created);
-    await putBack(originals);
+    const changed = new Set(change.assignments.map((a) => a.assignmentId));
+    await putBack(originals.filter((r) => changed.has(r.id)));
     const undo = assignmentRecordChange({
       id: `undo:${change.id}:${at}`,
       reason: 'undo',
@@ -573,10 +585,7 @@ export async function undoClosedDayFix(
       })),
     });
     if (undo) await saveRecordChanges([{ characterId, change: undo }]);
-    return { change: undo };
+    return { change: undo, originals: [] };
   });
-  if (!result.ok) return result;
-  return result.value
-    ? { ok: true, value: { change: result.value.change, stale: false } }
-    : { ok: true, value: { change: null, stale: true } };
+  return closedDayOutcome(result);
 }

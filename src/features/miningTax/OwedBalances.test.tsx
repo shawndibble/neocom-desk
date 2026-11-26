@@ -121,8 +121,8 @@ describe('OwedBalances Conflicts line', () => {
     expect(onReviewConflicts).toHaveBeenCalledOnce();
   });
 
-  it('says a paid day differs from the book and offers Fix my records', async () => {
-    const onFixConflicts = vi.fn();
+  it('says a paid day differs from the book and opens it to fix', async () => {
+    const onReviewConflicts = vi.fn();
     renderBalances([balance('a', 0)], {
       conflicts: {
         days: 1,
@@ -133,14 +133,14 @@ describe('OwedBalances Conflicts line', () => {
         firstResolvesOn: '',
         closed: 1,
       },
-      onFixConflicts,
+      onReviewConflicts,
     });
     expect(
       screen.getByText(/Your records differ from Brass's book on a day money already reached/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/Not owed yet/)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Fix my records' }));
-    expect(onFixConflicts).toHaveBeenCalledOnce();
+    await userEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect(onReviewConflicts).toHaveBeenCalledOnce();
   });
 
   it('counts several Conflict days, after the owed cards', () => {

@@ -215,6 +215,7 @@ export function closedDayDifferences(plan: Pick<ClosedDayPlan, 'fixes'>): Closed
       elsewhere.push({ payeeId: fix.payeeId, lines: lost });
       continue;
     }
+    moved = addLines(moved, lost);
     if (lost.length > 0)
       out.push({
         kind: 'overListed',

@@ -20,7 +20,9 @@ _Recorded 2026-11-25 · issue #6767._
   notice shows a before → after preview of every Assignment (`ClosedDayFixPreview`) after a first
   click, then applies; the Resolve dialog shows the preview under the preselected Fix my records
   choice and applies on its one button. Both call `fixClosedDay(plan, 'fixMyRecords')`. Its Record
-  Change id gets the time appended, since a miner may fix, undo and fix again.
+  Change id gets the time appended, since a miner may fix, undo and fix again. The day notice
+  closes the day detail before applying, and the result (fixed, already changed meanwhile, or failed)
+  comes back as a toast.
 - **Undo uses the Record Change.** `fixClosedDay` now also returns the Assignments as they were
   read inside its transaction; the Undo toast calls `undoClosedDayFix`, which checks every changed
   Assignment still matches the change's "after" (else it writes nothing and says so), deletes the
@@ -28,8 +30,10 @@ _Recorded 2026-11-25 · issue #6767._
   Record Change with the new reason `undo` (before and after swapped). Rules need no change: they
   never checked the reason.
 - **The old separate paths are retired.** "Let the corporation bill it" (`TakeoverConfirm`,
-  `planTakeover` and its `releaseOre` takeover) is removed; the Conflicts banner's one-click fix,
-  offered when one day is in Conflict, now runs Fix my records on that day's plan. A
+  `planTakeover` and its `releaseOre` takeover, and `restoreAssignments`, its Undo) is removed. The
+  Conflicts banner's one-click fix is gone too, so the miner always sees the preview first: its
+  Review opens the Resolve dialog with Fix my records preselected. The banner's hint says the days
+  were paid when they all are, and only that the records differ when closed and open Conflicts mix. A
   row Conflict on a day with no plan yet (another book on the entry still open, a Hold, two rates)
   keeps its facts, Tell {corp} and Resolve, and says that Fix my records puts the records right
   once the whole day has closed and nothing holds it; the Resolve dialog offers Fix my records only

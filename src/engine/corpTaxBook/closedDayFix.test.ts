@@ -389,6 +389,27 @@ describe('closedDayDifferences', () => {
     ).toEqual([{ kind: 'rate', corporationId: CORP_A, payeeId: 'own-a', yours: 8, book: 10 }]);
   });
 
+  it('does not call ore moved between two corps unassigned', () => {
+    const out = differencesOf(
+      dayOf({
+        oreLines: [{ typeId: ZEO, quantity: 100 }],
+        allocations: [
+          alloc({ id: 'a', payeeId: 'own-a', oreLines: [{ typeId: ZEO, quantity: 80 }] }),
+          alloc({ id: 'b', payeeId: 'own-b', oreLines: [{ typeId: ZEO, quantity: 20 }] }),
+        ],
+        books: [
+          bookOf({ share: [{ typeId: ZEO, quantity: 60 }] }),
+          bookOf({
+            corporationId: CORP_B,
+            ownPayeeIds: ['own-b'],
+            share: [{ typeId: ZEO, quantity: 40 }],
+          }),
+        ],
+      })
+    );
+    expect(out.map((d) => d.kind)).toEqual(['overListed']);
+  });
+
   it('says nothing for a day that matches', () => {
     expect(
       differencesOf(

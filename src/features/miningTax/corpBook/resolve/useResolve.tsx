@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { MadePayment } from '../../paymentLinks';
-import { ClosedDayFixPreview, type ConflictNames } from '../ClosedDayConflict';
+import { ClosedDayFixPreview } from '../ClosedDayConflict';
+import type { ConflictNames } from '../closedConflicts';
 import type { CorpBookView } from '../corpBookView';
 import { useNotPaying } from './notPaying';
 import { ProblemFacts } from './ProblemFacts';

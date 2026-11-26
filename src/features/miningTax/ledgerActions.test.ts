@@ -21,8 +21,6 @@ import {
   dismissOwed,
   fixClosedDay,
   undoClosedDayFix,
-  releaseOre,
-  restoreAssignments,
   unassign,
   uncombine,
   undoContinue,
@@ -256,41 +254,6 @@ describe('unassign', () => {
     expect(await stored()).toEqual(members);
     expect(await tombstonedIds()).toEqual([]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
-  });
-});
-
-describe('restoreAssignments (Undo of a release)', () => {
-  beforeEach(() => {
-    pricingMock.loadUnitPricesOnDate.mockResolvedValue({ prices: PRICES });
-  });
-
-  it('brings back what a release changed and what it deleted, and tombstones neither', async () => {
-    const kept = assignment({
-      id: 'a1',
-      oreLines: [
-        { typeId: ORE, quantity: 100 },
-        { typeId: 45491, quantity: 40 },
-      ],
-    });
-    const gone = assignment({ id: 'a2', date: '2026-09-05' });
-    await db.miningTaxAssignments.bulkPut([kept, gone]);
-
-    const released = await releaseOre([
-      { assignment: kept, after: [{ typeId: ORE, quantity: 100 }] },
-      { assignment: gone, after: [] },
-    ]);
-    expect(released.ok).toBe(true);
-    expect((await stored()).map((r) => r.id)).toEqual(['a1']);
-    expect(await tombstonedIds()).toEqual(['a2']);
-
-    const result = await restoreAssignments([kept, gone]);
-
-    expect(result.ok).toBe(true);
-    const rows = (await stored()).sort((a, b) => a.id.localeCompare(b.id));
-    expect(rows.map((r) => r.id)).toEqual(['a1', 'a2']);
-    expect(rows[0]!.oreLines).toEqual(kept.oreLines);
-    expect(rows[0]!.releasedTypeIds).toBeUndefined();
-    expect(await tombstonedIds()).toEqual([]);
   });
 });
 
@@ -676,7 +639,7 @@ describe('fixClosedDay', () => {
     });
 
     const again = await fixClosedDay(plan, 'autoFix');
-    expect(again).toEqual({ ok: true, value: { change: null, stale: true } });
+    expect(again).toEqual({ ok: true, value: { change: null, stale: true, originals: [] } });
     expect(await db.miningTaxRecordChanges.count()).toBe(1);
   });
 
@@ -750,7 +713,7 @@ describe('fixClosedDay', () => {
 
     expect(await fixClosedDay(plan, 'autoFix')).toEqual({
       ok: true,
-      value: { change: null, stale: true },
+      value: { change: null, stale: true, originals: [] },
     });
     expect((await stored())[0]!.oreLines).toEqual([{ typeId: ORE, quantity: 80 }]);
     expect(await db.miningTaxRecordChanges.count()).toBe(0);
@@ -774,7 +737,7 @@ describe('fixClosedDay', () => {
     );
     expect(fixed.ok && fixed.value.change?.reason).toBe('fixMyRecords');
     expect((await stored()).map((a) => a.id)).toEqual(['c']);
-    if (!fixed.ok || !fixed.value.change || !fixed.value.originals) throw new Error('not fixed');
+    if (!fixed.ok || !fixed.value.change) throw new Error('not fixed');
 
     const undone = await undoClosedDayFix(
       CHAR,
@@ -801,7 +764,7 @@ describe('fixClosedDay', () => {
     const other = assignment({ id: 'x', payeeId: 'buddy' });
     await db.miningTaxAssignments.put(other);
     const fixed = await fixClosedDay(planClosedDayFix(dayOf([other], 60)), 'fixMyRecords');
-    if (!fixed.ok || !fixed.value.change || !fixed.value.originals) throw new Error('not fixed');
+    if (!fixed.ok || !fixed.value.change) throw new Error('not fixed');
 
     await undoClosedDayFix(CHAR, fixed.value.change, fixed.value.originals);
 
@@ -813,13 +776,13 @@ describe('fixClosedDay', () => {
     const corp = assignment({ id: 'c', payeeId: 'own' });
     await db.miningTaxAssignments.put(corp);
     const fixed = await fixClosedDay(planClosedDayFix(dayOf([corp], 60)), 'fixMyRecords');
-    if (!fixed.ok || !fixed.value.change || !fixed.value.originals) throw new Error('not fixed');
+    if (!fixed.ok || !fixed.value.change) throw new Error('not fixed');
     const now = (await db.miningTaxAssignments.get('c'))!;
     await db.miningTaxAssignments.put({ ...now, taxPct: 3 });
 
     expect(await undoClosedDayFix(CHAR, fixed.value.change, fixed.value.originals)).toEqual({
       ok: true,
-      value: { change: null, stale: true },
+      value: { change: null, stale: true, originals: [] },
     });
     expect((await db.miningTaxAssignments.get('c'))!.taxPct).toBe(3);
   });

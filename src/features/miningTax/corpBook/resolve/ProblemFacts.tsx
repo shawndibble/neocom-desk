@@ -4,7 +4,8 @@ import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { isoDay } from '../memberFlag';
-import { ClosedDayFacts, type ConflictNames } from '../ClosedDayConflict';
+import { ClosedDayFacts } from '../ClosedDayConflict';
+import type { ConflictNames } from '../closedConflicts';
 import type { ResolveTarget } from './targets';
 
 const k = (key: string) => `miningTax.resolve.facts.${key}`;
@@ -17,7 +18,7 @@ const CONFLICT_FACT = {
   ownerCollected: 'conflictOwnerCollected',
 } as const;
 
-export function ProblemFacts({ target, names }: { target: ResolveTarget; names?: ConflictNames }) {
+export function ProblemFacts({ target, names }: { target: ResolveTarget; names: ConflictNames }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
   const { problem } = target;
@@ -89,7 +90,7 @@ export function ProblemFacts({ target, names }: { target: ResolveTarget; names?:
       );
     }
     case 'conflict':
-      if (problem.plan && names)
+      if (problem.plan)
         return (
           <>
             <ClosedDayFacts plan={problem.plan} names={names} />

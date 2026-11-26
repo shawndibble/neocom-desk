@@ -16,3 +16,18 @@ export function closedConflictFor(
       p.books.some((b) => b.corporationId === row.corporationId)
   );
 }
+
+export interface ConflictNames {
+  payee: (payeeId: string) => string;
+  corp: (corporationId: number) => string;
+  typeNames: ReadonlyMap<number, string>;
+}
+
+export const closedConflictCorps = (plan: ClosedDayPlan, names: ConflictNames): string =>
+  plan.books.map((b) => names.corp(b.corporationId)).join(', ');
+
+export const closedConflictPayees = (plan: ClosedDayPlan, names: ConflictNames): string =>
+  plan.fixes
+    .filter((f) => f.corporationId === undefined)
+    .map((f) => names.payee(f.payeeId))
+    .join(', ');
