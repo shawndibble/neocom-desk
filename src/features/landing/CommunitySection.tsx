@@ -38,6 +38,7 @@ function CommunityLink({
     <ExternalLink
       href={href}
       variant="bare"
+      mark="none"
       className={cx(
         'flex items-center gap-3.5 border border-line bg-bg/90 px-4 py-3.5 hover:border-accent/60',
         interactiveClassName,
