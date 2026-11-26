@@ -6,6 +6,7 @@ import type {
   FittingRecord,
   MiningTaxAssignmentRecord,
   MiningTaxPaymentLinkRecord,
+  MiningTaxRecordChangeRecord,
   NetWorthSnapshotRecord,
   PayeeRecord,
   PlanetRichnessRecord,
@@ -25,6 +26,7 @@ import type {
   RemoteFittingDoc,
   RemoteMiningTaxAssignmentDoc,
   RemoteMiningTaxPaymentLinkDoc,
+  RemoteMiningTaxRecordChangeDoc,
   RemotePayeeDoc,
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
@@ -69,6 +71,7 @@ export type SyncedCollectionName =
   | 'fittings'
   | 'miningTaxAssignments'
   | 'miningTaxPaymentLinks'
+  | 'miningTaxRecordChanges'
   | 'notificationFeed'
   | 'settings';
 
@@ -658,6 +661,36 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
   }),
 });
 
+function recordChangeFields(r: MiningTaxRecordChangeRecord) {
+  return {
+    id: r.id,
+    characterId: r.characterId,
+    reason: r.reason,
+    at: r.at,
+    date: r.date,
+    ...(r.corporationId !== undefined ? { corporationId: r.corporationId } : {}),
+    ...(r.minerId !== undefined ? { minerId: r.minerId } : {}),
+    ...(r.closeOut !== undefined ? { closeOut: r.closeOut } : {}),
+    ...(r.assignments !== undefined ? { assignments: r.assignments } : {}),
+    updatedAt: r.updatedAt,
+  };
+}
+
+export const MINING_TAX_RECORD_CHANGES = defineEditableCollection<
+  MiningTaxRecordChangeRecord,
+  RemoteMiningTaxRecordChangeDoc
+>({
+  kind: 'editable',
+  remoteName: 'miningTaxRecordChanges',
+  table: 'miningTaxRecordChanges',
+  tombstoneSegment: 'miningTaxRecordChangeTombstones',
+  rulesMayLag: true,
+  onRemoval: 'delete',
+  faqItem: 'miningTax',
+  toRemoteDoc: (r, ownerHash) => ({ ...recordChangeFields(r), ownerHash, deleted: false }),
+  toLocalRecord: (r) => recordChangeFields(r),
+});
+
 const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   NetWorthSnapshotRecord,
   RemoteNetWorthSnapshotDoc
@@ -742,6 +775,7 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   FITTINGS,
   MINING_TAX_ASSIGNMENTS,
   MINING_TAX_PAYMENT_LINKS,
+  MINING_TAX_RECORD_CHANGES,
 ];
 
 export const NOTIFICATION_FEED: FeedOrSettingsCollection = {

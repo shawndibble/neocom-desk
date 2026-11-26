@@ -6,6 +6,7 @@ import {
 import type { Adjustment } from './adjustments';
 import type { RecordedWriteOff, TaxPayment } from './payments';
 import { num, parseBookSettings, str } from './bookDocs';
+import { DAY_SETTLE_TOLERANCE_PCT } from './minerRunningAccount';
 import type { Miner } from './charges';
 import type { Dismissal } from './dismissals';
 import { parsePaymentId } from './payouts';
@@ -73,6 +74,9 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
     ...(settings.taxContact ? { taxContact: settings.taxContact } : {}),
     rates: settings.rates,
+    ...(settings.dayTolerancePct !== DAY_SETTLE_TOLERANCE_PCT
+      ? { dayTolerancePct: settings.dayTolerancePct }
+      : {}),
     ...(syncedAt !== undefined ? { lastSyncedAt: new Date(syncedAt).toISOString() } : {}),
     ...checked,
   };

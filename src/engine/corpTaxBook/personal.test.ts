@@ -985,6 +985,19 @@ describe('overlayCorpBooks', () => {
     const running = (amount: number) =>
       overlay(entries, [book({ observed, payments: [paid(amount)] })]).books[0];
 
+    it("settles the miner's days at the book's own tolerance", () => {
+      const miners = (dayTolerancePct?: number) =>
+        overlay(entries, [
+          book({
+            observed,
+            payments: [paid(1)],
+            ...(dayTolerancePct !== undefined ? { dayTolerancePct } : {}),
+          }),
+        ]).books[0]!.miners;
+      expect(miners()[0]?.account.input.dayTolerancePct).toBeUndefined();
+      expect(miners(2)[0]?.account.input.dayTolerancePct).toBe(2);
+    });
+
     describe('with an officer correction, as the corp book counts it', () => {
       const adjust = (id: string, date: string, amount: number) => ({
         id,

@@ -36,6 +36,14 @@ export interface DaySettlement {
   settled: boolean;
 }
 
+export interface ToleranceCloseOutDay {
+  billed: number;
+  paid: number;
+  writtenOff: number;
+  limit: number;
+  exempt?: true;
+}
+
 export interface DayAmount {
   date: string;
   amount: number;
@@ -98,7 +106,8 @@ export class MinerRunningAccount {
     readonly credit: number,
     readonly balance: number,
     readonly paidThrough: string | null,
-    readonly owes: RunningAccountOwes | null
+    readonly owes: RunningAccountOwes | null,
+    readonly toleranceCloseOuts: ReadonlyMap<string, ToleranceCloseOutDay>
   ) {}
 
   static build(input: MinerRunningAccountInput): MinerRunningAccount {
@@ -168,7 +177,8 @@ export class MinerRunningAccount {
       settled.credit,
       settled.balanceBeforePayments - opening - paid,
       paidThrough,
-      settled.owes
+      settled.owes,
+      settled.toleranceCloseOuts
     );
   }
 
@@ -384,6 +394,7 @@ interface SettledDays {
   balanceBeforePayments: number;
   paidThrough: string | null;
   owes: RunningAccountOwes | null;
+  toleranceCloseOuts: Map<string, ToleranceCloseOutDay>;
 }
 
 type Running = {
@@ -421,15 +432,17 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   );
   const isHeld = (d: RunningDay) =>
     held.has(d.date) && d.tax > 0 && !(stored !== undefined && d.date <= stored);
+  const limitOf = (st: Running) =>
+    st.exempt ?? daySettleTolerance(Math.max(0, st.tax - Math.max(0, st.charge)), pct);
   const isDone = (st: Running) => {
     const remaining = st.tax - st.credited;
     if (remaining < RESIDUE_ISK) return true;
     if (st.paidIn <= 0) return false;
     const mined = Math.max(0, st.tax - Math.max(0, st.charge));
     const minedLeft = Math.max(0, mined - st.credited);
-    const limit = st.exempt ?? daySettleTolerance(mined, pct);
-    return remaining - minedLeft < RESIDUE_ISK && minedLeft <= limit;
+    return remaining - minedLeft < RESIDUE_ISK && minedLeft <= limitOf(st);
   };
+  const toleranceCloseOuts = new Map<string, ToleranceCloseOutDay>();
   const queue = pools.payments.map((p) => ({
     paymentId: p.paymentId,
     days: [] as DayAmount[],
@@ -497,6 +510,14 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
     if (!settled && !dayHeld && st.paidIn > 0 && st.exempt)
       writtenOff = Math.max(writtenOff, Math.min(st.exempt, shortfall - chargeOwed));
     const remaining = shortfall - writtenOff;
+    if (!pinned && !dayHeld && st.paidIn > 0 && settled && writtenOff >= RESIDUE_ISK)
+      toleranceCloseOuts.set(d.date, {
+        billed: st.tax,
+        paid: st.paidIn,
+        writtenOff,
+        limit: limitOf(st),
+        ...(st.exempt !== undefined ? { exempt: true as const } : {}),
+      });
     if (!dayHeld) billed += Math.max(0, st.tax) - st.before;
     forgivenTotal += st.forgiven;
     writtenOffTotal += writtenOff;
@@ -529,5 +550,6 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
     balanceBeforePayments: billed - corrections - forgivenTotal - writtenOffTotal,
     paidThrough,
     owes: owedAmount > 0 && oldest ? { amount: owedAmount, days: owedDates.size, oldest } : null,
+    toleranceCloseOuts,
   };
 }

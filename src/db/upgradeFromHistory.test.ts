@@ -79,6 +79,7 @@ const HISTORY: [number, Record<string, string | null>][] = [
     },
   ],
   [34, { miningTaxPaymentLinks: 'id, characterId, payeeId' }],
+  [35, { miningTaxRecordChanges: 'id, characterId, corporationId' }],
 ];
 
 function schemaAt(version: number): Record<string, string> {

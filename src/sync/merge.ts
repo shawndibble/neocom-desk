@@ -16,6 +16,7 @@ import type {
   FittingRecord,
   MiningTaxAssignmentRecord,
   MiningTaxPaymentLinkRecord,
+  MiningTaxRecordChangeRecord,
   WhatIfImplantSelection,
 } from '@/db';
 import type { Attributes, PlanMilestone } from '@/engine/types';
@@ -59,6 +60,8 @@ export type RemoteFittingDoc = FittingRecord & RemoteDoc;
 export type RemoteMiningTaxAssignmentDoc = MiningTaxAssignmentRecord & RemoteDoc;
 
 export type RemoteMiningTaxPaymentLinkDoc = MiningTaxPaymentLinkRecord & RemoteDoc;
+
+export type RemoteMiningTaxRecordChangeDoc = MiningTaxRecordChangeRecord & RemoteDoc;
 
 export type RemoteProductionRunDoc = ProductionRunRecord & RemoteDoc;
 

@@ -32,10 +32,16 @@ import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { Translate } from '@/lib/translate';
 import { LedgerRowDetail } from './LedgerRowDetail';
-import { ledgerCsvColumns, ledgerWhat } from './ledgerCsv';
+import { ledgerCsvColumns, ledgerWhat, recordChangeSummary } from './ledgerCsv';
 import { lockRowBoundary } from './lockBoundary';
 
-const LEDGER_KINDS: readonly PayeeLedgerKind[] = ['charge', 'payment', 'writeOff', 'notice'];
+const LEDGER_KINDS: readonly PayeeLedgerKind[] = [
+  'charge',
+  'payment',
+  'writeOff',
+  'recordChange',
+  'notice',
+];
 
 interface LedgerFilter {
   startDate: string | null;
@@ -331,7 +337,9 @@ export function PayeeLedgerTable({
                 ? r.reason
                 : r.kind === 'payment'
                   ? r.payment.note
-                  : undefined;
+                  : r.kind === 'recordChange'
+                    ? recordChangeSummary(r.change, t)
+                    : undefined;
           return (
             <>
               {r.reversed ? (

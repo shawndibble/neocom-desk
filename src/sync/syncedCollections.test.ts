@@ -30,6 +30,7 @@ describe('synced collection registry — persisted names', () => {
       fittings: true,
       miningTaxAssignments: true,
       miningTaxPaymentLinks: true,
+      miningTaxRecordChanges: true,
       notificationFeed: true,
       settings: true,
     };
@@ -43,6 +44,7 @@ describe('synced collection registry — persisted names', () => {
       'fittings',
       'miningTaxAssignments',
       'miningTaxPaymentLinks',
+      'miningTaxRecordChanges',
       'netWorthSnapshots',
       'notificationFeed',
       'payees',
@@ -75,6 +77,7 @@ describe('synced collection registry — persisted names', () => {
       'fittings',
       'miningTaxAssignments',
       'miningTaxPaymentLinks',
+      'miningTaxRecordChanges',
     ]);
   });
 
@@ -95,6 +98,7 @@ describe('synced collection registry — persisted names', () => {
       fittings: 'fittings',
       miningTaxAssignments: 'miningTaxAssignments',
       miningTaxPaymentLinks: 'miningTaxPaymentLinks',
+      miningTaxRecordChanges: 'miningTaxRecordChanges',
     });
   });
 
@@ -117,6 +121,7 @@ describe('synced collection registry — persisted names', () => {
       fittings: 'sync.__fittingTombstones.7',
       miningTaxAssignments: 'sync.__miningTaxAssignmentTombstones.7',
       miningTaxPaymentLinks: 'sync.__miningTaxPaymentLinkTombstones.7',
+      miningTaxRecordChanges: 'sync.__miningTaxRecordChangeTombstones.7',
     });
     expect(ownerHashKey(7)).toBe('sync.__ownerHash.7');
   });

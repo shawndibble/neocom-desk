@@ -42,6 +42,14 @@ describe('readBookSettings', () => {
     });
   });
 
+  it("reads the book's per-day tolerance only when the corp changed it", () => {
+    expect(readBookSettings(1, book)).not.toHaveProperty('dayTolerancePct');
+    expect(readBookSettings(1, { ...book, dayTolerancePct: 0.5 })).not.toHaveProperty(
+      'dayTolerancePct'
+    );
+    expect(readBookSettings(1, { ...book, dayTolerancePct: 1.5 })?.dayTolerancePct).toBe(1.5);
+  });
+
   it("reads the corp's wallet division names a Director stored (#6161), skipping garbage", () => {
     expect(
       readBookSettings(1, { ...book, divisionNames: { '2': 'MOON TAXES', '9': 'x', '3': 5 } })

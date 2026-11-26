@@ -8999,7 +8999,8 @@
         "charge": "Charges",
         "payment": "Payments",
         "writeOff": "Write-offs",
-        "notice": "Late notices"
+        "notice": "Late notices",
+        "recordChange": "Automatic changes"
       },
       "kindOne": {
         "charge": "Charge",
@@ -9038,7 +9039,13 @@
         "final": "Final notice sent",
         "opening": "Balance through {{date}}",
         "reversal": "Reversal",
-        "openingBalance": "Opening balance"
+        "openingBalance": "Opening balance",
+        "recordChange": {
+          "tolerance": "Closed within tolerance",
+          "autoFix": "Fixed automatically at close",
+          "fixMyRecords": "Fixed by Fix my records",
+          "autoAssign": "Assigned automatically"
+        }
       },
       "held": "On hold while a dispute is open",
       "detail": {
@@ -9067,7 +9074,23 @@
         "markedNoPayment": "Marked paid in an older version: no wallet payment recorded.",
         "linkWalletPayment": "Link the wallet payment",
         "recordedWaits": "Recorded in Settle up. It waits for its wallet entry, and links to it once a transfer of this amount shows up.",
-        "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link."
+        "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link.",
+        "recordChange": {
+          "tolerance": "Your payment fell short of {{date}} by no more than the book’s {{pct}}% tolerance, so the day was closed and the gap written off.",
+          "toleranceExempt": "Your payment fell short of {{date}} by no more than the corporation allowed for that day, so the day was closed and the gap written off.",
+          "autoFix": "Changed automatically when {{date}} closed.",
+          "fixMyRecords": "Changed by Fix my records for {{date}}.",
+          "autoAssign": "Assigned automatically for {{date}}.",
+          "billed": "Billed",
+          "paid": "Paid",
+          "writtenOff": "Written off",
+          "limit": "Tolerance",
+          "before": "Before",
+          "after": "After",
+          "none": "Not assigned",
+          "terms": "{{pct}}%: {{tax}}",
+          "kept": "Saved when it happened. It stays here even if the day changes later."
+        }
       },
       "unlinkedToast": "Unlinked the {{amount}} ISK payment. Its days are owed again.",
       "historySubtitle": "Your own record from before the Corp Tax Book. For reference only: it changes no figure.",
@@ -9076,7 +9099,16 @@
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
       "reversedTag": "reversed",
-      "minerPicker": "Whose account"
+      "minerPicker": "Whose account",
+      "summary": {
+        "tolerance": "{{date}}: billed {{billed}}, paid {{paid}}, {{writtenOff}} written off (tolerance {{tolerance}})",
+        "assignments": "{{date}}: {{changes}}",
+        "terms": "{{pct}}% {{tax}}",
+        "none": "not assigned",
+        "change": "{{before}} → {{after}}",
+        "separator": "; ",
+        "line": "{{what}}: {{summary}}"
+      }
     }
   },
   "assets": {
@@ -15266,7 +15298,7 @@
           "quickbar": "Your Market Quickbar.",
           "stationPins": "Stations and structures you pinned in Assets.",
           "piPicks": "Resources you picked per planet on the PI tab.",
-          "miningTax": "Moon Mining payees and assignments.",
+          "miningTax": "Moon Mining payees, assignments, payment links and the record of changes the app made to them for you.",
           "fittings": "Fittings saved to My Fittings: name and share code.",
           "netWorthSnapshots": "Your daily net worth history: wallet, asset value, PLEX and order escrow per day, as plain numbers.",
           "characterAccelerators": "Which cerebral accelerator you told us is running on each Character: its bonus and when it ends.",

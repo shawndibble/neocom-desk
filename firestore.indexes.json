@@ -243,6 +243,20 @@
       ]
     },
     {
+      "collectionGroup": "miningTaxRecordChanges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerHash",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "notificationFeed",
       "queryScope": "COLLECTION",
       "fields": [
@@ -589,6 +603,12 @@
       "indexes": []
     },
     {
+      "collectionGroup": "miningTaxRecordChanges",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
       "collectionGroup": "miningTaxAssignments",
       "fieldPath": "ownerHash",
       "ttl": false,
@@ -601,6 +621,17 @@
     },
     {
       "collectionGroup": "miningTaxPaymentLinks",
+      "fieldPath": "ownerHash",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "miningTaxRecordChanges",
       "fieldPath": "ownerHash",
       "ttl": false,
       "indexes": [

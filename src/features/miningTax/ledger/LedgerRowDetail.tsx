@@ -7,6 +7,7 @@ import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import { OreLink } from '../OreIcon';
+import { RecordChangeDetail } from './RecordChangeDetail';
 
 const isk = (value: number) => `${formatIsk(value)} ISK`;
 
@@ -139,6 +140,9 @@ export function LedgerRowDetail({
             <p className="text-text-dim">{k('nothingToForgive')}</p>
           )}
         </>
+      )}
+      {row.kind === 'recordChange' && (
+        <RecordChangeDetail change={row.change} typeNames={typeNames} />
       )}
       {row.kind === 'opening' && <p className="text-text-dim">{k('opening')}</p>}
       {row.kind === 'notice' && (
