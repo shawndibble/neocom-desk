@@ -6,6 +6,21 @@ import {
   type PayeeRecord,
 } from '@/db';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
+import {
+  closedDayRecordChangeId,
+  type AssignmentFix,
+  type ClosedDayPlan,
+} from '@/engine/corpTaxBook/closedDayFix';
+import {
+  assignmentRecordChange,
+  sameTerms,
+  type AssignmentChange,
+  type AssignmentChangeReason,
+  type AssignmentRecordChange,
+  type AssignmentTerms,
+} from '@/engine/miningTax/recordChanges';
+import { addLines, priceMap, sameLines } from '@/engine/miningTax/oreLines';
+import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { scheduleSync } from '@/sync';
 import { removeTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
@@ -42,6 +57,8 @@ import {
 } from './paymentLinkStore';
 import type { SessionContinuation } from './sessionContinuation';
 import { putAssignments } from './storedAssignments';
+import { saveRecordChanges } from './recordChangeStore';
+import { withOreFormMarker } from './oreForm';
 
 export type {
   AssignInput,
@@ -78,7 +95,11 @@ async function commit<T>(
 ): Promise<LedgerActionResult<T>> {
   let value: T;
   try {
-    value = await db.transaction('rw', db.miningTaxAssignments, db.payees, db.settings, write);
+    value = await db.transaction(
+      'rw',
+      [db.miningTaxAssignments, db.payees, db.settings, db.miningTaxRecordChanges],
+      write
+    );
   } catch (cause) {
     return failure(cause);
   }
@@ -259,21 +280,17 @@ export async function releaseOre(
   });
 }
 
-export function restoreAssignments(
-  records: readonly MiningTaxAssignmentRecord[]
-): Promise<LedgerActionResult> {
-  return commit(charactersOf(records), async () => {
-    const idsByCharacter = new Map<number, string[]>();
-    for (const r of records) {
-      const ids = idsByCharacter.get(r.characterId);
-      if (ids) ids.push(r.id);
-      else idsByCharacter.set(r.characterId, [r.id]);
-    }
-    for (const [characterId, ids] of idsByCharacter)
-      await removeTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
-    const now = Date.now();
-    await putAssignments(records.map((r) => ({ ...r, updatedAt: now })));
-  });
+async function putBack(records: readonly MiningTaxAssignmentRecord[]): Promise<void> {
+  const idsByCharacter = new Map<number, string[]>();
+  for (const r of records) {
+    const ids = idsByCharacter.get(r.characterId);
+    if (ids) ids.push(r.id);
+    else idsByCharacter.set(r.characterId, [r.id]);
+  }
+  for (const [characterId, ids] of idsByCharacter)
+    await removeTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, characterId), ids);
+  const now = Date.now();
+  await putAssignments(records.map((r) => ({ ...r, updatedAt: now })));
 }
 
 export function split(
@@ -379,4 +396,196 @@ export async function unlinkPayments(keys: readonly string[]): Promise<LedgerAct
   } catch (cause) {
     return failure(cause);
   }
+}
+
+export type ClosedDayFixReason = Extract<AssignmentChangeReason, 'autoFix' | 'fixMyRecords'>;
+
+export interface ClosedDayFixOutcome {
+  change: AssignmentRecordChange | null;
+  stale: boolean;
+  originals: MiningTaxAssignmentRecord[];
+}
+
+type ClosedDayWrite = {
+  change: AssignmentRecordChange | null;
+  originals: MiningTaxAssignmentRecord[];
+};
+
+function closedDayOutcome(
+  result: LedgerActionResult<ClosedDayWrite | null>
+): LedgerActionResult<ClosedDayFixOutcome> {
+  if (!result.ok) return result;
+  return {
+    ok: true,
+    value: result.value
+      ? { ...result.value, stale: false }
+      : { change: null, stale: true, originals: [] },
+  };
+}
+
+const termsOf = (a: MiningTaxAssignmentRecord): AssignmentTerms => ({
+  payeeId: a.payeeId ?? null,
+  taxPct: a.taxPct,
+  taxOwed: a.taxOwed,
+  oreLines: addLines(a.oreLines, []),
+});
+
+const closedDayAssignmentId = (plan: ClosedDayPlan, payeeId: string) =>
+  `closed-day:${plan.characterId}:${plan.date}:${plan.solarSystemId}:${payeeId}`;
+
+const entryRecords = (plan: ClosedDayPlan) =>
+  db.miningTaxAssignments
+    .where('characterId')
+    .equals(plan.characterId)
+    .filter((a) => a.date === plan.date && a.solarSystemId === plan.solarSystemId)
+    .toArray();
+
+function stillPlanned(
+  plan: ClosedDayPlan,
+  stored: readonly MiningTaxAssignmentRecord[]
+): Map<AssignmentFix, MiningTaxAssignmentRecord> | null {
+  const byId = new Map(stored.map((a) => [a.id, a]));
+  const out = new Map<AssignmentFix, MiningTaxAssignmentRecord>();
+  for (const fix of plan.fixes) {
+    if (fix.assignmentId === null) {
+      if (stored.some((a) => a.payeeId === fix.payeeId && a.status !== 'dismissed')) return null;
+      continue;
+    }
+    const record = byId.get(fix.assignmentId);
+    if (!record || !fix.before) return null;
+    if (record.taxPct !== fix.before.taxPct || !sameLines(record.oreLines, fix.before.oreLines))
+      return null;
+    out.set(fix, record);
+  }
+  return out;
+}
+
+export async function fixClosedDay(
+  plan: ClosedDayPlan,
+  reason: ClosedDayFixReason,
+  at: string = new Date().toISOString()
+): Promise<LedgerActionResult<ClosedDayFixOutcome>> {
+  const stale = closedDayOutcome({ ok: true, value: null });
+  if (plan.fixes.length === 0)
+    return { ok: true, value: { change: null, stale: false, originals: [] } };
+  const bookPrices = (fix: AssignmentFix): ReleasePrices | undefined => {
+    const book = plan.books.find((b) => b.corporationId === fix.corporationId);
+    return book
+      ? { prices: priceMap({ ...book.unitPrices }), compressed: book.oreForm === 'compressed' }
+      : undefined;
+  };
+  let priced: Map<AssignmentFix, ReleasePrices>;
+  try {
+    const records = stillPlanned(plan, await entryRecords(plan));
+    if (!records) return stale;
+    priced = new Map(
+      await Promise.all(
+        plan.fixes.map(async (fix): Promise<[AssignmentFix, ReleasePrices]> => [
+          fix,
+          bookPrices(fix) ?? (await loadReleasePrices(records.get(fix)!, fix.after.oreLines)),
+        ])
+      )
+    );
+  } catch (cause) {
+    return failure(cause);
+  }
+  const result = await commit([plan.characterId], async (): Promise<ClosedDayWrite | null> => {
+    const held = stillPlanned(plan, await entryRecords(plan));
+    if (!held) return null;
+    const changes: AssignmentChange[] = [];
+    for (const fix of plan.fixes) {
+      const prices = priced.get(fix)!;
+      const record = held.get(fix);
+      if (!record) {
+        const value = computeAssignmentValue(fix.after.oreLines, prices.prices, fix.after.taxPct);
+        const created = withOreFormMarker<MiningTaxAssignmentRecord>(
+          {
+            id: closedDayAssignmentId(plan, fix.payeeId),
+            characterId: plan.characterId,
+            date: plan.date,
+            solarSystemId: plan.solarSystemId,
+            payeeId: fix.payeeId,
+            oreLines: fix.after.oreLines,
+            taxPct: fix.after.taxPct,
+            estimatedValue: value.estimatedValue,
+            taxOwed: value.taxOwed,
+            status: 'outstanding',
+            releasedTypeIds: fix.releasedTypeIds,
+            updatedAt: Date.now(),
+          },
+          prices.compressed
+        );
+        await putAssignments([created]);
+        changes.push({ assignmentId: created.id, before: null, after: termsOf(created) });
+        continue;
+      }
+      const own = fix.corporationId !== undefined;
+      const next: MiningTaxAssignmentRecord = {
+        ...record,
+        taxPct: fix.after.taxPct,
+        releasedTypeIds: [...new Set([...(record.releasedTypeIds ?? []), ...fix.releasedTypeIds])],
+        ...(own ? { status: 'outstanding' as const } : {}),
+      };
+      if (own) delete next.reviewDiff;
+      const after = await releaseOreFromAssignment(next, fix.after.oreLines, prices, true);
+      changes.push({
+        assignmentId: record.id,
+        before: termsOf(record),
+        after: after ? termsOf(after) : null,
+      });
+    }
+    const only = plan.books.length === 1 ? plan.books[0] : undefined;
+    const id = closedDayRecordChangeId(plan, reason);
+    const change = assignmentRecordChange({
+      id: reason === 'fixMyRecords' ? `${id}:${at}` : id,
+      reason,
+      at,
+      date: plan.date,
+      ...(only ? { corporationId: only.corporationId, minerId: only.minerId } : {}),
+      assignments: changes,
+    });
+    if (change) await saveRecordChanges([{ characterId: plan.characterId, change }]);
+    return { change, originals: [...held.values()] };
+  });
+  return closedDayOutcome(result);
+}
+
+export async function undoClosedDayFix(
+  characterId: number,
+  change: AssignmentRecordChange,
+  originals: readonly MiningTaxAssignmentRecord[],
+  at: string = new Date().toISOString()
+): Promise<LedgerActionResult<ClosedDayFixOutcome>> {
+  const result = await commit([characterId], async (): Promise<ClosedDayWrite | null> => {
+    const current = await db.miningTaxAssignments.bulkGet(
+      change.assignments.map((a) => a.assignmentId)
+    );
+    const moved = change.assignments.some((a, i) => {
+      const now = current[i];
+      return a.after === null ? now !== undefined : !now || !sameTerms(termsOf(now), a.after);
+    });
+    if (moved) return null;
+    const created = change.assignments.flatMap((a, i) =>
+      a.before === null && current[i] ? [current[i]!] : []
+    );
+    await deleteAssignments(created);
+    const changed = new Set(change.assignments.map((a) => a.assignmentId));
+    await putBack(originals.filter((r) => changed.has(r.id)));
+    const undo = assignmentRecordChange({
+      id: `undo:${change.id}:${at}`,
+      reason: 'undo',
+      at,
+      date: change.date,
+      ...(change.corporationId !== undefined ? { corporationId: change.corporationId } : {}),
+      ...(change.minerId !== undefined ? { minerId: change.minerId } : {}),
+      assignments: change.assignments.map((a) => ({
+        assignmentId: a.assignmentId,
+        before: a.after,
+        after: a.before,
+      })),
+    });
+    if (undo) await saveRecordChanges([{ characterId, change: undo }]);
+    return { change: undo, originals: [] };
+  });
+  return closedDayOutcome(result);
 }

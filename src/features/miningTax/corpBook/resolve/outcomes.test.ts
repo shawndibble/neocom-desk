@@ -1,3 +1,4 @@
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import { describe, expect, it } from 'vitest';
 import { notOwedPlan, outcomesFor, type ResolveProblem } from './outcomes';
 
@@ -87,10 +88,19 @@ describe('outcomesFor (resolving in the app)', () => {
   });
 
   it('offers fixing your own records first on a Conflict, and no paying: nothing is billed yet', () => {
-    const p: ResolveProblem = { ...base, kind: 'conflict', row: row() };
+    const plan = { state: 'conflict', fixes: [] } as unknown as ClosedDayPlan;
+    const p: ResolveProblem = { ...base, kind: 'conflict', row: row(), plan };
     expect(outcomesFor(p)).toMatchObject({
       outcomes: ['fixRecords', 'notPaying', 'notOwed'],
       preselected: 'fixRecords',
+    });
+  });
+
+  it('offers no Fix my records on a Conflict the day cannot be fixed for yet', () => {
+    const p: ResolveProblem = { ...base, kind: 'conflict', row: row() };
+    expect(outcomesFor(p)).toMatchObject({
+      outcomes: ['notPaying', 'notOwed'],
+      preselected: 'notOwed',
     });
   });
 

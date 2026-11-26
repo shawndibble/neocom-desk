@@ -11,7 +11,12 @@ import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import type { PayeeBalance } from '@/features/miningTax/balances';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
-import { CorpOverlapNotice } from '@/features/miningTax/corpBook/CorpOverlapNotice';
+import { CorpDayNotice } from '@/features/miningTax/corpBook/CorpDayNotice';
+import {
+  closedConflictFor,
+  type ConflictNames,
+} from '@/features/miningTax/corpBook/closedConflicts';
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import { conflictSiblings } from '@/features/miningTax/corpBook/conflictSummary';
 import type { ResolveTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
@@ -142,6 +147,9 @@ export interface TaxDialogsHostProps {
   linkSuggestions: ReturnType<typeof useLinkSuggestions>;
   corpView: CorpBookView | null;
   recordChanges: readonly RecordChange[];
+  closedConflicts: readonly ClosedDayPlan[];
+  conflictNames: ConflictNames;
+  onFixRecords: (plan: ClosedDayPlan) => Promise<void>;
   reloadCorpBooks: () => void;
   onResolve: (target: ResolveTarget) => void;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
@@ -188,6 +196,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     linkSuggestions,
     corpView,
     recordChanges,
+    closedConflicts,
+    conflictNames,
+    onFixRecords,
     reloadCorpBooks,
     onResolve,
     corpStateHint,
@@ -660,6 +671,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         : '';
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
+  const closedConflict = corpDetail
+    ? closedConflictFor(closedConflicts, corpDetail.view)
+    : undefined;
   const estimateOwn = estimateOwnRow(detailTarget);
   const ownEntry = corpDetail
     ? allDisplayRows.find(
@@ -757,38 +771,38 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               ...(corpDetail.view.minerId ? { minerId: corpDetail.view.minerId } : {}),
             });
           }}
+          {...(closedConflict ? { closedConflict } : {})}
           notice={
-            (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
-              <CorpOverlapNotice
-                view={corpDetail.view}
-                corpName={corpDetail.corpName}
-                recordedAt={corpDetail.view.refineryLabel ?? systemName(detailTarget)}
-                siblings={
-                  corpView ? conflictSiblings(corpView.overlay.rows, corpDetail.view) : undefined
-                }
-                everyAssignment={everyAssignment}
-                payeeById={payeeById}
-                typeNames={typeNames}
-                onChanged={() => {
-                  actions.openDetail(null);
-                  refresh();
-                }}
-                onBookChanged={reloadCorpBooks}
-                mail={{
-                  characterId: corpDetail.view.characterId,
-                  memberName: detailTarget.row.characterName,
-                  corporationId: corpDetail.view.corporationId,
-                  corpName: corpDetail.corpName,
-                  contact: corpView?.books.find(
-                    (b) => b.loaded.corporationId === corpDetail.view.corporationId
-                  )?.loaded.taxContact,
-                }}
-                onResolve={(target) => {
-                  actions.openDetail(null);
-                  onResolve(target);
-                }}
-              />
-            )
+            <CorpDayNotice
+              view={corpDetail.view}
+              corpName={corpDetail.corpName}
+              recordedAt={corpDetail.view.refineryLabel ?? systemName(detailTarget)}
+              {...(corpView
+                ? { siblings: conflictSiblings(corpView.overlay.rows, corpDetail.view) }
+                : {})}
+              {...(closedConflict ? { closedConflict } : {})}
+              names={conflictNames}
+              everyAssignment={everyAssignment}
+              payeeById={payeeById}
+              mail={{
+                characterId: corpDetail.view.characterId,
+                memberName: detailTarget.row.characterName,
+                corporationId: corpDetail.view.corporationId,
+                corpName: corpDetail.corpName,
+                contact: corpView?.books.find(
+                  (b) => b.loaded.corporationId === corpDetail.view.corporationId
+                )?.loaded.taxContact,
+              }}
+              onBookChanged={reloadCorpBooks}
+              onFix={(plan) => {
+                actions.openDetail(null);
+                void onFixRecords(plan);
+              }}
+              onResolve={(target) => {
+                actions.openDetail(null);
+                onResolve(target);
+              }}
+            />
           }
         />
       )}

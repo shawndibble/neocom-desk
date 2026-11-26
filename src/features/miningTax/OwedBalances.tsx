@@ -46,7 +46,6 @@ interface OwedBalancesProps {
   onReviewPayments: () => void;
   conflicts?: ConflictSummary | null;
   onReviewConflicts?: () => void;
-  onFixConflicts?: () => void;
 }
 
 export function OwedBalances({
@@ -64,7 +63,6 @@ export function OwedBalances({
   onReviewPayments,
   conflicts,
   onReviewConflicts,
-  onFixConflicts,
 }: OwedBalancesProps) {
   const { t } = useTranslation();
   const owed = balances.filter((b) => b.owed > 0);
@@ -339,23 +337,18 @@ export function OwedBalances({
                 corp: conflicts.firstCorpName,
                 date: conflicts.firstResolvesOn,
               })
-            : t('miningTax.conflictsHint', {
-                count: conflicts.days,
-                corp: conflicts.firstCorpName,
-              }),
-          (onFixConflicts || onReviewConflicts) && (
-            <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">
-              {onFixConflicts && (
-                <Button variant="primary" wrap className="sm:shrink-0" onClick={onFixConflicts}>
-                  {t('miningTax.conflictsFix', { corp: conflicts.firstCorpName })}
-                </Button>
-              )}
-              {onReviewConflicts && (
-                <Button wrap className="sm:shrink-0" onClick={onReviewConflicts}>
-                  {t('miningTax.conflictsReview')}
-                </Button>
-              )}
-            </div>
+            : t(
+                conflicts.closed === conflicts.days
+                  ? 'miningTax.conflictsHintClosed'
+                  : conflicts.closed > 0
+                    ? 'miningTax.conflictsHintMixed'
+                    : 'miningTax.conflictsHint',
+                { count: conflicts.days, corp: conflicts.firstCorpName }
+              ),
+          onReviewConflicts && (
+            <Button wrap className="sm:shrink-0" onClick={onReviewConflicts}>
+              {t('miningTax.conflictsReview')}
+            </Button>
           )
         )}
     </section>

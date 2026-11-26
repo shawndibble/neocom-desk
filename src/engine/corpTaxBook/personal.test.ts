@@ -10,6 +10,7 @@ import {
 import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { Declaration } from './overdue';
 import type { OreDispute } from './disputes';
+import { planClosedDayFix as planWith, type ClosedDay } from './closedDayFix';
 
 const CORP = 98000001;
 const ME = 90000001;
@@ -2712,5 +2713,143 @@ describe("overlayCorpBooks: an open day's own-Payee ore is owed as an estimate",
     const out = overlay([entry({ date: TODAY })], [withToday(41_200)]);
     expect(ofToday(out)).toEqual([]);
     expect(out.labels.get(KEY)?.state).toBe('pending');
+  });
+});
+
+describe('overlayCorpBooks closedDays', () => {
+  const planClosedDayFix = (day: ClosedDay) => planWith(day, new Set());
+  const overListed = entry({
+    oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+    freeOreLines: [],
+    allocations: [
+      {
+        id: 'own-1',
+        payeeId: 'bmw',
+        taxPct: 15,
+        oreLines: [{ typeId: ZEO, quantity: 50_000 }],
+        status: 'outstanding',
+      },
+    ],
+  });
+  const donation = {
+    id: 'p1',
+    minerId: `solo:${ME}`,
+    characterId: ME,
+    amount: 1_000,
+    at: '2026-10-18T10:00:00Z',
+    source: 'donation' as const,
+  };
+
+  it('hands the planner a closed day with the book share, rate and prices', () => {
+    const out = overlay([overListed], [book({ ownPayeeIds: ['bmw'] })]);
+    expect(out.closedDays).toEqual([
+      {
+        characterId: ME,
+        date: '2026-10-17',
+        solarSystemId: SYSTEM,
+        oreLines: overListed.oreLines,
+        allocations: overListed.allocations,
+        books: [
+          {
+            corporationId: CORP,
+            minerId: `solo:${ME}`,
+            ownPayeeIds: ['bmw'],
+            share: [{ typeId: ZEO, quantity: 43_050 }],
+            taxPct: 15,
+            unitPrices: { [ZEO]: 148 },
+            oreForm: 'compressed',
+            moneyApplied: false,
+          },
+        ],
+      },
+    ]);
+    const plan = planClosedDayFix(out.closedDays[0]!);
+    expect(plan.state).toBe('fix');
+    expect(plan.fixes[0]!.after.oreLines).toEqual([{ typeId: ZEO, quantity: 43_050 }]);
+  });
+
+  it('marks the day paid into once the book applied a payment to it', () => {
+    const out = overlay([overListed], [book({ ownPayeeIds: ['bmw'], payments: [donation] })]);
+    expect(out.closedDays[0]!.books[0]!.moneyApplied).toBe(true);
+    expect(planClosedDayFix(out.closedDays[0]!).state).toBe('conflict');
+  });
+
+  it('counts a donation the book has not credited yet as money on the day', () => {
+    const out = overlay(
+      [overListed],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          inFlight: [{ characterId: ME, amount: 1_000, at: '2026-10-18T11:30:00Z' }],
+        }),
+      ]
+    );
+    expect(out.closedDays[0]!.books[0]!.moneyApplied).toBe(true);
+  });
+
+  it('counts a donation still in flight as money on the day', () => {
+    const out = overlay(
+      [overListed],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          inFlight: [{ characterId: ME, amount: 1_000, at: '2026-10-18T10:00:00Z' }],
+        }),
+      ]
+    );
+    expect(out.closedDays[0]!.books[0]!.moneyApplied).toBe(true);
+  });
+
+  it('offers no day the book bills at two rates', () => {
+    const line = (structureId: number, sourceCorporationId?: number) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId,
+      date: '2026-10-17',
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 20_000 }],
+      ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
+    });
+    const out = overlay(
+      [overListed],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          observed: [line(1000, 98000077), line(2000)],
+          rates: [
+            { scope: 'corp', pct: 15, effectiveFrom: '2026-10-01' },
+            { scope: 'feeder', feederId: 98000077, pct: 5, effectiveFrom: '2026-10-01' },
+          ],
+        }),
+      ]
+    );
+    expect(out.closedDays).toEqual([]);
+  });
+
+  it('offers no open day', () => {
+    const out = overlay([overListed], [book({ ownPayeeIds: ['bmw'] })], '2026-10-17T20:00:00Z');
+    expect(out.closedDays).toEqual([]);
+  });
+
+  it('offers no day the corp dismissed', () => {
+    const out = overlay(
+      [overListed],
+      [
+        book({
+          ownPayeeIds: ['bmw'],
+          dismissals: [
+            {
+              id: 'd1',
+              scope: 'record' as const,
+              targetId: `${ME}:1000:2026-10-17`,
+              by: 1,
+              at: '2026-10-18T09:00:00Z',
+              reason: 'Fleet op',
+            },
+          ],
+        }),
+      ]
+    );
+    expect(out.closedDays).toEqual([]);
   });
 });

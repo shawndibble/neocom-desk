@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
+import { computeOwnership } from '@/engine/miningTax/ownership';
+import { planClosedDayFix as planWith, type ClosedDay } from '@/engine/corpTaxBook/closedDayFix';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS, PAYEES } from '@/sync/syncedCollections';
 import { coalesceAssignments } from './coalesce';
@@ -17,8 +19,8 @@ import {
   deletePayee,
   dismiss,
   dismissOwed,
-  releaseOre,
-  restoreAssignments,
+  fixClosedDay,
+  undoClosedDayFix,
   unassign,
   uncombine,
   undoContinue,
@@ -252,41 +254,6 @@ describe('unassign', () => {
     expect(await stored()).toEqual(members);
     expect(await tombstonedIds()).toEqual([]);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
-  });
-});
-
-describe('restoreAssignments (Undo of a release)', () => {
-  beforeEach(() => {
-    pricingMock.loadUnitPricesOnDate.mockResolvedValue({ prices: PRICES });
-  });
-
-  it('brings back what a release changed and what it deleted, and tombstones neither', async () => {
-    const kept = assignment({
-      id: 'a1',
-      oreLines: [
-        { typeId: ORE, quantity: 100 },
-        { typeId: 45491, quantity: 40 },
-      ],
-    });
-    const gone = assignment({ id: 'a2', date: '2026-09-05' });
-    await db.miningTaxAssignments.bulkPut([kept, gone]);
-
-    const released = await releaseOre([
-      { assignment: kept, after: [{ typeId: ORE, quantity: 100 }] },
-      { assignment: gone, after: [] },
-    ]);
-    expect(released.ok).toBe(true);
-    expect((await stored()).map((r) => r.id)).toEqual(['a1']);
-    expect(await tombstonedIds()).toEqual(['a2']);
-
-    const result = await restoreAssignments([kept, gone]);
-
-    expect(result.ok).toBe(true);
-    const rows = (await stored()).sort((a, b) => a.id.localeCompare(b.id));
-    expect(rows.map((r) => r.id)).toEqual(['a1', 'a2']);
-    expect(rows[0]!.oreLines).toEqual(kept.oreLines);
-    expect(rows[0]!.releasedTypeIds).toBeUndefined();
-    expect(await tombstonedIds()).toEqual([]);
   });
 });
 
@@ -591,5 +558,232 @@ describe('deletePayee', () => {
         .map((a) => a.id)
         .sort()
     ).toEqual(['g1', 'g2']);
+  });
+});
+
+describe('fixClosedDay', () => {
+  const planClosedDayFix = (day: ClosedDay) => planWith(day, new Set());
+  const CORP = 98000001;
+  const dayOf = (
+    allocations: MiningTaxAssignmentRecord[],
+    share: number,
+    ownPayeeIds = ['own']
+  ): ClosedDay => ({
+    characterId: CHAR,
+    date: '2026-09-04',
+    solarSystemId: SYSTEM,
+    oreLines: [{ typeId: ORE, quantity: 100 }],
+    allocations: allocations.map((a) => ({
+      id: a.id,
+      payeeId: a.payeeId ?? '',
+      taxPct: a.taxPct,
+      oreLines: a.oreLines,
+      status: a.status,
+    })),
+    books: [
+      {
+        corporationId: CORP,
+        minerId: `solo:${CHAR}`,
+        ownPayeeIds,
+        share: [{ typeId: ORE, quantity: share }],
+        taxPct: 10,
+        unitPrices: { [ORE]: 100 },
+        oreForm: 'compressed',
+        moneyApplied: false,
+      },
+    ],
+  });
+
+  beforeEach(async () => {
+    await db.miningTaxRecordChanges.clear();
+  });
+
+  it('shrinks the corp Assignment to the book, frees the rest, and saves one Record Change', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own', taxPct: 12, rawOrePriced: true });
+    await db.miningTaxAssignments.put(corp);
+    const plan = planClosedDayFix(dayOf([corp], 60));
+
+    const result = await fixClosedDay(plan, 'autoFix', '2026-09-06T00:00:00Z');
+
+    expect(result.ok).toBe(true);
+    const [saved] = await stored();
+    expect(saved).toMatchObject({
+      id: 'c',
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+      taxPct: 10,
+      estimatedValue: 6000,
+      taxOwed: 600,
+      releasedTypeIds: [ORE],
+      status: 'outstanding',
+    });
+    expect(saved!.rawOrePriced).toBeUndefined();
+    const grown = computeOwnership([{ typeId: ORE, quantity: 130 }], await stored());
+    expect(grown.ownedLines.get('c')).toEqual([{ typeId: ORE, quantity: 60 }]);
+    expect(grown.released).toEqual([{ typeId: ORE, quantity: 70 }]);
+    const changes = await db.miningTaxRecordChanges.toArray();
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      characterId: CHAR,
+      reason: 'autoFix',
+      at: '2026-09-06T00:00:00Z',
+      date: '2026-09-04',
+      corporationId: CORP,
+      minerId: `solo:${CHAR}`,
+      assignments: [
+        {
+          assignmentId: 'c',
+          before: { payeeId: 'own', taxPct: 12, taxOwed: 100 },
+          after: { payeeId: 'own', taxPct: 10, taxOwed: 600 },
+        },
+      ],
+    });
+
+    const again = await fixClosedDay(plan, 'autoFix');
+    expect(again).toEqual({ ok: true, value: { change: null, stale: true, originals: [] } });
+    expect(await db.miningTaxRecordChanges.count()).toBe(1);
+  });
+
+  it('moves ore from another split, priced at that Payee, into the corp Assignment', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own', oreLines: [{ typeId: ORE, quantity: 40 }] });
+    const other = assignment({
+      id: 'x',
+      payeeId: 'buddy',
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+    });
+    await db.miningTaxAssignments.bulkPut([corp, other]);
+
+    const result = await fixClosedDay(planClosedDayFix(dayOf([corp, other], 70)), 'autoFix');
+
+    expect(result.ok && result.value.change?.reason).toBe('autoFix');
+    const byId = new Map((await stored()).map((a) => [a.id, a]));
+    expect(byId.get('c')).toMatchObject({
+      oreLines: [{ typeId: ORE, quantity: 70 }],
+      taxOwed: 700,
+    });
+    expect(byId.get('x')).toMatchObject({
+      oreLines: [{ typeId: ORE, quantity: 30 }],
+      estimatedValue: 300,
+      taxOwed: 30,
+      releasedTypeIds: [ORE],
+    });
+  });
+
+  it('keeps a Default-made split a Default one after taking ore from it', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own', oreLines: [{ typeId: ORE, quantity: 40 }] });
+    const other = assignment({
+      id: 'x',
+      payeeId: 'buddy',
+      override: false,
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+    });
+    await db.miningTaxAssignments.bulkPut([corp, other]);
+
+    await fixClosedDay(planClosedDayFix(dayOf([corp, other], 70)), 'autoFix');
+
+    expect((await db.miningTaxAssignments.get('x'))?.override).toBe(false);
+  });
+
+  it('creates the corp Assignment when the miner listed none for it', async () => {
+    const other = assignment({ id: 'x', payeeId: 'buddy' });
+    await db.miningTaxAssignments.put(other);
+
+    const result = await fixClosedDay(planClosedDayFix(dayOf([other], 60)), 'autoFix');
+
+    expect(result.ok).toBe(true);
+    const created = (await stored()).find((a) => a.id !== 'x');
+    expect(created).toMatchObject({
+      payeeId: 'own',
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+      taxPct: 10,
+      taxOwed: 600,
+      status: 'outstanding',
+      releasedTypeIds: [ORE],
+    });
+    const [change] = await db.miningTaxRecordChanges.toArray();
+    expect(change!.assignments).toEqual([
+      expect.objectContaining({ assignmentId: 'x' }),
+      expect.objectContaining({ assignmentId: created!.id, before: null }),
+    ]);
+  });
+
+  it('writes nothing when the stored records moved on since the plan', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own' });
+    const plan = planClosedDayFix(dayOf([corp], 60));
+    await db.miningTaxAssignments.put({ ...corp, oreLines: [{ typeId: ORE, quantity: 80 }] });
+
+    expect(await fixClosedDay(plan, 'autoFix')).toEqual({
+      ok: true,
+      value: { change: null, stale: true, originals: [] },
+    });
+    expect((await stored())[0]!.oreLines).toEqual([{ typeId: ORE, quantity: 80 }]);
+    expect(await db.miningTaxRecordChanges.count()).toBe(0);
+  });
+  it('undoes Fix my records: brings back every Assignment as it was and saves an undo Record Change', async () => {
+    const corp = assignment({
+      id: 'c',
+      payeeId: 'own',
+      oreLines: [{ typeId: ORE, quantity: 40 }],
+    });
+    const other = assignment({
+      id: 'x',
+      payeeId: 'buddy',
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+    });
+    await db.miningTaxAssignments.bulkPut([corp, other]);
+    const fixed = await fixClosedDay(
+      planClosedDayFix(dayOf([corp, other], 100)),
+      'fixMyRecords',
+      '2026-09-06T00:00:00Z'
+    );
+    expect(fixed.ok && fixed.value.change?.reason).toBe('fixMyRecords');
+    expect((await stored()).map((a) => a.id)).toEqual(['c']);
+    if (!fixed.ok || !fixed.value.change) throw new Error('not fixed');
+
+    const undone = await undoClosedDayFix(
+      CHAR,
+      fixed.value.change,
+      fixed.value.originals,
+      '2026-09-06T00:01:00Z'
+    );
+
+    expect(undone).toMatchObject({ ok: true, value: { stale: false } });
+    const byId = new Map((await stored()).map((a) => [a.id, a]));
+    expect(byId.get('c')).toMatchObject({ oreLines: corp.oreLines, taxOwed: corp.taxOwed });
+    expect(byId.get('x')).toMatchObject({ oreLines: other.oreLines });
+    expect(await tombstonedIds()).toEqual([]);
+    const changes = await db.miningTaxRecordChanges.toArray();
+    expect(changes.map((c) => c.reason).sort()).toEqual(['fixMyRecords', 'undo']);
+    const undo = changes.find((c) => c.reason === 'undo')!;
+    expect(undo.assignments?.find((a) => a.assignmentId === 'x')).toMatchObject({
+      before: null,
+      after: { payeeId: 'buddy' },
+    });
+  });
+
+  it('removes an Assignment Fix my records created when it is undone', async () => {
+    const other = assignment({ id: 'x', payeeId: 'buddy' });
+    await db.miningTaxAssignments.put(other);
+    const fixed = await fixClosedDay(planClosedDayFix(dayOf([other], 60)), 'fixMyRecords');
+    if (!fixed.ok || !fixed.value.change) throw new Error('not fixed');
+
+    await undoClosedDayFix(CHAR, fixed.value.change, fixed.value.originals);
+
+    expect((await stored()).map((a) => a.id)).toEqual(['x']);
+    expect((await stored())[0]).toMatchObject({ oreLines: other.oreLines });
+  });
+
+  it('does not undo over a change made since the fix', async () => {
+    const corp = assignment({ id: 'c', payeeId: 'own' });
+    await db.miningTaxAssignments.put(corp);
+    const fixed = await fixClosedDay(planClosedDayFix(dayOf([corp], 60)), 'fixMyRecords');
+    if (!fixed.ok || !fixed.value.change) throw new Error('not fixed');
+    const now = (await db.miningTaxAssignments.get('c'))!;
+    await db.miningTaxAssignments.put({ ...now, taxPct: 3 });
+
+    expect(await undoClosedDayFix(CHAR, fixed.value.change, fixed.value.originals)).toEqual({
+      ok: true,
+      value: { change: null, stale: true, originals: [] },
+    });
+    expect((await db.miningTaxAssignments.get('c'))!.taxPct).toBe(3);
   });
 });

@@ -1,3 +1,4 @@
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { minusLines } from '@/engine/miningTax/oreLines';
 import type { OreLine } from '@/engine/miningTax/types';
@@ -22,7 +23,7 @@ export type ResolveProblem =
       held?: { id: string; characterId: number }[];
     })
   | (Of & { kind: 'figure'; bookAsksMore: boolean })
-  | (Of & { kind: 'conflict' })
+  | (Of & { kind: 'conflict'; plan?: ClosedDayPlan })
   | (Of & { kind: 'overdue'; noticeId: string; period: string })
   | (Of & { kind: 'billed' })
   | (Of & {
@@ -91,8 +92,12 @@ export function outcomesFor(p: ResolveProblem): Offer {
     }
     case 'conflict':
       return {
-        outcomes: ['fixRecords', 'notPaying', ...(tellWhy ? (['notOwed'] as const) : [])],
-        preselected: 'fixRecords',
+        outcomes: [
+          ...(p.plan ? (['fixRecords'] as const) : []),
+          'notPaying',
+          ...(tellWhy ? (['notOwed'] as const) : []),
+        ],
+        preselected: p.plan ? 'fixRecords' : tellWhy ? 'notOwed' : 'notPaying',
         tellWhy,
         noNotice: false,
       };

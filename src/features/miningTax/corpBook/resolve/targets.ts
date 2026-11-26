@@ -1,3 +1,4 @@
+import type { ClosedDayPlan } from '@/engine/corpTaxBook/closedDayFix';
 import type { ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
 import type {
   BookRowView,
@@ -131,8 +132,12 @@ export const figureNeedsAnswer = (row: BookRowView): boolean =>
   bookAsksMore(row) &&
   notOwedPlan(row) !== undefined;
 
-export const conflictTarget = (row: BookRowView, payeeName?: string): ResolveTarget => ({
-  problem: { ...of(row), kind: 'conflict' },
+export const conflictTarget = (
+  row: BookRowView,
+  payeeName?: string,
+  plan?: ClosedDayPlan
+): ResolveTarget => ({
+  problem: { ...of(row), kind: 'conflict', ...(plan ? { plan } : {}) },
   hideKey: keyOf(row),
   ...(payeeName !== undefined ? { payeeName } : {}),
 });
@@ -240,9 +245,13 @@ export const billedTarget = (row: BookRowView): ResolveTarget => ({
   hideKey: keyOf(row),
 });
 
-export function rowTarget(row: BookRowView, payeeName?: string): ResolveTarget | undefined {
+export function rowTarget(
+  row: BookRowView,
+  payeeName?: string,
+  plan?: ClosedDayPlan
+): ResolveTarget | undefined {
   if (keptBy(row)) return keptTarget(row);
-  if (row.state === 'conflict') return conflictTarget(row, payeeName);
+  if (plan || row.state === 'conflict') return conflictTarget(row, payeeName, plan);
   if (row.state === 'billed' && row.dispute !== undefined && row.flagged === undefined)
     return figureTarget(row);
   return row.state === 'billed'

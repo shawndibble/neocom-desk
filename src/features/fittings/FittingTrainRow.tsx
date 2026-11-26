@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function TrainRow({ title, detail, status, time, prerequisites, action }: Props) {
-  const hasSecondLine = Boolean(detail || status);
+  const hasSecondLine = Boolean(detail || status || prerequisites);
   const timing = (
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap tabular-nums">
       <span className={hasSecondLine ? undefined : 'min-w-[4.5rem] text-right'}>{time}</span>

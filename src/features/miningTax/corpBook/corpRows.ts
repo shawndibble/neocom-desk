@@ -119,13 +119,13 @@ export function buildDisplayRows(
     const taken = overlay.takenFromFree.get(
       entryKey(row.characterId, row.entry.date, row.entry.solarSystemId)
     );
-    return taken
-      ? {
-          ...row,
-          unassignedOreLines: minusLines(row.unassignedOreLines, taken),
-          bookTakenOreLines: taken,
-        }
-      : row;
+    if (!taken && !row.releasedOreLines) return row;
+    const free = addLines(row.unassignedOreLines, row.releasedOreLines);
+    return {
+      ...row,
+      unassignedOreLines: minusLines(free, taken),
+      ...(taken ? { bookTakenOreLines: taken } : {}),
+    };
   });
   const taken = (dr: DisplayRow) =>
     dr.assignment != null &&

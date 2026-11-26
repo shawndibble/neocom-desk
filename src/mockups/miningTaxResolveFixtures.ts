@@ -70,6 +70,7 @@ const conflicts = (waiting: number): ConflictSummary => ({
   first: {} as never,
   firstCorpName: BUH.name,
   firstResolvesOn: CONFLICT.resolvesOn,
+  closed: 0,
 });
 export const CONFLICTS_OPEN = conflicts(0);
 export const CONFLICTS_WAITING = conflicts(1);

@@ -173,7 +173,9 @@ function FittingsPage() {
     const name = catalogue?.types[String(typeId)]?.name;
     if (name !== undefined) return name;
     const mode = tacticalModeKind(typeId);
-    return mode !== undefined ? t(`fittings.mode.kind.${mode}`) : `#${typeId}`;
+    return mode !== undefined
+      ? t(`fittings.mode.kind.${mode}`)
+      : catalogueTypeName(catalogue, typeId);
   };
 
   const charges = useChargeLoading({

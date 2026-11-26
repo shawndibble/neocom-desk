@@ -1,10 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import { InlineError } from '@/components/ui/InlineError';
 import type { ConflictCause } from '@/engine/corpTaxBook/personal';
 import { formatIsk } from '@/lib/isk';
-import { TakeoverConfirm, type OverlapPreview } from './TakeoverConfirm';
 
 const TITLE_KEY: Record<ConflictCause, string> = {
   otherPayee: 'titleOtherPayee',
@@ -27,11 +25,6 @@ interface Props {
   recordedAt: string;
   resolvesOn: string;
   others: readonly { corpName: string; billAmount: number }[];
-  previews: readonly OverlapPreview[];
-  typeNames: ReadonlyMap<number, string>;
-  busy?: boolean;
-  error?: string | null;
-  onTakeOver: () => void;
   tell?: ReactNode;
   onResolve?: () => void;
 }
@@ -44,11 +37,6 @@ export function ConflictNotice({
   recordedAt,
   resolvesOn,
   others,
-  previews,
-  typeNames,
-  busy,
-  error,
-  onTakeOver,
   tell,
   onResolve,
 }: Props) {
@@ -107,24 +95,12 @@ export function ConflictNotice({
 
       <p className="font-semibold">{t(k('fixTitle'))}</p>
       <ul className="list-disc space-y-1.5 pl-4">
-        <li className="space-y-1">
-          <p>{t(k(others.length > 0 ? 'booksRight' : 'bookRight'))}</p>
-          {entries.length > 0 && (
-            <TakeoverConfirm
-              previews={previews}
-              typeNames={typeNames}
-              busy={busy}
-              onTakeOver={onTakeOver}
-              {...(others.length > 0 && { label: t(k('letEachBill')) })}
-            />
-          )}
-        </li>
+        <li>{t(k('bookRightLater'), { corp: corpName })}</li>
         <li className="space-y-1">
           <p>{t(k('entryRight'), { corp: corpName })}</p>
           {tell}
         </li>
       </ul>
-      {error && <InlineError>{error}</InlineError>}
     </div>
   );
 }

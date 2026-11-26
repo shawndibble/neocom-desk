@@ -34,6 +34,7 @@ import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from '.
 import { HOUR_MS } from '@/lib/age';
 import { sum } from '../math';
 import type { EstimateDay } from './paymentPreview';
+import type { ClosedDay, ClosedDayBook } from './closedDayFix';
 
 export type BookRowState = 'billed' | 'estimate' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 export type ConflictCause = 'otherPayee' | 'ownNeedsReview' | 'ownerCollected';
@@ -276,6 +277,7 @@ export interface PersonalOverlay {
   conflicted: Map<string, Map<string, number>>;
   labels: Map<string, { state: BookLabelState; corporationId: number; corpName: string }>;
   books: BookSummary[];
+  closedDays: ClosedDay[];
 }
 
 function sumLines(...lists: readonly (readonly OreLine[])[]): OreLine[] {
@@ -648,6 +650,12 @@ export function overlayCorpBooks(input: {
   const alsoBilled: PersonalOverlay['alsoBilled'] = new Map();
   const conflicted: PersonalOverlay['conflicted'] = new Map();
   const alsoBilledRows = new Map<string, Map<string, BookRowView[]>>();
+  const closedCandidates: {
+    entry: PersonalEntry;
+    books: { p: Prepared; share: OreLine[]; here: PreparedCharge[] }[];
+  }[] = [];
+  const ofKey = (key: string) => (e: PersonalEntry | undefined) =>
+    e !== undefined && entryKey(e.characterId, e.date, e.solarSystemId) === key;
   const free = new Map(
     entries.map((e) => [entryKey(e.characterId, e.date, e.solarSystemId), e.freeOreLines])
   );
@@ -916,6 +924,24 @@ export function overlayCorpBooks(input: {
       trimmed.set(key, ofEntry);
     }
     free.set(key, left);
+    const isEntry = ofKey(key);
+    const waiting = prepared.some(
+      (p) => p.open.some((c) => isEntry(c.entry)) || p.pending.some((x) => isEntry(x.entry))
+    );
+    const settled = claiming.every((p) => {
+      const here = chargesOf(p, key);
+      return (
+        new Set(here.map((c) => c.charge.taxPct)).size === 1 &&
+        here.every(
+          (c) => !c.dismissal && holdFor(c.charge.key, p.book.disputes ?? [], now) === undefined
+        )
+      );
+    });
+    if (!waiting && settled)
+      closedCandidates.push({
+        entry,
+        books: claiming.map((p) => ({ p, share: shareOf(p), here: chargesOf(p, key) })),
+      });
   }
 
   for (const [key, entry] of entryByKey) {
@@ -1042,6 +1068,17 @@ export function overlayCorpBooks(input: {
     showAdjustments(p, mine);
     uncreditedByBook.set(p.book.corporationId, settleRows(p, mine));
   }
+
+  const closedDays: ClosedDay[] = closedCandidates.map(({ entry, books: claimed }) => ({
+    characterId: entry.characterId,
+    date: entry.date,
+    solarSystemId: entry.solarSystemId,
+    oreLines: entry.oreLines,
+    allocations: entry.allocations,
+    books: claimed.map(({ p, share, here }) =>
+      closedDayBook(p, share, here, entry.date, uncreditedByBook.get(p.book.corporationId) ?? [])
+    ),
+  }));
 
   for (const [key, ofEntry] of alsoBilledRows) {
     for (const [id, billedRows] of ofEntry) {
@@ -1184,6 +1221,7 @@ export function overlayCorpBooks(input: {
     conflicted,
     labels,
     books: summaries,
+    closedDays,
   };
 }
 
@@ -1247,6 +1285,44 @@ const donationsCheckedAt = (book: Pick<PersonalBook, 'lastSyncedAt' | 'donations
 const isUncredited = (d: InFlightDonation, checkedAt: string | undefined) =>
   checkedAt !== undefined &&
   Date.parse(checkedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_HOURS * HOUR_MS;
+
+function moneyAppliedTo(
+  p: Prepared,
+  minerId: string,
+  date: string,
+  uncredited: readonly UncreditedDonation[]
+): boolean {
+  const account = p.miners.get(minerId)?.account;
+  const lost = uncredited.some(
+    (u) =>
+      inFlightPayment(u, p.book.miners).minerId === minerId &&
+      (u.covered.includes(date) || (u.at > date && account?.day(date)?.settled !== true))
+  );
+  return lost || account?.moneyAppliedOn(date) === true;
+}
+
+function closedDayBook(
+  p: Prepared,
+  share: OreLine[],
+  here: readonly PreparedCharge[],
+  date: string,
+  uncredited: readonly UncreditedDonation[]
+): ClosedDayBook {
+  const main = [...here].sort((a, b) => quantityOf(b.oreLines) - quantityOf(a.oreLines))[0]!;
+  const minerId = main.charge.minerId;
+  return {
+    corporationId: p.book.corporationId,
+    minerId,
+    ownPayeeIds: p.book.ownPayeeIds ?? [],
+    share,
+    taxPct: main.charge.taxPct,
+    unitPrices: Object.fromEntries(
+      here.flatMap((c) => Object.entries(c.charge.unitPrices))
+    ) as Record<number, number>,
+    oreForm: p.book.oreForm,
+    moneyApplied: moneyAppliedTo(p, minerId, date, uncredited),
+  };
+}
 
 const byDateThenId = (a: BookRowView, b: BookRowView) =>
   a.date.localeCompare(b.date) || a.id.localeCompare(b.id);

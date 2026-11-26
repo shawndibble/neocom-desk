@@ -13,7 +13,12 @@ describe('ProblemFacts', () => {
       problem: { kind: 'billed', corporationId: 1, corpName: 'Bureau', characterId: 7, row },
       hideKey: 'day:1:7:2026-11-06',
     } as unknown as ResolveTarget;
-    const { container } = render(<ProblemFacts target={target} />);
+    const { container } = render(
+      <ProblemFacts
+        target={target}
+        names={{ payee: (id) => id, corp: (id) => String(id), typeNames: new Map() }}
+      />
+    );
     expect(container.textContent).toBe('Its book bills 1,000,000 ISK.');
   });
 });

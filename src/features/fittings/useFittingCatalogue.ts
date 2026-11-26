@@ -5,6 +5,11 @@ import { loadFittingSlots, loadTypes } from '@/sde/loadSde';
 import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
 import type { MarketGroupNode, MarketTypeEntry, VariationData } from '@/sde/marketTypes';
 import type { TypeMap } from '@/sde/types';
+import {
+  resolvedTypeNames,
+  useResolvedTypeNames,
+  type ResolvedTypeNames,
+} from './resolvedTypeNames';
 
 export interface FittingCatalogue {
   types: TypeMap;
@@ -21,8 +26,12 @@ export function unnamedTypeName(typeId: number): string {
   return `#${typeId}`;
 }
 
-export function catalogueTypeName(catalogue: FittingCatalogue | null, typeId: number): string {
-  return catalogue?.types[String(typeId)]?.name ?? unnamedTypeName(typeId);
+export function catalogueTypeName(
+  catalogue: FittingCatalogue | null,
+  typeId: number,
+  resolved: ResolvedTypeNames = resolvedTypeNames()
+): string {
+  return catalogue?.types[String(typeId)]?.name ?? resolved.get(typeId) ?? unnamedTypeName(typeId);
 }
 
 export function catalogueVolume(catalogue: FittingCatalogue | null, typeId: number): number {
@@ -151,6 +160,7 @@ export function useFittingCatalogue(): FittingCatalogue | null {
     () => 0
   );
   const failed = useFittingCatalogueFailed();
+  useResolvedTypeNames();
   useEffect(() => {
     let cancelled = false;
     getCatalogue().then(

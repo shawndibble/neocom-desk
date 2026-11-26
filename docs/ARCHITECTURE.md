@@ -581,7 +581,11 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `corps/{corp}` for the Character's corp (and any corp remembered in
   the `corpTaxBookCorps` setting, so a leaver keeps reading), reads only the
   member's own lines through the `uid`/`uids` rules, and
-  `src/engine/corpTaxBook/personal.ts` (pure) overlays them on the Tax tab. No
+  `src/engine/corpTaxBook/personal.ts` (pure) overlays them on the Tax tab. Once
+  every book on an entry has closed the day, `closedDayFix.ts` (pure) plans the
+  miner's Assignments to match the books, and `useClosedDayFixes` writes the plan
+  with `fixClosedDay` (`ledgerActions.ts`) and a Record Change when nothing was
+  paid (issue #6766). No
   book or any failed read leaves the tab untouched; a guest has no app login
   and uses the verify page instead. **The verify page** is the public,
   no-login route `/corp-tax-book/verify/:token`
