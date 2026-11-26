@@ -107,7 +107,6 @@ export function useImprove(
     };
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new search starts from nothing
     setState({ status: 'searching', checked: 0, total: 0, slow: false });
-    setBefore(null);
     setRecalc(null);
     setCompletion(null);
     const searching = (
